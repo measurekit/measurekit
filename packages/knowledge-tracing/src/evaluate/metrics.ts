@@ -1,6 +1,6 @@
-import { DataError } from "@measurekit/core";
+import { DataError, mean } from "@measurekit/core";
 import { outcomeLogLikelihood } from "../math/logistic.js";
-import { checkPredictions, isBinary, mean } from "./predictions.js";
+import { checkPredictions, isBinary } from "./predictions.js";
 
 /** The metrics of predictions against outcomes. */
 export interface Metrics {

@@ -1,3 +1,5 @@
+import { cholesky } from "@measurekit/core";
+
 /**
  * Solves A x = b for a symmetric positive definite `size` by `size` matrix A, stored by rows, by its Cholesky
  * factorization, and writes x into `out`. Returns `false`, leaving `out` unspecified, when A is not positive definite
@@ -18,29 +20,6 @@ export function choleskySolve(a: Float64Array, size: number, b: Float64Array, ou
     out[i] = sum / (lower[i * size + i] ?? 1);
   }
   return true;
-}
-
-/** Returns the lower triangular L with L Lᵀ = A, by rows, or `null` when A is not positive definite. */
-function cholesky(a: Float64Array, size: number): Float64Array | null {
-  const lower = new Float64Array(size * size);
-  for (let j = 0; j < size; j++) {
-    const diagonal = a[j * size + j] ?? 0;
-    const pivot = diagonal - rowProduct(lower, size, j, j, j);
-    if (!(pivot > size * Number.EPSILON * Math.abs(diagonal))) return null;
-    const root = Math.sqrt(pivot);
-    lower[j * size + j] = root;
-    for (let i = j + 1; i < size; i++) {
-      lower[i * size + j] = ((a[i * size + j] ?? 0) - rowProduct(lower, size, i, j, j)) / root;
-    }
-  }
-  return lower;
-}
-
-/** Returns the sum over k below `count` of m[i][k] m[j][k]. */
-function rowProduct(m: Float64Array, size: number, i: number, j: number, count: number): number {
-  let sum = 0;
-  for (let k = 0; k < count; k++) sum += (m[i * size + k] ?? 0) * (m[j * size + k] ?? 0);
-  return sum;
 }
 
 /** Returns the sum of squares of the values. */

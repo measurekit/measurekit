@@ -1,9 +1,4 @@
-/** Returns the mean of at least one value. */
-export function mean(values: Float64Array): number {
-  let sum = 0;
-  for (const value of values) sum += value;
-  return sum / values.length;
-}
+import { mean } from "@measurekit/core";
 
 /**
  * Returns the sample covariance (denominator n - 1) of at least two pairs of values, as (n Σxy - Σx Σy) / (n (n - 1)).

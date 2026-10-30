@@ -1,3 +1,5 @@
+import { cholesky } from "@measurekit/core";
+
 /**
  * Returns the inverse of the `size` by `size` matrix `a`, stored by rows, or `null` when it is singular to working
  * precision. Uses Gauss-Jordan elimination with partial pivoting; meant for the small matrices of item parameters.
@@ -59,31 +61,8 @@ function subtractRow(m: Float64Array, size: number, target: number, source: numb
  * the work of {@link invert}.
  */
 export function invertPositiveDefinite(a: Float64Array, size: number): Float64Array | null {
-  const factor = choleskyFactor(a, size);
+  const factor = cholesky(a, size);
   return factor === null ? null : crossProductOfColumns(invertedTranspose(factor, size), size);
-}
-
-/** Returns the lower Cholesky factor L of a, L Lᵀ = a, by rows, or `null` when a is not positive definite. */
-function choleskyFactor(a: Float64Array, size: number): Float64Array | null {
-  const factor = new Float64Array(size * size);
-  for (let j = 0; j < size; j++) {
-    const rowJ = j * size;
-    const diagonal = (a[rowJ + j] ?? 0) - dotPrefix(factor, rowJ, rowJ, j);
-    if (!(diagonal > 0)) return null;
-    const pivot = Math.sqrt(diagonal);
-    factor[rowJ + j] = pivot;
-    for (let i = j + 1; i < size; i++) {
-      factor[i * size + j] = ((a[i * size + j] ?? 0) - dotPrefix(factor, i * size, rowJ, j)) / pivot;
-    }
-  }
-  return factor;
-}
-
-/** Returns Σ_(k < length) m[first + k] m[second + k]. */
-function dotPrefix(m: Float64Array, first: number, second: number, length: number): number {
-  let sum = 0;
-  for (let k = 0; k < length; k++) sum += (m[first + k] ?? 0) * (m[second + k] ?? 0);
-  return sum;
 }
 
 /**

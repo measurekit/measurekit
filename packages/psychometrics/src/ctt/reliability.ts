@@ -1,7 +1,7 @@
-import { checkChoice, checkOptions, checkUnitInterval, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, checkUnitInterval, DataError, mean } from "@measurekit/core";
 import { checkDichotomous } from "../data/dichotomous.js";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
-import { correlation, covariance, mean, variance } from "../math/statistics.js";
+import { correlation, covariance, variance } from "../math/statistics.js";
 import { type CompleteCases, completeCases, itemScores } from "./complete-cases.js";
 
 /** How to split the items into two halves. */

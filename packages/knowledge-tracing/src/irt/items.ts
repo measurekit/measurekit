@@ -1,6 +1,5 @@
-import { checkRecord, DataError, describe, isUnitInterval, logistic } from "@measurekit/core";
+import { checkRecord, DataError, describe, isUnitInterval, logistic, logLogistic } from "@measurekit/core";
 import { indexOfMax } from "../math/extremes.js";
-import { logLogistic } from "../math/logistic.js";
 
 /**
  * An item's parameters in the IRT form of mirt and `@measurekit/psychometrics`, D = 1. A dichotomous item has

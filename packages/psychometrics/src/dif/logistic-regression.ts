@@ -1,4 +1,4 @@
-import { checkOptions, logistic } from "@measurekit/core";
+import { checkOptions, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { chiSquareUpperTail } from "../math/chi-square.js";
 import { invert } from "../math/linear-algebra.js";
@@ -167,8 +167,7 @@ function addObservation(fit: LogisticFit, y: number): number {
       hessian[j * terms + k] = (hessian[j * terms + k] ?? 0) + p * (1 - p) * xj * (covariates[k] ?? 0);
     }
   }
-  // ln(1 + e^η) without overflow.
-  return Math.max(eta, 0) + Math.log1p(Math.exp(-Math.abs(eta))) - y * eta;
+  return -logLogistic(-eta) - y * eta;
 }
 
 /** Takes a Newton step on the fit's coefficients and returns its largest change, or `null` for a singular Hessian. */

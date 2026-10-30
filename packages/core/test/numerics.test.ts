@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dot, logistic, maxAbs, normalizeLogs, normalQuantile } from "../src/index.js";
+import { cholesky, dot, logistic, logLogistic, maxAbs, mean, normalizeLogs, normalQuantile } from "../src/index.js";
 
 /** Relative tolerance of the sums that the normalization of logs rounds. */
 const NORMALIZATION_TOLERANCE = 1e-12;
@@ -24,6 +24,26 @@ describe("logistic", () => {
     expect(logistic(Math.log(3))).toBeCloseTo(0.75, 15);
     expect(logistic(-Infinity)).toBe(0);
     expect(logistic(Infinity)).toBe(1);
+  });
+
+  it("gives its logarithm finite in both tails in logLogistic", () => {
+    for (const x of [-3, -0.5, 0, 0.5, 3]) expect(logLogistic(x)).toBeCloseTo(Math.log(logistic(x)), 14);
+    expect(logLogistic(-1000)).toBe(-1000);
+    expect(logLogistic(40)).toBe(-Math.exp(-40));
+  });
+});
+
+describe("cholesky", () => {
+  it("factors a positive definite matrix into L Lᵀ", () => {
+    const lower = cholesky(Float64Array.of(4, 2, 2, 5), 2);
+    expect(Array.from(lower ?? [])).toEqual([2, 0, 1, 2]);
+  });
+
+  it("returns null for a matrix that is singular or indefinite to working precision", () => {
+    expect(cholesky(Float64Array.of(1, 1, 1, 1), 2)).toBeNull();
+    expect(cholesky(Float64Array.of(1, 1, 1, 1 + 1e-17), 2)).toBeNull();
+    expect(cholesky(Float64Array.of(1, 2, 2, 1), 2)).toBeNull();
+    expect(cholesky(Float64Array.of(0), 1)).toBeNull();
   });
 });
 
@@ -57,5 +77,10 @@ describe("vectors", () => {
   it("takes the largest absolute value in maxAbs, 0 for no values", () => {
     expect(maxAbs(Float64Array.of(1, -7, 3))).toBe(7);
     expect(maxAbs(new Float64Array(0))).toBe(0);
+  });
+
+  it("averages arrays and typed arrays alike in mean", () => {
+    expect(mean([1, 2, 6])).toBe(3);
+    expect(mean(Float64Array.of(0.5))).toBe(0.5);
   });
 });

@@ -1,4 +1,4 @@
-import { dot, logistic, maxAbs } from "@measurekit/core";
+import { dot, logistic, logLogistic, maxAbs } from "@measurekit/core";
 import { choleskySolve, squares } from "./linear-algebra.js";
 import type { SparseMatrix } from "./sparse-matrix.js";
 
@@ -73,7 +73,7 @@ export function linear(design: SparseMatrix, row: number, beta: Float64Array): n
 
 /** Returns ln(1 + exp(η)) - y η, a row's negative log-likelihood, without overflow. */
 export function rowLoss(eta: number, y: number): number {
-  return Math.max(eta, 0) + Math.log1p(Math.exp(-Math.abs(eta))) - y * eta;
+  return -logLogistic(-eta) - y * eta;
 }
 
 /** Returns Σ y ln p + (1 - y) ln(1 - p) at the coefficients and group intercepts. */

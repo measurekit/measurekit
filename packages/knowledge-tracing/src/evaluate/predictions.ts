@@ -27,10 +27,3 @@ export function checkPredictions(predictions: readonly number[], outcomes: reado
 export function isBinary(outcomes: readonly number[]): boolean {
   return outcomes.every((outcome) => outcome === 0 || outcome === 1);
 }
-
-/** Returns the mean of at least one value. */
-export function mean(values: readonly number[]): number {
-  let sum = 0;
-  for (const value of values) sum += value;
-  return sum / values.length;
-}

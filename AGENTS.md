@@ -85,9 +85,10 @@ packages/core/                the published package @measurekit/core
                         checkPositiveInteger, checkUnitInterval, checkSeed, checkStopping
   src/random.ts         Random and createRandom
   src/normal.ts         normalQuantile
-  src/logistic.ts       logistic
+  src/logistic.ts       logistic, logLogistic
   src/normalize-logs.ts normalizeLogs
-  src/vectors.ts        dot, maxAbs
+  src/cholesky.ts       cholesky
+  src/vectors.ts        dot, maxAbs, mean
   test/<file>.test.ts   one file per concern; the numerics are validated by the fixtures of the packages
 packages/psychometrics/       the published package @measurekit/psychometrics
   src/index.ts          re-exports every module, and DataError, MeasurekitError and createRandom of core
@@ -163,7 +164,8 @@ behavior only, without "now", "no longer", "renamed" or "previously".
 - A module imports only the modules in its row; every module may import `@measurekit/core`. Biome enforces the rows,
   and imports never form cycles.
 - Code goes into `@measurekit/core` only if both libraries use it. What one library uses stays in that library, so that
-  core does not become a place for everything.
+  core does not become a place for everything. A generic routine that both use, such as a Cholesky factorization, is
+  written once, in core.
 - Code outside `packages/` imports a package by name.
 
 Psychometrics: every module of `cat/`, `irt/` and `sim/` may also import `checks.ts`.

@@ -1,7 +1,16 @@
-import { checkArray, checkFinite, checkPositive, checkRecord, DataError, describe, isRecord } from "@measurekit/core";
+import {
+  checkArray,
+  checkFinite,
+  checkPositive,
+  checkRecord,
+  DataError,
+  describe,
+  isRecord,
+  mean,
+} from "@measurekit/core";
 import { checkItem } from "../irt/items.js";
 import type { IrtItem } from "../irt/model.js";
-import { mean, standardDeviation } from "../math/statistics.js";
+import { standardDeviation } from "../math/statistics.js";
 import { itemMoments, rescaledErrors, rescaledItem } from "./models.js";
 
 /**

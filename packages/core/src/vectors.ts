@@ -11,3 +11,10 @@ export function maxAbs(values: Float64Array): number {
   for (const value of values) largest = Math.max(largest, Math.abs(value));
   return largest;
 }
+
+/** Returns the mean of at least one value. */
+export function mean(values: ArrayLike<number>): number {
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) sum += values[i] ?? 0;
+  return sum / values.length;
+}

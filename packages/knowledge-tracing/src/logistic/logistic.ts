@@ -1,4 +1,11 @@
-import { checkChoice, checkNonNegative, checkOptions, checkStopping, logistic as sigmoid } from "@measurekit/core";
+import {
+  checkChoice,
+  checkNonNegative,
+  checkOptions,
+  checkStopping,
+  mean,
+  logistic as sigmoid,
+} from "@measurekit/core";
 import { type Attempt, checkAttempt, checkEvent, checkHasSkills, type Event } from "../data/event.js";
 import { checkLog, type EventLog } from "../data/event-log.js";
 import { checkLearner, checkLearnerId } from "../data/learner.js";
@@ -126,7 +133,8 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
   checkParameters(parameters, labels);
   const decays = decaysOf(specs);
   const proficiencies = proficiency === "none" ? undefined : parameters.learners;
-  const absent = proficiency === "fixed" ? mean(Object.values(proficiencies ?? {})) : 0;
+  const fitted = Object.values(proficiencies ?? {});
+  const absent = proficiency === "fixed" && fitted.length > 0 ? mean(fitted) : 0;
   const skillOf = (skill: string): LogisticSkill => parametersOf(parameters.skills, "skill", skill);
 
   /** Returns P(correct) of an attempt, the state and attempt checked. */
@@ -231,8 +239,4 @@ export function afm(options: AfmOptions = {}): LogisticModel {
 export function pfa(options: Omit<LogisticOptions, "features"> = {}): LogisticModel {
   checkOptions(options);
   return logistic({ ...options, features: ["successes", "failures"] });
-}
-
-function mean(values: readonly number[]): number {
-  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
