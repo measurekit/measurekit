@@ -8,7 +8,7 @@ suppressPackageStartupMessages(library(catR))
 
 SEED <- 20261029
 RANGE <- c(-6, 6) # the package's default theta range for ML, WLE and MAP
-# the package's EAP integrates over 61 equally spaced points on [-6, 6] with weights proportional to the prior; catR's
+# The package's EAP integrates over 61 equally spaced points on [-6, 6] with weights proportional to the prior; catR's
 # trapezoid rule on the same points halves the two end weights, where the density is 6e-9.
 EAP_GRID <- c(-6, 6, 61)
 KL_GRID <- c(-4, 4, 33) # catR's default parInt for KL, which the package uses
@@ -16,7 +16,7 @@ LENGTH <- 15
 
 item_id <- function(i) sprintf("item%03d", i)
 
-# the package's parameters of catR's 4PL and GPCM bank rows; catR uses D = 1 by default, as the package does.
+# The package's parameters of catR's 4PL and GPCM bank rows; catR uses D = 1 by default, as the package does.
 logistic_items <- function(bank) {
   lapply(seq_len(nrow(bank)), function(i) {
     list(id = item_id(i), a = bank[i, "a"], b = bank[i, "b"], c = bank[i, "c"], d = bank[i, "d"])

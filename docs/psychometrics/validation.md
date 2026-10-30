@@ -126,7 +126,7 @@ psych enumerates splits only up to 15,000 of them, so for SAT12's 32 items the G
 - The base R marginal likelihood and gradient reproduce mirt's 2PL, and mirt's Oakes and Richardson SEs agree.
 - The 1PL and mirt's Rasch model, and the PCM and RSM and mirt's `Rasch` and `rsm` with a free latent variance, have
   the same likelihood up to quadrature.
-- the package's form of mirt's GRM, GPCM, PCM and NRM estimates equals `coef(IRTpars = TRUE)` within 1e-12.
+- The package's form of mirt's GRM, GPCM, PCM and NRM estimates equals `coef(IRTpars = TRUE)` within 1e-12.
 - mirt's WLE equals the base R WLE for the 1PL, 2PL, PCM, GPCM, RSM and NRM, and catR's `thetaEst(method = "WL")`
   agrees wherever Warm's equation has a single root.
 - TAM's JML estimates are within 4e-9 of the base R solution of its steps, and its log-likelihood within 1e-6. For
@@ -161,7 +161,7 @@ Several results of the reference packages are not references:
   without normalizing the weights over the nodes, so its fixed point is not the maximum of the log-likelihood it
   reports; with fixed items the missing information amplifies the gap. On the anchored fixture, N(0.63, 1.34²), its
   estimates are within 4.6e-3 of the maximum, whose log-likelihood is 7.6e-4 higher; where the distribution lies well
-  inside the nodes, within 1.4e-9. the package's M-step matches the weights' mean and variance to the counts', which
+  inside the nodes, within 1.4e-9. The package's M-step matches the weights' mean and variance to the counts', which
   maximizes the reported likelihood. mirt's default BFGS M-step also stops short; `optimizer = "NR"` converges.
 - **mirt's Richardson standard errors with a free variance.** `SE.type = "Richardson"` leaves `COV_11` shifted by
   -0.0025 in the fitted object; `"Oakes"` gives the same standard errors and keeps the estimate.
@@ -187,7 +187,7 @@ Several results of the reference packages are not references:
   mode's -2651.614. The 3PL is therefore validated against base R, and the 4PL and the mixed format against mirt with
   `norm` priors on logit g and logit u, which the test implements as a custom `ParameterPrior`.
 - **mirt's WLE for the 3PL, 4PL and GRM.** mirt maximizes ln L + ½ ln I, which equals Warm's estimator only for
-  exponential-family models: the 1PL, 2PL, PCM, GPCM, RSM and NRM. the package solves Warm's equation, as catR does.
+  exponential-family models: the 1PL, 2PL, PCM, GPCM, RSM and NRM. The package solves Warm's equation, as catR does.
 - **mirt's polytomous IRT standard errors.** mirt 1.48's `coef(IRTpars = TRUE, printSE = TRUE)` gives Science's
   Comfort item a GPCM b1 standard error of 1.111; the delta method on mirt's own covariance matrix gives 0.651, as
   the package does. Polytomous standard errors therefore come from the delta method.
@@ -197,7 +197,7 @@ Several results of the reference packages are not references:
   the complete cases of the JML data, its thresholds and TAM's corrected JML thresholds, both centered, differ by up to
   0.10. With missing responses its polytomous estimates are unreliable.
 - **difR's continuity correction.** `difMH` subtracts 0.5 from \|Σ (A - E(A))\| even when it is below 0.5, so
-  identical groups get a positive chi-square. the package and `mantelhaen.test` subtract it only from 0.5 up; on the
+  identical groups get a positive chi-square. The package and `mantelhaen.test` subtract it only from 0.5 up; on the
   fixtures the two differ for one simulated item.
 - **difR's ETS codes.** `print` on a `difMH` result codes items by \|MH D-DIF\| alone. ETS's rule also requires
   significance: on verbal, 14 of the 24 items differ. On the simulation, both flag the three DIF items C.

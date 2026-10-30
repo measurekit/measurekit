@@ -66,10 +66,10 @@ within 1.4e-6 in log-likelihood, where EM stops at a change of 1e-6. No start re
 Several results of pyBKT are not references, and the fixtures avoid them:
 
 - **A learner's only attempt at a skill.** pyBKT adds a sequence's last emission counts inside its backward loop, which
-  a sequence of one attempt skips, so such an attempt does not inform P(G) and P(S). the package counts it.
+  a sequence of one attempt skips, so such an attempt does not inform P(G) and P(S). The package counts it.
 - **Rates without data.** pyBKT sets P(T) = 1 for an item never followed by an attempt and P(G) = P(S) = 0.5 for a
-  class without expected counts. the package keeps such a rate's value, and an item without rates of its own uses its skill's.
-- **Outcomes of probability 0.** pyBKT treats a guess or slip of 0 as a probability of 1. the package throws `DataError`
+  class without expected counts. The package keeps such a rate's value, and an item without rates of its own uses its skill's.
+- **Outcomes of probability 0.** pyBKT treats a guess or slip of 0 as a probability of 1. The package throws `DataError`
   for an outcome given parameters make impossible, and its EM keeps P(G) and P(S) at least 2⁻⁵² from 0 and 1. On the
   practice log, where pyBKT drives some items' P(S) to 1e-101, the estimates still agree within 6e-16.
 
@@ -140,7 +140,7 @@ whose removal leaves a state (Cosyn and Uzun, 2009); kst's well-gradedness test 
 so pks's `is.downgradable` is the reference there.
 
 **pks.** pks keeps guess and slip at least 1e-6 from 0: on `DoignonFalmagne7` its estimates of η for items a and b are
-1e-6, where the likelihood rises as they fall to 0, by 2.9e-5 in log-likelihood. the package keeps the same bound, and then
+1e-6, where the likelihood rises as they fall to 0, by 2.9e-5 in log-likelihood. The package keeps the same bound, and then
 reaches pks's estimates within 1.3e-7 by ML and 1.4e-17 by MD.
 
 **DAKS.** The papers describe the selection set as excluding pairs that cause an intransitivity, without saying which

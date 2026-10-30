@@ -101,7 +101,7 @@ lord <- function(data, focal) {
 }
 
 # --- Sparse data and purification: base R ----------------------------------------------------------------------
-# the package's rule: each item uses the persons who answered it and another matching item; a person's matching score is the
+# The package's rule: each item uses the persons who answered it and another matching item; a person's matching score is the
 # response to the item plus the total over the other matching items the person answered, scaled to all of them and
 # rounded, halves up. With complete data it is difR's total score over the anchors and the studied item, which the
 # script checks against difMH and difLogistic, purified and not.

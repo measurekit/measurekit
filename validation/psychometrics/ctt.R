@@ -1,6 +1,6 @@
 # Classical test theory fixtures: item statistics, reliability and distractor analysis.
 # References: psych::alpha (alpha, r.drop, raw.r, alpha if dropped), psych::splitHalf (Guttman split-half per split),
-# psych::omega (one factor), checked against base R's minres, and base R for everything else. the package computes score-based statistics on the persons who answered every item,
+# psych::omega (one factor), checked against base R's minres, and base R for everything else. The package computes score-based statistics on the persons who answered every item,
 # so psych runs on na.omit(x).
 
 source("validation/psychometrics/common.R")

@@ -14,7 +14,7 @@ TOL <- 1e-10 # mirt's EM tolerance
 
 responses <- function(data) unname(lapply(seq_len(nrow(data)), function(i) as.numeric(data[i, ])))
 
-# the package's parameters of mirt's items: 2PL from coef(IRTpars = TRUE); GPCM and GRM thresholds from the slope-intercept
+# The package's parameters of mirt's items: 2PL from coef(IRTpars = TRUE); GPCM and GRM thresholds from the slope-intercept
 # values, b_k = -(d_k - d_(k-1)) / a for the GPCM and -d_k / a for the GRM.
 mirt_items <- function(fit, itemtype) {
   values <- mod2values(fit)

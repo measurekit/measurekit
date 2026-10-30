@@ -39,7 +39,7 @@ item_values <- function(values, item) {
   setNames(rows$value, rows$name)
 }
 
-# the package's parameters of a polytomous item from its named mirt values.
+# The package's parameters of a polytomous item from its named mirt values.
 polytomous_parameters <- function(model, v) {
   numbered <- function(prefix) v[grep(paste0("^", prefix, "[0-9]+$"), names(v))]
   switch(model,
@@ -58,7 +58,7 @@ polytomous_parameters <- function(model, v) {
   )
 }
 
-# the package's estimated parameters of a polytomous item, named as its vector entries.
+# The package's estimated parameters of a polytomous item, named as its vector entries.
 estimated_parameters <- function(model, p) {
   k <- length(p$a) # categories of an NRM item
   switch(model,
@@ -103,7 +103,7 @@ delta_errors <- function(fit, items, models) {
   })
 }
 
-# the package's items of a mirt fit: parameters and the standard errors of the estimated ones, by item. Fixed items have
+# The package's items of a mirt fit: parameters and the standard errors of the estimated ones, by item. Fixed items have
 # no standard errors.
 psychometrics_items <- function(fit, models) {
   items <- colnames(extract.mirt(fit, "data"))
@@ -230,7 +230,7 @@ response_patterns <- function(item_count, categories = 2) {
 }
 
 # Category probabilities P and their first and second theta derivatives P1 and P2, theta by category, of an item with
-# the package's parameters, written out for each model.
+# The package's parameters, written out for each model.
 item_trace <- function(model, p, theta) {
   if (model %in% LOGISTIC) {
     l <- plogis(p$a * (theta - p$b))
@@ -523,7 +523,7 @@ stopifnot(abs(logLik(mirt(science, 1, itemtype = "Rasch", TOL = TOL, verbose = F
   logLik(polytomous_fits$pcm)) < 1e-3)
 stopifnot(abs(logLik(mirt(science, 1, itemtype = "rsm", TOL = TOL, verbose = FALSE)) -
   logLik(polytomous_fits$rsm)) < 1e-3)
-# the package's parameters from mirt's values reproduce coef(IRTpars = TRUE) where mirt has the IRT form.
+# The package's parameters from mirt's values reproduce coef(IRTpars = TRUE) where mirt has the IRT form.
 for (model in c("grm", "gpcm", "pcm", "nrm")) {
   fit <- polytomous_fits[[model]]
   mirt_irt <- coef(fit, IRTpars = TRUE, simplify = TRUE)$items

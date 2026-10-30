@@ -101,8 +101,8 @@ Elo, logistic models and IRT have none: their prediction after an attempt depend
 
 ## Spaced repetition
 
-the package decides what a learner practices and when it is mastered; a spaced repetition scheduler, as
-[ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs), decides when to review what was mastered. the package does not
+The package decides what a learner practices and when it is mastered; a spaced repetition scheduler, as
+[ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs), decides when to review what was mastered. The package does not
 depend on it. Once a skill or fact is mastered, give it a card and grade each review by its outcome:
 
 ```ts

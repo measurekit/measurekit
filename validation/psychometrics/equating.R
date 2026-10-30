@@ -85,7 +85,7 @@ mixed_from <- lapply(mixed_to, function(item) {
   list(model = item$model, parameters = p)
 })
 
-# the package's default quadrature: 61 points from -6 to 6 with normal density weights.
+# The package's default quadrature: 61 points from -6 to 6 with normal density weights.
 nodes <- seq(-6, 6, length.out = 61)
 weights <- dnorm(nodes) / sum(dnorm(nodes))
 
