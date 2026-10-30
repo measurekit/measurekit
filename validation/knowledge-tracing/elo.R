@@ -1,7 +1,7 @@
 # Elo fixtures. No R package of record implements the Elo learner models, so the updates are written out here from
 # their equations (Pelánek, 2016; Nižnan, Pelánek and Řihák, 2015) and applied to small worked logs; the evaluation of
-# held-out events follows the package's documented order; and a seeded simulation checks that a replay recovers the abilities
-# and difficulties it simulated.
+# held-out events follows measurekit's documented order; and a seeded simulation checks that a replay recovers
+# the abilities and difficulties it simulated.
 
 source("validation/knowledge-tracing/common.R")
 

@@ -86,10 +86,11 @@ person and call reproduces a test.
 
 ### Estimators
 
-An `AbilityEstimator`, from `@measurekit/psychometrics/irt`, is a function `(items, responses) => { theta, standardError }`:
-one of `maximumLikelihoodEstimate`, `weightedLikelihoodEstimate`, `posteriorModeEstimate` and `posteriorMeanEstimate`
-([IRT](irt.md#ability-estimation)), or one with options, `(items, responses) => posteriorModeEstimate(items, responses,
-{ prior: { mean: 0, sd: 1.5 } })`.
+An `AbilityEstimator`, from `@measurekit/psychometrics/irt`, is a
+function `(items, responses) => { theta, standardError }`: one of
+`maximumLikelihoodEstimate`, `weightedLikelihoodEstimate`, `posteriorModeEstimate` and
+`posteriorMeanEstimate` ([IRT](irt.md#ability-estimation)), or one with
+options, `(items, responses) => posteriorModeEstimate(items, responses, { prior: { mean: 0, sd: 1.5 } })`.
 
 `untilMixed(initial, mixed)` uses `initial` until one response is above its item's lowest category and one below its
 highest, and `mixed` after: before that, the ML estimate is an end of the theta range. The test estimates before the

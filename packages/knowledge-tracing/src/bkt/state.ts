@@ -6,8 +6,8 @@ export interface BktState {
   /** The learner's id. */
   readonly learner: string;
   /**
-   * P(L) of each skill the learner has practiced, by skill id: the probability that the learner knows the skill at their
-   * next attempt. A skill not practiced has the learner's prior.
+   * P(L) of each skill the learner has practiced, by skill id: the probability that the learner knows the skill
+   * at their next attempt. A skill not practiced has the learner's prior.
    */
   readonly skills: Readonly<Record<string, number>>;
 }

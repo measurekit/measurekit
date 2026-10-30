@@ -1,8 +1,8 @@
 # Rater agreement
 
-`@measurekit/psychometrics/rater` measures how far raters agree: Cohen's kappa for two raters, unweighted, linear or quadratic
-weighted, Fleiss' kappa for two or more, and intraclass correlations of scores. Each is validated against irr and psych
-([validation](validation.md)).
+`@measurekit/psychometrics/rater` measures how far raters agree: Cohen's kappa for two raters, unweighted, linear
+or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of scores. Each is validated
+against irr and psych ([validation](validation.md)).
 
 ## Ratings
 
@@ -48,8 +48,8 @@ K - 1 is the range of the categories used. Quadratic weights give the quadratic 
 automated with human scoring. The weights use the categories' values; irr numbers the categories used in order, which
 gives the same weights when no category between the lowest and highest is unused.
 
-For Fleiss' kappa, P̄ is the mean over subjects of the share of agreeing pairs of raters, Σ_k n_k (n_k - 1) / (m (m - 1))
-for m raters of whom n_k chose category k, and P_e = Σ_k p_k² from each category's share p_k of all ratings.
+For Fleiss' kappa, P̄ is the mean over subjects of the share of agreeing pairs of raters, Σ_k n_k (n_k - 1) / (m (m
+- 1)) for m raters of whom n_k chose category k, and P_e = Σ_k p_k² from each category's share p_k of all ratings.
 
 Kappa is 1 for perfect agreement and 0 for agreement at chance level. When every rating is in one category the chance
 agreement is 1 and kappa is undefined: both functions throw `DataError`.

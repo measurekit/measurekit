@@ -53,8 +53,8 @@ def pybkt_data(rows, skill, options, gs_names=None, resource_names=None):
 
 
 def pybkt_model(parameters, data, options):
-    """pyBKT's model of the package's parameters of a skill. With prior groups, pyBKT's prior is 0 and each group's prior is
-    the learn rate of a phantom first step."""
+    """pyBKT's model of measurekit's parameters of a skill. With prior groups, pyBKT's prior is 0 and each group's prior
+    is the learn rate of a phantom first step."""
     resources = sorted(data["resource_names"].items(), key=lambda entry: entry[1])
     learning = []
     for name, _ in resources:
@@ -115,8 +115,8 @@ def pooled(numerator, denominator):
 
 
 def knowledge_tracing_parameters(model, data, options, counts):
-    """the package's parameters of a skill from a pyBKT fit. A rate that groups or items have of their own is, for the skill,
-    the ratio of the expected counts pooled over them, from the counts of the M-step that made the fit."""
+    """measurekit's parameters of a skill from a pyBKT fit. A rate that groups or items have of their own is, for the
+    skill, the ratio of the expected counts pooled over them, from the counts of the M-step that made the fit."""
     transitions, emissions = counts
     names = data["resource_names"]
     skill = {}
@@ -201,7 +201,7 @@ for skill in SKILLS:
 
 
 def parameters_for(options, values):
-    """the package's parameters with the rates that `options` uses, from per-skill values of every rate."""
+    """measurekit's parameters with the rates that `options` uses, from per-skill values of every rate."""
     skills = {}
     for skill in SKILLS:
         v = values[skill]
@@ -306,7 +306,7 @@ for name, options in CONFIGURATIONS[:-1]:
         "logLikelihood": sum(outcome_log_likelihood(p, e["outcome"]) for p, e in zip(predictions, events)),
     })
 
-# pyBKT's random starts, as Model.fit draws them with seed 42 and 5 fits, run to the default tolerance 1e-6 of the package.
+# pyBKT's random starts, as Model.fit draws them with seed 42 and 5 fits, run to measurekit's default tolerance 1e-6.
 random = np.random.RandomState(42)
 restarts = {}
 for skill in SKILLS:

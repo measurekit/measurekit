@@ -64,7 +64,8 @@ export function rescaledItem<TParameters>(
 /**
  * Returns the standard errors of an item's estimated parameters, by name, on the scale θ' = slope θ + intercept,
  * treating slope and intercept as known: each scales as its parameter, a by 1 / A and locations and steps by A. The
- * intercepts c_k - a_k B / A of an NRM item need the covariances of a_k and c_k, so an NRM item moved by B ≠ 0 has none.
+ * intercepts c_k - a_k B / A of an NRM item need the covariances of a_k and c_k, so an NRM item moved by B ≠ 0
+ * has none.
  *
  * @throws `DataError` when the item's parameters are invalid or its model is not one of the built-in models.
  */

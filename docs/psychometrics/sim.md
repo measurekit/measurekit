@@ -1,8 +1,8 @@
 # Simulation
 
-`@measurekit/psychometrics/sim` simulates thetas, item parameters of every built-in [IRT model](irt.md) and response matrices,
-for test design and research: recovery studies, the design of forms and pools, and data for any other analysis. Every
-draw comes from the `Random` passed in, so a seed reproduces a simulation.
+`@measurekit/psychometrics/sim` simulates thetas, item parameters of every built-in [IRT model](irt.md) and
+response matrices, for test design and research: recovery studies, the design of forms and pools, and data for any
+other analysis. Every draw comes from the `Random` passed in, so a seed reproduces a simulation.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -37,7 +37,7 @@ A `Distribution` is a function `(random) => number` that draws only from `random
 | `(random) => ...`                       | A custom distribution, such as the constant `() => 1` |
 
 Normal draws invert the normal distribution function at a uniform draw, as R's default `rnorm` does; R's generator
-differs from the package's, so a seed gives other values than in R.
+differs from `createRandom`, so a seed gives other values than in R.
 
 ## Item parameters
 
@@ -64,7 +64,7 @@ Each parameter comes from its distribution in `distributions` or from its defaul
 | `nominalResponse`          | Slopes `a` and intercepts `c` of the categories from 1; category 0: 0 | a ~ logN(0, 0.1225²), c ~ N(0, 1) |
 
 catR draws the number of categories of each polytomous item from a Poisson distribution unless `same.nrCat = TRUE`;
-the package gives every item `categoryCount`.
+`simulateItems` gives every item `categoryCount`.
 
 - **Shared parameters.** The parameters the model's items share are drawn once, as calibration estimates one value of
   each.
@@ -97,6 +97,6 @@ Adaptive and multistage tests are simulated by `simulateAdaptiveTest` and `simul
 
 ## Validation
 
-R's generator differs from the package's, so no R reference reproduces a simulation. Seeded tests check the distributions
-instead ([validation](validation.md#simulation)): moments, category frequencies, the share of missing responses, exact
-reproduction, and the recovery of simulated 2PL items by calibration.
+R's generator differs from `createRandom`, so no R reference reproduces a simulation. Seeded tests check
+the distributions instead ([validation](validation.md#simulation)): moments, category frequencies, the share of
+missing responses, exact reproduction, and the recovery of simulated 2PL items by calibration.

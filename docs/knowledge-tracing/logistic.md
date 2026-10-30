@@ -1,9 +1,10 @@
 # Logistic models
 
-`@measurekit/knowledge-tracing/logistic` fits logistic learner models: the additive factors model (AFM), performance factors
-analysis (PFA) and models of the features of logistic knowledge tracing (LKT). Learner proficiency is absent, a fixed
-effect per learner, or a random intercept. Fits are validated against `glm`, `lme4::glmer` and LiblineaR, and the
-features against the LKT package ([validation](validation.md#logistic-models)).
+`@measurekit/knowledge-tracing/logistic` fits logistic learner models: the additive factors model (AFM),
+performance factors analysis (PFA) and models of the features of logistic knowledge tracing (LKT). Learner
+proficiency is absent, a fixed effect per learner, or a random intercept. Fits are validated against
+`glm`, `lme4::glmer` and LiblineaR, and the features against the LKT
+package ([validation](validation.md#logistic-models)).
 
 ## The models
 
@@ -40,8 +41,8 @@ counts fully; their prior is one success and one failure, decayed over every att
 
 A decay d is above 0 and at most 1; an exponent e is at least 0. Decays and exponents are given, not estimated: compare
 candidates by [cross-validation](evaluate.md#model-comparison). The time unit only rescales a recency coefficient.
-LKT's `logitdec` looks at a learner's last 61 attempts at a skill; the package's at all of them, the earlier ones weighing
-d⁶¹ times less.
+LKT's `logitdec` looks at a learner's last 61 attempts at a skill; `decayedLogit` at all of them, the earlier
+ones weighing d⁶¹ times less.
 
 ## Options
 
@@ -58,7 +59,7 @@ d⁶¹ times less.
 
 - **Fixed.** θ is a free parameter per learner, estimated with the rest. Learners connect through the skills they share.
   In each set of connected learners whose events all have the same number m of skills, as one each, raising every θ by c
-  and lowering every intercept of the set's skills by c / m changes no prediction; the package reports each set's θ with mean
+  and lowering every intercept of the set's skills by c / m changes no prediction; `fit` reports each set's θ with mean
   0, and `aic` and `bic` count one parameter less per set. θ of learners in different sets, as two cohorts with no skill
   in common, are not comparable. A learner whose outcomes are all correct or all wrong has no finite θ: the fit stops
   where the gradient reaches the tolerance, with a large θ. A ridge or a random intercept keeps it finite.

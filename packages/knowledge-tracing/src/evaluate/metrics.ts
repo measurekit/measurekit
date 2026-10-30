@@ -12,7 +12,10 @@ export interface Metrics {
   readonly rmse: number;
   /** The mean negative log-likelihood -mean(y ln p + (1 - y) ln(1 - p)), natural logarithm. */
   readonly logLoss: number;
-  /** The share of outcomes predicted right, a prediction above 0.5 meaning correct, or `null` unless outcomes are 0 or 1. */
+  /**
+   * The share of outcomes predicted right, a prediction above 0.5 meaning correct, or `null` unless outcomes are 0 or
+   * 1.
+   */
   readonly accuracy: number | null;
 }
 

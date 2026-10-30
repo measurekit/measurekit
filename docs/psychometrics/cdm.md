@@ -1,14 +1,14 @@
 # Cognitive diagnosis
 
-`@measurekit/psychometrics/cdm` tells which attributes, such as the skills a test measures, each person has mastered: the
-G-DINA, DINA and DINO models calibrated by marginal maximum likelihood, persons' mastery probabilities and profiles,
-classification accuracy and consistency, Q-matrix validation, and a nonparametric classification for small samples. Each
-is validated against GDINA or NPCD ([validation](validation.md)).
+`@measurekit/psychometrics/cdm` tells which attributes, such as the skills a test measures, each person has
+mastered: the G-DINA, DINA and DINO models calibrated by marginal maximum likelihood, persons' mastery probabilities
+and profiles, classification accuracy and consistency, Q-matrix validation, and a nonparametric classification for
+small samples. Each is validated against GDINA or NPCD ([validation](validation.md)).
 
 ## Q-matrix
 
-A `QMatrix` lists the attributes each item measures, by item id. It has the shape of the `QMatrix` of `@measurekit/knowledge-tracing`, so one Q-matrix
-serves both packages:
+A `QMatrix` lists the attributes each item measures, by item id. It has the shape of the `QMatrix`
+of `@measurekit/knowledge-tracing`, so one Q-matrix serves both packages:
 
 ```ts
 import type { QMatrix } from "@measurekit/psychometrics/cdm";
@@ -85,9 +85,9 @@ response's probability enters the likelihood as `Number.MIN_VALUE`, so that a pe
 has a posterior on the profiles that the responses contradict least.
 
 `cdmClassificationAccuracy(matrix, calibration, { classification })` returns GDINA's `CA` indices for `"map"`
-(default) or `"eap"` classification: `accuracy` τ = Σ_c π_c τ_c, the probability that a person lands in the true profile, with
-`profileAccuracy` τ_c, and `attributeAccuracy` τ_k; `consistency` γ, the mean of Σ_c post(c)², the chance that two
-measurements agree, and `attributeConsistency` γ_k. They use the persons with a response.
+(default) or `"eap"` classification: `accuracy` τ = Σ_c π_c τ_c, the probability that a person lands in the
+true profile, with `profileAccuracy` τ_c, and `attributeAccuracy` τ_k; `consistency` γ, the mean of Σ_c post(c)²,
+the chance that two measurements agree, and `attributeConsistency` γ_k. They use the persons with a response.
 
 ```ts
 import { attributeProfiles, calibrateCdm, cdmClassificationAccuracy } from "@measurekit/psychometrics/cdm";

@@ -71,9 +71,9 @@ export interface ModelFit<TState = unknown, TParameters = unknown> {
   /** The prediction of each event of the log, in log order, made before the event's outcome was known. */
   readonly predictions: readonly number[];
   /**
-   * The log-likelihood ln L of the log under the fitted model: the sum over events of y ln p + (1 - y) ln(1 - p), with p
-   * the event's prediction and y its outcome, or, for a model whose learners are drawn from a distribution, the marginal
-   * log-likelihood, each learner's parameters integrated out.
+   * The log-likelihood ln L of the log under the fitted model: the sum over events of y ln p + (1 - y) ln(1 - p),
+   * with p the event's prediction and y its outcome, or, for a model whose learners are drawn from a distribution,
+   * the marginal log-likelihood, each learner's parameters integrated out.
    */
   readonly logLikelihood: number;
   /**

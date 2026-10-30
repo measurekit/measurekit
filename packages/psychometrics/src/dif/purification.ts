@@ -14,7 +14,9 @@ export interface PurificationOptions {
 
 /** The purification of a matching criterion. */
 export interface DifPurification {
-  /** The anchors of the final statistics, the items not flagged before them; with the studied item, its matching items. */
+  /**
+   * The anchors of the final statistics, the items not flagged before them; with the studied item, its matching items.
+   */
   readonly anchors: readonly string[];
   /** The rounds run after the first statistics, each on the items the previous one did not flag. */
   readonly iterations: number;

@@ -1,5 +1,5 @@
 # Numerics fixtures: normal, logistic and chi-square functions from base R, and Gauss-Hermite rules for the standard
-# normal density by the Golub-Welsch eigenvalue method, an algorithm independent of the package's.
+# normal density by the Golub-Welsch eigenvalue method, an algorithm independent of measurekit's.
 
 source("validation/psychometrics/common.R")
 

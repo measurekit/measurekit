@@ -123,8 +123,8 @@ export function opportunitiesToStreak(probability: number, options: Opportunitie
 }
 
 /**
- * Goes through the log: `observe` takes each event and returns whether the criterion is met for each of its skills after
- * it. Records, per learner and skill, the opportunity of the first event after which it is.
+ * Goes through the log: `observe` takes each event and returns whether the criterion is met for each of its
+ * skills after it. Records, per learner and skill, the opportunity of the first event after which it is.
  */
 function firstOpportunities(log: EventLog, observe: (event: Event) => (skill: string) => boolean): MasteryTable {
   const table = new Map<string, Map<string, number | null>>();

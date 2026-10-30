@@ -1,7 +1,7 @@
 # Storage
 
-How an app backed by a database uses `@measurekit/knowledge-tracing`: what it stores, what an answer reads and writes, how it refits models, and
-how much memory a fit takes.
+How an app backed by a database uses `@measurekit/knowledge-tracing`: what it stores, what an answer reads and
+writes, how it refits models, and how much memory a fit takes.
 
 ## What to store
 
@@ -57,11 +57,12 @@ change only at refits, so an app can cache them.
 
 ## Refits
 
-IRT's item parameters come from a calibration, as those of `@measurekit/psychometrics`, not from the log: recalibrate when the item bank changes, and
-keep learners' states, which stay on the calibration's scale only while it is linked to the previous one. Other refits
-run offline, on a schedule, from the log: on a recent time window, or on a sample of learners when the log is large. A
-refit writes new parameters; learner states continue from where they are. To rebase states on the new parameters, take
-them from the fit, `fit.states`, for the learners whose whole history the fitted log holds.
+IRT's item parameters come from a calibration, as those of `@measurekit/psychometrics`, not from the log:
+recalibrate when the item bank changes, and keep learners' states, which stay on the calibration's scale only while
+it is linked to the previous one. Other refits run offline, on a schedule, from the log: on a recent time window, or
+on a sample of learners when the log is large. A refit writes new parameters; learner states continue from where
+they are. To rebase states on the new parameters, take them from the fit, `fit.states`, for the learners whose
+whole history the fitted log holds.
 
 Elo's `fit` replays the log in time order, a logistic model's learner proficiency ties every skill of a learner
 together, and a KST state spans the structure's skills, so these take the log of all skills at once. BKT's skills are

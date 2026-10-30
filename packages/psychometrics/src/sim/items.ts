@@ -48,7 +48,7 @@ export interface ItemSimulationOptions {
 }
 
 // The defaults of catR's genDichoMatrix (aPrior, bPrior, cPrior, dPrior) and genPolyMatrix, where items without a
-// slope in catR's form have a = 1 in the package's.
+// slope in catR's form have a = 1.
 const ONE: Distribution = () => 1;
 const LOGISTIC_SLOPE = normalDistribution(1, 0.2);
 const POLYTOMOUS_SLOPE = logNormalDistribution(0, 0.1225);

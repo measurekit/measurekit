@@ -81,7 +81,8 @@ describe("mastery criteria", () => {
   });
 
   it("finds the first attempt after which the model's mastery reaches the threshold", () => {
-    // P(L) after a correct answer: 0.5 → 0.45 / 0.55 = 0.8182, then learning: 0.8545; after another: 0.9636, then 0.9708.
+    // P(L) after a correct answer: 0.5 → 0.45 / 0.55 = 0.8182, then learning: 0.8545; after another: 0.9636,
+    // then 0.9708.
     const model = bkt({
       parameters: { skills: { s: { prior: 0.5, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } },
     });

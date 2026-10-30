@@ -19,8 +19,8 @@ import { expectAllClose } from "./helpers.js";
 /** Absolute tolerance of EAP estimates, predictions and log-probabilities against the written-out grid posterior. */
 const GRID_TOLERANCE = 1e-10;
 /**
- * Absolute tolerance of the MAP estimate against the exact posterior mode at the default grid spacing, 0.2: the error of
- * the quintic interpolation between grid points, which grows with the fifth power of the spacing.
+ * Absolute tolerance of the MAP estimate against the exact posterior mode at the default grid spacing, 0.2: the
+ * error of the quintic interpolation between grid points, which grows with the fifth power of the spacing.
  */
 const MODE_TOLERANCE = 1e-5;
 /** Absolute tolerance of the MAP standard error at the default spacing, growing with its fourth power. */

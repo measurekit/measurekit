@@ -199,7 +199,7 @@ describe("forwardBackward", () => {
 });
 
 describe("expectationMaximization", () => {
-  // Observed 0/1 sequences of a two-state hidden Markov model, fitted by Baum-Welch: the use EM has in the package.
+  // Observed 0/1 sequences of a two-state hidden Markov model, fitted by Baum-Welch: the use EM has in BKT.
   const observations = [
     [0, 0, 1, 1, 1],
     [0, 1, 0, 1, 1, 1],

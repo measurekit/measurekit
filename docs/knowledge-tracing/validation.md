@@ -1,12 +1,13 @@
 # Validation
 
-Every statistic the package computes is compared with a reference: a function of an R or Python package, or a computation
-written out in the scripts. Bayesian knowledge tracing is compared with pyBKT; logistic models with `glm`, lme4,
-LiblineaR and the LKT package; IRT ability estimates with mirt; knowledge space theory with kst, pks and DAKS. The Elo
-models have no package of record, so their equations are written out in R. Simulations check that Elo and BKT recover
-the parameters they simulate. Scripts in [`validation/`](../../validation/README.md) run the references and write the
-inputs and expected results as JSON fixtures to `packages/knowledge-tracing/test/fixtures/`. The tests compare the package's results with
-the fixtures. CI runs only the TypeScript tests; R and Python run when fixtures change.
+Every statistic of `@measurekit/knowledge-tracing` is compared with a reference: a function of an R or Python
+package, or a computation written out in the scripts. Bayesian knowledge tracing is compared with pyBKT; logistic
+models with `glm`, lme4, LiblineaR and the LKT package; IRT ability estimates with mirt; knowledge space theory
+with kst, pks and DAKS. The Elo models have no package of record, so their equations are written out in R.
+Simulations check that Elo and BKT recover the parameters they simulate. Scripts
+in [`validation/`](../../validation/README.md) run the references and write the inputs and expected results as
+JSON fixtures to `packages/knowledge-tracing/test/fixtures/`. The tests compare the results with the fixtures. CI
+runs only the TypeScript tests; R and Python run when fixtures change.
 
 ## References
 
@@ -21,7 +22,7 @@ scikit-learn 1.7.2.
 | Calibration bins                                                               | Base R: `cut(right = FALSE, include.lowest = TRUE)` at the bounds `(0:K) / K`               |
 | Learning curves                                                                | Base R: opportunities by `ave(seq_along)` per learner and skill, error rates by opportunity |
 | Normal quantile, logistic function                                             | `qnorm`, `plogis`                                                                           |
-| Forward-backward: log-likelihood, state and transition posteriors, predictions | Base R: enumeration of every path of hidden states, an algorithm other than the package's   |
+| Forward-backward: log-likelihood, state and transition posteriors, predictions | Base R: enumeration of every path of hidden states, not the forward-backward recursion      |
 | Logistic regression coefficients and log-likelihood                            | `glm(family = binomial)`, `epsilon = 1e-14`; for outcomes in [0, 1] as well                 |
 | Elo predictions, abilities, skill abilities, difficulties and log-likelihood   | Base R: the update equations written out and replayed event by event                        |
 | Held-out predictions of cross-validation                                       | Base R: a replay of the training events, then the test learners' events in time order       |
@@ -32,10 +33,10 @@ so a correct answer raises the learner's ability to 0.5 and lowers the item's di
 
 ## Bayesian knowledge tracing
 
-`validation/knowledge-tracing/bkt.py` runs pyBKT's own functions: `data_helper.convert_data` builds its data, `predict_onestep.run`
-predicts at fixed parameters, and `EM_fit.run` and `M_step.run` fit, in EM_fit's loop, which the script runs itself to
-keep the expected counts of the last M-step; it checks that its estimates equal `EM_fit.EM_fit`'s. The options map to
-pyBKT as follows:
+`validation/knowledge-tracing/bkt.py` runs pyBKT's own functions: `data_helper.convert_data` builds its
+data, `predict_onestep.run` predicts at fixed parameters, and `EM_fit.run` and `M_step.run` fit, in EM_fit's loop,
+which the script runs itself to keep the expected counts of the last M-step; it checks that its estimates
+equal `EM_fit.EM_fit`'s. The options map to pyBKT as follows:
 
 | Option                                           | pyBKT                                                                                                                                            |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -59,23 +60,24 @@ and with `multigs` its data misaligns, as the phantom steps enter the outcomes b
 with item rates are therefore checked at fixed parameters by predicting each group with pyBKT's prior set to the
 group's; their fit has no reference beyond its parts.
 
-From the same start, the package's EM takes the same number of iterations as pyBKT's and reaches its estimates within 6e-16.
-From random starts, the package's and pyBKT's reach the same optimum for every skill of the practice log as the given starts,
+From the same start, the EM of `bkt` takes the same number of iterations as pyBKT's and reaches its estimates
+within 6e-16. From random starts, both reach the same optimum for every skill of the practice log as the given starts,
 within 1.4e-6 in log-likelihood, where EM stops at a change of 1e-6. No start reached another local optimum.
 
 Several results of pyBKT are not references, and the fixtures avoid them:
 
 - **A learner's only attempt at a skill.** pyBKT adds a sequence's last emission counts inside its backward loop, which
-  a sequence of one attempt skips, so such an attempt does not inform P(G) and P(S). The package counts it.
+  a sequence of one attempt skips, so such an attempt does not inform P(G) and P(S). `bkt` counts it.
 - **Rates without data.** pyBKT sets P(T) = 1 for an item never followed by an attempt and P(G) = P(S) = 0.5 for a
-  class without expected counts. The package keeps such a rate's value, and an item without rates of its own uses its skill's.
-- **Outcomes of probability 0.** pyBKT treats a guess or slip of 0 as a probability of 1. The package throws `DataError`
+  class without expected counts. `bkt` keeps such a rate's value, and an item without rates of its own uses its skill's.
+- **Outcomes of probability 0.** pyBKT treats a guess or slip of 0 as a probability of 1. `bkt` throws `DataError`
   for an outcome given parameters make impossible, and its EM keeps P(G) and P(S) at least 2⁻⁵² from 0 and 1. On the
   practice log, where pyBKT drives some items' P(S) to 1e-101, the estimates still agree within 6e-16.
 
 ## Logistic models
 
-`validation/knowledge-tracing/logistic.R` checks the features against the LKT package and the fits against `glm`, lme4 and LiblineaR:
+`validation/knowledge-tracing/logistic.R` checks the features against the LKT package and the fits against `glm`,
+lme4 and LiblineaR:
 
 | Quantity                                                                | Reference                                                                                                              |
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -85,29 +87,30 @@ Several results of pyBKT are not references, and the fixtures avoid them:
 | Ridge fits                                                              | `LiblineaR(type = 0, cost = 512)`, the L2-regularized logistic regression LKT uses, then Newton steps on its objective |
 
 The features map to LKT's names in [the logistic guide](logistic.md#features). With every event of one skill, glm
-drops a skill's intercept; the script moves the intercepts so that the learners' mean proficiency is 0, as the package
+drops a skill's intercept; the script moves the intercepts so that the learners' mean proficiency is 0, as `fit`
 reports it, which changes no prediction.
 
 **lme4.** The written-out Laplace approximation equals `logLik(glmer(nAGQ = 1))` within 3e-10 at glmer's estimates,
 and lme4's deviance function at the maximum. lme4 solves its inner problem to about 1e-7, and its optimizer stops
 short of the maximum: the maximum's log-likelihood is higher by 3.2e-6 for AFM and 9.5e-7 for PFA, its σ differs by
 6.9e-5 and 2.8e-7. So the reference is the maximum, found by `nlminb` and Newton steps on central differences of the
-exact approximation, to a gradient below 1e-6; the package reaches it within 7e-9.
+exact approximation, to a gradient below 1e-6; `fit` reaches it within 7e-9.
 
 **LiblineaR.** LiblineaR stops on a gradient norm relative to the start's, which left weakly penalized directions
-1.1e-5 short of the minimum on the sample; Newton steps on the same objective finish it, and the package matches the minimum.
+1.1e-5 short of the minimum on the sample; Newton steps on the same objective finish it, and `fit` matches the minimum.
 
-**LKT's own fit** of AFM on the sample, `LKT(features = c("intercept", "intercept", "lineafm$"))`, differs from the package's
+**LKT's own fit** of AFM on the sample, `LKT(features = c("intercept", "intercept", "lineafm$"))`, differs from
 `afm({ ridge: 1 / 512 })` by up to 0.0073 in a prediction, and its log-likelihood is -691.0597 against -691.0168. LKT's
-formula leaves out the first learner's column, 302 columns against the package's 303, and the ridge is not invariant to that
+formula leaves out the first learner's column, 302 columns against 303 in `afm`, and the ridge is not invariant to that
 choice: LiblineaR on LKT's columns, run to the same tight tolerance, still differs by 0.0071 and gives -691.0554. The
 rest is LKT's stopping tolerance, `epsilon = 1e-4`.
 
 ## Item response theory
 
-`validation/knowledge-tracing/irt.R` writes out the posterior of θ on the grid and its exact mode, for 10 learners answering 12 items one
-at a time: 1PL to 4PL, graded response and generalized partial credit items, with outcomes simulated from N(0, 1)
-abilities and, for two learners, every response in the top or the lowest category, `set.seed(20261029)`.
+`validation/knowledge-tracing/irt.R` writes out the posterior of θ on the grid and its exact mode, for 10
+learners answering 12 items one at a time: 1PL to 4PL, graded response and generalized partial credit items,
+with outcomes simulated from N(0, 1) abilities and, for two learners, every response in the top or the lowest
+category, `set.seed(20261029)`.
 
 | Quantity                                       | Reference                                                                                                             |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -123,8 +126,8 @@ points over ±6, by up to 2.5e-8 in EAP; the script sets it.
 
 ## Knowledge space theory
 
-`validation/knowledge-tracing/kst.R` runs kst, pks and DAKS on their example data and on data simulated by DAKS's `simu`, with
-`set.seed(20261029)`:
+`validation/knowledge-tracing/kst.R` runs kst, pks and DAKS on their example data and on data simulated by
+DAKS's `simu`, with `set.seed(20261029)`:
 
 | Quantity                                                                     | Reference                                                                                                                                                 |
 | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -140,28 +143,28 @@ whose removal leaves a state (Cosyn and Uzun, 2009); kst's well-gradedness test 
 so pks's `is.downgradable` is the reference there.
 
 **pks.** pks keeps guess and slip at least 1e-6 from 0: on `DoignonFalmagne7` its estimates of η for items a and b are
-1e-6, where the likelihood rises as they fall to 0, by 2.9e-5 in log-likelihood. The package keeps the same bound, and then
+1e-6, where the likelihood rises as they fall to 0, by 2.9e-5 in log-likelihood. `kst` keeps the same bound, and then
 reaches pks's estimates within 1.3e-7 by ML and 1.4e-17 by MD.
 
 **DAKS.** The papers describe the selection set as excluding pairs that cause an intransitivity, without saying which
 pair of a conflicting two goes. DAKS checks the pairs in the order of the items and drops each at once, so later pairs
-are checked against the pairs still in; the package does the same and reproduces DAKS's selection sets on `pisa` and 40 more
+are checked against the pairs still in; `iita` does the same and reproduces DAKS's selection sets on `pisa` and 40 more
 simulated data sets. DAKS also leaves out quasi-orders without implications.
 
 ## Simulation recovery
 
-**Elo.** R's generator differs from the package's, so the study is simulated in R and replayed in both. 400 learners with
-abilities drawn from N(0, 1) answer all of 60 Rasch items with difficulties drawn from N(0, 1), in random order,
-starting at random times so that their events interleave: 24,000 events, `set.seed(20261029)`. A replay through Elo
-with the default uncertainty function must recover the simulated values, at thresholds fixed before the simulation
-was first run:
+**Elo.** R's generator differs from `createRandom`, so the study is simulated in R and replayed in both. 400
+learners with abilities drawn from N(0, 1) answer all of 60 Rasch items with difficulties drawn from N(0, 1), in
+random order, starting at random times so that their events interleave: 24,000 events, `set.seed(20261029)`. A
+replay through Elo with the default uncertainty function must recover the simulated values, at thresholds fixed
+before the simulation was first run:
 
 | Estimate          | Required Pearson correlation with the simulated values | Found |
 | ----------------- | ------------------------------------------------------ | ----- |
 | Learner abilities | at least 0.85                                          | 0.937 |
 | Item difficulties | at least 0.95                                          | 0.985 |
 
-The R script stops when a threshold is missed; the test checks the package's replay against R's and the same thresholds.
+The R script stops when a threshold is missed; the test checks the replay by `elo` against R's and the same thresholds.
 
 **BKT.** 1,000 learners answer 10 items of each of two skills under the standard model, simulated by NumPy with
 `default_rng(20261029)`: 20,000 events. A fit with the default options must recover the parameters, at thresholds fixed
@@ -173,7 +176,7 @@ before the simulation was first run:
 | Every P(T), P(G) and P(S) within 0.05                 | Largest error 0.014          |
 | A log-likelihood at least that at the true parameters | -10868.34, against -10870.62 |
 
-**the package's simulator.** `test/sim.test.ts` simulates learners with `simulate` from `createRandom(20261029)` and fits
+**`simulate`.** `test/sim.test.ts` simulates learners with `simulate` from `createRandom(20261029)` and fits
 each family to them, at thresholds fixed before the first run:
 
 | Family        | Learners                                                      | Requirement                                                                                                  | Found               |
@@ -267,14 +270,14 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | BLIM by MD, the assessment's posteriors                             | 1e-12 absolute                 | 4.5e-13                        |
 | IITA `diff` and error rate                                          | 1e-10 relative, 1e-12 absolute | 1.7e-15, 6.9e-17               |
 
-glm stops when the deviance changes by less than 1e-14 relative, the package's Newton steps when no gradient component exceeds
-1e-10. The logistic fits' tolerances allow for the references' stopping rules, with the references finished as described
-above. pks stops when the parameters change by at most its `tol` and the package when the log-likelihood does, so the BLIM's
-ML estimates agree within the distance EM leaves to its fixed point. IRT's MAP interpolates between grid points, with an
-error of the fifth power of the spacing, so its tolerance scales with it: at spacing 0.45 the mode differs from the
-exact one by up to 2.1e-5, above the tolerance at the default spacing. Elo and the metrics repeat R's arithmetic; the
-differences come from the last bit of `exp` and from R's `mean`, which sums in extended precision. Fixtures store 17
-significant digits, so they reproduce R's doubles exactly.
+glm stops when the deviance changes by less than 1e-14 relative, the Newton steps of the logistic models when
+no gradient component exceeds 1e-10. The logistic fits' tolerances allow for the references' stopping rules, with
+the references finished as described above. pks stops when the parameters change by at most its `tol` and `kst` when
+the log-likelihood does, so the BLIM's ML estimates agree within the distance EM leaves to its fixed point. IRT's
+MAP interpolates between grid points, with an error of the fifth power of the spacing, so its tolerance scales with
+it: at spacing 0.45 the mode differs from the exact one by up to 2.1e-5, above the tolerance at the default spacing.
+Elo and the metrics repeat R's arithmetic; the differences come from the last bit of `exp` and from R's `mean`,
+which sums in extended precision. Fixtures store 17 significant digits, so they reproduce R's doubles exactly.
 
 ## Regenerating fixtures
 

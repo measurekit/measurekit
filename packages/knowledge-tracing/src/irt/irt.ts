@@ -122,7 +122,9 @@ export function irt(options: IrtOptions): IrtModel {
     slope: grid.map((theta) => (prior.mean - theta) / (prior.sd * prior.sd)),
     curvature: z.map(() => -1 / (prior.sd * prior.sd)),
   });
-  /** Returns the state after an outcome in category k, writing P(k | θ) at each grid point into `likelihood` if given. */
+  /**
+   * Returns the state after an outcome in category k, writing P(k | θ) at each grid point into `likelihood` if given.
+   */
   const advance = (state: IrtState, item: IrtItem, k: number, likelihood?: Float64Array): IrtState => {
     const terms = new Float64Array(3);
     const logDensity = [...state.logDensity];

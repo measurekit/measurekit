@@ -4,9 +4,9 @@
 
 - **Correct first.** Every statistic matches a named reference, R or pyBKT, within a documented tolerance
   ([validation](validation.md)), and the fixtures are committed.
-- **Portable.** No platform API (`node:*`, `fetch`, DOM, `process`) and one runtime dependency, `@measurekit/core`, which
-  has none and holds the errors, argument checks and random number generator that both packages share. ESM, strict
-  TypeScript.
+- **Portable.** No platform API (`node:*`, `fetch`, DOM, `process`) and one runtime dependency,
+  `@measurekit/core`, which has none and holds the errors, argument checks and random number generator that
+  both packages share. ESM, strict TypeScript.
 - **Deterministic.** The library never calls `Math.random`, which a Biome plugin enforces. Randomness comes from a
   `Random` passed in, or for a fit from a seed in the model's options, so a seed reproduces a result. Results are
   identical within one JavaScript engine version: `Math.log`, `Math.exp` and the other `Math` functions may differ in
@@ -30,12 +30,14 @@
 ## Modules
 
 Each module is a folder of `packages/knowledge-tracing/src/` with an `index.ts` that lists its public API.
-[AGENTS.md](../../AGENTS.md#layout) shows the layout of the repository and the [README](../../packages/knowledge-tracing/README.md#api) the contents of
-each module. The package exports `.` and one subpath per module: `@measurekit/knowledge-tracing/data`,
-`@measurekit/knowledge-tracing/evaluate`, `@measurekit/knowledge-tracing/elo`, `@measurekit/knowledge-tracing/bkt`, `@measurekit/knowledge-tracing/logistic`,
-`@measurekit/knowledge-tracing/irt`, `@measurekit/knowledge-tracing/kst`, `@measurekit/knowledge-tracing/practice` and `@measurekit/knowledge-tracing/sim`.
-Public names are unique across modules, so `.` re-exports all of them, with the model interface. Only the random number
-generator is public in `math/`.
+[AGENTS.md](../../AGENTS.md#layout) shows the layout of the repository and
+the [README](../../packages/knowledge-tracing/README.md#api) the contents of each module. The package exports `.`
+and one subpath per module: `@measurekit/knowledge-tracing/data`,
+`@measurekit/knowledge-tracing/evaluate`, `@measurekit/knowledge-tracing/elo`,
+`@measurekit/knowledge-tracing/bkt`, `@measurekit/knowledge-tracing/logistic`,
+`@measurekit/knowledge-tracing/irt`, `@measurekit/knowledge-tracing/kst`, `@measurekit/knowledge-tracing/practice`
+and `@measurekit/knowledge-tracing/sim`. Public names are unique across modules, so `.` re-exports all of them, with
+the model interface. Only the random number generator is public in `math/`.
 
 ## Dependencies between modules
 
@@ -101,9 +103,10 @@ The interface covers the classical families of learner models:
 
 ### Estimation options
 
-Families that estimate parameters iteratively take the same options, checked by `checkStopping` of `@measurekit/core`: `tolerance` is a number of
-at least 0, `maxIterations` a positive integer, `restarts` a positive integer and `seed` a safe integer. A fit reports
-`converged` and `iterations`, and does not throw when it stops at `maxIterations`.
+Families that estimate parameters iteratively take the same options, checked by `checkStopping` of
+`@measurekit/core`: `tolerance` is a number of at least 0, `maxIterations` a positive integer, `restarts` a
+positive integer and `seed` a safe integer. A fit reports `converged` and `iterations`, and does not throw when it
+stops at `maxIterations`.
 
 | Option          | Meaning                                                                                                                                         | BKT    | Logistic | KST     |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------- | ------- |
@@ -134,8 +137,9 @@ them, so the sum is what they mean.
 
 ### Writing a model
 
-A model written outside the package implements `LearnerModel` and works with every function of `@measurekit/knowledge-tracing/evaluate`.
-This one, for outcomes of 0 or 1, predicts the rate of correct outcomes of the log it was fitted to:
+A model written outside the package implements `LearnerModel` and works with every function
+of `@measurekit/knowledge-tracing/evaluate`. This one, for outcomes of 0 or 1, predicts the rate of correct outcomes
+of the log it was fitted to:
 
 ```ts
 import type { LearnerModel } from "@measurekit/knowledge-tracing";
@@ -164,7 +168,7 @@ function baseRate(rate = 0.5): LearnerModel<string, { rate: number }> {
 }
 ```
 
-A model in the package also validates its states and events, throwing `DataError`, so that states from storage are checked.
+A built-in model also validates its states and events, throwing `DataError`, so that states from storage are checked.
 Evaluation, practice and simulation check that a model passed in is an object with the methods `fit`, `initialState`,
 `update` and `predict`, and `thresholdMastery` that it has `mastery`.
 

@@ -4,7 +4,7 @@ source("validation/knowledge-tracing/common.R")
 suppressPackageStartupMessages(library(pROC))
 
 calibration_bins <- function(p, y, bins) {
-  # Bounds k / K as the package computes them, bins closed on the left and the last one closed on both sides.
+  # Bounds k / K as measurekit computes them, bins closed on the left and the last one closed on both sides.
   breaks <- (0:bins) / bins
   bin <- cut(p, breaks = breaks, right = FALSE, include.lowest = TRUE, labels = FALSE)
   lapply(seq_len(bins), function(k) {
@@ -65,7 +65,8 @@ earlier <- ave(seq_along(log$learner), log$learner, FUN = seq_along) - 1
 log$outcome <- rbinom(nrow(log), 1, plogis(-1 + 0.25 * earlier))
 predictions <- runif(nrow(log))
 
-# One row per learner, skill and event, with the opportunity: the event's rank among the learner's events with the skill.
+# One row per learner, skill and event, with the opportunity: the event's rank among the learner's events with
+# the skill.
 pairs <- do.call(rbind, lapply(seq_len(nrow(log)), function(i) {
   data.frame(event = i, learner = log$learner[i], skill = skill_lists[[i]])
 }))

@@ -1,8 +1,8 @@
 # Item and person fit
 
-`@measurekit/psychometrics/fit` checks how well items and persons fit an [IRT model](irt.md): Rasch infit and outfit, the S-X²
-item fit statistic, the lz person fit statistic and Yen's Q3 for local dependence. Each is validated against eRm or mirt
-([validation](validation.md)).
+`@measurekit/psychometrics/fit` checks how well items and persons fit an [IRT model](irt.md): Rasch infit and
+outfit, the S-X² item fit statistic, the lz person fit statistic and Yen's Q3 for local dependence. Each is
+validated against eRm or mirt ([validation](validation.md)).
 
 ## Inputs
 

@@ -29,8 +29,8 @@ export interface CalibrationOptions {
 
 /**
  * Returns a calibration table: predictions grouped into bins of equal width, with the mean prediction and the mean
- * outcome of each bin. A calibrated model's mean outcome is close to its mean prediction in every bin. Bin k of K covers
- * [k / K, (k + 1) / K), the last one [(K - 1) / K, 1].
+ * outcome of each bin. A calibrated model's mean outcome is close to its mean prediction in every bin. Bin k of
+ * K covers [k / K, (k + 1) / K), the last one [(K - 1) / K, 1].
  *
  * @throws `DataError` when the predictions and outcomes are malformed or `binCount` is not a positive integer.
  */
@@ -61,7 +61,9 @@ export function calibration(
   }));
 }
 
-/** Returns the bin k with k / K ≤ p < (k + 1) / K, comparing with the bounds as computed, not with p K, which rounds. */
+/**
+ * Returns the bin k with k / K ≤ p < (k + 1) / K, comparing with the bounds as computed, not with p K, which rounds.
+ */
 function binOf(prediction: number, binCount: number): number {
   let bin = Math.min(Math.floor(prediction * binCount), binCount - 1);
   if (prediction < bin / binCount) bin--;

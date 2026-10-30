@@ -36,7 +36,7 @@ function expectRelative(actual: unknown, expected: unknown, label: string): void
 describe("mirt", () => {
   mirt.items.forEach((row, i) => {
     const itemModel = defined(MODELS[row.model]);
-    it(`converts mirt's ${row.itemtype} coefficients of item ${i + 1} to the package's parameters and back`, () => {
+    it(`converts mirt's ${row.itemtype} coefficients of item ${i + 1} to item parameters and back`, () => {
       const item = fromMirtIrt(row.irt, itemModel);
       expect(item.model).toBe(itemModel);
       expectRelative(item.parameters, row.parameters, "from the IRT form");
@@ -49,7 +49,7 @@ describe("mirt", () => {
         });
       });
       if (row.model === "rsm") {
-        // mirt's rsm form is not unique per item: the package writes the steps as b1 to b(K-1) and c = -a b.
+        // mirt's rsm form is not unique per item: the conversions write the steps as b1 to b(K-1) and c = -a b.
         for (const to of [toMirtIrt, toMirtSlopeIntercept]) {
           expectRelative(fromMirtIrt(to(item), itemModel).parameters, row.parameters, "round trip");
         }
@@ -60,7 +60,7 @@ describe("mirt", () => {
     });
   });
 
-  it("names the asymptotes c and d in the package and g and u in mirt", () => {
+  it("names the asymptotes c and d, which mirt names g and u", () => {
     expect(fromMirtIrt({ a: 1.1, b: 0.4, g: 0.2, u: 0.9 }, fourParameterLogistic).parameters).toEqual({
       a: 1.1,
       b: 0.4,

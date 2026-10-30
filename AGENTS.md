@@ -109,7 +109,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/interop/          conversion of item parameters to and from mirt
   test/<module>.test.ts one file per src folder; fixtures/ holds R results
 packages/knowledge-tracing/   the published package @measurekit/knowledge-tracing
-  src/index.ts          re-exports every module, the model interface, and DataError, MeasurekitError and createRandom of core
+  src/index.ts          re-exports every module, the model interface, and DataError, MeasurekitError and
+                        createRandom of core
   src/model.ts          LearnerModel and ModelFit, the interface every model implements, and checkModel
   src/data/             events, logs, Q-matrices, learner checks, splits, the replay of a log through a model
   src/math/             numerics
@@ -202,14 +203,14 @@ Knowledge tracing: the model families never import each other, nor does anything
 - Types: PascalCase. Type parameters: `T` or `T` plus a name.
 - Acronyms are words: `kr20`, `bfgs`, `auc`, `rmse`. Other statistics are named in full: `standardErrorOfMeasurement`,
   `logLoss`, not `sem`, `ll`. `QMatrix` keeps the field's spelling, with a Biome exception.
-- Errors are `DataError` and its base class `MeasurekitError`, both of `@measurekit/core`, which the libraries re-export.
-  A package that needs an error of its own extends `MeasurekitError`.
+- Errors are `DataError` and its base class `MeasurekitError`, both of `@measurekit/core`, which the
+  libraries re-export. A package that needs an error of its own extends `MeasurekitError`.
 - Function options are `<Name>Options`; options shared by several functions are named after what they configure
   (`GroupOptions`), and a method's are named after it (`NextQuestionOptions`). Results are nouns: `ItemStatistics`,
   `SplitHalf`, `CrossValidation`, `LearningCurve`.
 - Psychometrics labels are string unions in kebab-case (`"very-good"`); their thresholds are `<NAME>_THRESHOLDS`.
-- A knowledge tracing model family has a factory named after it, `elo(options)`, that returns a `LearnerModel`, or a type
-  extending it when the family adds members: `EloModel`. Its files: `<family>.ts` for the factory, `state.ts` and
+- A knowledge tracing model family has a factory named after it, `elo(options)`, that returns a `LearnerModel`, or
+  a type extending it when the family adds members: `EloModel`. Its files: `<family>.ts` for the factory, `state.ts` and
   `parameters.ts` for the plain data and their checks, `estimation.ts` for a fit's numerics.
 - Iterative methods take `tolerance` and `maxIterations` and report `converged` and `iterations`; random starts take
   `restarts` and `seed`. Defaults are named constants, such as `DEFAULT_TOLERANCE`.
@@ -221,14 +222,15 @@ Knowledge tracing: the model families never import each other, nor does anything
 - Public functions validate their input and throw `DataError` with a full sentence that says what is wrong and
   what is expected, e.g. `A seed must be a safe integer, found 1.5.` Input may come from plain JavaScript or JSON, so
   every argument is checked for its type before it is read, once, where the public function reads it, with a `check`
-  function of `@measurekit/core`: options with `checkOptions`, arrays with `checkArray`, objects with `checkRecord`, an object
-  with a method with `checkMethod`, a function with `checkFunction` (`checks.ts` of psychometrics), a `Random` with `checkRandom`, a
-  number with `checkFinite`, `checkPositive`, `checkNonNegative`, `checkPositiveInteger` or `checkUnitInterval`,
-  `tolerance` and `maxIterations` with `checkStopping`, a seed with `checkSeed`, a boolean with `checkBoolean` and a
-  string option with `checkChoice`: `<Label> must be a positive number, found <value>.` An option's label is
-  `The option <name>`. A field of a record is tested with a predicate of core or the language, such as
-  `isUnitInterval` or `Number.isFinite`, and the message names the record; a predicate of core is never written
-  out by hand. Other messages show values with `describe`. The messages read alike in both libraries, as one set of checks writes them.
+  function of `@measurekit/core`: options with `checkOptions`, arrays with `checkArray`, objects with `checkRecord`,
+  an object with a method with `checkMethod`, a function with `checkFunction` (`checks.ts` of psychometrics), a
+  `Random` with `checkRandom`, a number with `checkFinite`, `checkPositive`, `checkNonNegative`,
+  `checkPositiveInteger` or `checkUnitInterval`, `tolerance` and `maxIterations` with `checkStopping`, a seed
+  with `checkSeed`, a boolean with `checkBoolean` and a string option with
+  `checkChoice`: `<Label> must be a positive number, found <value>.` An option's label is `The option <name>`. A
+  field of a record is tested with a predicate of core or the language, such as `isUnitInterval` or
+  `Number.isFinite`, and the message names the record; a predicate of core is never written out by hand. Other
+  messages show values with `describe`. The messages read alike in both libraries, as one set of checks writes them.
 - Psychometrics checks items with `checkItem` or `checkItemList` and an IRT model with `checkModel`, all of
   `irt/items.ts`. Knowledge tracing checks a learner model passed in with `checkModel` of `model.ts`, lists of attempts
   with `checkAttempts`, and the model's predictions with `checkUnitInterval`. A field's message names its record:
@@ -285,7 +287,7 @@ Knowledge tracing: the model families never import each other, nor does anything
   exactly.
 - The numerics of `@measurekit/core`, such as `normalQuantile` and `logistic`, are validated by the fixtures of the
   packages that use them; core's tests cover its edge cases and the rest of its behavior.
-- Psychometrics `sim/` has no R reference, as R's generator differs from the package's: seeded tests check its
+- Psychometrics `sim/` has no R reference, as R's generator differs from `createRandom`: seeded tests check its
   distributions, and a calibration recovers the items it simulates.
 - A knowledge tracing model without a package of record, such as Elo, has its equations written out in R and a seeded
   simulation recovery study, with thresholds fixed before the simulation is first run.
@@ -318,8 +320,8 @@ Knowledge tracing: the model families never import each other, nor does anything
   its `typedoc.json`, `export *` in `src/index.ts`, a test file, a guide in `docs/<package>/`, a reference script if it
   computes statistics, import rules in `biome.json` and the table above, and a row in the API table of the package's
   `README.md`.
-- A new package: a folder in `packages/` with the files listed under Layout, a project in `vitest.config.ts`, an entry in
-  the root `typedoc.json`, a changeset, a row in the package table of the root `README.md` and, for a library,
+- A new package: a folder in `packages/` with the files listed under Layout, a project in `vitest.config.ts`, an
+  entry in the root `typedoc.json`, a changeset, a row in the package table of the root `README.md` and, for a library,
   `docs/<package>/`.
 - Numerics shared by modules: `math/`, internal unless users need them; numerics both libraries use: `@measurekit/core`.
 - Checks shared by modules: of one value in `@measurekit/core` or, if only that library uses it, `checks.ts` of the

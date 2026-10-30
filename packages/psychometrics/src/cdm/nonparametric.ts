@@ -36,7 +36,8 @@ export interface NonparametricClassification {
  * differ from the person's on the fewest answered items. It needs no item parameters, so it suits small samples, such
  * as one classroom. Attributes are in order of first appearance in the Q-matrix; missing responses are skipped.
  *
- * @throws `DataError` when the matrix or the Q-matrix is invalid, the rule is unknown, or a response is neither 0 nor 1.
+ * @throws `DataError` when the matrix or the Q-matrix is invalid, the rule is unknown, or a response is neither 0
+ * nor 1.
  * @see {@link https://doi.org/10.1007/s00357-013-9132-9 | Chiu and Douglas (2013)}
  */
 export function nonparametricClassification(

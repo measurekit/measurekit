@@ -113,30 +113,42 @@ that statistic. Results never contain `NaN`.
 
 ## Documentation
 
-- [Data](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/data.md): response matrices, response records for sparse data, missing responses, scoring against a key.
-- [Classical test theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/ctt.md): every statistic, its formula, missing data and edge cases.
-- [Item response theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/irt.md): models, calibration, groups and distributions of theta, online calibration,
-  testlets, standard errors, joint maximum likelihood, ability estimation, summed-score tables, information,
-  reliability, adding a model.
-- [Cognitive diagnosis](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/cdm.md): G-DINA, DINA and DINO, attribute mastery, classification accuracy, Q-matrix
-  validation, nonparametric classification.
-- [Adaptive and multistage testing](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/cat.md): adaptive tests, item selection, content balancing, enemy sets,
-  exposure control and its calibration, stopping rules, multistage panels, simulation, form assembly.
-- [Item and person fit](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/fit.md): infit and outfit, S-X², lz, Yen's Q3.
-- [Differential item functioning](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/dif.md): Mantel-Haenszel and the ETS categories, logistic regression, sparse
-  data, purification, Lord's chi-square.
-- [Linking and equating](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/equating.md): scale linking from common items, observed-score equating with presmoothing,
-  true-score equating.
-- [Simulation](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/sim.md): thetas, item parameters of every model and response matrices, from a seed.
-- [Standard setting](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/standard-setting.md): modified Angoff, Bookmark and Hofstee cut scores, classification accuracy.
-- [Rater agreement](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/rater.md): Cohen's and Fleiss' kappa, intraclass correlations.
-- [Response times](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/response-time.md): the lognormal model, speed, aberrant times, rapid guessing.
-- [Interoperability](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/interop.md): mirt's coefficients.
-- [Validation](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/validation.md): R references, datasets and tolerances.
-- [Architecture](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/architecture.md): design principles and layout, for contributors.
+- [Data](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/data.md): response matrices,
+  response records for sparse data, missing responses, scoring against a key.
+- [Classical test theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/ctt.md):
+  every statistic, its formula, missing data and edge cases.
+- [Item response theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/irt.md):
+  models, calibration, groups and distributions of theta, online calibration, testlets, standard errors, joint
+  maximum likelihood, ability estimation, summed-score tables, information, reliability, adding a model.
+- [Cognitive diagnosis](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/cdm.md): G-DINA, DINA
+  and DINO, attribute mastery, classification accuracy, Q-matrix validation, nonparametric classification.
+- [Adaptive and multistage testing](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/cat.md):
+  adaptive tests, item selection, content balancing, enemy sets, exposure control and its calibration, stopping
+  rules, multistage panels, simulation, form assembly.
+- [Item and person fit](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/fit.md): infit and
+  outfit, S-X², lz, Yen's Q3.
+- [Differential item functioning](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/dif.md):
+  Mantel-Haenszel and the ETS categories, logistic regression, sparse data, purification, Lord's chi-square.
+- [Linking and equating](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/equating.md):
+  scale linking from common items, observed-score equating with presmoothing, true-score equating.
+- [Simulation](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/sim.md): thetas, item parameters
+  of every model and response matrices, from a seed.
+- [Standard setting](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/standard-setting.md):
+  modified Angoff, Bookmark and Hofstee cut scores, classification accuracy.
+- [Rater agreement](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/rater.md): Cohen's and
+  Fleiss' kappa, intraclass correlations.
+- [Response times](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/response-time.md):
+  the lognormal model, speed, aberrant times, rapid guessing.
+- [Interoperability](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/interop.md):
+  mirt's coefficients.
+- [Validation](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/validation.md): R
+  references, datasets and tolerances.
+- [Architecture](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/architecture.md):
+  design principles and layout, for contributors.
 - [API reference](https://measurekit.github.io/measurekit/): every export, generated by TypeDoc.
 
 ## License
 
-[Apache-2.0](LICENSE). Copyright Fariz Wakan; see [NOTICE](NOTICE). [CONTRIBUTING.md](https://github.com/measurekit/measurekit/blob/main/CONTRIBUTING.md)
-describes how to contribute.
+[Apache-2.0](LICENSE). Copyright Fariz Wakan; see
+[NOTICE](NOTICE). [CONTRIBUTING.md](https://github.com/measurekit/measurekit/blob/main/CONTRIBUTING.md) describes how
+to contribute.

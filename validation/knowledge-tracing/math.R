@@ -1,6 +1,6 @@
 # Numerics fixtures: the normal quantile and the logistic function from base R; the forward-backward quantities of
-# hidden Markov sequences by enumerating every path of hidden states, an algorithm independent of the package's; and logistic
-# regressions by glm.
+# hidden Markov sequences by enumerating every path of hidden states, an algorithm independent of measurekit's;
+# and logistic regressions by glm.
 
 source("validation/knowledge-tracing/common.R")
 
@@ -27,7 +27,7 @@ path_weight <- function(path, through, emit, initial, transitions, emissions) {
 }
 
 # A sequence with its posterior quantities by enumeration. `transitions` is a list of T - 1 K x K matrices, `emissions`
-# a T x K matrix; matrices are flattened by rows, as the package stores them.
+# a T x K matrix; matrices are flattened by rows, as measurekit stores them.
 enumerate <- function(initial, transitions, emissions) {
   steps <- nrow(emissions)
   k <- length(initial)

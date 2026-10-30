@@ -15,7 +15,7 @@ import { scoreLimits } from "./models.js";
  * L_from they map linearly from 0 to L_to (Kolen and Brennan's procedure), above U_from linearly from U_to to the
  * highest `to` score.
  *
- * @throws `DataError` when a form's items are not an array or there are none, an item is invalid or not one of the package's
+ * @throws `DataError` when a form's items are not an array or there are none, an item is invalid or not one of the
  * built-in models, or its expected score does not increase with theta: an NRM item, or a slope a ≤ 0.
  * @see {@link https://doi.org/10.4324/9780203056615 | Lord (1980)}
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}

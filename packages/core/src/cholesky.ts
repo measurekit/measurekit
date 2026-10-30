@@ -1,6 +1,6 @@
 /**
- * Returns the lower triangular L with L Lᵀ = A of a symmetric `size` by `size` matrix A, stored by rows, or `null` when A
- * is not positive definite to working precision: when a pivot is at most `size` ε |A_jj|.
+ * Returns the lower triangular L with L Lᵀ = A of a symmetric `size` by `size` matrix A, stored by rows, or `null`
+ * when A is not positive definite to working precision: when a pivot is at most `size` ε |A_jj|.
  */
 export function cholesky(a: Float64Array, size: number): Float64Array | null {
   const lower = new Float64Array(size * size);

@@ -1,8 +1,8 @@
 # Data
 
-Functions in `@measurekit/psychometrics/data` build the response matrices that every analysis takes, and the response records
-that calibration and ability estimation also take for sparse data. They are plain objects, so they can be built by hand
-or loaded from JSON; every analysis function checks its input.
+Functions in `@measurekit/psychometrics/data` build the response matrices that every analysis takes, and the
+response records that calibration and ability estimation also take for sparse data. They are plain objects, so they
+can be built by hand or loaded from JSON; every analysis function checks its input.
 
 ## Response matrices
 

@@ -39,7 +39,7 @@ const DEFAULT_RESPONSE_PROBABILITY = 0.67;
  * at the theta where P(X ≥ k | θ) equals the response probability (RP), in ascending order of location, ties in item
  * order. A dichotomous item has one page, at P(θ) = RP.
  *
- * @throws `DataError` without items, when an id is not a string or repeats, an item is invalid or not one of the package's
+ * @throws `DataError` without items, when an id is not a string or repeats, an item is invalid or not one of the
  * built-in models, its expected score does not increase with theta (an NRM item, or a ≤ 0), the response probability
  * is not between 0 and 1, or a logistic item's probability never equals it: c ≥ RP or d ≤ RP.
  * @see {@link https://doi.org/10.4324/9781410600264 | Mitzel, Lewis, Patz and Green (2001)}

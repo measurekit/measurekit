@@ -1,4 +1,5 @@
-# Helpers for the fixture scripts. Run the scripts from the repository root, e.g. `Rscript validation/knowledge-tracing/elo.R`.
+# Helpers for the fixture scripts. Run the scripts from the repository root,
+# e.g. `Rscript validation/knowledge-tracing/elo.R`.
 
 suppressPackageStartupMessages(library(jsonlite))
 
@@ -9,10 +10,10 @@ write_fixture <- function(name, x) {
   message("Wrote ", path)
 }
 
-# The logistic function written as the package computes it, so that both round alike.
+# The logistic function written as measurekit computes it, so that both round alike.
 logistic <- function(x) 1 / (1 + exp(-x))
 
-# A log as a list of events, the form the package takes: learner, item, skills (always an array), time, outcome.
+# A log as a list of events, the form measurekit takes: learner, item, skills (always an array), time, outcome.
 events_of <- function(learner, item, skills, time, outcome) {
   lapply(seq_along(learner), function(i) {
     list(learner = learner[i], item = item[i], skills = I(skills[[i]]), time = time[i], outcome = outcome[i])

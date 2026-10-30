@@ -139,7 +139,8 @@ interface LocatedModule {
  * Checks the structure of a panel and returns its modules by id.
  *
  * @throws `DataError` when the panel has no stages, a stage has no modules, the first stage has more than one, a module
- * is not an object with a string id and at least one item, module ids repeat, or cut points do not match the next stage.
+ * is not an object with a string id and at least one item, module ids repeat, or cut points do not match the
+ * next stage.
  */
 export function locateModules(stages: readonly (readonly MultistageModule[])[]): Map<string, LocatedModule> {
   checkArray(stages, "The option stages must be an array of stages");

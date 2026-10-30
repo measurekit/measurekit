@@ -32,8 +32,8 @@ export interface IntraclassCorrelation {
  * MS_E) / (MS_R + (MS_C - MS_E) / n) and (MS_R - MS_E) / MS_R. Ratings are finite numbers. Uses the subjects every
  * rater rated.
  *
- * @throws `DataError` when there are fewer than two raters, a rating is not a finite number or `null`, or fewer than two
- * subjects were rated by every rater.
+ * @throws `DataError` when there are fewer than two raters, a rating is not a finite number or `null`, or fewer
+ * than two subjects were rated by every rater.
  */
 export function intraclassCorrelation(ratings: readonly (readonly (number | null)[])[]): IntraclassCorrelation {
   const rows = completeRatings(ratings, "The intraclass correlation", {

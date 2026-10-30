@@ -1,7 +1,7 @@
 # Classical test theory
 
-`@measurekit/psychometrics/ctt` computes item statistics, distractor analysis, reliability, McDonald's omega and the standard
-error of measurement from a [response matrix](data.md). Every statistic is validated against R
+`@measurekit/psychometrics/ctt` computes item statistics, distractor analysis, reliability, McDonald's omega and
+the standard error of measurement from a [response matrix](data.md). Every statistic is validated against R
 ([validation](validation.md)).
 
 ## Missing responses

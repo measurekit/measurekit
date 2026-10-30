@@ -15,7 +15,7 @@ suppressPackageStartupMessages({
 
 POINTS <- 61 # mirt's default quadrature: 61 equally spaced nodes on [-6, 6]
 TOL <- 1e-10 # mirt's EM tolerance, tight so that its estimates are the optimum
-RANGE <- c(-6, 6) # the package's default theta range for ML, WLE and MAP
+RANGE <- c(-6, 6) # measurekit's default theta range for ML, WLE and MAP
 INFORMATION_THETA <- seq(-6, 6, by = 0.5)
 LOGISTIC <- c("1pl", "2pl", "3pl", "4pl")
 # Models whose Jeffreys prior gives Warm's estimator, so that mirt's WLE is a reference: the exponential family.
@@ -28,18 +28,19 @@ fit_mirt <- function(data, model, itemtype, se_type, ...) {
   fit
 }
 
-# --- the package's parameters of mirt's items ---------------------------------------------------------------------------
+# --- measurekit's parameters of mirt's items ----------------------------------------------------------------------
 # Logistic items: coef(IRTpars = TRUE), which applies the delta method to mirt's slope-intercept and logit scale.
-# Polytomous items: the package's parameters computed from mirt's slope-intercept values, and their standard errors by the
-# delta method from vcov(), with the Jacobian by central differences. mirt 1.48's coef(IRTpars = TRUE, printSE = TRUE)
-# is not used for them: its GPCM b1 standard error disagrees with the delta method on its own covariance matrix.
+# Polytomous items: measurekit's parameters computed from mirt's slope-intercept values, and their standard errors by
+# the delta method from vcov(), with the Jacobian by central differences. mirt 1.48's coef(IRTpars = TRUE,
+# printSE = TRUE) is not used for them: its GPCM b1 standard error disagrees with the delta method on its own
+# covariance matrix.
 
 item_values <- function(values, item) {
   rows <- values[values$item == item, ]
   setNames(rows$value, rows$name)
 }
 
-# The package's parameters of a polytomous item from its named mirt values.
+# measurekit's parameters of a polytomous item from its named mirt values.
 polytomous_parameters <- function(model, v) {
   numbered <- function(prefix) v[grep(paste0("^", prefix, "[0-9]+$"), names(v))]
   switch(model,
@@ -58,7 +59,7 @@ polytomous_parameters <- function(model, v) {
   )
 }
 
-# The package's estimated parameters of a polytomous item, named as its vector entries.
+# measurekit's estimated parameters of a polytomous item, named as its vector entries.
 estimated_parameters <- function(model, p) {
   k <- length(p$a) # categories of an NRM item
   switch(model,
@@ -103,7 +104,7 @@ delta_errors <- function(fit, items, models) {
   })
 }
 
-# The package's items of a mirt fit: parameters and the standard errors of the estimated ones, by item. Fixed items have
+# measurekit's items of a mirt fit: parameters and the standard errors of the estimated ones, by item. Fixed items have
 # no standard errors.
 psychometrics_items <- function(fit, models) {
   items <- colnames(extract.mirt(fit, "data"))
@@ -230,7 +231,7 @@ response_patterns <- function(item_count, categories = 2) {
 }
 
 # Category probabilities P and their first and second theta derivatives P1 and P2, theta by category, of an item with
-# The package's parameters, written out for each model.
+# measurekit's parameters, written out for each model.
 item_trace <- function(model, p, theta) {
   if (model %in% LOGISTIC) {
     l <- plogis(p$a * (theta - p$b))
@@ -505,7 +506,7 @@ science_patterns <- rbind(
 )
 science_models <- function(model) rep(model, ncol(science))
 
-# The RSM on the package's scale: mirt's rsm with the slopes freed and equal, and the latent variance fixed at 1.
+# The RSM on measurekit's scale: mirt's rsm with the slopes freed and equal, and the latent variance fixed at 1.
 rsm_values <- mirt(science, 1, itemtype = "rsm", pars = "values")
 rsm_values$est[rsm_values$name == "a1"] <- TRUE
 rsm_values$est[rsm_values$name == "COV_11"] <- FALSE
@@ -523,7 +524,7 @@ stopifnot(abs(logLik(mirt(science, 1, itemtype = "Rasch", TOL = TOL, verbose = F
   logLik(polytomous_fits$pcm)) < 1e-3)
 stopifnot(abs(logLik(mirt(science, 1, itemtype = "rsm", TOL = TOL, verbose = FALSE)) -
   logLik(polytomous_fits$rsm)) < 1e-3)
-# The package's parameters from mirt's values reproduce coef(IRTpars = TRUE) where mirt has the IRT form.
+# measurekit's parameters from mirt's values reproduce coef(IRTpars = TRUE) where mirt has the IRT form.
 for (model in c("grm", "gpcm", "pcm", "nrm")) {
   fit <- polytomous_fits[[model]]
   mirt_irt <- coef(fit, IRTpars = TRUE, simplify = TRUE)$items
@@ -1001,8 +1002,8 @@ online <- latent_case(sprintf("Online calibration: %d fixed operational and %d p
                       online_data, rep("all", persons), online_anchors, c(all = "normal"), list(all = online_fit))
 
 # A histogram on fixed items: base R's EM from the standard normal weights, each cycle's weights the expected counts
-# over their sum, until no weight changes by more than 1e-4, the package's rule. The weights creep toward a few spikes, the
-# maximum, so a histogram is where EM stops.
+# over their sum, until no weight changes by more than 1e-4, measurekit's rule. The weights creep toward a few
+# spikes, the maximum, so a histogram is where EM stops.
 histogram_tolerance <- 1e-4
 histogram_items <- online_anchors
 weights <- normal_weights(0, 1)
@@ -1032,8 +1033,8 @@ write_fixture("irt-latent", list(
 
 # --- Summed-score tables and reliability ---------------------------------------------------------------------------
 # mirt's fscores(method = "EAPsum") with the standard normal prior; base R's Lord-Wingersky recursion on probtrace for
-# another prior, with the nodes placed on it, the package's rule. mirt's marginal_rxx and empirical_rxx; base R's integrate
-# for the marginal reliability under another prior.
+# another prior, with the nodes placed on it, measurekit's rule. mirt's marginal_rxx and empirical_rxx; base
+# R's integrate for the marginal reliability under another prior.
 
 # The probability of each total score at each node, by the recursion of Lord and Wingersky (1984).
 score_likelihoods <- function(fit, nodes) {
@@ -1142,8 +1143,8 @@ testlet_fit <- function(data, testlet) {
 }
 
 # The marginal log-likelihood of 2PL items in testlets by the bifactor dimension reduction (Gibbons and Hedeker, 1992):
-# at each node of theta, each testlet's Σ_g w_g Π_j P_j(x_j | θ + γ_g), on the grid of θ + γ, the weights of γ ∝ φ(γ / σ).
-# The parameters are a, d = -a b and ln σ.
+# at each node of theta, each testlet's Σ_g w_g Π_j P_j(x_j | θ + γ_g), on the grid of θ + γ, the weights of γ ∝ φ(γ
+# / σ). The parameters are a, d = -a b and ln σ.
 testlet_log_likelihood <- function(par, x, testlet) {
   k <- ncol(x)
   testlets <- sort(unique(testlet))
@@ -1194,7 +1195,7 @@ testlet_maximum <- function(x, testlet, start) {
 }
 
 # The EAP of theta with each testlet's effect integrated out: 61 rectangular nodes z on the N(0, 1) prior for theta and
-# σ z for each testlet, weights ∝ φ(z), the package's rule.
+# σ z for each testlet, weights ∝ φ(z), measurekit's rule.
 testlet_eap <- function(pattern, a, d, sd, testlet) {
   z <- seq(-6, 6, length.out = 61)
   w <- dnorm(z) / sum(dnorm(z))

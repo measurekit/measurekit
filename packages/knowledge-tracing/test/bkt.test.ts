@@ -183,7 +183,8 @@ describe("bkt fitting", () => {
     // Each skill: P(L0), P(T), P(G), P(S).
     expectClose(fit.aic, 2 * 12 - 2 * fit.logLikelihood, 1e-9);
     expectClose(fit.bic, 12 * Math.log(log.length) - 2 * fit.logLikelihood, 1e-9);
-    // Skill a: 2 group priors, 4 items with learn and forget rates, 4 with guess and slip: 2 + 8 + 8; b alike; c: 2 + 4 + 4.
+    // Skill a: 2 group priors, 4 items with learn and forget rates, 4 with guess and slip: 2 + 8 + 8; b alike; c: 2 +
+    // 4 + 4.
     const extended = bkt({
       forgetting: true,
       itemGuessSlip: true,

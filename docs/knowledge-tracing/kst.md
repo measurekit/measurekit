@@ -1,9 +1,10 @@
 # Knowledge space theory
 
-`@measurekit/knowledge-tracing/kst` models what a learner knows as a knowledge state: the set of skills, or items, they master,
-out of the states a knowledge structure allows. It builds structures from prerequisites, derives prerequisites from
-data, fits the basic local independence model (BLIM), and assesses learners adaptively. Results are validated against
-the R packages kst, pks and DAKS ([validation](validation.md#knowledge-space-theory)).
+`@measurekit/knowledge-tracing/kst` models what a learner knows as a knowledge state: the set of skills, or items,
+they master, out of the states a knowledge structure allows. It builds structures from prerequisites,
+derives prerequisites from data, fits the basic local independence model (BLIM), and assesses learners
+adaptively. Results are validated against the R packages kst, pks and
+DAKS ([validation](validation.md#knowledge-space-theory)).
 
 ## Knowledge structures
 

@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
   library(sets)
 })
 
-# A structure as the package takes it: the domain and each state's elements.
+# A structure as measurekit takes it: the domain and each state's elements.
 structure_of <- function(K) {
   domain <- colnames(K)
   list(domain = domain, states = lapply(seq_len(nrow(K)), function(r) I(domain[K[r, ] == 1])))

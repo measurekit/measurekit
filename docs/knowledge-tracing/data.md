@@ -1,8 +1,8 @@
 # Data
 
-Functions in `@measurekit/knowledge-tracing/data` build the logs that every model and evaluation takes, and split them into folds.
-Logs are plain arrays of plain objects, so they can be built by hand or loaded from JSON; every function that takes a
-log checks it.
+Functions in `@measurekit/knowledge-tracing/data` build the logs that every model and evaluation takes, and split
+them into folds. Logs are plain arrays of plain objects, so they can be built by hand or loaded from JSON;
+every function that takes a log checks it.
 
 ## Events
 
@@ -56,8 +56,8 @@ other types are rejected.
 ## Q-matrices
 
 A `QMatrix` gives the skills of each item, `{ [item]: skills }`, for events that do not carry skills. Its shape is
-that of the `QMatrix` of `@measurekit/psychometrics`; a row may be empty here, as an item may practice no skill, where its
-cognitive diagnosis needs at least one attribute per item.
+that of the `QMatrix` of `@measurekit/psychometrics`; a row may be empty here, as an item may practice no skill,
+where its cognitive diagnosis needs at least one attribute per item.
 
 An event without skills whose item the Q-matrix lacks throws `DataError`:
 `Event 7 has no skills, and the Q-matrix lacks its item "q9".` A skill no model has seen is not an error: models start

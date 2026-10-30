@@ -157,7 +157,9 @@ interface TestletReduction {
   prepare(): void;
   /** Adds ln Σ_g w_g Π_j P_j(x_j | θ_q + γ_g) of each testlet the person answered to `logPosterior` at each θ_q. */
   integrate(person: number, start: number, end: number, logPosterior: Float64Array): void;
-  /** Adds the person's expected counts to the testlet items' counts and to the testlets', given the posterior over θ. */
+  /**
+   * Adds the person's expected counts to the testlet items' counts and to the testlets', given the posterior over θ.
+   */
   count(person: number, start: number, end: number, posterior: Float64Array): void;
   /** Adds the frequent patterns' expected counts to the testlet items' counts and to the testlets'. */
   finish(): void;

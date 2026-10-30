@@ -1,5 +1,5 @@
 # Interoperability fixtures: mirt's coefficients of the same items in the IRT form, coef(IRTpars = TRUE), and the
-# slope-intercept form, coef(IRTpars = FALSE), for every item type the package converts, with the category probabilities
+# slope-intercept form, coef(IRTpars = FALSE), for every item type measurekit converts, with the category probabilities
 # from probtrace. The items are set, not estimated.
 
 source("validation/psychometrics/common.R")

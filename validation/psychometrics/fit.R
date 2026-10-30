@@ -1,6 +1,6 @@
 # Item and person fit fixtures. References: eRm (itemfit and personfit: infit and outfit mean squares and their
 # standardized values), mirt (itemfit's S-X², personfit's Zh, residuals' Q3). Each fixture holds the responses, the
-# items in the package's parameters and the thetas the reference used, so the tests compute the statistics from the same
+# items in measurekit's parameters and the thetas the reference used, so the tests compute the statistics from the same
 # inputs.
 
 source("validation/psychometrics/common.R")
@@ -14,8 +14,8 @@ TOL <- 1e-10 # mirt's EM tolerance
 
 responses <- function(data) unname(lapply(seq_len(nrow(data)), function(i) as.numeric(data[i, ])))
 
-# The package's parameters of mirt's items: 2PL from coef(IRTpars = TRUE); GPCM and GRM thresholds from the slope-intercept
-# values, b_k = -(d_k - d_(k-1)) / a for the GPCM and -d_k / a for the GRM.
+# measurekit's parameters of mirt's items: 2PL from coef(IRTpars = TRUE); GPCM and GRM thresholds from
+# the slope-intercept values, b_k = -(d_k - d_(k-1)) / a for the GPCM and -d_k / a for the GRM.
 mirt_items <- function(fit, itemtype) {
   values <- mod2values(fit)
   lapply(colnames(extract.mirt(fit, "data")), function(item) {

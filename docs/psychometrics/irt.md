@@ -1,10 +1,10 @@
 # Item response theory
 
-`@measurekit/psychometrics/irt` calibrates items by marginal maximum likelihood, in one or several groups of persons, with the
-distribution of theta fixed or estimated, and Rasch and partial credit items also by joint maximum likelihood. It
-estimates abilities, converts summed scores to theta, and computes information and reliability. Every estimate is
-validated against mirt, ltm, TAM and base R ([validation](validation.md)). Theta is on the N(0, 1) scale unless a
-calibration estimates its distribution.
+`@measurekit/psychometrics/irt` calibrates items by marginal maximum likelihood, in one or several groups of
+persons, with the distribution of theta fixed or estimated, and Rasch and partial credit items also by joint
+maximum likelihood. It estimates abilities, converts summed scores to theta, and computes information and
+reliability. Every estimate is validated against mirt, ltm, TAM and base R ([validation](validation.md)). Theta is
+on the N(0, 1) scale unless a calibration estimates its distribution.
 
 ## Models
 
@@ -108,8 +108,9 @@ result.items[3]; // { id: "item4", model, parameters: { a: 0.93, b: [-0.97, 0.26
 result.logLikelihood; // also aic, bic, converged and iterations
 ```
 
-`calibrate(data, options)` takes a [response matrix](data.md) or, for sparse data, [response records](data.md#response-records):
-both give the same calibration, and records take memory in proportion to the responses only.
+`calibrate(data, options)` takes a [response matrix](data.md) or, for sparse
+data, [response records](data.md#response-records): both give the same calibration, and records take memory
+in proportion to the responses only.
 
 | Option           | Default             | Meaning                                                                                                                 |
 | ---------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -331,8 +332,8 @@ Priors apply to a parameter on its own scale, not on the logit scale. A custom p
 ### In a browser
 
 Calibration runs synchronously and can take seconds on large data. In a browser, run it in a Web Worker so that the
-page stays responsive: the package uses no platform API, so the worker imports it as any module does, and the data and the
-result pass as plain objects.
+page stays responsive: `@measurekit/psychometrics` uses no platform API, so the worker imports it as any module
+does, and the data and the result pass as plain objects.
 
 ```ts
 // calibrate.worker.ts, started with new Worker(new URL("./calibrate.worker.ts", import.meta.url), { type: "module" })
@@ -479,9 +480,9 @@ is a² times the variance of the category, and for the NRM the variance of the s
 
 A model is an object implementing `IrtModel<TParameters>`. Calibration, ability estimation, information, adaptive and
 multistage tests, fit, characteristic curve linking and `simulateResponses` use only its members, so a model defined
-outside the package works there as a built-in one does. Functions that rely on the parameters of the built-in models take
-those only: moment linking, `transformItem`, true-score equating, Lord's chi-square, `simulateItems`, the Bookmark
-method and the conversions of `@measurekit/psychometrics/interop`.
+outside the package works there as a built-in one does. Functions that rely on the parameters of the built-in
+models take those only: moment linking, `transformItem`, true-score equating, Lord's chi-square, `simulateItems`,
+the Bookmark method and the conversions of `@measurekit/psychometrics/interop`.
 
 | Member                                               | Purpose                                                                                                         |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |

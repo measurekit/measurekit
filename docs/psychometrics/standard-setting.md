@@ -1,9 +1,9 @@
 # Standard setting
 
-`@measurekit/psychometrics/standard-setting` turns a panel's judgments into cut scores by the modified Angoff, Bookmark and
-Hofstee methods, and reports how accurately and consistently cuts on theta classify persons. No R package among the
-references implements them; each is validated against its definition written out in base R, with mirt's probabilities
-and expected test scores for the Bookmark method ([validation](validation.md)).
+`@measurekit/psychometrics/standard-setting` turns a panel's judgments into cut scores by the modified Angoff,
+Bookmark and Hofstee methods, and reports how accurately and consistently cuts on theta classify persons. No R
+package among the references implements them; each is validated against its definition written out in base R,
+with mirt's probabilities and expected test scores for the Bookmark method ([validation](validation.md)).
 
 Cut scores on the total score scale are not rounded: a person meets the standard with a total score at or above it.
 

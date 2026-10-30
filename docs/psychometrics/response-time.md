@@ -1,8 +1,8 @@
 # Response times
 
-`@measurekit/psychometrics/response-time` models how long persons take on items: the lognormal model with its calibration,
-person speed, aberrant times, and rapid guessing by normative thresholds, response time effort and effort-moderated
-scoring. Each is validated against nlme, LNIRT, mirt or base R ([validation](validation.md)).
+`@measurekit/psychometrics/response-time` models how long persons take on items: the lognormal model with
+its calibration, person speed, aberrant times, and rapid guessing by normative thresholds, response time effort
+and effort-moderated scoring. Each is validated against nlme, LNIRT, mirt or base R ([validation](validation.md)).
 
 ## Times
 

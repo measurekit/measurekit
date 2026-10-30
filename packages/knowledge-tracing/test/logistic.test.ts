@@ -45,7 +45,8 @@ interface Reference {
   readonly expected: LogisticParameters & { readonly logLikelihood: number };
 }
 
-// Parsed rather than imported as typed: TypeScript merges the fits' coefficient records into one type with optional keys.
+// Parsed rather than imported as typed: TypeScript merges the fits' coefficient records into one type with
+// optional keys.
 const references: readonly Reference[] = JSON.parse(JSON.stringify(glm.fits));
 const simulated = eventLog(glm.events);
 const singleSkill = glm.singleSkill.map((index) => defined(simulated[index]));

@@ -13,7 +13,9 @@ export interface ThresholdParameters {
   readonly b: readonly number[];
 }
 
-/** Returns the estimated parameters of an item of a threshold model with `categoryCount` categories: `slope`, b1, ... */
+/**
+ * Returns the estimated parameters of an item of a threshold model with `categoryCount` categories: `slope`, b1, ...
+ */
 export function thresholdParameterList(slope: ModelParameter, categoryCount: number): ModelParameter[] {
   return [slope, ...Array.from({ length: categoryCount - 1 }, (_, j) => ({ name: `b${j + 1}` }))];
 }

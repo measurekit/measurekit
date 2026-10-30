@@ -115,8 +115,8 @@ export function createSystem(p: number, n: number): System {
 
 /**
  * Assembles the gradient and the Newton system of the negative log-likelihood + λ / 2 |β|² + μ / 2 |u|², one group at
- * a time: each group adds w x xᵀ of its rows to the coefficients' block, and subtracts its coupling B_g B_gᵀ / a_g, with
- * B_g = Σ w x and a_g = Σ w + μ over its rows.
+ * a time: each group adds w x xᵀ of its rows to the coefficients' block, and subtracts its coupling B_g B_gᵀ /
+ * a_g, with B_g = Σ w x and a_g = Σ w + μ over its rows.
  */
 export function assemble(
   problem: Problem,
@@ -147,7 +147,10 @@ export function assemble(
   }
 }
 
-/** Assembles the rows of block g, with its intercept u and its coupling with the coefficients; returns the new count of touched columns. */
+/**
+ * Assembles the rows of block g, with its intercept u and its coupling with the coefficients; returns the new count of
+ * touched columns.
+ */
 function assembleBlock(
   problem: Problem,
   system: System,
@@ -261,10 +264,10 @@ const FIRST_DAMPING = 1e-10;
 const DAMPING_GROWTH = 100;
 
 /**
- * Solves the Schur system S x = b, retrying with S + δ I where S is singular, as columns that are linear combinations of
- * others, such as successes and failures with opportunities, make it: δ grows from 1e-10 of the largest diagonal entry
- * by 100 a try, up to that entry (Levenberg-Marquardt). The gradient has no component along a direction the
- * likelihood is flat in, so the step along it stays near 0. Adds the damping to S in place.
+ * Solves the Schur system S x = b, retrying with S + δ I where S is singular, as columns that are linear
+ * combinations of others, such as successes and failures with opportunities, make it: δ grows from 1e-10 of the
+ * largest diagonal entry by 100 a try, up to that entry (Levenberg-Marquardt). The gradient has no component along
+ * a direction the likelihood is flat in, so the step along it stays near 0. Adds the damping to S in place.
  */
 function solveDamped(schur: Float64Array, p: number, rhs: Float64Array, out: Float64Array): boolean {
   if (choleskySolve(schur, p, rhs, out)) return true;
@@ -317,9 +320,9 @@ export interface PenalizedNewtonOptions {
 }
 
 /**
- * Minimizes the negative log-likelihood + λ / 2 |β|² + μ / 2 |u|² over the coefficients β and the group intercepts u, in
- * place, by Newton steps with a backtracking line search; where the Schur complement is not positive definite, the
- * step follows the negative gradient.
+ * Minimizes the negative log-likelihood + λ / 2 |β|² + μ / 2 |u|² over the coefficients β and the group intercepts
+ * u, in place, by Newton steps with a backtracking line search; where the Schur complement is not positive
+ * definite, the step follows the negative gradient.
  */
 export function penalizedNewton(
   problem: Problem,

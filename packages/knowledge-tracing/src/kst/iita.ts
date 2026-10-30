@@ -145,7 +145,9 @@ function selectionSet(b: Float64Array, m: number): Uint8Array[] {
   return relations.filter((candidate) => candidate.some((value, k) => value === 1 && k % (m + 1) !== 0));
 }
 
-/** Returns the relation with the pairs of at most `level` counterexamples that keep it transitive, or `null` if none. */
+/**
+ * Returns the relation with the pairs of at most `level` counterexamples that keep it transitive, or `null` if none.
+ */
 function extend(relation: Uint8Array, b: Float64Array, m: number, level: number): Uint8Array | null {
   const union = relation.slice();
   const added: number[] = [];

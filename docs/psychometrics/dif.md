@@ -1,9 +1,9 @@
 # Differential item functioning
 
-`@measurekit/psychometrics/dif` tests whether an item functions differently for two groups of persons of equal ability: the
-Mantel-Haenszel statistics with the ETS categories, logistic regression and Lord's chi-square. The first two work on
-sparse data and purify their matching criterion on request. Each is validated against difR, and the sparse-data rule
-against base R ([validation](validation.md)).
+`@measurekit/psychometrics/dif` tests whether an item functions differently for two groups of persons of equal
+ability: the Mantel-Haenszel statistics with the ETS categories, logistic regression and Lord's chi-square. The
+first two work on sparse data and purify their matching criterion on request. Each is validated against difR, and
+the sparse-data rule against base R ([validation](validation.md)).
 
 ## Groups
 
@@ -57,12 +57,12 @@ them all.
 
 ## Purification
 
-With `purify: true` (default `false`), the items flagged at the 0.05 level leave the anchors, and the statistics are computed again on
-the items not flagged, until a round flags the items the previous one did, every item is flagged, or 10 rounds have
-run, as difR's `purify` (Holland and Thayer, 1988). The Mantel-Haenszel test flags by its chi-square, logistic
-regression by its test of both terms, difR's default `type`. The result's `purification` holds the `anchors` of the
-final statistics, the `iterations` after the first statistics and whether they `converged`; it is `null` without
-`purify`.
+With `purify: true` (default `false`), the items flagged at the 0.05 level leave the anchors, and the statistics
+are computed again on the items not flagged, until a round flags the items the previous one did, every item is
+flagged, or 10 rounds have run, as difR's `purify` (Holland and Thayer, 1988). The Mantel-Haenszel test flags by
+its chi-square, logistic regression by its test of both terms, difR's default `type`. The result's `purification`
+holds the `anchors` of the final statistics, the `iterations` after the first statistics and whether they
+`converged`; it is `null` without `purify`.
 
 ## Mantel-Haenszel
 
@@ -145,5 +145,5 @@ The result holds `items`, `{ id, chiSquare, degreesOfFreedom, significance }` ea
 | Continuity correction | Subtracted when \|Σ (A - E(A))\| ≥ 0.5, as `mantelhaen.test` | Always subtracted: identical groups get (0.5)² / Σ Var(A), not 0                                              |
 | ETS categories        | ETS's rule with its significance tests                       | `print` codes \|MH D-DIF\| alone: below 1 A, below 1.5 B, else C                                              |
 | Lord's calibrations   | EM to `tolerance`                                            | ltm's default control, 40 EM cycles then BFGS, stops short: up to 2% in χ²                                    |
-| Lord's 1PL            | Not supported: the package's 1PL estimates a common a        | a fixed at 1                                                                                                  |
+| Lord's 1PL            | Not supported: `oneParameterLogistic` estimates a common a   | a fixed at 1                                                                                                  |
 | Missing responses     | The scaled matching score of each item's persons             | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect |

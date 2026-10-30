@@ -27,9 +27,9 @@ export interface RecommendOptions {
 }
 
 /**
- * Ranks candidate attempts by the learner's predicted success: the attempts predicted inside the band first, nearest its
- * middle first, then the others, nearest the band first. Ties keep the candidates' order. The first is the next item
- * to practice; filter the candidates first, for instance to the skills not yet mastered.
+ * Ranks candidate attempts by the learner's predicted success: the attempts predicted inside the band first,
+ * nearest its middle first, then the others, nearest the band first. Ties keep the candidates' order. The first is
+ * the next item to practice; filter the candidates first, for instance to the skills not yet mastered.
  *
  * @throws `DataError` when the model is not a learner model, the band is not within 0 to 1 with lower ≤ upper, or the
  * model rejects the state or an attempt.

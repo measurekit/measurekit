@@ -38,8 +38,8 @@ export interface ResponseTimeEffort {
 
 /**
  * Returns each item's rapid-guessing threshold by the normative threshold method: `percentage` of the mean of the
- * item's times, at most `cap` seconds. A response faster than its item's threshold is a rapid guess. Items without times
- * have no threshold.
+ * item's times, at most `cap` seconds. A response faster than its item's threshold is a rapid guess. Items
+ * without times have no threshold.
  *
  * @throws `DataError` when the data are malformed or have no times, or `percentage` or `cap` is not positive and
  * finite.

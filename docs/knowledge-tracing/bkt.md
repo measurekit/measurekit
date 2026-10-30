@@ -1,8 +1,8 @@
 # Bayesian knowledge tracing
 
-`@measurekit/knowledge-tracing/bkt` traces each skill with Bayesian knowledge tracing (Corbett and Anderson, 1994) and the
-extensions of pyBKT (Badrinath, Wang and Pardos, 2021): forgetting, item guess and slip, item learning and prior groups.
-Inference at fixed parameters and EM fitting are validated against pyBKT
+`@measurekit/knowledge-tracing/bkt` traces each skill with Bayesian knowledge tracing (Corbett and Anderson, 1994)
+and the extensions of pyBKT (Badrinath, Wang and Pardos, 2021): forgetting, item guess and slip, item learning and
+prior groups. Inference at fixed parameters and EM fitting are validated against pyBKT
 ([validation](validation.md#bayesian-knowledge-tracing)).
 
 ## The model

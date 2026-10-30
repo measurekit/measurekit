@@ -203,7 +203,10 @@ function iterate<TParameters>(
   return { converged, iterations };
 }
 
-/** Returns, for each item, the part of the covariance matrix of the free parameters at its slots; `null` for a fixed item. */
+/**
+ * Returns, for each item, the part of the covariance matrix of the free parameters at its slots; `null` for a fixed
+ * item.
+ */
 function covariancesOfItems<TParameters>(
   items: Setup<TParameters>["items"],
   covariance: Float64Array | null,

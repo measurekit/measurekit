@@ -3,7 +3,9 @@ import type { Attempt } from "../data/event.js";
 import { checkLearnerState } from "../data/learner.js";
 import { entry } from "../data/record.js";
 
-/** A learner's state in a logistic model: their history with each skill practiced. Plain data, which JSON serializes. */
+/**
+ * A learner's state in a logistic model: their history with each skill practiced. Plain data, which JSON serializes.
+ */
 export interface LogisticState {
   /** The learner's id. */
   readonly learner: string;
@@ -19,7 +21,10 @@ export interface SkillHistory {
   readonly failures: number;
   /** The time of the last attempt. */
   readonly last: number;
-  /** For each decay d of the model's features, by `String(d)`: successes and failures, each attempt weighing d times the next. */
+  /**
+   * For each decay d of the model's features, by `String(d)`: successes and failures, each attempt weighing d times the
+   * next.
+   */
   readonly decayed: Readonly<Record<string, DecayedCounts>>;
 }
 

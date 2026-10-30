@@ -168,8 +168,9 @@ interface Laplace {
 
 /**
  * Computes the conditional modes b̂_g of the group intercepts in place, from their current values, and the Laplace
- * approximation L = Σ ℓ(β, b̂) - Σ b̂² / (2σ²) - ½ Σ ln(1 + σ² h_g), h_g = Σ w over the group's rows. With a system, also
- * assembles the penalized Hessian there, whose Schur complement is the curvature of β, and the gradient over β and τ.
+ * approximation L = Σ ℓ(β, b̂) - Σ b̂² / (2σ²) - ½ Σ ln(1 + σ² h_g), h_g = Σ w over the group's rows. With a
+ * system, also assembles the penalized Hessian there, whose Schur complement is the curvature of β, and the
+ * gradient over β and τ.
  */
 function laplace(
   problem: Problem,
@@ -254,8 +255,8 @@ function addScaledRow(design: Problem["design"], row: number, scale: number, out
 
 /**
  * Returns the mode of a group's intercept given β and σ: the maximum of Σ ℓ(x β + b) - b² precision / 2 over its rows,
- * from `initial`, with x β in `problem.linear`. Newton steps are bounded, and the bound halves whenever a step overshoots
- * the maximum by more than the step before, so the iteration converges on this concave function.
+ * from `initial`, with x β in `problem.linear`. Newton steps are bounded, and the bound halves whenever a
+ * step overshoots the maximum by more than the step before, so the iteration converges on this concave function.
  */
 function conditionalMode(problem: Problem, start: number, end: number, initial: number, precision: number): number {
   const { outcomes, order, linear: eta0 } = problem;

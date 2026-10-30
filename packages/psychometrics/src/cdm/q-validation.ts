@@ -4,7 +4,9 @@ import { type CdmCalibration, calibratedModel, forEachPosterior } from "./calibr
 import { profilesOf } from "./q-matrix.js";
 
 const DEFAULT_EPS = 0.95;
-/** Added to a profile's expected correct and incorrect responses, so that a profile without persons has probability 1/2. */
+/**
+ * Added to a profile's expected correct and incorrect responses, so that a profile without persons has probability 1/2.
+ */
 const SMOOTHING = 1e-10;
 
 /** Options of {@link validateQMatrix}. */

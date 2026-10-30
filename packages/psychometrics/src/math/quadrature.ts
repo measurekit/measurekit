@@ -1,6 +1,8 @@
 import { normalDensity } from "./normal.js";
 
-/** Nodes and weights of a quadrature rule: the integral of `f` is approximated by the sum of `weights[i] * f(nodes[i])`. */
+/**
+ * Nodes and weights of a quadrature rule: the integral of `f` is approximated by the sum of `weights[i] * f(nodes[i])`.
+ */
 export interface Quadrature {
   /** Nodes, in ascending order. */
   readonly nodes: Float64Array;

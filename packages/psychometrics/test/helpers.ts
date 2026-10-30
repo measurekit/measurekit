@@ -55,7 +55,7 @@ export const MODELS: Readonly<Record<string, IrtModel>> = {
   nrm: nominalResponse,
 };
 
-/** Items of a fixture: a model name and the package's parameters. */
+/** Items of a fixture: a model name and the item parameters. */
 export type FixtureItems = readonly { readonly model: string; readonly parameters: FixtureParameters }[];
 
 /** Returns the items of a fixture. */

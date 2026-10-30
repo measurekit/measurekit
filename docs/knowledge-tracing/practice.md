@@ -1,7 +1,7 @@
 # Practice
 
-`@measurekit/knowledge-tracing/practice` chooses what a learner practices next and decides when a skill is mastered. It works with
-any model through the `LearnerModel` interface, including models written outside the package.
+`@measurekit/knowledge-tracing/practice` chooses what a learner practices next and decides when a skill is mastered.
+It works with any model through the `LearnerModel` interface, including models written outside the package.
 
 ## Next item
 
@@ -101,9 +101,10 @@ Elo, logistic models and IRT have none: their prediction after an attempt depend
 
 ## Spaced repetition
 
-The package decides what a learner practices and when it is mastered; a spaced repetition scheduler, as
-[ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs), decides when to review what was mastered. The package does not
-depend on it. Once a skill or fact is mastered, give it a card and grade each review by its outcome:
+`recommend` and the mastery criteria decide what a learner practices and when it is mastered; a spaced
+repetition scheduler, as [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs), decides when to review what
+was mastered. `@measurekit/knowledge-tracing` does not depend on it. Once a skill or fact is mastered, give it a
+card and grade each review by its outcome:
 
 ```ts
 import { DefaultScheduler, Rating } from "ts-fsrs"; // ts-fsrs 6, Node.js 24 or later

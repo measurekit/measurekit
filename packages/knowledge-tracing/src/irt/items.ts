@@ -108,8 +108,8 @@ function dichotomousTerms(item: DichotomousItem, k: number, theta: number, out: 
 /**
  * P(k) = P*(k) - P*(k + 1), P*(j) = logistic(z_j), z_j = a (θ - b_j), P*(0) = 1 and P*(K) = 0, equals
  * logistic(z_k) logistic(-z_(k+1)) (1 - exp(z_(k+1) - z_k)). Its last factor does not depend on θ, so the
- * log-probability's derivatives are a (t_k - s_(k+1)) and -a² (s_k t_k + s_(k+1) t_(k+1)), s_j = logistic(z_j) and t_j =
- * logistic(-z_j): no difference of probabilities that round to 1.
+ * log-probability's derivatives are a (t_k - s_(k+1)) and -a² (s_k t_k + s_(k+1) t_(k+1)), s_j = logistic(z_j) and
+ * t_j = logistic(-z_j): no difference of probabilities that round to 1.
  */
 function gradedTerms(item: GradedItem, k: number, theta: number, out: Float64Array): void {
   const zOf = (j: number): number => {

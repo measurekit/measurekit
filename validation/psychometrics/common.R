@@ -1,4 +1,5 @@
-# Helpers for the fixture scripts. Run the scripts from the repository root, e.g. `Rscript validation/psychometrics/ctt.R`.
+# Helpers for the fixture scripts. Run the scripts from the repository root,
+# e.g. `Rscript validation/psychometrics/ctt.R`.
 
 suppressPackageStartupMessages(library(jsonlite))
 
@@ -25,7 +26,7 @@ set_items <- function(data, itemtype, coefficients) {
   mirt::mirt(data, 1, itemtype = itemtype, pars = values, TOL = NaN, verbose = FALSE)
 }
 
-# The package's parameters of an item from its IRT coefficients; for the rsm, whose thresholds are b_j - c / a1, the
+# measurekit's parameters of an item from its IRT coefficients; for the rsm, whose thresholds are b_j - c / a1, the
 # location and the steps around it.
 psychometrics_parameters <- function(model, irt) {
   numbered <- function(prefix) unname(irt[grep(paste0("^", prefix, "[0-9]+$"), names(irt))])

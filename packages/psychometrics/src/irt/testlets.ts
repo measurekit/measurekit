@@ -32,7 +32,9 @@ export interface TestletDesign {
   readonly testlets: readonly TestletState[];
   /** Each item's testlet index, or -1 for an item in none. */
   readonly testletOf: Int32Array;
-  /** θ_q + γ_g on the rectangular rule: 2Q - 1 equally spaced points from twice the lowest node to twice the highest. */
+  /**
+   * θ_q + γ_g on the rectangular rule: 2Q - 1 equally spaced points from twice the lowest node to twice the highest.
+   */
   readonly sums: Float64Array;
 }
 

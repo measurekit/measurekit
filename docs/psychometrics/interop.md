@@ -5,7 +5,8 @@
 ## mirt
 
 mirt reports an item's coefficients in two forms, both with D = 1: the IRT form, `coef(model, IRTpars = TRUE)`, and
-the slope-intercept form, `coef(model, IRTpars = FALSE)`. The package's parameters are the IRT form.
+the slope-intercept form, `coef(model, IRTpars = FALSE)`. The items of this library have their parameters in the
+IRT form.
 
 | Function                                      | Conversion                                                       |
 | --------------------------------------------- | ---------------------------------------------------------------- |

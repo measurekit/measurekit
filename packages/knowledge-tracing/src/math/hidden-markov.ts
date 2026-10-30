@@ -95,9 +95,10 @@ function propagate(
 
 /**
  * The backward pass, by smoothing the filtered probabilities: γ_(T-1) = α_(T-1), and for earlier steps
- * ξ_t(i, j) = α_t(i) A_t(i, j) / p_(t+1)(j) · γ_(t+1)(j) and γ_t(i) = Σ_j ξ_t(i, j), with p_(t+1)(j) = Σ_i α_t(i) A_t(i, j)
- * the forward pass's prediction. Every factor is a probability or a share of one, so it neither overflows nor gives
- * `NaN` for a sequence of thousands of steps, in which a state's filtered probability underflows to 0.
+ * ξ_t(i, j) = α_t(i) A_t(i, j) / p_(t+1)(j) · γ_(t+1)(j) and γ_t(i) = Σ_j ξ_t(i, j), with p_(t+1)(j) = Σ_i
+ * α_t(i) A_t(i, j) the forward pass's prediction. Every factor is a probability or a share of one, so it
+ * neither overflows nor gives `NaN` for a sequence of thousands of steps, in which a state's filtered
+ * probability underflows to 0.
  */
 function backward(
   sequence: HiddenMarkovSequence,

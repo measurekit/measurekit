@@ -53,7 +53,10 @@ import { arbitraryItem, defined, expectClose, item2pl, mean } from "./helpers.js
 // Tolerances against catR, explained in docs/validation.md.
 /** ML, MAP and WLE theta and standard error: catR finds roots with uniroot's default tolerance, about 1.2e-4. */
 const CATR_MODAL_TOLERANCE = 1e-4;
-/** EAP theta and standard error: catR's trapezoid rule halves the end weights of the package's 61 points. */
+/**
+ * EAP theta and standard error: catR's trapezoid rule halves the end weights of the 61 points of
+ * `posteriorMeanEstimate`.
+ */
 const CATR_EAP_TOLERANCE = 1e-6;
 /** Information and Kullback-Leibler scores, relative to max(1, |score|). */
 const SCORE_TOLERANCE = 1e-12;
@@ -130,7 +133,7 @@ function runEstimator([initial = "", mixed = ""]: readonly string[]): AbilityEst
   return initial === mixed ? first : untilMixed(first, defined(ESTIMATORS.get(mixed)));
 }
 
-/** Expects the package's estimate within the tolerance for catR's method; before the first response, theta 0. */
+/** Expects an estimate within the tolerance for catR's method; before the first response, theta 0. */
 function expectEstimate(actual: AbilityEstimate, expected: CatEstimate, label: string): void {
   const tolerance = expected.method === "EAP" || expected.method === null ? CATR_EAP_TOLERANCE : CATR_MODAL_TOLERANCE;
   expectClose(actual.theta, expected.theta, tolerance, `${label} theta`);

@@ -4,9 +4,9 @@
 
 - **Correct first.** Every statistic matches a named R reference within a documented tolerance
   ([validation](validation.md)), and the fixtures are committed.
-- **Portable.** No platform API (`node:*`, `fetch`, DOM, `process`) and one runtime dependency, `@measurekit/core`, which
-  has none and holds the errors, argument checks and random number generator that both packages share. ESM, strict
-  TypeScript.
+- **Portable.** No platform API (`node:*`, `fetch`, DOM, `process`) and one runtime dependency,
+  `@measurekit/core`, which has none and holds the errors, argument checks and random number generator that
+  both packages share. ESM, strict TypeScript.
 - **Deterministic.** The library never calls `Math.random`, which a Biome plugin enforces. Randomness comes from a
   `Random` passed in, so a seed reproduces a result. Results are identical within one JavaScript engine version:
   `Math.log`, `Math.exp` and the other `Math` functions may differ in their last bits between engines and between
@@ -26,12 +26,16 @@
 ## Modules
 
 Each module is a folder of `packages/psychometrics/src/` with an `index.ts` that lists its public API.
-[AGENTS.md](../../AGENTS.md#layout) shows the layout of the repository and the [README](../../packages/psychometrics/README.md#api) the contents of
-each module. The package exports `.` and one subpath per module: `@measurekit/psychometrics/cat`, `@measurekit/psychometrics/cdm`,
-`@measurekit/psychometrics/ctt`, `@measurekit/psychometrics/data`, `@measurekit/psychometrics/dif`, `@measurekit/psychometrics/equating`,
-`@measurekit/psychometrics/fit`, `@measurekit/psychometrics/interop`, `@measurekit/psychometrics/irt`, `@measurekit/psychometrics/rater`,
-`@measurekit/psychometrics/response-time`, `@measurekit/psychometrics/sim` and `@measurekit/psychometrics/standard-setting`. Public names
-are unique across modules, so `.` re-exports all of them. Only the random number generator is public in `math/`.
+[AGENTS.md](../../AGENTS.md#layout) shows the layout of the repository and
+the [README](../../packages/psychometrics/README.md#api) the contents of each module. The package exports `.` and
+one subpath per module: `@measurekit/psychometrics/cat`,
+`@measurekit/psychometrics/cdm`, `@measurekit/psychometrics/ctt`,
+`@measurekit/psychometrics/data`, `@measurekit/psychometrics/dif`,
+`@measurekit/psychometrics/equating`, `@measurekit/psychometrics/fit`,
+`@measurekit/psychometrics/interop`, `@measurekit/psychometrics/irt`,
+`@measurekit/psychometrics/rater`, `@measurekit/psychometrics/response-time`, `@measurekit/psychometrics/sim`
+and `@measurekit/psychometrics/standard-setting`. Public names are unique across modules, so `.` re-exports all of
+them. Only the random number generator is public in `math/`.
 
 ## Dependencies between modules
 

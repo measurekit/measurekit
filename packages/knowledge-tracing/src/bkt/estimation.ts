@@ -109,7 +109,8 @@ export function randomStarts(structure: Structure, count: number, seed: number):
 
 /**
  * The upper bounds of the uniform draws of a random start. pyBKT's `random_model_uni` draws P(L0) from U(0, 1), P(T)
- * from U(0, 0.4), P(G) from U(0, 0.4) and P(S) from U(0, 0.3), and has no forgetting; P(F) from U(0, 0.2) is the package's.
+ * from U(0, 0.4), P(G) from U(0, 0.4) and P(S) from U(0, 0.3), and has no forgetting; P(F) from U(0, 0.2) is
+ * added here.
  */
 const START_BOUNDS = { prior: 1, learn: 0.4, forget: 0.2, guess: 0.4, slip: 0.3 };
 
@@ -184,7 +185,9 @@ type Counts = Map<string | null, Float64Array>;
 interface Expectation {
   /** By prior class: [learners who know the skill at their first attempt, learners]. */
   readonly prior: Counts;
-  /** By learning class: [transitions from not knowing, of them to knowing, transitions from knowing, of them to not]. */
+  /**
+   * By learning class: [transitions from not knowing, of them to knowing, transitions from knowing, of them to not].
+   */
   readonly learning: Counts;
   /** By guess and slip class: [attempts not knowing, of them correct, attempts knowing, of them incorrect]. */
   readonly guessSlip: Counts;
@@ -294,15 +297,16 @@ function add(sums: Float64Array, a: number, b: number, c = 0, d = 0): void {
 
 /**
  * The least distance of a fitted P(G) or P(S) from 0 and 1, 2⁻⁵², so that a fitted model gives every outcome a positive
- * probability: data with every outcome correct would otherwise fit P(S) = 0, and an incorrect answer would be impossible.
+ * probability: data with every outcome correct would otherwise fit P(S) = 0, and an incorrect answer would
+ * be impossible.
  */
 const MIN_GUESS_SLIP = Number.EPSILON;
 
 /**
  * The M-step: each rate is its expected count over its expected opportunities, P(G) and P(S) bounded by
- * {@link MIN_GUESS_SLIP}, which for a single rate maximizes the expected log-likelihood within the bounds. A rate of the
- * skill used by no event, when every group or item has its own, is the ratio over all of them, the value for groups and
- * items not fitted. A rate without expected opportunities keeps its value.
+ * {@link MIN_GUESS_SLIP}, which for a single rate maximizes the expected log-likelihood within the bounds. A rate
+ * of the skill used by no event, when every group or item has its own, is the ratio over all of them, the value
+ * for groups and items not fitted. A rate without expected opportunities keeps its value.
  */
 function maximization(skill: BktSkill, counts: Expectation, forgetting: boolean): BktSkill {
   const ratio = (sums: Float64Array | undefined, numerator: number, denominator: number, current: number): number => {

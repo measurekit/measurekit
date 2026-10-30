@@ -1,7 +1,7 @@
 # Differential item functioning fixtures. References: difR (difMH, difLogistic, difLord, purified and not), base R's
 # mantelhaen.test for the Mantel-Haenszel chi-square, the ETS categories written out below from difMH's odds ratios and
-# variances, and base R's statistics under the package's matching rule for sparse data. Data: difR's verbal, with Gender 1 as
-# the focal group, and a 2PL simulation with known DIF; both also with 2% of the responses missing.
+# variances, and base R's statistics under measurekit's matching rule for sparse data. Data: difR's verbal, with
+# Gender 1 as the focal group, and a 2PL simulation with known DIF; both also with 2% of the responses missing.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -101,10 +101,10 @@ lord <- function(data, focal) {
 }
 
 # --- Sparse data and purification: base R ----------------------------------------------------------------------
-# The package's rule: each item uses the persons who answered it and another matching item; a person's matching score is the
-# response to the item plus the total over the other matching items the person answered, scaled to all of them and
-# rounded, halves up. With complete data it is difR's total score over the anchors and the studied item, which the
-# script checks against difMH and difLogistic, purified and not.
+# measurekit's rule: each item uses the persons who answered it and another matching item; a person's matching score
+# is the response to the item plus the total over the other matching items the person answered, scaled to all of
+# them and rounded, halves up. With complete data it is difR's total score over the anchors and the studied item,
+# which the script checks against difMH and difLogistic, purified and not.
 
 match_scores <- function(data, item, anchors) {
   others <- setdiff(anchors, item)

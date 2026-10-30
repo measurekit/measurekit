@@ -1,6 +1,6 @@
 /**
- * Standard setting: cut scores by the modified Angoff, Bookmark and Hofstee methods, and the accuracy and consistency of
- * the classifications they give.
+ * Standard setting: cut scores by the modified Angoff, Bookmark and Hofstee methods, and the accuracy and
+ * consistency of the classifications they give.
  *
  * @module @measurekit/psychometrics/standard-setting
  */

@@ -71,8 +71,8 @@ for (feature in features) {
   stopifnot(isTRUE(all.equal(column(feature), written[[names[[feature]]]], tolerance = 1e-12)))
 }
 
-# The ridge fits in the package's parametrization, every learner and skill with its own column: LiblineaR's L2-regularized
-# logistic regression (type 0) without a bias term, to a tight tolerance.
+# The ridge fits in measurekit's parametrization, every learner and skill with its own column:
+# LiblineaR's L2-regularized logistic regression (type 0) without a bias term, to a tight tolerance.
 # LiblineaR stops on a gradient norm relative to the start's, which leaves weakly penalized directions about 1e-5 short
 # of the minimum; Newton steps on the same objective, -log-likelihood + |w|² / (2C), finish it.
 liblinear_gaps <- c()
@@ -188,7 +188,7 @@ glm_fit <- function(events, skills, values, learners) {
   columns <- do.call(cbind, lapply(names(x), function(n) { m <- x[[n]]; colnames(m) <- paste0(n, ":", SKILLS); m }))
   design <- if (learners) cbind(model.matrix(~ 0 + learner), columns) else columns
   # With every event of one skill, the learners' and the skills' intercepts are collinear: the last skill's is left out,
-  # then the intercepts are moved so that the learners' mean is 0, as the package reports them; no prediction changes.
+  # then the intercepts are moved so that the learners' mean is 0, as measurekit reports them; no prediction changes.
   flat <- learners && all(lengths(skills) == 1)
   if (flat) design <- design[, colnames(design) != paste0("intercept:", SKILLS[length(SKILLS)])]
   fit <- glm(events$outcome ~ 0 + design, family = binomial, control = glm.control(epsilon = 1e-14, maxit = 100))
@@ -228,9 +228,9 @@ one_skill <- which(lengths(simulated_skills) == 1)
 single <- one_skill[mixed(simulated[one_skill, ])]
 single_events <- simulated[single, ]
 
-# The Laplace approximation of a random intercept model: glmer's estimates, then the maximum of the approximation in base
-# R, with each learner's conditional mode by Newton's method to convergence; lme4 solves its inner problem to about 1e-7
-# only. At glmer's estimates and at the maximum, the base R approximation equals lme4's deviance function.
+# The Laplace approximation of a random intercept model: glmer's estimates, then the maximum of the approximation
+# in base R, with each learner's conditional mode by Newton's method to convergence; lme4 solves its inner problem
+# to about 1e-7 only. At glmer's estimates and at the maximum, the base R approximation equals lme4's deviance function.
 glmer_fit <- function(events, skills, values) {
   x <- design_of(events, skills, values)
   design <- do.call(cbind, lapply(names(x), function(n) { m <- x[[n]]; colnames(m) <- paste0(n, ":", SKILLS); m }))

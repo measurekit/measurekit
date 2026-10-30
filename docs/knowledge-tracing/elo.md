@@ -1,10 +1,10 @@
 # Elo
 
-`@measurekit/knowledge-tracing/elo` estimates learners' abilities and items' difficulties with the Elo rating system as adapted to
-education (Pelánek, 2016): each answer is a match between a learner and an item. It needs no fitting beyond a pass over
-the data, updates after every answer, and tracks abilities that change. The updates are validated against the equations
-written out in R, and a simulation checks that they recover the abilities and difficulties that generated the data
-([validation](validation.md)).
+`@measurekit/knowledge-tracing/elo` estimates learners' abilities and items' difficulties with the Elo rating system
+as adapted to education (Pelánek, 2016): each answer is a match between a learner and an item. It needs no
+fitting beyond a pass over the data, updates after every answer, and tracks abilities that change. The updates
+are validated against the equations written out in R, and a simulation checks that they recover the abilities
+and difficulties that generated the data ([validation](validation.md)).
 
 ## The models
 

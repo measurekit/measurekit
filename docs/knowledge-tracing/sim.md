@@ -1,7 +1,7 @@
 # Simulation
 
-`@measurekit/knowledge-tracing/sim` draws outcomes from a learner model, seeded, to check what a fit recovers before collecting
-data, to plan how many learners a fit needs, or to test an app with realistic logs.
+`@measurekit/knowledge-tracing/sim` draws outcomes from a learner model, seeded, to check what a fit recovers
+before collecting data, to plan how many learners a fit needs, or to test an app with realistic logs.
 
 `simulate(model, attempts, random)` takes the attempts, who answers what and when, and returns `{ log, states }`. In
 time order, each attempt is correct with the probability the model predicts from the learner's state, and the state

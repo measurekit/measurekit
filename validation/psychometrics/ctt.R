@@ -1,7 +1,7 @@
 # Classical test theory fixtures: item statistics, reliability and distractor analysis.
 # References: psych::alpha (alpha, r.drop, raw.r, alpha if dropped), psych::splitHalf (Guttman split-half per split),
-# psych::omega (one factor), checked against base R's minres, and base R for everything else. The package computes score-based statistics on the persons who answered every item,
-# so psych runs on na.omit(x).
+# psych::omega (one factor), checked against base R's minres, and base R for everything else. measurekit
+# computes score-based statistics on the persons who answered every item, so psych runs on na.omit(x).
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -34,9 +34,9 @@ split_half <- function(x, half) {
   list(correlation = r, spearmanBrown = 2 * r / (1 + r), guttman = if (is.na(reference)) guttman else reference)
 }
 
-# McDonald's omega total of one factor, as psych::omega(nfactors = 1): 1 - Σ (1 - h²) / Σ r, with the communalities h² of
-# the minres loadings, which minimize the squared off-diagonal residuals of the correlations. Base R minimizes them to
-# convergence (BFGS, then Newton); psych's L-BFGS-B stops near the minimum.
+# McDonald's omega total of one factor, as psych::omega(nfactors = 1): 1 - Σ (1 - h²) / Σ r, with the communalities
+# h² of the minres loadings, which minimize the squared off-diagonal residuals of the correlations. Base R
+# minimizes them to convergence (BFGS, then Newton); psych's L-BFGS-B stops near the minimum.
 omega_total <- function(x) {
   r <- cor(x)
   objective <- function(l) {

@@ -1,8 +1,8 @@
 # Linking and equating
 
-`@measurekit/psychometrics/equating` puts the item parameters of two calibrations on one theta scale (linking) and converts
-the scores of one form to the scale of another (equating). Linking is validated against equateIRT and base R,
-observed-score equating against the equate package, and true-score equating against base R and equateIRT
+`@measurekit/psychometrics/equating` puts the item parameters of two calibrations on one theta scale (linking)
+and converts the scores of one form to the scale of another (equating). Linking is validated against equateIRT and
+base R, observed-score equating against the equate package, and true-score equating against base R and equateIRT
 ([validation](validation.md)).
 
 ## Linking

@@ -76,7 +76,9 @@ function farTail(y: number): number {
   return gaussianTail(y, (INV_SQRT_2PI - ratio) / y);
 }
 
-/** Returns exp(-y² / 2) times `factor`, splitting y² so that its rounding does not enter the exponential (R's do_del). */
+/**
+ * Returns exp(-y² / 2) times `factor`, splitting y² so that its rounding does not enter the exponential (R's do_del).
+ */
 function gaussianTail(y: number, factor: number): number {
   const rounded = Math.trunc(y * 16) / 16;
   const remainder = (y - rounded) * (y + rounded);

@@ -1,8 +1,8 @@
 # Item response theory
 
-`@measurekit/knowledge-tracing/irt` estimates learners' ability online from item parameters calibrated beforehand, as by `@measurekit/psychometrics` or
-mirt: each outcome updates the posterior of the learner's θ, and the model predicts the next outcome from it. Estimates
-are validated against mirt's `fscores` and a posterior written out in R
+`@measurekit/knowledge-tracing/irt` estimates learners' ability online from item parameters calibrated beforehand, as
+by `@measurekit/psychometrics` or mirt: each outcome updates the posterior of the learner's θ, and the model
+predicts the next outcome from it. Estimates are validated against mirt's `fscores` and a posterior written out in R
 ([validation](validation.md#item-response-theory)).
 
 ## The model
@@ -15,10 +15,10 @@ Item parameters use the IRT parameterization with D = 1, as `@measurekit/psychom
 | Graded response (Samejima)          | `{ model: "graded", a, b: [b_1, ...] }`    | P(category ≥ k) = logistic(a (θ - b_k)), b increasing for a > 0 |
 | Generalized partial credit (Muraki) | `{ model: "gpcm", a, b: [b_1, ...] }`      | P(category k) ∝ exp(Σ over j ≤ k of a (θ - b_j))                |
 
-An item `{ model, parameters }` of `@measurekit/psychometrics` gives its `parameters`, with `model: "graded"` or `"gpcm"` added for the
-polytomous models. An item with K categories takes the outcomes k / (K - 1), as a rubric score from 0 to K - 1 divided
-by K - 1; a dichotomous item takes 0 and 1. A prediction is the expected outcome on that scale: P(correct) for a
-dichotomous item.
+An item `{ model, parameters }` of `@measurekit/psychometrics` gives its `parameters`, with `model: "graded"`
+or `"gpcm"` added for the polytomous models. An item with K categories takes the outcomes k / (K - 1), as a rubric
+score from 0 to K - 1 divided by K - 1; a dichotomous item takes 0 and 1. A prediction is the expected outcome on
+that scale: P(correct) for a dichotomous item.
 
 The posterior of θ starts from the prior, the population's distribution in the calibration, and each outcome multiplies
 it by the outcome's probability. θ is assumed constant: the posterior narrows with every outcome and does not follow
@@ -40,8 +40,8 @@ model per section, each with its items, and a learner has one state in each.
 | `points`     | `61`                 | Grid points, equally spaced from 6 prior standard deviations below the mean to 6 above |
 
 The prior's grid needs distinct, finite points, with finite squares of their spacing and of 1 / sd; an sd so small or a
-mean so large that it has not throws `DataError`. The default grid is that of `@measurekit/psychometrics` for EAP, and mirt's `fscores` with
-`quadpts = 61` and `theta_lim = c(-6, 6)` for the standard prior.
+mean so large that it has not throws `DataError`. The default grid is that of `@measurekit/psychometrics` for EAP,
+and mirt's `fscores` with `quadpts = 61` and `theta_lim = c(-6, 6)` for the standard prior.
 
 ## Online
 

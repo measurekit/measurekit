@@ -7,16 +7,16 @@ source("validation/psychometrics/common.R")
 suppressPackageStartupMessages(library(catR))
 
 SEED <- 20261029
-RANGE <- c(-6, 6) # the package's default theta range for ML, WLE and MAP
-# The package's EAP integrates over 61 equally spaced points on [-6, 6] with weights proportional to the prior; catR's
+RANGE <- c(-6, 6) # measurekit's default theta range for ML, WLE and MAP
+# measurekit's EAP integrates over 61 equally spaced points on [-6, 6] with weights proportional to the prior; catR's
 # trapezoid rule on the same points halves the two end weights, where the density is 6e-9.
 EAP_GRID <- c(-6, 6, 61)
-KL_GRID <- c(-4, 4, 33) # catR's default parInt for KL, which the package uses
+KL_GRID <- c(-4, 4, 33) # catR's default parInt for KL, which measurekit uses
 LENGTH <- 15
 
 item_id <- function(i) sprintf("item%03d", i)
 
-# The package's parameters of catR's 4PL and GPCM bank rows; catR uses D = 1 by default, as the package does.
+# measurekit's parameters of catR's 4PL and GPCM bank rows; catR uses D = 1 by default, as measurekit does.
 logistic_items <- function(bank) {
   lapply(seq_len(nrow(bank)), function(i) {
     list(id = item_id(i), a = bank[i, "a"], b = bank[i, "b"], c = bank[i, "c"], d = bank[i, "d"])
@@ -71,7 +71,7 @@ information_peak <- function(bank) {
 }
 
 # Scores of the eligible items, NA for the administered ones: MFI's information and KL's integral, the latter divided
-# by the largest likelihood on the grid as the package scales it.
+# by the largest likelihood on the grid as measurekit scales it.
 selection_scores <- function(bank, model, criterion, theta, out, x) {
   scores <- if (criterion == "MFI") {
     Ii(theta, bank, model = model)$Ii

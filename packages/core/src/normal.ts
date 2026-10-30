@@ -24,7 +24,8 @@ const FAR_DENOMINATOR = [
   1.421511758316446e-7, 2.0442631033899397e-15,
 ];
 // Wichura's AS 241 splits: |p - 1/2| up to SPLIT1 uses the central rational function of CONST1 - q²; beyond it, with
-// r = √(-ln min(p, 1 - p)), r up to SPLIT2 uses the near tail in r - CONST2, and beyond that the far tail in r - SPLIT2.
+// r = √(-ln min(p, 1 - p)), r up to SPLIT2 uses the near tail in r - CONST2, and beyond that the far tail in r
+// - SPLIT2.
 const SPLIT1 = 0.425;
 const CONST1 = 0.180625;
 const SPLIT2 = 5;

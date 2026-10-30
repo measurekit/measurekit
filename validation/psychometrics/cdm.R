@@ -11,8 +11,8 @@ suppressPackageStartupMessages({
 SEED <- 20261029
 CONTROL <- list(conv.crit = 1e-9, maxitr = 20000)
 
-# The Q-matrix's columns in the package's order: attributes by first appearance over the items, so that both libraries order
-# the profiles and each item's latent groups alike.
+# The Q-matrix's columns in measurekit's order: attributes by first appearance over the items, so that both
+# libraries order the profiles and each item's latent groups alike.
 psychometrics_order <- function(Q) {
   first <- unique(unlist(lapply(seq_len(nrow(Q)), function(j) which(Q[j, ] == 1))))
   Q[, first, drop = FALSE]
@@ -86,7 +86,7 @@ cdm_fit <- function(data, Q, model, persons = TRUE) {
 
 nonparametric <- function(data, Q, gate) {
   result <- AlphaNP(data, Q, gate = gate, method = "Hamming")
-  # NPCD's profiles in the package's order: GDINA's attributepattern.
+  # NPCD's profiles in measurekit's order: GDINA's attributepattern.
   order <- match(apply(attributepattern(ncol(Q)), 1, paste, collapse = ""), apply(result$pattern, 1, paste, collapse = ""))
   distance <- apply(result$loss.matrix, 2, min)
   list(gate = gate, distance = distance, ties = unname(apply(result$loss.matrix, 2, function(x) sum(x == min(x)))),

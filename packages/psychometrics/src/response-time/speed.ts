@@ -46,8 +46,8 @@ export interface PersonTimeFit extends SpeedEstimate {
  * parameters: with a prior N(0, σ_τ²), the posterior mean Σ α_i² (β_i - y_i) / (1 / σ_τ² + Σ α_i²) and its SD;
  * without, the maximum likelihood estimate Σ α_i² (β_i - y_i) / Σ α_i² and 1 / √Σ α_i². Items are matched by id.
  *
- * @throws `DataError` when the data are malformed or have no times, an item of the data has no time item, or the prior's
- * sd is not positive and finite.
+ * @throws `DataError` when the data are malformed or have no times, an item of the data has no time item, or
+ * the prior's sd is not positive and finite.
  */
 export function speedEstimates(
   data: ResponseMatrix | ResponseRecords,
