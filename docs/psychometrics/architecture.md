@@ -54,7 +54,7 @@ Analysis modules (`ctt/` and `irt/`) build on `data/` and `math/`, not on each o
 `cdm/` to simulate their models, `cat/` on `sim/` for the same response simulation, and `dif/` and `standard-setting/`
 on `equating/` for linking and score distributions. [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each
 module may use; Biome enforces them, the absence of Node modules and platform globals in `src/`, and that code outside
-the package imports it by name.
+`packages/` imports `@measurekit/psychometrics` by name.
 
 ## Numerics
 

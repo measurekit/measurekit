@@ -54,7 +54,8 @@ Modules form layers; a module imports only from lower layers, never from its own
 `data/` builds on `math/` for the random splits, and `model.ts` on the types of `data/`. The model families,
 `evaluate/`, `practice/` and `sim/` never import each other: evaluation, practice and simulation know models only
 through the interface. [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces
-them, the absence of Node modules and platform globals in `src/`, and that code outside the package imports it by name.
+them, the absence of Node modules and platform globals in `src/`, and that code outside `packages/` imports
+`@measurekit/knowledge-tracing` by name.
 
 ## The learner model interface
 
