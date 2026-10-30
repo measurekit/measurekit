@@ -44,8 +44,7 @@ export interface ResponseRecordsOptions {
 }
 
 /**
- * Builds response records, by default with the persons and items in the order they first appear. The records are
- * copied.
+ * Builds response records, with the persons and items of `personIds` and `itemIds`. The records are copied.
  *
  * @throws `DataError` when the records are not an array, a record's person or item is not a string among the ids, a
  * response is not a non-negative integer, a time is not a positive finite number, a person has two records of one

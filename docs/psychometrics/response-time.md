@@ -165,6 +165,8 @@ effortModeratedEstimates(data, items, thresholds); // person2 from item 3 alone
   Behavioral Statistics, 31, 181-204.
 - van der Linden, W. J., & Guo, F. (2008). Bayesian procedures for identifying aberrant response-time patterns in
   adaptive testing. Psychometrika, 73, 365-384.
+- Wise, S. L. (2017). Rapid-guessing behavior: Its identification, interpretation, and implications. Educational
+  Measurement: Issues and Practice, 36(4), 52-61.
 - Wise, S. L., & DeMars, C. E. (2006). An application of item response time: The effort-moderated IRT model. Journal of
   Educational Measurement, 43, 19-38.
 - Wise, S. L., & Kong, X. (2005). Response time effort: A new measure of examinee motivation in computer-based tests.

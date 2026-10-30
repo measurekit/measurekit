@@ -21,7 +21,11 @@ export interface EventInput extends Omit<Event, "skills"> {
 
 /** Options of {@link eventLog}. */
 export interface EventLogOptions {
-  /** The skills of each item, for events without skills of their own. */
+  /**
+   * The skills of each item, for events without skills of their own.
+   *
+   * @defaultValue none: an event without skills of its own practices none
+   */
   readonly qMatrix?: QMatrix;
 }
 

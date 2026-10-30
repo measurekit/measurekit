@@ -8,8 +8,9 @@ import { forEachTime, itemsOfData, type TimedResponses, type TimeItem, timedResp
 /** Options of {@link speedEstimates} and {@link responseTimeFit}. */
 export interface SpeedOptions {
   /**
-   * σ_τ of the speed's normal prior, such as a calibration's `speedSd`, for posterior means; without it, maximum
-   * likelihood estimates.
+   * σ_τ of the speed's normal prior, such as a calibration's `speedSd`, for posterior means.
+   *
+   * @defaultValue none: maximum likelihood estimates
    */
   readonly sd?: number;
 }

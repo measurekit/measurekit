@@ -30,7 +30,11 @@ export interface ResponseMatrixOptions {
    * @defaultValue `item1`, `item2`, and so on
    */
   readonly itemIds?: readonly string[];
-  /** Response times in seconds by person, then item, `null` when missing. */
+  /**
+   * Response times in seconds by person, then item, `null` when missing.
+   *
+   * @defaultValue none: the matrix has no times
+   */
   readonly times?: readonly (readonly (number | null)[])[];
 }
 

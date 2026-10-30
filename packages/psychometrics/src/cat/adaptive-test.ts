@@ -31,11 +31,15 @@ export interface AdaptiveTestOptions {
   /**
    * Target proportions of the content areas, by area, for Kingsbury-Zara content balancing; they need not sum to 1.
    * Every pool item then needs one of these areas.
+   *
+   * @defaultValue none: no content balancing
    */
   readonly contentTargets?: Readonly<Record<string, number>>;
   /**
    * Enemy sets: ids of items that must not be administered in the same test, such as items that give away each other's
    * answers. Once an item of a set is administered, the others are not eligible.
+   *
+   * @defaultValue none
    */
   readonly enemies?: readonly (readonly string[])[];
 }

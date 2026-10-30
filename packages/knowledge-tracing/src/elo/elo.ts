@@ -47,7 +47,11 @@ export interface EloOptions {
    * @defaultValue `1`
    */
   readonly skillWeight?: number;
-  /** The item ratings to start from, such as a fit's. Without them, every item starts at difficulty 0. */
+  /**
+   * The item ratings to start from, such as a fit's.
+   *
+   * @defaultValue none: every item starts at difficulty 0
+   */
   readonly parameters?: EloParameters;
 }
 

@@ -41,8 +41,9 @@ export interface KstOptions {
    */
   readonly maxIterations?: number;
   /**
-   * The parameters, which `fit` starts from. Without them, the states have equal probabilities, and items without
-   * parameters start at guess and slip 0.1, as in pks.
+   * The parameters, which `fit` starts from. Items without parameters start at guess and slip 0.1, as in pks.
+   *
+   * @defaultValue none: the states have equal probabilities
    */
   readonly parameters?: KstParameters;
 }

@@ -52,6 +52,8 @@ export interface BktOptions {
   /**
    * The group of each learner, by learner id: the learners of a group share a prior for each skill (individualized
    * priors). Learners without a group have the skill's prior.
+   *
+   * @defaultValue none: every learner has the skill's prior
    */
   readonly priorGroups?: Readonly<Record<string, string>>;
   /**
@@ -78,7 +80,11 @@ export interface BktOptions {
    * @defaultValue `500`
    */
   readonly maxIterations?: number;
-  /** The parameters to predict with, and to start EM from. Without them, no skill has parameters. */
+  /**
+   * The parameters to predict with, and to start EM from.
+   *
+   * @defaultValue none: no skill has parameters
+   */
   readonly parameters?: BktParameters;
 }
 

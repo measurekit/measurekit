@@ -17,11 +17,17 @@ export interface CalibrationOptions<TParameters> {
    * its type written out, such as `IrtModel<LogisticParameters | ThresholdParameters>[]`.
    */
   readonly model: IrtModel<TParameters> | readonly IrtModel<TParameters>[];
-  /** Parameters of anchor items by item id: they stay fixed, and the other items are estimated on their scale. */
+  /**
+   * Parameters of anchor items by item id: they stay fixed, and the other items are estimated on their scale.
+   *
+   * @defaultValue none: every item is estimated
+   */
   readonly fixed?: Readonly<Record<string, TParameters>>;
   /**
    * Priors by parameter name, such as `{ c: betaPrior(5, 17) }`, applied to that parameter of every estimated item
    * whose model has it.
+   *
+   * @defaultValue none
    */
   readonly priors?: Readonly<Record<string, ParameterPrior>>;
   /**
@@ -56,6 +62,8 @@ export interface CalibrationOptions<TParameters> {
    * Testlets by id, each the ids of its items, such as the items of a reading passage, for the testlet response model:
    * an item of a testlet answers at θ + γ, with γ ~ N(0, σ²) per person and testlet. Testlets need one group with the
    * standard normal, the rectangular rule, and standard errors `"none"` or `"hessian"`.
+   *
+   * @defaultValue none: the items answer independently given theta
    */
   readonly testlets?: Readonly<Record<string, readonly string[]>>;
   /**

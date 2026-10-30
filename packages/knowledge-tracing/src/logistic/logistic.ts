@@ -56,7 +56,11 @@ export interface LogisticOptions {
    * @defaultValue `100`
    */
   readonly maxIterations?: number;
-  /** The parameters to predict with. Without them, no skill has parameters. */
+  /**
+   * The parameters to predict with.
+   *
+   * @defaultValue none: no skill has parameters
+   */
   readonly parameters?: LogisticParameters;
 }
 

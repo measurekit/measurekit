@@ -38,12 +38,12 @@ export interface ResponseTimeEffort {
 
 /**
  * Returns each item's rapid-guessing threshold by the normative threshold method: `percentage` of the mean of the
- * item's times, at most `cap` seconds; NT10 by default. A response faster than its item's threshold is a rapid guess.
- * Items without times have no threshold.
+ * item's times, at most `cap` seconds. A response faster than its item's threshold is a rapid guess. Items without times
+ * have no threshold.
  *
  * @throws `DataError` when the data are malformed or have no times, or `percentage` or `cap` is not positive and
  * finite.
- * @see {@link https://www.researchgate.net/publication/265407579 | Wise and Ma (2012)}
+ * @see {@link https://doi.org/10.1111/emip.12165 | Wise (2017)}
  */
 export function normativeThresholds(
   data: ResponseMatrix | ResponseRecords,
