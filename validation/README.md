@@ -1,0 +1,55 @@
+# validation
+
+Scripts that write the reference fixtures in `packages/<package>/test/fixtures/`. Run them from the repository root.
+References, datasets, versions and tolerances are listed in
+[psychometrics](../docs/psychometrics/validation.md) and [knowledge tracing](../docs/knowledge-tracing/validation.md).
+
+## Psychometrics
+
+R scripts in `validation/psychometrics/`:
+
+```bash
+Rscript validation/psychometrics/ctt.R               # classical test theory
+Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
+Rscript validation/psychometrics/cat.R               # adaptive testing: item selection, estimates, content balancing, stopping, catR
+Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
+Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord
+Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
+Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
+Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych
+Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
+Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA and NPCD
+Rscript validation/psychometrics/interop.R           # mirt's coefficient forms of every item type
+Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
+```
+
+They need R with the packages psych, mirt, ltm, catR, TAM, eRm, difR, equate, equateIRT, irr, cacIRT, sirt, nlme,
+LNIRT, numDeriv, GDINA, NPCD and jsonlite; `common.R` holds their shared helpers.
+
+## Knowledge tracing
+
+R and Python scripts in `validation/knowledge-tracing/`:
+
+```bash
+Rscript validation/knowledge-tracing/math.R      # normal quantile, logistic function, forward-backward by enumeration, glm
+Rscript validation/knowledge-tracing/evaluate.R  # AUC by pROC; RMSE, log-loss, accuracy, calibration and learning curves in base R
+Rscript validation/knowledge-tracing/elo.R       # Elo updates written out, held-out predictions, the recovery simulation
+Rscript validation/knowledge-tracing/logistic.R  # LKT's features; AFM, PFA and LKT fits by glm, lme4's Laplace approximation, LiblineaR
+Rscript validation/knowledge-tracing/irt.R       # the grid posterior and exact mode of θ, against mirt's fscores
+Rscript validation/knowledge-tracing/kst.R       # structures, fringes, BLIM, IITA and assessment by kst, pks and DAKS
+validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/bkt.py  # BKT by pyBKT: inference, EM from given and random starts, recovery
+```
+
+The R scripts need R with the packages pROC, lme4, LiblineaR, LKT, mirt, kst, pks, DAKS, sets and jsonlite; `common.R`
+holds their shared helpers. `bkt.py` needs the Python environment below, and takes under a minute.
+
+### Python
+
+`bkt.py` runs in a Python 3.12 environment in `validation/knowledge-tracing/.venv`, which git ignores:
+
+```bash
+uv venv --python 3.12 validation/knowledge-tracing/.venv
+uv pip install --python validation/knowledge-tracing/.venv -r validation/knowledge-tracing/requirements.txt
+```
+
+`requirements.txt` pins pyBKT with the NumPy, pandas and scikit-learn versions it works with.

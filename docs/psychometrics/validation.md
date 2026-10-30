@@ -1,0 +1,356 @@
+# Validation
+
+Every statistic the package computes is compared with an R reference; [simulation](#simulation) is checked by its properties
+instead. R scripts in [`validation/`](../../validation/README.md) load public datasets or simulate data with a fixed
+seed, run the reference, and write the inputs and expected results as JSON fixtures to `packages/psychometrics/test/fixtures/`.
+The tests compare the package's results with the fixtures. CI runs only the TypeScript tests; R runs when fixtures change.
+
+## References
+
+Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
+equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169, LNIRT 0.5.1, numDeriv 2016.8-1.1, GDINA
+2.13.2, NPCD 1.0.11 and jsonlite 2.0.0.
+
+| Statistic                                                                                                             | Reference                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Alpha, `itemTotal` (`raw.r`), `itemRest` (`r.drop`), alpha if deleted                                                 | `psych::alpha` on the complete cases                                                                                            |
+| Guttman split-half coefficient                                                                                        | `psych::splitHalf(raw = TRUE, brute = TRUE, covar = TRUE)`, the split's entry                                                   |
+| Item count, mean and SD; biserial; D; KR-20; KR-21; split-half correlation and Spearman-Brown; SEM; option statistics | Base R, written out in `validation/psychometrics/ctt.R`                                                                         |
+| McDonald's omega and the minres loadings                                                                              | Base R: Σ_(i<j) (r_ij - λ_i λ_j)² minimized by BFGS, then Newton; `psych::omega(nfactors = 1)`'s `omega.tot` agrees within 1e-4 |
+| Scoring against a key                                                                                                 | `mirt::key2binary`                                                                                                              |
+| Normal quantile, density and distribution function, logistic function, chi-square upper tail                          | `qnorm`, `dnorm`, `pnorm`, `plogis`, `pchisq(lower.tail = FALSE)`                                                               |
+| Gauss-Hermite nodes and weights                                                                                       | Golub-Welsch: `eigen` of the Jacobi matrix, an algorithm other than the package's                                               |
+
+| IRT quantity                                                           | Reference                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1PL, 2PL and anchored 2PL estimates, SEs, log-likelihood, AIC, BIC     | `mirt(SE.type = "Richardson")`, `TOL = 1e-10`, 61 rectangular points; the 1PL as a 2PL with equal slopes                                                                                                                  |
+| 4PL estimates with priors, SEs, log-likelihood, AIC, BIC               | `mirt(SE.type = "Oakes")` with `norm` priors on logit g and logit u                                                                                                                                                       |
+| 2PL with Gauss-Hermite quadrature                                      | `ltm(GHk = 21)`, `summary()` for the SEs                                                                                                                                                                                  |
+| 3PL with a beta prior on c                                             | Base R: direct maximization of the log-posterior (BFGS, then Newton) and `optimHess` for the SEs                                                                                                                          |
+| GRM, GPCM and NRM estimates, log-likelihood, AIC, BIC                  | `mirt(itemtype = "graded", "gpcm", "nominal", SE.type = "Richardson")`, `TOL = 1e-10`, 61 points                                                                                                                          |
+| PCM                                                                    | mirt's `gpcm` with equal slopes                                                                                                                                                                                           |
+| RSM                                                                    | mirt's `rsm` with the slopes freed and equal and the latent variance fixed at 1                                                                                                                                           |
+| Polytomous parameters and SEs                                          | Base R: the package's form of mirt's estimates; the delta method on `vcov()`, Jacobian by central differences                                                                                                             |
+| Mixed-format 3PL and GPCM with anchors and a prior                     | `mirt(SE.type = "Oakes")` with a `norm` prior on logit g                                                                                                                                                                  |
+| EAP and MAP theta, ML theta                                            | `fscores(method = "EAP", "MAP", "ML")`, 61 points                                                                                                                                                                         |
+| ML, WLE and MAP standard errors                                        | Base R from `iteminfo`: 1 / √I(θ) and 1 / √(I(θ) + 1)                                                                                                                                                                     |
+| WLE theta                                                              | Base R: the root of Warm's equation by `uniroot`, the largest weighted likelihood by `integrate`                                                                                                                          |
+| Item and test information                                              | `iteminfo`, `testinfo`                                                                                                                                                                                                    |
+| JML thresholds, thetas and log-likelihood                              | `TAM::tam.jml`, iterated by base R from its estimates to a change below 1e-12                                                                                                                                             |
+| JML standard errors                                                    | Base R: the inverse threshold information matrix of each item, 1 / √I(θ) for persons                                                                                                                                      |
+| mirt's IRT and slope-intercept coefficients                            | `coef(IRTpars = TRUE)`, `coef(IRTpars = FALSE)` and `probtrace` of the same items, every item type                                                                                                                        |
+| Normal distributions of theta: anchored, in groups, online calibration | Base R: Newton's method on the marginal likelihood, its gradient by Fisher's identity, the Hessian by central differences of it, which gives the SEs; mirt with `optimizer = "NR"` and `multipleGroup` cross-check        |
+| Empirical histogram on fixed items                                     | Base R: EM with the same update and stopping rule                                                                                                                                                                         |
+| Testlet model: estimates, SEs, log-likelihood                          | Base R: the bifactor likelihood by dimension reduction, maximized by BFGS and Newton on central-difference gradients; `optimHess` for the SEs; mirt's `bfactor` with equal slopes and free testlet variances cross-checks |
+| EAP with testlet effects integrated out                                | Base R: the double sum over the nodes written out                                                                                                                                                                         |
+| Cross-product standard errors                                          | `mirt(SE.type = "crossprod")`                                                                                                                                                                                             |
+| EAP summed-score tables                                                | `fscores(method = "EAPsum")`; base R's Lord-Wingersky recursion on `probtrace` for another prior                                                                                                                          |
+| Marginal and empirical reliability                                     | `marginal_rxx`, `empirical_rxx`; base R's `integrate` for another prior                                                                                                                                                   |
+
+| CAT quantity                                                 | Reference                                                                                               |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Next item by maximum information, Kullback-Leibler and thOpt | `nextItem(criterion = "MFI", "KL", "thOpt")` at catR's estimate, after each response of a run           |
+| Information and KL scores of every eligible item             | `Ii`; `KL()` divided by the largest likelihood on its grid, computed from `Pi`                          |
+| The theta of an item's largest information                   | catR's closed form for the 4PL, written out from `nextItem`'s `thOpt`                                   |
+| a-stratification of 2PL items                                | `aStratified` strata, and `nextItem(criterion = "bOpt")` with the other strata excluded                 |
+| Theta and standard error after each response                 | `thetaEst`, `semTheta`: `BM`, `ML` and `WL` with `range = c(-6, 6)`; `EAP` with `parInt = c(-6, 6, 61)` |
+| Content balancing                                            | `nextItem` with `cbControl`                                                                             |
+| Stopping decisions                                           | `checkStopRule` with `length`, `precision` and `minInfo` on the remaining items, alone and together     |
+| Randomesque, Sympson-Hetter, multistage routing, simulation  | Properties over seeded simulations and hand-derived routes (below)                                      |
+| Enemy sets, exposure calibration, form assembly              | Properties (below); catR has no enemy sets or form assembly                                             |
+
+| Fit statistic                                              | Reference                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Item infit and outfit mean squares and standardized values | eRm's `itemfit` on its `RM` and `PCM` items and `person.parameter` thetas |
+| Person infit and outfit                                    | eRm's `personfit`, the same inputs                                        |
+| lz                                                         | mirt's `personfit(Theta = )` `Zh`, at mirt's EAP thetas                   |
+| Q3                                                         | mirt's `residuals(type = "Q3", Theta = )`, the same thetas                |
+| S-X², degrees of freedom, significance                     | mirt's `itemfit(fit_stats = "S_X2")`                                      |
+
+| DIF statistic                                               | Reference                                                                                                                                                |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mantel-Haenszel chi-square, with and without the correction | Base R's `mantelhaen.test`; difMH's `MH` where they agree                                                                                                |
+| Common odds ratio, MH D-DIF and its standard error          | difR's `difMH`: `alphaMH`, `varLambda`                                                                                                                   |
+| ETS categories                                              | Base R: ETS's rule written out from the values above                                                                                                     |
+| Logistic regression chi-squares and R² changes              | difR's `difLogistic(type = "udif", "nudif", "both")`                                                                                                     |
+| Lord's chi-square and the mean-sigma transformation         | difR's `difLord(irtParam = )` on ltm calibrations run to convergence, checked against `LordChi2` and `itemRescale`                                       |
+| Purification, complete data                                 | Base R's statistics on difR's anchors; `difMH(purify = TRUE)` and `difLogistic(purify = TRUE)` agree in odds ratios, chi-squares, rounds and convergence |
+| Sparse data, purified and not                               | Base R: the matching score written out, `mantelhaen.test` and `glm` on each item's persons                                                               |
+
+| Linking and equating quantity                              | Reference                                                                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Mean-mean, mean-sigma, Haebara, Stocking-Lord: 2PL and 3PL | equateIRT's `direc(nq = 30)`                                                                   |
+| The same, mixed-format items                               | Base R: the moments and the criteria written out, minimized by `nlminb`                        |
+| True-score equating                                        | Base R: `uniroot` and Kolen and Brennan's line; equateIRT's `score(method = "TSE")` agrees     |
+| Linear equating                                            | equate's `equate(type = "linear")`                                                             |
+| Equipercentile equating                                    | Base R: Kolen and Brennan's definition; equate's `equate(type = "equipercentile")` within 1e-6 |
+| Log-linear presmoothing                                    | Base R's Poisson `glm` to a deviance change of 1e-15; equate's `presmoothing` within 1e-6      |
+
+| Standard-setting quantity                              | Reference                                                                         |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Angoff cut score, the panelists' cut scores, SD and SE | Base R: `rowSums`, `mean`, `sd`                                                   |
+| Bookmark page locations                                | Base R: `uniroot` on the cumulative category probabilities of mirt's `probtrace`  |
+| Bookmark raw cut scores                                | mirt's `expected.test` at the page locations                                      |
+| Hofstee cut score and failure rate                     | Base R: `uniroot` on the failure rates interpolated by `approxfun`, less the line |
+| Classification accuracy and consistency                | cacIRT's `class.Rud`; each category's probability by base R's `pnorm`             |
+
+| Rater statistic                              | Reference                                                                        |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| Cohen's kappa, unweighted, linear, quadratic | irr's `kappa2(weight = "unweighted", "equal", "squared")`; psych's `cohen.kappa` |
+| Fleiss' kappa                                | irr's `kappam.fleiss`                                                            |
+| The six intraclass correlations              | irr's `icc`; psych's `ICC(lmer = FALSE)` agrees within 1e-12                     |
+
+| Response time quantity                                             | Reference                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lognormal model: intensities, discriminations, σ_τ, log-likelihood | nlme's `lme(log(t) ~ 0 + item, random = ~ 1 \| person, weights = varIdent(form = ~ 1 \| item), method = "ML")`, taken to the maximum of the written-out likelihood by Newton steps with numDeriv; LNIRT's `LNRT` by MCMC within 0.1 |
+| Intensity standard errors, posterior speeds                        | Base R: (Σ X' V⁻¹ X)⁻¹ and the normal posterior written out; lme's `vcov` and BLUPs at its own estimates                                                                                                                            |
+| Residuals and the person statistic                                 | Base R; LNIRT's `personfitLN`                                                                                                                                                                                                       |
+| Normative thresholds, response time effort                         | Base R                                                                                                                                                                                                                              |
+| Effort-moderated estimates                                         | mirt's `fscores(method = "EAP")` with rapid guesses as `NA`                                                                                                                                                                         |
+
+| Cognitive diagnosis quantity                                               | Reference                                                                                                                              |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| G-DINA, DINA and DINO probabilities, proportions, log-likelihood, AIC, BIC | GDINA's `GDINA` with `conv.crit = 1e-9`; for the DINA on 8 attributes, the proportions summed over profiles with equal ideal responses |
+| Mastery, posteriors, MAP and EAP profiles                                  | GDINA's `personparm`; the MAP where GDINA's has a single mode                                                                          |
+| Classification accuracy and consistency                                    | GDINA's `CA` by MAP; by EAP, `CA`'s computation in base R                                                                              |
+| Q-matrix validation                                                        | GDINA's `Qval(method = "PVAF")`                                                                                                        |
+| Nonparametric classification                                               | NPCD's `AlphaNP(method = "Hamming")`: distances and ties; the profile where NPCD has no tie                                            |
+| Simulation of cognitive diagnosis responses                                | Properties: frequencies, reproduction, recovery by calibration                                                                         |
+
+The scripts also check the references against each other: KR-20 equals alpha for 0/1 items, the base R item-total
+correlations equal psych's, and the base R Guttman coefficient equals psych's for every split psych enumerates.
+psych enumerates splits only up to 15,000 of them, so for SAT12's 32 items the Guttman coefficient is base R only.
+
+`validation/psychometrics/irt.R` checks its IRT references the same way:
+
+- The base R marginal likelihood and gradient reproduce mirt's 2PL, and mirt's Oakes and Richardson SEs agree.
+- The 1PL and mirt's Rasch model, and the PCM and RSM and mirt's `Rasch` and `rsm` with a free latent variance, have
+  the same likelihood up to quadrature.
+- the package's form of mirt's GRM, GPCM, PCM and NRM estimates equals `coef(IRTpars = TRUE)` within 1e-12.
+- mirt's WLE equals the base R WLE for the 1PL, 2PL, PCM, GPCM, RSM and NRM, and catR's `thetaEst(method = "WL")`
+  agrees wherever Warm's equation has a single root.
+- TAM's JML estimates are within 4e-9 of the base R solution of its steps, and its log-likelihood within 1e-6. For
+  dichotomous items, the base R standard error equals TAM's `errorP` within 1e-6.
+
+`validation/psychometrics/irt.R` simulates adaptive tests of 15 items by maximum information at the EAP estimate, each with 2 of 6
+pretest items, for the online calibration. The tests add a recovery check: pretest items seeded into the package's own
+simulated adaptive tests, calibrated with the operational items fixed and a normal distribution or a histogram,
+are within four standard errors of their true values, and the distribution's mean and SD within 0.1.
+
+`validation/psychometrics/cat.R` runs each adaptive test in catR step by step: before each item, catR's estimate from the responses
+so far, by one method until the responses are mixed and another after, and catR's next item at that estimate; then a
+response drawn once from a true theta with a fixed seed. The tests replay the responses through `adaptiveTest`, which
+must select catR's item at every step. Where catR picks a content area at random, the test accepts any area catR
+could pick, and checks that the item is the most informative of its area. Properties cover the stochastic parts:
+randomesque selects only among the top items and reaches each of them; an item every test selects first is
+administered at the rate of its exposure parameter, within four binomial standard errors over 4,000 seeded persons;
+the last eligible item is never withheld; seeded simulations reproduce exactly. Multistage routing is checked against
+routes derived by hand, at and beside the cut points. Enemy sets: over random sets and responses, no test administers
+two items of a set. Exposure calibration: every rate of the last simulation is within its tolerance of r, the result
+reproduces with its seed, and a test too long for r does not converge. Form assembly is a heuristic without a
+reference solution: an assembled form of 30 from 300 items meets every content constraint and comes within 5% of the
+information target, a target above any form's information selects the most informative items, and the counts and
+information it reports equal those of its items.
+
+`validation/psychometrics/fit.R`, `dif.R` and `equating.R` store the inputs each reference used: the items, the thetas, the
+calibrations. The tests compute the statistics from those inputs, so a difference is the statistic's alone.
+
+Several results of the reference packages are not references:
+
+- **mirt's M-step for a normal distribution of theta.** mirt maximizes Σ n_q ln φ(θ_q) over the mean and the variance,
+  without normalizing the weights over the nodes, so its fixed point is not the maximum of the log-likelihood it
+  reports; with fixed items the missing information amplifies the gap. On the anchored fixture, N(0.63, 1.34²), its
+  estimates are within 4.6e-3 of the maximum, whose log-likelihood is 7.6e-4 higher; where the distribution lies well
+  inside the nodes, within 1.4e-9. the package's M-step matches the weights' mean and variance to the counts', which
+  maximizes the reported likelihood. mirt's default BFGS M-step also stops short; `optimizer = "NR"` converges.
+- **mirt's Richardson standard errors with a free variance.** `SE.type = "Richardson"` leaves `COV_11` shifted by
+  -0.0025 in the fitted object; `"Oakes"` gives the same standard errors and keeps the estimate.
+- **mirt's `bfactor` with free testlet variances.** On the simulated testlets, mirt with `optimizer = "NR"` stops
+  short, 1.5e-3 from the maximum and 1.5e-4 below its log-likelihood. On sirt's `data.read` it reaches a degenerate
+  solution, testlet variances near 58 and a negative slope, 47.7 below the maximum's log-likelihood. The base R
+  maximum is the reference; the package's and base R's log-likelihoods agree within 4e-10.
+- **lme's ML fit.** nlme's optimizer stops 9e-8 below the maximum of the log-likelihood, 2e-5 from it in the
+  discriminations; Newton steps on the written-out likelihood reach it. LNIRT's MCMC posterior means are within its
+  Monte Carlo error, 0.08 on the simulation and 0.03 on CredentialForm1.
+- **GDINA on the fraction subtraction data.** Under the DINA, profiles with equal ideal responses share any split of
+  their proportion; GDINA's split depends on its starts, so the fixture sums proportions over such profiles, and
+  persons' posteriors among them are not compared. Under the G-DINA with 8 attributes, GDINA's estimates have a
+  log-likelihood 110.8 below the package's: the likelihood has several maxima, and the case is left out. `coef` rounds to 4
+  digits unless given `digits`; GDINA breaks MAP ties at random. GDINA's `CA(what = "EAP")` classifies every person
+  in the first profile, as its row matching `whichrow_AinB` returns 1 for every row; the EAP reference is `CA`'s
+  computation in base R with the profiles matched by their patterns.
+- **Histograms.** The EM weights of an empirical histogram creep toward a spiky maximum without reaching it, in mirt
+  as in the package, so a histogram is where EM stops; mirt stops by its items' change alone. The fixture checks the
+  histogram on fixed items against base R's EM with the package's stopping rule.
+- **mirt's `expbeta` prior.** mirt 1.48 differentiates the prior with respect to g instead of logit g, so its EM stops
+  short of the posterior mode it reports: on LSAT7 with Beta(5, 17) on g, its log-posterior is -2651.687, the base R
+  mode's -2651.614. The 3PL is therefore validated against base R, and the 4PL and the mixed format against mirt with
+  `norm` priors on logit g and logit u, which the test implements as a custom `ParameterPrior`.
+- **mirt's WLE for the 3PL, 4PL and GRM.** mirt maximizes ln L + ½ ln I, which equals Warm's estimator only for
+  exponential-family models: the 1PL, 2PL, PCM, GPCM, RSM and NRM. the package solves Warm's equation, as catR does.
+- **mirt's polytomous IRT standard errors.** mirt 1.48's `coef(IRTpars = TRUE, printSE = TRUE)` gives Science's
+  Comfort item a GPCM b1 standard error of 1.111; the delta method on mirt's own covariance matrix gives 0.651, as
+  the package does. Polytomous standard errors therefore come from the delta method.
+- **TAM's JML standard errors.** TAM's `errorP` for a polytomous item uses only the diagonal of its threshold
+  information matrix, and TAM does not apply the bias correction to it.
+- **eRm's CML.** eRm estimates the Rasch model and the PCM by conditional maximum likelihood, a different estimator. On
+  the complete cases of the JML data, its thresholds and TAM's corrected JML thresholds, both centered, differ by up to
+  0.10. With missing responses its polytomous estimates are unreliable.
+- **difR's continuity correction.** `difMH` subtracts 0.5 from \|Σ (A - E(A))\| even when it is below 0.5, so
+  identical groups get a positive chi-square. the package and `mantelhaen.test` subtract it only from 0.5 up; on the
+  fixtures the two differ for one simulated item.
+- **difR's ETS codes.** `print` on a `difMH` result codes items by \|MH D-DIF\| alone. ETS's rule also requires
+  significance: on verbal, 14 of the 24 items differ. On the simulation, both flag the three DIF items C.
+- **difLord's ltm calibrations.** With ltm's default control, 40 EM cycles and then BFGS at `optim`'s relative
+  tolerance, the estimates stop up to 1.5e-3 from the maximum on the fixtures' groups, which moves Lord's chi-square by
+  up to 2%. The fixture passes difLord calibrations run to convergence.
+- **equate's percentile ranks** are rounded to 10 decimals, which moves equipercentile equivalents by up to 1e-7, and
+  equate returns an X score above Y's scale with a percentile rank of 1 unchanged. The unrounded base R computation is
+  the reference.
+- **equateIRT's Rasch linking** fixes A = 1 for every method, and its `direc` takes dichotomous items only.
+
+No package among the references implements the modified Angoff, Bookmark or Hofstee method, so their references are
+base R written out from each method's definition. The tests add values derived by hand: the Bookmark locations
+b + ln((RP - c) / (d - RP)) / a of logistic items, b + ln 2 at RP 2/3 for a Rasch item (Huynh, 2006), and the peak of
+P(θ) I(θ) of a 3PL item at RP (2 + c) / 3 (Huynh, 1998).
+
+## Simulation
+
+R's generator differs from the package's, so no R function reproduces a simulation. The tests of `sim` use fixed seeds and
+bounds of four standard errors, which a correct simulation exceeds with a probability below 1e-4 per check:
+
+- **Moments.** The mean and standard deviation of 100,000 draws of each distribution and of `simulateThetas`, and of
+  20,000 items with each model's default distributions.
+- **Categories.** The frequency of each category of 20,000 responses at one theta, for 3PL, GRM, GPCM, RSM and NRM
+  items, against P(k | θ).
+- **Missingness.** The share of missing responses, with the other responses those of the same seed without them.
+- **Reproduction.** Equal seeds give equal simulations, for every model.
+- **Recovery.** 20 simulated 2PL items, calibrated from 2,000 simulated persons: every estimate within four standard
+  errors of the true value, and root mean square errors below 0.15 for a and 0.2 for b (0.10 and 0.16 found).
+
+## Datasets
+
+| Fixture                        | Data                                                                                                                                                                                                                   | Covers                                                                                                        |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ctt-lsat7.json`               | `mirt::LSAT7`, expanded: 1000 persons, 5 dichotomous items                                                                                                                                                             | Complete data, an odd number of items                                                                         |
+| `ctt-simulated-2pl.json`       | 2PL simulation, `set.seed(20261029)`: 300 persons, 16 dichotomous items                                                                                                                                                | An even number of items                                                                                       |
+| `ctt-bfi-neuroticism.json`     | `psych::bfi` items N1-N5, scored 0-5: 2800 persons, 106 incomplete                                                                                                                                                     | Polytomous items, missing responses                                                                           |
+| `ctt-sat12.json`               | `mirt::SAT12` with its key, 8 as missing: 600 persons, 32 items, 28 incomplete                                                                                                                                         | Scoring, distractor analysis, omitted responses                                                               |
+| `math-functions.json`          | 18 probabilities from 1e-300 to 1 - 1e-10, 13 points from -30 to 30; chi-squares from 0 to 400, 1 to 100 df                                                                                                            | Tails of the normal quantile and of the chi-square                                                            |
+| `math-gauss-hermite.json`      | Rules of 1, 2, 5, 21 and 61 points                                                                                                                                                                                     | Small and large rules                                                                                         |
+| `irt-lsat7.json`               | `mirt::LSAT7`, expanded: 2PL, 2PL with two anchors, 3PL with a prior                                                                                                                                                   | All 32 patterns and 4 with missing responses                                                                  |
+| `irt-simulated-1pl.json`       | 1PL simulation, `set.seed(20261029)`: 800 persons, 12 items, a = 1.3, 10% missing                                                                                                                                      | Missing responses, a shared parameter                                                                         |
+| `irt-simulated-4pl.json`       | 4PL simulation, `set.seed(20261029)`: 2000 persons, 12 items                                                                                                                                                           | Four parameters, priors on both asymptotes                                                                    |
+| `irt-science.json`             | `mirt::Science`, recoded 0-3: 392 persons, 4 items with 4 categories                                                                                                                                                   | GRM, GPCM, PCM, RSM, NRM; all 256 patterns and 4 with missing responses                                       |
+| `irt-simulated-mixed.json`     | Mixed-format simulation, `set.seed(20261029)`: 3000 persons, 9 3PL items, 3 GPCM items with 3 or 4 categories                                                                                                          | Mixed models, an anchor of each, a prior on c                                                                 |
+| `irt-simulated-pcm.json`       | Rasch and PCM simulation, `set.seed(20261029)`: 500 persons, 10 dichotomous and 4 polytomous items, 5% missing                                                                                                         | JML; 15 extreme total scores, missing responses                                                               |
+| `cat-3pl.json`                 | catR's `genDichoMatrix(items = 100, model = "3PL", seed = 20261029)`: 4 runs of 15 items                                                                                                                               | MFI, KL, thOpt; MAP, EAP then ML, EAP then WLE; 15 stopping decisions                                         |
+| `cat-2pl.json`                 | `genDichoMatrix(items = 100, model = "2PL")`: 4 strata of 25, 3 items from each                                                                                                                                        | a-stratification                                                                                              |
+| `cat-gpcm.json`                | `genPolyMatrix(items = 40, nrCat = 4, model = "GPCM")`: 2 to 4 categories, 2 runs of 15 items                                                                                                                          | Polytomous MFI and KL; MAP, EAP then ML                                                                       |
+| `cat-content.json`             | `genDichoMatrix(items = 60, model = "3PL", cbControl)`: areas with targets 0.5, 0.3 and 0.2                                                                                                                            | Content balancing                                                                                             |
+| `interop-mirt.json`            | 25 items set in mirt: 2PL, 3PL, 4PL, `graded` (one negative slope), `gpcm`, `Rasch`, `rsm`, `nominal`                                                                                                                  | Both coefficient forms, probabilities                                                                         |
+| `fit-rasch.json`               | difR's `verbal`, 24 items under `RM`; `mirt::Science` recoded 0-3 under `PCM`                                                                                                                                          | Extreme scores, polytomous mean squares                                                                       |
+| `fit-summed-score.json`        | `mirt::LSAT7` and `SAT12` scored (omissions wrong) under the 2PL; Science under the GPCM and GRM                                                                                                                       | Dichotomous and polytomous collapsing                                                                         |
+| `fit-residuals.json`           | SAT12 scored with omissions missing under the 2PL; Science under the GPCM                                                                                                                                              | Missing responses, polytomous lz and Q3                                                                       |
+| `dif.json`                     | difR's `verbal`, Gender 1 focal; a 2PL simulation, `set.seed(20261029)`: 2 × 1000 persons, 20 items; both also with 2% of the responses missing                                                                        | Known uniform DIF in items 1, 2 and nonuniform in item 3; purification; 39% and 33% of the persons incomplete |
+| `equating-linking.json`        | equateIRT's `est2pl`, `est3pl`, forms 1 to 2 over I1-I10; 10 mixed-format items, `set.seed(20261029)`                                                                                                                  | 3PL, GRM, GPCM; a known transformation with noise                                                             |
+| `equating-true-score.json`     | est3pl's form 2 and form 1 linked to it; the mixed-format items                                                                                                                                                        | Scores below Σ c, polytomous items                                                                            |
+| `equating-observed-score.json` | equate's `ACTmath` (40 items); the total scores of `KBneat` (36 items)                                                                                                                                                 | Scores without persons                                                                                        |
+| `standard-setting.json`        | Angoff ratings, `set.seed(20261029)`: 8 panelists, 30 items; 9 items set in mirt; SAT12, omissions wrong                                                                                                               | Every Bookmark page at RP 0.67 and 0.5; mean and whole Hofstee bounds; classification by one and three cuts   |
+| `irt-latent.json`              | 2PL simulations, `set.seed(20261029)`: 4 anchors of 12 items, θ ~ N(0.5, 1.2²); 2 × 1000 persons; 2,000 adaptive tests of 37 operational and 6 pretest items                                                           | A free normal distribution, two groups, online calibration, a histogram                                       |
+| `irt-scoring.json`             | LSAT7 under the 2PL and Science under the GPCM, the calibrations of `irt-lsat7` and `irt-science`                                                                                                                      | Summed-score tables and marginal reliability under two priors; 1000 EAP estimates                             |
+| `irt-cross-product.json`       | LSAT7, the simulated 1PL with missing responses, Science under the GPCM                                                                                                                                                | Cross-product standard errors, a shared slope                                                                 |
+| `equating-presmoothing.json`   | ACTmath's X and KBneat's X totals                                                                                                                                                                                      | Degrees 2, 3, 4 and 6                                                                                         |
+| `irt-testlet.json`             | A 2PL testlet simulation, `set.seed(20261029)`: 1000 persons, 3 testlets of 4 items, SDs 0.5, 0.8 and 1; sirt's `data.read`, 328 persons, 3 passages of 4 items                                                        | 21 nodes, as mirt's `bfactor`; EAP of 10 patterns                                                             |
+| `rater.json`                   | irr's `anxiety` (20 subjects, 3 raters), also with two ratings missing; irr's `diagnoses` (30 subjects, 6 raters)                                                                                                      | Weighted kappa, nominal categories, missing ratings                                                           |
+| `response-time.json`           | A lognormal simulation, `set.seed(20261029)`: 400 persons, 12 items, 5% of times missing; LNIRT's `CredentialForm1`, items 1 to 10, 1636 persons, times of 0 as missing                                                | Calibration, speeds, residuals; NT10 and NT15 with a 30 s cap                                                 |
+| `cdm.json`                     | GDINA's `realdata_Tatsuoka1990`, fraction subtraction: 536 persons, 20 items, 8 attributes, under the DINA; a G-DINA simulation, `set.seed(20261029)`: 1500 persons, 15 items, 4 attributes, under the G-DINA and DINO | 256 profiles, indistinguishable profiles; persons, accuracy, PVAF, nonparametric classification of 30 persons |
+
+The upper and lower groups use 27% of the persons. Edge cases (constant items, persons and items without responses,
+one item, two persons) are tested against values derived by hand in `test/ctt.test.ts`.
+
+## Tolerances
+
+| Quantity                                                                | Tolerance                                          | Largest difference found |
+| ----------------------------------------------------------------------- | -------------------------------------------------- | ------------------------ |
+| CTT statistics                                                          | 1e-10 absolute                                     | 4e-14                    |
+| Normal quantile and density, logistic function                          | 1e-14 relative                                     | 3e-16                    |
+| Gauss-Hermite nodes and weights                                         | 1e-12 absolute                                     | 3e-14                    |
+| IRT item parameters                                                     | 1e-5 absolute                                      | 6e-7                     |
+| IRT standard errors                                                     | 1e-4 relative                                      | 9e-6                     |
+| IRT log-likelihood, AIC, BIC at the estimates                           | 1e-6 absolute                                      | 3e-10                    |
+| 4PL, polytomous and mixed-format parameters                             | 2e-4 absolute                                      | 1.1e-4                   |
+| 4PL, polytomous and mixed-format standard errors                        | 1e-3 relative                                      | 8e-5                     |
+| 4PL, polytomous and mixed-format log-likelihood, AIC, BIC               | 1e-4 absolute                                      | 7e-5                     |
+| Log-likelihood at the reference's estimates                             | 1e-8 absolute                                      | 2e-11                    |
+| EAP and WLE theta and standard error                                    | 1e-10 absolute                                     | 6e-14                    |
+| ML and MAP theta and standard error                                     | 1e-5 absolute                                      | 7e-6                     |
+| Item and test information                                               | 1e-12 absolute                                     | 3e-14                    |
+| JML thresholds, standard errors, thetas, log-likelihood                 | 1e-10 absolute                                     | 1.4e-12                  |
+| mirt coefficient forms                                                  | 1e-15 relative                                     | 4e-16                    |
+| CAT ML, MAP and WLE theta and standard error against catR               | 1e-4 absolute                                      | 3e-5                     |
+| CAT EAP theta and standard error against catR                           | 1e-6 absolute                                      | 6e-8                     |
+| CAT information and KL scores                                           | 1e-12 relative                                     | 4e-15                    |
+| Theta of an item's largest information                                  | 1e-10 absolute                                     | 4e-15                    |
+| Category probabilities against `probtrace`                              | 1e-15 absolute                                     | 4e-16                    |
+| Chi-square upper tail                                                   | 1e-12 relative                                     | 2e-14                    |
+| Infit, outfit, lz, Q3, S-X² and its significance                        | 1e-12 absolute                                     | 3e-14                    |
+| Mantel-Haenszel statistics                                              | 1e-12 absolute                                     | 1e-15                    |
+| Logistic regression chi-squares and R² changes                          | 1e-9 absolute                                      | 7e-11                    |
+| Lord's chi-square                                                       | 1e-5 relative                                      | 3e-7                     |
+| Lord's mean-sigma transformation                                        | 1e-8 absolute                                      | 9e-10                    |
+| Mean-mean and mean-sigma transformations                                | 1e-12 absolute                                     | 2e-16                    |
+| Haebara and Stocking-Lord transformations                               | 1e-7 absolute                                      | 2.5e-8                   |
+| Linear, equipercentile and true-score equivalents                       | 1e-12 absolute                                     | 2e-13                    |
+| Equipercentile equivalents against equate                               | 1e-6 absolute                                      | 1e-7                     |
+| Cut scores, Bookmark locations                                          | 1e-12 absolute                                     | 4e-15                    |
+| Normal distribution function                                            | 1e-14 relative                                     | 1.5e-16                  |
+| Distributions of theta: parameters, mean, SD                            | 1e-7 absolute                                      | 3e-9                     |
+| Distributions of theta: standard errors                                 | 1e-6 relative                                      | 1.6e-9                   |
+| Histogram weights on fixed items                                        | 1e-12 absolute                                     | 6e-15                    |
+| Cross-product standard errors                                           | as the Hessian's: 1e-4, flat models 1e-3, relative | 4.4e-7; GPCM 2e-5        |
+| Summed-score tables                                                     | 1e-12 absolute                                     | 3e-15                    |
+| Marginal reliability, 61 nodes against `integrate`                      | 1e-8 absolute                                      | 7e-10                    |
+| Empirical reliability, omega and its loadings                           | 1e-10 absolute                                     | 2e-14                    |
+| Purified and sparse Mantel-Haenszel statistics                          | 1e-12 absolute                                     | 4e-16                    |
+| Purified and sparse logistic regression                                 | 1e-9 absolute                                      | 9e-11                    |
+| Presmoothed counts                                                      | 1e-11 relative                                     | 6e-13                    |
+| Classification probabilities, accuracy, consistency                     | 1e-14 absolute                                     | 1e-16                    |
+| Kappa and intraclass correlations                                       | 1e-12 absolute                                     | 2e-15                    |
+| Testlet parameters and SDs against the base R maximum                   | 2e-5 absolute                                      | 9e-6                     |
+| Testlet standard errors                                                 | 1e-4 relative                                      | 9e-6                     |
+| Testlet log-likelihood                                                  | 1e-8 absolute                                      | 4e-10                    |
+| Lognormal calibration against the maximum                               | 1e-8 absolute                                      | 2e-9                     |
+| Speeds, residuals, statistics, thresholds, effort                       | 1e-10 absolute                                     | 7e-15                    |
+| Effort-moderated EAP estimates                                          | 1e-10 absolute                                     | 3e-15                    |
+| Cognitive diagnosis probabilities, proportions, persons, accuracy, PVAF | 1e-5 absolute                                      | 1.1e-6                   |
+| Cognitive diagnosis log-likelihood, AIC, BIC                            | 1e-8 absolute                                      | 5e-11                    |
+
+Calibrations run with `tolerance: 1e-10`, mirt's `TOL`. The parameter and SE tolerances cover where EM stops in
+mirt: ltm and the base R mode, which converge further, agree within 3e-9. mirt's EM stops short on the flat
+likelihoods of the 4PL, the polytomous models and the mixed format, whatever its `TOL`: the package's log-likelihood or
+log-posterior at its own estimates is higher, by 2e-9 for the 4PL, up to 3e-9 on Science and 2e-7 for the mixed
+format, and the log-likelihood at mirt's estimates agrees within 2e-11. SEs come from numerical Hessians on both
+sides. mirt's ML and MAP use `nlm` with numerical derivatives, good to about 7e-6; the base R WLE is exact. mirt
+computes 1 - P by subtraction, so information is compared in absolute terms: in the tails mirt keeps few significant
+digits. JML runs with `tolerance: 1e-12` against a base R solution iterated to 1e-12.
+
+catR's `thetaEst` finds ML, MAP and WLE roots with `uniroot`'s default tolerance, about 1.2e-4; the package's are good to
+1e-12. catR's EAP uses the trapezoid rule on the package's 61 points, which halves the two end weights; the difference grows
+when the posterior reaches the ends, after responses all in the lowest or highest categories. Item choices match
+exactly at every step.
+
+The fit statistics, the Mantel-Haenszel statistics and equating are closed forms of the same inputs. glm stops its
+iterations when the deviance changes by less than 1e-8 relative, the package's Newton steps when no coefficient changes by
+more than 1e-10, so the logistic deviances differ near 1e-10. Lord's chi-square compares two calibrations, each with
+the parameter and SE differences above. equateIRT and the base R reference minimize the Haebara and Stocking-Lord
+criteria with `nlminb`, which stops near 1e-8 from the minimum; the package's BFGS stops at a gradient of 1e-10, or where
+rounding of the criterion leaves no step that makes progress, within about 1e-8 of the minimum.
+
+Fixtures store 17 significant digits, so they reproduce R's doubles exactly.
+
+## Regenerating fixtures
+
+[validation/README.md](../../validation/README.md) lists the scripts and the R packages they need. Update the versions
+above when they change. A new statistic needs a reference in an R script, a fixture, a test that loads it, and a row in
+the tables above.

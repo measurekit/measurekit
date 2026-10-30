@@ -1,0 +1,106 @@
+{
+  "name": "@measurekit/knowledge-tracing",
+  "version": "0.0.0",
+  "description": "Knowledge tracing for JavaScript and TypeScript: Bayesian knowledge tracing, logistic models (AFM, PFA, LKT features), Elo, online IRT and knowledge space theory, mastery and practice recommendations, evaluation by cross-validation and learning curves, serializable learner state, validated against pyBKT and R.",
+  "keywords": [
+    "knowledge-tracing",
+    "bayesian-knowledge-tracing",
+    "bkt",
+    "additive-factors-model",
+    "performance-factors-analysis",
+    "logistic-knowledge-tracing",
+    "learner-model",
+    "student-model",
+    "elo",
+    "computerized-adaptive-testing",
+    "irt",
+    "item-response-theory",
+    "adaptive-learning",
+    "adaptive-practice",
+    "mastery-learning",
+    "educational-data-mining",
+    "learning-analytics",
+    "learning-curve",
+    "cross-validation",
+    "q-matrix",
+    "knowledge-space-theory",
+    "learning-space",
+    "adaptive-assessment"
+  ],
+  "author": "Fariz Wakan (https://github.com/luthfanwakan)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/measurekit/measurekit.git",
+    "directory": "packages/knowledge-tracing"
+  },
+  "homepage": "https://github.com/measurekit/measurekit/tree/main/packages/knowledge-tracing#readme",
+  "bugs": "https://github.com/measurekit/measurekit/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./bkt": {
+      "types": "./dist/bkt/index.d.ts",
+      "default": "./dist/bkt/index.js"
+    },
+    "./data": {
+      "types": "./dist/data/index.d.ts",
+      "default": "./dist/data/index.js"
+    },
+    "./elo": {
+      "types": "./dist/elo/index.d.ts",
+      "default": "./dist/elo/index.js"
+    },
+    "./evaluate": {
+      "types": "./dist/evaluate/index.d.ts",
+      "default": "./dist/evaluate/index.js"
+    },
+    "./irt": {
+      "types": "./dist/irt/index.d.ts",
+      "default": "./dist/irt/index.js"
+    },
+    "./kst": {
+      "types": "./dist/kst/index.d.ts",
+      "default": "./dist/kst/index.js"
+    },
+    "./logistic": {
+      "types": "./dist/logistic/index.d.ts",
+      "default": "./dist/logistic/index.js"
+    },
+    "./practice": {
+      "types": "./dist/practice/index.d.ts",
+      "default": "./dist/practice/index.js"
+    },
+    "./sim": {
+      "types": "./dist/sim/index.d.ts",
+      "default": "./dist/sim/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "clean": "node --eval \"for (const path of ['dist', 'tsconfig.build.tsbuildinfo']) fs.rmSync(path, { recursive: true, force: true })\"",
+    "build": "pnpm clean && tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "check:packages": "pnpm build && publint --pack pnpm --strict && attw --pack . --profile esm-only"
+  },
+  "dependencies": {
+    "@measurekit/core": "workspace:^"
+  },
+  "devDependencies": {
+    "fast-check": "^4.10.2"
+  }
+}

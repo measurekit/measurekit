@@ -1,0 +1,267 @@
+import { logistic, normalQuantile } from "@measurekit/core";
+import fc from "fast-check";
+import { describe, expect, it } from "vitest";
+import { chiSquareUpperTail } from "../src/math/chi-square.js";
+import { numericalHessian } from "../src/math/hessian.js";
+import { invert, invertPositiveDefinite } from "../src/math/linear-algebra.js";
+import { normalCdf, normalDensity } from "../src/math/normal.js";
+import { bfgs, newton } from "../src/math/optimize.js";
+import { gaussHermite, rectangular } from "../src/math/quadrature.js";
+import { findIncreasingRoot, findRoot } from "../src/math/root.js";
+import functions from "./fixtures/math-functions.json" with { type: "json" };
+import hermite from "./fixtures/math-gauss-hermite.json" with { type: "json" };
+import { defined, expectClose } from "./helpers.js";
+
+/** Relative tolerance of the normal and logistic functions against R. */
+const FUNCTION_TOLERANCE = 1e-14;
+/** Relative tolerance of the chi-square upper tail against R's pchisq. */
+const CHI_SQUARE_TOLERANCE = 1e-12;
+/** Absolute tolerance of Gauss-Hermite nodes and weights against R's eigenvalue method. */
+const QUADRATURE_TOLERANCE = 1e-12;
+
+function expectRelative(actual: number, expected: number, tolerance: number, label: string): void {
+  expect(Math.abs(actual - expected), label).toBeLessThanOrEqual(tolerance * Math.abs(expected));
+}
+
+describe("chiSquareUpperTail", () => {
+  it("matches R's pchisq(lower.tail = FALSE)", () => {
+    const { x, df, upperTail } = functions.chiSquare;
+    x.forEach((value, i) => {
+      const expected = defined(upperTail[i]);
+      const label = `pchisq(${value}, ${df[i]})`;
+      expectRelative(chiSquareUpperTail(value, defined(df[i])), expected, CHI_SQUARE_TOLERANCE, label);
+    });
+  });
+});
+
+describe("numericalHessian", () => {
+  it("differentiates a gradient to the Hessian", () => {
+    const hessian = numericalHessian((x, gradient) => rosenbrock(x, gradient), Float64Array.of(-1.2, 1));
+    const exact = new Float64Array(4);
+    rosenbrock(Float64Array.of(-1.2, 1), new Float64Array(2), exact);
+    exact.forEach((value, i) => {
+      expectClose(defined(hessian[i]), value, 1e-6 * Math.abs(value));
+    });
+    expect(hessian[1]).toBe(hessian[2]);
+  });
+});
+
+describe("invert", () => {
+  it("inverts a matrix", () => {
+    const inverse = defined(invert(Float64Array.of(4, 7, 2, 6), 2));
+    expect([...inverse].map((value) => Number(value.toFixed(12)))).toEqual([0.6, -0.7, -0.2, 0.4]);
+  });
+
+  it("returns the identity product for random well-conditioned matrices", () => {
+    const matrix = fc
+      .integer({ min: 1, max: 5 })
+      .chain((size) =>
+        fc.array(fc.double({ min: -1, max: 1, noNaN: true }), { minLength: size * size, maxLength: size * size }),
+      );
+    fc.assert(
+      fc.property(matrix, (values) => {
+        const size = Math.sqrt(values.length);
+        // Diagonal dominance keeps the matrix well conditioned.
+        const a = Float64Array.from(values, (value, i) => (i % (size + 1) === 0 ? value + size + 1 : value));
+        const inverse = defined(invert(a, size));
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            let sum = 0;
+            for (let k = 0; k < size; k++) sum += defined(a[i * size + k]) * defined(inverse[k * size + j]);
+            expect(Math.abs(sum - (i === j ? 1 : 0))).toBeLessThan(1e-12);
+          }
+        }
+      }),
+    );
+  });
+
+  it("returns null for a singular matrix", () => {
+    expect(invert(Float64Array.of(1, 2, 2, 4), 2)).toBeNull();
+    expect(invert(Float64Array.of(0), 1)).toBeNull();
+  });
+});
+
+describe("invertPositiveDefinite", () => {
+  it("gives the inverse of Gauss-Jordan elimination for symmetric positive definite matrices", () => {
+    const factors = fc
+      .integer({ min: 1, max: 6 })
+      .chain((size) =>
+        fc.array(fc.double({ min: -1, max: 1, noNaN: true }), { minLength: size * size, maxLength: size * size }),
+      );
+    fc.assert(
+      fc.property(factors, (values) => {
+        const size = Math.sqrt(values.length);
+        // B Bᵀ plus the identity is symmetric positive definite.
+        const a = new Float64Array(size * size);
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            let sum = i === j ? 1 : 0;
+            for (let k = 0; k < size; k++) sum += defined(values[i * size + k]) * defined(values[j * size + k]);
+            a[i * size + j] = sum;
+          }
+        }
+        const expected = defined(invert(a, size));
+        defined(invertPositiveDefinite(a, size)).forEach((value, index) => {
+          expectClose(value, defined(expected[index]), 1e-12 * Math.max(1, Math.abs(defined(expected[index]))));
+        });
+      }),
+    );
+  });
+
+  it("returns null for a matrix that is not positive definite", () => {
+    expect(invertPositiveDefinite(Float64Array.of(1, 2, 2, 1), 2)).toBeNull();
+    expect(invertPositiveDefinite(Float64Array.of(1, 1, 1, 1), 2)).toBeNull();
+  });
+});
+
+describe("normal and logistic functions", () => {
+  it("match R's qnorm, dnorm and plogis", () => {
+    functions.p.forEach((p, i) => {
+      expectRelative(normalQuantile(p), defined(functions.normalQuantile[i]), FUNCTION_TOLERANCE, `qnorm(${p})`);
+    });
+    functions.x.forEach((x, i) => {
+      expectRelative(normalDensity(x), defined(functions.normalDensity[i]), FUNCTION_TOLERANCE, `dnorm(${x})`);
+      expectRelative(logistic(x), defined(functions.logistic[i]), FUNCTION_TOLERANCE, `plogis(${x})`);
+    });
+  });
+
+  it("matches R's pnorm in both tails and at the boundaries of Cody's ranges", () => {
+    functions.cumulativeX.forEach((x, i) => {
+      const expected = defined(functions.normalDistribution[i]);
+      expectClose(normalCdf(x), expected, FUNCTION_TOLERANCE * Math.max(expected, Number.MIN_VALUE), `pnorm(${x})`);
+    });
+  });
+});
+
+/** The Rosenbrock function, minimal at (1, 1), with its gradient and Hessian. */
+function rosenbrock(x: Float64Array, gradient: Float64Array, hessian?: Float64Array): number {
+  const a = defined(x[0]);
+  const b = defined(x[1]);
+  gradient[0] = -2 * (1 - a) - 400 * a * (b - a * a);
+  gradient[1] = 200 * (b - a * a);
+  hessian?.set([2 - 400 * (b - 3 * a * a), -400 * a, -400 * a, 200]);
+  return (1 - a) ** 2 + 100 * (b - a * a) ** 2;
+}
+
+describe("optimizers", () => {
+  it("minimize the Rosenbrock function", () => {
+    for (const result of [newton(rosenbrock, [-1.2, 1]), bfgs(rosenbrock, [-1.2, 1])]) {
+      expect(result.converged).toBe(true);
+      expect(defined(result.x[0])).toBeCloseTo(1, 7);
+      expect(defined(result.x[1])).toBeCloseTo(1, 7);
+      expect(result.value).toBeLessThan(1e-14);
+    }
+  });
+
+  it("solve a quadratic in one Newton step", () => {
+    const result = newton(
+      (x, gradient, hessian) => {
+        const v = defined(x[0]);
+        gradient[0] = 2 * (v - 3);
+        hessian[0] = 2;
+        return (v - 3) ** 2;
+      },
+      [10],
+    );
+    expect(result).toMatchObject({ iterations: 1, converged: true, value: 0 });
+    expect(result.x[0]).toBe(3);
+  });
+
+  it("follows the gradient where the Hessian is not positive definite", () => {
+    // f(x) = x^4 - x^2 has a negative second derivative at 0.1 and minima at ±1/√2.
+    const result = newton(
+      (x, gradient, hessian) => {
+        const v = defined(x[0]);
+        gradient[0] = 4 * v ** 3 - 2 * v;
+        hessian[0] = 12 * v * v - 2;
+        return v ** 4 - v * v;
+      },
+      [0.1],
+    );
+    expect(result.converged).toBe(true);
+    expect(defined(result.x[0])).toBeCloseTo(Math.SQRT1_2, 8);
+  });
+
+  it("report non-convergence within the iteration limit", () => {
+    const result = bfgs(rosenbrock, [-1.2, 1], { maxIterations: 3 });
+    expect(result).toMatchObject({ iterations: 3, converged: false });
+  });
+});
+
+describe("gaussHermite", () => {
+  it("matches the Golub-Welsch rules computed in R", () => {
+    for (const rule of hermite.rules) {
+      const { nodes, weights } = gaussHermite(rule.count);
+      expect(nodes).toHaveLength(rule.count);
+      rule.nodes.forEach((node, i) => {
+        expectClose(defined(nodes[i]), node, QUADRATURE_TOLERANCE, `node ${i} of ${rule.count}`);
+      });
+      rule.weights.forEach((weight, i) => {
+        expectClose(defined(weights[i]), weight, QUADRATURE_TOLERANCE, `weight ${i} of ${rule.count}`);
+      });
+    }
+  });
+
+  it("integrates normal moments exactly up to degree 2n - 1", () => {
+    for (const count of [1, 2, 3, 10, 40]) {
+      const { nodes, weights } = gaussHermite(count);
+      let doubleFactorial = 1;
+      for (let degree = 0; degree <= 2 * count - 1; degree++) {
+        const terms = Array.from(nodes, (node, i) => defined(weights[i]) * node ** degree);
+        const moment = terms.reduce((sum, term) => sum + term, 0);
+        const scale = terms.reduce((sum, term) => sum + Math.abs(term), 0);
+        const expected = degree % 2 === 1 ? 0 : doubleFactorial;
+        expect(Math.abs(moment - expected), `E[X^${degree}], ${count} points`).toBeLessThanOrEqual(1e-12 * scale);
+        if (degree % 2 === 1) doubleFactorial *= degree;
+      }
+    }
+  });
+});
+
+describe("rectangular", () => {
+  it("spaces nodes evenly from -6 to 6 with normal density weights summing to 1, as mirt", () => {
+    const { nodes, weights } = rectangular(61);
+    expect(nodes[0]).toBe(-6);
+    expect(nodes[60]).toBe(6);
+    expectClose(defined(nodes[30]), 0, 1e-15);
+    expectClose(defined(nodes[31]) - defined(nodes[30]), 0.2, 1e-14);
+    expectClose(
+      weights.reduce((sum, weight) => sum + weight, 0),
+      1,
+      1e-15,
+    );
+    expectClose(defined(weights[31]) / defined(weights[30]), normalDensity(0.2) / normalDensity(0), 1e-15);
+  });
+});
+
+describe("findRoot", () => {
+  it("finds the root of a bracketing interval to the tolerance", () => {
+    const f = (x: number): number => Math.exp(x) - 2;
+    expectClose(findRoot(f, -1, 3, f(-1), f(3)), Math.LN2, 1e-12);
+    const g = (x: number): number => Math.cos(x) - x;
+    expectClose(findRoot(g, 0, 1, g(0), g(1)), 0.7390851332151607, 1e-12);
+  });
+
+  it("works with the signs in either order", () => {
+    const f = (x: number): number => 1 - x ** 3;
+    expectClose(findRoot(f, 0, 4, f(0), f(4)), 1, 1e-12);
+    expectClose(
+      findRoot((x) => -f(x), 0, 4, -f(0), -f(4)),
+      1,
+      1e-12,
+    );
+  });
+});
+
+describe("findIncreasingRoot", () => {
+  it("brackets the root of an increasing function from a start on either side", () => {
+    for (const start of [-50, 0, 3, 200]) expect(findIncreasingRoot((x) => Math.atan(x - 3), start)).toBeCloseTo(3, 12);
+    expect(findIncreasingRoot((x) => x - 2, 2)).toBe(2);
+  });
+
+  it("returns the furthest point searched when the function keeps its sign over the finite numbers", () => {
+    const point = findIncreasingRoot(() => -1, 0);
+    expect(Number.isFinite(point)).toBe(true);
+    expect(Number.isFinite(point * 2)).toBe(false);
+  });
+});

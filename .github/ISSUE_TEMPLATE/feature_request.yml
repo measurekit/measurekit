@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest a feature, a model or a statistic for a measurekit package.
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - "@measurekit/psychometrics"
+        - "@measurekit/knowledge-tracing"
+        - "@measurekit/core"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do and what the package lacks for it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: The API or behavior you would like, with a short usage example.
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference
+      description: The paper, the formula or the reference implementation that defines it, for a new or changed statistic or model.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve the problem, including doing it outside the package.

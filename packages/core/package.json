@@ -1,0 +1,49 @@
+{
+  "name": "@measurekit/core",
+  "version": "0.0.0",
+  "description": "The foundation that the measurekit packages share: their errors, the checks of their arguments, a seeded random number generator and common numerics.",
+  "keywords": [
+    "measurekit",
+    "psychometrics",
+    "knowledge-tracing",
+    "random-number-generator",
+    "argument-validation"
+  ],
+  "author": "Fariz Wakan (https://github.com/luthfanwakan)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/measurekit/measurekit.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/measurekit/measurekit/tree/main/packages/core#readme",
+  "bugs": "https://github.com/measurekit/measurekit/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "clean": "node --eval \"for (const path of ['dist', 'tsconfig.build.tsbuildinfo']) fs.rmSync(path, { recursive: true, force: true })\"",
+    "build": "pnpm clean && tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "check:packages": "pnpm build && publint --pack pnpm --strict && attw --pack . --profile esm-only"
+  },
+  "devDependencies": {
+    "fast-check": "^4.10.2"
+  }
+}

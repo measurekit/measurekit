@@ -1,0 +1,31 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/data/index.ts",
+    "src/ctt/index.ts",
+    "src/irt/index.ts",
+    "src/cat/index.ts",
+    "src/cdm/index.ts",
+    "src/fit/index.ts",
+    "src/dif/index.ts",
+    "src/equating/index.ts",
+    "src/sim/index.ts",
+    "src/standard-setting/index.ts",
+    "src/rater/index.ts",
+    "src/response-time/index.ts",
+    "src/interop/index.ts",
+    "src/index.ts"
+  ],
+  "tsconfig": "tsconfig.build.json",
+  "sourceLinkTemplate": "https://github.com/measurekit/measurekit/blob/{gitRevision}/packages/psychometrics/{path}#L{line}",
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  },
+  "readme": "README.md",
+  "excludePrivate": true,
+  "projectDocuments": ["../../docs/psychometrics/*.md"],
+  "ignoredHighlightLanguages": ["r"],
+  "treatWarningsAsErrors": true
+}

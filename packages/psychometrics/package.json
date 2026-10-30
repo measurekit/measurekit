@@ -1,0 +1,121 @@
+{
+  "name": "@measurekit/psychometrics",
+  "version": "0.0.0",
+  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory, cognitive diagnosis, adaptive testing, item fit, differential item functioning, equating, simulation, standard setting, rater agreement and response times, validated against R.",
+  "keywords": [
+    "psychometrics",
+    "classical-test-theory",
+    "item-response-theory",
+    "irt",
+    "computerized-adaptive-testing",
+    "multistage-testing",
+    "item-analysis",
+    "reliability",
+    "cronbach-alpha",
+    "assessment",
+    "item-fit",
+    "differential-item-functioning",
+    "test-equating",
+    "simulation",
+    "standard-setting",
+    "rater-agreement",
+    "cohen-kappa",
+    "intraclass-correlation",
+    "response-times",
+    "rapid-guessing",
+    "cognitive-diagnosis",
+    "gdina"
+  ],
+  "author": "Fariz Wakan (https://github.com/luthfanwakan)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/measurekit/measurekit.git",
+    "directory": "packages/psychometrics"
+  },
+  "homepage": "https://github.com/measurekit/measurekit/tree/main/packages/psychometrics#readme",
+  "bugs": "https://github.com/measurekit/measurekit/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./cat": {
+      "types": "./dist/cat/index.d.ts",
+      "default": "./dist/cat/index.js"
+    },
+    "./cdm": {
+      "types": "./dist/cdm/index.d.ts",
+      "default": "./dist/cdm/index.js"
+    },
+    "./ctt": {
+      "types": "./dist/ctt/index.d.ts",
+      "default": "./dist/ctt/index.js"
+    },
+    "./data": {
+      "types": "./dist/data/index.d.ts",
+      "default": "./dist/data/index.js"
+    },
+    "./dif": {
+      "types": "./dist/dif/index.d.ts",
+      "default": "./dist/dif/index.js"
+    },
+    "./equating": {
+      "types": "./dist/equating/index.d.ts",
+      "default": "./dist/equating/index.js"
+    },
+    "./fit": {
+      "types": "./dist/fit/index.d.ts",
+      "default": "./dist/fit/index.js"
+    },
+    "./interop": {
+      "types": "./dist/interop/index.d.ts",
+      "default": "./dist/interop/index.js"
+    },
+    "./irt": {
+      "types": "./dist/irt/index.d.ts",
+      "default": "./dist/irt/index.js"
+    },
+    "./rater": {
+      "types": "./dist/rater/index.d.ts",
+      "default": "./dist/rater/index.js"
+    },
+    "./response-time": {
+      "types": "./dist/response-time/index.d.ts",
+      "default": "./dist/response-time/index.js"
+    },
+    "./sim": {
+      "types": "./dist/sim/index.d.ts",
+      "default": "./dist/sim/index.js"
+    },
+    "./standard-setting": {
+      "types": "./dist/standard-setting/index.d.ts",
+      "default": "./dist/standard-setting/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "clean": "node --eval \"for (const path of ['dist', 'tsconfig.build.tsbuildinfo']) fs.rmSync(path, { recursive: true, force: true })\"",
+    "build": "pnpm clean && tsc -b tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "check:packages": "pnpm build && publint --pack pnpm --strict && attw --pack . --profile esm-only"
+  },
+  "dependencies": {
+    "@measurekit/core": "workspace:^"
+  },
+  "devDependencies": {
+    "fast-check": "^4.10.2"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/data/index.ts",
+    "src/evaluate/index.ts",
+    "src/elo/index.ts",
+    "src/bkt/index.ts",
+    "src/logistic/index.ts",
+    "src/irt/index.ts",
+    "src/kst/index.ts",
+    "src/practice/index.ts",
+    "src/sim/index.ts",
+    "src/index.ts"
+  ],
+  "tsconfig": "tsconfig.build.json",
+  "sourceLinkTemplate": "https://github.com/measurekit/measurekit/blob/{gitRevision}/packages/knowledge-tracing/{path}#L{line}",
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  },
+  "readme": "README.md",
+  "excludePrivate": true,
+  "projectDocuments": ["../../docs/knowledge-tracing/*.md"],
+  "ignoredHighlightLanguages": ["r"],
+  "treatWarningsAsErrors": true
+}

@@ -1,0 +1,15 @@
+{
+  "name": "measurekit-examples",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@measurekit/knowledge-tracing": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "license": "Apache-2.0"
+}

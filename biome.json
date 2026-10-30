@@ -1,0 +1,541 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["**", "!pnpm-lock.yaml", "!**/CHANGELOG.md", "!docs/api", "!**/test/fixtures"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "error"
+      },
+      "correctness": {
+        "noUndeclaredDependencies": "error",
+        "useImportExtensions": {
+          "level": "error",
+          "options": {
+            "extensionMappings": {
+              "ts": "js"
+            }
+          }
+        }
+      },
+      "style": {
+        "noDefaultExport": "error",
+        "noParameterProperties": "error",
+        "noNonNullAssertion": "error",
+        "useConsistentArrayType": {
+          "level": "error",
+          "options": {
+            "syntax": "shorthand"
+          }
+        },
+        "useConsistentTypeDefinitions": {
+          "level": "error",
+          "options": {
+            "style": "interface"
+          }
+        },
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "filenameCases": ["kebab-case"],
+            "requireAscii": true
+          }
+        },
+        "useNamingConvention": {
+          "level": "error",
+          "options": {
+            "strictCase": true,
+            "requireAscii": true,
+            "conventions": [
+              {
+                "selector": {
+                  "kind": "typeParameter"
+                },
+                "match": "T(?:[A-Z][a-zA-Z]*)?",
+                "formats": ["PascalCase"]
+              }
+            ]
+          }
+        }
+      },
+      "suspicious": {
+        "noConsole": "error",
+        "noImportCycles": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "markdown": {
+    "parser": {
+      "frontmatter": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/*/src/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "error"
+          },
+          "style": {
+            "noProcessEnv": "error",
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "fetch": "The packages use no platform API.",
+                  "window": "The packages use no platform API.",
+                  "document": "The packages use no platform API.",
+                  "process": "The packages use no platform API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "plugins": ["./biome/no-math-random.grit"]
+    },
+    {
+      "includes": ["packages/*/src/checks.ts", "packages/*/src/errors.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["./*", "./*/**", "!./errors.js"],
+                    "message": "checks.ts depends only on errors.ts, and errors.ts on nothing."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/*/src/math/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**"],
+                    "message": "math/ imports no other module of the package."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/data/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**"],
+                    "message": "data/ imports no other module of the package."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/ctt/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../math/**"],
+                    "message": "ctt/ builds on data/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/irt/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../checks.js", "!../data/**", "!../math/**"],
+                    "message": "irt/ builds on data/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/sim/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../*",
+                      "../*/**",
+                      "!../checks.js",
+                      "!../data/**",
+                      "!../irt/**",
+                      "!../cdm/**",
+                      "!../math/**"
+                    ],
+                    "message": "sim/ builds on data/, irt/, cdm/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/cat/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../checks.js", "!../irt/**", "!../sim/**", "!../math/**"],
+                    "message": "cat/ builds on irt/, sim/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/interop/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../irt/**"],
+                    "message": "interop/ converts the parameters of irt/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/fit/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../irt/**", "!../math/**"],
+                    "message": "fit/ builds on data/, irt/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/dif/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../irt/**", "!../equating/**", "!../math/**"],
+                    "message": "dif/ builds on data/, irt/, equating/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/equating/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../irt/**", "!../math/**"],
+                    "message": "equating/ builds on irt/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/standard-setting/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../irt/**", "!../equating/**", "!../math/**"],
+                    "message": "standard-setting/ builds on irt/, equating/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/rater/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**"],
+                    "message": "rater/ imports no other module of the package."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/response-time/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../irt/**", "!../math/**"],
+                    "message": "response-time/ builds on data/, irt/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/psychometrics/src/cdm/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../irt/**", "!../math/**"],
+                    "message": "cdm/ builds on data/, irt/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/knowledge-tracing/src/data/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../math/**"],
+                    "message": "data/ builds on math/ only; models and evaluation build on data/."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/knowledge-tracing/src/model.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["./*", "./*/**", "!./data/**"],
+                    "message": "model.ts depends only on the types of data/."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/knowledge-tracing/src/*/**",
+        "!packages/knowledge-tracing/src/data/**",
+        "!packages/knowledge-tracing/src/math/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../math/**", "!../model.js"],
+                    "message": "Modules build on data/, math/, and model.ts only: model families never import each other, and evaluation and practice use models through LearnerModel."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**", "!packages/*/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/src/**", "**/dist/**"],
+                    "message": "Import a package by its name; its internals, such as math/, are private."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["examples/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/test/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          },
+          "correctness": {
+            "noUndeclaredDependencies": "off"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "tsconfig": "tsconfig.build.json",
+  "sourceLinkTemplate": "https://github.com/measurekit/measurekit/blob/{gitRevision}/packages/core/{path}#L{line}",
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  },
+  "readme": "README.md",
+  "excludePrivate": true,
+  "treatWarningsAsErrors": true
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "measurekit",
+  "entryPointStrategy": "packages",
+  "entryPoints": ["packages/core", "packages/psychometrics", "packages/knowledge-tracing"],
+  "readme": "README.md",
+  "out": "docs/api",
+  "treatWarningsAsErrors": true,
+  "ignoredHighlightLanguages": ["r"]
+}

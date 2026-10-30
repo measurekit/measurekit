@@ -1,0 +1,5 @@
+# pyBKT 1.4.3 fails to import with scikit-learn 1.8 and to fit with NumPy 2.
+pyBKT==1.4.3
+numpy==1.26.4
+pandas==2.3.3
+scikit-learn==1.7.2
