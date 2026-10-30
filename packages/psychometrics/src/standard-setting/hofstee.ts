@@ -74,5 +74,9 @@ export function hofsteeCutScore(distribution: readonly number[], bounds: Hofstee
   const step = failure(score + 1) - failure(score);
   const t = (maximumFailureRate - failure(score) - (minimumCutScore - score) * step) / (cutRange * step + rateRange);
   const share = Math.min(1, Math.max(0, t));
-  return { cutScore: minimumCutScore + share * cutRange, failureRate: maximumFailureRate - share * rateRange };
+  // k_min + (k_max - k_min) can round above k_max, and the rate below f_min likewise.
+  return {
+    cutScore: Math.min(maximumCutScore, minimumCutScore + share * cutRange),
+    failureRate: Math.max(minimumFailureRate, maximumFailureRate - share * rateRange),
+  };
 }

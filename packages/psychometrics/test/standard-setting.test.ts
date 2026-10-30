@@ -256,6 +256,17 @@ describe("hofsteeCutScore", () => {
     expectClose(result.failureRate, 0.75 - 0.55 / 0.65 / 4, 1e-15);
   });
 
+  it("keeps the cut score within the bounds where their difference rounds", () => {
+    // 1.4663184973103873e-93 + (5.304227003211107e-93 - 1.4663184973103873e-93) rounds one ulp above the maximum.
+    const bounds = {
+      minimumCutScore: 1.4663184973103873e-93,
+      maximumCutScore: 5.304227003211107e-93,
+      minimumFailureRate: 0,
+      maximumFailureRate: 5e-324,
+    };
+    expect(hofsteeCutScore([0, 1], bounds)).toEqual({ cutScore: bounds.maximumCutScore, failureRate: 0 });
+  });
+
   it("rejects invalid bounds and a line that does not cross the failure rates", () => {
     expect(() => hofsteeCutScore([1, 1, 1, 1], { ...bounds, maximumCutScore: 4 })).toThrow(
       "The Hofstee cut score bounds need 0 ≤ k_min < k_max ≤ 3, found 1 and 4.",
