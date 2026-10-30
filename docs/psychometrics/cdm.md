@@ -80,6 +80,10 @@ attributes and few persons the G-DINA can have several maxima; compare the log-l
 | `map`       | The profile of largest posterior probability, the first in profile order on ties |
 | `eap`       | Each attribute mastered when its probability is above 0.5                        |
 
+A calibration from JSON may hold success probabilities of 0 or 1, which make some responses impossible. Such a
+response's probability enters the likelihood as `Number.MIN_VALUE`, so that a person whose responses no profile can give
+has a posterior on the profiles that the responses contradict least.
+
 `cdmClassificationAccuracy(matrix, calibration, { classification })` returns GDINA's `CA` indices for `"map"`
 (default) or `"eap"` classification: `accuracy` τ = Σ_c π_c τ_c, the probability that a person lands in the true profile, with
 `profileAccuracy` τ_c, and `attributeAccuracy` τ_k; `consistency` γ, the mean of Σ_c post(c)², the chance that two

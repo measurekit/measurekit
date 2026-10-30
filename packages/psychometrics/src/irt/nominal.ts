@@ -99,6 +99,8 @@ export const nominalResponse: IrtModel<NominalParameters> = {
     for (let k = 0; k < a.length; k++) {
       const slope = a[k] ?? 0;
       const weight = Math.exp(slope * theta + (c[k] ?? 0) - largest);
+      // A weight that underflows adds nothing, and while the total is 0 it would make the mean 0 / 0.
+      if (weight === 0) continue;
       total += weight;
       const deviation = slope - mean;
       mean += (deviation * weight) / total;

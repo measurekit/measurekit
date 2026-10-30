@@ -237,6 +237,28 @@ describe("attributeProfiles", () => {
     );
   });
 
+  it("places responses that no profile can give on the profiles they contradict least", () => {
+    const qMatrix = { item1: ["A"], item2: ["B"], item3: ["A", "B"] };
+    const data = responseMatrix([
+      [1, 0, 1],
+      [0, 0, 1],
+    ]);
+    const calibration = calibrateCdm(data, qMatrix, { model: "dina", maxIterations: 5 });
+    // Deterministic items, as JSON may hold them: a person answers correctly exactly when mastering the attributes.
+    const items = calibration.items.map((item) => ({
+      ...item,
+      probabilities: item.probabilities.map((_, group, all) => (group === all.length - 1 ? 1 : 0)),
+    }));
+    const [first, second] = attributeProfiles(data, { ...calibration, items });
+    // Of the profiles [0, 0], [1, 0], [0, 1] and [1, 1], the first person's answers contradict [1, 0] and [1, 1] once
+    // and the others more; the second person's contradict [0, 0] once and the others twice.
+    const posterior = defined(first).posterior;
+    expectClose((posterior[1] ?? 0) + (posterior[3] ?? 0), 1, 1e-12);
+    expectClose(defined(second).posterior[0] ?? 0, 1, 1e-12);
+    expect(defined(second).map).toEqual([0, 0]);
+    expect(Number.isFinite(cdmClassificationAccuracy(data, { ...calibration, items }).accuracy)).toBe(true);
+  });
+
   it("rejects a calibration from JSON that does not fit its design", () => {
     const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), { maxIterations: 5 });
     const [first, ...rest] = calibration.items;

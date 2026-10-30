@@ -241,6 +241,10 @@ Knowledge tracing: the model families never import each other, nor does anything
 - Never use `Math.random`; take a `Random`. The GritQL plugin `biome/no-math-random.grit` makes `pnpm lint` fail on
   `Math.random` anywhere in `packages/*/src`.
 - Numerics work on `Float64Array` and do not allocate in inner loops.
+- Numerics stay defined at extreme parameters. A weight that underflows to 0 is skipped before it divides; a loop that
+  grows or shrinks a value until a test passes also stops when the value is not finite. In psychometrics, a response's
+  probability enters a log-likelihood as at least `MIN_PROBABILITY` of `irt/probability.ts`, so that no likelihood is
+  0; knowledge tracing throws `DataError` for outcomes of probability 0.
 - A number with a meaning is a named constant with its source, such as the reference's name for it.
 - No speculative options, abstractions or modules. Add a method only when a real use needs it, with its validation.
 
@@ -299,6 +303,7 @@ Knowledge tracing: the model families never import each other, nor does anything
   an empty log, one learner, events out of time order, items and skills that are unknown, outcomes all correct or all
   wrong, and each model's limits, such as BKT parameters at their bounds or a posterior mode beyond the IRT grid.
 - Test names are plain sentences about behavior: `it("shares the places at a tied boundary equally")`.
+- A bug fix comes with a test that fails without it, in the test file of the fixed folder.
 
 ## Where things go
 

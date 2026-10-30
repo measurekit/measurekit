@@ -158,6 +158,8 @@ export function partialCreditInformation(a: number, location: number, steps: Arr
   for (let k = 0; k <= steps.length; k++) {
     if (k > 0) z += a * (theta - location - (steps[k - 1] ?? 0));
     const weight = Math.exp(z - largest);
+    // A weight that underflows adds nothing, and while the total is 0 it would make the mean 0 / 0.
+    if (weight === 0) continue;
     total += weight;
     const deviation = k - mean;
     mean += (deviation * weight) / total;

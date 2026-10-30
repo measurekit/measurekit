@@ -12,6 +12,7 @@ import {
 } from "@measurekit/core";
 import { checkDichotomous } from "../data/dichotomous.js";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { MIN_PROBABILITY } from "../irt/probability.js";
 import { type CdmDesign, cdmDesign, profilesOf, type QMatrix } from "./q-matrix.js";
 
 /**
@@ -308,7 +309,8 @@ function addPosterior(
 
 /**
  * Calls `visit` with each person who answered an item, the posterior over the profiles and the log of the person's
- * marginal likelihood. `posterior` is reused between calls.
+ * marginal likelihood. `posterior` is reused between calls. A response's probability enters the likelihood as at least
+ * `MIN_PROBABILITY`, so that responses no profile can give still have a posterior.
  */
 export function forEachPosterior(
   data: DichotomousRows,
@@ -318,8 +320,8 @@ export function forEachPosterior(
 ): void {
   const { itemCount, responses } = data;
   const logProbabilities = state.probabilities.map((p) => ({
-    correct: p.map(Math.log),
-    incorrect: p.map((value) => Math.log(1 - value)),
+    correct: p.map((value) => Math.log(Math.max(value, MIN_PROBABILITY))),
+    incorrect: p.map((value) => Math.log(Math.max(1 - value, MIN_PROBABILITY))),
   }));
   const logProportions = state.proportions.map(Math.log);
   const posterior = new Float64Array(design.profiles.length);

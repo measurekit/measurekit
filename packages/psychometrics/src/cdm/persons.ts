@@ -20,6 +20,11 @@ export interface AttributeProfile {
  * probability of mastering each attribute, and the MAP and EAP profiles, as GDINA's `personparm`. A person without
  * responses takes the calibrated proportions.
  *
+ * @remarks
+ * A success probability of 0 or 1, as a calibration from JSON may hold, makes a response impossible; the response's
+ * probability enters the likelihood as `Number.MIN_VALUE` instead, so that responses no profile can give still have a
+ * posterior, on the profiles they contradict least.
+ *
  * @throws `DataError` when the matrix is invalid, its items are not the calibration's in its order, or a response is
  * neither 0 nor 1.
  */

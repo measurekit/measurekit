@@ -802,6 +802,18 @@ describe("information", () => {
     expect(testInformation([], 0)).toBe(0);
   });
 
+  it("stays finite for steep divide-by-total items whose lowest category underflows", () => {
+    // At θ = 0.5 the GPCM's category 2 has logit 1000 more than category 0, whose weight exp(-1000) is 0.
+    const gpcm = { model: generalizedPartialCredit, parameters: { a: 1000, b: [-0.5, 0] } };
+    const nrm = { model: nominalResponse, parameters: { a: [0, 1000, 2000], c: [0, 0, 0] } };
+    for (const item of [gpcm, nrm]) {
+      for (const theta of [-0.5, 0.5, 3]) expect(Number.isFinite(itemInformation(item, theta))).toBe(true);
+      expect(Number.isFinite(marginalReliability([item]))).toBe(true);
+    }
+    // Category 1's share is logistic(-500) ≈ 7e-218 at θ = 0.5, so the variance of the category is about that.
+    expect(itemInformation(gpcm, 0.5)).toBeCloseTo(0, 10);
+  });
+
   it("rejects invalid theta and items", () => {
     const item = { model: twoParameterLogistic, parameters: { a: 1, b: 0, c: 0, d: 1 } };
     expect(() => itemInformation(item, Number.NaN)).toThrow("Theta must be a finite number, found NaN.");

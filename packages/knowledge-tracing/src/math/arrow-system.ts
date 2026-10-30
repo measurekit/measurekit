@@ -270,7 +270,8 @@ function solveDamped(schur: Float64Array, p: number, rhs: Float64Array, out: Flo
   if (choleskySolve(schur, p, rhs, out)) return true;
   let largest = 0;
   for (let j = 0; j < p; j++) largest = Math.max(largest, Math.abs(schur[j * p + j] ?? 0));
-  if (!(largest > 0)) return false;
+  // An infinite diagonal, from a feature whose square overflows, would keep the damping infinite and the loop going.
+  if (!(largest > 0 && largest < Number.POSITIVE_INFINITY)) return false;
   let added = 0;
   for (let damping = FIRST_DAMPING * largest; damping <= largest; damping *= DAMPING_GROWTH) {
     for (let j = 0; j < p; j++) schur[j * p + j] = (schur[j * p + j] ?? 0) + damping - added;

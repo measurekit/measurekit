@@ -297,6 +297,18 @@ describe("logistic edge cases", () => {
     expect(featureValue(defined(spec), history, 1)).toBe(1200 * Math.log(0.5) - Math.log(2));
   });
 
+  it("stop without converging when a feature's square overflows", () => {
+    // Recency at a gap of 1e-310 is 1e155, whose square overflows the Newton system's diagonal to Infinity.
+    const log = eventLog([
+      { ...event, time: 0, outcome: 1 },
+      { ...event, time: 1e-310, outcome: 0 },
+      { ...event, learner: "budi", time: 1, outcome: 0 },
+    ]);
+    const fit = logistic({ features: [{ recency: 0.5 }] }).fit(log);
+    expect(fit.converged).toBe(false);
+    expect(fit.predictions.every((p) => p >= 0 && p <= 1)).toBe(true);
+  });
+
   it("keep the coefficient of a feature that is 0 on every event at 0, and converge", () => {
     // No event follows a success, so the feature of successes is 0 throughout.
     const log = eventLog([
