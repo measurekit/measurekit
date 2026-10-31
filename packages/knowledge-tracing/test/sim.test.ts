@@ -228,11 +228,14 @@ describe("recovery from simulated learners", () => {
   const backward = (element: string) => graded((state) => state.filter((e) => e !== element));
 
   it("recovers the BLIM's identifiable guesses and slips, at a log-likelihood at least the truth's", () => {
-    // 8 items allow 256 response patterns, so many learners cost little.
-    const attempts = Array.from({ length: 40_000 }, (_, l) =>
+    // The work is the 8 events of each learner, simulated once and replayed by two fits. 20,000 learners recover the
+    // rates to 0.015, within half of the threshold, where 15,000 reach 0.029. A generator of its own keeps that result
+    // independent of the tests before this one.
+    const own = createRandom(20261029);
+    const attempts = Array.from({ length: 20_000 }, (_, l) =>
       structure.domain.map((item, i) => ({ learner: `l${l}`, item, skills: [], time: l * 10 + i })),
     ).flat();
-    const { log } = simulate(kst({ structure, over: "items", parameters: truth }), attempts, random);
+    const { log } = simulate(kst({ structure, over: "items", parameters: truth }), attempts, own);
     const fit = kst({ structure, over: "items" }).fit(log);
     for (const [item, rates] of Object.entries(truth.items)) {
       const found = defined(fit.model.parameters.items[item]);
