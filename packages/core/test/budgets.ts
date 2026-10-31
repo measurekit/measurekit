@@ -5,11 +5,11 @@ import { benchmarksOf } from "../../../bench/harness.js";
  * one significant digit, as docs/performance.md explains.
  */
 const BUDGETS = {
-  "numerics.normalQuantile": 200,
-  "numerics.logistic": 200,
-  "numerics.cholesky": 4,
+  "numerics.normalQuantile": 30,
+  "numerics.logistic": 20,
+  "numerics.cholesky": 3,
   "random.uniform": 20,
-  "random.normal": 90,
+  "random.normal": 60,
 } as const;
 
 /** Runs a benchmark against its budget. */

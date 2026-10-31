@@ -14,7 +14,9 @@ bench_task("numerics.normalQuantile", "Normal quantile function", "1,000,000 pro
 bench_task("numerics.logistic", "Logistic function", "1,000,000 points", reference("stats", "plogis"),
            function() plogis(points))
 bench_task("numerics.cholesky", "Cholesky factorization", "A correlation matrix of order 200",
-           reference("base", "chol"), function() chol(correlations))
+           reference("base", "chol"), function() chol(correlations),
+           note = paste("R's BLAS is OpenBLAS, whose kernels fuse multiplication and addition in vector registers;",
+                        "JavaScript has neither, and measurekit's loops are at the speed of scalar code"))
 bench_task("random.uniform", "Uniform draws", "1,000,000 draws", reference("stats", "runif"),
            function() runif(POINTS))
 bench_task("random.normal", "Normal draws", "1,000,000 draws", reference("stats", "rnorm"), function() rnorm(POINTS))
