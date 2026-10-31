@@ -48,7 +48,8 @@ for (name in names(models)) {
   })
 }
 bench_task("cdm.attributeProfiles", "Posterior profiles of the persons of a calibration", size,
-           reference("GDINA", "personparm(what = \"EAP\")"), function() personparm(gdina_fit, what = "EAP"))
+           reference("GDINA", "personparm(what = \"EAP\")"), function() personparm(gdina_fit, what = "EAP"),
+           note = "personparm multiplies the log posterior that the fit stored by the profiles and returns the EAP classification; measurekit's calibration holds no posterior, so it computes each person's from the responses, and returns the posterior, the probability of each attribute and the MAP and EAP profiles")
 bench_task("cdm.accuracy", "Accuracy and consistency of the classification", size,
            reference("GDINA", "CA"), function() CA(gdina_fit))
 bench_task("cdm.validateQMatrix", "Validation of the Q-matrix by the proportion of variance accounted for", size,
