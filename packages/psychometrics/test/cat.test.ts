@@ -1,7 +1,10 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { informationPeak } from "../src/cat/a-stratified.js";
+import { bindPool, type DiagnosticTestItem } from "../src/cat/diagnostic-items.js";
+import { profileSpace } from "../src/cat/profile-space.js";
 import { highestScore } from "../src/cat/selection.js";
+import { profileEstimate } from "../src/cdm/persons.js";
 import {
   type AbilityEstimate,
   type AbilityEstimator,
@@ -16,6 +19,12 @@ import {
   calibrateExposure,
   createRandom,
   DataError,
+  type DiagnosticAdaptiveTest,
+  type DiagnosticAdaptiveTestState,
+  type DiagnosticPoolItem,
+  diagnosticAdaptiveTest,
+  diagnosticKullbackLeibler,
+  gdinaDiscriminationIndex,
   generalizedPartialCredit,
   type ItemSelectionRule,
   informationThreshold,
@@ -23,17 +32,25 @@ import {
   kullbackLeibler,
   type MultistageModule,
   type MultistageTest,
+  masteryThreshold,
   maximumInformation,
   maximumLikelihoodEstimate,
+  modifiedPosteriorWeightedKullbackLeibler,
   multistageTest,
   type PoolItem,
+  type ProfileEstimate,
   posteriorMeanEstimate,
   posteriorModeEstimate,
+  posteriorThreshold,
+  posteriorWeightedKullbackLeibler,
   type Random,
   randomesque,
   type SelectionContext,
   type StoppingRule,
+  shannonEntropy,
   simulateAdaptiveTest,
+  simulateCdmResponses,
+  simulateDiagnosticTest,
   simulateItems,
   simulateMultistageTest,
   standardErrorThreshold,
@@ -46,6 +63,7 @@ import {
 } from "../src/index.js";
 import cat2pl from "./fixtures/cat-2pl.json" with { type: "json" };
 import cat3pl from "./fixtures/cat-3pl.json" with { type: "json" };
+import catCdm from "./fixtures/cat-cdm.json" with { type: "json" };
 import catContent from "./fixtures/cat-content.json" with { type: "json" };
 import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
 import { arbitraryItem, defined, expectClose, item2pl, mean } from "./helpers.js";
@@ -1226,6 +1244,801 @@ describe("Sympson-Hetter exposure control", () => {
   });
 });
 
+/** The posterior and the attribute mastery of a profile estimate against the written-out replay in base R. */
+const POSTERIOR_TOLERANCE = 1e-12;
+
+type CdmReference = (typeof catCdm.cases)[number];
+type DiagnosticRule = ItemSelectionRule<DiagnosticTestItem, ProfileEstimate>;
+
+// By the names of the replays.
+const DIAGNOSTIC_RULES = new Map<string, DiagnosticRule>([
+  ["GDI", gdinaDiscriminationIndex],
+  ["MPWKL", modifiedPosteriorWeightedKullbackLeibler],
+  ["PWKL", posteriorWeightedKullbackLeibler],
+  ["SHE", shannonEntropy],
+  ["KL", diagnosticKullbackLeibler],
+]);
+
+const SKILL_POOL: readonly DiagnosticPoolItem[] = [
+  { id: "q1", attributes: ["add"], probabilities: [0.2, 0.9] },
+  { id: "q2", attributes: ["subtract"], probabilities: [0.15, 0.85] },
+  { id: "q3", attributes: ["add", "subtract"], probabilities: [0.1, 0.4, 0.4, 0.9] },
+];
+const SKILLS = ["add", "subtract"];
+
+function diagnosticPool(reference: CdmReference): DiagnosticPoolItem[] {
+  return reference.items.map(({ id, attributes, probabilities }) => ({ id, attributes, probabilities }));
+}
+
+function referenceTest(
+  reference: CdmReference,
+  selection: DiagnosticRule,
+  stopping: StoppingRule<DiagnosticTestItem, ProfileEstimate> = testLength(catCdm.length),
+): DiagnosticAdaptiveTest {
+  return diagnosticAdaptiveTest({
+    pool: diagnosticPool(reference),
+    attributes: reference.attributes,
+    prior: reference.profiles,
+    selection,
+    stopping,
+  });
+}
+
+/** The id of an item of a reference by its number in the replay, which counts from 1. */
+function itemId(reference: CdmReference, item: number): string {
+  return defined(reference.items[item - 1]).id;
+}
+
+/** The response of a reference's person, counting from 1, to an item by id. */
+function respondOf(reference: CdmReference, person: number): (id: string) => number {
+  const row = defined(reference.responses[person - 1]);
+  return (id) => defined(row[reference.items.findIndex((item) => item.id === id)]);
+}
+
+/** Administers a diagnostic test to its end with the response `respond` gives each item, and returns every state. */
+function administerDiagnostic(
+  test: DiagnosticAdaptiveTest,
+  respond: (id: string) => number,
+  random = createRandom(1),
+): DiagnosticAdaptiveTestState[] {
+  const states = [test.start(random)];
+  for (let state = defined(states[0]); state.next !== null; ) {
+    state = test.answer(state, respond(state.next), random);
+    states.push(state);
+  }
+  return states;
+}
+
+function expectProfileEstimate(
+  actual: ProfileEstimate,
+  expected: {
+    readonly posterior: readonly number[];
+    readonly mastery: readonly number[];
+    readonly map: readonly number[];
+  },
+  label: string,
+): void {
+  expected.posterior.forEach((p, c) => {
+    expectClose(defined(actual.posterior[c]), p, POSTERIOR_TOLERANCE, `${label}, profile ${c}`);
+  });
+  expected.mastery.forEach((m, k) => {
+    expectClose(defined(actual.mastery[k]), m, POSTERIOR_TOLERANCE, `${label}, attribute ${k}`);
+  });
+  expect(actual.map, label).toEqual(expected.map);
+  expect(actual.eap, label).toEqual(expected.mastery.map((m) => (m > 0.5 ? 1 : 0)));
+}
+
+describe("diagnosticAdaptiveTest", () => {
+  for (const reference of catCdm.cases) {
+    for (const [name, rule] of DIAGNOSTIC_RULES) {
+      it(`selects the items and estimates of the written-out ${name} replay on ${reference.name}`, () => {
+        const test = referenceTest(reference, rule);
+        for (const run of reference.runs.filter((candidate) => candidate.rule === name)) {
+          const label = `person ${run.person}`;
+          const states = administerDiagnostic(test, respondOf(reference, run.person));
+          expect(states.map((state) => state.next).slice(0, run.items.length), label).toEqual(
+            run.items.map((item) => itemId(reference, item)),
+          );
+          run.steps.forEach((step, k) => {
+            expectProfileEstimate(defined(states[k]).estimate, step, `${label}, step ${k}`);
+          });
+          const last = defined(states.at(-1));
+          expectProfileEstimate(last.estimate, run.final, `${label}, final`);
+          expect(last.items, label).toEqual(run.items.map((item) => itemId(reference, item)));
+          expect(last.next).toBeNull();
+          // cdcatR's fixed-length test administers the same items where it has the rule.
+          if (run.cdcat !== undefined)
+            expect(last.items, label).toEqual(run.cdcat.map((item) => itemId(reference, item)));
+        }
+      });
+    }
+
+    it(`ends at the length of cdcatR's fixed-precision test on ${reference.name}`, () => {
+      const test = referenceTest(
+        reference,
+        gdinaDiscriminationIndex,
+        anyOf(testLength(catCdm.length), posteriorThreshold(0.8)),
+      );
+      for (const { person, items } of reference.precision) {
+        const last = defined(administerDiagnostic(test, respondOf(reference, person)).at(-1));
+        expect(last.items, `person ${person}`).toEqual(items.map((item) => itemId(reference, item)));
+      }
+    });
+  }
+
+  it("starts from the prior and updates it by the probability of each response in the item's latent group", () => {
+    const pool = [{ id: "q", attributes: ["a"], probabilities: [0.2, 0.9] }];
+    const test = diagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
+    const random = createRandom(1);
+    const start = test.start(random);
+    expect(start).toEqual({
+      items: [],
+      responses: [],
+      withheld: [],
+      next: "q",
+      estimate: { posterior: [0.5, 0.5], mastery: [0.5], map: [0], eap: [0] },
+    });
+    const correct = test.answer(start, 1, random);
+    expectClose(defined(correct.estimate.posterior[1]), 0.9 / 1.1, 1e-15);
+    expectClose(defined(correct.estimate.mastery[0]), 0.9 / 1.1, 1e-15);
+    expect(correct).toMatchObject({ items: ["q"], responses: [1], next: null, estimate: { map: [1], eap: [1] } });
+    const wrong = test.answer(start, 0, random);
+    expectClose(defined(wrong.estimate.posterior[1]), 0.1 / 0.9, 1e-15);
+    expect(wrong.estimate.map).toEqual([0]);
+  });
+
+  it("matches the prior to the profiles by pattern, in any order, and normalizes it", () => {
+    const pool = [...SKILL_POOL];
+    const prior = [
+      { profile: [1, 1], proportion: 0.4 },
+      { profile: [0, 1], proportion: 0.2 },
+      { profile: [1, 0], proportion: 0.6 },
+      { profile: [0, 0], proportion: 0.8 },
+    ];
+    const test = diagnosticAdaptiveTest({ pool, attributes: SKILLS, prior, stopping: testLength(1) });
+    // The order of the profiles: 00, 10, 01, 11.
+    const posterior = test.start(createRandom(1)).estimate.posterior;
+    [0.4, 0.3, 0.1, 0.2].forEach((p, c) => {
+      expectClose(defined(posterior[c]), p, 1e-15, `profile ${c}`);
+    });
+  });
+
+  it("follows the order of an item's own attributes for its latent groups", () => {
+    // The item's second group is the profile over (b, a) that masters b only, whatever the test's attribute order.
+    const pool = [{ id: "q", attributes: ["b", "a"], probabilities: [0.1, 0.9, 0.1, 0.1] }];
+    const test = diagnosticAdaptiveTest({ pool, attributes: ["a", "b"], stopping: testLength(1) });
+    const random = createRandom(1);
+    const { mastery, map } = test.answer(test.start(random), 1, random).estimate;
+    expectClose(defined(mastery[0]), 1 / 6, 1e-15);
+    expectClose(defined(mastery[1]), 5 / 6, 1e-15);
+    expect(map).toEqual([0, 1]);
+  });
+
+  it("gives no posterior to a profile the prior excludes", () => {
+    const prior = [
+      { profile: [0, 0], proportion: 1 },
+      { profile: [1, 0], proportion: 1 },
+      { profile: [0, 1], proportion: 0 },
+      { profile: [1, 1], proportion: 1 },
+    ];
+    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, prior, stopping: testLength(3) });
+    for (const state of administerDiagnostic(test, (id) => (id === "q2" ? 1 : 0))) {
+      expect(state.estimate.posterior[2]).toBe(0);
+    }
+  });
+
+  it("keeps the posterior defined when a response is impossible in every latent group", () => {
+    const pool = [{ id: "q", attributes: ["a"], probabilities: [0, 1] }];
+    const test = diagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
+    const random = createRandom(1);
+    const { posterior } = test.answer(test.start(random), 0, random).estimate;
+    expect(posterior).toEqual([1, Number.MIN_VALUE]);
+  });
+
+  it("uses the G-DINA discrimination index unless given a selection rule", () => {
+    const reference = defined(catCdm.cases[0]);
+    const run = (test: DiagnosticAdaptiveTest) => administerDiagnostic(test, respondOf(reference, 1)).at(-1);
+    const stopping = testLength(catCdm.length);
+    const standard = diagnosticAdaptiveTest({
+      pool: diagnosticPool(reference),
+      attributes: reference.attributes,
+      prior: reference.profiles,
+      stopping,
+    });
+    expect(run(standard)).toEqual(run(referenceTest(reference, gdinaDiscriminationIndex)));
+    expect(run(standard)).not.toEqual(run(referenceTest(reference, shannonEntropy)));
+  });
+
+  it("selects by a custom rule and ends when the pool does", () => {
+    const first: DiagnosticRule = {
+      scores({ eligible }, out) {
+        eligible.forEach((flag, i) => {
+          if (flag === 1) out[i] = -i;
+        });
+      },
+    };
+    const test = diagnosticAdaptiveTest({
+      pool: SKILL_POOL,
+      attributes: SKILLS,
+      selection: first,
+      stopping: testLength(10),
+    });
+    expect(defined(administerDiagnostic(test, () => 1).at(-1))).toMatchObject({
+      items: ["q1", "q2", "q3"],
+      next: null,
+    });
+  });
+
+  it("selects among the items of the content area furthest below its target", () => {
+    const pool = SKILL_POOL.map((item, i) => ({ ...item, contentArea: i === 2 ? "both" : "single" }));
+    const test = diagnosticAdaptiveTest({
+      pool,
+      attributes: SKILLS,
+      contentTargets: { single: 0.5, both: 0.5 },
+      stopping: testLength(2),
+    });
+    for (let seed = 0; seed < 10; seed++) {
+      const { items } = defined(administerDiagnostic(test, () => 1, createRandom(seed)).at(-1));
+      expect(new Set(items.map((id) => pool.find((item) => item.id === id)?.contentArea))).toEqual(
+        new Set(["single", "both"]),
+      );
+    }
+  });
+
+  it("never administers enemies together", () => {
+    const test = diagnosticAdaptiveTest({
+      pool: SKILL_POOL,
+      attributes: SKILLS,
+      enemies: [["q1", "q2"]],
+      stopping: testLength(3),
+    });
+    for (let seed = 0; seed < 10; seed++) {
+      const { items } = defined(administerDiagnostic(test, () => 0, createRandom(seed)).at(-1));
+      expect(items).toHaveLength(2);
+      expect(items.includes("q3")).toBe(true);
+    }
+  });
+
+  it("withholds the item it selects with probability one minus its exposure parameter", () => {
+    const pool = SKILL_POOL.map((item) => (item.id === "q3" ? { ...item, exposure: 0 } : item));
+    const lastItemFirst: DiagnosticRule = {
+      scores({ eligible }, out) {
+        eligible.forEach((flag, i) => {
+          if (flag === 1) out[i] = i;
+        });
+      },
+    };
+    const test = diagnosticAdaptiveTest({
+      pool,
+      attributes: SKILLS,
+      selection: lastItemFirst,
+      stopping: testLength(2),
+    });
+    const state = test.start(createRandom(1));
+    expect(state).toMatchObject({ withheld: ["q3"], next: "q2" });
+    expect(defined(administerDiagnostic(test, () => 1).at(-1))).toMatchObject({
+      items: ["q2", "q1"],
+      withheld: ["q3"],
+    });
+  });
+
+  it("ends at once without items, at the prior", () => {
+    const test = diagnosticAdaptiveTest({ pool: [], attributes: ["a"], stopping: testLength(1) });
+    expect(test.start(createRandom(1))).toMatchObject({ next: null, estimate: { posterior: [0.5, 0.5] } });
+  });
+
+  it("continues identically from a state stored as JSON", () => {
+    const reference = defined(catCdm.cases[1]);
+    const test = referenceTest(reference, posteriorWeightedKullbackLeibler);
+    const respond = respondOf(reference, 2);
+    const states = administerDiagnostic(test, respond, createRandom(3));
+    const middle = defined(states[4]);
+    const stored: DiagnosticAdaptiveTestState = JSON.parse(JSON.stringify(middle));
+    expect(stored).toEqual(middle);
+    let resumed = stored;
+    while (resumed.next !== null) resumed = test.answer(resumed, respond(resumed.next), createRandom(3));
+    expect(resumed).toEqual(states.at(-1));
+  });
+
+  it("leaves the state it is given unchanged", () => {
+    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const random = createRandom(1);
+    const state = test.start(random);
+    const copy: DiagnosticAdaptiveTestState = JSON.parse(JSON.stringify(state));
+    test.answer(state, 1, random);
+    expect(state).toEqual(copy);
+  });
+
+  it("rejects options and pools of other types and invalid ones", () => {
+    const options = { pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) };
+    const parse = (json: string) => JSON.parse(json);
+    expect(() => diagnosticAdaptiveTest(parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => diagnosticAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
+      "The option stopping must be a stopping rule, such as testLength(20)",
+    );
+    expect(() => diagnosticAdaptiveTest({ ...options, selection: parse('"gdi"') })).toThrow(
+      "The option selection must be a selection rule, such as gdinaDiscriminationIndex",
+    );
+    expect(() => diagnosticAdaptiveTest({ ...options, pool: parse('"q1"') })).toThrow(
+      'The option pool must be an array of items, found "q1".',
+    );
+    expect(() => diagnosticAdaptiveTest({ ...options, pool: parse("[null]") })).toThrow(
+      "Item 1 must be an object { id, attributes, probabilities }, found null.",
+    );
+    expect(() => diagnosticAdaptiveTest({ ...options, pool: parse('[{"id":3}]') })).toThrow(
+      "Item 1 needs a string id, found 3.",
+    );
+    expect(() => diagnosticAdaptiveTest({ ...options, pool: [...SKILL_POOL, defined(SKILL_POOL[0])] })).toThrow(
+      'Item ids must be unique; "q1" appears twice.',
+    );
+    expect(() =>
+      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: [], probabilities: [] }] }),
+    ).toThrow('Item "x" needs at least one attribute.');
+    expect(() =>
+      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: ["divide"], probabilities: [0.2, 0.9] }] }),
+    ).toThrow('Item "x" has attribute "divide", which is not an attribute of the test.');
+    expect(() =>
+      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: ["add"], probabilities: [0.2, 0.9, 0.5] }] }),
+    ).toThrow('Item "x" needs 2 probabilities from 0 to 1, one per latent group.');
+    expect(() =>
+      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: ["add"], probabilities: [0.2, 1.5] }] }),
+    ).toThrow('Item "x" needs 2 probabilities from 0 to 1, one per latent group.');
+    expect(() => diagnosticAdaptiveTest({ ...options, pool: [{ ...defined(SKILL_POOL[0]), exposure: 2 }] })).toThrow(
+      'The exposure parameter of item "q1" must be a number from 0 to 1, found 2.',
+    );
+    expect(() => diagnosticAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
+      'Item "q1" needs a content area among the targets (easy), found undefined.',
+    );
+    expect(() => diagnosticAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
+      'Enemy set 1 names "zz", which is not a pool item.',
+    );
+  });
+
+  it("rejects attributes and priors of other types and invalid ones", () => {
+    const options = { pool: SKILL_POOL, stopping: testLength(2) };
+    const parse = (json: string) => JSON.parse(json);
+    const attributes = (value: unknown) => () =>
+      diagnosticAdaptiveTest({ ...options, attributes: parse(JSON.stringify(value)) });
+    expect(attributes("add")).toThrow('The option attributes must be an array of attribute names, found "add".');
+    expect(attributes([])).toThrow("The option attributes must list from 1 to 20 distinct non-empty names");
+    expect(attributes(["add", "add"])).toThrow("distinct non-empty names");
+    expect(attributes(["add", ""])).toThrow("distinct non-empty names");
+    expect(attributes(["add", 2])).toThrow("distinct non-empty names");
+    expect(attributes(Array.from({ length: 21 }, (_, k) => `a${k}`))).toThrow("from 1 to 20 distinct");
+    const prior = (value: unknown) => () =>
+      diagnosticAdaptiveTest({ ...options, attributes: SKILLS, prior: parse(JSON.stringify(value)) });
+    const entries = [
+      { profile: [0, 0], proportion: 1 },
+      { profile: [1, 0], proportion: 1 },
+      { profile: [0, 1], proportion: 1 },
+      { profile: [1, 1], proportion: 1 },
+    ];
+    expect(prior("uniform")).toThrow('The option prior must be an array of { profile, proportion }, found "uniform".');
+    expect(prior([null, ...entries])).toThrow("Prior entry 1 must be an object { profile, proportion }, found null.");
+    expect(prior(entries.slice(1))).toThrow("The option prior must list each of the 4 profiles once, found 3 entries.");
+    expect(prior([...entries, entries[0]])).toThrow("Prior entry 5 repeats the profile [0, 0].");
+    expect(prior([{ profile: [0], proportion: 1 }, ...entries.slice(1)])).toThrow(
+      "Prior entry 1 needs a 0 or 1 for each of the 2 attributes, found [0].",
+    );
+    expect(prior([{ profile: [0, 2], proportion: 1 }, ...entries.slice(1)])).toThrow("Prior entry 1 needs a 0 or 1");
+    expect(prior([{ profile: [0, 0], proportion: 1.5 }, ...entries.slice(1)])).toThrow(
+      "The proportion of prior entry 1 must be a number from 0 to 1, found 1.5.",
+    );
+    expect(prior(entries.map((entry) => ({ ...entry, proportion: 0 })))).toThrow(
+      "The option prior needs profile proportions that are not all 0.",
+    );
+  });
+
+  it("rejects states and responses of other types and invalid ones", () => {
+    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const random = createRandom(1);
+    const state = test.start(random);
+    const parse = (json: string) => JSON.parse(json);
+    expect(() => test.start(parse("null"))).toThrow(DataError);
+    expect(() => test.answer(state, 1, parse("null"))).toThrow(DataError);
+    expect(() => test.answer(parse("null"), 1, random)).toThrow("A test state needs the arrays items and responses.");
+    expect(() => test.answer(state, 2, random)).toThrow(
+      `The response to item "${state.next}" must be an integer from 0 to 1, found 2.`,
+    );
+    expect(() => test.answer(state, parse('"1"'), random)).toThrow("must be an integer from 0 to 1");
+    expect(() => test.answer(state, 0.5, random)).toThrow("must be an integer from 0 to 1");
+    expect(() => test.answer({ ...state, items: ["zz"], responses: [1] }, 1, random)).toThrow(
+      'The test has no item "zz".',
+    );
+    expect(() => test.answer({ ...state, items: ["q1"], responses: [] }, 1, random)).toThrow(
+      "A test state needs one response per item, found 0 responses to 1 items.",
+    );
+    expect(() => test.answer({ ...state, items: ["q1"], responses: [3] }, 1, random)).toThrow(
+      'The response to item "q1" must be an integer from 0 to 1, found 3.',
+    );
+    expect(() => test.answer({ ...state, withheld: parse("null") }, 1, random)).toThrow(
+      "An adaptive test state needs the array withheld.",
+    );
+    expect(() => test.answer({ ...state, withheld: ["q1"], next: "q1" }, 1, random)).toThrow(
+      'A test state names item "q1" twice; an item is administered or withheld once.',
+    );
+    const ended = test.answer(test.answer(state, 1, random), 1, random);
+    expect(() => test.answer(ended, 1, random)).toThrow("The test has ended; it takes no more responses.");
+  });
+});
+
+describe("diagnostic selection rules", () => {
+  for (const reference of catCdm.cases) {
+    for (const [name, rule] of DIAGNOSTIC_RULES) {
+      it(`scores the items as the written-out ${name} does on ${reference.name}`, () => {
+        const space = profileSpace(reference.attributes, reference.profiles);
+        const { items } = bindPool(diagnosticPool(reference), space);
+        const profiles = reference.profiles.map(({ profile }) => profile);
+        for (const run of reference.runs.filter((candidate) => candidate.rule === name)) {
+          run.steps.forEach((step, k) => {
+            const administered = run.items.slice(0, k).map((item) => item - 1);
+            const eligible = Uint8Array.from(items, (_, i) => (administered.includes(i) ? 0 : 1));
+            const context: SelectionContext<DiagnosticTestItem, ProfileEstimate> = {
+              pool: items,
+              administered,
+              responses: run.steps.slice(0, k).map((earlier) => earlier.response),
+              estimate: profileEstimate(step.posterior, profiles),
+              eligible,
+              random: createRandom(0),
+            };
+            const out = new Float64Array(items.length);
+            rule.scores(context, out);
+            step.scores.forEach((expected, i) => {
+              if (expected === null) return;
+              expectClose(
+                defined(out[i]),
+                expected,
+                SCORE_TOLERANCE * Math.max(1, Math.abs(expected)),
+                `person ${run.person}, step ${k}, item ${i + 1}`,
+              );
+            });
+          });
+        }
+      });
+    }
+  }
+
+  it("scores the items of one latent group by the probability of its profiles alone, as plain KL sums them", () => {
+    // One attribute, one item: KL sums the divergence of the distribution at the MAP profile from each profile.
+    const pool = [{ id: "q", attributes: ["a"], probabilities: [0.2, 0.9] }];
+    const space = profileSpace(
+      ["a"],
+      [
+        { profile: [0, 0], proportion: 0.3 },
+        { profile: [1, 1], proportion: 0.7 },
+      ]
+        .slice(0, 0)
+        .concat([
+          { profile: [0], proportion: 0.3 },
+          { profile: [1], proportion: 0.7 },
+        ]),
+    );
+    const { items } = bindPool(pool, space);
+    const estimate = profileEstimate([0.3, 0.7], [[0], [1]]);
+    const out = new Float64Array(1);
+    diagnosticKullbackLeibler.scores(
+      { pool: items, administered: [], responses: [], estimate, eligible: Uint8Array.of(1), random: createRandom(0) },
+      out,
+    );
+    const divergence = (p: number, q: number): number => p * Math.log(p / q) + (1 - p) * Math.log((1 - p) / (1 - q));
+    // The MAP profile masters the attribute: P = 0.9, against 0.2 and 0.9.
+    expectClose(defined(out[0]), divergence(0.9, 0.2) + divergence(0.9, 0.9), 1e-15);
+  });
+
+  it("scores an item that tells the profiles apart above one that does not", () => {
+    const pool: DiagnosticPoolItem[] = [
+      { id: "flat", attributes: ["a"], probabilities: [0.5, 0.5] },
+      { id: "sharp", attributes: ["a"], probabilities: [0.05, 0.95] },
+    ];
+    const test = diagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
+    for (const [name, rule] of DIAGNOSTIC_RULES) {
+      const selecting = diagnosticAdaptiveTest({ pool, attributes: ["a"], selection: rule, stopping: testLength(1) });
+      expect(selecting.start(createRandom(1)).next, name).toBe("sharp");
+    }
+    expect(test.start(createRandom(1)).next).toBe("sharp");
+  });
+
+  it("scores every item 0 when no item tells the profiles apart, for the rules that are zero there", () => {
+    const pool: DiagnosticPoolItem[] = [{ id: "flat", attributes: ["a"], probabilities: [0.5, 0.5] }];
+    const { items } = bindPool(pool, profileSpace(["a"], undefined));
+    const estimate = profileEstimate([0.5, 0.5], [[0], [1]]);
+    for (const rule of [
+      diagnosticKullbackLeibler,
+      posteriorWeightedKullbackLeibler,
+      modifiedPosteriorWeightedKullbackLeibler,
+      gdinaDiscriminationIndex,
+    ]) {
+      const out = new Float64Array(1);
+      rule.scores(
+        { pool: items, administered: [], responses: [], estimate, eligible: Uint8Array.of(1), random: createRandom(0) },
+        out,
+      );
+      expect(out[0]).toBe(0);
+    }
+  });
+
+  it("scores the Shannon entropy rule by minus the expected entropy after the response", () => {
+    // Two profiles, probabilities 0.2 and 0.9, posterior 0.5 and 0.5: P(correct) = 0.55; the posteriors after a
+    // correct response are (0.1, 0.45) / 0.55 and after an incorrect one (0.4, 0.05) / 0.45.
+    const pool: DiagnosticPoolItem[] = [{ id: "q", attributes: ["a"], probabilities: [0.2, 0.9] }];
+    const { items } = bindPool(pool, profileSpace(["a"], undefined));
+    const entropy = (p: number): number => -(p * Math.log(p) + (1 - p) * Math.log(1 - p));
+    const expected = -(0.55 * entropy(0.45 / 0.55) + 0.45 * entropy(0.4 / 0.45));
+    const out = new Float64Array(1);
+    shannonEntropy.scores(
+      {
+        pool: items,
+        administered: [],
+        responses: [],
+        estimate: profileEstimate([0.5, 0.5], [[0], [1]]),
+        eligible: Uint8Array.of(1),
+        random: createRandom(0),
+      },
+      out,
+    );
+    expectClose(defined(out[0]), expected, 1e-15);
+  });
+
+  it("leaves the scores of items that are not eligible as they are", () => {
+    const { items } = bindPool([...SKILL_POOL], profileSpace(SKILLS, undefined));
+    const estimate = profileEstimate(
+      [0.25, 0.25, 0.25, 0.25],
+      [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+      ],
+    );
+    for (const rule of DIAGNOSTIC_RULES.values()) {
+      const out = new Float64Array(3).fill(-7);
+      rule.scores(
+        {
+          pool: items,
+          administered: [0],
+          responses: [1],
+          estimate,
+          eligible: Uint8Array.of(0, 1, 1),
+          random: createRandom(0),
+        },
+        out,
+      );
+      expect(out[0]).toBe(-7);
+      expect(out[1]).not.toBe(-7);
+    }
+  });
+});
+
+describe("diagnostic stopping rules", () => {
+  for (const reference of catCdm.cases) {
+    it(`stops as the written-out posterior and mastery thresholds do on ${reference.name}`, () => {
+      const { items } = bindPool(diagnosticPool(reference), profileSpace(reference.attributes, reference.profiles));
+      const profiles = reference.profiles.map(({ profile }) => profile);
+      const gdi = reference.runs.filter((run) => run.rule === "GDI");
+      gdi.forEach((run, person) => {
+        for (const decision of defined(reference.stopping[person])) {
+          const state = decision.administered < run.steps.length ? run.steps[decision.administered] : run.final;
+          const administered = run.items.slice(0, decision.administered).map((item) => item - 1);
+          const context = {
+            pool: items,
+            administered,
+            responses: administered.map(() => 1),
+            estimate: profileEstimate(defined(state).posterior, profiles),
+            eligible: new Uint8Array(items.length).fill(1),
+          };
+          catCdm.thresholds.forEach((threshold, t) => {
+            const label = `person ${run.person}, ${decision.administered} items, threshold ${threshold}`;
+            expect(posteriorThreshold(threshold).stops(context), label).toBe(defined(decision.posterior[t]));
+            expect(masteryThreshold(threshold).stops(context), label).toBe(defined(decision.mastery[t]));
+          });
+        }
+      });
+    });
+  }
+
+  it("stops a test once the posterior or the mastery reaches the threshold", () => {
+    const pool: DiagnosticPoolItem[] = [
+      { id: "q1", attributes: ["a"], probabilities: [0.05, 0.95] },
+      { id: "q2", attributes: ["b"], probabilities: [0.05, 0.95] },
+      { id: "q3", attributes: ["a"], probabilities: [0.05, 0.95] },
+      { id: "q4", attributes: ["b"], probabilities: [0.05, 0.95] },
+    ];
+    const attributes = ["a", "b"];
+    const lengths = (stopping: StoppingRule<DiagnosticTestItem, ProfileEstimate>) =>
+      defined(administerDiagnostic(diagnosticAdaptiveTest({ pool, attributes, stopping }), () => 1).at(-1)).items
+        .length;
+    // After q1 the posterior of the profiles that master a is 0.95 / 1.0 = 0.95, split over two profiles.
+    expect(lengths(masteryThreshold(0.9))).toBe(2);
+    expect(lengths(posteriorThreshold(0.9))).toBe(2);
+    expect(lengths(anyOf(posteriorThreshold(0.99), testLength(3)))).toBe(3);
+    expect(lengths(allOf(testLength(3), masteryThreshold(0.6)))).toBe(3);
+  });
+
+  it("rejects thresholds of other types and outside their ranges", () => {
+    const parse = (json: string) => JSON.parse(json);
+    expect(() => posteriorThreshold(parse('"0.8"'))).toThrow(
+      'A posterior threshold must be above 0 and at most 1, found "0.8".',
+    );
+    expect(() => posteriorThreshold(0)).toThrow("A posterior threshold must be above 0 and at most 1, found 0.");
+    expect(() => posteriorThreshold(1.5)).toThrow("at most 1, found 1.5");
+    expect(() => posteriorThreshold(parse("null"))).toThrow("found null");
+    expect(() => masteryThreshold(0.5)).toThrow("A mastery threshold must be above 0.5 and at most 1, found 0.5.");
+    expect(() => masteryThreshold(parse('"0.9"'))).toThrow('found "0.9"');
+    expect(() => masteryThreshold(2)).toThrow("found 2");
+    expect(posteriorThreshold(1)).toHaveProperty("stops");
+    expect(masteryThreshold(1)).toHaveProperty("stops");
+  });
+});
+
+describe("simulateDiagnosticTest", () => {
+  const SingleAttributePool: DiagnosticPoolItem[] = ["a", "b", "c"].flatMap((attribute) =>
+    [1, 2, 3].map((j) => ({ id: `${attribute}${j}`, attributes: [attribute], probabilities: [0.01, 0.99] })),
+  );
+  const Profiles = [
+    [0, 0, 0],
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 1, 0],
+    [1, 0, 1],
+    [0, 1, 1],
+    [1, 1, 1],
+  ];
+
+  it("classifies nearly every person with near-deterministic items", () => {
+    const test = diagnosticAdaptiveTest({
+      pool: SingleAttributePool,
+      attributes: ["a", "b", "c"],
+      stopping: testLength(9),
+    });
+    const random = createRandom(5);
+    const profiles = Array.from({ length: 400 }, (_, i) => defined(Profiles[i % 8]));
+    const result = simulateDiagnosticTest(test, profiles, random);
+    expect(result.patternAccuracy).toBeGreaterThan(0.99);
+    expect(Math.min(...result.attributeAccuracy)).toBeGreaterThan(0.995);
+    expect(result.meanLength).toBe(9);
+    expect(result.persons).toHaveLength(400);
+  });
+
+  it("measures the share of persons whose MAP profile is the true profile, and of each attribute", () => {
+    const test = diagnosticAdaptiveTest({
+      pool: SingleAttributePool.map((item) => ({ ...item, probabilities: [0.3, 0.7] })),
+      attributes: ["a", "b", "c"],
+      stopping: testLength(4),
+    });
+    const result = simulateDiagnosticTest(test, Profiles.concat(Profiles, Profiles), createRandom(8));
+    const { persons } = result;
+    const hits = persons.filter(({ profile, state }) => profile.every((value, k) => state.estimate.map[k] === value));
+    expect(result.patternAccuracy).toBe(hits.length / persons.length);
+    expect(result.patternAccuracy).toBeGreaterThan(0);
+    expect(result.patternAccuracy).toBeLessThan(1);
+    result.attributeAccuracy.forEach((accuracy, k) => {
+      expect(accuracy).toBe(
+        persons.filter(({ profile, state }) => state.estimate.map[k] === profile[k]).length / persons.length,
+      );
+      expect(accuracy).toBeGreaterThanOrEqual(result.patternAccuracy);
+    });
+  });
+
+  it("reports the exposure rate of every item and the mean length", () => {
+    const test = diagnosticAdaptiveTest({
+      pool: SingleAttributePool,
+      attributes: ["a", "b", "c"],
+      stopping: anyOf(testLength(9), masteryThreshold(0.95)),
+    });
+    const result = simulateDiagnosticTest(test, Profiles, createRandom(2));
+    expect(result.exposureRates.map(({ id }) => id)).toEqual(SingleAttributePool.map(({ id }) => id));
+    const total = result.exposureRates.reduce((sum, { rate }) => sum + rate, 0);
+    expectClose(total, result.meanLength, 1e-12);
+    expect(result.meanLength).toBeLessThan(9);
+    for (const { rate } of result.exposureRates) expect(rate).toBeGreaterThanOrEqual(0);
+  });
+
+  it("draws each person's responses to the pool from the true profile as simulateCdmResponses does", () => {
+    const test = diagnosticAdaptiveTest({
+      pool: SKILL_POOL,
+      attributes: SKILLS,
+      stopping: testLength(3),
+    });
+    const profiles = [
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [0, 0],
+    ];
+    const result = simulateDiagnosticTest(test, profiles, createRandom(21));
+    const matrix = simulateCdmResponses({ attributes: SKILLS, items: SKILL_POOL }, profiles, createRandom(21));
+    result.persons.forEach(({ state }, person) => {
+      state.items.forEach((id, j) => {
+        expect(state.responses[j]).toBe(defined(defined(matrix.responses[person])[matrix.itemIds.indexOf(id)]));
+      });
+    });
+  });
+
+  it("reproduces a simulation from its seed", () => {
+    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const run = () =>
+      simulateDiagnosticTest(
+        test,
+        Profiles.map((profile) => profile.slice(0, 2)),
+        createRandom(77),
+      );
+    expect(run()).toEqual(run());
+  });
+
+  it("rejects tests, profiles and generators of other types and invalid ones", () => {
+    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const parse = (json: string) => JSON.parse(json);
+    const random = createRandom(1);
+    expect(() => simulateDiagnosticTest(parse("null"), [[1, 0]], random)).toThrow(
+      "The test must be a diagnostic adaptive test from diagnosticAdaptiveTest, found null.",
+    );
+    expect(() => simulateDiagnosticTest(parse('{"pool":[],"start":1,"answer":2}'), [[1, 0]], random)).toThrow(
+      "The test must be a diagnostic adaptive test",
+    );
+    expect(() => simulateDiagnosticTest({ ...test, attributes: parse('"ab"') }, [[1, 0]], random)).toThrow(
+      "The test must be a diagnostic adaptive test",
+    );
+    expect(() => simulateDiagnosticTest(test, [[1, 0]], parse("null"))).toThrow(DataError);
+    expect(() => simulateDiagnosticTest(test, parse('"10"'), random)).toThrow("The profiles must be an array");
+    expect(() => simulateDiagnosticTest(test, [], random)).toThrow(DataError);
+    expect(() => simulateDiagnosticTest(test, [[1]], random)).toThrow(
+      "Profile 1 needs a 0 or 1 for each of the 2 attributes.",
+    );
+    expect(() => simulateDiagnosticTest(test, [[1, 2]], random)).toThrow("Profile 1 needs a 0 or 1");
+  });
+});
+
+describe("rules of tests of other items and estimates", () => {
+  interface Precision {
+    readonly standardErrors: readonly number[];
+  }
+  const context = <TEstimate>(estimate: TEstimate): AdaptiveTestContext<PoolItem, TEstimate> => ({
+    pool: [],
+    administered: [0, 1, 2],
+    responses: [1, 0, 1],
+    estimate,
+    eligible: new Uint8Array(0),
+  });
+
+  it("stops at a standard error threshold once every standard error of a multidimensional estimate is below it", () => {
+    const rule = standardErrorThreshold<PoolItem, Precision>(0.3);
+    expect(rule.stops(context({ standardErrors: [0.3, 0.1] }))).toBe(true);
+    expect(rule.stops(context({ standardErrors: [0.2, 0.31] }))).toBe(false);
+    expect(rule.stops(context({ standardErrors: [Number.POSITIVE_INFINITY, 0.1] }))).toBe(false);
+    expect(standardErrorThreshold(0.3).stops(context({ theta: 0, standardError: 0.29 }))).toBe(true);
+    expect(standardErrorThreshold(0.3).stops(context({ theta: 0, standardError: 0.31 }))).toBe(false);
+    expect(standardErrorThreshold(0.3).stops(context(JSON.parse('{"theta":0}')))).toBe(false);
+  });
+
+  it("combines and cuts off the stopping rules of any estimate", () => {
+    const either = anyOf<PoolItem, Precision>(testLength(10), standardErrorThreshold(0.3));
+    expect(either.stops(context({ standardErrors: [0.2, 0.2] }))).toBe(true);
+    expect(either.stops(context({ standardErrors: [0.2, 0.4] }))).toBe(false);
+    const both = allOf<PoolItem, Precision>(testLength(3), standardErrorThreshold(0.3));
+    expect(both.stops(context({ standardErrors: [0.2, 0.2] }))).toBe(true);
+    expect(
+      allOf<PoolItem, Precision>(testLength(4), standardErrorThreshold(0.3)).stops(context({ standardErrors: [0.2] })),
+    ).toBe(false);
+  });
+
+  it("selects at random among the best items of any rule", () => {
+    const pool: DiagnosticPoolItem[] = Array.from({ length: 5 }, (_, j) => ({
+      id: `q${j}`,
+      attributes: ["x"],
+      probabilities: [0.5 - 0.09 * j, 0.5 + 0.09 * j],
+    }));
+    const rule = randomesque(gdinaDiscriminationIndex, 2);
+    const firsts = new Set<string | null>();
+    for (let seed = 0; seed < 40; seed++) {
+      const test = diagnosticAdaptiveTest({ pool, attributes: ["x"], selection: rule, stopping: testLength(1) });
+      firsts.add(test.start(createRandom(seed)).next);
+    }
+    // GDI ranks q4 above q3 above the others.
+    expect(firsts).toEqual(new Set(["q4", "q3"]));
+  });
+});
+
 describe("properties", () => {
   it("an item's information is largest at its peak", () => {
     fc.assert(
@@ -1273,5 +2086,145 @@ describe("properties", () => {
       ),
       { numRuns: 60 },
     );
+  });
+  describe("diagnostic tests", () => {
+    const Attributes = ["a", "b", "c"];
+    /** A pool over the first `count` attributes: items of one to three of them, with any success probabilities. */
+    const arbitraryDiagnosticPool = fc.integer({ min: 1, max: 3 }).chain((count) => {
+      const names = Attributes.slice(0, count);
+      const item = fc.subarray(names, { minLength: 1 }).chain((attributes) =>
+        fc
+          .array(fc.double({ min: 0, max: 1, noNaN: true }), {
+            minLength: 2 ** attributes.length,
+            maxLength: 2 ** attributes.length,
+          })
+          .map((probabilities) => ({ attributes, probabilities })),
+      );
+      return fc.record({
+        names: fc.constant(names),
+        pool: fc
+          .array(item, { minLength: 1, maxLength: 6 })
+          .map((items) => items.map((entry, i) => ({ id: `q${i}`, ...entry }))),
+        prior: fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { minLength: 2 ** count, maxLength: 2 ** count }),
+      });
+    });
+    /** The profiles of `count` attributes in the order of the posterior. */
+    const profilesFor = (count: number) => profileSpace(Attributes.slice(0, count), undefined).profiles;
+
+    it("the posterior sums to 1, the estimates follow from it, and prior 0 stays 0", () => {
+      fc.assert(
+        fc.property(
+          arbitraryDiagnosticPool,
+          fc.integer(),
+          fc.integer({ min: 1, max: 6 }),
+          ({ names, pool, prior }, seed, length) => {
+            const entries = profilesFor(names.length).map((profile) => ({ profile, proportion: 0 }));
+            const proportions = prior.some((value) => value > 0) ? prior : prior.map(() => 1);
+            const shaped = entries.map((entry, c) => ({ ...entry, proportion: defined(proportions[c]) }));
+            const test = diagnosticAdaptiveTest({
+              pool,
+              attributes: names,
+              prior: shaped,
+              stopping: testLength(length),
+            });
+            const random = createRandom(seed);
+            let state = test.start(random);
+            for (;;) {
+              const { posterior, mastery, map, eap } = state.estimate;
+              expect(Math.abs(posterior.reduce((sum, p) => sum + p, 0) - 1)).toBeLessThan(1e-12);
+              posterior.forEach((p, c) => {
+                expect(p).toBeGreaterThanOrEqual(0);
+                if (defined(proportions[c]) === 0) expect(p).toBe(0);
+              });
+              mastery.forEach((m, k) => {
+                expect(m).toBeGreaterThanOrEqual(0);
+                expect(m).toBeLessThanOrEqual(1 + 1e-12);
+                expect(eap[k]).toBe(m > 0.5 ? 1 : 0);
+              });
+              expect(
+                posterior[profilesFor(names.length).findIndex((profile) => profile.every((v, k) => v === map[k]))],
+              ).toBe(Math.max(...posterior));
+              if (state.next === null) break;
+              state = test.answer(state, random.uniform() < 0.5 ? 1 : 0, random);
+            }
+          },
+        ),
+        { numRuns: 80 },
+      );
+    });
+
+    it("the posterior does not depend on the order of the responses", () => {
+      fc.assert(
+        fc.property(arbitraryDiagnosticPool, fc.integer(), ({ names, pool }, seed) => {
+          const random = createRandom(seed);
+          const responses = pool.map(() => (random.uniform() < 0.5 ? 1 : 0));
+          const posterior = (order: readonly number[]): readonly number[] => {
+            const test = diagnosticAdaptiveTest({
+              pool: order.map((i) => defined(pool[i])),
+              attributes: names,
+              selection: {
+                scores: ({ eligible }, out) =>
+                  eligible.forEach((flag, i) => {
+                    if (flag === 1) out[i] = -i;
+                  }),
+              },
+              stopping: testLength(pool.length),
+            });
+            let state = test.start(random);
+            order.forEach((i) => {
+              state = test.answer(state, defined(responses[i]), random);
+            });
+            return state.estimate.posterior;
+          };
+          const forward = pool.map((_, i) => i);
+          const first = posterior(forward);
+          const second = posterior([...forward].reverse());
+          first.forEach((p, c) => {
+            expect(Math.abs(p - defined(second[c]))).toBeLessThan(1e-12);
+          });
+        }),
+        { numRuns: 60 },
+      );
+    });
+
+    it("tests administer each item at most once, never enemies together, and reproduce from their seed", () => {
+      const selections = fc.constantFrom<DiagnosticRule>(
+        gdinaDiscriminationIndex,
+        diagnosticKullbackLeibler,
+        posteriorWeightedKullbackLeibler,
+        modifiedPosteriorWeightedKullbackLeibler,
+        shannonEntropy,
+        randomesque(gdinaDiscriminationIndex, 2),
+      );
+      fc.assert(
+        fc.property(
+          arbitraryDiagnosticPool,
+          selections,
+          fc.integer({ min: 1, max: 6 }),
+          fc.integer(),
+          ({ names, pool }, selection, length, seed) => {
+            const enemies = pool.length > 1 ? [[defined(pool[0]).id, defined(pool[1]).id]] : [];
+            const test = diagnosticAdaptiveTest({
+              pool,
+              attributes: names,
+              selection,
+              enemies,
+              stopping: testLength(length),
+            });
+            const profiles = [profilesFor(names.length).at(-1) ?? []];
+            const { persons } = simulateDiagnosticTest(test, profiles, createRandom(seed));
+            const { state } = defined(persons[0]);
+            expect(new Set(state.items).size).toBe(state.items.length);
+            expect(state.items.length).toBeLessThanOrEqual(length);
+            for (const set of enemies) expect(set.every((id) => state.items.includes(id))).toBe(false);
+            expect(state.next).toBeNull();
+            expect(simulateDiagnosticTest(test, profiles, createRandom(seed))).toEqual(
+              simulateDiagnosticTest(test, profiles, createRandom(seed)),
+            );
+          },
+        ),
+        { numRuns: 60 },
+      );
+    });
   });
 });

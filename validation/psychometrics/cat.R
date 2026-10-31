@@ -2,6 +2,12 @@
 # aStratified's strata, bOpt (nextItem); the estimate and its standard error after each response (thetaEst, semTheta);
 # content balancing (nextItem with cbControl) and stopping decisions (checkStopRule). Banks are catR's generated banks;
 # each run's responses are drawn once from a true theta with a fixed seed and are then a fixed sequence.
+#
+# Adaptive cognitive diagnosis: tests replayed step by step on the items of GDINA calibrations in base R, written out
+# from the formulas of each rule, and the item sequences of cdcatR's cdcat for the rules it has. cdcatR imports
+# cdmTools, which only its nonparametric rules use and whose dependency clarabel needs a Rust compiler, so
+# install.packages("cdcatR") fails. Download the source with download.packages, remove cdmTools from the Imports of
+# DESCRIPTION and `import(cdmTools)` from NAMESPACE, and run R CMD INSTALL on the directory.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages(library(catR))
@@ -203,4 +209,187 @@ write_fixture("cat-content", list(
   items = items_content,
   targets = as.list(setNames(TARGETS, AREAS)),
   run = content_run[names(content_run) != "administered"]
+))
+
+# ---- Adaptive cognitive diagnosis ---------------------------------------------------------------------------------
+
+CD_LENGTH <- 10 # items per test
+CD_PERSONS <- 4 # persons per case, the first rows of the data
+# The prior in multiples of 1 / 4096, so that its sum is exactly 1 as cdcatR's att.prior check requires.
+PRIOR_UNITS <- 4096
+
+# The Q-matrix's columns in the package's order: attributes by first appearance over the items, so that both libraries
+# order the profiles and each item's latent groups alike.
+psychometrics_order <- function(Q) {
+  first <- unique(unlist(lapply(seq_len(nrow(Q)), function(j) which(Q[j, ] == 1))))
+  Q[, first, drop = FALSE]
+}
+
+# The prior of a fit's profile proportions in multiples of 1 / PRIOR_UNITS, each profile `allowed` at least one.
+rounded_prior <- function(proportions, allowed) {
+  units <- ifelse(allowed, pmax(round(proportions * PRIOR_UNITS), 1), 0)
+  units[which.max(units)] <- units[which.max(units)] + PRIOR_UNITS - sum(units)
+  units / PRIOR_UNITS
+}
+
+# P(correct) of every item for every profile: the item's success probability in the latent group of the profile.
+profile_probabilities <- function(fit, Q) {
+  patterns <- GDINA::attributepattern(ncol(Q))
+  probabilities <- coef(fit, digits = 15)
+  t(sapply(seq_len(nrow(Q)), function(j) {
+    attributes <- which(Q[j, ] == 1)
+    groups <- apply(GDINA::attributepattern(length(attributes)), 1, paste, collapse = "")
+    unname(probabilities[[j]][match(apply(patterns[, attributes, drop = FALSE], 1, paste, collapse = ""), groups)])
+  }))
+}
+
+# The Kullback-Leibler divergence of a correct-response probability q from p, summed over both responses.
+divergence <- function(p, q) p * log(p / q) + (1 - p) * log((1 - p) / (1 - q))
+
+# The score of an item, whose probabilities of a correct response by profile are `lc`, at the posterior `post`, from the
+# definition of each rule over the profiles.
+score_item <- function(rule, lc, post) {
+  mode <- lc[which.max(post)]
+  switch(rule,
+    KL = sum(divergence(mode, lc)),
+    PWKL = sum(post * divergence(mode, lc)),
+    MPWKL = sum(sapply(seq_along(lc), function(d) post[d] * sum(post * divergence(lc[d], lc)))),
+    GDI = sum(post * (lc - sum(post * lc))^2),
+    # Minus the expected entropy of the posterior after the response.
+    SHE = -sum(sapply(c(1, 0), function(x) {
+      weights <- if (x == 1) lc else 1 - lc
+      probability <- sum(post * weights)
+      after <- post * weights / probability
+      after <- after[after > 0]
+      probability * -sum(after * log(after))
+    }))
+  )
+}
+
+posterior_after <- function(post, lc, response) {
+  weights <- if (response == 1) lc else 1 - lc
+  post * weights / sum(post * weights)
+}
+
+# The state of a test: the posterior, the attribute mastery and the MAP profile (the first on ties).
+estimate <- function(post, patterns) {
+  list(posterior = post, mastery = as.vector(post %*% patterns), map = unname(patterns[which.max(post), ]))
+}
+
+# A test of CD_LENGTH items: before each item the scores of the items not administered at the posterior so far, then the
+# item with the highest score, the first on ties, and the person's response to it in `row`.
+replay <- function(rule, lc, prior, patterns, row) {
+  administered <- integer(0)
+  post <- prior
+  steps <- lapply(seq_len(CD_LENGTH), function(k) {
+    scores <- sapply(seq_len(nrow(lc)), function(j) score_item(rule, lc[j, ], post))
+    scores[administered] <- NA
+    item <- which.max(scores)
+    step <- c(estimate(post, patterns), list(scores = scores, item = item, response = row[item]))
+    administered <<- c(administered, item)
+    post <<- posterior_after(post, lc[item, ], row[item])
+    step
+  })
+  list(rule = rule, person = NA, steps = steps, final = estimate(post, patterns), items = administered)
+}
+
+# The stopping decisions along a replay: whether each rule stops before item k + 1, as the posterior stands.
+stopping_decisions <- function(run) {
+  states <- c(lapply(run$steps, function(step) step[c("posterior", "mastery")]), list(run$final))
+  lapply(seq_along(states), function(k) {
+    posterior <- states[[k]]$posterior
+    mastery <- states[[k]]$mastery
+    list(administered = k - 1,
+         posterior = sapply(c(0.7, 0.9), function(p) max(posterior) >= p),
+         mastery = sapply(c(0.7, 0.9), function(p) all(mastery >= p | mastery <= 1 - p)))
+  })
+}
+
+# cdcatR's PWKL takes the point estimate by sample(which(posterior == max(posterior)), 1), which for one mode m draws a
+# number from 1:m, so its item sequences are not reproducible. Its scores at the MAP profile are the reference instead.
+check_pwkl <- function(run, lc) {
+  for (step in run$steps) {
+    reference <- cdcatR:::PWKL.M(lc, step$posterior, point.est = which.max(step$posterior))
+    seen <- !is.na(step$scores)
+    stopifnot(isTRUE(all.equal(step$scores[seen], reference[seen], tolerance = 1e-12)))
+  }
+}
+
+# cdcatR's item sequences: the fixed-length test by `rule`, starting with the item of the highest score at the prior.
+cdcat_items <- function(fit, data, rule, prior, precision = NULL) {
+  result <- cdcatR::cdcat(fit = fit, dat = data, itemSelect = rule, MAXJ = CD_LENGTH, FIXED.LENGTH = is.null(precision),
+                          startRule = "max", precision.cut = if (is.null(precision)) 0.8 else precision,
+                          att.prior = prior, initial.distr = prior, n.cores = 2, seed = 1, print.progress = FALSE)
+  lapply(result$est, function(person) person$item.usage)
+}
+
+# A case: the items of a calibration as pool items, the prior, and for CD_PERSONS persons a replay by each rule, with
+# cdcatR's item sequences where it has the rule and reproducible sequences. cdcatR's JSD is the mutual information of
+# the response and the profile: the Shannon entropy rule's score plus the entropy of the posterior, the same for every
+# item, so it ranks items alike.
+cd_case <- function(name, calibration_data, Q, model, hierarchy = NULL) {
+  Q <- psychometrics_order(Q)
+  colnames(calibration_data) <- paste0("item", seq_len(ncol(calibration_data)))
+  fit <- GDINA::GDINA(dat = calibration_data, Q = Q, model = model, control = list(conv.crit = 1e-9, maxitr = 20000),
+                      verbose = 0)
+  stopifnot(GDINA::extract(fit, "convergence"))
+  data <- as.matrix(calibration_data[seq_len(CD_PERSONS), ])
+  patterns <- GDINA::attributepattern(ncol(Q))
+  allowed <- rep(TRUE, nrow(patterns))
+  if (!is.null(hierarchy)) allowed <- apply(patterns, 1, paste, collapse = "") %in% hierarchy
+  prior <- rounded_prior(c(GDINA::extract(fit, "posterior.prob")), allowed)
+  lc <- profile_probabilities(fit, Q)
+  rules <- c("GDI", "MPWKL", "PWKL", "SHE", "KL")
+  cdcat_rules <- c(GDI = "GDI", MPWKL = "MPWKL", SHE = "JSD")
+  runs <- unlist(lapply(rules, function(rule) {
+    reference <- if (rule %in% names(cdcat_rules)) cdcat_items(fit, data, cdcat_rules[[rule]], prior)
+    lapply(seq_len(CD_PERSONS), function(i) {
+      run <- replay(rule, lc, prior, patterns, data[i, ])
+      run$person <- i
+      if (rule == "PWKL") check_pwkl(run, lc)
+      if (!is.null(reference)) {
+        if (!identical(as.integer(reference[[i]]), as.integer(run$items))) {
+          stop(sprintf("%s, %s, person %d: cdcatR's items %s, written out %s", name, rule, i,
+                       paste(reference[[i]], collapse = " "), paste(run$items, collapse = " ")))
+        }
+        run$cdcat <- I(reference[[i]])
+      }
+      run
+    })
+  }), recursive = FALSE)
+  gdi_runs <- Filter(function(run) run$rule == "GDI", runs)
+  precision <- cdcat_items(fit, data, "GDI", prior, precision = 0.8)
+  list(
+    name = name,
+    attributes = colnames(Q),
+    items = lapply(seq_len(nrow(Q)), function(j) list(
+      id = colnames(calibration_data)[j], attributes = I(colnames(Q)[Q[j, ] == 1]),
+      probabilities = unname(coef(fit, digits = 15)[[j]]))),
+    profiles = lapply(seq_len(nrow(patterns)), function(c) {
+      list(profile = unname(patterns[c, ]), proportion = prior[c])
+    }),
+    responses = unname(data),
+    runs = runs,
+    stopping = lapply(gdi_runs, stopping_decisions),
+    precision = lapply(seq_along(precision), function(i) list(person = i, items = I(precision[[i]])))
+  )
+}
+
+data(sim30GDINA, package = "GDINA")
+ecpe_q <- as.matrix(CDM::data.ecpe$q.matrix)
+ecpe <- as.matrix(CDM::data.ecpe$data[, -1])
+
+write_fixture("cat-cdm", list(
+  source = paste("GDINA's sim30GDINA (1000 persons, 30 items, 5 attributes) and CDM's data.ecpe (2922 persons,",
+                 "28 items, 3 attributes), calibrated by GDINA; the first", CD_PERSONS, "persons take each test of",
+                 CD_LENGTH, "items"),
+  length = CD_LENGTH,
+  thresholds = c(0.7, 0.9),
+  cases = list(
+    cd_case("sim30GDINA with the G-DINA model", as.matrix(sim30GDINA$simdat), as.matrix(sim30GDINA$simQ), "GDINA"),
+    cd_case("ECPE with the G-DINA model", ecpe, ecpe_q, "GDINA"),
+    cd_case("ECPE with the DINA model", ecpe, ecpe_q, "DINA"),
+    cd_case("ECPE with the G-DINA model and a linear hierarchy", ecpe, ecpe_q, "GDINA",
+            hierarchy = c("000", "100", "110", "111"))
+  )
 ))

@@ -97,7 +97,7 @@ export function multistageTest(options: MultistageTestOptions): MultistageTest {
       next: stages[0]?.[0]?.id ?? null,
     }),
     answer(state, responses) {
-      checkState(state, items, indices);
+      checkState(state, items, indices, checkResponse);
       if (state.next === null) throw new DataError("The test has ended; it takes no more responses.");
       const { module, stage } = moduleById(located, state.next);
       checkPath(located, state, stage);

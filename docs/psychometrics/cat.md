@@ -1,9 +1,10 @@
 # Adaptive and multistage testing
 
 `@measurekit/psychometrics/cat` runs computerized adaptive tests (CAT) and multistage tests (MST) on items of any [IRT
-model](irt.md), simulates them, calibrates their exposure control and assembles fixed forms. Item selection, ability
-estimates, content balancing and stopping decisions are validated against catR step by step
-([validation](validation.md)).
+model](irt.md), adaptive tests that classify a person's attribute profile with the items of a [cognitive diagnosis
+model](cdm.md), simulates them, calibrates their exposure control and assembles fixed forms. Item selection, ability
+estimates, content balancing and stopping decisions are validated against catR step by step; diagnostic tests against a
+replay of every rule written out in base R and against cdcatR ([validation](validation.md)).
 
 ## Adaptive tests
 
@@ -215,6 +216,178 @@ The test checks its stopping rule before every item, the first included, and als
 implements `StoppingRule`: `stops(context)` with the context of [item selection](#item-selection) without `random`,
 `eligible` marking the items not administered or withheld.
 
+### Rules for other items and estimates
+
+Contexts, rules and states are generic in the type of the pool's items and of the estimate, and the diagnostic and
+other adaptive tests run on the same engine as `adaptiveTest`.
+
+| Type                                                | Parameters                                | Defaults                      |
+| --------------------------------------------------- | ----------------------------------------- | ----------------------------- |
+| `AdaptiveTestContext`, `SelectionContext`           | `TItem extends PoolControls`, `TEstimate` | `PoolItem`, `AbilityEstimate` |
+| `ItemSelectionRule`, `StoppingRule`                 | `TItem extends PoolControls`, `TEstimate` | `PoolItem`, `AbilityEstimate` |
+| `TestState`                                         | `TEstimate`                               | `AbilityEstimate`             |
+| `AdaptiveState`: a state with `withheld` and `next` | `TEstimate`                               | none                          |
+
+`PoolControls` is what every adaptive test needs of an item: `id`, `contentArea` and `exposure`. `PoolItem` adds the
+model and parameters of an IRT item. The context of a rule has the fields of the [table above](#item-selection) whatever
+the types: `estimate` is the estimate the test computes from the responses, an `AbilityEstimate` for `adaptiveTest`.
+
+`testLength`, `allOf`, `anyOf` and `randomesque` take the types of the test they are used in, or of the rules they
+combine, so one `testLength(20)` stops a test of any kind. `standardErrorThreshold` stops a test of any estimate with a
+`standardError`, or a `standardErrors` for each of its dimensions, once every one is at most the threshold. A rule
+written for one kind of test, such as `maximumInformation`, has the types of that test and does not compile in another.
+
+## Diagnostic adaptive tests
+
+`diagnosticAdaptiveTest(options)` classifies which attributes a person has mastered. Its estimate is the posterior over
+the 2^K profiles of K attributes, the prior times the probability of each response in the item's latent group of the
+profile, from the items of a [cognitive diagnosis calibration](cdm.md#calibration). The rules use only each item's
+success probabilities by latent group, so items of any model, the G-DINA, DINA and DINO included, work. Like
+`adaptiveTest`, it returns a test with `start` and `answer`, each returning a new state.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  anyOf,
+  diagnosticAdaptiveTest,
+  posteriorThreshold,
+  simulateDiagnosticTest,
+  testLength,
+} from "@measurekit/psychometrics/cat";
+import { calibrateCdm } from "@measurekit/psychometrics/cdm";
+import { simulateCdmResponses } from "@measurekit/psychometrics/sim";
+
+// A bank of 12 items over three attributes, and 1,000 persons with random profiles who answer all of them.
+const attributes = ["add", "borrow", "convert"];
+const single = (attribute: string, j: number) => ({
+  id: `${attribute}${j}`,
+  attributes: [attribute],
+  probabilities: [0.15, 0.85],
+});
+const both = (id: string, pair: string[]) => ({ id, attributes: pair, probabilities: [0.1, 0.35, 0.35, 0.9] });
+const bank = [
+  ...attributes.flatMap((attribute) => [1, 2, 3].map((j) => single(attribute, j))),
+  both("addBorrow", ["add", "borrow"]),
+  both("borrowConvert", ["borrow", "convert"]),
+  both("addConvert", ["add", "convert"]),
+];
+const random = createRandom(11);
+const profiles = Array.from({ length: 1000 }, () => attributes.map(() => (random.uniform() < 0.5 ? 1 : 0)));
+const matrix = simulateCdmResponses({ attributes, items: bank }, profiles, random);
+
+// Calibrate the bank, then test from the calibration: its items are the pool and its profiles the prior.
+const fit = calibrateCdm(matrix, Object.fromEntries(bank.map(({ id, attributes }) => [id, attributes])));
+const test = diagnosticAdaptiveTest({
+  pool: fit.items,
+  attributes: fit.attributes,
+  prior: fit.profiles,
+  stopping: anyOf(testLength(8), posteriorThreshold(0.85)),
+});
+
+// The first person answers the items the test selects.
+const answers = Object.fromEntries(matrix.itemIds.map((id, j) => [id, matrix.responses[0]?.[j] ?? 0]));
+let state = test.start(random);
+state.next; // "convert2", the first item
+while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);
+state.items; // ["convert2", "add2", "borrow3", "borrowConvert", "add1", "add3", "addConvert"]: stops at 0.87 >= 0.85
+state.estimate.mastery; // [0.936, 0.946, 0.983] to three digits; the true profile is [1, 1, 1]
+state.estimate.map; // [1, 1, 1]
+
+const result = simulateDiagnosticTest(test, profiles.slice(0, 500), random);
+result.patternAccuracy; // 0.826
+result.attributeAccuracy; // [0.938, 0.934, 0.946]
+result.meanLength; // 6.726
+```
+
+| Option           | Default                    | Meaning                                                                                                  |
+| ---------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `pool`           | required                   | Items `{ id, attributes, probabilities }`, with an optional `contentArea` and `exposure`; see below.     |
+| `attributes`     | required                   | From 1 to 20 distinct attribute names, in the order of the profiles. A calibration's `attributes`.       |
+| `prior`          | uniform over the profiles  | `{ profile, proportion }` for each profile: a calibration's `profiles`. A [hierarchy](#prior) has zeros. |
+| `stopping`       | required                   | A [stopping rule](#stopping-of-diagnostic-tests).                                                        |
+| `selection`      | `gdinaDiscriminationIndex` | An [item selection rule](#selection-of-diagnostic-tests).                                                |
+| `contentTargets` | none                       | As for [`adaptiveTest`](#content-balancing).                                                             |
+| `enemies`        | none                       | As for [`adaptiveTest`](#enemy-sets).                                                                    |
+
+The pool is an array of calibrated items; a calibration's `items` are one. `attributes` of an item lists the attributes
+it measures, each among the test's, and `probabilities` the probability of a correct response in each of its latent
+groups: the profiles over its attributes as listed, by the number of attributes mastered, then earlier attributes first
+(`00`, `10`, `01`, `11` for two). An item of one attribute has 2 probabilities, of three 8. Each probability is from 0
+to 1. Content balancing, enemy sets and exposure control work as for [`adaptiveTest`](#adaptive-tests), and so do the
+steps before each item; the first item is selected at the prior. Responses are 0 or 1.
+
+### Estimate
+
+The state's `estimate` is a `ProfileEstimate`, the shape of an [`AttributeProfile`](cdm.md#persons) without an id.
+
+| Field       | Meaning                                                                                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `posterior` | The posterior probability of each profile, in the order of the profiles: `000`, `100`, `010`, `001`, `110`, `101`, `011`, `111` for three attributes |
+| `mastery`   | The posterior probability of mastering each attribute                                                                                                |
+| `map`       | The profile of largest posterior probability, the first in that order on ties                                                                        |
+| `eap`       | Each attribute mastered when its posterior probability is above 0.5                                                                                  |
+
+A response enters the likelihood with a probability of at least `Number.MIN_VALUE`, so that a success probability of 0
+or 1, as a calibration from JSON may hold, does not make the posterior 0 for every profile. The state is plain data in
+the same way as an adaptive test's: `items`, `responses`, `estimate`, `withheld` and `next`, which `answer` checks.
+
+### Prior
+
+`prior` lists every profile once, matched to the profiles of `attributes` by its pattern, in any order, with a
+proportion from 0 to 1 that are not all 0; the test normalizes them to sum to 1. A proportion of 0 excludes the profile,
+as a hierarchy among the attributes does: its posterior stays 0 and the MAP profile is never it. Pass a calibration's
+`profiles`, or `[{ profile: [0, 0], proportion: 0.5 }, ...]` for a prior of your own.
+
+### Selection of diagnostic tests
+
+A rule scores every eligible item at the posterior π over the profiles, and the test selects the highest score. Each is
+computed over the item's latent groups, with π_l the posterior probability of the profiles in group l, P_l the success
+probability of the group, α̂ the MAP profile and KL(p, q) = p ln(p / q) + (1 - p) ln((1 - p) / (1 - q)).
+
+| Rule                                       | Score                                                                  | Name  |
+| ------------------------------------------ | ---------------------------------------------------------------------- | ----- |
+| `gdinaDiscriminationIndex`                 | Σ_l π_l (P_l - P̄)², P̄ = Σ_l π_l P_l                                    | GDI   |
+| `modifiedPosteriorWeightedKullbackLeibler` | Σ_l Σ_m π_l π_m KL(P_l, P_m)                                           | MPWKL |
+| `posteriorWeightedKullbackLeibler`         | Σ_l π_l KL(P_α̂, P_l)                                                   | PWKL  |
+| `diagnosticKullbackLeibler`                | Σ_l n_l KL(P_α̂, P_l), n_l the profiles in group l: unweighted          | KL    |
+| `shannonEntropy`                           | minus the expected Shannon entropy of the posterior after the response | SHE   |
+
+Kaplan, de la Torre and Barrada (2015) found GDI and MPWKL select best; GDI is the default, as it needs no divergence.
+KL sums over every profile, also one the prior excludes; PWKL and the others weight by the posterior. SHE (Tatsuoka
+and Ferguson, 2003) ranks items as the Jensen-Shannon divergence rule does, which is not included. The cost of a rule is
+proportional to the eligible items times the profiles, 2^K.
+
+The rules are `ItemSelectionRule<DiagnosticTestItem, ProfileEstimate>`; `randomesque(rule, count)` wraps any of them. A
+custom rule reads, as for [IRT items](#item-selection), `context.pool`, `administered`, `responses`, `estimate`,
+`eligible` and `random`. Its pool items are `DiagnosticTestItem`s: the item as given, plus `groups`, the index of the
+item's latent group in each profile of the test, so that `item.probabilities[item.groups[c]]` is the success probability
+at profile `c` of `estimate.posterior`.
+
+### Stopping of diagnostic tests
+
+| Rule                    | Stops when                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `posteriorThreshold(p)` | the largest posterior probability of a profile is at least p, from above 0 to 1 |
+| `masteryThreshold(p)`   | every attribute's mastery is at least p or at most 1 - p, p above 0.5 to 1      |
+
+`testLength(count)`, `allOf` and `anyOf` combine with them: `anyOf(testLength(20), posteriorThreshold(0.8))` gives a
+fixed-precision test of at most 20 items. A custom rule implements `StoppingRule<DiagnosticTestItem, ProfileEstimate>`.
+
+### Simulation of diagnostic tests
+
+`simulateDiagnosticTest(test, profiles, random)` administers the test to one person per true profile. Each person's
+response to every pool item is drawn first, correct with the success probability of the latent group the profile falls
+in, as [`simulateCdmResponses`](sim.md#responses) draws them; the same `random` then makes the test's random choices, so
+a seed reproduces the result.
+
+| Result              | Meaning                                                                         |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `persons`           | `{ profile, state }` per true profile, in order: the final state of each        |
+| `patternAccuracy`   | The share of persons whose `map` profile equals the true profile                |
+| `attributeAccuracy` | For each attribute, the share of persons whose `map` profile agrees on it       |
+| `meanLength`        | Mean number of items administered                                               |
+| `exposureRates`     | `{ id, rate }` for every item of the pool: the share of persons administered it |
+
 ## Multistage tests
 
 `multistageTest(options)` administers a panel: stages of modules, one module per stage. Every person takes the single
@@ -267,10 +440,10 @@ data in the same way; `answer` also checks that it takes one module per stage, i
 
 ## Simulation
 
-`simulateAdaptiveTest(test, thetas, random)` and `simulateMultistageTest(test, thetas, random)` administer a test to
-one person per true theta, drawing each response from the item's category probabilities, as
-[`simulateResponses`](sim.md#responses) does. The same `random` draws the responses and the test's random choices, so
-a seed reproduces the result.
+[`simulateDiagnosticTest`](#simulation-of-diagnostic-tests) simulates diagnostic tests. `simulateAdaptiveTest(test,
+thetas, random)` and `simulateMultistageTest(test, thetas, random)` administer a test to one person per true theta,
+drawing each response from the item's category probabilities, as [`simulateResponses`](sim.md#responses) does. The same
+`random` draws the responses and the test's random choices, so a seed reproduces the result.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -351,6 +524,14 @@ const form = assembleForm({
 form.contentCounts; // the number of items of each constrained area, within its bounds
 ```
 
+## Not included
+
+- Diagnostic tests of polytomous items or attributes, and tests that mix IRT and diagnostic items.
+- Exposure calibration for diagnostic tests: `calibrateExposure` takes IRT tests only; set `exposure` on the items.
+- The dual rule on the two largest posteriors, the Jensen-Shannon divergence rule, which ranks items as `shannonEntropy`
+  does, and the nonparametric selection rules NPS and GNPS.
+- Multidimensional adaptive tests.
+
 ## Differences from catR
 
 | Topic             | This package                                                               | catR                                                                     |
@@ -364,6 +545,20 @@ form.contentCounts; // the number of items of each constrained area, within its 
 | Content balancing | Only areas with eligible items                                             | Fails when the area picked has no item left                              |
 | Exposure control  | Sympson-Hetter, calibrated by `calibrateExposure`                          | `simulateRespondents(rmax)`: the restricted and item eligibility methods |
 | `minInfo`         | Over items not administered or withheld                                    | Over items not administered                                              |
+
+## Differences from cdcatR
+
+| Topic            | This package                                                | cdcatR                                                                                |
+| ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Rules            | GDI, MPWKL, PWKL, KL and SHE                                | GDI, MPWKL, PWKL, JSD, NPS, GNPS and random                                           |
+| PWKL's estimate  | The MAP profile, the first on ties                          | `sample(which(posterior == max(posterior)), 1)`: for a single mode m, a draw from 1:m |
+| First item       | The item of the highest score at the prior                  | `startRule = "random"` by default; `"max"` selects as this package does               |
+| Prior            | One `prior` for the first item and the posterior            | `att.prior` for the posterior and `initial.distr` for the first item                  |
+| Stopping         | Any `StoppingRule`; `posteriorThreshold` is `precision.cut` | A fixed length, or `precision.cut` on the largest posterior                           |
+| Constraints      | Content balancing and enemy sets                            | A minimum number of items per attribute (`itemConstraint = "attribute"`)              |
+| Exposure control | Sympson-Hetter, with `exposure` set by hand                 | The progressive method                                                                |
+| Estimates        | `ProfileEstimate`: posterior, mastery, MAP and EAP profiles | ML, MAP and EAP profiles by item in `est.cat`                                         |
+| Parallel runs    | One test at a time; a seed reproduces a simulation          | Persons in parallel on sockets, `seed + i` per person                                 |
 
 ## Implementation
 

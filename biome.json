@@ -260,8 +260,16 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../checks.js", "!../irt/**", "!../sim/**", "!../math/**"],
-                    "message": "cat/ builds on irt/, sim/ and math/ only."
+                    "group": [
+                      "../*",
+                      "../*/**",
+                      "!../checks.js",
+                      "!../irt/**",
+                      "!../sim/**",
+                      "!../cdm/**",
+                      "!../math/**"
+                    ],
+                    "message": "cat/ builds on irt/, sim/, cdm/ and math/ only."
                   }
                 ]
               }

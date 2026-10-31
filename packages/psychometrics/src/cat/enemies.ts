@@ -1,5 +1,5 @@
 import { checkArray, DataError, describe } from "@measurekit/core";
-import type { PoolItem } from "./items.js";
+import type { PoolControls } from "./items.js";
 
 /**
  * Returns the enemies of each pool item by index: the other items of every enemy set it is in.
@@ -8,7 +8,7 @@ import type { PoolItem } from "./items.js";
  * items.
  */
 export function enemyIndices(
-  pool: readonly PoolItem[],
+  pool: readonly PoolControls[],
   indices: ReadonlyMap<string, number>,
   sets: readonly (readonly string[])[],
 ): readonly (readonly number[])[] {
@@ -50,7 +50,7 @@ export function excludeEnemies(
 export function checkEnemies(
   enemies: readonly (readonly number[])[],
   administered: readonly number[],
-  pool: readonly PoolItem[],
+  pool: readonly PoolControls[],
 ): void {
   const taken = new Set<number>();
   for (const index of administered) {

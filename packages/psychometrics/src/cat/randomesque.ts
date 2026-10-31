@@ -1,4 +1,5 @@
 import { checkMethod, checkPositiveInteger } from "@measurekit/core";
+import type { PoolControls } from "./items.js";
 import type { ItemSelectionRule } from "./selection.js";
 
 /**
@@ -9,7 +10,10 @@ import type { ItemSelectionRule } from "./selection.js";
  * @throws `DataError` when `rule` is not a selection rule or `count` is not a positive integer.
  * @see {@link https://doi.org/10.1207/s15324818ame0204_6 | Kingsbury and Zara (1989)}
  */
-export function randomesque(rule: ItemSelectionRule, count: number): ItemSelectionRule {
+export function randomesque<TItem extends PoolControls, TEstimate>(
+  rule: ItemSelectionRule<TItem, TEstimate>,
+  count: number,
+): ItemSelectionRule<TItem, TEstimate> {
   checkMethod(rule, "scores", "Randomesque selection needs a selection rule, such as maximumInformation");
   checkPositiveInteger(count, "The number of items of randomesque selection");
   return {

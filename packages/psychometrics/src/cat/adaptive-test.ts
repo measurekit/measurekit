@@ -1,14 +1,11 @@
-import { checkMethod, checkOptions, checkRandom, DataError, type Random } from "@measurekit/core";
+import { checkMethod, checkOptions, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
-import { type AbilityEstimator, posteriorMeanEstimate } from "../irt/ability.js";
+import { type AbilityEstimate, type AbilityEstimator, posteriorMeanEstimate } from "../irt/ability.js";
 import { indexItems } from "../irt/items.js";
-import { contentBalancing, restrictToArea } from "./content-balancing.js";
-import { checkEnemies, enemyIndices, excludeEnemies } from "./enemies.js";
-import { checkResponse, indexOf, itemById, type PoolItem } from "./items.js";
-import { type AdaptiveTestContext, type ItemSelectionRule, maximumInformation } from "./selection.js";
-import { checkDistinct, checkState, type TestState } from "./state.js";
+import { type AdaptiveState, adaptiveEngine } from "./engine.js";
+import { checkResponse, type PoolItem } from "./items.js";
+import { type ItemSelectionRule, maximumInformation } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
-import { checkExposure, selectItem } from "./sympson-hetter.js";
 
 /** Options of {@link adaptiveTest}. */
 export interface AdaptiveTestOptions {
@@ -45,12 +42,7 @@ export interface AdaptiveTestOptions {
 }
 
 /** The state of an adaptive test: plain data, which JSON serializes, so that a test can resume from a stored state. */
-export interface AdaptiveTestState extends TestState {
-  /** The ids of the items exposure control withheld: they are not administered in this test. */
-  readonly withheld: readonly string[];
-  /** The id of the item to administer next, or `null` when the test has ended. */
-  readonly next: string | null;
-}
+export interface AdaptiveTestState extends AdaptiveState<AbilityEstimate> {}
 
 /** An adaptive test: a pool with the rules that select its items, estimate theta and end the test. */
 export interface AdaptiveTest {
@@ -111,7 +103,7 @@ export function adaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
     selection = maximumInformation,
     estimator = posteriorMeanEstimate,
     contentTargets,
-    enemies: enemySets = [],
+    enemies = [],
   } = options;
   checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
   checkMethod(selection, "scores", "The option selection must be a selection rule, such as maximumInformation");
@@ -119,59 +111,15 @@ export function adaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
     estimator,
     "The option estimator must be a function of items and responses, such as posteriorMeanEstimate",
   );
-  const indices = indexItems(pool);
-  pool.forEach(checkExposure);
-  const balancing = contentTargets === undefined ? null : contentBalancing(pool, contentTargets);
-  const enemies = enemyIndices(pool, indices, enemySets);
-
-  const advance = (
-    administered: readonly number[],
-    responses: readonly number[],
-    withheld: number[],
-    random: Random,
-  ): AdaptiveTestState => {
-    const estimate = estimator(
-      administered.flatMap((index) => pool[index] ?? []),
-      responses,
-    );
-    const eligible = new Uint8Array(pool.length).fill(1);
-    for (const index of administered) eligible[index] = 0;
-    for (const index of withheld) eligible[index] = 0;
-    excludeEnemies(enemies, administered, eligible);
-    const context: AdaptiveTestContext = { pool, administered, responses, estimate, eligible };
-    let next: number | null = null;
-    if (eligible.includes(1) && !stopping.stops(context)) {
-      const selectable = eligible.slice();
-      if (balancing !== null) restrictToArea(balancing, administered, selectable, random);
-      next = selectItem(selection, { ...context, eligible: selectable, random }, withheld);
-    }
-    const ids = (list: readonly number[]): string[] => list.flatMap((index) => pool[index]?.id ?? []);
-    return {
-      items: ids(administered),
-      responses,
-      estimate,
-      withheld: ids(withheld),
-      next: next === null ? null : (pool[next]?.id ?? null),
-    };
-  };
-
-  return {
+  const engine = adaptiveEngine({
     pool,
-    start(random) {
-      checkRandom(random);
-      return advance([], [], [], random);
-    },
-    answer(state, response, random) {
-      checkRandom(random);
-      const administered = checkState(state, pool, indices);
-      if (!Array.isArray(state.withheld)) throw new DataError("An adaptive test state needs the array withheld.");
-      if (state.next === null) throw new DataError("The test has ended; it takes no more responses.");
-      const withheld = state.withheld.map((id) => indexOf(indices, id));
-      const next = indexOf(indices, state.next);
-      checkDistinct([...administered, ...withheld, next], pool);
-      checkEnemies(enemies, [...administered, next], pool);
-      checkResponse(itemById(pool, indices, state.next), response);
-      return advance([...administered, next], [...state.responses, response], withheld, random);
-    },
-  };
+    indices: indexItems(pool),
+    stopping,
+    selection,
+    contentTargets,
+    enemies,
+    estimate: estimator,
+    checkResponse,
+  });
+  return { pool, ...engine };
 }

@@ -1,5 +1,5 @@
 import { checkPositive, checkRecord, DataError, describe, type Random } from "@measurekit/core";
-import type { PoolItem } from "./items.js";
+import type { PoolControls } from "./items.js";
 
 /** The content areas of a pool with their target proportions, and each item's area. */
 export interface ContentBalancing {
@@ -16,7 +16,7 @@ export interface ContentBalancing {
  * item has no content area among the targets.
  */
 export function contentBalancing(
-  pool: readonly PoolItem[],
+  pool: readonly PoolControls[],
   targets: Readonly<Record<string, number>>,
 ): ContentBalancing {
   checkRecord(targets, "The option contentTargets must be an object of target proportions by area");

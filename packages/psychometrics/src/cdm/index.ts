@@ -19,6 +19,6 @@ export {
   type NonparametricOptions,
   nonparametricClassification,
 } from "./nonparametric.js";
-export { type AttributeProfile, attributeProfiles } from "./persons.js";
+export { type AttributeProfile, attributeProfiles, type ProfileEstimate } from "./persons.js";
 export type { QMatrix } from "./q-matrix.js";
 export { type QMatrixValidationOptions, type QVectorSuggestion, validateQMatrix } from "./q-validation.js";

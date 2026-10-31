@@ -113,7 +113,7 @@ export function simulateMultistageTest(
  *
  * @throws `DataError` when it is not.
  */
-function checkTest(test: unknown, field: "pool" | "stages", message: string): void {
+export function checkTest(test: unknown, field: "pool" | "stages", message: string): void {
   const valid =
     isRecord(test) &&
     Array.isArray(test[field]) &&
@@ -126,7 +126,6 @@ function summarize<TState extends TestState>(
   persons: readonly SimulatedPerson<TState>[],
   items: readonly TestItem[],
 ): TestSimulation<TState> {
-  const counts = new Map(items.map((item) => [item.id, 0]));
   let error = 0;
   let squaredError = 0;
   let length = 0;
@@ -135,7 +134,6 @@ function summarize<TState extends TestState>(
     error += difference;
     squaredError += difference * difference;
     length += state.items.length;
-    for (const id of state.items) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
   const n = persons.length;
   return {
@@ -143,6 +141,19 @@ function summarize<TState extends TestState>(
     bias: error / n,
     rootMeanSquareError: Math.sqrt(squaredError / n),
     meanLength: length / n,
-    exposureRates: items.map(({ id }) => ({ id, rate: (counts.get(id) ?? 0) / n })),
+    exposureRates: exposureRates(
+      items,
+      persons.map(({ state }) => state),
+    ),
   };
+}
+
+/** Returns the share of the states that administered each item, in the order of the items. */
+export function exposureRates(
+  items: readonly { readonly id: string }[],
+  states: readonly TestState<unknown>[],
+): ExposureRate[] {
+  const counts = new Map(items.map((item) => [item.id, 0]));
+  for (const state of states) for (const id of state.items) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return items.map(({ id }) => ({ id, rate: (counts.get(id) ?? 0) / states.length }));
 }

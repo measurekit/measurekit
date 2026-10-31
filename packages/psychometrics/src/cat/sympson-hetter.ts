@@ -1,5 +1,5 @@
 import { checkUnitInterval, DataError } from "@measurekit/core";
-import type { PoolItem } from "./items.js";
+import type { PoolControls } from "./items.js";
 import { highestScore, type ItemSelectionRule, type SelectionContext } from "./selection.js";
 
 /**
@@ -7,7 +7,7 @@ import { highestScore, type ItemSelectionRule, type SelectionContext } from "./s
  *
  * @throws `DataError` unless it is missing or a number from 0 to 1.
  */
-export function checkExposure(item: PoolItem): void {
+export function checkExposure(item: PoolControls): void {
   if (item.exposure !== undefined) checkUnitInterval(item.exposure, `The exposure parameter of item "${item.id}"`);
 }
 
@@ -23,7 +23,11 @@ export function checkExposure(item: PoolItem): void {
  * @throws `DataError` when the rule scores every eligible item `-Infinity`.
  * @see {@link https://doi.org/10.1037/10244-014 | Hetter and Sympson (1997)}
  */
-export function selectItem(rule: ItemSelectionRule, context: SelectionContext, withheld: number[]): number {
+export function selectItem<TItem extends PoolControls, TEstimate>(
+  rule: ItemSelectionRule<TItem, TEstimate>,
+  context: SelectionContext<TItem, TEstimate>,
+  withheld: number[],
+): number {
   const { pool, eligible, random } = context;
   const scores = new Float64Array(pool.length);
   let remaining = eligible.reduce((sum, flag) => sum + flag, 0);

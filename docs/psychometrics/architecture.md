@@ -50,11 +50,12 @@ Modules form layers; a module imports only from lower layers, never from its own
 | 5     | `sim/`, `dif/`, `standard-setting/`                       |
 | 6     | `cat/`                                                    |
 
-Analysis modules (`ctt/` and `irt/`) build on `data/` and `math/`, not on each other. `sim/` builds on `irt/` and
-`cdm/` to simulate their models, `cat/` on `sim/` for the same response simulation, and `dif/` and `standard-setting/`
-on `equating/` for linking and score distributions. [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each
-module may use; Biome enforces them, the absence of Node modules and platform globals in `src/`, and that code outside
-`packages/` imports `@measurekit/psychometrics` by name.
+Analysis modules (`ctt/` and `irt/`) build on `data/` and `math/`, not on each other. `sim/` builds on `irt/` and `cdm/`
+to simulate their models, `cat/` on `sim/` for the same response simulation and on `cdm/` for the profile estimates of
+diagnostic tests, and `dif/` and `standard-setting/` on `equating/` for linking and score distributions.
+[AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces them, the absence of
+Node modules and platform globals in `src/`, and that code outside `packages/` imports `@measurekit/psychometrics` by
+name.
 
 ## Numerics
 

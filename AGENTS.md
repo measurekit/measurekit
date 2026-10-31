@@ -184,7 +184,7 @@ Psychometrics: every module of `cat/`, `irt/` and `sim/` may also import `checks
 | `sim/`                     | `data/`, `irt/`, `cdm/`, `math/`      |
 | `dif/`                     | `data/`, `irt/`, `equating/`, `math/` |
 | `standard-setting/`        | `irt/`, `equating/`, `math/`          |
-| `cat/`                     | `irt/`, `sim/`, `math/`               |
+| `cat/`                     | `irt/`, `sim/`, `cdm/`, `math/`       |
 
 Knowledge tracing: the model families never import each other, nor does anything import `evaluate/`, `practice/` or
 `sim/`: they use models only through `LearnerModel`.

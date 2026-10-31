@@ -1,7 +1,7 @@
 {
   "name": "@measurekit/psychometrics",
   "version": "0.0.0",
-  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory, cognitive diagnosis, adaptive testing, item fit, differential item functioning, equating, simulation, standard setting, rater agreement and response times, validated against R.",
+  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory, cognitive diagnosis, adaptive testing including cognitive diagnosis, item fit, differential item functioning, equating, simulation, standard setting, rater agreement and response times, validated against R.",
   "keywords": [
     "psychometrics",
     "classical-test-theory",

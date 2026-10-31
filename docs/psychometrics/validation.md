@@ -10,7 +10,7 @@ TypeScript tests; R runs when fixtures change.
 
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169, LNIRT 0.5.1, numDeriv 2016.8-1.1, GDINA
-2.13.2, NPCD 1.0.11 and jsonlite 2.0.0.
+2.13.2, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -59,6 +59,14 @@ equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
 | Stopping decisions                                           | `checkStopRule` with `length`, `precision` and `minInfo` on the remaining items, alone and together     |
 | Randomesque, Sympson-Hetter, multistage routing, simulation  | Properties over seeded simulations and hand-derived routes (below)                                      |
 | Enemy sets, exposure calibration, form assembly              | Properties (below); catR has no enemy sets or form assembly                                             |
+
+| Diagnostic CAT quantity                                    | Reference                                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Posterior, mastery and MAP profile after each response     | Base R: the prior times the probability of each response at every profile, normalized                        |
+| KL, PWKL, MPWKL, GDI and SHE scores of every eligible item | Base R, written out over the profiles from the definition of each rule; PWKL also against `cdcatR:::PWKL.M`  |
+| Item sequences                                             | The replay in base R, selecting the highest score, the first on ties; `cdcat()` for GDI, MPWKL and JSD (SHE) |
+| Fixed-precision test length                                | `cdcat(FIXED.LENGTH = FALSE, precision.cut = 0.8)` for GDI                                                   |
+| Posterior and mastery thresholds                           | Base R: the largest posterior at least p; every mastery at least p or at most 1 - p                          |
 
 | Fit statistic                                              | Reference                                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -153,6 +161,28 @@ is within its tolerance of r, the result reproduces with its seed, and a test to
 Form assembly is a heuristic without a reference solution: an assembled form of 30 from 300 items meets every
 content constraint and comes within 5% of the information target, a target above any form's information selects the
 most informative items, and the counts and information it reports equal those of its items.
+
+`validation/psychometrics/cat.R` also replays diagnostic adaptive tests on the items of GDINA calibrations: `sim30GDINA`
+with the G-DINA model (30 items, 5 attributes), and ECPE (`CDM::data.ecpe`, 28 items, 3 attributes) with the G-DINA
+model, the DINA model and the G-DINA model under a linear hierarchy of the attributes, which gives three of the eight
+profiles prior 0. The first four persons of each dataset take a test of 10 items with each rule, and the prior is the
+calibration's profile proportions in multiples of 1/4096, so that its sum is exactly 1 as cdcatR checks. The base R
+replay stores, before each item, the posterior, the mastery, the MAP profile and every item's score; the test replays
+the persons' responses through `diagnosticAdaptiveTest` and compares each estimate, then scores the items from the
+stored posterior, so a difference in a score is the rule's alone. cdcatR's `cdcat()` runs the same tests for GDI, MPWKL
+and JSD, the mutual information of the response and the profile in bits: the Shannon entropy rule's score plus the
+entropy of the posterior, the same for every item, so the rules rank items alike; the script stops if its item sequence
+differs from the replay's. It starts with the item of the highest score (`startRule = "max"`) and takes the prior as
+`att.prior` and `initial.distr`. The sequences of the fixed-precision test (`precision.cut = 0.8`) end where the tests
+ended, 1 to 10 items. The stopping rules are compared on every state along the GDI replays, at 0.7 and 0.9. Properties:
+posteriors sum to 1 and a profile of prior 0 keeps posterior 0; the posterior does not depend on the order of the
+responses; no test administers an item twice or two enemies; seeds reproduce simulations.
+
+cdcatR 1.0.7 is installed from CRAN source without its import cdmTools, which only its nonparametric rules use and whose
+dependency clarabel needs a Rust compiler; `cat.R` describes the installation. cdcatR's PWKL takes its point estimate by
+`sample(which(posterior == max(posterior)), 1)`, which for a single mode m draws a number from 1:m instead of returning
+m, so its PWKL item sequences are not reproducible and are not a reference. The PWKL scores are compared with its
+`PWKL.M` at the MAP profile instead.
 
 `validation/psychometrics/fit.R`, `dif.R` and `equating.R` store the inputs each reference used: the items, the
 thetas, the calibrations. The tests compute the statistics from those inputs, so a difference is the statistic's alone.
@@ -252,6 +282,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `cat-2pl.json`                 | `genDichoMatrix(items = 100, model = "2PL")`: 4 strata of 25, 3 items from each                                                                                                                                        | a-stratification                                                                                              |
 | `cat-gpcm.json`                | `genPolyMatrix(items = 40, nrCat = 4, model = "GPCM")`: 2 to 4 categories, 2 runs of 15 items                                                                                                                          | Polytomous MFI and KL; MAP, EAP then ML                                                                       |
 | `cat-content.json`             | `genDichoMatrix(items = 60, model = "3PL", cbControl)`: areas with targets 0.5, 0.3 and 0.2                                                                                                                            | Content balancing                                                                                             |
+| `cat-cdm.json`                 | GDINA's `sim30GDINA` and `CDM::data.ecpe` calibrated by GDINA: G-DINA; ECPE also DINA and G-DINA under a linear hierarchy; 4 persons, 10 items, 5 rules each                                                           | The five diagnostic selection rules, posterior thresholds, a prior with zeros, DINA items, fixed precision    |
 | `interop-mirt.json`            | 25 items set in mirt: 2PL, 3PL, 4PL, `graded` (one negative slope), `gpcm`, `Rasch`, `rsm`, `nominal`                                                                                                                  | Both coefficient forms, probabilities                                                                         |
 | `fit-rasch.json`               | difR's `verbal`, 24 items under `RM`; `mirt::Science` recoded 0-3 under `PCM`                                                                                                                                          | Extreme scores, polytomous mean squares                                                                       |
 | `fit-summed-score.json`        | `mirt::LSAT7` and `SAT12` scored (omissions wrong) under the 2PL; Science under the GPCM and GRM                                                                                                                       | Dichotomous and polytomous collapsing                                                                         |
@@ -295,6 +326,8 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | CAT ML, MAP and WLE theta and standard error against catR               | 1e-4 absolute                                      | 3e-5                     |
 | CAT EAP theta and standard error against catR                           | 1e-6 absolute                                      | 6e-8                     |
 | CAT information and KL scores                                           | 1e-12 relative                                     | 4e-15                    |
+| CD-CAT scores of every rule against the written-out replay              | 1e-12 relative                                     | 9e-16                    |
+| CD-CAT posterior and attribute mastery                                  | 1e-12 absolute                                     | 6e-16                    |
 | Theta of an item's largest information                                  | 1e-10 absolute                                     | 4e-15                    |
 | Category probabilities against `probtrace`                              | 1e-15 absolute                                     | 4e-16                    |
 | Chi-square upper tail                                                   | 1e-12 relative                                     | 2e-14                    |

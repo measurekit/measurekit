@@ -1,12 +1,36 @@
 /**
  * Adaptive and multistage testing: adaptive test sessions with item selection rules, content balancing, enemy sets,
- * Sympson-Hetter exposure control and its calibration, and stopping rules; multistage panels with routing; simulation
- * of both; and the assembly of fixed forms.
+ * Sympson-Hetter exposure control and its calibration, and stopping rules; adaptive tests of cognitive diagnosis;
+ * multistage panels with routing; simulation of all of them; and the assembly of fixed forms.
  *
  * @module @measurekit/psychometrics/cat
  */
 export { aStratified } from "./a-stratified.js";
 export { type AdaptiveTest, type AdaptiveTestOptions, type AdaptiveTestState, adaptiveTest } from "./adaptive-test.js";
+export type {
+  DiagnosticPoolItem,
+  DiagnosticTestItem,
+} from "./diagnostic-items.js";
+export {
+  diagnosticKullbackLeibler,
+  gdinaDiscriminationIndex,
+  modifiedPosteriorWeightedKullbackLeibler,
+  posteriorWeightedKullbackLeibler,
+  shannonEntropy,
+} from "./diagnostic-selection.js";
+export {
+  type DiagnosticTestSimulation,
+  type SimulatedDiagnosticPerson,
+  simulateDiagnosticTest,
+} from "./diagnostic-simulation.js";
+export { masteryThreshold, posteriorThreshold } from "./diagnostic-stopping.js";
+export {
+  type DiagnosticAdaptiveTest,
+  type DiagnosticAdaptiveTestOptions,
+  type DiagnosticAdaptiveTestState,
+  diagnosticAdaptiveTest,
+} from "./diagnostic-test.js";
+export type { AdaptiveState } from "./engine.js";
 export { untilMixed } from "./estimator.js";
 export {
   calibrateExposure,
@@ -20,7 +44,7 @@ export {
   type FormAssemblyOptions,
   type InformationTarget,
 } from "./form-assembly.js";
-export type { PoolItem } from "./items.js";
+export type { PoolControls, PoolItem } from "./items.js";
 export { kullbackLeibler } from "./kullback-leibler.js";
 export {
   type MultistageModule,
@@ -49,6 +73,7 @@ export {
   allOf,
   anyOf,
   informationThreshold,
+  type PrecisionEstimate,
   type StoppingRule,
   standardErrorThreshold,
   testLength,

@@ -1,28 +1,32 @@
 import { DataError, isRecord } from "@measurekit/core";
 import type { AbilityEstimate } from "../irt/ability.js";
-import type { TestItem } from "../irt/model.js";
-import { checkResponse, indexOf, itemById } from "./items.js";
+import { indexOf, itemById } from "./items.js";
 
-/** What the states of adaptive and multistage tests share: the responses so far and the estimate from them. */
-export interface TestState {
+/**
+ * What the states of adaptive and multistage tests share: the responses so far and the estimate from them.
+ *
+ * @typeParam TEstimate - The estimate of what the test measures.
+ */
+export interface TestState<TEstimate = AbilityEstimate> {
   /** The ids of the administered items, in order. */
   readonly items: readonly string[];
   /** The responses to the administered items. */
   readonly responses: readonly number[];
-  /** The estimate of theta from the responses. */
-  readonly estimate: AbilityEstimate;
+  /** The estimate from the responses. */
+  readonly estimate: TEstimate;
 }
 
 /**
  * Checks a state passed back to a test, as from JSON, and returns the indices of its administered items: `items` and
- * `responses` are arrays with one response per item, each a category of its item.
+ * `responses` are arrays with one response per item, each accepted by `checkResponse` for its item.
  *
  * @throws `DataError` when they are not, or an id is not one of the test's items.
  */
-export function checkState(
-  state: TestState,
-  items: readonly TestItem[],
+export function checkState<TItem extends { readonly id: string }>(
+  state: TestState<unknown>,
+  items: readonly TItem[],
   indices: ReadonlyMap<string, number>,
+  checkResponse: (item: TItem, response: number) => void,
 ): number[] {
   if (!(isRecord(state) && Array.isArray(state.items) && Array.isArray(state.responses))) {
     throw new DataError("A test state needs the arrays items and responses.");
@@ -43,7 +47,7 @@ export function checkState(
  *
  * @throws `DataError` naming the first item that appears twice.
  */
-export function checkDistinct(indices: readonly number[], items: readonly TestItem[]): void {
+export function checkDistinct(indices: readonly number[], items: readonly { readonly id: string }[]): void {
   const seen = new Set<number>();
   for (const index of indices) {
     if (seen.has(index)) {

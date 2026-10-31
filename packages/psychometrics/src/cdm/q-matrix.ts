@@ -58,7 +58,7 @@ export function bitPattern(profile: readonly number[], positions: Iterable<numbe
 }
 
 /** The most attributes of a design: 2^20 profiles. */
-const MAX_ATTRIBUTES = 20;
+export const MAX_ATTRIBUTES = 20;
 
 /**
  * Checks an item's attributes: at least one, each a non-empty string, none twice.
