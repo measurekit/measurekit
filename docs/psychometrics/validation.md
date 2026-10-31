@@ -10,8 +10,8 @@ TypeScript tests; R runs when fixtures change.
 
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 lordif 0.4-2, MASS 7.3-65, rms 8.2.0, equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
-LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite
-2.0.0.
+LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14,
+cdcatR 1.0.7, GPArotation 2026.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -52,6 +52,20 @@ LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, GDINA 2.13.2, alaba
 | Posterior of theta on 61 points                                        | Base R: the prior's rectangular weights times the likelihood from mirt's `probtrace`; its mean is mirt's EAP                                                                                                              |
 | EAP summed-score tables                                                | `fscores(method = "EAPsum")`; base R's Lord-Wingersky recursion on `probtrace` for another prior                                                                                                                          |
 | Marginal and empirical reliability                                     | `marginal_rxx`, `empirical_rxx`; base R's `integrate` for another prior                                                                                                                                                   |
+
+| Multidimensional quantity                                          | Reference                                                                                                                                             |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2PL: estimates, SEs, correlations, log-likelihood, AIC, BIC        | `mirt(model = "F1 = 1-6 / F2 = 7-12 / COV = F1*F2", SE.type = "Oakes")`, `TOL = 1e-10`, 31 points; also with 8% of the responses missing              |
+| 3PL with normal priors on logit c                                  | The same, 21 points, `PRIOR = (1-12, g, norm, ...)`                                                                                                   |
+| Graded: `bfi` A and C on two dimensions, A, C and E on three       | `mirt(itemtype = "graded")` with `COV`; 31 points and 15 points                                                                                       |
+| Cross-product standard errors                                      | `mirt(SE.type = "crossprod")`                                                                                                                         |
+| Exploratory 2D 2PL: estimates, log-likelihood                      | Base R: BFGS then Newton steps on the exact gradient of the marginal likelihood from mirt's estimates, the first item's second slope fixed at 0       |
+| Rotation: varimax, oblimin, Kaiser normalization, gamma            | `GPArotation::Varimax`, `GPArotation::oblimin` to a gradient of 1e-10, mirt's sign convention; checked against mirt's `Rotate`                        |
+| Rotated slopes and scores in the rotated dimensions                | mirt's `rotateLambdas`; `fscores(rotate = "oblimin", method = "EAP")`                                                                                 |
+| EAP theta and standard error                                       | `fscores(method = "EAP", QMC = FALSE)`, rectangular nodes from -6 to 6 on the prior                                                                   |
+| MAP theta; standard error                                          | `fscores(method = "MAP")`; the standard error from base R: the inverse of the information matrices plus the precision of the prior                    |
+| Information matrices                                               | Base R: the sum over categories of the outer products of the derivatives of the probabilities written out, checked against `probtrace` and `iteminfo` |
+| mirt's slope-intercept coefficients of items on 2 and 3 dimensions | `coef(simplify = TRUE)` and `probtrace` of the same items                                                                                             |
 
 | CAT quantity                                                 | Reference                                                                                               |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
@@ -347,6 +361,22 @@ Several results of the reference packages are not references:
   estimate three times, after which the estimates agree within 3.3e-7; the test allows 1e-5. gtheory, which wraps lme4
   for G and D studies, was removed from CRAN in March 2025, so lme4 is the reference. REML keeps estimates at 0 or
   above, so the case with a negative component has the base R computation alone.
+- **mirt's exploratory models.** mirt estimates every slope of an exploratory model, so that the likelihood is flat along
+  the rotations: on SAT12 scored with 31 points its EM does not converge in 5,000 iterations at `TOL = 1e-10`. The
+  reference gives mirt the constraint of `calibrateMultidimensional`, the first D - 1 items' later slopes at 0, and
+  maximizes the likelihood in base R from mirt's estimates, BFGS and then Newton steps on the exact gradient to a
+  gradient below 1e-8. mirt's own EM stops 14.5 log-likelihood units below that maximum on the simulated case and 0.21
+  below it on SAT12, with 11 points.
+- **mirt's `summary` loadings and communalities.** mirt's standardized loadings divide by √(1 + Σ (a / 1.702)²), and its
+  communality is the sum of the squared loadings, whatever the correlations of the dimensions. The variance of a · θ is
+  aᵀ Φ a, so `calibrateMultidimensional` uses it, and the two agree for items that load on one dimension, the fixtures'
+  items. The test of an item that loads on two dimensions checks the formula written out.
+- **mirt's MAP standard errors.** `fscores(method = "MAP")` takes them from the observed information, which for the
+  graded model differs from the expected information that `multidimensionalPosteriorModeEstimate` uses, by up to 0.15 on
+  the `bfi` fixture. The M2PL's two agree, so its standard errors are compared with mirt's, and the graded model's with
+  base R: the inverse of the information matrices written out plus the precision of the prior, at mirt's MAP.
+- **mirt's rotation in `fscores`.** `fscores(rotate = "oblimin")` rotates to GPArotation's default tolerance, 1e-5, so
+  its thetas in the rotated dimensions differ from those of a rotation run to 1e-10 by up to 2.4e-5.
 
 No package among the references implements the modified Angoff, Bookmark or Hofstee method, so their references are
 base R written out from each method's definition. The tests add values derived by hand: the Bookmark locations
@@ -366,6 +396,11 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 - **Reproduction.** Equal seeds give equal simulations, for every model.
 - **Recovery.** 20 simulated 2PL items, calibrated from 2,000 simulated persons: every estimate within four standard
   errors of the true value, and root mean square errors below 0.15 for a and 0.2 for b (0.10 and 0.16 found).
+- **Multidimensional recovery.** 24 simulated M2PL items, 8 on each of 3 dimensions correlated 0.3, 0.5 and 0.4, from
+  1,500 simulated persons: every slope, intercept and correlation within four standard errors of the true value, and a
+  root mean square error of the slopes below 0.2 (3.0 standard errors at most, 0.10 found).
+- **Multidimensional categories.** The frequency of each category of 20,000 responses at one vector of thetas, for
+  M2PL, M3PL and graded items on two and three dimensions.
 
 ## Datasets
 
@@ -390,6 +425,15 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `cat-content.json`                     | `genDichoMatrix(items = 60, model = "3PL", cbControl)`: areas with targets 0.5, 0.3 and 0.2                                                                                                                                                      | Content balancing                                                                                                                      |
 | `cat-cdm.json`                         | GDINA's `sim30GDINA` and `CDM::data.ecpe` calibrated by GDINA: G-DINA; ECPE also DINA and G-DINA under a linear hierarchy; 4 persons, 10 items, 5 rules each                                                                                     | The five diagnostic selection rules, posterior thresholds, a prior with zeros, DINA items, fixed precision                             |
 | `interop-mirt.json`                    | 25 items set in mirt: 2PL, 3PL, 4PL, `graded` (one negative slope), `gpcm`, `Rasch`, `rsm`, `nominal`                                                                                                                                            | Both coefficient forms, probabilities                                                                                                  |
+| `interop-multidimensional.json`        | 6 M2PL, 6 M3PL, 4 graded items on 2 dimensions and 5 graded items on 3 dimensions, set in mirt                                                                                                                                                   | Both models' coefficients, probabilities at vectors of theta                                                                           |
+| `multidimensional-m2pl.json`           | `mirt::simdata` with `set.seed(20261029)`: 1500 persons, 12 dichotomous items, 6 on each of 2 dimensions correlated 0.4                                                                                                                          | Correlated dimensions, Oakes and cross-product standard errors, EAP and MAP of 24 patterns, some with missing responses                |
+| `multidimensional-missing.json`        | The same data with 8% of the responses missing completely at random                                                                                                                                                                              | Missing responses                                                                                                                      |
+| `multidimensional-m3pl.json`           | `simdata`, `set.seed(20261029)`: 1000 persons, 12 3PL items with g = 0.15, 6 on each of 2 dimensions                                                                                                                                             | Normal priors on logit c                                                                                                               |
+| `multidimensional-graded.json`         | `psych::bfi` A1-A5 and C1-C5, 2632 complete cases, coded 0-5                                                                                                                                                                                     | Six categories, two dimensions, EAP and MAP of 24 patterns                                                                             |
+| `multidimensional-graded3.json`        | `psych::bfi` A1-A5, C1-C5 and E1-E5, the first 500 complete cases                                                                                                                                                                                | Three dimensions, 15 points                                                                                                            |
+| `multidimensional-exploratory.json`    | The first 600 persons of the M2PL simulation; `mirt::SAT12` scored, omissions wrong: 600 persons, 32 items                                                                                                                                       | Exploratory 2D models, the base R maximum, a flat likelihood                                                                           |
+| `multidimensional-rotation.json`       | The standardized loadings of the base R maximum of the first exploratory case                                                                                                                                                                    | Varimax, oblimin, Kaiser normalization, gamma 0.5; EAP in the rotated dimensions                                                       |
+| `multidimensional-information.json`    | 6 M2PL, 6 M3PL, 4 graded items on 2 dimensions and 3 graded items on 3 dimensions, set in mirt; 3 vectors of theta each                                                                                                                          | Information matrices                                                                                                                   |
 | `fit-rasch.json`                       | difR's `verbal`, 24 items under `RM`; `mirt::Science` recoded 0-3 under `PCM`                                                                                                                                                                    | Extreme scores, polytomous mean squares                                                                                                |
 | `fit-summed-score.json`                | `mirt::LSAT7` and `SAT12` scored (omissions wrong) under the 2PL; Science under the GPCM and GRM                                                                                                                                                 | Dichotomous and polytomous collapsing                                                                                                  |
 | `fit-residuals.json`                   | SAT12 scored with omissions missing under the 2PL; Science under the GPCM                                                                                                                                                                        | Missing responses, polytomous lz and Q3                                                                                                |
@@ -519,6 +563,22 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Additive-model log-likelihood                                                                    | at least GDINA's less 1e-8                         | never below              |
 | Persons and accuracy at GDINA's additive estimates                                               | 1e-6 absolute                                      | 6.7e-8                   |
 | One additive M-step on fixed counts                                                              | 1e-8 absolute                                      | 1.0e-12                  |
+| Multidimensional 2PL parameters, correlations, loadings, communalities                           | 1e-5 absolute                                      | 1.3e-6                   |
+| Multidimensional 2PL standard errors                                                             | 1e-4 relative                                      | 1.5e-6                   |
+| Multidimensional 2PL log-likelihood, AIC, BIC                                                    | 1e-6 absolute                                      | 4.4e-11                  |
+| Multidimensional 3PL and graded parameters, correlations, loadings                               | 2e-4 absolute                                      | 9.7e-5                   |
+| Multidimensional 3PL and graded standard errors                                                  | 1e-3 relative                                      | 9.2e-5                   |
+| Multidimensional 3PL and graded log-likelihood, AIC, BIC                                         | 1e-4 absolute                                      | 2.5e-5                   |
+| Multidimensional cross-product standard errors                                                   | 1e-3 relative                                      | 8.2e-7                   |
+| Exploratory parameters against the base R maximum                                                | 2e-4 absolute                                      | 1.8e-6                   |
+| Exploratory log-likelihood against the base R maximum                                            | 1e-6 absolute                                      | 1e-11                    |
+| Rotated loadings, correlations, rotation matrices and slopes against GPArotation                 | 1e-6 absolute                                      | 9e-16                    |
+| EAP in rotated dimensions against mirt                                                           | 1e-4 absolute                                      | 2.4e-5                   |
+| Multidimensional EAP theta, standard error                                                       | 1e-8 absolute                                      | 3.6e-15                  |
+| Multidimensional MAP theta                                                                       | 1e-5 absolute                                      | 5.2e-6                   |
+| Multidimensional MAP standard error                                                              | 1e-4 absolute                                      | 1.4e-5                   |
+| Multidimensional information matrices                                                            | 1e-12 absolute                                     | 2.8e-16                  |
+| mirt's multidimensional coefficients and category probabilities                                  | 1e-15 relative                                     | 4.4e-16                  |
 
 Entries of a covariance matrix are compared relative to √(Σ_ii Σ_jj) of the reference, so that an off-diagonal entry is
 on the correlation scale.
@@ -531,6 +591,11 @@ the mixed format, and the log-likelihood at mirt's estimates agrees within 2e-11
 on both sides. mirt's ML and MAP use `nlm` with numerical derivatives, good to about 7e-6; the base R WLE is exact. mirt
 computes 1 - P by subtraction, so information is compared in absolute terms: in the tails mirt keeps few significant
 digits. JML runs with `tolerance: 1e-12` against a base R solution iterated to 1e-12.
+
+The multidimensional calibrations run with `tolerance: 1e-9` for the 2PL, 1e-7 for the 3PL and the graded model on two
+dimensions, and 1e-8 on three, and the exploratory ones with 1e-8: the likelihoods of the other models are flatter, and
+mirt's EM stops within the tolerances above. The `bfi` fixtures take a few seconds each, and the exploratory cases, whose
+EM needs hundreds to thousands of iterations on 600 persons, tens of seconds.
 
 catR's `thetaEst` finds ML, MAP and WLE roots with `uniroot`'s default tolerance, about 1.2e-4; this library's are
 good to 1e-12. catR's EAP uses the trapezoid rule on the 61 points of `posteriorMeanEstimate`, which halves the two

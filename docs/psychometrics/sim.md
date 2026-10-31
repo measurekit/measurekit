@@ -1,7 +1,7 @@
 # Simulation
 
 `@measurekit/psychometrics/sim` simulates thetas, item parameters of every built-in [IRT model](irt.md) and
-response matrices, for test design and research: recovery studies, the design of forms and pools, and data for any
+response matrices, also of [multidimensional models](multidimensional.md), for test design and research: recovery studies, the design of forms and pools, and data for any
 other analysis. Every draw comes from the `Random` passed in, so a seed reproduces a simulation.
 
 ```ts
@@ -16,11 +16,12 @@ const matrix = simulateResponses(items, thetas, random, { missingProbability: 0.
 calibrate(matrix, { model: twoParameterLogistic }).items; // estimates near items[j].parameters
 ```
 
-| Function                                            | Result                                                                 |
-| --------------------------------------------------- | ---------------------------------------------------------------------- |
-| `simulateThetas(count, random, distribution)`       | `count` thetas from `distribution`, by default N(0, 1)                 |
-| `simulateItems(model, count, random, options)`      | `count` items `{ model, parameters }` of a built-in model              |
-| `simulateResponses(items, thetas, random, options)` | A response matrix: a row per theta, a column per item, the default ids |
+| Function                                                            | Result                                                                                         |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `simulateThetas(count, random, distribution)`                       | `count` thetas from `distribution`, by default N(0, 1)                                         |
+| `simulateItems(model, count, random, options)`                      | `count` items `{ model, parameters }` of a built-in model                                      |
+| `simulateResponses(items, thetas, random, options)`                 | A response matrix: a row per theta, a column per item, the default ids                         |
+| `simulateMultidimensionalResponses(items, thetas, random, options)` | The same for [multidimensional](multidimensional.md) items, with an array of thetas per person |
 
 Thetas need not come from `simulateThetas`: any finite values work, such as a grid or the estimates of a real
 sample. A seed gives the same simulation for the same calls in the same order.
@@ -86,6 +87,27 @@ in order.
 `missingProbability` (default `0`) makes each response missing with that probability, independently of everything
 else: missing completely at random. The missing responses are drawn after all responses, so a seed gives the same
 responses with and without missingness, less the missing ones.
+
+### Multidimensional responses
+
+`simulateMultidimensionalResponses(items, thetas, random, { missingProbability })` draws responses of items of the
+[multidimensional models](multidimensional.md) in the same way, from each person's vector of thetas: `thetas` has one
+array per person, as many numbers as the items have dimensions. Every item has the same number of dimensions. The
+thetas come from any source, such as correlated normal draws:
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { multidimensionalTwoParameterLogistic } from "@measurekit/psychometrics/multidimensional";
+import { simulateMultidimensionalResponses } from "@measurekit/psychometrics/sim";
+
+const random = createRandom(5);
+const items = [
+  { model: multidimensionalTwoParameterLogistic, parameters: { a: [1.2, 0], intercept: 0.3, c: 0, d: 1 } },
+  { model: multidimensionalTwoParameterLogistic, parameters: { a: [0.4, 1.1], intercept: -0.5, c: 0, d: 1 } },
+];
+const thetas = Array.from({ length: 4 }, () => [random.normal(), random.normal()]);
+simulateMultidimensionalResponses(items, thetas, random).responses; // [[1, 1], [0, 1], [1, 1], [0, 0]]
+```
 
 `simulateCdmResponses(model, profiles, random)` simulates responses from a [cognitive diagnosis](cdm.md) model, its
 `attributes` and `items` with their success probabilities per latent group, such as a calibration's: one person per

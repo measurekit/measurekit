@@ -223,6 +223,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/multidimensional/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../checks.js", "!../data/**", "!../irt/**", "!../math/**"],
+                    "message": "multidimensional/ builds on data/, irt/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/sim/**"],
       "linter": {
         "rules": {
@@ -239,9 +259,10 @@
                       "!../data/**",
                       "!../irt/**",
                       "!../cdm/**",
+                      "!../multidimensional/**",
                       "!../math/**"
                     ],
-                    "message": "sim/ builds on data/, irt/, cdm/ and math/ only."
+                    "message": "sim/ builds on data/, irt/, cdm/, multidimensional/ and math/ only."
                   }
                 ]
               }
@@ -288,8 +309,8 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../irt/**"],
-                    "message": "interop/ converts the parameters of irt/ only."
+                    "group": ["../*", "../*/**", "!../irt/**", "!../multidimensional/**"],
+                    "message": "interop/ converts the parameters of irt/ and multidimensional/ only."
                   }
                 ]
               }

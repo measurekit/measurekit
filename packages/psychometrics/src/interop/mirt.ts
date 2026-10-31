@@ -13,6 +13,14 @@ import { centered, type NominalParameters, nominalResponse } from "../irt/nomina
 import { generalizedPartialCredit, partialCredit } from "../irt/partial-credit.js";
 import { type RatingScaleParameters, ratingScale } from "../irt/rating-scale.js";
 import type { ThresholdParameters } from "../irt/thresholds.js";
+import { type MultidimensionalGradedParameters, multidimensionalGradedResponse } from "../multidimensional/graded.js";
+import { checkMultidimensionalItem, checkMultidimensionalModel } from "../multidimensional/items.js";
+import {
+  type MultidimensionalLogisticParameters,
+  multidimensionalThreeParameterLogistic,
+  multidimensionalTwoParameterLogistic,
+} from "../multidimensional/logistic.js";
+import type { MultidimensionalItem, MultidimensionalModel } from "../multidimensional/model.js";
 
 /**
  * One item's coefficients as a row of mirt's `coef(model, simplify = TRUE)$items` gives them, without the columns of
@@ -72,6 +80,44 @@ export function fromMirtSlopeIntercept<TParameters>(
   model: IrtModel<TParameters>,
 ): IrtItem<TParameters> {
   return fromMirt(coefficients, model, "slopeIntercept");
+}
+
+/**
+ * Returns a multidimensional item's coefficients in mirt's slope-intercept form, as `coef(model, simplify =
+ * TRUE)$items` gives them for the item's model: the slopes `a1` to `aD`, and `d`, `g` and `u` for a logistic item or
+ * `d1` to `d(K-1)` for a graded one.
+ *
+ * @throws `DataError` when the item's parameters are invalid, or its model is not one of the built-in multidimensional
+ * models.
+ */
+export function toMirtMultidimensional(item: MultidimensionalItem): MirtCoefficients {
+  checkMultidimensionalItem(item, "The item");
+  return multidimensionalFormOf(item.model).toMirt(item.parameters);
+}
+
+/**
+ * Returns the multidimensional item of a model with mirt's coefficients in the slope-intercept form.
+ *
+ * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
+ * parameters, or the model is not one of the built-in multidimensional models.
+ */
+export function fromMirtMultidimensional<TParameters>(
+  model: MultidimensionalModel<TParameters>,
+  coefficients: MirtCoefficients,
+): MultidimensionalItem<TParameters> {
+  checkRecord(coefficients, "The mirt coefficients must be an object of numbers by name");
+  checkMultidimensionalModel(
+    model,
+    "The model must be one of the built-in multidimensional models, such as multidimensionalTwoParameterLogistic",
+  );
+  const parameters = readParameters(
+    coefficients,
+    multidimensionalFormOf(model),
+    `The mirt coefficients of a multidimensional ${model.name} item`,
+    "form",
+  ) as TParameters;
+  checkMultidimensionalItem({ model, parameters }, `The multidimensional ${model.name} item of the mirt coefficients`);
+  return { model, parameters };
 }
 
 /** A model's conversions to and from mirt's coefficient forms. */
@@ -223,6 +269,38 @@ const FORMS = new Map<IrtModel, MirtForms>([
   [nominalResponse, NOMINAL],
 ]);
 
+const MULTIDIMENSIONAL_LOGISTIC: MirtForm = {
+  toMirt: ({ a, intercept, c, d }: MultidimensionalLogisticParameters) => ({
+    ...numbered("a", 1, a),
+    d: intercept,
+    g: c,
+    u: d,
+  }),
+  fromMirt: (read) => ({ a: read.series("a", 1), intercept: read.value("d"), c: read.value("g"), d: read.value("u") }),
+};
+
+const MULTIDIMENSIONAL_GRADED: MirtForm = {
+  toMirt: ({ a, intercepts }: MultidimensionalGradedParameters) => ({
+    ...numbered("a", 1, a),
+    ...numbered("d", 1, intercepts),
+  }),
+  fromMirt: (read) => ({ a: read.series("a", 1), intercepts: read.series("d", 1) }),
+};
+
+const MULTIDIMENSIONAL_FORMS = new Map<MultidimensionalModel, MirtForm>([
+  [multidimensionalTwoParameterLogistic, MULTIDIMENSIONAL_LOGISTIC],
+  [multidimensionalThreeParameterLogistic, MULTIDIMENSIONAL_LOGISTIC],
+  [multidimensionalGradedResponse, MULTIDIMENSIONAL_GRADED],
+]);
+
+function multidimensionalFormOf(model: MultidimensionalModel): MirtForm {
+  const form = MULTIDIMENSIONAL_FORMS.get(model);
+  if (form === undefined) {
+    throw new DataError(`Only the built-in models convert to and from mirt, found the ${describe(model.name)} model.`);
+  }
+  return form;
+}
+
 function formsOf(model: IrtModel): MirtForms {
   const forms = FORMS.get(model);
   if (forms === undefined) {
@@ -243,14 +321,31 @@ function fromMirt<TParameters>(
 ): IrtItem<TParameters> {
   checkRecord(coefficients, "The mirt coefficients must be an object of numbers by name");
   checkModel(model, "The model must be one of the built-in models, such as twoParameterLogistic");
-  const forms = formsOf(model);
+  const parameters = readParameters(
+    coefficients,
+    formsOf(model)[form],
+    `The mirt coefficients of a ${model.name} item`,
+    form === "irt" ? "IRT form" : "slope-intercept form",
+  ) as TParameters;
+  checkItem({ model, parameters }, `The ${model.name} item of the mirt coefficients`);
+  return { model, parameters };
+}
+
+/**
+ * Returns the parameters that a form reads from the coefficients, which must use all of them. The form builds them from
+ * untyped coefficients, so the caller's model checks them before they are typed.
+ *
+ * @param subject - Starts the messages, such as `The mirt coefficients of a 2PL item`.
+ * @param formName - Names the form in the message about coefficients it does not use.
+ * @throws `DataError` when a coefficient the form reads is missing or not finite, or the coefficients have a name it does
+ * not use.
+ */
+function readParameters(coefficients: MirtCoefficients, form: MirtForm, subject: string, formName: string): unknown {
   const used = new Set<string>();
   const value = (name: string): number => {
     const coefficient = coefficients[name];
     if (!(typeof coefficient === "number" && Number.isFinite(coefficient))) {
-      throw new DataError(
-        `The mirt coefficients of a ${model.name} item need a finite ${name}, found ${describe(coefficient)}.`,
-      );
+      throw new DataError(`${subject} need a finite ${name}, found ${describe(coefficient)}.`);
     }
     used.add(name);
     return coefficient;
@@ -262,16 +357,12 @@ function fromMirt<TParameters>(
     for (let k = first + 1; `${prefix}${k}` in coefficients; k++) values.push(value(`${prefix}${k}`));
     return values;
   };
-  // The form builds the model's parameters from untyped coefficients; the model checks them before they are typed.
-  const parameters = forms[form].fromMirt({ value, series }) as TParameters;
-  const unused = Object.keys(coefficients).filter((name) => !used.has(name));
-  if (unused.length > 0) {
-    throw new DataError(
-      `The mirt coefficients of a ${model.name} item have names its ${form === "irt" ? "IRT" : "slope-intercept"} form does not use: ${unused.join(", ")}.`,
-    );
+  const parameters = form.fromMirt({ value, series });
+  const unusedNames = Object.keys(coefficients).filter((name) => !used.has(name));
+  if (unusedNames.length > 0) {
+    throw new DataError(`${subject} have names its ${formName} does not use: ${unusedNames.join(", ")}.`);
   }
-  checkItem({ model, parameters }, `The ${model.name} item of the mirt coefficients`);
-  return { model, parameters };
+  return parameters;
 }
 
 /** Returns the slope a1, which a conversion divides by. */

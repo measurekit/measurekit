@@ -97,7 +97,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/math/             numerics
   src/ctt/              classical test theory
   src/irt/              item response theory: models, calibration, ability estimation, information, reliability
-  src/sim/              simulation of thetas, item parameters and responses
+  src/multidimensional/ multidimensional item response theory: models, EM calibration, rotation, scoring, information
+  src/sim/              simulation of thetas, item parameters and responses, multidimensional ones included
   src/cat/              adaptive and multistage tests, their simulation, exposure control, form assembly
   src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, A-CDM, LLM, R-RUM, Q-matrix validation,
                         nonparametric classification
@@ -112,7 +113,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction
   src/rater/            rater agreement and rater effects: kappa, intraclass correlations, the many-facet Rasch model
   src/response-time/    response times: the lognormal model, speed, aberrant times, rapid guessing
-  src/interop/          conversion of item parameters to and from mirt
+  src/interop/          conversion of item parameters, multidimensional ones included, to and from mirt
   test/<module>.test.ts one file per src folder; fixtures/ holds R results
 packages/knowledge-tracing/   the published package @measurekit/knowledge-tracing
   src/index.ts          re-exports every module, the model interface, and DataError, MeasurekitError and
@@ -175,26 +176,28 @@ behavior only, without "now", "no longer", "renamed" or "previously".
   written once, in core.
 - Code outside `packages/` imports a package by name.
 
-Psychometrics: every module of `cat/`, `equating/`, `irt/`, `rater/` and `sim/` may also import `checks.ts`.
+Psychometrics: every module of `cat/`, `equating/`, `irt/`, `multidimensional/`, `rater/` and `sim/` may also import
+`checks.ts`.
 
-| Module              | Imports                               |
-| ------------------- | ------------------------------------- |
-| `math/`, `data/`    | none                                  |
-| `ctt/`              | `data/`, `math/`                      |
-| `irt/`              | `data/`, `math/`                      |
-| `interop/`          | `irt/`                                |
-| `cdm/`              | `data/`, `irt/`, `math/`              |
-| `fit/`              | `data/`, `irt/`, `math/`              |
-| `response-time/`    | `data/`, `irt/`, `math/`              |
-| `equating/`         | `irt/`, `math/`                       |
-| `sim/`              | `data/`, `irt/`, `cdm/`, `math/`      |
-| `dif/`              | `data/`, `irt/`, `equating/`, `math/` |
-| `standard-setting/` | `irt/`, `equating/`, `math/`          |
-| `explanatory/`      | `data/`, `irt/`, `math/`              |
-| `generalizability/` | `data/`, `math/`                      |
-| `scaling/`          | `irt/`, `equating/`, `math/`          |
-| `rater/`            | `data/`, `irt/`, `fit/`, `math/`      |
-| `cat/`              | `irt/`, `sim/`, `cdm/`, `math/`       |
+| Module              | Imports                                               |
+| ------------------- | ----------------------------------------------------- |
+| `math/`, `data/`    | none                                                  |
+| `ctt/`              | `data/`, `math/`                                      |
+| `irt/`              | `data/`, `math/`                                      |
+| `interop/`          | `irt/`, `multidimensional/`                           |
+| `cdm/`              | `data/`, `irt/`, `math/`                              |
+| `fit/`              | `data/`, `irt/`, `math/`                              |
+| `response-time/`    | `data/`, `irt/`, `math/`                              |
+| `equating/`         | `irt/`, `math/`                                       |
+| `sim/`              | `data/`, `irt/`, `cdm/`, `multidimensional/`, `math/` |
+| `dif/`              | `data/`, `irt/`, `equating/`, `math/`                 |
+| `standard-setting/` | `irt/`, `equating/`, `math/`                          |
+| `explanatory/`      | `data/`, `irt/`, `math/`                              |
+| `multidimensional/` | `data/`, `irt/`, `math/`                              |
+| `generalizability/` | `data/`, `math/`                                      |
+| `scaling/`          | `irt/`, `equating/`, `math/`                          |
+| `rater/`            | `data/`, `irt/`, `fit/`, `math/`                      |
+| `cat/`              | `irt/`, `sim/`, `cdm/`, `math/`                       |
 
 Knowledge tracing: the model families never import each other, nor does anything import `evaluate/`, `practice/` or
 `sim/`: they use models only through `LearnerModel`.

@@ -1,7 +1,9 @@
+import { cholesky } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   calibrate,
+  calibrateMultidimensional,
   createRandom,
   DataError,
   type Distribution,
@@ -12,6 +14,11 @@ import {
   type IrtModel,
   type LogisticParameters,
   logNormalDistribution,
+  type MultidimensionalItem,
+  type MultidimensionalLogisticParameters,
+  multidimensionalGradedResponse,
+  multidimensionalThreeParameterLogistic,
+  multidimensionalTwoParameterLogistic,
   type NominalParameters,
   nominalResponse,
   normalDistribution,
@@ -21,6 +28,7 @@ import {
   ratingScale,
   simulateCdmResponses,
   simulateItems,
+  simulateMultidimensionalResponses,
   simulateResponses,
   simulateThetas,
   type ThresholdParameters,
@@ -374,6 +382,124 @@ describe("simulateResponses", () => {
   });
 });
 
+describe("simulateMultidimensionalResponses", () => {
+  const Items: readonly MultidimensionalItem[] = [
+    { model: multidimensionalTwoParameterLogistic, parameters: { a: [1.2, 0.5], intercept: -0.3, c: 0, d: 1 } },
+    { model: multidimensionalThreeParameterLogistic, parameters: { a: [0.4, 1.4], intercept: 0.2, c: 0.2, d: 1 } },
+    { model: multidimensionalGradedResponse, parameters: { a: [0.9, -0.7], intercepts: [1.2, -0.1, -1.4] } },
+  ];
+
+  it("draws each category with its probability at the person's thetas", () => {
+    const theta = [0.4, -0.6];
+    const persons = 20_000;
+    const matrix = simulateMultidimensionalResponses(
+      Items,
+      Array.from({ length: persons }, () => theta),
+      createRandom(31),
+    );
+    Items.forEach((item, j) => {
+      const probabilities = new Float64Array(item.model.categoryCount(item.parameters));
+      item.model.probabilities(item.parameters, Float64Array.from(theta), probabilities);
+      probabilities.forEach((p, k) => {
+        const observed = matrix.responses.filter((row) => row[j] === k).length;
+        expectShare(observed, persons, p, `item ${j + 1}, category ${k}`);
+      });
+    });
+  });
+
+  it("draws from items on three dimensions", () => {
+    const items: readonly MultidimensionalItem[] = [
+      { model: multidimensionalGradedResponse, parameters: { a: [1, 0.3, -0.5], intercepts: [0.6, -0.8] } },
+    ];
+    const theta = [-0.2, 0.5, 1];
+    const persons = 20_000;
+    const matrix = simulateMultidimensionalResponses(
+      items,
+      Array.from({ length: persons }, () => theta),
+      createRandom(32),
+    );
+    const probabilities = new Float64Array(3);
+    defined(items[0]).model.probabilities(defined(items[0]).parameters, Float64Array.from(theta), probabilities);
+    probabilities.forEach((p, k) => {
+      expectShare(matrix.responses.filter((row) => row[0] === k).length, persons, p, `category ${k}`);
+    });
+  });
+
+  it("makes responses missing completely at random, keeping the others", () => {
+    const random = createRandom(33);
+    const thetas = Array.from({ length: 400 }, () => [random.normal(), random.normal()]);
+    const complete = simulateMultidimensionalResponses(Items, thetas, createRandom(34));
+    const missing = simulateMultidimensionalResponses(Items, thetas, createRandom(34), { missingProbability: 0.2 });
+    const cells = missing.responses.flat();
+    expectShare(cells.filter((response) => response === null).length, cells.length, 0.2, "missing");
+    missing.responses.forEach((row, i) => {
+      row.forEach((response, j) => {
+        if (response !== null) expect(response).toBe(complete.responses[i]?.[j]);
+      });
+    });
+  });
+
+  it("returns a matrix with a row per person, a column per item and the default ids", () => {
+    const matrix = simulateMultidimensionalResponses(
+      Items.slice(0, 2),
+      [
+        [0, 1],
+        [1, -1],
+        [0, 0],
+      ],
+      createRandom(35),
+    );
+    expect(matrix.personIds).toEqual(["person1", "person2", "person3"]);
+    expect(matrix.itemIds).toEqual(["item1", "item2"]);
+  });
+
+  it("rejects missing items and thetas, invalid items, thetas and missing probabilities", () => {
+    const random = createRandom(36);
+    expect(() => simulateMultidimensionalResponses([], [[0, 0]], random)).toThrow(
+      "A simulation needs at least one item.",
+    );
+    expect(() => simulateMultidimensionalResponses(Items, [], random)).toThrow(
+      "A simulation needs at least one person's thetas.",
+    );
+    expect(() => simulateMultidimensionalResponses(Items, [[0]], random)).toThrow(
+      "Person 1 needs 2 thetas for items on 2 dimensions, found 1.",
+    );
+    expect(() =>
+      simulateMultidimensionalResponses(
+        Items,
+        [
+          [0, 0],
+          [1, Number.NaN],
+        ],
+        random,
+      ),
+    ).toThrow("Theta 2 of person 2 must be a finite number, found NaN.");
+    expect(() =>
+      simulateMultidimensionalResponses(
+        [{ model: multidimensionalGradedResponse, parameters: { a: [1], intercepts: [1, 2] } }],
+        [[0]],
+        random,
+      ),
+    ).toThrow("Item 1: An MGRM item needs strictly decreasing intercepts");
+    expect(() => simulateMultidimensionalResponses(Items, [[0, 0]], random, { missingProbability: 1.5 })).toThrow(
+      "The option missingProbability must be a number from 0 to 1, found 1.5.",
+    );
+    expect(() => simulateMultidimensionalResponses(Items, JSON.parse("null"), random)).toThrow(
+      "A simulation needs an array of thetas by person, found null.",
+    );
+    expect(() => simulateMultidimensionalResponses(Items, [JSON.parse("null")], random)).toThrow(
+      "The thetas of person 1 must be an array, found null.",
+    );
+    expect(() => simulateMultidimensionalResponses(JSON.parse("null"), [[0, 0]], random)).toThrow(DataError);
+    expect(() => simulateMultidimensionalResponses(Items, [[0, 0]], JSON.parse("null"))).toThrow(
+      "A random number generator must be one from createRandom, found null.",
+    );
+    expect(() => simulateMultidimensionalResponses(Items, [[0, 0]], random, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+  });
+});
+
 describe("simulateThetas", () => {
   it("draws N(0, 1) by default, or from the distribution given", () => {
     expectMoments(simulateThetas(DRAWS, createRandom(19)), 0, 1, "default");
@@ -419,6 +545,65 @@ describe("recovery", () => {
     expect(rootMeanSquare(errors.a)).toBeLessThan(0.15);
     expect(rootMeanSquare(errors.b)).toBeLessThan(0.2);
   });
+
+  it("recovers the parameters of simulated multidimensional items by calibration", () => {
+    // Three correlated dimensions with eight items each, each item loading on one dimension. Thresholds fixed before
+    // the first run: every estimate within four standard errors of the true value, and a root mean square error of the
+    // slopes below 0.2.
+    const random = createRandom(20261029);
+    const correlations = [
+      [1, 0.3, 0.5],
+      [0.3, 1, 0.4],
+      [0.5, 0.4, 1],
+    ];
+    const factor = defined(cholesky(Float64Array.from(correlations.flat()), 3));
+    const items: MultidimensionalItem<MultidimensionalLogisticParameters>[] = Array.from({ length: 24 }, (_, i) => ({
+      model: multidimensionalTwoParameterLogistic,
+      parameters: {
+        a: [0, 1, 2].map((d) => (d === i % 3 ? 0.8 + 0.1 * Math.floor(i / 3) : 0)),
+        intercept: ((i % 5) - 2) * 0.5,
+        c: 0,
+        d: 1,
+      },
+    }));
+    const thetas = Array.from({ length: 1500 }, () => {
+      const z = [random.normal(), random.normal(), random.normal()];
+      return [0, 1, 2].map((d) => [0, 1, 2].reduce((sum, k) => sum + (factor[d * 3 + k] ?? 0) * defined(z[k]), 0));
+    });
+    const matrix = simulateMultidimensionalResponses(items, thetas, random);
+    const loadings = Object.fromEntries(items.map((_, i) => [`item${i + 1}`, [`D${(i % 3) + 1}`]]));
+    const result = calibrateMultidimensional(matrix, {
+      model: multidimensionalTwoParameterLogistic,
+      loadings,
+      points: 11,
+      standardErrors: "cross-product",
+      tolerance: 1e-5,
+    });
+    expect(result.converged).toBe(true);
+    const slopeErrors: number[] = [];
+    result.items.forEach((estimate, j) => {
+      const truth = defined(items[j]).parameters;
+      const standardErrors = defined(estimate.standardErrors);
+      const d = j % 3;
+      const slopeError = defined(estimate.parameters.a[d]) - defined(truth.a[d]);
+      expect(Math.abs(slopeError), `${estimate.id} slope`).toBeLessThan(4 * defined(standardErrors[`a${d + 1}`]));
+      expect(Math.abs(estimate.parameters.intercept - truth.intercept), `${estimate.id} intercept`).toBeLessThan(
+        4 * defined(standardErrors.intercept),
+      );
+      slopeErrors.push(slopeError);
+    });
+    for (const [i, j] of [
+      [1, 0],
+      [2, 0],
+      [2, 1],
+    ] as const) {
+      const error = defined(result.correlations[i]?.[j]) - defined(correlations[i]?.[j]);
+      expect(Math.abs(error), `correlation ${i},${j}`).toBeLessThan(
+        4 * defined(result.correlationStandardErrors?.[i]?.[j]),
+      );
+    }
+    expect(Math.sqrt(mean(slopeErrors.map((error) => error * error)))).toBeLessThan(0.2);
+  });
 });
 
 describe("properties", () => {
@@ -456,6 +641,31 @@ describe("properties", () => {
         expect(valid).toBe(true);
       }),
       { numRuns: 100 },
+    );
+  });
+
+  it("seeded multidimensional simulations reproduce exactly", () => {
+    fc.assert(
+      fc.property(seeds, fc.double({ min: 0, max: 1, noNaN: true }), (seed, missingProbability) => {
+        const run = (): unknown => {
+          const random = createRandom(seed);
+          const thetas = Array.from({ length: 20 }, () => [random.normal(), random.normal()]);
+          return simulateMultidimensionalResponses(
+            [
+              {
+                model: multidimensionalThreeParameterLogistic,
+                parameters: { a: [1, 0.5], intercept: 0, c: 0.1, d: 1 },
+              },
+              { model: multidimensionalGradedResponse, parameters: { a: [0.3, 1], intercepts: [1, -1] } },
+            ],
+            thetas,
+            random,
+            { missingProbability },
+          );
+        };
+        expect(run()).toEqual(run());
+      }),
+      { numRuns: 30 },
     );
   });
 });

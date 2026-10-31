@@ -1,0 +1,98 @@
+import {
+  checkArray,
+  checkFinite,
+  checkOptions,
+  checkRandom,
+  checkUnitInterval,
+  DataError,
+  type Random,
+} from "@measurekit/core";
+import { type ResponseMatrix, responseMatrix } from "../data/response-matrix.js";
+import { checkMultidimensionalItems } from "../multidimensional/items.js";
+import type { MultidimensionalItem } from "../multidimensional/model.js";
+import type { ResponseSimulationOptions } from "./responses.js";
+
+/**
+ * Simulates the responses of persons with known vectors of thetas to multidimensional items of any models.
+ *
+ * @remarks
+ * Each response is drawn from its item's category probabilities at the person's thetas, by person, then item, by
+ * inverting the distribution function of the categories at one uniform draw. Then, with a `missingProbability`, each
+ * response is missing with that probability, so a seed gives the same responses with and without missingness, less
+ * the missing ones. The matrix has a row per person and a column per item, with the default ids.
+ *
+ * @param thetas - One array of thetas per person, as many as the items have dimensions.
+ * @throws `DataError` without items or thetas, when an item is invalid, the items differ in their number of dimensions,
+ * a person's thetas are not that many finite numbers, `random` is not a random number generator, or
+ * `missingProbability` is outside [0, 1].
+ */
+export function simulateMultidimensionalResponses(
+  items: readonly MultidimensionalItem[],
+  thetas: readonly (readonly number[])[],
+  random: Random,
+  options: ResponseSimulationOptions = {},
+): ResponseMatrix {
+  checkOptions(options);
+  const { missingProbability = 0 } = options;
+  checkUnitInterval(missingProbability, "The option missingProbability");
+  const dimensions = checkMultidimensionalItems(items, "A simulation");
+  checkThetas(thetas, dimensions);
+  checkRandom(random);
+  const theta = new Float64Array(dimensions);
+  const probabilities = new Float64Array(
+    items.reduce((most, { model, parameters }) => Math.max(most, model.categoryCount(parameters)), 0),
+  );
+  const rows: (number | null)[][] = thetas.map((person) => {
+    theta.set(person);
+    return items.map((item) => simulateResponse(item, theta, random, probabilities));
+  });
+  if (missingProbability > 0) {
+    for (const row of rows) {
+      for (let j = 0; j < row.length; j++) if (random.uniform() < missingProbability) row[j] = null;
+    }
+  }
+  return responseMatrix(rows);
+}
+
+/**
+ * Draws the response of a person at `theta` to an item: category k with probability P(k | θ), by inverting the
+ * distribution function of the categories at one uniform draw.
+ */
+function simulateResponse(
+  item: MultidimensionalItem,
+  theta: Float64Array,
+  random: Random,
+  probabilities: Float64Array,
+): number {
+  item.model.probabilities(item.parameters, theta, probabilities);
+  const last = item.model.categoryCount(item.parameters) - 1;
+  let remaining = random.uniform();
+  let category = 0;
+  while (category < last && remaining >= (probabilities[category] ?? 0)) {
+    remaining -= probabilities[category] ?? 0;
+    category++;
+  }
+  return category;
+}
+
+/**
+ * Checks the true thetas of a simulation.
+ *
+ * @throws `DataError` when the thetas are not an array, without thetas, or when a person's thetas are not an array of
+ * `dimensions` finite numbers.
+ */
+function checkThetas(thetas: readonly (readonly number[])[], dimensions: number): void {
+  checkArray(thetas, "A simulation needs an array of thetas by person");
+  if (thetas.length === 0) throw new DataError("A simulation needs at least one person's thetas.");
+  thetas.forEach((person, index) => {
+    checkArray(person, `The thetas of person ${index + 1} must be an array`);
+    if (person.length !== dimensions) {
+      throw new DataError(
+        `Person ${index + 1} needs ${dimensions} thetas for items on ${dimensions} dimensions, found ${person.length}.`,
+      );
+    }
+    person.forEach((value, d) => {
+      checkFinite(value, `Theta ${d + 1} of person ${index + 1}`);
+    });
+  });
+}

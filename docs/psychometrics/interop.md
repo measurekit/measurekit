@@ -1,6 +1,7 @@
 # Interoperability
 
-`@measurekit/psychometrics/interop` converts item parameters ([IRT](irt.md)) to and from mirt's coefficients.
+`@measurekit/psychometrics/interop` converts item parameters ([IRT](irt.md) and
+[multidimensional IRT](multidimensional.md)) to and from mirt's coefficients.
 
 ## mirt
 
@@ -34,6 +35,34 @@ model. Only the built-in models convert.
   give the same thresholds.
 - **Nominal.** The IRT form sums the slopes and the intercepts to 0. The slope-intercept form fixes ak0 = 0,
   ak(K-1) = K - 1 and d0 = 0, so an item whose first and last slopes are equal has none.
+
+## Multidimensional items
+
+Items of the [multidimensional models](multidimensional.md) have parameters in mirt's slope-intercept form, so the
+conversion renames: the slopes `a` are mirt's `a1` to `aD`, and the intercept is mirt's `d`. There is no IRT form.
+
+| Function                                        | Conversion                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| `toMirtMultidimensional(item)`                  | An item, such as a calibration's, to its coefficients        |
+| `fromMirtMultidimensional(model, coefficients)` | Coefficients to an item `{ model, parameters }` of the model |
+
+| Model                                    | mirt item type | Coefficients                          |
+| ---------------------------------------- | -------------- | ------------------------------------- |
+| `multidimensionalTwoParameterLogistic`   | `2PL`          | a1 to aD, d = intercept, g = c, u = d |
+| `multidimensionalThreeParameterLogistic` | `3PL`          | a1 to aD, d = intercept, g = c, u = d |
+| `multidimensionalGradedResponse`         | `graded`       | a1 to aD, d1 to d(K-1) = intercepts   |
+
+A conversion from mirt throws `DataError` when a name of the form is missing or not finite, when the coefficients have a
+name the form does not use, or when the parameters are invalid for the model. Only the built-in models convert. The
+number of dimensions is the number of `a` names, `a1` up to the first one not given.
+
+```ts
+import { fromMirtMultidimensional } from "@measurekit/psychometrics/interop";
+import { multidimensionalGradedResponse } from "@measurekit/psychometrics/multidimensional";
+
+const item = fromMirtMultidimensional(multidimensionalGradedResponse, { a1: 1.1, a2: 0.4, d1: 2, d2: 0, d3: -1.5 });
+item.parameters; // { a: [1.1, 0.4], intercepts: [2, 0, -1.5] }
+```
 
 In R, write the coefficients as one object per item; jsonlite leaves out the columns of other item types:
 

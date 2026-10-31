@@ -12,8 +12,9 @@ export default defineConfig({
       },
       {
         resolve: { alias: CORE_SOURCE },
-        // Calibrations to a tolerance of 1e-8 take seconds, and the testlet and diagnosis models many times more.
-        test: { name: "psychometrics", include: ["packages/psychometrics/test/**/*.test.ts"], testTimeout: 60_000 },
+        // Calibrations to a tolerance of 1e-8 take seconds, the testlet, diagnosis and multidimensional models many
+        // times more, on a machine under load longer still.
+        test: { name: "psychometrics", include: ["packages/psychometrics/test/**/*.test.ts"], testTimeout: 120_000 },
       },
       {
         resolve: { alias: CORE_SOURCE },

@@ -22,12 +22,19 @@ Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofs
 Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych; the many-facet Rasch model: base R, with TAM and sirt data
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
 Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
-Rscript validation/psychometrics/interop.R           # mirt's coefficient forms of every item type
+Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mirt, GPArotation and base R; case names as arguments run only those cases
+Rscript validation/psychometrics/interop.R           # mirt's coefficient forms of every item type, multidimensional ones included
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
 ```
 
 They need R with the packages psych, mirt, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
-sirt, nlme, LNIRT, numDeriv, lme4, metafor, GDINA, alabama, NPCD, CDM, cdcatR and jsonlite; `common.R` holds their shared helpers.
+sirt, nlme, LNIRT, numDeriv, lme4, metafor, GDINA, alabama, NPCD, CDM, cdcatR, GPArotation, mvtnorm and jsonlite;
+`common.R` holds their shared helpers.
+
+`multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `exploratory`, `rotation` and
+`information` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and the
+base R maximum are slow. `rotation` reads the fixture that `exploratory` writes, so run `exploratory` first.
+`multidimensional-items.R` holds the helper of `multidimensional.R` and `interop.R` that sets items in mirt.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in

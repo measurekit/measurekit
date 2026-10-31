@@ -1,6 +1,6 @@
 /**
- * Simulation: thetas, item parameters of every built-in model, response matrices of IRT and cognitive diagnosis models,
- * drawn from a seeded `Random`.
+ * Simulation: thetas, item parameters of every built-in model, response matrices of IRT, multidimensional IRT and
+ * cognitive diagnosis models, drawn from a seeded `Random`.
  *
  * @module @measurekit/psychometrics/sim
  */
@@ -12,5 +12,6 @@ export {
   uniformDistribution,
 } from "./distributions.js";
 export { type ItemSimulationOptions, simulateItems } from "./items.js";
+export { simulateMultidimensionalResponses } from "./multidimensional-responses.js";
 export { type ResponseSimulationOptions, simulateResponses } from "./responses.js";
 export { simulateThetas } from "./thetas.js";

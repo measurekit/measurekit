@@ -3,6 +3,7 @@
 # from probtrace. The items are set, not estimated.
 
 source("validation/psychometrics/common.R")
+source("validation/psychometrics/multidimensional-items.R")
 suppressPackageStartupMessages(library(mirt))
 
 THETA <- c(-2, 0, 1.5)
@@ -71,5 +72,70 @@ write_fixture("interop-mirt", list(
     items_of(rasch, "Rasch", "pcm"),
     items_of(rsm, "rsm", "rsm"),
     items_of(nominal, "nominal", "nrm")
+  )
+))
+
+# --- Multidimensional items ----------------------------------------------------------------------------------------------
+# mirt's slope-intercept coefficients, coef(simplify = TRUE), of items on 2 and 3 dimensions with the category
+# probabilities from probtrace at vectors of theta. The IRT form exists for one dimension only.
+
+multidimensional_thetas <- list(
+  `2` = rbind(c(-2, 0.5), c(0, 0), c(1.5, -1.2)),
+  `3` = rbind(c(-2, 0.5, 1), c(0, 0, 0), c(1.5, -1.2, -0.3))
+)
+
+multidimensional_items_of <- function(fit, itemtype, model, dimensions) {
+  slope_intercept <- coef(fit, simplify = TRUE)$items
+  thetas <- multidimensional_thetas[[as.character(dimensions)]]
+  lapply(seq_len(nrow(slope_intercept)), function(i) {
+    row <- as.list(slope_intercept[i, !is.na(slope_intercept[i, ])])
+    a <- unname(unlist(row[paste0("a", seq_len(dimensions))]))
+    parameters <- if (model == "mgrm") {
+      list(a = I(a), intercepts = I(unname(unlist(row[grep("^d[0-9]+$", names(row))]))))
+    } else {
+      list(a = I(a), intercept = row$d, c = row$g, d = row$u)
+    }
+    list(itemtype = itemtype, model = model, dimensions = dimensions, slopeIntercept = row, parameters = parameters,
+         theta = lapply(seq_len(nrow(thetas)), function(j) I(thetas[j, ])),
+         probabilities = unname(probtrace(extract.item(fit, i), thetas)))
+  })
+}
+
+dichotomous_data <- function(count) {
+  data <- as.data.frame(sapply(seq_len(count), function(i) rep(0:1, length.out = 16)))
+  colnames(data) <- sprintf("q%d", seq_len(count))
+  data
+}
+
+graded_data <- function(count, categories) {
+  data <- as.data.frame(sapply(seq_len(count), function(i) rep(0:(categories - 1), length.out = 24)))
+  colnames(data) <- sprintf("q%d", seq_len(count))
+  data
+}
+
+m2pl_2d <- set_multidimensional_items(dichotomous_data(6), 2, "2PL", data.frame(
+  a1 = c(1.2, 0.5, -0.8, 0.9, 0, 1.4), a2 = c(0.7, 0, 1.5, -0.6, 1.1, 0.2),
+  d = c(0.3, -0.4, 1, -1.1, 0.6, 0), g = 0, u = 1
+))
+m3pl_2d <- set_multidimensional_items(dichotomous_data(6), 2, "3PL", data.frame(
+  a1 = c(1.2, 0.5, -0.8, 0.9, 0, 1.4), a2 = c(0.7, 0, 1.5, -0.6, 1.1, 0.2),
+  d = c(0.3, -0.4, 1, -1.1, 0.6, 0), g = c(0.2, 0.1, 0.25, 0.15, 0.05, 0.3), u = 1
+))
+graded_2d <- set_multidimensional_items(graded_data(4, 4), 2, "graded", data.frame(
+  a1 = c(1.2, 0.5, -0.8, 1), a2 = c(0.7, 1.1, 1.5, 0), d1 = c(2, 1.5, 2.2, 1), d2 = c(0, 0.3, 0.5, -0.4),
+  d3 = c(-2, -1.2, -1.9, -1.5)
+))
+graded_3d <- set_multidimensional_items(graded_data(5, 3), 3, "graded", data.frame(
+  a1 = c(1.2, 0.5, 0.9, 0, 1.6), a2 = c(0.7, 1.1, -0.4, 0.8, 0), a3 = c(0.3, 0.8, 1.3, 1.1, 0.4),
+  d1 = c(1.5, 1, 0.8, 2, 0.4), d2 = c(-1, -0.5, -1.4, 0.2, -2)
+))
+
+write_fixture("interop-multidimensional", list(
+  source = "Items on 2 and 3 dimensions set to given slope-intercept coefficients in mirt, one model per item type.",
+  items = c(
+    multidimensional_items_of(m2pl_2d, "2PL", "m2pl", 2),
+    multidimensional_items_of(m3pl_2d, "3PL", "m3pl", 2),
+    multidimensional_items_of(graded_2d, "graded", "mgrm", 2),
+    multidimensional_items_of(graded_3d, "graded", "mgrm", 3)
   )
 ))
