@@ -1,4 +1,4 @@
-import { iterateToConvergence, largestChange } from "@measurekit/core";
+import { largestChange } from "@measurekit/core";
 import { numericalHessian } from "../math/hessian.js";
 import { invert } from "../math/linear-algebra.js";
 import { type HessianFunction, newton } from "../math/optimize.js";
@@ -14,6 +14,7 @@ import {
 } from "./linear-rasch-maximization.js";
 import { partialCredit, stepStarts } from "./partial-credit.js";
 import type { CompressedResponses } from "./responses.js";
+import { squarem } from "./squarem.js";
 
 export type { LocationRow } from "./linear-rasch-maximization.js";
 
@@ -117,14 +118,20 @@ export function fitLinearRasch(model: LinearRaschModel, options: LinearRaschOpti
   let parameters = startingValues(model, layout);
   if (held !== null) parameters[held.index] = held.value;
   const assign = assigner(layout, nodes, items, steps);
-  const { converged, iterations } = iterateToConvergence(
-    () => {
-      assign(parameters);
-      step.run();
-      const next = maximize(objective, parameters, held);
-      const change = largestChange(parameters, next);
-      parameters = next;
-      return change;
+  const { converged, iterations } = squarem(
+    {
+      step() {
+        assign(parameters);
+        const logLikelihood = step.run();
+        const next = maximize(objective, parameters, held);
+        const change = largestChange(parameters, next);
+        parameters = next;
+        return { logLikelihood, change };
+      },
+      get: () => Float64Array.from(parameters),
+      set(state) {
+        parameters = Float64Array.from(state);
+      },
     },
     { tolerance, maxIterations },
   );

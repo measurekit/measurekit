@@ -244,7 +244,7 @@ scale, the measures of each facet sum to 0 and the thresholds of each set sum to
 and more severe raters, and μ carries the overall level.
 
 The model is estimated by the EM algorithm of `calibrate`, over partial credit items with a = 1, with Newton's method
-for all measures, thresholds, μ and σ together. Standard errors come from the Hessian of the marginal log-likelihood,
+for all measures, thresholds, μ and σ together, and the extrapolation SQUAREM on the iterations. Standard errors come from the Hessian of the marginal log-likelihood,
 and, for the element each facet's constraint leaves out and for the last threshold, from the delta method.
 
 | Option           | Default                 | Meaning                                                                                                 |
@@ -331,12 +331,12 @@ fit; above 1.5, a rater who departs from the others unpredictably; below 0.5, on
 
 ### Differences from TAM
 
-| Topic                 | This package                                                                              | TAM's `tam.mml.mfr`                                                                     |
-| --------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Quadrature            | Nodes μ + σ z on the 61 points of -6 to 6 standard deviations                             | Fixed nodes in theta units, weighted by the normal density at the estimated mean and SD |
-| Convergence           | EM with Newton's method for all parameters: 66 to 280 iterations to 1e-11 on the fixtures | EM that stops short of the maximum within 3000 iterations on the fixtures               |
-| Constraints           | Each facet and each set of thresholds sums to 0                                           | The same, with `constraint = "items"`                                                   |
-| Thresholds by a facet | Any facet                                                                                 | `rater:step` fails with more than three raters in TAM 4.3-25                            |
+| Topic                 | This package                                                                                         | TAM's `tam.mml.mfr`                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Quadrature            | Nodes μ + σ z on the 61 points of -6 to 6 standard deviations                                        | Fixed nodes in theta units, weighted by the normal density at the estimated mean and SD |
+| Convergence           | EM with Newton's method for all parameters and SQUAREM: 27 to 51 iterations to 1e-11 on the fixtures | EM that stops short of the maximum within 3000 iterations on the fixtures               |
+| Constraints           | Each facet and each set of thresholds sums to 0                                                      | The same, with `constraint = "items"`                                                   |
+| Thresholds by a facet | Any facet                                                                                            | `rater:step` fails with more than three raters in TAM 4.3-25                            |
 
 ## References
 
