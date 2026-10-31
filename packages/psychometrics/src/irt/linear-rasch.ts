@@ -79,9 +79,11 @@ export interface LinearRaschFit {
 /** The M-step stops when the gradient of the expected log-likelihood is this small. */
 const M_STEP_TOLERANCE = 1e-10;
 /**
- * The M-step takes a Newton step in full, and stops, when it moves no parameter by more than this: Newton's method
- * converges quadratically, so the error after such a step is far below the rounding of the parameters, while rounding
- * of the log-likelihood would make a line search reject it.
+ * The M-step takes a Newton step in full, and stops, when it moves no parameter by more than this. Newton's method
+ * converges quadratically, so a step s leaves an error of the order of s², 1e-12 here, six orders below the EM tolerance
+ * of 1e-4 and below the 1e-10 of the strictest calibrations. A smaller step is also one that the objective cannot
+ * resolve: it changes by about λ s² / 2 with λ the curvature along the step, which is below the rounding of a value of
+ * 1e4, 2e-12, for s under 2e-6 where λ is 1.
  */
 const M_STEP_STEP_TOLERANCE = 1e-6;
 const M_STEP_ITERATIONS = 50;
@@ -153,15 +155,53 @@ interface Held {
 }
 
 /** Returns the parameters that minimize the objective from `start` by Newton's method, a held parameter unchanged. */
-function maximize(objective: HessianFunction, start: Float64Array, held: Held | null): Float64Array {
-  const options = {
-    tolerance: M_STEP_TOLERANCE,
-    stepTolerance: M_STEP_STEP_TOLERANCE,
-    maxIterations: M_STEP_ITERATIONS,
-  };
-  if (held === null) return newton(objective, start, options).x;
-  const reduced = newton(withoutParameter(objective, start.length, held), removeAt(start, held.index), options).x;
+export function maximize(objective: HessianFunction, start: Float64Array, held: Held | null): Float64Array {
+  if (held === null) return descend(objective, start);
+  const reduced = descend(withoutParameter(objective, start.length, held), removeAt(start, held.index));
   return insertAt(reduced, held.index, held.value);
+}
+
+/**
+ * Takes Newton steps with a line search from `start` until the gradient or a full step is within its tolerance, or a
+ * step does not lower the objective: where rounding of its value hides the decrease, the line search would otherwise
+ * halve the step through every evaluation of every iteration without moving the point.
+ */
+function descend(objective: HessianFunction, start: Float64Array): Float64Array {
+  const options = { tolerance: M_STEP_TOLERANCE, stepTolerance: M_STEP_STEP_TOLERANCE, maxIterations: 1 };
+  const remembered = remembering(objective);
+  let point = start;
+  let value = remembered(start, new Float64Array(start.length), new Float64Array(start.length ** 2));
+  for (let step = 0; step < M_STEP_ITERATIONS; step++) {
+    const next = newton(remembered, point, options);
+    if (next.converged) return next.x;
+    if (!(next.value < value)) return next.value <= value ? next.x : point;
+    point = next.x;
+    value = next.value;
+  }
+  return point;
+}
+
+/**
+ * Returns the objective, answering a call at the point of the last one from memory: one Newton step starts where the
+ * line search of the one before it ended.
+ */
+function remembering(objective: HessianFunction): HessianFunction {
+  let point = new Float64Array(0);
+  let value = 0;
+  let known = new Float64Array(0);
+  let curvature = new Float64Array(0);
+  return (x, gradient, hessian) => {
+    if (x.length === point.length && x.every((entry, j) => entry === point[j])) {
+      gradient.set(known);
+      hessian.set(curvature);
+      return value;
+    }
+    value = objective(x, gradient, hessian);
+    point = Float64Array.from(x);
+    known = Float64Array.from(gradient);
+    curvature = Float64Array.from(hessian);
+    return value;
+  };
 }
 
 /** Returns the objective as a function of the parameters other than the held one, which keeps its value. */
