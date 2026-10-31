@@ -1,8 +1,9 @@
 # Response times
 
 `@measurekit/psychometrics/response-time` models how long persons take on items: the lognormal model with
-its calibration, person speed, aberrant times, and rapid guessing by normative thresholds, response time effort
-and effort-moderated scoring. Each is validated against nlme, LNIRT, mirt or base R ([validation](validation.md)).
+its calibration, person speed, aberrant times, the hierarchical model of speed and accuracy, which puts responses and
+times in one model, and rapid guessing by normative thresholds, response time effort and effort-moderated scoring.
+Each is validated against nlme, LNIRT, mirt or base R ([validation](validation.md)).
 
 ## Times
 
@@ -103,6 +104,91 @@ Under the model, each z_i is about N(0, 1) and the statistic about chi-square; w
 both are approximate. Large negative residuals flag times much shorter than the person's speed predicts, as from
 preknowledge or rapid guessing; a large statistic flags a person's whole pattern.
 
+## Speed and accuracy
+
+`calibrateSpeedAccuracy(data, options)` estimates the hierarchical model of speed and accuracy (van der Linden, 2007) by
+marginal maximum likelihood: an [IRT model](irt.md) for the responses, the lognormal model for the times, and ability
+and speed correlated in the population.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { calibrateSpeedAccuracy, speedAccuracyEstimates } from "@measurekit/psychometrics/response-time";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 500 persons answer 8 items; speed τ = 0.4 (0.6 θ + 0.8 z) with z ~ N(0, 1), and ln T = β - τ + ε / 1.5, β from 3 up.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 8, random);
+const thetas = simulateThetas(500, random);
+const speeds = thetas.map((theta) => 0.4 * (0.6 * theta + 0.8 * random.normal()));
+const times = speeds.map((speed) => items.map((_, i) => Math.exp(3 + i / 8 - speed + random.normal() / 1.5)));
+const data = responseMatrix(simulateResponses(items, thetas, random).responses, { times });
+
+const calibration = calibrateSpeedAccuracy(data, { model: twoParameterLogistic, standardErrors: "hessian" });
+calibration.correlation; // 0.63, standard error 0.05: the true value is 0.6
+calibration.speedSd; // 0.41
+calibration.items[0]; // parameters { a: 0.74, b: -0.33, c: 0, d: 1 }, intensity 3.00, discrimination 1.51, ...
+speedAccuracyEstimates(data, calibration)[0]; // { id: "person1", theta: -0.11, thetaStandardError: 0.57, speed: 0.14, ... }
+```
+
+The model has two levels for each person. Responses follow the IRT model of each item, and the log times
+
+ln T_ij ~ N(β_i - τ_j, 1 / α_i²),
+
+with β_i and α_i as in the lognormal model. Persons have the abilities θ ~ N(0, 1) and the speeds τ ~ N(0, σ_τ²) of a
+bivariate normal distribution with correlation ρ. Given θ, the speed is normal with mean ρ σ_τ θ and variance σ_τ² (1 -
+ρ²), so the log times of a person are multivariate normal given θ, with mean β - ρ σ_τ θ and covariance diag(1 / α²) +
+σ_τ² (1 - ρ²) 11ᵀ. Their density has a closed form, and the likelihood needs the quadrature over θ alone: the estimates
+are those of maximum likelihood, with the item parameters as fixed effects (Molenaar, Tuerlinckx and van der Maas, 2015).
+
+The E-step is that of `calibrate` with each person's density of the times at each node added to the responses'; the
+items' M-step is `calibrate`'s, and β, α, σ_τ and ρ follow in closed form from the expected moments of τ. The scale of
+θ is N(0, 1), as in `calibrate` with one group; the scale of τ has mean 0.
+
+| Option           | Default               | Meaning                                                                                                                 |
+| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `model`          | required              | An [IRT model](irt.md#models) for every item, or one for each item in the data's item order                             |
+| `priors`         | none                  | Priors of the items' parameters by name, as [calibrate](irt.md#calibration)                                             |
+| `quadrature`     | 61 rectangular points | The rule over θ, as `calibrate`                                                                                         |
+| `standardErrors` | `"none"`              | `"hessian"` computes them from the Hessian of the marginal log-likelihood, by central differences of its exact gradient |
+| `tolerance`      | `1e-6`                | EM stops when no parameter changes by more than this in an iteration                                                    |
+| `maxIterations`  | `1000`                | The most EM iterations                                                                                                  |
+
+| Result                    | Meaning                                                                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`                   | Per item: the calibrated `parameters` and their `standardErrors`, the time `intensity` β and `discrimination` α, and `timeStandardErrors` |
+| `speedSd`                 | σ_τ                                                                                                                                       |
+| `correlation`             | ρ, the correlation between θ and τ, and its `correlationStandardError`                                                                    |
+| `logLikelihood`           | The marginal log-likelihood of the responses and the times                                                                                |
+| `aic`, `bic`              | With the items' parameters, 2 time parameters per item, σ_τ and ρ; n the persons with responses                                           |
+| `converged`, `iterations` | Whether EM reached `tolerance`, and the iterations run                                                                                    |
+
+The standard errors are `null` without the option, and when the information matrix cannot be inverted. A person's
+responses and times need not be complete: a response without a time counts for the responses only, and a time needs its
+response. Each item needs at least two times that differ and the responses `calibrate` needs, in every category up to
+the highest.
+
+Because the times carry information on θ through ρ, the item parameters differ from those of `calibrate` on the
+responses alone, by little where ρ is small. With ρ = 0, the model is the IRT model and the lognormal model estimated
+together.
+
+### Estimates
+
+`speedAccuracyEstimates(data, calibration)` returns, for each person in the data, the posterior of θ and τ at the
+calibration's parameters, with items matched by id:
+
+| Field                         | Meaning                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `theta`, `thetaStandardError` | The posterior mean and SD of θ over 61 rectangular points; `null` for a person without responses |
+| `speed`, `speedStandardError` | The posterior mean and SD of τ; `null` for a person without times                                |
+
+The density of the times, which depends on θ through ρ, is in the posterior of θ: the times sharpen the estimate of
+θ, the collateral information of van der Linden, Klein Entink and Fox (2010), the more so the larger |ρ|. The speed is
+then normal given θ, so its posterior mean and variance follow from those of θ. A person with responses and no times
+has the estimate of θ from the responses alone and no speed. The calibration's items need a model with `probabilities`
+and, for each response, a category of its item.
+
 ## Rapid guessing
 
 A rapid guess is a response faster than its item's threshold: too fast to have read and solved the item.
@@ -156,13 +242,32 @@ effortModeratedEstimates(data, items, thresholds); // person2 from item 3 alone
 
 ## Not included
 
-- The joint hierarchical model of responses and times (van der Linden, 2007), which correlates ability and speed.
-- Response times as collateral information in adaptive tests.
+- The item population level of the hierarchical model, a multivariate normal distribution of the item parameters: only
+  Bayesian estimation uses it.
+- Response times as collateral information in adaptive tests: `AbilityEstimator` sees no times.
+- Speed that changes within a test, and mixture and rapid-guessing models of the joint distribution.
+
+## Differences from LNIRT
+
+| Topic             | This package                                                               | LNIRT                                                                                                                                                                          |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Estimation        | Maximum likelihood with the item parameters as fixed effects               | Gibbs sampling with a prior on the item parameters and the person distribution                                                                                                 |
+| Response model    | The logistic IRT models of `irt/`, any number of categories                | The normal ogive; with `guess` the three-parameter model                                                                                                                       |
+| Person parameters | θ ~ N(0, 1) and τ with mean 0 and an estimated SD                          | θ and τ with estimated means and variances, as `ident` sets them                                                                                                               |
+| Time parameters   | β, α and σ_τ agree: the times do not involve the response model            | The same                                                                                                                                                                       |
+| Correlation       | The correlation of θ and τ under the logistic model, by maximum likelihood | Posterior mean of the covariance over the product of the SDs, under a prior on the items: close where the items are well determined, lower where most persons answer correctly |
+| Missing data      | A response or a time may be missing, each by itself                        | Needs every time                                                                                                                                                               |
 
 ## References
 
 - van der Linden, W. J. (2006). A lognormal model for response times on test items. Journal of Educational and
   Behavioral Statistics, 31, 181-204.
+- Molenaar, D., Tuerlinckx, F., & van der Maas, H. L. J. (2015). A bivariate generalized linear item response theory
+  modeling framework to the analysis of responses and response times. Multivariate Behavioral Research, 50, 56-74.
+- van der Linden, W. J. (2007). A hierarchical framework for modeling speed and accuracy on test items. Psychometrika,
+  72, 287-308.
+- van der Linden, W. J., Klein Entink, R. H., & Fox, J.-P. (2010). IRT parameter estimation with response times as
+  collateral information. Applied Psychological Measurement, 34, 327-347.
 - van der Linden, W. J., & Guo, F. (2008). Bayesian procedures for identifying aberrant response-time patterns in
   adaptive testing. Psychometrika, 73, 365-384.
 - Wise, S. L. (2017). Rapid-guessing behavior: Its identification, interpretation, and implications. Educational

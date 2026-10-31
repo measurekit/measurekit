@@ -33,6 +33,7 @@
     "cohen-kappa",
     "intraclass-correlation",
     "response-times",
+    "speed-accuracy",
     "rapid-guessing",
     "cognitive-diagnosis",
     "gdina",

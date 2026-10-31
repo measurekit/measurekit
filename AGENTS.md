@@ -112,7 +112,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/generalizability/ variance components of balanced crossed and nested designs, decision studies
   src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction
   src/rater/            rater agreement and rater effects: kappa, intraclass correlations, the many-facet Rasch model
-  src/response-time/    response times: the lognormal model, speed, aberrant times, rapid guessing
+  src/response-time/    response times: the lognormal model, speed, aberrant times, the joint model of speed and
+                        accuracy, rapid guessing
   src/interop/          conversion of item parameters, multidimensional ones included, to and from mirt
   test/<module>.test.ts one file per src folder; fixtures/ holds R results
 packages/knowledge-tracing/   the published package @measurekit/knowledge-tracing
