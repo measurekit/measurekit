@@ -10,7 +10,7 @@ export {
   calibrateMultidimensional,
   type MultidimensionalCalibration,
 } from "./calibration.js";
-export type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
+export type { CalibrationMethod, MultidimensionalCalibrationOptions } from "./calibration-options.js";
 export { type MultidimensionalGradedParameters, multidimensionalGradedResponse } from "./graded.js";
 export { multidimensionalInformation } from "./information.js";
 export {

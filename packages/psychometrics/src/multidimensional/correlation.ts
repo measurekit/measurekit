@@ -38,7 +38,7 @@ export interface Latent {
 }
 
 /** Returns the pairs of dimensions below the diagonal in the order of the correlations. */
-function pairsOf(dimensions: number): [number, number][] {
+export function pairsOf(dimensions: number): [number, number][] {
   const pairs: [number, number][] = [];
   for (let i = 1; i < dimensions; i++) for (let j = 0; j < i; j++) pairs.push([i, j]);
   return pairs;

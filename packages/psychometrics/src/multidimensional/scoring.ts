@@ -125,7 +125,7 @@ function priorGrid(standard: Grid, prior: CheckedPrior): Grid {
   const { dimensions } = standard;
   const sds = Float64Array.from(prior.mean, (_, d) => Math.sqrt(prior.covariance[d * dimensions + d] ?? 0));
   const nodes = standard.nodes.map((z, k) => (prior.mean[k % dimensions] ?? 0) + (sds[k % dimensions] ?? 0) * z);
-  return { dimensions, count: standard.count, nodes };
+  return { dimensions, points: standard.points, count: standard.count, nodes };
 }
 
 /** Returns the mean and the covariance of the nodes under the posterior weights. */

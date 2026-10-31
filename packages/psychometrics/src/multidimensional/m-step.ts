@@ -54,7 +54,7 @@ export function itemMaximization<TParameters>(
     gradient?: Float64Array,
     hessian?: Float64Array,
   ): number => {
-    assign(item, eta);
+    assignCoordinates(item, eta);
     const size = item.free.length;
     gradient?.fill(0, 0, size);
     hessian?.fill(0, 0, size * size);
@@ -64,13 +64,13 @@ export function itemMaximization<TParameters>(
   };
 
   return {
-    assign,
+    assign: assignCoordinates,
     objective,
-    coordinates,
+    coordinates: itemCoordinates,
     maximize(item) {
       const size = item.free.length;
       if (size === 0) return;
-      const start = coordinates(item);
+      const start = itemCoordinates(item);
       const gradient = new Float64Array(size);
       const hessian = new Float64Array(size * size);
       const value = objective(item, start, gradient, hessian);
@@ -80,12 +80,13 @@ export function itemMaximization<TParameters>(
         for (let l = 0; l < size; l++) trial[l] = (start[l] ?? 0) + step * (direction[l] ?? 0);
         if (objective(item, trial) <= value) return;
       }
-      assign(item, start);
+      assignCoordinates(item, start);
     },
   };
 }
 
-function assign<TParameters>(item: ItemState<TParameters>, eta: Float64Array): void {
+/** Sets the item's estimated entries from their unbounded coordinates `eta`, and its parameters from them. */
+export function assignCoordinates<TParameters>(item: ItemState<TParameters>, eta: Float64Array): void {
   item.free.forEach((j, l) => {
     const { lower, upper } = item.entries[l] ?? UNBOUNDED;
     item.vector[j] = fromUnbounded(eta[l] ?? 0, lower, upper);
@@ -93,7 +94,8 @@ function assign<TParameters>(item: ItemState<TParameters>, eta: Float64Array): v
   item.parameters = item.model.fromVector(item.vector, item.dimensions);
 }
 
-function coordinates<TParameters>(item: ItemState<TParameters>): Float64Array {
+/** Returns the unbounded coordinates of the item's estimated entries. */
+export function itemCoordinates<TParameters>(item: ItemState<TParameters>): Float64Array {
   return Float64Array.from(item.free, (j, l) => {
     const { lower, upper } = item.entries[l] ?? UNBOUNDED;
     return toUnbounded(item.vector[j] ?? 0, lower, upper);

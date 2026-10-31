@@ -2,9 +2,9 @@
 
 `@measurekit/psychometrics/multidimensional` models a person by a vector of thetas, one per dimension, and an item by a
 slope on each dimension: a high theta on one dimension makes up for a low one on another (compensatory models). It
-calibrates items and the correlations between dimensions by marginal maximum likelihood with EM, exploratory and
-confirmatory, for up to three dimensions; computes standard errors; rotates exploratory solutions; estimates thetas
-by EAP and MAP in any number of dimensions; and computes information matrices. Every estimate is validated against
+calibrates items and the correlations between dimensions by marginal maximum likelihood, exploratory and confirmatory,
+with EM for up to three dimensions and with MH-RM for any number; computes standard errors; rotates exploratory
+solutions; estimates thetas by EAP and MAP in any number of dimensions; and computes information matrices. Every estimate is validated against
 mirt, GPArotation and base R ([validation](validation.md)). The dimensions have mean 0 and variance 1.
 
 ```ts
@@ -71,20 +71,39 @@ differentiates with respect to the vector, and `information` writes the Fisher i
 
 ## Calibration
 
+```mermaid
+flowchart TD
+  M{"method"} -->|"em: the default for 1 to 3 dimensions"| E["EM: integrates theta over a grid of points ** D nodes"]
+  M -->|"mhrm: the default for 4 or more"| H["MH-RM: draws theta from its posterior, no grid"]
+  E --> EO["Deterministic; hessian and cross-product standard errors; at most 3 dimensions"]
+  H --> HO["Seeded, with Monte Carlo error; hessian standard errors; any number of dimensions"]
+```
+
+|                      | EM                                                   | MH-RM                                                                               |
+| -------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Dimensions           | 1 to 3                                               | Any number; the default above 3                                                     |
+| Integration of theta | Quadrature on a grid of `points` nodes per dimension | Metropolis-Hastings draws, no grid                                                  |
+| Result               | Deterministic, exact to `tolerance`                  | Seeded, within a Monte Carlo error                                                  |
+| Standard errors      | `"hessian"` and `"cross-product"`                    | `"hessian"`                                                                         |
+| Log-likelihood       | Exact on the grid                                    | Importance sampling                                                                 |
+| Time                 | Grows with the responses times `points ** D`         | Grows with the persons, responses and parameters; slower than EM below 4 dimensions |
+
 `calibrateMultidimensional(data, options)` takes a response matrix or response records, and a model, one for all items
 or one per item. Missing responses are skipped, and persons without responses change nothing.
 
-| Option           | Default                                  | Meaning                                                                                                 |
-| ---------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `model`          | required                                 | One model, or one per item in item order                                                                |
-| `dimensions`     | none; one of `dimensions` and `loadings` | Exploratory: the number of dimensions, from 1 to 3; every item loads on each                            |
-| `loadings`       | none; one of `dimensions` and `loadings` | Confirmatory: the names of the dimensions of each item, by item id, of every item                       |
-| `correlated`     | `true`                                   | Confirmatory: estimate the correlations; variances are 1 and means 0. Ignored when exploratory          |
-| `priors`         | none                                     | Priors by parameter name: `"a"` for every slope, `"intercept"` and `"c"`; estimates are posterior modes |
-| `points`         | `61`, `31`, `15` for 1, 2, 3 dimensions  | Nodes per dimension of the grid, at least 2, from -6 to 6 standard deviations: mirt's `quadpts`         |
-| `standardErrors` | `"none"`                                 | `"hessian"` or `"cross-product"`                                                                        |
-| `tolerance`      | `1e-4`                                   | EM has converged when no estimated parameter changes by more than this in an iteration                  |
-| `maxIterations`  | `500`                                    | The most EM iterations                                                                                  |
+| Option           | Default                                   | Meaning                                                                                                    |
+| ---------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `model`          | required                                  | One model, or one per item in item order                                                                   |
+| `method`         | `"em"` up to 3 dimensions, `"mhrm"` above | `"em"` or `"mhrm"`                                                                                         |
+| `dimensions`     | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, at most 3 for EM; every item loads on each      |
+| `loadings`       | none; one of `dimensions` and `loadings`  | Confirmatory: the names of the dimensions of each item, by item id, of every item                          |
+| `correlated`     | `true`                                    | Confirmatory: estimate the correlations; variances are 1 and means 0. Ignored when exploratory             |
+| `priors`         | none                                      | Priors by parameter name: `"a"` for every slope, `"intercept"` and `"c"`; estimates are posterior modes    |
+| `points`         | `61`, `31`, `15` for 1, 2, 3 dimensions   | EM only: nodes per dimension of the grid, at least 2, from -6 to 6 standard deviations: mirt's `quadpts`   |
+| `standardErrors` | `"none"`                                  | `"hessian"`, or `"cross-product"` for EM only                                                              |
+| `seed`           | `0`                                       | MH-RM only: a safe integer; the same seed gives the same calibration                                       |
+| `tolerance`      | `1e-4` for EM, `1e-3` for MH-RM           | Converged when no parameter changes by more than this: in an EM iteration, or in 3 successive MH-RM cycles |
+| `maxIterations`  | `500` for EM, `2000` for MH-RM            | The most EM iterations, or the most cycles of MH-RM's last stage, after the 250 of its first two stages    |
 
 - **Confirmatory.** Each item loads on the dimensions named for it; the dimensions are named in order of first
   appearance among the items, in item order, and their slopes on the other dimensions are fixed at 0. With
@@ -101,21 +120,37 @@ or one per item. Missing responses are skipped, and persons without responses ch
   takes a Fisher-scoring step for each item, halved until the expected log-likelihood does not fall, and maximizes the
   correlations, which keep a unit diagonal and stay positive definite, with BFGS on the weights of the grid, so that
   it maximizes the reported likelihood.
+- **MH-RM.** Each cycle draws every person's theta from its posterior given the current estimates, by 5 random-walk
+  Metropolis-Hastings steps whose variance is tuned to an acceptance of 0.35, and moves the estimates by γ Γ⁻¹ g, with g
+  the complete-data score at the draws and Γ the observed complete-data information. The stages, gains and tolerance
+  are mirt's defaults (below). The dimensions are not integrated, so their number is not limited, and the cost grows with
+  the persons, responses and parameters, not with a grid. The result is stochastic, with a Monte Carlo error that
+  [validation](validation.md) measures, and seeded: `seed` fixes the draws. MH-RM does not compute the log-likelihood,
+  which is estimated by importance sampling with 5,000 draws per person, from the normal approximation of each person's
+  posterior.
 - **Priors.** A prior of `"c"` is on the probability scale; mirt's `norm` prior is on logit c, which a custom
   `ParameterPrior` reproduces ([IRT](irt.md#priors)). A prior of `"a"` applies to every estimated slope.
 
+```mermaid
+flowchart LR
+  A["Stage 1: 150 cycles, gain 0.2, tunes the walk"] --> B["Stage 2: 100 cycles, gain 0.2, keeps the estimates and information"]
+  B --> C["Stage 3: gain (0.1 / t)^0.75, from their means, until 3 successive cycles move no estimate by more than tolerance"]
+  C --> D["Log-likelihood: importance sampling"]
+  C --> E["Standard errors: 400 cycles at the estimates"]
+```
+
 The result:
 
-| Field                         | Content                                                                                                    |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `dimensions`                  | The names of the dimensions, in the order of the slopes                                                    |
-| `items`                       | Each item's `id`, `model`, `parameters` and `standardErrors`                                               |
-| `correlations`                | The correlations between dimensions, by rows                                                               |
-| `correlationStandardErrors`   | By rows with a zero diagonal; `null` if the correlations are not estimated or there are no standard errors |
-| `loadings`                    | The standardized loadings, items by dimensions                                                             |
-| `communalities`               | λᵀ Φ λ of each item                                                                                        |
-| `logLikelihood`, `aic`, `bic` | The marginal log-likelihood at the estimates, without priors; -2 ln L + 2p; -2 ln L + p ln n               |
-| `converged`, `iterations`     | Whether EM reached `tolerance`, and the iterations run                                                     |
+| Field                         | Content                                                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `dimensions`                  | The names of the dimensions, in the order of the slopes                                                                        |
+| `items`                       | Each item's `id`, `model`, `parameters` and `standardErrors`                                                                   |
+| `correlations`                | The correlations between dimensions, by rows                                                                                   |
+| `correlationStandardErrors`   | By rows with a zero diagonal; `null` if the correlations are not estimated or there are no standard errors                     |
+| `loadings`                    | The standardized loadings, items by dimensions                                                                                 |
+| `communalities`               | λᵀ Φ λ of each item                                                                                                            |
+| `logLikelihood`, `aic`, `bic` | The marginal log-likelihood at the estimates, without priors, by importance sampling for MH-RM; -2 ln L + 2p; -2 ln L + p ln n |
+| `converged`, `iterations`     | Whether `tolerance` was reached, and the iterations run: EM's, or the cycles of MH-RM's last stage                             |
 
 The number of parameters p counts the estimated slopes, intercepts and asymptotes, and the correlations; n is the
 number of persons with a response.
@@ -125,10 +160,18 @@ correlation matrix, and the communality is λᵀ Φ λ.
 
 ### Standard errors
 
-| `standardErrors`  | Method                                                                                                                                                                          | Cost                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `"hessian"`       | The inverse of the Hessian of the log-posterior in unbounded coordinates, by central differences of the exact gradient, with the delta method for c; mirt's `SE.type = "Oakes"` | Two E-steps per estimated parameter |
-| `"cross-product"` | The inverse of the sum over persons of the outer products of their score vectors, plus the curvature of the priors; mirt's `"crossprod"`                                        | One pass over the persons           |
+| `standardErrors`  | Method                                                                                                                                                                                                                                                                       | Cost                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `"hessian"`       | The inverse of the observed information of the log-posterior in unbounded coordinates, with the delta method for c, by Louis' formula: the complete-data information minus the covariance of the complete-data score under the posterior. For EM, mirt's `SE.type = "Oakes"` | EM: one pass over the posterior; MH-RM: 400 further cycles |
+| `"cross-product"` | The inverse of the sum over persons of the outer products of their score vectors, plus the curvature of the priors; mirt's `"crossprod"`; EM only                                                                                                                            | One pass over the persons                                  |
+
+Oakes' formula differentiates the EM map and needs two E-steps for each estimated parameter. Louis' formula gives the
+same matrix from the posterior of one E-step: the complete-data information is the second derivative of the M-step's
+objective, and the covariance of the scores is summed over the grid, for an item over the marginal of the posterior on
+the dimensions the item loads on. MH-RM has no grid: the covariance is that of each person's score over the draws of 400
+cycles at the estimates, summed over persons, and the information is the observed complete-data information at the
+draws. The standard errors of MH-RM are therefore stochastic, as mirt's are; the person-wise covariance leaves out the
+covariance between persons, which is 0 given the parameters and would add noise.
 
 A standard error is listed by the name of the parameter: `a1` to `aD` for the slopes the item loads on, `intercept` or
 `intercept1`, `intercept2`, ..., and `c`. Slopes fixed at 0 have none. All standard errors of a calibration are `null`
@@ -137,17 +180,29 @@ if the information matrix cannot be inverted or gives a variance that is not pos
 ### Time
 
 CPU time of one calibration on an Apple M5 with Node.js 26, simulated data, each item loading on one dimension, the
-default `tolerance`:
+default `tolerance`. EM:
 
 | Data                                                                       | `"none"` | `"cross-product"` | `"hessian"` |
 | -------------------------------------------------------------------------- | -------- | ----------------- | ----------- |
-| 2 dimensions, M2PL, 20 items, 2,000 persons, 31 points                     | 1.1 s    | 1.6 s             | 7.7 s       |
-| 3 dimensions, M2PL, 30 items, 2,000 persons, 15 points                     | 8.1 s    | 8.4 s             | 52.7 s      |
-| 3 dimensions, graded with 5 categories, 15 items, 1,000 persons, 15 points | 3.8 s    | 3.9 s             | 22.0 s      |
+| 2 dimensions, M2PL, 20 items, 2,000 persons, 31 points                     | 1.1 s    | 1.4 s             | 3.3 s       |
+| 3 dimensions, M2PL, 30 items, 2,000 persons, 15 points                     | 7.3 s    | 7.6 s             | 11.6 s      |
+| 3 dimensions, graded with 5 categories, 15 items, 1,000 persons, 15 points | 3.6 s    | 3.3 s             | 5.7 s       |
 
-The E-step dominates and grows with the responses times the nodes: a grid of `points` nodes in each of D dimensions has
-`points ** D` nodes. Fewer `points` is faster and, for a calibration, less exact. The exploratory model of a weak
-second dimension converges slowly; `maxIterations` bounds it. Standard errors by `"cross-product"` suit three dimensions.
+MH-RM, seeded, with the cycles of its last stage:
+
+| Data                                                            | Cycles | `"none"` | `"hessian"` |
+| --------------------------------------------------------------- | ------ | -------- | ----------- |
+| 2 dimensions, M2PL, 20 items, 2,000 persons                     | 44     | 16.1 s   | 23.8 s      |
+| 3 dimensions, M2PL, 30 items, 2,000 persons                     | 45     | 27.3 s   | 38.1 s      |
+| 3 dimensions, graded with 5 categories, 15 items, 1,000 persons | 53     | 21.5 s   | 30.0 s      |
+| 5 dimensions, M2PL, 30 items, 2,000 persons                     | 54     | 31.9 s   | 43.8 s      |
+| 5 dimensions, graded with 5 categories, 25 items, 1,000 persons | 57     | 38.6 s   | 53.6 s      |
+
+Differences under 10% are noise. The E-step of EM dominates and grows with the responses times the nodes: a grid of
+`points` nodes in each of D dimensions has `points ** D` nodes. Fewer `points` is faster and, for a calibration, less
+exact. MH-RM has no grid, so its time grows slowly with the dimensions; it runs 250 cycles before the last stage, and
+the importance-sampled log-likelihood is part of every time. Use EM up to three dimensions, where it is exact and
+faster. The exploratory model of a weak second dimension converges slowly with EM; `maxIterations` bounds it.
 Calibration runs synchronously: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
 
 ## Rotation
@@ -224,7 +279,7 @@ convert items to and from mirt.
 - Noncompensatory models; multidimensional GPCM and nominal models; bifactor and two-tier reduction (the testlet model
   of [IRT](irt.md#testlets) covers equal-slope testlets).
 - Multiple groups, fixed anchor items and multidimensional linking.
-- Calibration of more than three dimensions, which needs MH-RM; EM acceleration, QMC-EM and latent means other than 0.
+- EM acceleration, QMC-EM and latent means other than 0.
 - Multidimensional person fit and DIF.
 
 ## Differences from mirt
@@ -244,7 +299,20 @@ convert items to and from mirt.
 - **Rotation.** GPArotation's default algorithm, Barzilai-Borwein steps with a nonmonotone line search; mirt's
   `summary` and `fscores` rotate to GPArotation's default tolerance, 1e-5.
 - **Priors.** A prior of c is on the probability scale; mirt's `norm` on `g` is on its logit.
-- **Dimensions.** EM calibrates up to three dimensions; scoring has no limit.
+- **Dimensions.** EM calibrates up to three dimensions, MH-RM any number; scoring has no limit.
+- **MH-RM estimates.** The stages, gains and tolerance are mirt's defaults, and the estimates agree within Monte Carlo
+  error, not to the digits that EM does: on 800 persons, 25 graded items and 5 dimensions, mirt's four runs differ from
+  their mean by up to 0.08 in a parameter, and a run here from that mean by up to 0.17.
+- **MH-RM information.** A cycle's information is the observed complete-data information at the draws, as mirt's
+  `Deriv` gives it. The expected information is about 10% larger and makes the estimates of weakly determined directions
+  noisier, so it is not used.
+- **MH-RM standard errors.** mirt accumulates the score and information over at least 400 cycles in a running average;
+  here they are the person-wise Louis estimate above. On the same data the standard errors here are a median 1.03 of
+  the mean of mirt's four runs, with a quarter of them within 0.96 to 1.08; mirt's own vary 20% from seed to seed
+  at the median and 79% at most, and some are missing where its information is not positive definite.
+- **MH-RM log-likelihood.** The importance-sampling estimate here agrees within about 1 with the exact log-likelihood
+  of EM on three dimensions. On the five-dimensional data mirt's reported log-likelihood is 24 to 29 below the estimate
+  here, at mirt's own parameters as well, so the two are not compared.
 
 ## References
 
@@ -264,3 +332,11 @@ convert items to and from mirt.
   https://doi.org/10.1177/0013164404272507
 - Camilli, G. (1994). Origin of the scaling constant d = 1.7 in item response theory. Journal of Educational and
   Behavioral Statistics, 19, 293-295. https://doi.org/10.3102/10769986019003293
+- Robbins, H., & Monro, S. (1951). A stochastic approximation method. The Annals of Mathematical Statistics, 22,
+  400-407. https://doi.org/10.1214/aoms/1177729586
+- Louis, T. A. (1982). Finding the observed information matrix when using the EM algorithm. Journal of the Royal
+  Statistical Society: Series B, 44, 226-233. https://doi.org/10.1111/j.2517-6161.1982.tb01203.x
+- Cai, L. (2010). High-dimensional exploratory item factor analysis by a Metropolis-Hastings Robbins-Monro algorithm.
+  Psychometrika, 75, 33-57. https://doi.org/10.1007/s11336-009-9136-x
+- Cai, L. (2010). Metropolis-Hastings Robbins-Monro algorithm for confirmatory item factor analysis. Journal of
+  Educational and Behavioral Statistics, 35, 307-335. https://doi.org/10.3102/1076998609353115

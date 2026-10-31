@@ -12,6 +12,8 @@ const DEFAULT_POINTS_ABOVE = 3;
 export interface Grid {
   /** The number of dimensions. */
   readonly dimensions: number;
+  /** The number of nodes per dimension. */
+  readonly points: number;
   /** The number of nodes, `points ** dimensions`. */
   readonly count: number;
   /** The nodes by rows: node `q` is `nodes[q * dimensions]` to `nodes[(q + 1) * dimensions - 1]`. */
@@ -45,7 +47,7 @@ export function productGrid(dimensions: number, points: number): Grid {
       rest = Math.floor(rest / points);
     }
   }
-  return { dimensions, count, nodes };
+  return { dimensions, points, count, nodes };
 }
 
 /**

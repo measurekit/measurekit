@@ -33,9 +33,9 @@ They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eR
 sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm and jsonlite;
 `common.R` holds their shared helpers.
 
-`multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `exploratory`, `rotation` and
-`information` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and the
-base R maximum are slow. `rotation` reads the fixture that `exploratory` writes, so run `exploratory` first.
+`multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`
+and `information` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and
+the base R maximum are slow, and `mhrm`, which runs mirt's MH-RM four times on five dimensions, takes about as long. `rotation` reads the fixture that `exploratory` writes, so run `exploratory` first.
 `multidimensional-items.R` holds the helper of `multidimensional.R` and `interop.R` that sets items in mirt.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.

@@ -298,6 +298,50 @@ if (selected("graded3")) {
   ))
 }
 
+# --- MH-RM: psych::bfi, five dimensions --------------------------------------------------------------------------------
+
+# mirt's MH-RM on all 25 items of psych::bfi under the graded model, the first 800 complete cases, on five correlated
+# dimensions, with several seeds: mirt and measurekit are both stochastic, so the seeds give mirt's own Monte Carlo
+# error, with which the test justifies its tolerance. mirt's default `SE.type = "MHRM"` gives the standard errors.
+if (selected("mhrm")) {
+  mhrm_data <- bfi_items(c("A", "C", "E", "N", "O"))[1:800, ]
+  mhrm_groups <- rep(c("A", "C", "E", "N", "O"), each = 5)
+  mhrm_model <- mirt.model(paste0(
+    "A = 1-5\nC = 6-10\nE = 11-15\nN = 16-20\nO = 21-25\n",
+    "COV = A*C, A*E, A*N, A*O, C*E, C*N, C*O, E*N, E*O, N*O"
+  ))
+  fits <- lapply(1:4, function(seed) {
+    fit <- mirt(mhrm_data, mhrm_model, itemtype = "graded", method = "MHRM", SE = TRUE, verbose = FALSE,
+                technical = list(set.seed = seed))
+    stopifnot_converged(fit)
+    fit
+  })
+  runs <- lapply(seq_along(fits), function(seed) {
+    fit <- fits[[seed]]
+    c(list(seed = seed, items = mirt_items(fit, 5, graded = TRUE, guessing = FALSE)),
+      mirt_correlations(fit, 5), mirt_statistics(fit))
+  })
+  # mirt's complete-data score and information of two items at given thetas: the quantities of one MH-RM cycle, which
+  # mirt's Deriv returns for the item's slopes a1 to a5 and intercepts d1 to d5. The thetas are the EAPs of the persons
+  # plus noise, so that they are spread as the draws of a cycle are.
+  set.seed(20261029)
+  thetas <- fscores(fits[[1]], method = "EAP", quadpts = 5, QMC = TRUE, QMC_draws = 2000)[, 1:5]
+  thetas <- thetas + matrix(rnorm(length(thetas), 0, 0.4), nrow(thetas))
+  complete_data <- lapply(c(1, 23), function(i) {
+    item <- extract.item(fits[[1]], i)
+    derivative <- mirt:::Deriv(item, Theta = thetas, estHess = TRUE)
+    list(item = colnames(mhrm_data)[i], parameters = unname(item@par), responses = unname(mhrm_data[, i]),
+         gradient = derivative$grad, hessian = unname(derivative$hess))
+  })
+  write_fixture("multidimensional-mhrm", list(
+    source = paste("psych::bfi items A1-E5, N1-N5 and O1-O5, the first 800 complete cases, coded 0-5, under the graded model:",
+                   "mirt's MH-RM with seeds 1 to 4, and its complete-data score and information of items A1 and O3."),
+    model = "mgrm", itemIds = colnames(mhrm_data), responses = unname(as.matrix(mhrm_data)),
+    loadings = confirmatory_pattern(colnames(mhrm_data), mhrm_groups), dimensionNames = c("A", "C", "E", "N", "O"),
+    runs = runs, thetas = unname(thetas), completeData = complete_data
+  ))
+}
+
 # --- Exploratory 2D models -----------------------------------------------------------------------------------------------
 
 # The model with the first D - 1 items' later slopes fixed at 0, which identifies the rotation, as measurekit fixes it.

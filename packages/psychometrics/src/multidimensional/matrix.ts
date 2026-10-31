@@ -16,6 +16,16 @@ export function multiply(
   }
 }
 
+/** Returns the square matrix of `size` rows averaged with its transpose. */
+export function symmetrized(matrix: Float64Array, size: number): Float64Array {
+  const result = new Float64Array(size * size);
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++)
+      result[i * size + j] = ((matrix[i * size + j] ?? 0) + (matrix[j * size + i] ?? 0)) / 2;
+  }
+  return result;
+}
+
 /** Returns the transpose of the `rows` by `columns` matrix `a`. */
 export function transpose(a: Float64Array, rows: number, columns: number): Float64Array {
   const result = new Float64Array(a.length);

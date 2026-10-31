@@ -1,19 +1,17 @@
-import { checkChoice, checkOptions, checkPositiveInteger, checkStopping, DataError, describe } from "@measurekit/core";
+import { checkChoice, checkOptions, checkSeed, checkStopping, DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
 import type { StandardErrorMethod } from "../irt/calibration-options.js";
-import { compressResponses } from "../irt/responses.js";
-import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
+import { type CompressedResponses, compressResponses } from "../irt/responses.js";
+import type { CalibrationMethod, MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { type ItemState, setUp } from "./calibration-setup.js";
-import { type Latent, latentDistribution } from "./correlation.js";
-import { designOf } from "./design.js";
-import { checkEmDimensions, expectationMaximization } from "./em.js";
-import { expectationStep } from "./expectation.js";
-import { defaultPoints, productGrid } from "./grid.js";
+import { pairsOf } from "./correlation.js";
+import { type Design, designOf } from "./design.js";
+import { calibrateByEm, MAX_EM_DIMENSIONS } from "./em.js";
 import { standardizedLoadings } from "./loadings.js";
-import { itemMaximization } from "./m-step.js";
+import { calibrateByMhrm } from "./mhrm.js";
 import type { MultidimensionalTestItem } from "./model.js";
-import { crossProductCovariance, type Fit, hessianCovariance, parameterCount } from "./standard-errors.js";
+import type { Settings, Solution } from "./solution.js";
 
 /** An item with its calibrated parameters. */
 export interface CalibratedMultidimensionalItem<TParameters> extends MultidimensionalTestItem<TParameters> {
@@ -49,35 +47,48 @@ export interface MultidimensionalCalibration<TParameters> {
   readonly aic: number;
   /** The Bayesian information criterion: -2 logLikelihood + p ln n, with n the number of persons with at least one response. */
   readonly bic: number;
-  /** Whether EM reached `tolerance` within `maxIterations`. */
+  /** Whether the calibration reached `tolerance` within `maxIterations`. */
   readonly converged: boolean;
-  /** EM iterations run. */
+  /** EM iterations run, or the cycles of the last stage of MH-RM. */
   readonly iterations: number;
 }
 
-const DEFAULT_TOLERANCE = 1e-4;
-const DEFAULT_MAX_ITERATIONS = 500;
+const EM_TOLERANCE = 1e-4;
+const EM_MAX_ITERATIONS = 500;
+/** The defaults of MH-RM: mirt's `TOL` and `NCYCLES`. */
+const MHRM_TOLERANCE = 1e-3;
+const MHRM_MAX_ITERATIONS = 2000;
 const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
+const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
 
 /**
  * Estimates the item parameters of a multidimensional model, and the correlations between its dimensions, by marginal
- * maximum likelihood with the Bock-Aitkin EM algorithm, theta integrated by quadrature over a grid.
+ * maximum likelihood: by the Bock-Aitkin EM algorithm with theta integrated by quadrature over a grid, up to three
+ * dimensions, or by the Metropolis-Hastings Robbins-Monro algorithm, in any number.
  *
  * @remarks
  * Exploratory models (`dimensions`) have every item load on every dimension, and confirmatory ones (`loadings`) only
- * on the dimensions named for them; the dimensions have mean 0 and variance 1. The grid has `points` equally spaced
- * nodes per dimension from -6 to 6, weighted by the normal density of the correlations, as mirt. The M-step takes a
- * Fisher-scoring step for each item and maximizes the correlations, which keep a unit diagonal and stay positive
- * definite, with BFGS on the weights of the grid, so that it maximizes the reported likelihood. With priors, the
- * estimates are posterior modes. Standard errors come from the Hessian of the marginal log-likelihood plus the log
- * priors, by central differences of its exact gradient, or from the cross-product of the persons' score vectors.
- * Missing responses are skipped; persons without responses change nothing.
+ * on the dimensions named for them; the dimensions have mean 0 and variance 1. With priors, the estimates are posterior
+ * modes. Missing responses are skipped; persons without responses change nothing.
+ *
+ * EM: the grid has `points` equally spaced nodes per dimension from -6 to 6, weighted by the normal density of the
+ * correlations, as mirt. The M-step takes a Fisher-scoring step for each item and maximizes the correlations, which keep
+ * a unit diagonal and stay positive definite, with BFGS on the weights of the grid, so that it maximizes the reported
+ * likelihood. Standard errors come from Louis' formula for the observed information of the marginal log-posterior, or
+ * from the cross-product of the persons' score vectors.
+ *
+ * MH-RM: each cycle draws every person's theta from its posterior at the current estimates by Metropolis-Hastings and
+ * moves the estimates by a Robbins-Monro step on the complete-data score, in the stages and with the gains of mirt's
+ * defaults. The estimates carry Monte Carlo error, and a seed reproduces them. The log-likelihood is estimated by
+ * importance sampling, and the standard errors, `"hessian"` only, by Louis' formula from 400 further cycles of draws.
+ * `iterations` counts the cycles of the last stage, after the 250 of the first two.
  *
  * An exploratory solution is determined up to the signs of its dimensions; {@link rotateLoadings} rotates it.
  *
  * @throws `DataError` when the data or an option is invalid, there are no responses, neither or both of `dimensions`
- * and `loadings` are given, there are more than 3 dimensions, an item is not in `loadings` or lacks responses in a
- * category up to its highest or has more categories than its model allows, or the grid has more than 10⁶ nodes.
+ * and `loadings` are given, an item is not in `loadings` or lacks responses in a category up to its highest or has more
+ * categories than its model allows; with EM, when there are more than 3 dimensions or the grid has more than 10⁶ nodes;
+ * with MH-RM, when `points` or the standard errors `"cross-product"` are given.
  */
 export function calibrateMultidimensional<TParameters>(
   data: ResponseMatrix | ResponseRecords,
@@ -85,38 +96,80 @@ export function calibrateMultidimensional<TParameters>(
 ): MultidimensionalCalibration<TParameters> {
   checkOptions(options);
   const responses = compressResponses(data);
-  const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, standardErrors = "none" } = options;
-  checkStopping(tolerance, maxIterations);
+  const { standardErrors = "none", seed = 0 } = options;
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
+  checkSeed(seed);
   const respondents = Array.from(responses.personIds, (_, person) => {
     return (responses.offsets[person + 1] ?? 0) > (responses.offsets[person] ?? 0);
   }).filter(Boolean).length;
   if (respondents === 0) throw new DataError("Calibration needs at least one response.");
   const design = designOf(options, responses.itemIds);
-  const dimensions = design.dimensionNames.length;
-  checkEmDimensions(dimensions);
-  const points = options.points === undefined ? defaultPoints(dimensions) : options.points;
-  checkPoints(points);
-  const grid = productGrid(dimensions, points);
-  const items = setUp(responses, options, design, grid.count);
-  const latent = latentDistribution(grid);
-  const fit: Fit<TParameters> = {
-    items,
-    grid,
-    latent,
-    correlated: design.correlated,
-    maximization: itemMaximization(items, grid),
-    eStep: expectationStep(responses, items, grid, latent.logWeights),
-    responses,
-  };
+  const { method = defaultMethod(design.dimensionNames.length) } = options;
+  checkChoice(method, "The option method", METHODS);
+  const em = method === "em";
+  const {
+    tolerance = em ? EM_TOLERANCE : MHRM_TOLERANCE,
+    maxIterations = em ? EM_MAX_ITERATIONS : MHRM_MAX_ITERATIONS,
+  } = options;
+  checkStopping(tolerance, maxIterations);
+  const settings: Settings = { tolerance, maxIterations, seed, standardErrors, points: options.points };
+  const solution = em
+    ? calibrateByEm(responses, options, design, settings)
+    : mhrm(responses, options, design, settings);
+  return assemble(design, solution, respondents);
+}
 
-  const { converged, iterations } = expectationMaximization(fit, tolerance, maxIterations);
-  const logLikelihood = fit.eStep.run();
-  const size = parameterCount(fit);
-  const covariance = size > 0 ? covarianceOf(standardErrors, fit) : null;
+/** Estimates by MH-RM, which takes neither a grid nor the cross-product standard errors. */
+function mhrm<TParameters>(
+  responses: CompressedResponses,
+  options: MultidimensionalCalibrationOptions<TParameters>,
+  design: Design,
+  settings: Settings,
+): Solution<TParameters> {
+  if (options.points !== undefined) {
+    throw new DataError('The option points sets the grid of EM, which the method "mhrm" does not use.');
+  }
+  if (settings.standardErrors === "cross-product") {
+    throw new DataError(
+      'MH-RM has no posterior over a grid to cross-multiply: the option standardErrors needs "none" or "hessian" with the method "mhrm".',
+    );
+  }
+  const items = setUp(responses, options, design, 0);
+  const fit = calibrateByMhrm(responses, items, design, {
+    tolerance: settings.tolerance,
+    maxIterations: settings.maxIterations,
+    standardErrors: settings.standardErrors === "hessian",
+    seed: settings.seed,
+  });
+  return {
+    items,
+    correlations: fit.correlations.matrix,
+    correlated: design.correlated,
+    covariance: fit.covariance,
+    logLikelihood: fit.logLikelihood,
+    converged: fit.converged,
+    iterations: fit.iterations,
+  };
+}
+
+/** EM up to the dimensions that it calibrates, MH-RM above. */
+function defaultMethod(dimensions: number): CalibrationMethod {
+  return dimensions > MAX_EM_DIMENSIONS ? "mhrm" : "em";
+}
+
+/** Builds the calibration from the solution of a method. */
+function assemble<TParameters>(
+  design: Design,
+  { items, correlations, correlated, covariance, logLikelihood, converged, iterations }: Solution<TParameters>,
+  respondents: number,
+): MultidimensionalCalibration<TParameters> {
+  const dimensions = design.dimensionNames.length;
+  const size =
+    items.reduce((sum, item) => sum + item.free.length, 0) + (correlated ? (dimensions * (dimensions - 1)) / 2 : 0);
+  const rows = matrixRows(correlations, dimensions);
   const { loadings, communalities } = standardizedLoadings(
     items.map((item) => Array.from(item.vector.subarray(0, dimensions))),
-    matrixRows(latent),
+    rows,
   );
   return {
     dimensions: design.dimensionNames,
@@ -126,9 +179,9 @@ export function calibrateMultidimensional<TParameters>(
       parameters: item.parameters,
       standardErrors: covariance === null ? null : itemErrors(item, i, items, covariance, size),
     })),
-    correlations: matrixRows(latent),
+    correlations: rows,
     correlationStandardErrors:
-      covariance === null || !design.correlated ? null : correlationErrors(latent, covariance, size),
+      covariance === null || !correlated ? null : correlationErrors(pairsOf(dimensions), dimensions, covariance, size),
     loadings,
     communalities,
     logLikelihood,
@@ -137,18 +190,6 @@ export function calibrateMultidimensional<TParameters>(
     converged,
     iterations,
   };
-}
-
-function checkPoints(points: unknown): asserts points is number {
-  checkPositiveInteger(points, "The option points");
-  if (points < 2) throw new DataError(`The option points must be at least 2, found ${describe(points)}.`);
-}
-
-/** Returns the covariance matrix of the estimated parameters by the method, or `null` without standard errors. */
-function covarianceOf<TParameters>(method: StandardErrorMethod, fit: Fit<TParameters>): Float64Array | null {
-  if (method === "hessian") return hessianCovariance(fit);
-  if (method === "cross-product") return crossProductCovariance(fit);
-  return null;
 }
 
 /** Returns the standard errors of an item's estimated entries by name. */
@@ -167,8 +208,12 @@ function itemErrors<TParameters>(
 }
 
 /** Returns the standard errors of the correlations as a matrix with a zero diagonal. */
-function correlationErrors(latent: Latent, covariance: Float64Array, size: number): number[][] {
-  const { dimensions, pairs } = latent;
+function correlationErrors(
+  pairs: readonly (readonly [number, number])[],
+  dimensions: number,
+  covariance: Float64Array,
+  size: number,
+): number[][] {
   const first = size - pairs.length;
   const errors = Array.from({ length: dimensions }, () => new Array<number>(dimensions).fill(0));
   pairs.forEach(([i, j], p) => {
@@ -181,7 +226,7 @@ function correlationErrors(latent: Latent, covariance: Float64Array, size: numbe
   return errors;
 }
 
-function matrixRows({ matrix, dimensions }: Latent): number[][] {
+function matrixRows(matrix: Float64Array, dimensions: number): number[][] {
   return Array.from({ length: dimensions }, (_, i) =>
     Array.from(matrix.subarray(i * dimensions, (i + 1) * dimensions)),
   );

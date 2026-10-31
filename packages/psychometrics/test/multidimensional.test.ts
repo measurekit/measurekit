@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calibrate,
   calibrateMultidimensional,
+  createRandom,
   DataError,
   type LoadingPattern,
   logNormalPrior,
@@ -29,14 +30,27 @@ import {
   rotateLoadings,
   twoParameterLogistic,
 } from "../src/index.js";
+import { compressResponses } from "../src/irt/responses.js";
+import { setUp } from "../src/multidimensional/calibration-setup.js";
 import { latentDistribution } from "../src/multidimensional/correlation.js";
+import { designOf } from "../src/multidimensional/design.js";
 import { productGrid } from "../src/multidimensional/grid.js";
+import { createChain, responsesByItem, responsesByPerson } from "../src/multidimensional/mhrm-chain.js";
+import {
+  createCorrelations,
+  latentObservedInformation,
+  latentScore,
+  personLatentScores,
+  secondMoments,
+} from "../src/multidimensional/mhrm-latent.js";
+import { createScratch, itemMoments, observedItemInformation } from "../src/multidimensional/mhrm-moments.js";
 import exploratory from "./fixtures/multidimensional-exploratory.json" with { type: "json" };
 import graded from "./fixtures/multidimensional-graded.json" with { type: "json" };
 import graded3 from "./fixtures/multidimensional-graded3.json" with { type: "json" };
 import information from "./fixtures/multidimensional-information.json" with { type: "json" };
 import m2pl from "./fixtures/multidimensional-m2pl.json" with { type: "json" };
 import m3pl from "./fixtures/multidimensional-m3pl.json" with { type: "json" };
+import mhrm from "./fixtures/multidimensional-mhrm.json" with { type: "json" };
 import missing from "./fixtures/multidimensional-missing.json" with { type: "json" };
 import rotation from "./fixtures/multidimensional-rotation.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
@@ -84,6 +98,30 @@ interface Fixture {
   readonly aic: number;
   readonly bic: number;
 }
+
+/** One item of a run of mirt's MH-RM: its standard error is `null` where mirt's information was not positive definite. */
+interface MhrmItem {
+  readonly id: string;
+  readonly parameters: FixtureParameters;
+  readonly standardErrors?: Readonly<Record<string, number | null | undefined>>;
+}
+
+/** Runs of mirt's MH-RM on one dataset, with seeds 1 to 4, and the complete-data score and Hessian of two items at given thetas. */
+interface MhrmFixture extends Pick<Fixture, "model" | "itemIds" | "responses" | "loadings"> {
+  readonly runs: readonly {
+    readonly items: readonly MhrmItem[];
+    readonly correlations: readonly (readonly number[])[];
+  }[];
+  readonly thetas: readonly (readonly number[])[];
+  readonly completeData: readonly {
+    readonly item: string;
+    readonly parameters: readonly number[];
+    readonly gradient: readonly number[];
+    readonly hessian: readonly (readonly number[])[];
+  }[];
+}
+
+const mirtMhrm: MhrmFixture = mhrm;
 
 function modelOf(name: string): MultidimensionalModel<Parameters> {
   return defined(MODELS[name as ModelName]);
@@ -840,6 +878,497 @@ describe("calibration", () => {
   });
 });
 
+describe("MH-RM", () => {
+  /** The calibration of a fixture by MH-RM. */
+  function byMhrm(
+    fixture: Pick<Fixture, "model" | "itemIds" | "responses" | "loadings">,
+    extra: {
+      readonly seed: number;
+      readonly priors?: Readonly<Record<string, ParameterPrior>>;
+      readonly standardErrors?: "none" | "hessian";
+    },
+  ): MultidimensionalCalibration<Parameters> {
+    return calibrateMultidimensional(responseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
+      model: modelOf(fixture.model),
+      loadings: fixture.loadings,
+      method: "mhrm",
+      ...extra,
+    });
+  }
+
+  /** Returns the largest absolute difference of the slopes and intercepts from those of the fixture. */
+  function largestDifference(fit: MultidimensionalCalibration<Parameters>, fixture: Pick<Fixture, "items">): number {
+    let largest = 0;
+    fixture.items.forEach(({ parameters: target }, i) => {
+      const found = defined(fit.items[i]).parameters;
+      target.a.forEach((slope, d) => {
+        if (slope !== 0) largest = Math.max(largest, Math.abs(defined(found.a[d]) - slope));
+      });
+      if ("intercepts" in found) {
+        (target.intercepts ?? []).forEach((value, k) => {
+          largest = Math.max(largest, Math.abs(defined(found.intercepts[k]) - value));
+        });
+      } else {
+        largest = Math.max(largest, Math.abs(found.intercept - defined(target.intercept)));
+      }
+    });
+    return largest;
+  }
+
+  // The estimates of MH-RM carry Monte Carlo error. Its size was measured over seeds 1 to 6 on the case of two correlated
+  // dimensions, at the default settings: the largest difference from the solution of EM was 0.057, 0.34 to 0.41 of the
+  // largest standard error, and the standard errors were within 7%. The tolerances are about twice as large.
+  it("agrees with the EM solution on two correlated dimensions within its Monte Carlo error", () => {
+    const fit = byMhrm(m2pl, { seed: 1, standardErrors: "hessian" });
+    expect(fit.converged).toBe(true);
+    expect(fit.dimensions).toEqual(["F1", "F2"]);
+    expect(largestDifference(fit, m2pl)).toBeLessThan(0.12);
+    expectClose(defined(fit.correlations[0]?.[1]), defined(m2pl.correlations[0]?.[1]), 0.05, "correlation");
+    m2pl.items.forEach((expected, i) => {
+      for (const [name, error] of Object.entries(expected.standardErrors ?? {})) {
+        const actual = defined(fit.items[i]?.standardErrors)[name] ?? Number.NaN;
+        expectClose(actual / defined(error), 1, 0.15, `standard error of ${name} of ${expected.id}`);
+      }
+    });
+    expectClose(
+      defined(fit.correlationStandardErrors?.[0]?.[1]) / defined(m2pl.correlationStandardErrors?.[0]?.[1]),
+      1,
+      0.15,
+      "standard error of the correlation",
+    );
+    // The log-likelihood is estimated by importance sampling, within about one unit of EM's here.
+    expectClose(fit.logLikelihood, m2pl.logLikelihood, 4, "log-likelihood");
+    expectClose(fit.aic, -2 * fit.logLikelihood + 2 * 25, 1e-9, "AIC");
+  }, 120_000);
+
+  it("agrees with the EM solution with missing responses and with the M3PL and its priors", () => {
+    const withMissing = byMhrm(missing, { seed: 1 });
+    expect(largestDifference(withMissing, missing)).toBeLessThan(0.15);
+    const { mean, sd } = m3pl.priors.c;
+    const guessing = byMhrm(m3pl, { seed: 1, priors: { c: logitNormalPrior(mean, sd) } });
+    expect(largestDifference(guessing, m3pl)).toBeLessThan(0.2);
+    m3pl.items.forEach(({ parameters: target }, i) => {
+      const c = (defined(guessing.items[i]).parameters as MultidimensionalLogisticParameters).c;
+      expectClose(c, defined(target.c), 0.05, `c of item ${i + 1}`);
+      expect(c).toBeGreaterThan(0);
+    });
+  }, 120_000);
+
+  // mirt's MH-RM was run with seeds 1 to 4 on the first 800 complete cases of the 25 items of bfi: its estimates differ from
+  // their mean over the seeds by up to 0.076, and measurekit's, over seeds 1 to 4, from that mean by up to 0.17, which is
+  // about one standard error of the least precise intercepts. The tolerance is 0.3. mirt's standard errors vary 20% from
+  // seed to seed (79% at most); measurekit's are compared with their mean over the seeds.
+  it("agrees with mirt's MH-RM on five dimensions", () => {
+    const fit = byMhrm(mirtMhrm, { seed: 1, standardErrors: "hessian" });
+    expect(fit.converged).toBe(true);
+    const slopes = (parameters: FixtureParameters): number[] => parameters.a.filter((value) => value !== 0);
+    mirtMhrm.itemIds.forEach((_, i) => {
+      const found = defined(fit.items[i]).parameters as MultidimensionalGradedParameters;
+      const references = mirtMhrm.runs.map((run) => defined(run.items[i]).parameters);
+      slopes(found).forEach((slope, k) => {
+        const reference =
+          references.reduce((sum, parameters) => sum + defined(slopes(parameters)[k]), 0) / references.length;
+        expectClose(slope, reference, 0.3, `slope of item ${i + 1}`);
+      });
+      found.intercepts.forEach((value, k) => {
+        const reference =
+          references.reduce((sum, parameters) => sum + defined(parameters.intercepts?.[k]), 0) / references.length;
+        expectClose(value, reference, 0.3, `intercept ${k + 1} of item ${i + 1}`);
+      });
+    });
+    const meanCorrelation = (i: number, j: number): number =>
+      mirtMhrm.runs.reduce((sum, run) => sum + defined(run.correlations[i]?.[j]), 0) / mirtMhrm.runs.length;
+    fit.correlations.forEach((row, i) => {
+      row.forEach((value, j) => {
+        expectClose(value, meanCorrelation(i, j), 0.08, `correlation ${i},${j}`);
+      });
+    });
+    const ratios: number[] = [];
+    mirtMhrm.runs[0]?.items.forEach((item, i) => {
+      for (const name of Object.keys(item.standardErrors ?? {})) {
+        const reference = mirtMhrm.runs.map((run) => run.items[i]?.standardErrors?.[name]);
+        if (!reference.every((value) => typeof value === "number")) continue;
+        const mean = reference.reduce((sum, value) => sum + (value ?? 0), 0) / reference.length;
+        ratios.push(defined(fit.items[i]?.standardErrors?.[name]) / mean);
+      }
+    });
+    ratios.sort((a, b) => a - b);
+    expect(ratios.length).toBeGreaterThan(100);
+    expectClose(ratios[Math.floor(ratios.length / 2)] ?? Number.NaN, 1, 0.1, "median ratio of the standard errors");
+    expect(ratios[0]).toBeGreaterThan(0.6);
+    expect(ratios.at(-1)).toBeLessThan(1.6);
+  }, 300_000);
+
+  it("estimates the log-likelihood that EM computes, on three dimensions", () => {
+    const fit = byMhrm(graded3, { seed: 1 });
+    expect(fit.converged).toBe(true);
+    expectClose(fit.logLikelihood, graded3.logLikelihood, 3, "log-likelihood");
+    expect(largestDifference(fit, graded3)).toBeLessThan(0.25);
+  }, 120_000);
+
+  describe("small data", () => {
+    const rows = m2pl.responses.slice(0, 250);
+    const data = responseMatrix(rows, { itemIds: [...m2pl.itemIds] });
+    const options = { model: multidimensionalTwoParameterLogistic, loadings: m2pl.loadings, method: "mhrm" } as const;
+
+    it("gives the same calibration for the same seed and another for another seed", () => {
+      const first = calibrateMultidimensional(data, { ...options, seed: 5, standardErrors: "hessian" });
+      expect(calibrateMultidimensional(data, { ...options, seed: 5, standardErrors: "hessian" })).toEqual(first);
+      const other = calibrateMultidimensional(data, { ...options, seed: 6 });
+      expect(other.items[0]?.parameters).not.toEqual(first.items[0]?.parameters);
+    });
+
+    it("reports the cycles of its last stage and whether the tolerance was met", () => {
+      const short = calibrateMultidimensional(data, { ...options, maxIterations: 3 });
+      expect(short.converged).toBe(false);
+      expect(short.iterations).toBe(3);
+      const long = calibrateMultidimensional(data, { ...options, tolerance: 0.05 });
+      expect(long.converged).toBe(true);
+      expect(long.iterations).toBeGreaterThanOrEqual(3);
+      expect(long.iterations).toBeLessThan(2000);
+    });
+
+    it("reports AIC and BIC from the same number of parameters as EM", () => {
+      const fit = calibrateMultidimensional(data, { ...options, maxIterations: 5 });
+      expectClose(fit.aic, -2 * fit.logLikelihood + 2 * 25, 1e-9);
+      expectClose(fit.bic, -2 * fit.logLikelihood + 25 * Math.log(250), 1e-9);
+    });
+
+    it("fixes the correlations at 0 when they are not estimated and has none in one dimension", () => {
+      const uncorrelated = calibrateMultidimensional(data, { ...options, correlated: false, maxIterations: 5 });
+      expect(uncorrelated.correlations).toEqual([
+        [1, 0],
+        [0, 1],
+      ]);
+      expect(uncorrelated.correlationStandardErrors).toBeNull();
+      const one = calibrateMultidimensional(
+        responseMatrix(
+          rows.map((row) => row.slice(0, 6)),
+          { itemIds: m2pl.itemIds.slice(0, 6) },
+        ),
+        { model: multidimensionalTwoParameterLogistic, dimensions: 1, method: "mhrm", standardErrors: "hessian" },
+      );
+      expect(one.correlations).toEqual([[1]]);
+      expect(one.items.every(({ standardErrors }) => standardErrors !== null)).toBe(true);
+    });
+
+    it("estimates exploratory models with the first items' later slopes fixed at 0", () => {
+      const fit = calibrateMultidimensional(data, {
+        model: multidimensionalTwoParameterLogistic,
+        dimensions: 2,
+        method: "mhrm",
+        maxIterations: 10,
+      });
+      expect(fit.items[0]?.parameters.a[1]).toBe(0);
+      expect(fit.items[1]?.parameters.a[1]).not.toBe(0);
+      expect(fit.correlations).toEqual([
+        [1, 0],
+        [0, 1],
+      ]);
+    });
+
+    it("applies priors", () => {
+      const plain = calibrateMultidimensional(data, { ...options, seed: 2 });
+      const shrunk = calibrateMultidimensional(data, {
+        ...options,
+        seed: 2,
+        priors: { intercept: normalPrior(0, 0.3) },
+      });
+      const size = (fit: MultidimensionalCalibration<Parameters>): number =>
+        fit.items.reduce(
+          (sum, { parameters }) => sum + Math.abs((parameters as MultidimensionalLogisticParameters).intercept),
+          0,
+        );
+      expect(size(shrunk)).toBeLessThan(size(plain));
+    });
+
+    it("calibrates sparse records", () => {
+      const records = rows.flatMap((row, person) =>
+        row.flatMap((response, item) =>
+          response === null ? [] : [{ person: `p${person}`, item: defined(m2pl.itemIds[item]), response }],
+        ),
+      );
+      const fit = calibrateMultidimensional(responseRecords(records), { ...options, maxIterations: 5 });
+      expect(fit.items).toHaveLength(12);
+      expect(fit.logLikelihood).toBeLessThan(0);
+    });
+
+    it("chooses EM up to three dimensions and MH-RM above", () => {
+      // Only EM has a grid: the option points is accepted by the default method up to three dimensions and rejected above.
+      expect(() =>
+        calibrateMultidimensional(data, {
+          model: multidimensionalTwoParameterLogistic,
+          loadings: m2pl.loadings,
+          points: 5,
+          maxIterations: 1,
+        }),
+      ).not.toThrow();
+      const four = Object.fromEntries(m2pl.itemIds.map((id, i) => [id, [`D${(i % 4) + 1}`]]));
+      expect(() =>
+        calibrateMultidimensional(data, { model: multidimensionalTwoParameterLogistic, loadings: four, points: 5 }),
+      ).toThrow('The option points sets the grid of EM, which the method "mhrm" does not use.');
+      const fit = calibrateMultidimensional(data, {
+        model: multidimensionalTwoParameterLogistic,
+        loadings: four,
+        maxIterations: 3,
+      });
+      expect(fit.dimensions).toEqual(["D1", "D2", "D3", "D4"]);
+      expect(fit.correlations).toHaveLength(4);
+    });
+  });
+
+  it("gives the same calibration for the same seed, whatever the seed", () => {
+    const data = responseMatrix(
+      m2pl.responses.slice(0, 40).map((row) => row.slice(0, 6)),
+      { itemIds: m2pl.itemIds.slice(0, 6) },
+    );
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 2 ** 31 }), (seed) => {
+        const options = {
+          model: multidimensionalTwoParameterLogistic,
+          dimensions: 1,
+          method: "mhrm",
+          seed,
+          maxIterations: 2,
+        } as const;
+        expect(calibrateMultidimensional(data, options)).toEqual(calibrateMultidimensional(data, options));
+      }),
+      { numRuns: 4 },
+    );
+  }, 120_000);
+});
+
+describe("MH-RM internals", () => {
+  const items5 = mirtMhrm.itemIds;
+  const responses = compressResponses(responseMatrix(mirtMhrm.responses, { itemIds: [...items5] }));
+
+  it("computes the complete-data score and information of mirt's Deriv", () => {
+    const design = designOf({ loadings: mirtMhrm.loadings }, items5);
+    const states = setUp(responses, { model: multidimensionalGradedResponse, loadings: mirtMhrm.loadings }, design, 0);
+    const theta = Float64Array.from(mirtMhrm.thetas.flat());
+    const data = responsesByItem(responses);
+    const scratch = createScratch(states, 5);
+    for (const reference of mirtMhrm.completeData) {
+      const index = items5.indexOf(reference.item);
+      const item = defined(states[index]);
+      item.parameters = { a: reference.parameters.slice(0, 5), intercepts: reference.parameters.slice(5) };
+      item.vector.set(item.model.toVector(item.parameters));
+      // The estimated entries are indices in mirt's vector: the slopes a1 to a5 of the loaded dimensions, then d1 to d5.
+      const own = Array.from(item.free);
+      const draws = { theta, responses: data, dimensions: 5 };
+      const size = own.length;
+      const gradient = new Float64Array(size);
+      itemMoments(item, index, draws, scratch, gradient);
+      const central = new Float64Array(size * size);
+      observedItemInformation(item, index, draws, scratch, central, true);
+      const forward = new Float64Array(size * size);
+      observedItemInformation(item, index, draws, scratch, forward, false);
+      own.forEach((entry, l) => {
+        const slot = entry;
+        expectClose(
+          gradient[l] ?? Number.NaN,
+          defined(reference.gradient[slot]),
+          1e-10 * Math.max(1, Math.abs(defined(reference.gradient[slot]))),
+          `${reference.item} score ${l}`,
+        );
+        own.forEach((other, m) => {
+          const expected = -defined(reference.hessian[slot]?.[other]);
+          expectClose(
+            central[l * size + m] ?? Number.NaN,
+            expected,
+            1e-8 * Math.max(1, Math.abs(expected)),
+            `${reference.item} information ${l},${m}`,
+          );
+          expectClose(
+            forward[l * size + m] ?? Number.NaN,
+            expected,
+            2e-4 * Math.max(1, Math.abs(expected)),
+            `${reference.item} forward information ${l},${m}`,
+          );
+        });
+      });
+    }
+  });
+
+  it("lists the responses by item and by person, each once, with a person's in item order", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.array(fc.option(fc.integer({ min: 0, max: 1 }), { nil: null }), { minLength: 4, maxLength: 4 }), {
+          minLength: 1,
+          maxLength: 12,
+        }),
+        (rows) => {
+          const compressed = compressResponses(responseMatrix(rows));
+          const data = responsesByItem(compressed);
+          const people = responsesByPerson(data);
+          const answered = rows.flat().filter((value) => value !== null).length;
+          expect(data.respondents).toHaveLength(answered);
+          expect(people.responses).toHaveLength(answered);
+          expect(new Set(people.responses).size).toBe(answered);
+          for (let p = 0; p < data.count; p++) {
+            const list = Array.from(people.responses.subarray(people.starts[p], people.starts[p + 1]));
+            const itemsOfPerson = list.map((r) => people.itemOf[r] ?? -1);
+            expect(itemsOfPerson).toEqual([...itemsOfPerson].sort((a, b) => a - b));
+            expect(list.every((r) => data.respondents[r] === p)).toBe(true);
+          }
+        },
+      ),
+    );
+  });
+
+  it("draws a person's theta from the exact posterior", () => {
+    const itemIds = m2pl.itemIds.slice(0, 6);
+    const loadings = Object.fromEntries(itemIds.map((id, i) => [id, [i < 3 ? "F1" : "F2"]]));
+    const pattern = [1, 0, 1, 1, 0, 1];
+    // Starting values need every category answered, which one person's responses do not.
+    const calibrated = compressResponses(
+      responseMatrix(
+        m2pl.responses.slice(0, 250).map((row) => row.slice(0, 6)),
+        { itemIds },
+      ),
+    );
+    const states = setUp(
+      calibrated,
+      { model: multidimensionalTwoParameterLogistic, loadings },
+      designOf({ loadings }, itemIds),
+      0,
+    );
+    const parameters = [
+      { a: [1.2, 0], intercept: 0.3 },
+      { a: [0.9, 0], intercept: -0.4 },
+      { a: [1.5, 0], intercept: 0.1 },
+      { a: [0, 1.1], intercept: 0.5 },
+      { a: [0, 1.4], intercept: -0.2 },
+      { a: [0, 0.8], intercept: 0.2 },
+    ];
+    states.forEach((item, i) => {
+      item.parameters = { ...defined(parameters[i]), c: 0, d: 1 };
+    });
+    const correlations = createCorrelations(2);
+    correlations.set(Float64Array.of(1, 0.5, 0.5, 1));
+    const chain = createChain(
+      states,
+      responsesByItem(compressResponses(responseMatrix([pattern], { itemIds }))),
+      correlations,
+    );
+    const random = createRandom(11);
+    chain.refresh();
+    for (let k = 0; k < 200; k++) chain.sweep(random, 0.5);
+    const sums = new Float64Array(2);
+    const products = new Float64Array(4);
+    const sweeps = 40_000;
+    let accepted = 0;
+    for (let k = 0; k < sweeps; k++) {
+      accepted += chain.sweep(random, 0.5);
+      for (let i = 0; i < 2; i++) {
+        sums[i] = (sums[i] ?? 0) + (chain.theta[i] ?? 0);
+        for (let j = 0; j < 2; j++)
+          products[i * 2 + j] = (products[i * 2 + j] ?? 0) + (chain.theta[i] ?? 0) * (chain.theta[j] ?? 0);
+      }
+    }
+    const exact = multidimensionalPosteriorMeanEstimate(
+      states.map((item) => ({ model: item.model, parameters: item.parameters })),
+      pattern,
+      {
+        prior: {
+          mean: [0, 0],
+          covariance: [
+            [1, 0.5],
+            [0.5, 1],
+          ],
+        },
+        points: 61,
+      },
+    );
+    // The draws are correlated, so the bound is several times the standard error of independent draws.
+    for (let i = 0; i < 2; i++) {
+      expectClose((sums[i] ?? 0) / sweeps, defined(exact.theta[i]), 0.04, `mean ${i + 1}`);
+      const variance = (products[i * 2 + i] ?? 0) / sweeps - ((sums[i] ?? 0) / sweeps) ** 2;
+      expectClose(variance, defined(exact.covariance[i]?.[i]), 0.04, `variance ${i + 1}`);
+    }
+    expect(accepted / sweeps).toBeGreaterThan(0.1);
+    expect(accepted / sweeps).toBeLessThan(0.9);
+  });
+
+  describe("correlations of the draws", () => {
+    const dimensions = 3;
+    const matrix = Float64Array.of(1, 0.5, -0.2, 0.5, 1, 0.3, -0.2, 0.3, 1);
+    const correlations = createCorrelations(dimensions);
+    expect(correlations.set(matrix)).toBe(true);
+    const theta = Float64Array.from({ length: 7 * dimensions }, (_, k) => Math.sin(k * 1.7) * 1.3 + Math.cos(k * 0.9));
+    const persons = 7;
+
+    /** The log-likelihood of the draws under N(0, Φ) for the matrix with the pair (i, j) shifted by `shift`. */
+    function logLikelihood(shifts: number[]): number {
+      const shifted = createCorrelations(dimensions);
+      const next = Float64Array.from(matrix);
+      correlations.pairs.forEach(([i, j], a) => {
+        next[i * dimensions + j] = (matrix[i * dimensions + j] ?? 0) + (shifts[a] ?? 0);
+        next[j * dimensions + i] = (matrix[j * dimensions + i] ?? 0) + (shifts[a] ?? 0);
+      });
+      shifted.set(next);
+      const second = new Float64Array(dimensions * dimensions);
+      secondMoments(theta, persons, dimensions, second);
+      let trace = 0;
+      for (let i = 0; i < dimensions; i++)
+        for (let j = 0; j < dimensions; j++)
+          trace += (shifted.precision[i * dimensions + j] ?? 0) * (second[j * dimensions + i] ?? 0);
+      return -0.5 * persons * shifted.logDeterminant() - 0.5 * trace;
+    }
+
+    it("gives the score and the observed information as derivatives of the log-likelihood", () => {
+      const pairs = correlations.pairs.length;
+      const second = new Float64Array(dimensions * dimensions);
+      secondMoments(theta, persons, dimensions, second);
+      const score = new Float64Array(pairs);
+      latentScore(correlations, second, persons, score);
+      const information = new Float64Array(pairs * pairs);
+      latentObservedInformation(correlations, second, persons, information);
+      const step = 1e-5;
+      const at = (a: number, b: number, sa: number, sb: number): number => {
+        const shifts = new Array<number>(pairs).fill(0);
+        shifts[a] = (shifts[a] ?? 0) + sa;
+        shifts[b] = (shifts[b] ?? 0) + sb;
+        return logLikelihood(shifts);
+      };
+      for (let a = 0; a < pairs; a++) {
+        expectClose(defined(score[a]), (at(a, a, step, 0) - at(a, a, -step, 0)) / (2 * step), 1e-6, `score ${a}`);
+        for (let b = 0; b < pairs; b++) {
+          const second2 =
+            a === b
+              ? (at(a, b, step, 0) - 2 * logLikelihood(new Array<number>(pairs).fill(0)) + at(a, b, -step, 0)) /
+                step ** 2
+              : (at(a, b, step, step) - at(a, b, step, -step) - at(a, b, -step, step) + at(a, b, -step, -step)) /
+                (4 * step ** 2);
+          expectClose(defined(information[a * pairs + b]), -second2, 1e-4, `information ${a},${b}`);
+        }
+      }
+    });
+
+    it("gives the sum over persons of the persons' scores as the score of the draws", () => {
+      const pairs = correlations.pairs.length;
+      const second = new Float64Array(dimensions * dimensions);
+      secondMoments(theta, persons, dimensions, second);
+      const total = new Float64Array(pairs);
+      latentScore(correlations, second, persons, total);
+      const each = new Float64Array(persons * pairs);
+      personLatentScores(correlations, theta, persons, each);
+      for (let a = 0; a < pairs; a++) {
+        let sum = 0;
+        for (let p = 0; p < persons; p++) sum += each[p * pairs + a] ?? 0;
+        expectClose(sum, defined(total[a]), 1e-12, `pair ${a}`);
+      }
+    });
+
+    it("rejects a matrix that is not positive definite and keeps the old one", () => {
+      const fresh = createCorrelations(2);
+      expect(fresh.set(Float64Array.of(1, 1, 1, 1))).toBe(false);
+      expect(fresh.matrix).toEqual(Float64Array.of(1, 0, 0, 1));
+      expect(fresh.logDeterminant()).toBe(0);
+    });
+  });
+});
+
 describe("rotation", () => {
   /** An exploratory calibration with the base R maximum of the fixture: loadings and items, uncorrelated. */
   const calibration: MultidimensionalCalibration<Parameters> = {
@@ -1397,11 +1926,11 @@ describe("errors", () => {
   });
 
   it("limits EM to three dimensions and needs at least as many items as dimensions", () => {
-    expect(() => calibrateMultidimensional(data, { model, dimensions: 4 })).toThrow(
+    expect(() => calibrateMultidimensional(data, { model, method: "em", dimensions: 4 })).toThrow(
       "EM calibrates up to 3 dimensions, found 4.",
     );
     const names = Object.fromEntries(m2pl.itemIds.map((id, i) => [id, [`d${i % 4}`]]));
-    expect(() => calibrateMultidimensional(data, { model, loadings: names })).toThrow(
+    expect(() => calibrateMultidimensional(data, { model, method: "em", loadings: names })).toThrow(
       "EM calibrates up to 3 dimensions, found 4.",
     );
     expect(() =>
@@ -1414,6 +1943,26 @@ describe("errors", () => {
         { model, dimensions: 3 },
       ),
     ).toThrow("An exploratory model of 3 dimensions needs at least 3 items, found 2.");
+  });
+
+  it("rejects the method, the seed and the options that a method does not take", () => {
+    const options = { model, loadings };
+    expect(() => calibrateMultidimensional(data, { ...options, method: "mcmc" as never })).toThrow(
+      'The option method must be "em" or "mhrm", found "mcmc".',
+    );
+    expect(() => calibrateMultidimensional(data, { ...options, method: JSON.parse("null") })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, { ...options, seed: 1.5 })).toThrow(
+      "A seed must be a safe integer, found 1.5.",
+    );
+    expect(() => calibrateMultidimensional(data, { ...options, seed: JSON.parse('"7"') })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, { ...options, method: "mhrm", points: 15 })).toThrow(
+      'The option points sets the grid of EM, which the method "mhrm" does not use.',
+    );
+    expect(() =>
+      calibrateMultidimensional(data, { ...options, method: "mhrm", standardErrors: "cross-product" }),
+    ).toThrow(
+      'MH-RM has no posterior over a grid to cross-multiply: the option standardErrors needs "none" or "hessian" with the method "mhrm".',
+    );
   });
 
   it("checks the pattern of loadings", () => {

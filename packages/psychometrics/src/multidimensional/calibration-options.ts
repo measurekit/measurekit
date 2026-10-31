@@ -2,6 +2,9 @@ import type { StandardErrorMethod } from "../irt/calibration-options.js";
 import type { ParameterPrior } from "../irt/prior.js";
 import type { LoadingPattern, MultidimensionalModel } from "./model.js";
 
+/** How a calibration estimates: `"em"`, by quadrature over a grid, or `"mhrm"`, by Metropolis-Hastings Robbins-Monro. */
+export type CalibrationMethod = "em" | "mhrm";
+
 /** Options of {@link calibrateMultidimensional}. */
 export interface MultidimensionalCalibrationOptions<TParameters> {
   /**
@@ -11,18 +14,26 @@ export interface MultidimensionalCalibrationOptions<TParameters> {
    */
   readonly model: MultidimensionalModel<TParameters> | readonly MultidimensionalModel<TParameters>[];
   /**
-   * The number of dimensions of an exploratory model, from 1 to 3: every item loads on every dimension. The slopes of
-   * the first D - 1 items on later dimensions are fixed at 0 (item j loads on the first j dimensions), which fixes the
-   * rotation, and the dimensions are uncorrelated. One of `dimensions` and `loadings` is required.
+   * How to estimate: `"em"`, which integrates theta by quadrature over a grid and calibrates up to 3 dimensions, or
+   * `"mhrm"`, the Metropolis-Hastings Robbins-Monro algorithm, which draws theta and has no limit of dimensions.
+   *
+   * @defaultValue `"em"` up to 3 dimensions, `"mhrm"` above
+   */
+  readonly method?: CalibrationMethod;
+  /**
+   * The number of dimensions of an exploratory model, a positive integer, at most 3 for EM: every item loads on every
+   * dimension. The slopes of the first D - 1 items on later dimensions are fixed at 0 (item j loads on the first j
+   * dimensions), which fixes the rotation, and the dimensions are uncorrelated. One of `dimensions` and `loadings` is
+   * required.
    *
    * @defaultValue none
    */
   readonly dimensions?: number;
   /**
    * The dimensions each item loads on, in a confirmatory model: the dimension names by item id, such as `{ q1:
-   * ["verbal"], q2: ["verbal", "quantitative"] }`, every item of the data included. The dimensions, up to 3, are named
-   * in order of first appearance among the items in item order; the slopes of the others are fixed at 0. One of
-   * `dimensions` and `loadings` is required.
+   * ["verbal"], q2: ["verbal", "quantitative"] }`, every item of the data included. The dimensions, at most 3 for EM,
+   * are named in order of first appearance among the items in item order; the slopes of the others are fixed at 0. One
+   * of `dimensions` and `loadings` is required.
    *
    * @defaultValue none
    */
@@ -43,27 +54,38 @@ export interface MultidimensionalCalibrationOptions<TParameters> {
   readonly priors?: Readonly<Record<string, ParameterPrior>>;
   /**
    * The number of nodes per dimension of the grid over the dimensions, at least 2, from -6 to 6 standard deviations.
+   * EM only: MH-RM has no grid, and rejects the option.
    *
    * @defaultValue `61` for one dimension, `31` for two and `15` for three
    */
   readonly points?: number;
   /**
-   * The method of the standard errors. `"hessian"` runs two E-steps per estimated parameter; `"cross-product"` one pass
-   * over the persons.
+   * The method of the standard errors. `"hessian"` is Louis' formula for the observed information: exact, from the
+   * posterior over the grid, for EM, and from 400 cycles of draws at the estimates for MH-RM, which makes it stochastic;
+   * `"cross-product"` is the sum over persons of the outer products of their scores, for EM only.
    *
    * @defaultValue `"none"`
    */
   readonly standardErrors?: StandardErrorMethod;
   /**
-   * EM has converged when no estimated parameter changes by more than this in an iteration.
+   * The seed of the draws of MH-RM, of the persons' thetas and of the importance sampling of the log-likelihood. A seed
+   * gives the same calibration. EM ignores it.
    *
-   * @defaultValue `1e-4`
+   * @defaultValue `0`
+   */
+  readonly seed?: number;
+  /**
+   * The calibration has converged when no estimated parameter changes by more than this: in an EM iteration, or, for
+   * MH-RM, in three successive cycles of the last stage.
+   *
+   * @defaultValue `1e-4` for EM, `1e-3` for MH-RM
    */
   readonly tolerance?: number;
   /**
-   * The most EM iterations to run.
+   * The most iterations to run: EM iterations, or the cycles of the last stage of MH-RM, after the 250 of its first two
+   * stages.
    *
-   * @defaultValue `500`
+   * @defaultValue `500` for EM, `2000` for MH-RM
    */
   readonly maxIterations?: number;
 }

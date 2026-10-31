@@ -604,6 +604,66 @@ describe("recovery", () => {
     }
     expect(Math.sqrt(mean(slopeErrors.map((error) => error * error)))).toBeLessThan(0.2);
   });
+
+  it("recovers the parameters of simulated five-dimensional items by MH-RM", () => {
+    // Five dimensions with correlations 0.4 to the power of their distance, six items each, each item loading on one
+    // dimension. Thresholds fixed before the first run: every estimate within four standard errors of the true value,
+    // and a root mean square error of the slopes below 0.2.
+    const random = createRandom(20261029);
+    const dimensions = 5;
+    const correlations = Array.from({ length: dimensions }, (_, i) =>
+      Array.from({ length: dimensions }, (_, j) => 0.4 ** Math.abs(i - j)),
+    );
+    const factor = defined(cholesky(Float64Array.from(correlations.flat()), dimensions));
+    const items: MultidimensionalItem<MultidimensionalLogisticParameters>[] = Array.from({ length: 30 }, (_, i) => ({
+      model: multidimensionalTwoParameterLogistic,
+      parameters: {
+        a: Array.from({ length: dimensions }, (_, d) =>
+          d === i % dimensions ? 0.8 + 0.1 * Math.floor(i / dimensions) : 0,
+        ),
+        intercept: ((i % 7) - 3) * 0.4,
+        c: 0,
+        d: 1,
+      },
+    }));
+    const thetas = Array.from({ length: 2000 }, () => {
+      const z = Array.from({ length: dimensions }, () => random.normal());
+      return Array.from({ length: dimensions }, (_, d) =>
+        z.reduce((sum, value, k) => sum + (factor[d * dimensions + k] ?? 0) * value, 0),
+      );
+    });
+    const matrix = simulateMultidimensionalResponses(items, thetas, random);
+    const loadings = Object.fromEntries(items.map((_, i) => [`item${i + 1}`, [`D${(i % dimensions) + 1}`]]));
+    const result = calibrateMultidimensional(matrix, {
+      model: multidimensionalTwoParameterLogistic,
+      loadings,
+      method: "mhrm",
+      seed: 20261029,
+      standardErrors: "hessian",
+    });
+    expect(result.converged).toBe(true);
+    const slopeErrors: number[] = [];
+    result.items.forEach((estimate, j) => {
+      const truth = defined(items[j]).parameters;
+      const standardErrors = defined(estimate.standardErrors);
+      const d = j % dimensions;
+      const slopeError = defined(estimate.parameters.a[d]) - defined(truth.a[d]);
+      expect(Math.abs(slopeError), `${estimate.id} slope`).toBeLessThan(4 * defined(standardErrors[`a${d + 1}`]));
+      expect(Math.abs(estimate.parameters.intercept - truth.intercept), `${estimate.id} intercept`).toBeLessThan(
+        4 * defined(standardErrors.intercept),
+      );
+      slopeErrors.push(slopeError);
+    });
+    for (let i = 1; i < dimensions; i++) {
+      for (let j = 0; j < i; j++) {
+        const error = defined(result.correlations[i]?.[j]) - defined(correlations[i]?.[j]);
+        expect(Math.abs(error), `correlation ${i},${j}`).toBeLessThan(
+          4 * defined(result.correlationStandardErrors?.[i]?.[j]),
+        );
+      }
+    }
+    expect(Math.sqrt(mean(slopeErrors.map((error) => error * error)))).toBeLessThan(0.2);
+  }, 300_000);
 });
 
 describe("properties", () => {
