@@ -1,15 +1,16 @@
 # Rater agreement and effects
 
-`@measurekit/psychometrics/rater` measures how far raters agree: Cohen's kappa for two raters, unweighted, linear
-or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of scores. It also estimates what
+`@measurekit/psychometrics/rater` measures how far raters agree: exact and adjacent agreement, Cohen's kappa for two
+raters, unweighted, linear or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of
+scores; and how far one rater is more lenient than another, by the standardized mean difference. It also estimates what
 raters do to scores: the many-facet Rasch model puts persons, items and raters on one scale, so that a rater's severity
 is a number of logits and a person's score can be adjusted for the raters who gave it. The agreement statistics are
-validated against irr and psych, the model against base R and TAM ([validation](validation.md)).
+validated against irr, psych and effsize, the model against base R and TAM ([validation](validation.md)).
 
 ## Ratings
 
 Every function takes ratings by subject: one row per rated subject, such as an essay, with one rating per rater,
-`null` when a rater did not rate the subject. Kappa takes categories, integers from 0, as item responses; intraclass
+`null` when a rater did not rate the subject. Agreement and kappa take categories, integers from 0, as item responses; the standardized mean difference and the intraclass
 correlations take any finite numbers. Each statistic uses the subjects every rater rated.
 
 ```ts
@@ -56,6 +57,54 @@ For Fleiss' kappa, P̄ is the mean over subjects of the share of agreeing pairs 
 Kappa is 1 for perfect agreement and 0 for agreement at chance level. When every rating is in one category the chance
 agreement is 1 and kappa is undefined: both functions throw `DataError`.
 
+## Exact and adjacent agreement
+
+`exactAgreement(ratings)` and `adjacentAgreement(ratings, options)` return the share of subjects on which the raters
+agree: exactly, or within a number of categories. They are the simplest checks of how well automated scores or two
+human raters match; kappa corrects them for chance.
+
+```mermaid
+flowchart LR
+  R[Ratings by subject] --> C[Subjects every rater rated]
+  C --> S["Span of each subject: highest rating less lowest"]
+  S --> W{"Span at most the width?"}
+  W -->|yes| A[The subject agrees]
+  W -->|no| D[The subject does not agree]
+  A --> P[Share of subjects that agree]
+  D --> P
+```
+
+| Function                              | Agreement of a subject                                                                       | irr                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------- |
+| `exactAgreement(ratings)`             | Every rater gave the same rating: a span of 0                                                | `agree(tolerance = 0)`     |
+| `adjacentAgreement(ratings, options)` | The highest rating less the lowest is at most `width`: with two raters, a difference of that | `agree(tolerance = width)` |
+
+| Option  | Default | Meaning                                                                                             |
+| ------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `width` | `1`     | Of `adjacentAgreement`: the widest span, in categories, that counts as agreement; an integer from 0 |
+
+Both return a proportion from 0 to 1, where irr reports a percentage. Ratings are categories, integers from 0, from two
+raters or more; with more than two, every rating of a subject must lie within the width. They use the subjects every
+rater rated. Not included: agreement corrected for chance, which kappa gives.
+
+```ts
+import { adjacentAgreement, exactAgreement } from "@measurekit/psychometrics/rater";
+
+// Four essays scored 0 to 4 by three raters; rater 3 did not score essay 4.
+const ratings = [
+  [3, 3, 2],
+  [1, 2, 1],
+  [4, 4, 4],
+  [2, 1, null],
+];
+exactAgreement(ratings); // 0.33: the three raters agree on essay 3 alone
+adjacentAgreement(ratings); // 1: on essays 1 to 3 no two raters differ by more than 1
+adjacentAgreement(
+  ratings.map((row) => row.slice(0, 2)),
+  { width: 0 },
+); // 0.5: raters 1 and 2 agree exactly on two of four essays
+```
+
 ## Intraclass correlation
 
 `intraclassCorrelation(ratings)` returns the six coefficients of Shrout and Fleiss (1979) and McGraw and Wong (1996),
@@ -74,6 +123,46 @@ and within subjects MS_W.
 Use the single-rater forms when one rater scores each subject in practice, the average forms when the reported score
 is the raters' mean; absolute agreement when raters' leniency matters, consistency when only their ordering does. A
 coefficient whose denominator is 0, as when every rating is equal, is `null`.
+
+## Standardized mean difference
+
+`standardizedMeanDifference(ratings)` measures how much more lenient the first of two raters is than the second, in
+standard deviations: the difference of their mean ratings over their pooled standard deviation. It is the measure used
+to compare automated with human scores, where a magnitude above 0.15 is commonly taken to flag a difference worth
+acting on.
+
+```mermaid
+flowchart LR
+  R[Ratings of two raters] --> C[Subjects both rated]
+  C --> M["Means m₁ and m₂"]
+  C --> V["Variances s₁² and s₂², on n - 1"]
+  V --> P["Pooled SD, √((s₁² + s₂²) / 2)"]
+  M --> D["Difference m₁ - m₂"]
+  D --> Q["SMD = (m₁ - m₂) / pooled SD"]
+  P --> Q
+```
+
+The result is positive when the first rater rates higher on average, and 0 when the means are equal; it does not depend
+on the origin or the scale of the ratings. With the same subjects rated by both raters, the pooled standard deviation
+is that of Cohen's d, so the value equals effsize's `cohen.d` of the two raters' ratings as independent samples.
+Ratings are finite numbers, not only categories: automated scores are often continuous. It uses the subjects both
+raters rated, needs at least two, and is undefined when both raters' ratings are constant.
+
+```ts
+import { standardizedMeanDifference } from "@measurekit/psychometrics/rater";
+
+// Raters 1 and 3 of the four essays above; rater 3 did not score essay 4.
+standardizedMeanDifference([
+  [3, 2],
+  [1, 1],
+  [4, 4],
+]); // 0.22: rater 1 is 0.22 standard deviations more lenient
+```
+
+Not included: the small-sample correction of Hedges' g, confidence intervals, and the differences among more than two
+raters, which pairs of raters give. Where effsize treats the two sets of ratings as independent samples, so does this
+function, though the same subjects were rated; it does not use the standard deviation of the differences, as a paired
+effect size would.
 
 ## Many-facet Rasch model
 

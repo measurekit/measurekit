@@ -9,5 +9,5 @@ adaptive and multistage testing, item and person fit, differential item function
 items, linking and equating, including equating through common items, IRT observed-score equating and standard errors by
 bootstrap and the delta method, score scaling and prediction, dimensionality by polychoric correlations and parallel
 analysis, explanatory item response models, generalizability theory, Mokken scale analysis, simulation, standard
-setting, rater agreement and rater effects by the many-facet Rasch model, and response times with the joint model of
+setting, rater agreement and rater effects, including the many-facet Rasch model, and response times with the joint model of
 speed and accuracy.

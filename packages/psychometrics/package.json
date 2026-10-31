@@ -33,6 +33,7 @@
     "many-facet-rasch",
     "rater-severity",
     "cohen-kappa",
+    "percent-agreement",
     "intraclass-correlation",
     "response-times",
     "speed-accuracy",

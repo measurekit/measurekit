@@ -21,7 +21,7 @@ Rscript validation/psychometrics/generalizability.R  # variance components and d
 Rscript validation/psychometrics/mokken.R            # Mokken scale analysis: mokken's coefH, aisp, check.monotonicity and check.iio
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
-Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych; the many-facet Rasch model: base R, with TAM and sirt data
+Rscript validation/psychometrics/rater.R             # rater agreement: irr, psych and effsize; the many-facet Rasch model: base R, with TAM and sirt data
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
 Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
 Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mirt, GPArotation and base R; case names as arguments run only those cases
@@ -29,7 +29,7 @@ Rscript validation/psychometrics/interop.R           # mirt's coefficient forms 
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
 ```
 
-They need R with the packages psych, mirt, subscore, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
+They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
 sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm and jsonlite;
 `common.R` holds their shared helpers.
 

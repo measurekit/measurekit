@@ -1,9 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  adjacentAgreement,
   cohenKappa,
   createRandom,
   DataError,
+  exactAgreement,
   expectedRating,
   type FacetedScore,
   fleissKappa,
@@ -14,14 +16,18 @@ import {
   manyFacetRasch,
   maximumLikelihoodEstimate,
   type PersonEstimate,
+  standardizedMeanDifference,
 } from "../src/index.js";
 import { summarizeFacet } from "../src/rater/facet-summary.js";
 import fixture from "./fixtures/rater.json" with { type: "json" };
+import agreementFixture from "./fixtures/rater-agreement.json" with { type: "json" };
 import manyFacetFixture from "./fixtures/rater-many-facet.json" with { type: "json" };
 import { expectClose } from "./helpers.js";
 
 /** Kappa and intraclass correlations against irr: closed forms of the same counts and sums. */
 const TOLERANCE = 1e-12;
+/** Agreement shares and standardized mean differences against irr and effsize: closed forms of the same counts and sums. */
+const AGREEMENT_TOLERANCE = 1e-12;
 /** Measures, thresholds, the mean and SD of theta against the base R maximum of the marginal likelihood. */
 const ESTIMATE_TOLERANCE = 1e-8;
 /** The marginal log-likelihood at the maximum. */
@@ -236,6 +242,160 @@ function simulatedScores(seed: number, persons: number, severities = [-0.4, 0, 0
   }
   return scores;
 }
+
+describe("exactAgreement and adjacentAgreement", () => {
+  for (const reference of agreementFixture.agreement) {
+    it(`match irr's agree at every width on ${reference.name}`, () => {
+      expectClose(exactAgreement(reference.ratings), reference.exact, AGREEMENT_TOLERANCE, "exact");
+      expectClose(adjacentAgreement(reference.ratings), reference.adjacent, AGREEMENT_TOLERANCE, "adjacent");
+      for (const { width, agreement } of reference.widths) {
+        expectClose(adjacentAgreement(reference.ratings, { width }), agreement, AGREEMENT_TOLERANCE, `width ${width}`);
+      }
+    });
+  }
+
+  it("counts a subject when the ratings are within the width, derived by hand", () => {
+    // Differences 0, 1, 2 and 0: exact 2 of 4, within 1 three of 4, within 2 all.
+    const ratings = [
+      [0, 0],
+      [1, 2],
+      [3, 1],
+      [2, 2],
+    ];
+    expect(exactAgreement(ratings)).toBe(0.5);
+    expect(adjacentAgreement(ratings)).toBe(0.75);
+    expect(adjacentAgreement(ratings, { width: 0 })).toBe(0.5);
+    expect(adjacentAgreement(ratings, { width: 2 })).toBe(1);
+  });
+
+  it("needs every rater of a subject within the width when there are more than two", () => {
+    // The ratings 1, 2, 3 span 2 although neighbors differ by 1.
+    const ratings = [
+      [1, 2, 3],
+      [2, 2, 2],
+      [1, 2, 2],
+    ];
+    expect(exactAgreement(ratings)).toBeCloseTo(1 / 3, 15);
+    expect(adjacentAgreement(ratings)).toBeCloseTo(2 / 3, 15);
+    expect(adjacentAgreement(ratings, { width: 2 })).toBe(1);
+  });
+
+  it("uses the subjects every rater rated", () => {
+    const rated = [
+      [0, 0],
+      [1, 3],
+    ];
+    expect(exactAgreement([...rated, [2, null], [null, 4], [null, null]])).toBe(exactAgreement(rated));
+  });
+
+  it("rejects a width that is not a non-negative integer, options of the wrong type and other invalid ratings", () => {
+    const ratings = [[0, 1]];
+    expect(() => adjacentAgreement(ratings, { width: -1 })).toThrow(
+      "The option width must be a non-negative number, found -1.",
+    );
+    expect(() => adjacentAgreement(ratings, { width: 1.5 })).toThrow(
+      "The option width must be a non-negative integer, found 1.5.",
+    );
+    expect(() => adjacentAgreement(ratings, { width: JSON.parse('"1"') })).toThrow(
+      'The option width must be a non-negative number, found "1".',
+    );
+    expect(() => adjacentAgreement(ratings, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => exactAgreement([[0], [1]])).toThrow("Exact agreement needs at least 2 raters, found 1.");
+    expect(() => adjacentAgreement([[0, 1.5]])).toThrow(
+      "The rating of subject 1 by rater 2 must be a category, an integer from 0, or null, found 1.5.",
+    );
+    expect(() => exactAgreement([[0, null]])).toThrow(
+      "Exact agreement needs at least 1 subjects rated by every rater, found 0.",
+    );
+    expect(() => adjacentAgreement(JSON.parse("null"))).toThrow(
+      "Adjacent agreement needs an array of ratings, one row per subject.",
+    );
+  });
+});
+
+describe("standardizedMeanDifference", () => {
+  for (const reference of agreementFixture.meanDifference) {
+    it(`matches base R and effsize's cohen.d on ${reference.name}`, () => {
+      expectClose(standardizedMeanDifference(reference.ratings), reference.value, AGREEMENT_TOLERANCE);
+    });
+  }
+
+  it("divides the first rater's mean less the second's by the pooled standard deviation, derived by hand", () => {
+    // Means 2 and 4 with variances 1 and 1: (2 - 4) / 1.
+    expect(
+      standardizedMeanDifference([
+        [1, 3],
+        [2, 4],
+        [3, 5],
+      ]),
+    ).toBe(-2);
+    // Means 2 and 1, variances 4 and 0: pooled √2, so 1 / √2.
+    expect(
+      standardizedMeanDifference([
+        [0, 1],
+        [2, 1],
+        [4, 1],
+      ]),
+    ).toBeCloseTo(1 / Math.SQRT2, 15);
+  });
+
+  it("is 0 for equal means, changes sign with the order of the raters and ignores the scale and origin of the ratings", () => {
+    const ratings = [
+      [1, 2],
+      [4, 3],
+      [2, 2],
+      [5, 6],
+    ];
+    // Means 3 and 3.25, variances 10/3 and 10.75/3: -0.25 / √(20.75 / 6).
+    expect(standardizedMeanDifference(ratings)).toBeCloseTo(-0.25 / Math.sqrt(20.75 / 6), 14);
+    const value = standardizedMeanDifference(ratings);
+    expectClose(standardizedMeanDifference(ratings.map(([x = 0, y = 0]) => [y, x])), -value, 1e-15);
+    expectClose(standardizedMeanDifference(ratings.map(([x = 0, y = 0]) => [3 * x + 7, 3 * y + 7])), value, 1e-12);
+    expect(
+      standardizedMeanDifference([
+        [1, 3],
+        [3, 1],
+        [2, 2],
+      ]),
+    ).toBe(0);
+  });
+
+  it("uses the subjects both raters rated and accepts ratings that are not categories", () => {
+    const rated = [
+      [1.5, 2.25],
+      [3, 2.5],
+      [4.75, 4],
+    ];
+    expect(standardizedMeanDifference([...rated, [null, 9], [8, null]])).toBe(standardizedMeanDifference(rated));
+  });
+
+  it("rejects other numbers of raters, constant ratings, too few subjects and invalid ratings", () => {
+    expect(() =>
+      standardizedMeanDifference([
+        [1, 2, 3],
+        [2, 3, 4],
+      ]),
+    ).toThrow("The standardized mean difference needs 2 raters, found 3.");
+    expect(() =>
+      standardizedMeanDifference([
+        [2, 2],
+        [2, 2],
+      ]),
+    ).toThrow("The standardized mean difference is undefined when both raters' ratings are constant.");
+    expect(() => standardizedMeanDifference([[1, 2]])).toThrow(
+      "The standardized mean difference needs at least 2 subjects rated by every rater, found 1.",
+    );
+    expect(() =>
+      standardizedMeanDifference([
+        [1, Number.NaN],
+        [2, 3],
+      ]),
+    ).toThrow("The rating of subject 1 by rater 2 must be a finite number or null, found NaN.");
+    expect(() => standardizedMeanDifference(JSON.parse("null"))).toThrow(
+      "The standardized mean difference needs an array of ratings, one row per subject.",
+    );
+  });
+});
 
 describe("manyFacetRasch", () => {
   for (const dataset of manyFacetFixture.cases) {
@@ -778,6 +938,36 @@ describe("properties", () => {
         expectClose(model.thresholds[0]?.thresholds.reduce((sum, tau) => sum + tau, 0) ?? null, 0, 1e-9, "thresholds");
       }),
       { numRuns: 5 },
+    );
+  });
+
+  it("agreement grows with the width, lies from 0 to 1 and is 1 once the width spans the categories", () => {
+    fc.assert(
+      fc.property(ratings(3), (rows) => {
+        let previous = exactAgreement(rows);
+        expect(previous).toBeGreaterThanOrEqual(0);
+        for (const width of [1, 2, 3, 4]) {
+          const value = adjacentAgreement(rows, { width });
+          expect(value).toBeGreaterThanOrEqual(previous);
+          expect(value).toBeLessThanOrEqual(1);
+          previous = value;
+        }
+        expect(previous).toBe(1);
+      }),
+    );
+  });
+
+  it("agreement and the standardized mean difference do not depend on the order of subjects", () => {
+    fc.assert(
+      fc.property(ratings(2), (rows) => {
+        const reversed = [...rows].reverse();
+        expect(adjacentAgreement(reversed)).toBe(adjacentAgreement(rows));
+        try {
+          expectClose(standardizedMeanDifference(reversed), standardizedMeanDifference(rows), 1e-12);
+        } catch (error) {
+          if (!(error instanceof DataError)) throw error;
+        }
+      }),
     );
   });
 });

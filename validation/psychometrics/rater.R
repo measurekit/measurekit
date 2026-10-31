@@ -1,4 +1,5 @@
-# Rater agreement fixtures. References: irr (kappa2, kappam.fleiss, icc) and psych (cohen.kappa, ICC) as a check.
+# Rater agreement fixtures. References: irr (kappa2, kappam.fleiss, icc, agree) and psych (cohen.kappa, ICC) as a check;
+# effsize's cohen.d for the standardized mean difference between two raters, checked against base R.
 # Data: irr's anxiety (20 subjects, 3 raters, ratings 1 to 6), recoded 0 to 5, and diagnoses (30 subjects, 6 raters,
 # 5 categories), coded 0 to 4; anxiety again with two ratings missing.
 
@@ -448,4 +449,48 @@ write_fixture("rater-many-facet", list(
            mfrm_case(incomplete, c("item", "rater"), NULL, incomplete_tam(~ item + rater + step)),
            mfrm_case(incomplete, c("item", "rater"), "rater", incomplete_tam(~ item + rater + rater:step))))
   )
+))
+
+# --- Exact and adjacent agreement, standardized mean difference --------------------------------------------------------
+# irr's agree, the percentage of subjects whose ratings are all within `tolerance` of each other, on the subjects every
+# rater rated, as a proportion; and the standardized mean difference of two raters over the pooled SD of their ratings,
+# by base R and by effsize's cohen.d, which agree for ratings of the same subjects.
+
+agreement_case <- function(name, x) {
+  agree_values <- function(tolerance) irr::agree(x, tolerance)$value / 100
+  complete <- na.omit(x)
+  rows <- apply(complete, 1, function(row) max(row) - min(row))
+  stopifnot(all(sapply(0:3, function(tolerance) abs(agree_values(tolerance) - mean(rows <= tolerance)) < 1e-15)))
+  list(name = name, ratings = ratings(x), subjects = nrow(complete), exact = agree_values(0),
+       adjacent = agree_values(1), widths = lapply(0:3, function(width) list(width = width, agreement = agree_values(width))))
+}
+
+mean_difference <- function(x) {
+  complete <- na.omit(x)
+  pooled <- sqrt((var(complete[, 1]) + var(complete[, 2])) / 2)
+  value <- (mean(complete[, 1]) - mean(complete[, 2])) / pooled
+  stopifnot(abs(value - effsize::cohen.d(complete[, 1], complete[, 2])$estimate) < 1e-12)
+  value
+}
+
+# Two raters' continuous scores of 150 subjects: the second rates 0.4 higher on average and is noisier; 5% are missing.
+set.seed(20261029)
+true_scores <- rnorm(150, 3, 1)
+scores <- cbind(true_scores + rnorm(150, 0, 0.5), true_scores + 0.4 + rnorm(150, 0, 0.7))
+scores[matrix(runif(length(scores)) < 0.05, 150)] <- NA
+
+write_fixture("rater-agreement", list(
+  source = "irr's anxiety, recoded 0 to 5, also with two ratings missing; irr's diagnoses, coded 0 to 4; a simulation of two raters' continuous scores, set.seed(20261029).",
+  agreement = list(
+    agreement_case("anxiety, three raters", anxiety),
+    agreement_case("anxiety, two raters", anxiety[, 1:2]),
+    agreement_case("anxiety with missing ratings", sparse),
+    agreement_case("diagnoses, six raters", diagnoses)
+  ),
+  meanDifference = lapply(list(
+    list(name = "anxiety, raters 1 and 2", x = anxiety[, 1:2]),
+    list(name = "anxiety, raters 2 and 3", x = anxiety[, 2:3]),
+    list(name = "anxiety with missing ratings", x = sparse[, 1:2]),
+    list(name = "continuous scores with missing", x = scores)
+  ), function(case) list(name = case$name, ratings = ratings(case$x), value = mean_difference(case$x)))
 ))
