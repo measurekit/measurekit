@@ -9,21 +9,36 @@ import {
   type ItemFeatureRegression,
   type ItemFeatures,
   itemFeatureRegression,
+  type Lltm,
+  type LltmOptions,
+  lltm,
+  logNormalPrior,
   normalPrior,
   oneParameterLogistic,
   predictItemParameter,
   type Random,
   type ResponseMatrix,
   responseMatrix,
+  responseRecords,
   simulateResponses,
+  simulateThetas,
   twoParameterLogistic,
 } from "../src/index.js";
+import lltmFixture from "./fixtures/explanatory-lltm.json" with { type: "json" };
 import fixture from "./fixtures/explanatory-regression.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Effects, standard errors, covariances, residual variance, log-likelihood and predictions against base R. */
 const REGRESSION_TOLERANCE = 1e-10;
+/** LLTM effects and standard deviation of theta against the base R maximum, which EM at tolerance 1e-10 reaches. */
+const LLTM_PARAMETER_TOLERANCE = 1e-7;
+/** Their standard errors, relative: numerical Hessians on both sides. */
+const LLTM_STANDARD_ERROR_TOLERANCE = 1e-6;
+/** LLTM log-likelihoods, information criteria and the likelihood-ratio statistic. */
+const LLTM_LOG_LIKELIHOOD_TOLERANCE = 1e-8;
+/** EM tolerance of the LLTM comparisons: the base R maxima are exact to 1e-10. */
+const LLTM_EM_TOLERANCE = 1e-10;
 
 /** A 2PL item of a calibration with standard errors of a and b. */
 function calibrated(id: string, b: number, standardError: number, a = 1, slopeError = 0.1): CalibratedItem<unknown> {
@@ -418,6 +433,300 @@ describe("itemFeatureRegression", () => {
   });
 });
 
+/** The responses of a dataset of the LLTM fixture. */
+function lltmData(dataset: number) {
+  const { itemIds, responses } = defined(lltmFixture.datasets[dataset]);
+  return responseMatrix(responses as (number | null)[][], { itemIds });
+}
+
+/** The features of a case of the LLTM fixture. */
+function lltmFeatures(reference: (typeof lltmFixture.cases)[number]): ItemFeatures {
+  return JSON.parse(JSON.stringify(reference.features));
+}
+
+/** Estimates the LLTM of a case of the LLTM fixture, to the tolerance that matches the base R maximum. */
+function lltmOf(reference: (typeof lltmFixture.cases)[number], options: LltmOptions = {}): Lltm {
+  return lltm(lltmData(reference.dataset), lltmFeatures(reference), {
+    intercept: reference.intercept,
+    tolerance: LLTM_EM_TOLERANCE,
+    maxIterations: 10_000,
+    ...options,
+  });
+}
+
+/** The models of the fixture's cases at the tolerance that matches base R, estimated once. */
+const FITTED = new Map<number, Lltm>();
+
+function fitted(index: number): Lltm {
+  let model = FITTED.get(index);
+  if (model === undefined) {
+    model = lltmOf(defined(lltmFixture.cases[index]));
+    FITTED.set(index, model);
+  }
+  return model;
+}
+
+describe("lltm", () => {
+  lltmFixture.cases.forEach((reference, index) => {
+    it(`matches the base R maximum for ${reference.name}`, () => {
+      const actual = fitted(index);
+      expect(actual.converged).toBe(true);
+      expect(actual.effects.map(({ name }) => name)).toEqual(reference.effects.map(({ name }) => name));
+      reference.effects.forEach((expected, j) => {
+        const effect = defined(actual.effects[j]);
+        expectClose(effect.estimate, expected.estimate, LLTM_PARAMETER_TOLERANCE, `${expected.name} estimate`);
+        expectClose(
+          effect.standardError,
+          expected.standardError,
+          LLTM_STANDARD_ERROR_TOLERANCE * expected.standardError,
+          `${expected.name} error`,
+        );
+      });
+      expectClose(actual.sd, reference.sd, LLTM_PARAMETER_TOLERANCE, "sd of theta");
+      expect(actual.items.map(({ id }) => id)).toEqual(defined(lltmFixture.datasets[reference.dataset]).itemIds);
+      reference.difficulties.forEach((expected, i) => {
+        const { model, parameters } = defined(actual.items[i]);
+        expect(model).toBe(twoParameterLogistic);
+        expect(parameters).toMatchObject({ a: 1, c: 0, d: 1 });
+        expectClose(parameters.b, expected, LLTM_PARAMETER_TOLERANCE, `difficulty ${i + 1}`);
+      });
+      expectClose(actual.logLikelihood, reference.logLikelihood, LLTM_LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
+      expectClose(actual.aic, reference.aic, 2 * LLTM_LOG_LIKELIHOOD_TOLERANCE, "AIC");
+      expectClose(actual.bic, reference.bic, 2 * LLTM_LOG_LIKELIHOOD_TOLERANCE, "BIC");
+      const { comparison } = actual;
+      expectClose(comparison.raschLogLikelihood, reference.raschLogLikelihood, LLTM_LOG_LIKELIHOOD_TOLERANCE, "Rasch");
+      expectClose(comparison.chiSquare, reference.chiSquare, 2 * LLTM_LOG_LIKELIHOOD_TOLERANCE, "chi-square");
+      expect(comparison.degreesOfFreedom).toBe(reference.degreesOfFreedom);
+      expectClose(comparison.significance, reference.significance, 1e-9, "significance");
+    });
+  });
+
+  it("keeps the features' difficulties against the Rasch model where they hold, and rejects them where they do not", () => {
+    const [exact, noisy, withoutIntercept, missing, shifts] = lltmFixture.cases.map(
+      (_, index) => fitted(index).comparison,
+    );
+    expect(defined(exact).significance).toBeGreaterThan(0.05);
+    expect(defined(missing).significance).toBeGreaterThan(0.05);
+    expect(defined(noisy).significance).toBeLessThan(1e-10);
+    expect(defined(withoutIntercept).significance).toBeLessThan(1e-6);
+    expect(defined(shifts).significance).toBeLessThan(1e-10);
+  });
+
+  it("is nested in the Rasch model: the statistic is not negative and the degrees of freedom are the items less the effects", () => {
+    lltmFixture.cases.forEach((reference, index) => {
+      const { comparison, effects } = fitted(index);
+      expect(comparison.chiSquare).toBeGreaterThanOrEqual(0);
+      expect(comparison.degreesOfFreedom).toBe(
+        defined(lltmFixture.datasets[reference.dataset]).itemIds.length - effects.length,
+      );
+    });
+  });
+
+  it("converges at the default tolerance to within 1e-3 of the maximum", () => {
+    const reference = defined(lltmFixture.cases[0]);
+    const actual = lltm(lltmData(0), lltmFeatures(reference));
+    expect(actual.converged).toBe(true);
+    reference.effects.forEach((expected, j) => {
+      expectClose(defined(actual.effects[j]).estimate, expected.estimate, 1e-3, expected.name);
+    });
+    expectClose(actual.comparison.chiSquare, reference.chiSquare, 1e-3);
+  });
+
+  it("gives the same model from response records as from the matrix", () => {
+    const reference = defined(lltmFixture.cases[3]);
+    const matrix = lltmData(2);
+    const records = responseRecords(
+      matrix.responses
+        .flatMap((row, person) =>
+          row.flatMap((response, item) =>
+            response === null
+              ? []
+              : [{ person: defined(matrix.personIds[person]), item: defined(matrix.itemIds[item]), response }],
+          ),
+        )
+        .reverse(),
+      { personIds: matrix.personIds, itemIds: matrix.itemIds },
+    );
+    const options = { tolerance: 1e-6 };
+    expect(lltm(records, lltmFeatures(reference), options)).toEqual(lltm(matrix, lltmFeatures(reference), options));
+  });
+
+  it("is not changed by persons without responses, which are not counted in the BIC", () => {
+    const reference = defined(lltmFixture.cases[0]);
+    const matrix = lltmData(0);
+    const padded = responseMatrix([...matrix.responses, matrix.itemIds.map(() => null)], { itemIds: matrix.itemIds });
+    const options = { tolerance: 1e-6 };
+    const base = lltm(matrix, lltmFeatures(reference), options);
+    const result = lltm(padded, lltmFeatures(reference), options);
+    expect(result.effects).toEqual(base.effects);
+    expect(result.logLikelihood).toBe(base.logLikelihood);
+    expect(result.bic).toBe(base.bic);
+  });
+
+  it("does not depend on the order of the items, the effects being named", () => {
+    const reference = defined(lltmFixture.cases[0]);
+    const matrix = lltmData(0);
+    const order = matrix.itemIds.map((_, i) => (i * 7) % matrix.itemIds.length);
+    const permuted = responseMatrix(
+      matrix.responses.map((row) => order.map((i) => defined(row[i]))),
+      { itemIds: order.map((i) => defined(matrix.itemIds[i])) },
+    );
+    const options = { tolerance: 1e-10, maxIterations: 10_000 };
+    const base = lltm(matrix, lltmFeatures(reference), options);
+    const result = lltm(permuted, lltmFeatures(reference), options);
+    const byName = (model: Lltm) => Object.fromEntries(model.effects.map(({ name, estimate }) => [name, estimate]));
+    for (const [name, estimate] of Object.entries(byName(base))) {
+      expectClose(defined(byName(result)[name]), estimate, 1e-7, name);
+    }
+    expectClose(result.logLikelihood, base.logLikelihood, 1e-8);
+    expectClose(result.comparison.chiSquare, base.comparison.chiSquare, 1e-7);
+  });
+
+  it("leaves out the standard errors on request, with the same estimates", () => {
+    const reference = defined(lltmFixture.cases[0]);
+    const none = lltmOf(reference, { standardErrors: "none" });
+    const hessian = fitted(0);
+    expect(none.effects.every(({ standardError }) => standardError === null)).toBe(true);
+    expect(hessian.effects.every(({ standardError }) => (standardError ?? 0) > 0)).toBe(true);
+    expect(none.effects.map(({ estimate }) => estimate)).toEqual(hessian.effects.map(({ estimate }) => estimate));
+    expect(lltm(lltmData(0), lltmFeatures(reference)).effects[0]?.standardError).not.toBeNull();
+  });
+
+  it("estimates without an intercept the mean of theta fixed at 0 and the features' effects only", () => {
+    expect(fitted(2).effects.map(({ name }) => name)).toEqual(["steps", "density", "open"]);
+    expect(fitted(0).effects.map(({ name }) => name)).toEqual(["(intercept)", "steps", "density", "open"]);
+  });
+
+  it("reports non-convergence within the iteration limit, and converges faster at a looser tolerance", () => {
+    const reference = defined(lltmFixture.cases[0]);
+    const limited = lltm(lltmData(0), lltmFeatures(reference), { maxIterations: 2 });
+    expect(limited).toMatchObject({ converged: false, iterations: 2 });
+    const loose = lltm(lltmData(0), lltmFeatures(reference), { tolerance: 1e-2 });
+    const tight = lltm(lltmData(0), lltmFeatures(reference));
+    expect(loose.iterations).toBeLessThan(tight.iterations);
+  });
+
+  it("takes the quadrature rule, a coarser Gauss-Hermite rule giving nearly the same model", () => {
+    const reference = defined(lltmFixture.cases[0]);
+    const rectangular = lltm(lltmData(0), lltmFeatures(reference));
+    const hermite = lltm(lltmData(0), lltmFeatures(reference), { quadrature: { method: "gauss-hermite", points: 21 } });
+    reference.effects.forEach((_, j) => {
+      expectClose(defined(hermite.effects[j]).estimate, defined(rectangular.effects[j]).estimate, 5e-3);
+    });
+    expectClose(hermite.sd, rectangular.sd, 5e-3);
+  });
+
+  it("recovers the effects and the standard deviation of theta of simulated responses", () => {
+    const random = createRandom(20261031);
+    const steps = [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6, 2, 3, 4, 5];
+    const open = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1];
+    const difficulties = steps.map((count, i) => -0.5 + 0.4 * count + 0.6 * defined(open[i]));
+    const matrix = simulatedResponses(
+      difficulties,
+      Array.from({ length: 2000 }, () => 1.3 * random.normal()),
+      random,
+    );
+    const features = Object.fromEntries(
+      steps.map((count, i) => [`q${i + 1}`, { steps: count, open: defined(open[i]) }]),
+    );
+    const model = lltm(matrix, features);
+    const [intercept, stepEffect, openEffect] = model.effects;
+    for (const [effect, expected] of [
+      [intercept, -0.5],
+      [stepEffect, 0.4],
+      [openEffect, 0.6],
+    ] as const) {
+      const found = defined(effect);
+      expect(Math.abs(found.estimate - expected), found.name).toBeLessThan(4 * defined(found.standardError));
+    }
+    expect(Math.abs(model.sd - 1.3)).toBeLessThan(0.1);
+    expect(model.comparison.significance).toBeGreaterThan(0.001);
+  });
+
+  it("gives items that are the anchors of a calibration on the scale of its theta, N(0, sd²)", () => {
+    const model = fitted(0);
+    const fixed = Object.fromEntries(model.items.map(({ id, parameters }) => [id, parameters]));
+    const calibration = calibrate(lltmData(0), { model: twoParameterLogistic, fixed, latent: "normal" });
+    const [group] = calibration.groups;
+    expectClose(defined(group).mean, 0, 1e-3);
+    expectClose(defined(group).sd, model.sd, 1e-3);
+    expectClose(calibration.logLikelihood, model.logLikelihood, 1e-3);
+  });
+
+  it("rejects options of other types from JavaScript", () => {
+    const matrix = lltmData(0);
+    const features = lltmFeatures(defined(lltmFixture.cases[0]));
+    expect(() => lltm(matrix, features, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => lltm(matrix, features, { intercept: JSON.parse('"yes"') })).toThrow(
+      'The option intercept must be a boolean, found "yes".',
+    );
+    expect(() => lltm(matrix, features, { standardErrors: JSON.parse('"full"') })).toThrow(
+      'The option standardErrors must be "none" or "hessian", found "full".',
+    );
+    expect(() => lltm(matrix, features, { tolerance: -1 })).toThrow(
+      "The option tolerance must be a non-negative number, found -1.",
+    );
+    expect(() => lltm(matrix, features, { maxIterations: JSON.parse('"5"') })).toThrow(DataError);
+    expect(() => lltm(matrix, features, { quadrature: { points: 1 } })).toThrow(DataError);
+    expect(() => lltm(matrix, JSON.parse("null"))).toThrow(
+      "The features must be an object of features by item id, found null.",
+    );
+    expect(() => lltm(JSON.parse("null"), features)).toThrow(DataError);
+  });
+
+  it("rejects responses that are not dichotomous with both categories for every item", () => {
+    const features = oneFeature([1, 2, 3, 4]);
+    const rows = [
+      [1, 0, 1, 0],
+      [0, 1, 1, 1],
+      [1, 1, 0, 0],
+      [0, 0, 1, 1],
+      [1, 0, 0, 1],
+    ];
+    const polytomous = responseMatrix(
+      rows.map((row, person) => (person === 0 ? [row[0] ?? 0, 2, row[2] ?? 0, row[3] ?? 0] : row)),
+      { itemIds: ["q1", "q2", "q3", "q4"] },
+    );
+    expect(() => lltm(polytomous, features)).toThrow(
+      'Item "q2" has a response of 2, but the 2PL model allows responses from 0 to 1.',
+    );
+    const allCorrect = responseMatrix(
+      rows.map(([, ...rest]) => [1, ...rest]),
+      { itemIds: ["q1", "q2", "q3", "q4"] },
+    );
+    expect(() => lltm(allCorrect, features)).toThrow('Item "q1" has no response in category 0');
+    expect(() => lltm(responseMatrix([[null, null]]), oneFeature([1, 2]))).toThrow(
+      'Item "item1" has responses in fewer than two categories; calibration needs at least two.',
+    );
+  });
+
+  it("rejects features that are missing, collinear or too many for the items", () => {
+    const matrix = lltmData(0);
+    const reference = defined(lltmFixture.cases[0]);
+    const features = lltmFeatures(reference);
+    expect(() => lltm(matrix, { ...features, q03: JSON.parse("null") })).toThrow(
+      'Item "q03" needs features, an object of numbers, found null.',
+    );
+    expect(() => lltm(matrix, { ...features, q03: { steps: 1 } })).toThrow('Item "q03" lacks the feature "density".');
+    const itemIds = ["q1", "q2", "q3", "q4", "q5"];
+    const random = createRandom(9);
+    const small = simulatedResponses(
+      [-1, -0.4, 0, 0.5, 1],
+      Array.from({ length: 300 }, () => random.normal()),
+      random,
+    );
+    const names = Object.fromEntries(
+      itemIds.map((id, i) => [id, { first: i, second: i * i, third: (i * 3) % 4, fourth: i % 2 }]),
+    );
+    expect(() => lltm(small, names)).toThrow("An LLTM needs more items than effects, found 5 items for 5 effects.");
+    const collinear = Object.fromEntries(itemIds.map((id, i) => [id, { x: i, double: 2 * i }]));
+    expect(() => lltm(small, collinear)).toThrow('The effect "double" is all zeros or a linear combination');
+    const constant = Object.fromEntries(itemIds.map((id) => [id, { x: 3 }]));
+    expect(() => lltm(small, constant)).toThrow('The effect "x" is all zeros or a linear combination');
+    expect(lltm(small, constant, { intercept: false }).effects).toHaveLength(1);
+  });
+});
+
 /** A regression with known effects and covariance, as a calibration of items would give it. */
 const REGRESSION: ItemFeatureRegression = {
   parameter: "b",
@@ -588,6 +897,135 @@ describe("predictItemParameter", () => {
       "The residual sd of the regression must be a non-negative number, found -1.",
     );
     expect(() => predictItemParameter({ ...REGRESSION, residualSd: JSON.parse('"0.5"') }, { x: 1 })).toThrow(DataError);
+  });
+});
+
+describe("documentation examples", () => {
+  const item = (id: string, b: number, se: number) => ({
+    id,
+    model: twoParameterLogistic,
+    parameters: { a: 1, b, c: 0, d: 1 },
+    standardErrors: { a: 0.1, b: se },
+  });
+  const bank = [
+    item("q1", -1.1, 0.12),
+    item("q2", -0.4, 0.1),
+    item("q3", 0.2, 0.11),
+    item("q4", 0.9, 0.1),
+    item("q5", 1.6, 0.13),
+  ];
+  const stepFeatures = { q1: { steps: 1 }, q2: { steps: 2 }, q3: { steps: 3 }, q4: { steps: 4 }, q5: { steps: 5 } };
+
+  it("regresses the difficulties of a bank of five items on their steps, as the reference of itemFeatureRegression shows", () => {
+    const regression = itemFeatureRegression(bank, stepFeatures);
+    expect(regression.effects.map(({ name }) => name)).toEqual(["(intercept)", "steps"]);
+    expect(defined(regression.effects[0]).estimate).toBeCloseTo(-1.76, 2);
+    expect(defined(regression.effects[1]).estimate).toBeCloseTo(0.67, 2);
+  });
+
+  it("predicts the sixth step from that regression, as the reference of predictItemParameter shows", () => {
+    const { mean, sd } = predictItemParameter(itemFeatureRegression(bank, stepFeatures), { steps: 6 });
+    expect(mean).toBeCloseTo(2.24, 2);
+    expect(sd).toBeCloseTo(0.12, 2);
+  });
+
+  it("explains the difficulties of six items by their steps from 500 simulated persons, as the LLTM example shows", () => {
+    const random = createRandom(3);
+    const items = [1, 2, 3, 4, 5, 6].map((steps) => ({
+      model: twoParameterLogistic,
+      parameters: { a: 1, b: -1.5 + 0.5 * steps, c: 0, d: 1 },
+    }));
+    const responses = simulateResponses(items, simulateThetas(500, random), random);
+    const features = {
+      item1: { steps: 1 },
+      item2: { steps: 2 },
+      item3: { steps: 3 },
+      item4: { steps: 4 },
+      item5: { steps: 5 },
+      item6: { steps: 6 },
+    };
+    const model = lltm(responses, features);
+    const [intercept, steps] = model.effects;
+    expect([defined(intercept).estimate, defined(intercept).standardError]).toEqual([
+      expect.closeTo(-1.56, 2),
+      expect.closeTo(0.11, 2),
+    ]);
+    expect([defined(steps).estimate, defined(steps).standardError]).toEqual([
+      expect.closeTo(0.5, 2),
+      expect.closeTo(0.03, 2),
+    ]);
+    expect(model.sd).toBeCloseTo(0.98, 2);
+    expect(model.comparison.raschLogLikelihood).toBeCloseTo(-1831.8, 1);
+    expect(model.comparison).toMatchObject({ degreesOfFreedom: 4 });
+    expect(model.comparison.chiSquare).toBeCloseTo(2.43, 2);
+    expect(model.comparison.significance).toBeCloseTo(0.66, 2);
+    expect(defined(model.items[0]).parameters).toEqual({ a: 1, b: expect.closeTo(-1.06, 2), c: 0, d: 1 });
+  });
+
+  it("runs the cold start of the guide: calibrate a bank, regress on features, predict a new item and calibrate it with the prior", () => {
+    const rows = [
+      { steps: 1, open: 0, noise: 0.2 },
+      { steps: 2, open: 0, noise: -0.3 },
+      { steps: 3, open: 0, noise: 0.1 },
+      { steps: 4, open: 0, noise: 0.25 },
+      { steps: 5, open: 0, noise: -0.2 },
+      { steps: 6, open: 0, noise: 0.05 },
+      { steps: 1, open: 1, noise: -0.1 },
+      { steps: 2, open: 1, noise: 0.3 },
+      { steps: 3, open: 1, noise: -0.25 },
+      { steps: 4, open: 1, noise: 0.15 },
+      { steps: 5, open: 1, noise: 0 },
+      { steps: 6, open: 1, noise: -0.05 },
+      { steps: 2, open: 0, noise: 0.1 },
+      { steps: 3, open: 1, noise: -0.2 },
+      { steps: 4, open: 0, noise: 0.3 },
+      { steps: 5, open: 1, noise: -0.1 },
+    ];
+    const difficulty = ({ steps, open, noise }: (typeof rows)[number]) => -1.5 + 0.5 * steps + 0.4 * open + noise;
+    const bankItems = rows.map((row, i) => ({
+      id: `q${i + 1}`,
+      model: twoParameterLogistic,
+      parameters: { a: 1, b: difficulty(row), c: 0, d: 1 },
+    }));
+    const features = Object.fromEntries(rows.map(({ steps, open }, i) => [`q${i + 1}`, { steps, open }]));
+    const newItem = { id: "new1", model: twoParameterLogistic, parameters: { a: 1, b: 0.9, c: 0, d: 1 } };
+    const random = createRandom(11);
+    const thetas = Array.from({ length: 1000 }, () => random.normal());
+    const { responses } = simulateResponses([...bankItems, newItem], thetas, random);
+    const ids = [...bankItems, newItem].map(({ id }) => id);
+
+    const calibration = calibrate(
+      responseMatrix(
+        responses.map((row) => row.slice(0, 16)),
+        { itemIds: ids.slice(0, 16) },
+      ),
+      { model: twoParameterLogistic, standardErrors: "hessian" },
+    );
+    const regression = itemFeatureRegression(calibration.items, features);
+    const [intercept, steps, open] = regression.effects;
+    expect(defined(intercept).estimate).toBeCloseTo(-1.4, 2);
+    expect(defined(intercept).standardError).toBeCloseTo(0.14, 2);
+    expect(defined(steps).estimate).toBeCloseTo(0.49, 2);
+    expect(defined(open).estimate).toBeCloseTo(0.21, 2);
+    expect(regression.residualSd).toBeCloseTo(0.18, 2);
+    const slopes = itemFeatureRegression(calibration.items, features, { parameter: "a" });
+
+    const itsFeatures = { steps: 4, open: 1 };
+    const b = predictItemParameter(regression, itsFeatures);
+    const a = predictItemParameter(slopes, itsFeatures);
+    expect([b.mean, b.sd]).toEqual([expect.closeTo(0.78, 2), expect.closeTo(0.2, 2)]);
+    expect([a.mean, a.sd]).toEqual([expect.closeTo(0.05, 2), expect.closeTo(0.04, 2)]);
+
+    const sparse = responseMatrix(
+      responses.map((row, person) => row.map((response, item) => (item === 16 && person >= 25 ? null : response))),
+      { itemIds: ids },
+    );
+    const fixed = Object.fromEntries(calibration.items.map(({ id, parameters }) => [id, parameters]));
+    const itemPriors = { new1: { b: normalPrior(b.mean, b.sd), a: logNormalPrior(a.mean, a.sd) } };
+    const free = calibrate(sparse, { model: twoParameterLogistic, fixed }).items[16]?.parameters;
+    const informed = calibrate(sparse, { model: twoParameterLogistic, fixed, itemPriors }).items[16]?.parameters;
+    expect([defined(free).a, defined(free).b]).toEqual([expect.closeTo(1.0, 2), expect.closeTo(0.59, 2)]);
+    expect([defined(informed).a, defined(informed).b]).toEqual([expect.closeTo(1.05, 2), expect.closeTo(0.75, 2)]);
   });
 });
 

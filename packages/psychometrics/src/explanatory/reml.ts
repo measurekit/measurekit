@@ -31,6 +31,8 @@ interface Evaluation {
   readonly covariance: Float64Array;
 }
 
+/** The relative decrease of the restricted log-likelihood that counts as rounding, not as a step that fails. */
+const LIKELIHOOD_ROUNDING = 1e-12;
 /** The most times a Fisher scoring step is halved, for a step that lowers the restricted log-likelihood. */
 const MAX_HALVINGS = 60;
 
@@ -45,7 +47,13 @@ const MAX_HALVINGS = 60;
  * stops when the score is not positive. It starts at τ² = 0.
  *
  * @param design - X, by item, then effect, of full column rank.
+ * @param items - The number of items.
+ * @param effects - The number of effects.
+ * @param y - The estimates.
  * @param variances - The sampling variances v_i, positive.
+ * @param tolerance - The change of τ² in a step at which scoring has converged.
+ * @param maxIterations - The most Fisher scoring steps.
+ * @returns The coefficients, their covariance, τ², the restricted log-likelihood and the convergence.
  * @throws `DataError` when there are not more items than effects, or XᵀWX cannot be inverted.
  * @see {@link https://doi.org/10.1080/01621459.1977.10480998 | Harville (1977)}
  * @see {@link https://doi.org/10.3102/10769986030003261 | Viechtbauer (2005)}
@@ -77,7 +85,8 @@ export function remlRegression(
     let trial = evaluate(next);
     for (
       let halvings = 0;
-      halvings < MAX_HALVINGS && trial.logLikelihood < current.logLikelihood - 1e-12 * Math.abs(current.logLikelihood);
+      halvings < MAX_HALVINGS &&
+      trial.logLikelihood < current.logLikelihood - LIKELIHOOD_ROUNDING * Math.abs(current.logLikelihood);
       halvings++
     ) {
       next = tau2 + (next - tau2) / 2;

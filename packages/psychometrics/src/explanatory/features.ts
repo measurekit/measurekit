@@ -32,6 +32,10 @@ export interface Design {
  * Builds the design matrix of items from their features: an optional intercept, then the features, in the order of
  * their first appearance among the items.
  *
+ * @param ids - The ids of the items, in the order of the rows.
+ * @param features - The features of each item by item id.
+ * @param intercept - Whether the first effect is an intercept, a column of 1.
+ * @returns The names of the effects and the design matrix by item, then effect.
  * @throws `DataError` when the features are not an object of objects, an item has none or lacks a feature that another
  * has, a value is not finite, a feature is named like the intercept, or the design has no effect.
  */
@@ -70,6 +74,7 @@ export function designMatrix(ids: readonly string[], features: ItemFeatures, int
  * Checks that the columns of the design are linearly independent: that XᵀX of each leading set of columns is positive
  * definite.
  *
+ * @param design - The design of the effects.
  * @throws `DataError` naming the first effect that is a linear combination of those before it.
  */
 export function checkFullRank({ names, matrix }: Design): void {

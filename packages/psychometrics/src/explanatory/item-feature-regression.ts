@@ -106,6 +106,11 @@ const SLOPE = "a";
  * regression.effects; // [{ name: "(intercept)", estimate: -1.76, ... }, { name: "steps", estimate: 0.67, ... }]
  * ```
  *
+ * @param items - The items of a calibration, with the standard errors of their parameters.
+ * @param features - The features of each item by item id, each a finite number by feature name.
+ * @param options - Which parameter is regressed, whether there is an intercept, and the stopping rule.
+ * @returns The effects with their covariance, the residual standard deviation between items and the restricted
+ * log-likelihood.
  * @throws `DataError` when the items, features or options are invalid, no item has the parameter or standard errors
  * for it, the parameter is shared by the items of its model, a standard error is not positive, a slope is not
  * positive, there are not more items than effects, or an effect is a linear combination of those before it.

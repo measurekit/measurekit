@@ -1,8 +1,10 @@
-# Explanatory item response theory fixtures: the regression of item parameters on item features, estimated in two stages.
-# The estimates and standard errors of a bank are mirt's 2PL calibration of simulated responses (SE.type = "Richardson",
-# the delta method for b); the regression of them on the features by restricted maximum likelihood is the base R
-# maximization of the restricted likelihood, and metafor's rma(method = "REML") agrees. The predictions of new items are
-# the mean x' eta and the sd sqrt(tau^2 + x' Cov x), written out.
+# Explanatory item response theory fixtures. The regression of item parameters on item features, estimated in two
+# stages: the estimates and standard errors of a bank are mirt's 2PL calibration of simulated responses (SE.type =
+# "Richardson", the delta method for b); the regression of them on the features by restricted maximum likelihood is the
+# base R maximization of the restricted likelihood, and metafor's rma(method = "REML") agrees. The predictions of new
+# items are the mean x' eta and the sd sqrt(tau^2 + x' Cov x), written out. The linear logistic test model: mirt's Rasch
+# model with an item design (SE.type = "Oakes", the only one mirt supports with an item design), compared with mirt's
+# Rasch model; eRm's conditional maximum likelihood LLTM cross-checks the method.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -161,5 +163,168 @@ write_fixture("explanatory-regression", list(
                  "features and tau = 0.3; 1500 persons and 40 items with two features and tau = 0; 800 persons and",
                  "12 items with one feature and tau = 0.25. The regression is the base R maximum of the restricted",
                  "likelihood, and metafor's rma(method = \"REML\") agrees."),
+  cases = cases
+))
+
+# --- The linear logistic test model ---------------------------------------------------------------------------------
+# The reference is the base R maximum of the marginal log-likelihood on the package's rule: theta ~ N(0, sigma^2) on 61
+# rectangular points z sigma, an item's logit sigma z - b_j with b = X eta, by BFGS and Newton steps on the exact gradient,
+# and the standard errors from the inverse Hessian, by central differences of the gradient. The Rasch model of the
+# comparison is the same with X the identity. mirt's Rasch model with `itemdesign` and `item.formula` (SE.type =
+# "Oakes", the only one it supports with an item design) cross-checks it: it keeps its nodes on [-6, 6] when it frees
+# the variance, so its estimates differ by the quadrature, up to 2e-5 here.
+
+rectangular_rule <- function(points) {
+  z <- seq(-6, 6, length.out = points)
+  list(z = z, weights = dnorm(z) / sum(dnorm(z)))
+}
+
+# The marginal log-likelihood and its gradient with respect to (eta, ln sigma), by Fisher's identity: the posterior mean
+# of the complete-data gradient. `x` has NA for missing responses.
+lltm_marginal <- function(par, x, design, rule = rectangular_rule(POINTS)) {
+  effects <- par[seq_len(ncol(design))]
+  sigma <- exp(par[ncol(design) + 1])
+  b <- drop(design %*% effects)
+  logit <- outer(sigma * rule$z, b, "-")
+  correct <- ifelse(is.na(x), 0, x)
+  answered <- ifelse(is.na(x), 0, 1)
+  joint <- correct %*% t(plogis(logit, log.p = TRUE)) + (answered - correct) %*% t(plogis(-logit, log.p = TRUE)) +
+    matrix(log(rule$weights), nrow(x), length(rule$z), byrow = TRUE)
+  largest <- apply(joint, 1, max)
+  posterior <- exp(joint - largest)
+  totals <- rowSums(posterior)
+  posterior <- posterior / totals
+  residual <- t(posterior) %*% correct - (t(posterior) %*% answered) * plogis(logit)
+  # d/d b_j = -sum over nodes of the residual; d/d sigma = sum of z times the residual.
+  gradient_b <- -colSums(residual)
+  list(logLikelihood = sum(largest + log(totals)),
+       gradient = c(drop(crossprod(design, gradient_b)), sigma * sum(rule$z * residual)))
+}
+
+lltm_maximum <- function(x, design) {
+  objective <- function(par) -lltm_marginal(par, x, design)$logLikelihood
+  gradient <- function(par) -lltm_marginal(par, x, design)$gradient
+  start <- c(rep(0, ncol(design)), 0)
+  par <- optim(start, objective, gradient, method = "BFGS", control = list(reltol = 1e-16, maxit = 10000))$par
+  # BFGS stops on the relative change of the objective; Newton steps take the gradient to its rounding level.
+  for (step in 1:5) par <- par - solve(jacobian(gradient, par), gradient(par))
+  stopifnot(max(abs(gradient(par))) < 1e-8)
+  covariance <- solve(jacobian(gradient, par))
+  list(par = par, covariance = covariance, logLikelihood = -objective(par))
+}
+
+lltm_case <- function(name, dataset, responses, design, intercept) {
+  terms <- colnames(design)
+  X <- cbind(if (intercept) 1, as.matrix(design))
+  colnames(X) <- c(if (intercept) "(intercept)", terms)
+  items <- ncol(responses)
+  fit <- lltm_maximum(responses, X)
+  rasch <- lltm_maximum(responses, diag(items))
+  effect_count <- ncol(X)
+  size <- effect_count + 1
+  statistic <- 2 * (rasch$logLikelihood - fit$logLikelihood)
+  persons <- nrow(responses)
+  # mirt's Rasch model with the item design: its coefficient is minus a difficulty effect.
+  formula <- as.formula(paste("~", if (intercept) "1 +" else "0 +", paste(terms, collapse = " + ")))
+  mirt_fit <- mirt(as.data.frame(responses), 1, itemtype = "Rasch", item.formula = formula, itemdesign = design,
+                   SE = TRUE, SE.type = "Oakes", TOL = TOL, quadpts = POINTS, verbose = FALSE,
+                   technical = list(NCYCLES = 1e5))
+  mirt_rasch <- mirt(as.data.frame(responses), 1, itemtype = "Rasch", TOL = TOL, quadpts = POINTS, verbose = FALSE)
+  stopifnot(extract.mirt(mirt_fit, "converged"), extract.mirt(mirt_rasch, "converged"))
+  mirt_effects <- -coef(mirt_fit)[[1]][1, seq_len(effect_count)]
+  mirt_errors <- sqrt(diag(vcov(mirt_fit)))[seq_len(effect_count)]
+  mirt_statistic <- 2 * (as.numeric(logLik(mirt_rasch)) - as.numeric(logLik(mirt_fit)))
+  stopifnot(
+    max(abs(mirt_effects - fit$par[seq_len(effect_count)])) < 1e-4,
+    max(abs(mirt_errors / sqrt(diag(fit$covariance))[seq_len(effect_count)] - 1)) < 1e-3,
+    abs(sqrt(coef(mirt_fit)$GroupPars[1, "COV_11"]) - exp(fit$par[size])) < 1e-4,
+    abs(as.numeric(logLik(mirt_fit)) - fit$logLikelihood) < 5e-4,
+    abs(mirt_statistic - statistic) < 1e-3
+  )
+  message(name, ": chi-square ", statistic, " on ", items - effect_count, " df; mirt ", mirt_statistic)
+  list(
+    name = name, dataset = dataset, intercept = intercept,
+    effects = lapply(seq_len(effect_count), function(j) {
+      list(name = colnames(X)[j], estimate = fit$par[j], standardError = sqrt(fit$covariance[j, j]))
+    }),
+    sd = exp(fit$par[size]),
+    difficulties = drop(X %*% fit$par[seq_len(effect_count)]),
+    logLikelihood = fit$logLikelihood, aic = -2 * fit$logLikelihood + 2 * size,
+    bic = -2 * fit$logLikelihood + size * log(persons),
+    raschLogLikelihood = rasch$logLikelihood, chiSquare = statistic, degreesOfFreedom = items - effect_count,
+    significance = pchisq(statistic, items - effect_count, lower.tail = FALSE)
+  )
+}
+
+lltm_features <- function(items, seed) {
+  set.seed(seed)
+  data.frame(steps = round(runif(items, 1, 6)), density = round(rnorm(items), 2), open = rbinom(items, 1, 0.4),
+             row.names = sprintf("q%02d", seq_len(items)))
+}
+
+lltm_responses <- function(persons, difficulty, spread, seed) {
+  set.seed(seed)
+  theta <- rnorm(persons, 0, spread)
+  x <- matrix(rbinom(persons * length(difficulty), 1, plogis(outer(theta, difficulty, "-"))), persons,
+              length(difficulty))
+  colnames(x) <- sprintf("q%02d", seq_along(difficulty))
+  x
+}
+
+# 1000 persons, 20 items, three features: the LLTM holds exactly (tau = 0), and with a residual of 0.3 between items.
+lltm_design <- lltm_features(20, 20261029)
+exact_difficulty <- drop(as.matrix(cbind(1, lltm_design)) %*% c(-0.5, 0.35, 0.3, 0.5))
+set.seed(20261030)
+noisy_difficulty <- exact_difficulty + rnorm(20, 0, 0.3)
+exact_responses <- lltm_responses(1000, exact_difficulty, 1.2, 20261029)
+noisy_responses <- lltm_responses(1000, noisy_difficulty, 1.2, 20261029)
+# 8% of the responses of the exact data missing at random.
+set.seed(20261029)
+missing_responses <- exact_responses
+missing_responses[matrix(runif(length(exact_responses)) < 0.08, nrow(exact_responses))] <- NA
+
+# eRm's lltmdat1: 100 persons answering 15 items at two time points, 30 virtual items, with a difficulty of each item
+# and a shift at the second time point. The cross-check is eRm's conditional maximum likelihood estimate of the shift.
+data(lltmdat1, package = "eRm")
+erm_ids <- sprintf("%s.t%d", sprintf("I%02d", rep(1:15, 2)), rep(1:2, each = 15))
+erm_responses <- as.matrix(lltmdat1)
+colnames(erm_responses) <- erm_ids
+erm_design <- as.data.frame(cbind(sapply(1:15, function(i) as.numeric(rep(1:15, 2) == i)), time2 = rep(0:1, each = 15)))
+colnames(erm_design) <- c(sprintf("I%02d", 1:15), "time2")
+rownames(erm_design) <- erm_ids
+erm_lltm <- eRm::LLTM(lltmdat1, mpoints = 2)
+erm_time <- unname(erm_lltm$etapar[15])
+
+datasets <- list(
+  list(name = "simulated exact LLTM", itemIds = colnames(exact_responses), responses = unname(exact_responses)),
+  list(name = "simulated LLTM with a residual of 0.3", itemIds = colnames(noisy_responses),
+       responses = unname(noisy_responses)),
+  list(name = "simulated exact LLTM with 8% missing", itemIds = colnames(missing_responses),
+       responses = unname(missing_responses)),
+  list(name = "eRm lltmdat1", itemIds = erm_ids, responses = unname(erm_responses))
+)
+features_of <- function(design) setNames(lapply(seq_len(nrow(design)), function(i) as.list(design[i, ])), rownames(design))
+
+cases <- list(
+  lltm_case("exact LLTM, three features with an intercept", 0, exact_responses, lltm_design, TRUE),
+  lltm_case("LLTM of difficulties with a residual", 1, noisy_responses, lltm_design, TRUE),
+  lltm_case("exact LLTM, three features without an intercept", 0, exact_responses, lltm_design, FALSE),
+  lltm_case("exact LLTM with missing responses", 2, missing_responses, lltm_design, TRUE),
+  lltm_case("difficulty of each item and a shift at the second time point", 3, erm_responses, erm_design, FALSE)
+)
+for (i in c(1, 2, 3, 4)) cases[[i]]$features <- features_of(lltm_design)
+cases[[5]]$features <- features_of(erm_design)
+# eRm's conditional maximum likelihood shift has the opposite sign, as eRm's parameters are easiness; the cross-check is
+# that it is within 0.05 of the marginal maximum likelihood estimate.
+shift <- cases[[5]]$effects[[16]]$estimate
+message("time shift: MML ", shift, ", eRm CML ", erm_time)
+stopifnot(abs(shift + erm_time) < 0.05)
+
+write_fixture("explanatory-lltm", list(
+  source = paste("Simulated LLTMs (set.seed(20261029)): 1000 persons, 20 items, three features, theta ~ N(0, 1.2^2),",
+                 "exact and with a residual of 0.3 between items, and with 8% of the responses missing; eRm's lltmdat1",
+                 "as 30 items. Base R maxima of the marginal likelihood on the package's rule; mirt's Rasch model with an item",
+                 "design (Oakes standard errors) and its Rasch model cross-check them."),
+  datasets = datasets,
   cases = cases
 ))

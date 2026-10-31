@@ -1,6 +1,6 @@
 import { numericalHessian } from "../math/hessian.js";
 import { invert } from "../math/linear-algebra.js";
-import { newton } from "../math/optimize.js";
+import { type HessianFunction, newton } from "../math/optimize.js";
 import type { Quadrature } from "../math/quadrature.js";
 import { type ExpectationItem, type ExpectationStep, expectationStep } from "./expectation.js";
 import { largestChange } from "./iteration.js";
@@ -33,6 +33,13 @@ export interface LinearRaschModel {
   readonly setOf: Int32Array;
   /** The number of categories of each set, at least 2; every item of a set has them. */
   readonly categoryCounts: Int32Array;
+  /**
+   * The mean of theta, held at this value rather than estimated, for locations that identify the scale themselves. It
+   * has no standard error.
+   *
+   * @defaultValue estimated
+   */
+  readonly fixedMean?: number;
 }
 
 /** How a linear Rasch model is estimated. */
@@ -104,7 +111,9 @@ export function fitLinearRasch(model: LinearRaschModel, options: LinearRaschOpti
     nodes,
     items.map((item) => item.counts),
   );
+  const held = model.fixedMean === undefined ? null : { index: layout.meanIndex, value: model.fixedMean };
   let parameters = startingValues(model, layout);
+  if (held !== null) parameters[held.index] = held.value;
   const assign = assigner(layout, nodes, items, steps);
   let converged = false;
   let iterations = 0;
@@ -112,17 +121,13 @@ export function fitLinearRasch(model: LinearRaschModel, options: LinearRaschOpti
     iterations++;
     assign(parameters);
     step.run();
-    const next = newton(objective, parameters, {
-      tolerance: M_STEP_TOLERANCE,
-      stepTolerance: M_STEP_STEP_TOLERANCE,
-      maxIterations: M_STEP_ITERATIONS,
-    }).x;
+    const next = maximize(objective, parameters, held);
     converged = largestChange(parameters, next) <= tolerance;
     parameters = next;
   }
   assign(parameters);
   const logLikelihood = step.run();
-  const covariance = options.standardErrors ? covarianceOf(layout, parameters, assign, step, objective) : null;
+  const covariance = options.standardErrors ? covarianceOf(layout, parameters, assign, step, objective, held) : null;
   return {
     parameters,
     layout,
@@ -138,6 +143,56 @@ export function fitLinearRasch(model: LinearRaschModel, options: LinearRaschOpti
     iterations,
     covariance,
   };
+}
+
+/** A parameter held at a value: its index in the parameter vector and the value. */
+interface Held {
+  readonly index: number;
+  readonly value: number;
+}
+
+/** Returns the parameters that minimize the objective from `start` by Newton's method, a held parameter unchanged. */
+function maximize(objective: HessianFunction, start: Float64Array, held: Held | null): Float64Array {
+  const options = {
+    tolerance: M_STEP_TOLERANCE,
+    stepTolerance: M_STEP_STEP_TOLERANCE,
+    maxIterations: M_STEP_ITERATIONS,
+  };
+  if (held === null) return newton(objective, start, options).x;
+  const reduced = newton(withoutParameter(objective, start.length, held), removeAt(start, held.index), options).x;
+  return insertAt(reduced, held.index, held.value);
+}
+
+/** Returns the objective as a function of the parameters other than the held one, which keeps its value. */
+function withoutParameter(objective: HessianFunction, size: number, held: Held): HessianFunction {
+  const full = new Float64Array(size);
+  full[held.index] = held.value;
+  const fullGradient = new Float64Array(size);
+  const fullHessian = new Float64Array(size * size);
+  const kept = Array.from({ length: size }, (_, j) => j).filter((j) => j !== held.index);
+  return (x, gradient, hessian) => {
+    kept.forEach((j, a) => {
+      full[j] = x[a] ?? 0;
+    });
+    const value = objective(full, fullGradient, fullHessian);
+    kept.forEach((j, a) => {
+      gradient[a] = fullGradient[j] ?? 0;
+      kept.forEach((k, b) => {
+        hessian[a * kept.length + b] = fullHessian[j * size + k] ?? 0;
+      });
+    });
+    return value;
+  };
+}
+
+function removeAt(values: ArrayLike<number>, index: number): Float64Array {
+  return Float64Array.from(Array.from(values).filter((_, j) => j !== index));
+}
+
+function insertAt(values: ArrayLike<number>, index: number, value: number): Float64Array {
+  const list = Array.from(values);
+  list.splice(index, 0, value);
+  return Float64Array.from(list);
 }
 
 function layoutOf(model: LinearRaschModel): RaschLayout {
@@ -243,23 +298,48 @@ function startingValues(model: LinearRaschModel, layout: RaschLayout): Float64Ar
   return parameters;
 }
 
-/** Returns the covariance matrix of the parameters, or `null` when the information is singular. */
+/**
+ * Returns the covariance matrix of the parameters, or `null` when the information is singular. A held parameter has no
+ * variance or covariance: its row and column are 0.
+ */
 function covarianceOf(
   layout: RaschLayout,
   parameters: Float64Array,
   assign: (parameters: Float64Array) => void,
   step: ExpectationStep,
   objective: ReturnType<typeof maximization>,
+  held: Held | null,
 ): Float64Array | null {
-  const scratch = new Float64Array(layout.size * layout.size);
-  const information = numericalHessian((point, gradient) => {
-    assign(point);
-    step.run();
-    return objective(point, gradient, scratch);
-  }, parameters);
+  const { size } = layout;
+  const kept = Array.from({ length: size }, (_, j) => j).filter((j) => j !== held?.index);
+  const count = kept.length;
+  const scratch = new Float64Array(size * size);
+  const fullGradient = new Float64Array(size);
+  const full = Float64Array.from(parameters);
+  const information = numericalHessian(
+    (point, gradient) => {
+      kept.forEach((j, a) => {
+        full[j] = point[a] ?? 0;
+      });
+      assign(full);
+      step.run();
+      const value = objective(full, fullGradient, scratch);
+      kept.forEach((j, a) => {
+        gradient[a] = fullGradient[j] ?? 0;
+      });
+      return value;
+    },
+    Float64Array.from(kept, (j) => parameters[j] ?? 0),
+  );
   assign(parameters);
-  const inverse = invert(information, layout.size);
+  const inverse = invert(information, count);
   if (inverse === null) return null;
-  for (let j = 0; j < layout.size; j++) if (!((inverse[j * layout.size + j] ?? 0) > 0)) return null;
-  return inverse;
+  for (let a = 0; a < count; a++) if (!((inverse[a * count + a] ?? 0) > 0)) return null;
+  const covariance = new Float64Array(size * size);
+  kept.forEach((j, a) => {
+    kept.forEach((k, b) => {
+      covariance[j * size + k] = inverse[a * count + b] ?? 0;
+    });
+  });
+  return covariance;
 }

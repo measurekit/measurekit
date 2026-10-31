@@ -6,5 +6,5 @@
   "readme": "README.md",
   "out": "docs/api",
   "treatWarningsAsErrors": true,
-  "ignoredHighlightLanguages": ["r"]
+  "ignoredHighlightLanguages": ["mermaid", "r"]
 }

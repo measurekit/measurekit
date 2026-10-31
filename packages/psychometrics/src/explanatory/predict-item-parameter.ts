@@ -32,6 +32,9 @@ export interface ParameterPrediction {
  * predictItemParameter(regression, { steps: 6 }); // { mean: 2.24, sd: 0.12 }
  * ```
  *
+ * @param regression - The regression of the parameter on the features.
+ * @param features - The new item's value of each feature the regression uses, by feature name.
+ * @returns The mean and the standard deviation of the item's parameter, on the regression's scale.
  * @throws `DataError` when the regression is not a regression, or the features lack one it uses or give it a value that
  * is not finite.
  */

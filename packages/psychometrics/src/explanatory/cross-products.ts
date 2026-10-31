@@ -3,6 +3,11 @@
  * without weights.
  *
  * @param design - X, by row, then column.
+ * @param rows - The number of rows of X.
+ * @param columns - The number of columns of X.
+ * @param weights - The diagonal of W, one per row.
+ * @param power - The power k of W.
+ * @returns The `columns` by `columns` matrix, by rows.
  */
 export function designCrossProducts(
   design: Float64Array,
