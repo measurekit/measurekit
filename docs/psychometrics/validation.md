@@ -10,7 +10,7 @@ TypeScript tests; R runs when fixtures change.
 
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 lordif 0.4-2, MASS 7.3-65, rms 8.2.0, equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
-LNIRT 0.5.1, numDeriv 2016.8-1.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite
+LNIRT 0.5.1, numDeriv 2016.8-1.1, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite
 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                       |
@@ -120,6 +120,11 @@ LNIRT 0.5.1, numDeriv 2016.8-1.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, C
 | Scale scores of equated scores                                    | Base R: `approx` on the unrounded table, then rounding written out                                                          |
 | Percentile ranks                                                  | Base R: the counts below and at a score; equate's `px` on `ACTmath`                                                         |
 
+| Explanatory quantity                                                               | Reference                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Effects, standard errors, covariance, residual variance, restricted log-likelihood | Base R: the restricted likelihood maximized by `optimize` and the root of its score by `uniroot`, then generalized least squares; metafor's `rma(method = "REML")` at the same τ² and, where it converges, at its own |
+| Predictions of new items                                                           | Base R: xᵀη̂ and √(τ² + xᵀ Cov x)                                                                                                                                                                                      |
+
 | Standard-setting quantity                              | Reference                                                                         |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
 | Angoff cut score, the panelists' cut scores, SD and SE | Base R: `rowSums`, `mean`, `sd`                                                   |
@@ -181,6 +186,16 @@ each with 2 of 6 pretest items, for the online calibration. The tests add a reco
 into adaptive tests simulated by `simulateAdaptiveTest`, calibrated with the operational items fixed and a
 normal distribution or a histogram, are within four standard errors of their true values, and the distribution's
 mean and SD within 0.1.
+
+`validation/psychometrics/explanatory.R` checks its references against each other: the analytic score of τ² equals the
+central-difference derivative of the restricted likelihood within 1e-6, and metafor's `rma` with τ² given reproduces the
+base R likelihood, coefficients and covariance within 1e-8. Its own search for τ² agrees with the base R maximum within
+1e-6 for every design with an intercept; for the design without one it stops at τ² = 1.03, 2.3 below the maximum in
+log-likelihood, so base R is the reference there. The tests add a simulation: 200 banks of 40 items, with sampling
+errors of 0.08 to 0.18 and τ = 0.3, whose 90% intervals for 100 held-out items each cover between 85% and 95% of their
+true difficulties (88.5% found), and a calibration of 3,000 simulated persons that recovers the effects within four
+standard errors and τ within 0.1. Properties cover the order of the items, shifts of the parameter, and the symmetry
+of the covariance.
 
 `validation/psychometrics/scaling.R` checks its references against each other: the base R EAP of the summed score equals
 mirt's EAPsum within 1e-10, and the base R percentile ranks equal equate's `px` of `ACTmath` within 1e-10. The tests add
@@ -381,6 +396,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `scaling-conversion.json`              | LSAT7 under the 2PL and Science under the GPCM, as mirt calibrates them; forms 1 and 2 of equateIRT's `est3pl` (20 3PL items each) set in mirt                                                                                                   | Tables of both methods on four scales, a prior other than N(0, 1), polytomous forms, scores with no theta                              |
 | `scaling-prediction.json`              | Posteriors of theta given responses to five 2PL practice items under N(0, 1) and N(0.3, 1.2²), predicted on the forms of the conversion fixture                                                                                                  | Form scores with pooled scale scores, theta scores on scales with bounds that are not multiples of the step, errors of 0, 0.25 and 0.6 |
 | `scaling-norms.json`                   | `equate::ACTmath` form X (4329 persons); a simulated normal sample of scale scores (`set.seed(20261029)`, 2000 persons); one score                                                                                                               | Ties, scores outside the sample, scores between scores                                                                                 |
+| `explanatory-regression.json`          | 2PL simulations (`set.seed(20261029)`) calibrated by mirt: 1000 persons and 20 items with three features and τ = 0.3; 1500 persons and 40 items with two features and τ = 0; 800 persons and 12 items with one feature and τ = 0.25              | b and ln a on features, with and without an intercept, τ² at its boundary, a single feature                                            |
 | `equating-presmoothing.json`           | ACTmath's X and KBneat's X totals                                                                                                                                                                                                                | Degrees 2, 3, 4 and 6                                                                                                                  |
 | `equating-neat.json`                   | equate's `KBneat`, internal anchor; a 2PL simulation, `set.seed(20261029)`, external anchor: 20-item forms, 10 anchor items, 700 and 500 persons                                                                                                 | Both anchors; the groups' shares and a weight of 0.3; Levine's true-score method                                                       |
 | `equating-bivariate-presmoothing.json` | The X group of each case of `equating-neat.json`                                                                                                                                                                                                 | Degrees (4, 3), (3, 3), (2, 2), (4, 2); cross degrees 0 to 2                                                                           |
@@ -401,91 +417,93 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 
 ## Tolerances
 
-| Quantity                                                                                 | Tolerance                                          | Largest difference found |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------ |
-| CTT statistics                                                                           | 1e-10 absolute                                     | 4e-14                    |
-| Normal quantile and density, logistic function                                           | 1e-14 relative                                     | 3e-16                    |
-| Gauss-Hermite nodes and weights                                                          | 1e-12 absolute                                     | 3e-14                    |
-| Eigenvalues and eigenvectors, up to sign                                                 | 1e-12 absolute                                     | 2e-14                    |
-| IRT item parameters                                                                      | 1e-5 absolute                                      | 6e-7                     |
-| IRT standard errors                                                                      | 1e-4 relative                                      | 9e-6                     |
-| IRT log-likelihood, AIC, BIC at the estimates                                            | 1e-6 absolute                                      | 3e-10                    |
-| 4PL, polytomous and mixed-format parameters                                              | 2e-4 absolute                                      | 1.1e-4                   |
-| 4PL, polytomous and mixed-format standard errors                                         | 1e-3 relative                                      | 8e-5                     |
-| 4PL, polytomous and mixed-format log-likelihood, AIC, BIC                                | 1e-4 absolute                                      | 7e-5                     |
-| Log-likelihood at the reference's estimates                                              | 1e-8 absolute                                      | 2e-11                    |
-| EAP and WLE theta and standard error                                                     | 1e-10 absolute                                     | 6e-14                    |
-| ML and MAP theta and standard error                                                      | 1e-5 absolute                                      | 7e-6                     |
-| Item and test information                                                                | 1e-12 absolute                                     | 3e-14                    |
-| JML thresholds, standard errors, thetas, log-likelihood                                  | 1e-10 absolute                                     | 1.4e-12                  |
-| mirt coefficient forms                                                                   | 1e-15 relative                                     | 4e-16                    |
-| CAT ML, MAP and WLE theta and standard error against catR                                | 1e-4 absolute                                      | 3e-5                     |
-| CAT EAP theta and standard error against catR                                            | 1e-6 absolute                                      | 6e-8                     |
-| CAT information and KL scores                                                            | 1e-12 relative                                     | 4e-15                    |
-| CD-CAT scores of every rule against the written-out replay                               | 1e-12 relative                                     | 9e-16                    |
-| CD-CAT posterior and attribute mastery                                                   | 1e-12 absolute                                     | 6e-16                    |
-| Theta of an item's largest information                                                   | 1e-10 absolute                                     | 4e-15                    |
-| Category probabilities against `probtrace`                                               | 1e-15 absolute                                     | 4e-16                    |
-| Chi-square upper tail                                                                    | 1e-12 relative                                     | 2e-14                    |
-| Infit, outfit, lz, Q3, S-X² and its significance                                         | 1e-12 absolute                                     | 3e-14                    |
-| Mantel-Haenszel statistics                                                               | 1e-12 absolute                                     | 1e-15                    |
-| Logistic regression chi-squares and R² changes                                           | 1e-9 absolute                                      | 7e-11                    |
-| Lord's chi-square                                                                        | 1e-5 relative                                      | 3e-7                     |
-| Lord's mean-sigma transformation                                                         | 1e-8 absolute                                      | 9e-10                    |
-| Mean-mean and mean-sigma transformations                                                 | 1e-12 absolute                                     | 2e-16                    |
-| Haebara and Stocking-Lord transformations                                                | 1e-7 absolute                                      | 2.5e-8                   |
-| Linear, equipercentile and true-score equivalents                                        | 1e-12 absolute                                     | 2e-13                    |
-| Equipercentile equivalents against equate                                                | 1e-6 absolute                                      | 1e-7                     |
-| Tucker, Levine and chained linear equivalents against equate                             | 1e-12 absolute                                     | 1.4e-14                  |
-| Chained equipercentile and frequency estimation equivalents                              | 1e-12 absolute                                     | 2.7e-13                  |
-| The same against equate                                                                  | 1e-6 absolute                                      | 4.1e-8                   |
-| Bivariate presmoothed counts, relative to max(1, count)                                  | 1e-11                                              | 5.5e-14                  |
-| Bootstrap standard errors above 0.05 against equate's                                    | 10% relative                                       | 4.4%                     |
-| Robust z                                                                                 | 1e-12 absolute                                     | 1.5e-15                  |
-| IRT observed-score equivalents                                                           | 1e-12 absolute                                     | 2.5e-14                  |
-| Delta-method standard errors of IRT equating, relative                                   | 1e-6                                               | 8.5e-9                   |
-| Cut scores, Bookmark locations                                                           | 1e-12 absolute                                     | 4e-15                    |
-| Normal distribution function                                                             | 1e-14 relative                                     | 1.5e-16                  |
-| Distributions of theta: parameters, mean, SD                                             | 1e-7 absolute                                      | 3e-9                     |
-| Distributions of theta: standard errors                                                  | 1e-6 relative                                      | 1.6e-9                   |
-| Histogram weights on fixed items                                                         | 1e-12 absolute                                     | 6e-15                    |
-| Cross-product standard errors                                                            | as the Hessian's: 1e-4, flat models 1e-3, relative | 4.4e-7; GPCM 2e-5        |
-| Covariance of item parameters: 2PL, base R maximum                                       | 1e-4 of √(Σ_ii Σ_jj)                               | 1.6e-5                   |
-| Covariance of GPCM parameters                                                            | 1e-3 of √(Σ_ii Σ_jj)                               | 6.4e-5                   |
-| Summed-score tables                                                                      | 1e-12 absolute                                     | 3e-15                    |
-| Posterior of theta                                                                       | 1e-12 absolute                                     | 3e-15                    |
-| EAP of the summed score: theta and standard error                                        | 1e-12 absolute                                     | 1.3e-15                  |
-| True-score theta and standard error                                                      | 1e-10 absolute                                     | 7e-15                    |
-| Scale scores and conditional errors of tables                                            | 1e-10 absolute                                     | 4.5e-13                  |
-| Conditional errors of scale scores at the reference's thetas                             | 1e-12 absolute                                     | 6e-14                    |
-| Probabilities of predicted scores, interpolated scale scores, percentile ranks           | 1e-12 absolute                                     | 8e-17                    |
-| Means of predicted scores                                                                | 1e-11 absolute                                     | 2.3e-13                  |
-| Marginal reliability, 61 nodes against `integrate`                                       | 1e-8 absolute                                      | 7e-10                    |
-| Empirical reliability, omega and its loadings                                            | 1e-10 absolute                                     | 2e-14                    |
-| Purified and sparse Mantel-Haenszel statistics                                           | 1e-12 absolute                                     | 4e-16                    |
-| Purified and sparse logistic regression                                                  | 1e-9 absolute                                      | 9e-11                    |
-| Mantel and generalized Mantel-Haenszel chi-squares, SMD, effect size                     | 1e-12 absolute                                     | 3.4e-13                  |
-| Ordinal logistic regression chi-squares, significances, R², slope change                 | 1e-8 absolute                                      | 2e-10                    |
-| Ordinal logistic regression against lordif's rounded statistics                          | 5e-5 + 1e-9 absolute                               | 4.96e-5                  |
-| Presmoothed counts                                                                       | 1e-11 relative                                     | 6e-13                    |
-| Classification probabilities, accuracy, consistency                                      | 1e-14 absolute                                     | 1e-16                    |
-| Kappa and intraclass correlations                                                        | 1e-12 absolute                                     | 2e-15                    |
-| Many-facet measures, thresholds, mean and SD of theta                                    | 1e-8 absolute                                      | 1.3e-10                  |
-| Many-facet log-likelihood                                                                | 1e-8 absolute                                      | 4.5e-12                  |
-| Many-facet standard errors, separation, reliability, homogeneity                         | 1e-6 relative                                      | 6.2e-8                   |
-| Many-facet EAP estimates, fit, fair and expected ratings, summaries from the same inputs | 1e-10 absolute                                     | 2.4e-14                  |
-| Testlet parameters and SDs against the base R maximum                                    | 2e-5 absolute                                      | 9e-6                     |
-| Testlet standard errors                                                                  | 1e-4 relative                                      | 9e-6                     |
-| Testlet log-likelihood                                                                   | 1e-8 absolute                                      | 4e-10                    |
-| Lognormal calibration against the maximum                                                | 1e-8 absolute                                      | 2e-9                     |
-| Speeds, residuals, statistics, thresholds, effort                                        | 1e-10 absolute                                     | 7e-15                    |
-| Effort-moderated EAP estimates                                                           | 1e-10 absolute                                     | 3e-15                    |
-| Cognitive diagnosis probabilities, proportions, persons, accuracy, PVAF                  | 1e-5 absolute                                      | 1.1e-6                   |
-| Cognitive diagnosis log-likelihood, AIC, BIC                                             | 1e-8 absolute                                      | 5e-11                    |
-| Additive-model probabilities, coefficients, proportions                                  | 1e-5 absolute                                      | 2.1e-6                   |
-| Additive-model log-likelihood                                                            | at least GDINA's less 1e-8                         | never below              |
-| Persons and accuracy at GDINA's additive estimates                                       | 1e-6 absolute                                      | 6.7e-8                   |
-| One additive M-step on fixed counts                                                      | 1e-8 absolute                                      | 1.0e-12                  |
+| Quantity                                                                                         | Tolerance                                          | Largest difference found |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ------------------------ |
+| CTT statistics                                                                                   | 1e-10 absolute                                     | 4e-14                    |
+| Normal quantile and density, logistic function                                                   | 1e-14 relative                                     | 3e-16                    |
+| Gauss-Hermite nodes and weights                                                                  | 1e-12 absolute                                     | 3e-14                    |
+| Eigenvalues and eigenvectors, up to sign                                                         | 1e-12 absolute                                     | 2e-14                    |
+| IRT item parameters                                                                              | 1e-5 absolute                                      | 6e-7                     |
+| IRT standard errors                                                                              | 1e-4 relative                                      | 9e-6                     |
+| IRT log-likelihood, AIC, BIC at the estimates                                                    | 1e-6 absolute                                      | 3e-10                    |
+| 4PL, polytomous and mixed-format parameters                                                      | 2e-4 absolute                                      | 1.1e-4                   |
+| 4PL, polytomous and mixed-format standard errors                                                 | 1e-3 relative                                      | 8e-5                     |
+| 4PL, polytomous and mixed-format log-likelihood, AIC, BIC                                        | 1e-4 absolute                                      | 7e-5                     |
+| Log-likelihood at the reference's estimates                                                      | 1e-8 absolute                                      | 2e-11                    |
+| EAP and WLE theta and standard error                                                             | 1e-10 absolute                                     | 6e-14                    |
+| ML and MAP theta and standard error                                                              | 1e-5 absolute                                      | 7e-6                     |
+| Item and test information                                                                        | 1e-12 absolute                                     | 3e-14                    |
+| JML thresholds, standard errors, thetas, log-likelihood                                          | 1e-10 absolute                                     | 1.4e-12                  |
+| mirt coefficient forms                                                                           | 1e-15 relative                                     | 4e-16                    |
+| CAT ML, MAP and WLE theta and standard error against catR                                        | 1e-4 absolute                                      | 3e-5                     |
+| CAT EAP theta and standard error against catR                                                    | 1e-6 absolute                                      | 6e-8                     |
+| CAT information and KL scores                                                                    | 1e-12 relative                                     | 4e-15                    |
+| CD-CAT scores of every rule against the written-out replay                                       | 1e-12 relative                                     | 9e-16                    |
+| CD-CAT posterior and attribute mastery                                                           | 1e-12 absolute                                     | 6e-16                    |
+| Theta of an item's largest information                                                           | 1e-10 absolute                                     | 4e-15                    |
+| Category probabilities against `probtrace`                                                       | 1e-15 absolute                                     | 4e-16                    |
+| Chi-square upper tail                                                                            | 1e-12 relative                                     | 2e-14                    |
+| Infit, outfit, lz, Q3, S-X² and its significance                                                 | 1e-12 absolute                                     | 3e-14                    |
+| Mantel-Haenszel statistics                                                                       | 1e-12 absolute                                     | 1e-15                    |
+| Logistic regression chi-squares and R² changes                                                   | 1e-9 absolute                                      | 7e-11                    |
+| Lord's chi-square                                                                                | 1e-5 relative                                      | 3e-7                     |
+| Lord's mean-sigma transformation                                                                 | 1e-8 absolute                                      | 9e-10                    |
+| Mean-mean and mean-sigma transformations                                                         | 1e-12 absolute                                     | 2e-16                    |
+| Haebara and Stocking-Lord transformations                                                        | 1e-7 absolute                                      | 2.5e-8                   |
+| Linear, equipercentile and true-score equivalents                                                | 1e-12 absolute                                     | 2e-13                    |
+| Equipercentile equivalents against equate                                                        | 1e-6 absolute                                      | 1e-7                     |
+| Tucker, Levine and chained linear equivalents against equate                                     | 1e-12 absolute                                     | 1.4e-14                  |
+| Chained equipercentile and frequency estimation equivalents                                      | 1e-12 absolute                                     | 2.7e-13                  |
+| The same against equate                                                                          | 1e-6 absolute                                      | 4.1e-8                   |
+| Bivariate presmoothed counts, relative to max(1, count)                                          | 1e-11                                              | 5.5e-14                  |
+| Bootstrap standard errors above 0.05 against equate's                                            | 10% relative                                       | 4.4%                     |
+| Robust z                                                                                         | 1e-12 absolute                                     | 1.5e-15                  |
+| IRT observed-score equivalents                                                                   | 1e-12 absolute                                     | 2.5e-14                  |
+| Delta-method standard errors of IRT equating, relative                                           | 1e-6                                               | 8.5e-9                   |
+| Cut scores, Bookmark locations                                                                   | 1e-12 absolute                                     | 4e-15                    |
+| Normal distribution function                                                                     | 1e-14 relative                                     | 1.5e-16                  |
+| Distributions of theta: parameters, mean, SD                                                     | 1e-7 absolute                                      | 3e-9                     |
+| Distributions of theta: standard errors                                                          | 1e-6 relative                                      | 1.6e-9                   |
+| Histogram weights on fixed items                                                                 | 1e-12 absolute                                     | 6e-15                    |
+| Cross-product standard errors                                                                    | as the Hessian's: 1e-4, flat models 1e-3, relative | 4.4e-7; GPCM 2e-5        |
+| Covariance of item parameters: 2PL, base R maximum                                               | 1e-4 of √(Σ_ii Σ_jj)                               | 1.6e-5                   |
+| Covariance of GPCM parameters                                                                    | 1e-3 of √(Σ_ii Σ_jj)                               | 6.4e-5                   |
+| Summed-score tables                                                                              | 1e-12 absolute                                     | 3e-15                    |
+| Posterior of theta                                                                               | 1e-12 absolute                                     | 3e-15                    |
+| EAP of the summed score: theta and standard error                                                | 1e-12 absolute                                     | 1.3e-15                  |
+| True-score theta and standard error                                                              | 1e-10 absolute                                     | 7e-15                    |
+| Scale scores and conditional errors of tables                                                    | 1e-10 absolute                                     | 4.5e-13                  |
+| Conditional errors of scale scores at the reference's thetas                                     | 1e-12 absolute                                     | 6e-14                    |
+| Probabilities of predicted scores, interpolated scale scores, percentile ranks                   | 1e-12 absolute                                     | 8e-17                    |
+| Means of predicted scores                                                                        | 1e-11 absolute                                     | 2.3e-13                  |
+| Item feature regression: effects, standard errors, covariance, residual variance, log-likelihood | 1e-10 absolute                                     | 9e-12                    |
+| Predictions of new items                                                                         | 1e-10 absolute                                     | 2e-11                    |
+| Marginal reliability, 61 nodes against `integrate`                                               | 1e-8 absolute                                      | 7e-10                    |
+| Empirical reliability, omega and its loadings                                                    | 1e-10 absolute                                     | 2e-14                    |
+| Purified and sparse Mantel-Haenszel statistics                                                   | 1e-12 absolute                                     | 4e-16                    |
+| Purified and sparse logistic regression                                                          | 1e-9 absolute                                      | 9e-11                    |
+| Mantel and generalized Mantel-Haenszel chi-squares, SMD, effect size                             | 1e-12 absolute                                     | 3.4e-13                  |
+| Ordinal logistic regression chi-squares, significances, R², slope change                         | 1e-8 absolute                                      | 2e-10                    |
+| Ordinal logistic regression against lordif's rounded statistics                                  | 5e-5 + 1e-9 absolute                               | 4.96e-5                  |
+| Presmoothed counts                                                                               | 1e-11 relative                                     | 6e-13                    |
+| Classification probabilities, accuracy, consistency                                              | 1e-14 absolute                                     | 1e-16                    |
+| Kappa and intraclass correlations                                                                | 1e-12 absolute                                     | 2e-15                    |
+| Many-facet measures, thresholds, mean and SD of theta                                            | 1e-8 absolute                                      | 1.3e-10                  |
+| Many-facet log-likelihood                                                                        | 1e-8 absolute                                      | 4.5e-12                  |
+| Many-facet standard errors, separation, reliability, homogeneity                                 | 1e-6 relative                                      | 6.2e-8                   |
+| Many-facet EAP estimates, fit, fair and expected ratings, summaries from the same inputs         | 1e-10 absolute                                     | 2.4e-14                  |
+| Testlet parameters and SDs against the base R maximum                                            | 2e-5 absolute                                      | 9e-6                     |
+| Testlet standard errors                                                                          | 1e-4 relative                                      | 9e-6                     |
+| Testlet log-likelihood                                                                           | 1e-8 absolute                                      | 4e-10                    |
+| Lognormal calibration against the maximum                                                        | 1e-8 absolute                                      | 2e-9                     |
+| Speeds, residuals, statistics, thresholds, effort                                                | 1e-10 absolute                                     | 7e-15                    |
+| Effort-moderated EAP estimates                                                                   | 1e-10 absolute                                     | 3e-15                    |
+| Cognitive diagnosis probabilities, proportions, persons, accuracy, PVAF                          | 1e-5 absolute                                      | 1.1e-6                   |
+| Cognitive diagnosis log-likelihood, AIC, BIC                                                     | 1e-8 absolute                                      | 5e-11                    |
+| Additive-model probabilities, coefficients, proportions                                          | 1e-5 absolute                                      | 2.1e-6                   |
+| Additive-model log-likelihood                                                                    | at least GDINA's less 1e-8                         | never below              |
+| Persons and accuracy at GDINA's additive estimates                                               | 1e-6 absolute                                      | 6.7e-8                   |
+| One additive M-step on fixed counts                                                              | 1e-8 absolute                                      | 1.0e-12                  |
 
 Entries of a covariance matrix are compared relative to √(Σ_ii Σ_jj) of the reference, so that an off-diagonal entry is
 on the correlation scale.

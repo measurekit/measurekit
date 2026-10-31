@@ -6,6 +6,7 @@
     "src/irt/index.ts",
     "src/cat/index.ts",
     "src/cdm/index.ts",
+    "src/explanatory/index.ts",
     "src/fit/index.ts",
     "src/dif/index.ts",
     "src/equating/index.ts",

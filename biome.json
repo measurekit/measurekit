@@ -379,6 +379,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/explanatory/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../irt/**", "!../math/**"],
+                    "message": "explanatory/ builds on data/, irt/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/standard-setting/**"],
       "linter": {
         "rules": {

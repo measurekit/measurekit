@@ -107,6 +107,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
                         and observed-score equating, bootstrap and delta-method standard errors, the anchor screen,
                         presmoothing
   src/standard-setting/ cut scores by the modified Angoff, Bookmark and Hofstee methods; classification accuracy
+  src/explanatory/      regression of item parameters on item features, prediction of the parameters of new items
   src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction
   src/rater/            rater agreement and rater effects: kappa, intraclass correlations, the many-facet Rasch model
   src/response-time/    response times: the lognormal model, speed, aberrant times, rapid guessing
@@ -188,6 +189,7 @@ Psychometrics: every module of `cat/`, `equating/`, `irt/`, `rater/` and `sim/` 
 | `sim/`              | `data/`, `irt/`, `cdm/`, `math/`      |
 | `dif/`              | `data/`, `irt/`, `equating/`, `math/` |
 | `standard-setting/` | `irt/`, `equating/`, `math/`          |
+| `explanatory/`      | `data/`, `irt/`, `math/`              |
 | `scaling/`          | `irt/`, `equating/`, `math/`          |
 | `rater/`            | `data/`, `irt/`, `fit/`, `math/`      |
 | `cat/`              | `irt/`, `sim/`, `cdm/`, `math/`       |
