@@ -1,7 +1,7 @@
 {
   "name": "@measurekit/psychometrics",
   "version": "0.0.0",
-  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory, cognitive diagnosis (G-DINA, DINA, DINO, A-CDM, LLM, R-RUM), adaptive testing including cognitive diagnosis, item fit, differential item functioning, equating, score scaling and prediction, explanatory models of item difficulty, simulation, standard setting, rater agreement and effects, and response times, validated against R.",
+  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory, cognitive diagnosis (G-DINA, DINA, DINO, A-CDM, LLM, R-RUM), adaptive testing including cognitive diagnosis, item fit, differential item functioning, equating, score scaling and prediction, explanatory models of item difficulty, generalizability theory, simulation, standard setting, rater agreement and effects, and response times, validated against R.",
   "keywords": [
     "psychometrics",
     "classical-test-theory",
@@ -19,6 +19,8 @@
     "polytomous-items",
     "test-equating",
     "explanatory-irt",
+    "generalizability-theory",
+    "variance-components",
     "score-scaling",
     "scale-scores",
     "percentile-ranks",
@@ -83,6 +85,10 @@
     "./fit": {
       "types": "./dist/fit/index.d.ts",
       "default": "./dist/fit/index.js"
+    },
+    "./generalizability": {
+      "types": "./dist/generalizability/index.d.ts",
+      "default": "./dist/generalizability/index.js"
     },
     "./interop": {
       "types": "./dist/interop/index.d.ts",

@@ -12,6 +12,7 @@ export * from "./dif/index.js";
 export * from "./equating/index.js";
 export * from "./explanatory/index.js";
 export * from "./fit/index.js";
+export * from "./generalizability/index.js";
 export * from "./interop/index.js";
 export * from "./irt/index.js";
 export * from "./rater/index.js";

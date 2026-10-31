@@ -108,6 +108,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
                         presmoothing
   src/standard-setting/ cut scores by the modified Angoff, Bookmark and Hofstee methods; classification accuracy
   src/explanatory/      regression of item parameters on item features, prediction of the parameters of new items
+  src/generalizability/ variance components of balanced crossed and nested designs, decision studies
   src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction
   src/rater/            rater agreement and rater effects: kappa, intraclass correlations, the many-facet Rasch model
   src/response-time/    response times: the lognormal model, speed, aberrant times, rapid guessing
@@ -190,6 +191,7 @@ Psychometrics: every module of `cat/`, `equating/`, `irt/`, `rater/` and `sim/` 
 | `dif/`              | `data/`, `irt/`, `equating/`, `math/` |
 | `standard-setting/` | `irt/`, `equating/`, `math/`          |
 | `explanatory/`      | `data/`, `irt/`, `math/`              |
+| `generalizability/` | `data/`, `math/`                      |
 | `scaling/`          | `irt/`, `equating/`, `math/`          |
 | `rater/`            | `data/`, `irt/`, `fit/`, `math/`      |
 | `cat/`              | `irt/`, `sim/`, `cdm/`, `math/`       |

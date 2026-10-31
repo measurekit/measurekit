@@ -10,7 +10,7 @@ TypeScript tests; R runs when fixtures change.
 
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 lordif 0.4-2, MASS 7.3-65, rms 8.2.0, equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
-LNIRT 0.5.1, numDeriv 2016.8-1.1, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite
+LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite
 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                       |
@@ -143,6 +143,12 @@ LNIRT 0.5.1, numDeriv 2016.8-1.1, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0,
 | Separation, reliability, homogeneity                                        | Base R written out from the measures and standard errors                                                                                                                                                             |
 | Person EAP estimates, fair averages, expected ratings                       | Base R, from the same parameters                                                                                                                                                                                     |
 | Element infit, outfit and standardized forms                                | Base R written out, at the same person estimates                                                                                                                                                                     |
+
+| Generalizability quantity                         | Reference                                                                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Degrees of freedom, sums of squares, mean squares | Base R: `aov` on the balanced design                                                                                                       |
+| Variance components                               | Base R: the expected mean squares of each design written out and solved with `solve`; lme4's REML estimates where no component is negative |
+| Universe score and error variances, coefficients  | Base R: the textbook formulas of each design (Brennan, 2001), components below 0 taken as 0                                                |
 
 | Response time quantity                                             | Reference                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -336,6 +342,11 @@ Several results of the reference packages are not references:
   that of a and b = -d / a1 with the Jacobian of the transformation, and takes the means and variances of the groups
   from the same calibration as known populations. The standard errors of equating then come from numDeriv's
   Richardson Jacobian, which agrees with the central differences of the package within 1e-8.
+- **lme4's REML estimates** equal the analysis of variance estimates of a balanced design when no component is negative,
+  but lme4's optimizer stops where the REML criterion is flat to its tolerance. The script restarts bobyqa from its own
+  estimate three times, after which the estimates agree within 3.3e-7; the test allows 1e-5. gtheory, which wraps lme4
+  for G and D studies, was removed from CRAN in March 2025, so lme4 is the reference. REML keeps estimates at 0 or
+  above, so the case with a negative component has the base R computation alone.
 
 No package among the references implements the modified Angoff, Bookmark or Hofstee method, so their references are
 base R written out from each method's definition. The tests add values derived by hand: the Bookmark locations
@@ -407,6 +418,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `irt-testlet.json`                     | A 2PL testlet simulation, `set.seed(20261029)`: 1000 persons, 3 testlets of 4 items, SDs 0.5, 0.8 and 1; sirt's `data.read`, 328 persons, 3 passages of 4 items                                                                                  | 21 nodes, as mirt's `bfactor`; EAP of 10 patterns                                                                                      |
 | `rater.json`                           | irr's `anxiety` (20 subjects, 3 raters), also with two ratings missing; irr's `diagnoses` (30 subjects, 6 raters)                                                                                                                                | Weighted kappa, nominal categories, missing ratings                                                                                    |
 | `rater-many-facet.json`                | sirt's `data.ratings1` (135 students, 5 criteria, 7 raters); TAM's `data.sim.mfr` (100 persons, 5 items, 5 raters, 3 topics); a simulation, `set.seed(20261029)`: 300 persons, 4 items, 6 raters, 2 raters per person, rater-specific thresholds | Shared and per-item or per-rater thresholds; a third facet; nested and incomplete designs                                              |
+| `generalizability.json`                | Simulations, `set.seed(20261029)`: p x i (40 x 12), p x r x i (40 x 4 x 6), (r:p) x i (25 x 3 x 4), i:p, r:pi, i:r:p, (i:p) x (r:p); p x i (8 x 4) with a negative item component                                                                | Crossed and nested designs; labels repeated within parents; a negative component; fixed facets and nesting in decision studies         |
 | `response-time.json`                   | A lognormal simulation, `set.seed(20261029)`: 400 persons, 12 items, 5% of times missing; LNIRT's `CredentialForm1`, items 1 to 10, 1636 persons, times of 0 as missing                                                                          | Calibration, speeds, residuals; NT10 and NT15 with a 30 s cap                                                                          |
 | `cdm.json`                             | GDINA's `realdata_Tatsuoka1990`, fraction subtraction: 536 persons, 20 items, 8 attributes, under the DINA; a G-DINA simulation, `set.seed(20261029)`: 1500 persons, 15 items, 4 attributes, under the G-DINA and DINO                           | 256 profiles, indistinguishable profiles; persons, accuracy, PVAF, nonparametric classification of 30 persons                          |
 | `cdm-additive.json`                    | GDINA's `realdata_ECPE` (2922 persons, 28 items, 3 attributes) and `sim30GDINA` (1000 persons, 30 items, 5 attributes)                                                                                                                           | A-CDM, LLM, R-RUM and a mix of all six models per item                                                                                 |
@@ -492,6 +504,9 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Many-facet log-likelihood                                                                        | 1e-8 absolute                                      | 4.5e-12                  |
 | Many-facet standard errors, separation, reliability, homogeneity                                 | 1e-6 relative                                      | 6.2e-8                   |
 | Many-facet EAP estimates, fit, fair and expected ratings, summaries from the same inputs         | 1e-10 absolute                                     | 2.4e-14                  |
+| Generalizability sums of squares, mean squares, components, relative to max(1, value)            | 1e-10                                              | 6e-15                    |
+| Components against lme4's REML estimates                                                         | 1e-5 absolute                                      | 3.3e-7                   |
+| Decision study variances and coefficients, relative                                              | 1e-10                                              | 5e-15                    |
 | Testlet parameters and SDs against the base R maximum                                            | 2e-5 absolute                                      | 9e-6                     |
 | Testlet standard errors                                                                          | 1e-4 relative                                      | 9e-6                     |
 | Testlet log-likelihood                                                                           | 1e-8 absolute                                      | 4e-10                    |

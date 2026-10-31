@@ -32,7 +32,7 @@ one subpath per module: `@measurekit/psychometrics/cat`,
 `@measurekit/psychometrics/cdm`, `@measurekit/psychometrics/ctt`,
 `@measurekit/psychometrics/data`, `@measurekit/psychometrics/dif`,
 `@measurekit/psychometrics/equating`, `@measurekit/psychometrics/explanatory`, `@measurekit/psychometrics/fit`,
-`@measurekit/psychometrics/interop`, `@measurekit/psychometrics/irt`,
+`@measurekit/psychometrics/generalizability`, `@measurekit/psychometrics/interop`, `@measurekit/psychometrics/irt`,
 `@measurekit/psychometrics/rater`, `@measurekit/psychometrics/response-time`, `@measurekit/psychometrics/scaling`,
 `@measurekit/psychometrics/sim` and `@measurekit/psychometrics/standard-setting`. Public names are unique across
 modules, so `.` re-exports all of them. Only the random number generator is public in `math/`.
@@ -45,12 +45,12 @@ Modules form layers; a module imports only from lower layers, never from its own
 | ----- | ------------------------------------------------------------------------- |
 | 1     | `@measurekit/core`, `checks.ts`                                           |
 | 2     | `math/`, `data/`                                                          |
-| 3     | `ctt/`, `irt/`                                                            |
+| 3     | `ctt/`, `irt/`, `generalizability/`                                       |
 | 4     | `interop/`, `cdm/`, `fit/`, `equating/`, `response-time/`, `explanatory/` |
 | 5     | `sim/`, `dif/`, `standard-setting/`, `scaling/`, `rater/`                 |
 | 6     | `cat/`                                                                    |
 
-Analysis modules (`ctt/` and `irt/`) build on `data/` and `math/`, not on each other. `sim/` builds on `irt/` and `cdm/`
+Analysis modules (`ctt/`, `irt/` and `generalizability/`) build on `data/` and `math/`, not on each other. `sim/` builds on `irt/` and `cdm/`
 to simulate their models, `cat/` on `sim/` for the same response simulation and on `cdm/` for the profile estimates of
 diagnostic tests, `dif/` and `standard-setting/` on `equating/` for linking and score distributions, `scaling/` on
 `equating/` for the linear transformation of a theta scale, and `rater/` on `irt/` for the Rasch model of its many facets

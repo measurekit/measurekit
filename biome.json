@@ -379,6 +379,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/generalizability/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../math/**"],
+                    "message": "generalizability/ builds on data/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/explanatory/**"],
       "linter": {
         "rules": {
