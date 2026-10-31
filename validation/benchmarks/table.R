@@ -71,8 +71,8 @@ chart <- function(title, entries, by_module = TRUE) {
   top <- max(2, ceiling(max(ratios)))
   plain <- vapply(ratios, format, "", scientific = FALSE, trim = TRUE)
   labels <- vapply(entries, function(entry) if (by_module) sub("^[^.]*\\.", "", entry$key) else entry$key, "")
-  labels <- sub("^multidimensional\\.", "multi.", labels)
-    c("```mermaid",
+  labels <- sub("^multidimensional\\.", "md.", labels)
+  c("```mermaid",
     sprintf('%%%%{init: {"xyChart": {"height": %d, "xAxis": {"labelFontSize": 11}}}}%%%%', 150 + 34 * length(entries)),
     "xychart-beta horizontal",
     sprintf('  title "%s"', title),
@@ -114,8 +114,8 @@ environment <- sprintf("Measured on %s with %s cores, %s GB of memory, Node.js %
 
 charts <- c("### Where measurekit is slower", "",
             chart(sprintf("Tasks that take more than %s times as long as the reference", SLOW), slow_entries, by_module = FALSE),
+            "A bar above the line takes longer than the reference, and md stands for multidimensional.", "",
             "### Every task", "",
-            "A bar above the line takes longer than the reference.", "",
             unlist(lapply(names(PACKAGES), function(package) {
               unlist(lapply(chart_groups(results[[package]]), function(group) {
                 modules <- unique(vapply(group, function(entry) sub("\\..*$", "", entry$key), ""))

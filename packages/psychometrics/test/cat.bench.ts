@@ -46,6 +46,28 @@ test("simulates adaptive tests of 30 items for 200 persons on a pool of 500 3PL 
   );
 });
 
+test("simulates adaptive tests of 30 items that select testlets, for 200 persons on a pool of 500 3PL items", async (context) => {
+  const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
+    id: `item${i + 1}`,
+    model: threeParameterLogistic,
+    parameters: { a, b: defined(fixture.pool.b[i]), c: defined(fixture.pool.c[i]), d: 1 },
+    ...(fixture.testlets[i] !== null && { testlet: fixture.testlets[i] }),
+  }));
+  const test = adaptiveTest({
+    pool,
+    selection: maximumInformation,
+    estimator: posteriorMeanEstimate,
+    stopping: testLength(fixture.length),
+  });
+  expect(simulateAdaptiveTest(test, fixture.thetas, createRandom(SEED)).persons).toHaveLength(fixture.thetas.length);
+  await benchmark(
+    context,
+    "cat.simulateTestlets",
+    () => simulateAdaptiveTest(test, fixture.thetas, createRandom(SEED)),
+    SLOW_OPTIONS,
+  );
+});
+
 test("simulates diagnostic adaptive tests of 10 items for 200 persons on a pool of 20 items", async (context) => {
   const matrix = responseMatrix(cdm.responses, { itemIds: cdm.itemIds });
   const calibration = calibrateCdm(matrix, cdm.qMatrix);

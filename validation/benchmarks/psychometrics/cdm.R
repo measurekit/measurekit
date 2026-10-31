@@ -49,7 +49,7 @@ for (name in names(models)) {
 }
 bench_task("cdm.attributeProfiles", "Posterior profiles of the persons of a calibration", size,
            reference("GDINA", "personparm(what = \"EAP\")"), function() personparm(gdina_fit, what = "EAP"))
-bench_task("cdm.classificationAccuracy", "Accuracy and consistency of the classification", size,
+bench_task("cdm.accuracy", "Accuracy and consistency of the classification", size,
            reference("GDINA", "CA"), function() CA(gdina_fit))
 bench_task("cdm.validateQMatrix", "Validation of the Q-matrix by the proportion of variance accounted for", size,
            reference("GDINA", "Qval(method = \"PVAF\")"), function() Qval(gdina_fit, method = "PVAF", eps = 0.95))

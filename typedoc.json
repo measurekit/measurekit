@@ -9,5 +9,6 @@
   "treatWarningsAsErrors": true,
   "plugin": ["typedoc-plugin-mermaid"],
   "mermaidVersion": "11.17.2",
+  "customCss": "docs/diagrams.css",
   "ignoredHighlightLanguages": ["r"]
 }

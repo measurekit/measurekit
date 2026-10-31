@@ -1,0 +1,5 @@
+/* Lets the text of a diagram spill over the edge of its SVG: Mermaid sizes the axis labels of a chart from a width that the
+   page's fonts exceed by a few percent, which would clip the first letter of the longest label. */
+.mermaid svg {
+  overflow: visible;
+}

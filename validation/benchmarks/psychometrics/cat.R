@@ -2,7 +2,7 @@
 # mirtCAT. Each test is a full one for every simulated person, from the start to the stopping rule. The unidimensional test
 # selects by maximum information and estimates by the posterior mean; the diagnostic test selects by the G-DINA
 # discrimination index; the multidimensional one by the determinant of the information, and estimates by the posterior
-# mode.
+# mode. Testlets have no reference.
 
 suppressPackageStartupMessages({
   library(catR)
@@ -23,6 +23,9 @@ persons <- 200
 length_of_test <- 30
 bank <- cbind(a = round(rlnorm(pool_size, 0, 0.3), 3), b = round(rnorm(pool_size), 3), c = round(runif(pool_size, 0.05, 0.25), 3), d = 1)
 thetas <- rnorm(persons)
+# The first 400 items of the pool are in 100 testlets of four items, the others alone.
+testlet_items <- 400
+testlet_of <- ifelse(seq_len(pool_size) <= testlet_items, paste0("t", ceiling(seq_len(pool_size) / 4)), NA)
 
 multi_pool <- 200
 multi_persons <- 100
@@ -47,6 +50,7 @@ bench_fixture("psychometrics", "cat", list(
   length = length_of_test,
   pool = list(a = I(bank[, "a"]), b = I(bank[, "b"]), c = I(bank[, "c"])),
   thetas = I(thetas),
+  testlets = I(testlet_of),
   multidimensional = list(length = multi_length, slopes = unname(slopes), intercepts = I(intercepts),
                           thetas = unname(multi_thetas)),
   diagnostic = list(length = diagnostic_length, persons = diagnostic_persons)
@@ -75,6 +79,9 @@ simulate_diagnostic <- function() {
 bench_task("cat.simulateAdaptive", "Simulation of adaptive tests by maximum information and the posterior mean",
            sprintf("%d persons, a pool of %d 3PL items, %d items each", persons, pool_size, length_of_test),
            reference("catR", "randomCAT"), simulate_unidimensional)
+bench_task("cat.simulateTestlets", "Simulation of adaptive tests that select testlets as units, by their mean information",
+           sprintf("%d persons, a pool of %d 3PL items with %d in testlets of 4, %d items each", persons, pool_size, testlet_items, length_of_test),
+           note = "catR has no testlets, so no reference does this task")
 bench_task("cat.simulateDiagnostic", "Simulation of diagnostic adaptive tests by the G-DINA discrimination index",
            sprintf("%d persons, a pool of 20 items over 4 attributes, %d items each", diagnostic_persons, diagnostic_length),
            reference("cdcatR", "cdcat"), simulate_diagnostic)

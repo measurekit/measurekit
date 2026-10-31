@@ -55,6 +55,18 @@ test("calibrates an exploratory two-dimensional 2PL of 1,000 persons and 20 item
   );
 });
 
+test("calibrates a five-dimensional graded model of 800 persons and 25 items by MH-RM", async (context) => {
+  const matrix = responseMatrix(fixture.mhrm.responses, { itemIds: fixture.mhrm.itemIds });
+  const options = { model: multidimensionalGradedResponse, loadings: fixture.mhrm.loadings, method: "mhrm" } as const;
+  expect(calibrateMultidimensional(matrix, options).converged).toBe(true);
+  await benchmark(
+    context,
+    "multidimensional.calibrateMhrm",
+    () => calibrateMultidimensional(matrix, options),
+    SLOW_OPTIONS,
+  );
+});
+
 test("estimates the abilities of 1,000 persons on 24 items in two dimensions", async (context) => {
   const { items } = calibrateMultidimensional(confirmatory, confirmatoryOptions);
   await benchmark(context, "multidimensional.estimateMode", () => multidimensionalEstimates(confirmatory, items));

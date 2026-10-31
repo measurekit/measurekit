@@ -1,11 +1,13 @@
-# Multidimensional item response theory: confirmatory and exploratory calibration by EM, ability estimation, and rotation
-# of the loadings, against mirt's mirt and fscores and GPArotation. mirt runs at its defaults: a tolerance of 1e-4 and a
-# limit of 500 cycles, and 31 quadrature points per dimension, as measurekit does.
+# Multidimensional item response theory: confirmatory and exploratory calibration by EM, calibration of five dimensions by
+# Metropolis-Hastings Robbins-Monro, ability estimation, and rotation of the loadings, against mirt's mirt and fscores and
+# GPArotation. mirt runs at its defaults: a tolerance of 1e-4 and a limit of 500 cycles, and 31 quadrature points per
+# dimension, as measurekit does; its MH-RM, at its default tolerance, with one seed.
 
 suppressPackageStartupMessages({
   library(mirt)
   library(GPArotation)
   library(mvtnorm)
+  library(psych)
 })
 
 set.seed(20261029)
@@ -49,6 +51,14 @@ exploratory_slopes[11:20, 1] <- round(runif(10, 0, 0.4), 3)
 exploratory <- dichotomous(correlated_thetas(persons, 0.3), exploratory_slopes, round(rnorm(20), 3))
 colnames(exploratory) <- ids(20)
 
+# psych's bfi, the 25 items of its five scales for the first 800 persons who answered all of them, scored from 0, on five
+# correlated dimensions under the graded model.
+data(bfi, package = "psych")
+bfi_items <- as.matrix(bfi[, 1:25])
+bfi_items <- (bfi_items[complete.cases(bfi_items), ][1:800, ] - 1L)
+colnames(bfi_items) <- ids(25)
+bfi_scales <- rep(c("A", "C", "E", "N", "O"), each = 5)
+
 # --- References -----------------------------------------------------------------------------------------------------
 
 confirmatory_model <- mirt.model("F1 = 1-12\nF2 = 13-24\nCOV = F1*F2")
@@ -69,7 +79,8 @@ bench_fixture("psychometrics", "multidimensional", list(
                       loadings = setNames(lapply(1:24, function(i) I(if (i <= 12) "F1" else "F2")), ids(24))),
   graded = list(itemIds = ids(20), responses = unname(graded),
                 loadings = setNames(lapply(1:20, function(i) I(if (i <= 10) "F1" else "F2")), ids(20))),
-  exploratory = list(itemIds = ids(20), responses = unname(exploratory))
+  exploratory = list(itemIds = ids(20), responses = unname(exploratory)),
+  mhrm = list(itemIds = ids(25), responses = unname(bfi_items), loadings = setNames(lapply(bfi_scales, I), ids(25)))
 ))
 
 bench_task("multidimensional.calibrateConfirmatory", "Calibration of a confirmatory two-dimensional 2PL by EM",
@@ -81,6 +92,13 @@ bench_task("multidimensional.calibrateGraded", "Calibration of a confirmatory tw
 bench_task("multidimensional.calibrateExploratory", "Calibration of an exploratory two-dimensional 2PL by EM",
            sprintf("%s persons, 20 items, 2 dimensions", count(persons)), reference("mirt", "mirt(data, 2, quadpts = 31)"),
            calibrate_exploratory, note = "mirt stops at its limit of 500 cycles when it has not converged")
+bench_task("multidimensional.calibrateMhrm", "Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro",
+           sprintf("%d persons, 25 items of 6 categories, 5 correlated dimensions", nrow(bfi_items)),
+           reference("mirt", "mirt(method = \"MHRM\")"),
+           function() mirt(bfi_items, mirt.model(paste0("A = 1-5\nC = 6-10\nE = 11-15\nN = 16-20\nO = 21-25\n",
+                                                          "COV = A*C, A*E, A*N, A*O, C*E, C*N, C*O, E*N, E*O, N*O")),
+                           itemtype = "graded", method = "MHRM", verbose = FALSE, technical = list(set.seed = 1)),
+           note = "both draw the abilities, so the time depends on the seed; mirt runs with one")
 bench_task("multidimensional.estimateMode", "Abilities by the posterior mode, in two dimensions",
            sprintf("%s persons, 24 items", count(persons)), reference("mirt", "fscores(method = \"MAP\")"),
            function() fscores(confirmatory_fit, method = "MAP", quadpts = POINTS, verbose = FALSE))
