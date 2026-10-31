@@ -252,8 +252,12 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 The iterations that each EM calibration of the tables needed to reach its tolerance, on the data of the benchmark. A ratio
 of times is the product of a ratio of iterations and a ratio of the time of one. The one-parameter to the generalized partial
-credit calibrations and the multidimensional ones of measurekit extrapolate EM with SQUAREM, as mirt does with Ramsay's
-method; the others run plain EM. Every EM iteration counts, those that follow an extrapolation included.
+credit calibrations, the multidimensional ones, the many-facet Rasch model and the linear logistic test model of
+measurekit extrapolate EM with SQUAREM, as mirt does with Ramsay's method; the others run plain EM. Every EM iteration
+counts, those that follow an extrapolation included. EM stops when an iteration changes no parameter by more than the
+tolerance, which leaves the estimates some distance from the maximum, more where EM contracts slowly. Extrapolated, they
+stop closer to it than plain EM does, by up to about 1e-3 at the default tolerance (the confirmatory 2PL is 1.3e-4 from
+the maximum, was 4.8e-4); at a tolerance of 1e-8 both are at it.
 
 | Calibration                         | measurekit | Reference |
 | ----------------------------------- | ---------: | --------: |
@@ -262,9 +266,9 @@ method; the others run plain EM. Every EM iteration counts, those that follow an
 | Three-parameter model               |         81 |       183 |
 | Graded response model               |         12 |        11 |
 | Generalized partial credit model    |         19 |        37 |
-| Confirmatory two-dimensional 2PL    |         13 |        24 |
+| Confirmatory two-dimensional 2PL    |         12 |        24 |
 | Confirmatory two-dimensional graded |         12 |        43 |
-| Exploratory two-dimensional 2PL     |         93 |       135 |
+| Exploratory two-dimensional 2PL     |        100 |       135 |
 | G-DINA                              |        187 |       184 |
 | DINA                                |         44 |        45 |
 | DINO                                |        195 |       231 |
