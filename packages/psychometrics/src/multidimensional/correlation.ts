@@ -33,6 +33,14 @@ export interface Latent {
   gradient(nodeCounts: Float64Array, out: Float64Array): void;
   /** Sets the correlations that maximize the expected complete-data log-likelihood. */
   maximize(nodeCounts: Float64Array): void;
+  /**
+   * Returns the parameters of the correlation matrix, which any values keep a correlation matrix when positive definite:
+   * the entries below the diagonal of its Cholesky factor over the diagonal entry of their row, in the order of the
+   * pairs.
+   */
+  parameters(): Float64Array;
+  /** Sets the correlation matrix and the weights from parameters. Returns `false`, leaving both unchanged, when singular. */
+  assign(parameters: Float64Array): boolean;
   /** Writes the derivative of ln w_q with respect to each correlation into `out`, by pair, then node. */
   scores(out: Float64Array): void;
 }
@@ -135,6 +143,13 @@ export function latentDistribution(grid: Grid): Latent {
       });
       correlationMatrix(x, dimensions, factor, candidate);
       set(candidate);
+    },
+    parameters() {
+      return rowParameters(matrix, dimensions) ?? new Float64Array(pairs.length);
+    },
+    assign(parameters) {
+      correlationMatrix(parameters, dimensions, factor, candidate);
+      return set(candidate);
     },
     scores(out) {
       secondMoments(expected, grid, weights, 1);

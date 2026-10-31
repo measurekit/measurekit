@@ -1,5 +1,6 @@
-import { checkIntegerFrom, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
+import { checkIntegerFrom, DataError, largestChange } from "@measurekit/core";
 import type { CompressedResponses } from "../irt/responses.js";
+import { type EmMap, squarem } from "./acceleration.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { setUp } from "./calibration-setup.js";
 import { latentDistribution } from "./correlation.js";
@@ -24,26 +25,52 @@ function checkEmDimensions(dimensions: number): void {
   }
 }
 
-/** Runs EM cycles of the E-step and M-step until no parameter changes by more than `tolerance` or `maxIterations`. */
+/** Runs EM, accelerated, until no parameter changes by more than `tolerance` in an iteration or `maxIterations`. */
 function expectationMaximization<TParameters>(
   fit: Fit<TParameters>,
   tolerance: number,
   maxIterations: number,
 ): { readonly converged: boolean; readonly iterations: number } {
+  return squarem(emMap(fit), { tolerance, maxIterations });
+}
+
+/**
+ * Returns EM as a map on the unbounded coordinates of the items' estimated entries, then the parameters of the
+ * correlations, which any values keep a correlation matrix.
+ */
+function emMap<TParameters>(fit: Fit<TParameters>): EmMap {
   const { items, latent, correlated, maximization, eStep } = fit;
+  const itemSize = items.reduce((sum, item) => sum + item.free.length, 0);
   const current = new Float64Array(parameterCount(fit));
   const previous = new Float64Array(current.length);
-  return iterateToConvergence(
-    () => {
-      eStep.run();
+  return {
+    size: itemSize + (correlated ? latent.pairs.length : 0),
+    read(out) {
+      let slot = 0;
+      for (const item of items) {
+        out.set(maximization.coordinates(item), slot);
+        slot += item.free.length;
+      }
+      if (correlated) out.set(latent.parameters(), itemSize);
+    },
+    write(parameters) {
+      if (correlated && !latent.assign(parameters.subarray(itemSize))) return false;
+      let slot = 0;
+      for (const item of items) {
+        maximization.assign(item, parameters.subarray(slot, slot + item.free.length));
+        slot += item.free.length;
+      }
+      return true;
+    },
+    step() {
+      const logLikelihood = eStep.run();
       estimatesOf(fit, previous);
       for (const item of items) maximization.maximize(item);
       if (correlated) latent.maximize(eStep.nodeCounts);
       estimatesOf(fit, current);
-      return largestChange(previous, current);
+      return { logLikelihood, change: largestChange(previous, current) };
     },
-    { tolerance, maxIterations },
-  );
+  };
 }
 
 /** Writes the estimated parameters, on their own scale, into `out`: the items' estimated entries, then the correlations. */

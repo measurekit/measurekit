@@ -31,6 +31,7 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { compressResponses } from "../src/irt/responses.js";
+import { type EmMap, squarem } from "../src/multidimensional/acceleration.js";
 import { setUp } from "../src/multidimensional/calibration-setup.js";
 import { latentDistribution } from "../src/multidimensional/correlation.js";
 import { designOf } from "../src/multidimensional/design.js";
@@ -445,6 +446,73 @@ describe("models", () => {
     );
     expect(() => multidimensionalGradedResponse.toVector(JSON.parse("null"))).toThrow(DataError);
     expect(() => multidimensionalTwoParameterLogistic.toVector(JSON.parse("null"))).toThrow(DataError);
+  });
+});
+
+describe("accelerated EM", () => {
+  /** An EM whose steps shrink the distance to `target` by a rate per coordinate: linear convergence, as EM's. */
+  function linearMap(rates: readonly number[], target: readonly number[], valid = (_: Float64Array) => true) {
+    const point = Float64Array.from(rates, () => 0);
+    const steps: number[] = [];
+    const map: EmMap = {
+      size: rates.length,
+      read: (out) => out.set(point),
+      write(parameters) {
+        if (!valid(parameters)) return false;
+        point.set(parameters);
+        return true;
+      },
+      step() {
+        const logLikelihood = -point.reduce((sum, x, j) => sum + (x - defined(target[j])) ** 2, 0);
+        let change = 0;
+        rates.forEach((rate, j) => {
+          const next = defined(target[j]) + rate * (defined(point[j]) - defined(target[j]));
+          change = Math.max(change, Math.abs(next - defined(point[j])));
+          point[j] = next;
+        });
+        steps.push(logLikelihood);
+        return { logLikelihood, change };
+      },
+    };
+    return { map, point, steps };
+  }
+
+  it("reaches the fixed point of a slowly converging map in a few iterations", () => {
+    const { map, point } = linearMap([0.99, 0.9, 0.5], [1, -2, 3]);
+    const { converged, iterations } = squarem(map, { tolerance: 1e-8, maxIterations: 5000 });
+    expect(converged).toBe(true);
+    // Plain steps shrink the slowest coordinate by 0.99 each: 1,376 of them reach a change of 1e-8.
+    expect(iterations).toBeLessThan(60);
+    [1, -2, 3].forEach((x, j) => {
+      expectClose(defined(point[j]), x, 1e-6, `coordinate ${j + 1}`);
+    });
+  });
+
+  it("falls back to the plain steps where the extrapolated points are not valid", () => {
+    const { map, point } = linearMap([0.9, 0.8], [1, 1], () => false);
+    const { converged, iterations } = squarem(map, { tolerance: 1e-6, maxIterations: 500 });
+    expect(converged).toBe(true);
+    expect(iterations).toBeGreaterThan(60);
+    expectClose(defined(point[0]), 1, 1e-4);
+  });
+
+  it("falls back to the plain steps where the extrapolation lowers the log-likelihood", () => {
+    // A log-likelihood that rises away from the fixed point: every extrapolation lowers it.
+    const { map, point } = linearMap([0.9, 0.8], [1, 1]);
+    const inverted: EmMap = { ...map, step: () => ({ ...map.step(), logLikelihood: Number.NaN }) };
+    const { converged, iterations } = squarem(inverted, { tolerance: 1e-6, maxIterations: 5000 });
+    expect(converged).toBe(true);
+    expect(iterations).toBeGreaterThan(60);
+    expectClose(defined(point[0]), 1, 1e-4);
+  });
+
+  it("stops at the most iterations, counting every EM iteration", () => {
+    for (const maxIterations of [1, 2, 3, 4, 7]) {
+      const { map, steps } = linearMap([0.999, 0.5, 0.2], [1, 1, 1]);
+      const result = squarem(map, { tolerance: 1e-12, maxIterations });
+      expect(result).toEqual({ converged: false, iterations: maxIterations });
+      expect(steps).toHaveLength(maxIterations);
+    }
   });
 });
 
