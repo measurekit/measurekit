@@ -1,4 +1,4 @@
-import { checkArray, checkFinite, checkRecord, DataError } from "@measurekit/core";
+import { checkArray, checkFinite, checkRecord, DataError, isRecord } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { identity } from "./correlation.js";
 
@@ -18,6 +18,14 @@ export interface CheckedPrior {
   readonly covariance: Float64Array;
   /** The inverse of the covariance matrix by rows. */
   readonly precision: Float64Array;
+}
+
+/**
+ * Returns the number of dimensions a prior claims, the length of its mean, or `undefined` when it has no mean of at
+ * least one value: for estimates without items, where the prior gives the dimensions.
+ */
+export function priorDimensions(prior: MultivariateNormalPrior | undefined): number | undefined {
+  return isRecord(prior) && Array.isArray(prior.mean) && prior.mean.length > 0 ? prior.mean.length : undefined;
 }
 
 /**

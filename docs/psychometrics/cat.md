@@ -459,14 +459,14 @@ result.rootMeanSquareError; // [0.538, 0.478]
 result.meanLength; // 16.34
 ```
 
-| Option           | Default                                 | Meaning                                                                             |
-| ---------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
-| `pool`           | required                                | Items `{ id, model, parameters }`, with an optional `contentArea` and `exposure`    |
-| `stopping`       | required                                | A [stopping rule](#stopping-rules-of-multidimensional-tests)                        |
-| `selection`      | `maximumDeterminant()`                  | An [item selection rule](#selection-of-multidimensional-tests)                      |
-| `estimator`      | `multidimensionalPosteriorModeEstimate` | A [multidimensional estimator](#estimates-of-multidimensional-tests), under N(0, I) |
-| `contentTargets` | none                                    | As for [`adaptiveTest`](#content-balancing)                                         |
-| `enemies`        | none                                    | As for [`adaptiveTest`](#enemy-sets)                                                |
+| Option           | Default                      | Meaning                                                                            |
+| ---------------- | ---------------------------- | ---------------------------------------------------------------------------------- |
+| `pool`           | required                     | Items `{ id, model, parameters }`, with an optional `contentArea` and `exposure`   |
+| `stopping`       | required                     | A [stopping rule](#stopping-rules-of-multidimensional-tests)                       |
+| `selection`      | `maximumDeterminant()`       | An [item selection rule](#selection-of-multidimensional-tests)                     |
+| `estimator`      | posterior mode under N(0, I) | A [multidimensional estimator](#estimates-of-multidimensional-tests), with a prior |
+| `contentTargets` | none                         | As for [`adaptiveTest`](#content-balancing)                                        |
+| `enemies`        | none                         | As for [`adaptiveTest`](#enemy-sets)                                               |
 
 The pool is an array of at least one item with a model of the [multidimensional models](multidimensional.md#models) and
 valid parameters for it, a string id and, as a calibration's `items` have, the same number of dimensions as every other;
@@ -485,12 +485,12 @@ The state has the fields of an [adaptive test's](#state), and its `estimate` is 
 
 The estimator is a `MultidimensionalEstimator`, a function `(items, responses) => estimate`: one of
 `multidimensionalPosteriorModeEstimate` and `multidimensionalPosteriorMeanEstimate` ([multidimensional
-scoring](multidimensional.md#scoring)), or one with options, `(items, responses) =>
-multidimensionalPosteriorModeEstimate(items, responses, { prior })`. The test calls it with the administered items and
-their responses. Without responses it calls it with the first pool item and a missing response, `null`, which the
-built-in estimators take as no information and answer with the prior: the mean of the prior as theta, and its
-covariance. The default is the posterior mode under N(0, I). Pass the calibration's `correlations` as the covariance of
-the prior to the estimator and to `maximumDeterminant`.
+scoring](multidimensional.md#scoring)) with options, `(items, responses) => multidimensionalPosteriorModeEstimate(items,
+responses, { prior })`. The test calls it with the administered items and their responses, and before the first response
+with no items and no responses: the estimators then answer with the prior, the mean of the prior as theta and its
+covariance, and the prior gives them the dimensions, so an estimator without a `prior` throws `DataError` when the test
+starts. The default is the posterior mode under N(0, I) of the pool's dimensions. Pass the calibration's `correlations`
+as the covariance of the prior to the estimator and to `maximumDeterminant`.
 
 ### Selection of multidimensional tests
 

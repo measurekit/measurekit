@@ -1,5 +1,5 @@
-import { cholesky, isRecord } from "@measurekit/core";
-import { checkedPrior, type MultivariateNormalPrior } from "../multidimensional/prior.js";
+import { cholesky } from "@measurekit/core";
+import { checkedPrior, type MultivariateNormalPrior, priorDimensions } from "../multidimensional/prior.js";
 import type { MultidimensionalEstimate } from "../multidimensional/scoring.js";
 import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
 import type { ItemSelectionRule } from "./selection.js";
@@ -26,7 +26,7 @@ import type { ItemSelectionRule } from "./selection.js";
 export function maximumDeterminant(
   prior?: MultivariateNormalPrior,
 ): ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate> {
-  if (prior !== undefined) checkedPrior(prior, priorDimensions(prior));
+  if (prior !== undefined) checkedPrior(prior, priorDimensions(prior) ?? 0);
   return {
     scores({ pool, administered, estimate, eligible }, out) {
       const dimensions = estimate.theta.length;
@@ -50,11 +50,6 @@ export function maximumDeterminant(
       });
     },
   };
-}
-
-/** Returns the number of rows a prior's mean claims, so that the covariance is checked against it. */
-function priorDimensions(prior: MultivariateNormalPrior): number {
-  return isRecord(prior) && Array.isArray(prior.mean) ? prior.mean.length : 0;
 }
 
 function add(sum: Float64Array, matrix: Float64Array): void {

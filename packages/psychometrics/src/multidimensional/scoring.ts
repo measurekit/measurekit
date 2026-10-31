@@ -9,7 +9,7 @@ import { checkMultidimensionalPattern, indexMultidimensionalItems } from "./item
 import type { MultidimensionalItem, MultidimensionalTestItem } from "./model.js";
 import { answeredPattern } from "./pattern.js";
 import { posteriorMode } from "./posterior-mode.js";
-import { type CheckedPrior, checkedPrior, type MultivariateNormalPrior } from "./prior.js";
+import { type CheckedPrior, checkedPrior, type MultivariateNormalPrior, priorDimensions } from "./prior.js";
 
 /** An estimate of a person's thetas with their standard errors and covariance. */
 export interface MultidimensionalEstimate {
@@ -74,10 +74,12 @@ const STANDARD_GRIDS = new Map<string, Grid>();
  * @remarks
  * The posterior mean, with the posterior covariance, by quadrature on the rectangular grid placed on the prior: nodes
  * `mean + sd * z`, weights proportional to the prior density at the nodes times the likelihood. Missing responses are
- * skipped; without responses the estimate is the prior. The grid has `points ** dimensions` nodes: more than 10⁶ throw.
+ * skipped; without responses the estimate is the prior, also without items, when the `prior` gives the dimensions. The
+ * grid has `points ** dimensions` nodes: more than 10⁶ throw.
  *
- * @throws `DataError` when the items, responses, prior or points are invalid, or the grid has more than 10⁶ nodes: use
- * {@link multidimensionalPosteriorModeEstimate}, which works in any number of dimensions.
+ * @throws `DataError` when the items, responses, prior or points are invalid, there are no items and no prior, or the
+ * grid has more than 10⁶ nodes: use {@link multidimensionalPosteriorModeEstimate}, which works in any number of
+ * dimensions.
  */
 export function multidimensionalPosteriorMeanEstimate(
   items: readonly MultidimensionalItem[],
@@ -85,7 +87,7 @@ export function multidimensionalPosteriorMeanEstimate(
   options: MultidimensionalPosteriorMeanOptions = {},
 ): MultidimensionalEstimate {
   checkOptions(options);
-  const dimensions = checkMultidimensionalPattern(items, responses);
+  const dimensions = checkMultidimensionalPattern(items, responses, priorDimensions(options.prior));
   const prior = checkedPrior(options.prior, dimensions);
   const points = checkedPoints(options.points, dimensions);
   const pattern = answeredPattern(items, responses, dimensions);
@@ -161,9 +163,10 @@ function addOuterProduct(out: Float64Array, x: Float64Array, weight: number): vo
  * A scan of the log posterior on a grid of 5 points per dimension (3 above three dimensions) from -3 to 3 standard
  * deviations of the prior picks the start of Fisher scoring with backtracking, which runs until the gradient is below
  * 1e-10. The covariance is the inverse of the test information plus the inverse of the prior covariance, at the
- * estimate. Missing responses are skipped; without responses the estimate is the prior mean.
+ * estimate. Missing responses are skipped; without responses the estimate is the prior mean, also without items, when
+ * the `prior` gives the dimensions.
  *
- * @throws `DataError` when the items, responses or prior are invalid.
+ * @throws `DataError` when the items, responses or prior are invalid, or there are no items and no prior.
  */
 export function multidimensionalPosteriorModeEstimate(
   items: readonly MultidimensionalItem[],
@@ -171,7 +174,7 @@ export function multidimensionalPosteriorModeEstimate(
   options: MultidimensionalPosteriorModeOptions = {},
 ): MultidimensionalEstimate {
   checkOptions(options);
-  const dimensions = checkMultidimensionalPattern(items, responses);
+  const dimensions = checkMultidimensionalPattern(items, responses, priorDimensions(options.prior));
   const prior = checkedPrior(options.prior, dimensions);
   const { theta, information } = posteriorMode(answeredPattern(items, responses, dimensions), prior, dimensions);
   const covariance =

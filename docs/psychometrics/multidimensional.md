@@ -197,10 +197,11 @@ missing. An estimate has `theta`, `standardErrors` and `covariance`.
 | `prior`  | EAP, MAP | N(0, I)                                                     | `{ mean, covariance }`: pass the calibration's `correlations` as the covariance                      |
 | `points` | EAP      | `61`, `31`, `15`, `9`, `7` for 1 to 5 dimensions, `3` above | Nodes per dimension of the rectangular grid placed on the prior: `mean + sd * z` with z from -6 to 6 |
 
-The covariance of the prior is symmetric and positive definite. EAP weights the grid nodes by the prior density times the
-likelihood. A grid of more than 10⁶ nodes throws, naming MAP, which works in any number of dimensions: a scan of 5 points
-per dimension (3 above three dimensions) from -3 to 3 prior standard deviations picks the start of Fisher scoring with
-halved steps, which runs to a gradient below 1e-10. Without responses the estimate is the prior.
+The covariance of the prior is symmetric and positive definite. EAP weights the grid nodes by the prior density times
+the likelihood. A grid of more than 10⁶ nodes throws, naming MAP, which works in any number of dimensions: a scan of 5
+points per dimension (3 above three dimensions) from -3 to 3 prior standard deviations picks the start of Fisher scoring
+with halved steps, which runs to a gradient below 1e-10. Without responses the estimate is the prior, also without
+items, when a `prior` gives the dimensions: an estimate from no items needs one.
 
 `multidimensionalEstimates` matches the data's item ids to `items`, estimates each person from the person's answered
 items only, and takes `multidimensionalPosteriorModeEstimate` unless given an estimator, a function of items and

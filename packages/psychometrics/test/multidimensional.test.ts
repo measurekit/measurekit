@@ -1131,6 +1131,53 @@ describe("scoring", () => {
     }
   });
 
+  it("returns the prior when there are no items, as the prior gives the dimensions", () => {
+    const prior = {
+      mean: [0.5, -0.5, 0.25],
+      covariance: [
+        [1, 0.3, 0],
+        [0.3, 2, 0.1],
+        [0, 0.1, 1.5],
+      ],
+    };
+    const mode = multidimensionalPosteriorModeEstimate([], [], { prior });
+    expect(mode.theta).toEqual(prior.mean);
+    prior.covariance.forEach((row, i) => {
+      row.forEach((value, j) => {
+        expectClose(defined(mode.covariance[i]?.[j]), value, 1e-12, `mode covariance ${i + 1}, ${j + 1}`);
+      });
+    });
+    expect(mode.standardErrors.map((value) => value ** 2)).toEqual(
+      mode.covariance.map((row, i) => defined(row[i])).map((value) => expect.closeTo(value, 12)),
+    );
+    const mean = multidimensionalPosteriorMeanEstimate([], [], { prior, points: 15 });
+    prior.mean.forEach((value, d) => {
+      expectClose(defined(mean.theta[d]), value, 1e-12, `mean ${d + 1}`);
+    });
+    expectClose(defined(mean.covariance[0]?.[1]), 0.3, 1e-6);
+  });
+
+  it("needs a prior to estimate without items, as it gives the dimensions", () => {
+    const message = "Scoring needs at least one item, or a prior, which gives the dimensions.";
+    expect(() => multidimensionalPosteriorModeEstimate([], [])).toThrow(message);
+    expect(() => multidimensionalPosteriorMeanEstimate([], [])).toThrow(message);
+    expect(() => multidimensionalPosteriorModeEstimate([], [], { prior: { mean: [], covariance: [] } })).toThrow(
+      message,
+    );
+    expect(() => multidimensionalPosteriorModeEstimate([], [1])).toThrow(message);
+    const prior = {
+      mean: [0, 0],
+      covariance: [
+        [1, 0],
+        [0, 1],
+      ],
+    };
+    expect(() => multidimensionalPosteriorModeEstimate([], [1], { prior })).toThrow("Found 1 responses to 0 items.");
+    expect(() =>
+      multidimensionalPosteriorModeEstimate([], [], { prior: JSON.parse('{"mean":[0,0],"covariance":"x"}') }),
+    ).toThrow("The covariance of the prior must be an array of rows");
+  });
+
   it("returns the prior when there are no responses", () => {
     const items = itemsOf(m2pl);
     const prior = {

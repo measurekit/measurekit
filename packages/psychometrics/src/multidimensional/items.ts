@@ -96,15 +96,24 @@ export function indexMultidimensionalItems(
 }
 
 /**
- * Checks the items against one response each, `null` when missing, and returns their number of dimensions.
+ * Checks the items against one response each, `null` when missing, and returns their number of dimensions: without
+ * items, the number of `priorDimensions`.
  *
- * @throws `DataError` naming the first invalid item or response.
+ * @throws `DataError` naming the first invalid item or response, or when there are no items and no prior to give the
+ * dimensions.
  */
 export function checkMultidimensionalPattern(
   items: readonly MultidimensionalItem[],
   responses: readonly (number | null)[],
+  priorDimensions?: number,
 ): number {
-  const dimensions = checkMultidimensionalItems(items, "Scoring");
+  if (Array.isArray(items) && items.length === 0 && priorDimensions === undefined) {
+    throw new DataError("Scoring needs at least one item, or a prior, which gives the dimensions.");
+  }
+  const dimensions =
+    Array.isArray(items) && items.length === 0 && priorDimensions !== undefined
+      ? priorDimensions
+      : checkMultidimensionalItems(items, "Scoring");
   checkArray(responses, "The responses must be an array");
   if (responses.length !== items.length) {
     throw new DataError(`Found ${responses.length} responses to ${items.length} items.`);

@@ -44,6 +44,7 @@ import {
   modifiedPosteriorWeightedKullbackLeibler,
   multidimensionalAdaptiveTest,
   multidimensionalInformation,
+  multidimensionalPosteriorMeanEstimate,
   multidimensionalPosteriorModeEstimate,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
@@ -2222,7 +2223,7 @@ describe("multidimensionalAdaptiveTest", () => {
     });
   }
 
-  it("starts at the prior, from the estimator's answer to the first item with a missing response", () => {
+  it("starts at the prior, from the estimator's answer without items or responses", () => {
     const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
     const start = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) }).start(createRandom(1));
     expect(start).toMatchObject({ items: [], responses: [], withheld: [] });
@@ -2253,25 +2254,59 @@ describe("multidimensionalAdaptiveTest", () => {
     });
   });
 
-  it("calls the estimator with the administered items, and with a missing response at the start", () => {
+  it("calls the estimator with the administered items, and with no items at the start", () => {
     const pool = [
       multidimensionalItem("q1", [1, 0], 0),
       multidimensionalItem("q2", [0, 1], 0),
       multidimensionalItem("q3", [1, 1], 0),
     ];
+    const prior = {
+      mean: [0, 0],
+      covariance: [
+        [1, 0],
+        [0, 1],
+      ],
+    };
     const calls: { ids: string[]; answers: (number | null)[] }[] = [];
     const test = multidimensionalAdaptiveTest({
       pool,
       stopping: testLength(2),
       estimator: (items, answers) => {
         calls.push({ ids: items.map((item) => (item as MultidimensionalPoolItem).id), answers: [...answers] });
-        return multidimensionalPosteriorModeEstimate(items, answers);
+        return multidimensionalPosteriorModeEstimate(items, answers, { prior });
       },
     });
     const states = administerMultidimensional(test, () => 1);
-    expect(calls[0]).toEqual({ ids: ["q1"], answers: [null] });
+    expect(calls[0]).toEqual({ ids: [], answers: [] });
     expect(calls[1]).toEqual({ ids: [defined(states[0]?.next)], answers: [1] });
     expect(calls[2]?.answers).toEqual([1, 1]);
+  });
+
+  it("starts with the estimate of a posterior mean estimator under a prior, and fails without a prior", () => {
+    const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
+    const prior = {
+      mean: [0.2, -0.4],
+      covariance: [
+        [1.5, 0.2],
+        [0.2, 1],
+      ],
+    };
+    const mean = multidimensionalAdaptiveTest({
+      pool,
+      stopping: testLength(1),
+      selection: maximumDeterminant(prior),
+      estimator: (items, answers) => multidimensionalPosteriorMeanEstimate(items, answers, { prior }),
+    }).start(createRandom(1));
+    expectClose(defined(mean.estimate.theta[0]), 0.2, 1e-12);
+    expectClose(defined(mean.estimate.theta[1]), -0.4, 1e-12);
+    const withoutPrior = multidimensionalAdaptiveTest({
+      pool,
+      stopping: testLength(1),
+      estimator: multidimensionalPosteriorModeEstimate,
+    });
+    expect(() => withoutPrior.start(createRandom(1))).toThrow(
+      "Scoring needs at least one item, or a prior, which gives the dimensions.",
+    );
   });
 
   it("selects the item with the largest determinant, a within-dimension item first at the prior", () => {
@@ -2385,6 +2420,9 @@ describe("multidimensionalAdaptiveTest", () => {
       "The option selection must be a selection rule, such as maximumDeterminant()",
     );
     expect(() => multidimensionalAdaptiveTest({ ...options, estimator: parse('"map"') })).toThrow(
+      "The option estimator must be a function of items and responses",
+    );
+    expect(() => multidimensionalAdaptiveTest({ ...options, estimator: parse("null") })).toThrow(
       "The option estimator must be a function of items and responses",
     );
     expect(() => multidimensionalAdaptiveTest({ ...options, pool: parse('"q1"') })).toThrow(

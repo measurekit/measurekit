@@ -26,9 +26,10 @@ export interface MultidimensionalAdaptiveTestOptions {
    */
   readonly selection?: ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate>;
   /**
-   * Estimates the thetas after each response, and before the first, from the first pool item with a missing response.
+   * Estimates the thetas after each response, and before the first, without items or responses: it must take a prior,
+   * which gives the dimensions then, as the built-in estimators do with `prior`.
    *
-   * @defaultValue `multidimensionalPosteriorModeEstimate`, under a prior of N(0, I)
+   * @defaultValue `multidimensionalPosteriorModeEstimate`, under a prior of N(0, I) of the pool's dimensions
    */
   readonly estimator?: MultidimensionalEstimator;
   /**
@@ -78,14 +79,15 @@ export interface MultidimensionalAdaptiveTest {
  * test ends, content balancing restricts the eligible items to one content area, the selection rule selects among
  * them, and Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or
  * enemies of an administered item are not eligible. The estimator is called with the administered items and their
- * responses; without responses it is called with the first pool item and a missing response, which the built-in
- * estimators take as no information and answer with the prior. The default estimate and rule use a prior of N(0, I);
- * give the same prior to both when the dimensions correlate, such as a calibration's `correlations`.
+ * responses, and before the first response with neither: the built-in estimators then answer with the prior, which
+ * gives them the dimensions. The default estimate and rule use a prior of N(0, I); give the same prior to both when the
+ * dimensions correlate, such as a calibration's `correlations`.
  *
  * @throws `DataError` when `stopping`, `selection` or `estimator` is not a rule or function, the pool is not an array
  * of at least one valid item with a string id, ids repeat or the items differ in their number of dimensions, an exposure
  * parameter is outside [0, 1], a content target is invalid or missing for an item's area, or an enemy set does not name
- * two or more distinct pool items.
+ * two or more distinct pool items. An estimator that takes no prior throws, from `start`, as it cannot estimate without
+ * items.
  *
  * @example
  * ```ts
@@ -111,21 +113,25 @@ export function multidimensionalAdaptiveTest(
   options: MultidimensionalAdaptiveTestOptions,
 ): MultidimensionalAdaptiveTest {
   checkOptions(options);
-  const {
-    pool,
-    stopping,
-    selection = maximumDeterminant(),
-    estimator = multidimensionalPosteriorModeEstimate,
-    contentTargets,
-    enemies = [],
-  } = options;
+  const { pool, stopping, selection = maximumDeterminant(), estimator, contentTargets, enemies = [] } = options;
   checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
   checkMethod(selection, "scores", "The option selection must be a selection rule, such as maximumDeterminant()");
-  checkFunction(
-    estimator,
-    "The option estimator must be a function of items and responses, such as multidimensionalPosteriorModeEstimate",
-  );
-  checkMultidimensionalItems(pool, "A multidimensional adaptive test");
+  if (estimator !== undefined) {
+    checkFunction(
+      estimator,
+      "The option estimator must be a function of items and responses, such as multidimensionalPosteriorModeEstimate",
+    );
+  }
+  const dimensions = checkMultidimensionalItems(pool, "A multidimensional adaptive test");
+  const standardPrior = {
+    mean: Array.from({ length: dimensions }, () => 0),
+    covariance: Array.from({ length: dimensions }, (_, i) =>
+      Array.from({ length: dimensions }, (__, j) => (i === j ? 1 : 0)),
+    ),
+  };
+  const estimate: MultidimensionalEstimator =
+    estimator ??
+    ((items, responses) => multidimensionalPosteriorModeEstimate(items, responses, { prior: standardPrior }));
   const engine = adaptiveEngine({
     pool,
     indices: indexMultidimensionalItems(pool),
@@ -133,8 +139,7 @@ export function multidimensionalAdaptiveTest(
     selection,
     contentTargets,
     enemies,
-    estimate: (administered, responses) =>
-      administered.length === 0 ? estimator(pool.slice(0, 1), [null]) : estimator(administered, responses),
+    estimate,
     checkResponse: (item, response) => {
       checkCategory(item.id, item.model.categoryCount(item.parameters), response);
     },
