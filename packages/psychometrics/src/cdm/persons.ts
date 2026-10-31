@@ -63,8 +63,9 @@ export function attributeProfiles(matrix: ResponseMatrix, calibration: CdmCalibr
   forEachPosterior(data, design, state, (person, posterior) => {
     estimates[person] = profileEstimate(copyOf(posterior), design.profiles);
   });
-  return matrix.personIds.map((id, person) => ({
-    id,
-    ...(estimates[person] ?? profileEstimate(Array.from(state.proportions), design.profiles)),
-  }));
+  return matrix.personIds.map((id, person) => {
+    const { posterior, mastery, map, eap } =
+      estimates[person] ?? profileEstimate(Array.from(state.proportions), design.profiles);
+    return { id, posterior, mastery, map, eap };
+  });
 }

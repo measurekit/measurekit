@@ -37,8 +37,8 @@ interface Cycle {
  * iterations, extrapolates the parameters along their steps, and takes one EM iteration from the extrapolated point.
  *
  * @remarks
- * The extrapolation uses the steplength α = -‖r‖/‖v‖ for the first step r and the change of step v, and is shortened
- * toward the plain EM steps, α = -1, when the log-likelihood at the extrapolated point is below the cycle's start or the
+ * The extrapolation goes a length α = -‖r‖/‖v‖ along the first step r, with v the change of step, and is shortened toward
+ * the plain EM steps, α = -1, when the log-likelihood at the extrapolated point is below the cycle's start or the
  * point is invalid. It accelerates the linear convergence of EM, which is slow where much of the information is
  * missing, to the same fixed points. Every EM iteration counts as an iteration, and the algorithm has converged when
  * one of them changes no parameter by more than `tolerance`, as plain EM does.
@@ -70,7 +70,7 @@ export function squarem(
     const next = step();
     map.read(cycle.second);
     if (next.change <= tolerance) return { converged: true, iterations };
-    const length = steplength(cycle);
+    const length = extrapolationLength(cycle);
     const result = length === null ? null : extrapolate(map, cycle, length, initial.logLikelihood, { step, remaining });
     if (result !== null && result.change <= tolerance) return { converged: true, iterations };
     map.read(cycle.start);
@@ -79,7 +79,7 @@ export function squarem(
 }
 
 /** Returns α = -‖r‖/‖v‖, at most -1, or `null` when the steps leave no direction to extrapolate along. */
-function steplength({ start, first, second }: Cycle): number | null {
+function extrapolationLength({ start, first, second }: Cycle): number | null {
   let steps = 0;
   let changes = 0;
   for (let j = 0; j < start.length; j++) {
