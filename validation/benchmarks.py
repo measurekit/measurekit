@@ -1,0 +1,66 @@
+"""Times pyBKT, the reference of the Bayesian knowledge tracing benchmarks of measurekit, on the log of bench-bkt.json.
+
+    validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py
+
+The results go to validation/benchmarks/results/python.json, which `Rscript validation/benchmarks.R table` reads. pyBKT
+fits every skill, five starts each by default, with the processes of its parallel option off, one thread.
+"""
+
+import json
+import os
+import statistics
+import time
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
+import pandas as pd  # noqa: E402
+from pyBKT.models import Model  # noqa: E402
+
+FIXTURE = "packages/knowledge-tracing/test/fixtures/bench-bkt.json"
+RESULTS = "validation/benchmarks/results/python.json"
+
+
+def time_calls(function):
+    """The median and the fastest of the calls of `function` in milliseconds, after one call that warms up."""
+    start = time.perf_counter()
+    function()
+    first = time.perf_counter() - start
+    inner = max(1, int(0.05 / max(first, 1e-4)) + 1)
+    runs = 15 if first < 1 else 7 if first < 15 else 3 if first < 60 else 2
+    samples = []
+    for _ in range(runs):
+        start = time.perf_counter()
+        for _ in range(inner):
+            function()
+        samples.append((time.perf_counter() - start) * 1000 / inner)
+    return {"median": statistics.median(samples), "min": min(samples), "samples": runs}
+
+
+with open(FIXTURE) as file:
+    fixture = json.load(file)
+
+data = pd.DataFrame(
+    {
+        "order_id": range(len(fixture["learner"])),
+        "user_id": fixture["learner"],
+        "skill_name": fixture["skill"],
+        "correct": fixture["outcome"],
+    }
+)
+
+model = Model(seed=1, parallel=False)
+
+
+def fit():
+    Model(seed=1, parallel=False).fit(data=data)
+
+
+model.fit(data=data)
+results = {"bkt.fit": time_calls(fit), "bkt.replay": time_calls(lambda: model.predict(data=data))}
+for key, result in results.items():
+    print(f"{key:20} median {result['median']:10.3f} ms   fastest {result['min']:10.3f} ms")
+
+os.makedirs(os.path.dirname(RESULTS), exist_ok=True)
+with open(RESULTS, "w") as file:
+    json.dump({"knowledge-tracing": results}, file, indent=2)

@@ -1,5 +1,5 @@
 import { expect } from "vitest";
-import type { EventLog, LearnerModel } from "../src/index.js";
+import { type EventLog, eventLog, type LearnerModel } from "../src/index.js";
 
 /** Expects `actual` within `tolerance` of `expected`, or `null` when `expected` is `null`. */
 export function expectClose(actual: number | null, expected: number | null, tolerance: number, label = ""): void {
@@ -61,4 +61,26 @@ export function online<TState>(
     return prediction;
   });
   return { predictions, states };
+}
+
+/**
+ * Returns the log of events that a benchmark fixture holds as columns: the learner, item, time and outcome of each event,
+ * and its skill when the fixture has them, a skill for each event.
+ */
+export function columnsLog(columns: {
+  readonly learner: readonly string[];
+  readonly item: readonly string[];
+  readonly time: readonly number[];
+  readonly outcome: readonly number[];
+  readonly skill?: readonly string[];
+}): EventLog {
+  return eventLog(
+    columns.learner.map((learner, i) => ({
+      learner,
+      item: defined(columns.item[i]),
+      skills: columns.skill === undefined ? [] : [defined(columns.skill[i])],
+      time: defined(columns.time[i]),
+      outcome: defined(columns.outcome[i]),
+    })),
+  );
 }

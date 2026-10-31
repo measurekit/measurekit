@@ -6,3 +6,4 @@ coverage/
 .DS_Store
 validation/knowledge-tracing/.venv/
 __pycache__/
+validation/benchmarks/results/

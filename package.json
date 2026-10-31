@@ -10,6 +10,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck && tsc -p tsconfig.json",
     "test": "vitest run",
+    "bench": "pnpm -r --workspace-concurrency=1 bench",
     "lint": "biome check . && cspell --no-progress",
     "format": "biome check --write .",
     "knip": "knip",

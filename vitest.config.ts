@@ -20,6 +20,39 @@ export default defineConfig({
         resolve: { alias: CORE_SOURCE },
         test: { name: "knowledge-tracing", include: ["packages/knowledge-tracing/test/**/*.test.ts"] },
       },
+      {
+        // The benchmarks of each package: `pnpm bench` runs them with `vitest bench`, which gives a project the suffix
+        // "(bench)". The files run one after another, so that no benchmark competes with another for the processor, and a
+        // test may take minutes.
+        test: {
+          name: "core-bench",
+          include: [],
+          fileParallelism: false,
+          benchmark: { include: ["packages/core/test/**/*.bench.ts"], suppressExportGetterWarnings: true },
+        },
+      },
+      {
+        resolve: { alias: CORE_SOURCE },
+        test: {
+          name: "psychometrics-bench",
+          include: [],
+          testTimeout: 1_800_000,
+          hookTimeout: 1_800_000,
+          fileParallelism: false,
+          benchmark: { include: ["packages/psychometrics/test/**/*.bench.ts"], suppressExportGetterWarnings: true },
+        },
+      },
+      {
+        resolve: { alias: CORE_SOURCE },
+        test: {
+          name: "knowledge-tracing-bench",
+          include: [],
+          testTimeout: 1_800_000,
+          hookTimeout: 1_800_000,
+          fileParallelism: false,
+          benchmark: { include: ["packages/knowledge-tracing/test/**/*.bench.ts"], suppressExportGetterWarnings: true },
+        },
+      },
     ],
   },
 });

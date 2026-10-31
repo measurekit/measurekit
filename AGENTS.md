@@ -134,7 +134,10 @@ packages/knowledge-tracing/   the published package @measurekit/knowledge-tracin
   src/sim/              outcomes simulated from any learner model
   test/<module>.test.ts one file per src folder; fixtures/ holds the reference results
 docs/<package>/         guides of each package; TypeDoc publishes them with the API reference
+docs/performance.md     the benchmarks against the references, and the budgets
 validation/<package>/   R and Python scripts that write the fixtures; validation/README.md lists them
+validation/benchmarks/  the inputs of the benchmarks and the timing of their references, by package and module
+bench/                  the harness of the benchmarks, which each package binds to its budgets
 examples/<package>/     runnable examples, which import the package by name
 biome/                  Biome GritQL plugins
 .changeset/             the pending release: one changeset per package
@@ -150,6 +153,7 @@ pnpm install
 pnpm lint             # Biome and cspell; `pnpm format` fixes formatting
 pnpm typecheck        # tsc over the sources, tests and examples of every package
 pnpm test             # Vitest, one project per package; `pnpm test --project psychometrics` runs one
+pnpm bench            # the benchmarks of every package, one after another, against the budgets of `test/budgets.ts`
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package: tsc -b after deleting dist/, so that no stale output ships
 pnpm check:packages   # builds, then publint and Are the Types Wrong on each packed package
@@ -324,6 +328,9 @@ Knowledge tracing: the model families never import each other, nor does anything
 - Edge cases are tested for every function: constant items, persons and items without responses, one item, two persons;
   an empty log, one learner, events out of time order, items and skills that are unknown, outcomes all correct or all
   wrong, and each model's limits, such as BKT parameters at their bounds or a posterior mode beyond the IRT grid.
+- A module has benchmarks of its hot path in `test/<module>.bench.ts`, with the size of the input in the title of each, a
+  budget in `test/budgets.ts` and, where a reference does the task, the same task timed in
+  `validation/benchmarks/<package>/<module>.R` on the same data. `docs/performance.md` explains the method and the budgets.
 - Test names are plain sentences about behavior: `it("shares the places at a tied boundary equally")`.
 - A bug fix comes with a test that fails without it, in the test file of the fixed folder.
 
@@ -336,9 +343,10 @@ Knowledge tracing: the model families never import each other, nor does anything
   plain data and their checks, its steps for `replay` in `fit`, and the property tests of the interface.
 - A module: a folder in `src/` with `index.ts`, a subpath in the package's `package.json` `exports`, an entry point in
   its `typedoc.json`, `export *` in `src/index.ts`, a test file, a guide in `docs/<package>/`, a reference script if it
-  computes statistics, import rules in `biome.json` and the table above, and a row in the API table of the package's
+  computes statistics, benchmarks of its hot path with their budgets and, where a reference does the task, its timing in
+  `validation/benchmarks/`, import rules in `biome.json` and the table above, and a row in the API table of the package's
   `README.md`.
-- A new package: a folder in `packages/` with the files listed under Layout, a project in `vitest.config.ts`, an
+- A new package: a folder in `packages/` with the files listed under Layout, a project and a benchmark project in `vitest.config.ts`, an
   entry in the root `typedoc.json`, a changeset, a row in the package table of the root `README.md` and, for a library,
   `docs/<package>/`.
 - Numerics shared by modules: `math/`, internal unless users need them; numerics both libraries use: `@measurekit/core`.

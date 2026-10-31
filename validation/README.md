@@ -69,3 +69,20 @@ uv pip install --python validation/knowledge-tracing/.venv -r validation/knowled
 ```
 
 `requirements.txt` pins pyBKT with the NumPy, pandas and scikit-learn versions it works with.
+
+## Benchmarks
+
+`benchmarks.R` and `benchmarks.py` time the references on the tasks of the benchmarks of measurekit
+([performance](../docs/performance.md)). Each script of `validation/benchmarks/<package>/` simulates the inputs, writes
+them to `packages/<package>/test/fixtures/bench-<module>.json` and times the reference on them with one thread:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R               # every module
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R irt mokken    # the modules named
+validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py                  # pyBKT
+Rscript validation/benchmarks.R table                                                   # the tables of docs/performance.md
+```
+
+They need the packages of the scripts above, and for the tasks of
+`validation/benchmarks/` psych, TAM, nlme, metafor, pROC, irr, equate, equateIRT, difR, rms, GDINA, NPCD, catR, cdcatR,
+mirtCAT, pks and DAKS. The results go to `validation/benchmarks/results/`, which git ignores.
