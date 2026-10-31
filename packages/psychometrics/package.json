@@ -15,6 +15,8 @@
     "assessment",
     "item-fit",
     "differential-item-functioning",
+    "mantel-haenszel",
+    "polytomous-items",
     "test-equating",
     "simulation",
     "standard-setting",

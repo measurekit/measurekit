@@ -13,7 +13,7 @@ Rscript validation/psychometrics/ctt.R               # classical test theory
 Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
 Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic tests: cdcatR
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
-Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord
+Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
 Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych
@@ -23,8 +23,8 @@ Rscript validation/psychometrics/interop.R           # mirt's coefficient forms 
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
 ```
 
-They need R with the packages psych, mirt, ltm, catR, TAM, eRm, difR, equate, equateIRT, irr, cacIRT, sirt, nlme,
-LNIRT, numDeriv, GDINA, alabama, NPCD, CDM, cdcatR and jsonlite; `common.R` holds their shared helpers.
+They need R with the packages psych, mirt, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
+sirt, nlme, LNIRT, numDeriv, GDINA, alabama, NPCD, CDM, cdcatR and jsonlite; `common.R` holds their shared helpers.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in

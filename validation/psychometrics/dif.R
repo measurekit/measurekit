@@ -2,6 +2,10 @@
 # mantelhaen.test for the Mantel-Haenszel chi-square, the ETS categories written out below from difMH's odds ratios and
 # variances, and base R's statistics under measurekit's matching rule for sparse data. Data: difR's verbal, with
 # Gender 1 as the focal group, and a 2PL simulation with known DIF; both also with 2% of the responses missing.
+# Polytomous items (dif-polytomous.json): Mantel's chi-square, the standardized mean difference and the generalized
+# Mantel-Haenszel chi-square in base R and mantelhaen.test, and ordinal logistic regression by rms::lrm, with
+# MASS::polr and lordif's rundif as checks. Data: psych's bfi N1 to N5 by gender and a graded response simulation with known DIF; both also with 2% of
+# the responses missing.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -103,15 +107,18 @@ lord <- function(data, focal) {
 # --- Sparse data and purification: base R ----------------------------------------------------------------------
 # measurekit's rule: each item uses the persons who answered it and another matching item; a person's matching score
 # is the response to the item plus the total over the other matching items the person answered, scaled to all of
-# them and rounded, halves up. With complete data it is difR's total score over the anchors and the studied item,
-# which the script checks against difMH and difLogistic, purified and not.
+# them by their highest possible scores and rounded, halves up. With complete data it is difR's total score over the
+# anchors and the studied item, which the script checks against difMH and difLogistic, purified and not.
 
+# The highest possible score of an item is its highest response, at least 1: 1 for a dichotomous item.
 match_scores <- function(data, item, anchors) {
   others <- setdiff(anchors, item)
-  answered <- rowSums(!is.na(data[, others, drop = FALSE]))
+  highest <- pmax(1, suppressWarnings(apply(data, 2, max, na.rm = TRUE)))
+  possible <- drop((!is.na(data[, others, drop = FALSE])) %*% highest[others])
   correct <- rowSums(data[, others, drop = FALSE], na.rm = TRUE)
-  keep <- !is.na(data[, item]) & answered > 0
-  list(rows = which(keep), score = data[keep, item] + floor(length(others) * correct[keep] / answered[keep] + 0.5))
+  keep <- !is.na(data[, item]) & possible > 0
+  list(rows = which(keep),
+       score = data[keep, item] + floor(sum(highest[others]) * correct[keep] / possible[keep] + 0.5))
 }
 
 # The Mantel-Haenszel statistics of every item under the rule: mantelhaen.test's chi-square over the score groups of
@@ -250,5 +257,258 @@ write_fixture("dif", list(
   cases = list(
     dif_case("verbal", verbal_items, verbal$Gender),
     dif_case("simulated", simulated, simulated_focal)
+  )
+))
+
+# --- Polytomous items ------------------------------------------------------------------------------------------
+# Each item's persons and matching scores are those of the rule above, with a given score such as theta in place of
+# the total score for ordinal logistic regression.
+
+POLYTOMOUS_ETS <- c(moderate = 0.17, large = 0.25)
+
+# ETS categories (Zwick, 2012): AA when Mantel's chi-square is not significant or |SMD / SD| <= 0.17; CC when it is
+# significant and |SMD / SD| > 0.25; BB otherwise.
+polytomous_category <- function(effect, p) {
+  ifelse(is.na(effect) | is.na(p), NA_character_,
+         ifelse(p >= ETS_SIGNIFICANCE | abs(effect) <= POLYTOMOUS_ETS[["moderate"]], "AA",
+                ifelse(abs(effect) > POLYTOMOUS_ETS[["large"]], "CC", "BB")))
+}
+
+# Mantel's chi-square from the rows of each score group: with n persons, n_F of them focal, the focal group's sum of
+# responses F has mean n_F * mean(y) and variance n_R n_F var(y) / n, var the sample variance, which is the sampling
+# variance of n_F draws without replacement from the score group (Mantel, 1963).
+mantel_chi_square <- function(y, g, groups) {
+  groups <- Filter(function(rows) length(rows) > 1, groups)
+  excess <- sum(vapply(groups, function(rows) sum(y[rows][g[rows] == 1]) - sum(g[rows] == 1) * mean(y[rows]), 0))
+  variance <- sum(vapply(groups, function(rows) {
+    n <- length(rows)
+    focal <- sum(g[rows] == 1)
+    focal * (n - focal) * var(y[rows]) / n
+  }, 0))
+  if (variance > 0) excess^2 / variance else NA_real_
+}
+
+# The standardized mean difference over the score groups with persons of both groups, weighted by the focal group's.
+standardized_mean_difference <- function(y, g, groups) {
+  groups <- Filter(function(rows) any(g[rows] == 1) && any(g[rows] == 0), groups)
+  if (length(groups) == 0) return(NA_real_)
+  focal <- vapply(groups, function(rows) sum(g[rows] == 1), 0)
+  difference <- vapply(groups, function(rows) mean(y[rows][g[rows] == 1]) - mean(y[rows][g[rows] == 0]), 0)
+  sum(focal * difference) / sum(focal)
+}
+
+# The generalized Mantel-Haenszel test by mantelhaen.test on the 2 x K x S table of the categories used in the score
+# groups of more than one person; its degrees of freedom are the categories used less 1. A singular covariance matrix,
+# which mantelhaen.test reports as an error, is undefined.
+generalized_mantel_haenszel <- function(y, g, score) {
+  kept <- score %in% as.numeric(names(which(table(score) > 1)))
+  used <- sort(unique(y[kept]))
+  df <- max(length(used) - 1, 0)
+  if (df < 1) return(c(NA_real_, df, NA_real_))
+  table3 <- table(factor(g[kept], 0:1), factor(y[kept], used), score[kept])
+  chi <- tryCatch(unname(mantelhaen.test(table3, correct = FALSE)$statistic), error = function(e) NA_real_)
+  c(chi, df, if (is.na(chi)) NA_real_ else pchisq(chi, df, lower.tail = FALSE))
+}
+
+mantel_rule <- function(data, focal, anchors) {
+  rows <- lapply(seq_len(ncol(data)), function(item) {
+    m <- match_scores(data, item, anchors)
+    y <- data[m$rows, item]
+    g <- focal[m$rows]
+    groups <- split(seq_along(y), m$score)
+    chi <- mantel_chi_square(y, g, groups)
+    p <- if (is.na(chi)) NA_real_ else pchisq(chi, 1, lower.tail = FALSE)
+    smd <- standardized_mean_difference(y, g, groups)
+    spread <- sd(y)
+    effect <- if (is.na(smd) || is.na(spread) || spread == 0) NA_real_ else smd / spread
+    c(chi, p, generalized_mantel_haenszel(y, g, m$score), smd, effect)
+  })
+  values <- do.call(rbind, rows)
+  list(chiSquare = values[, 1], significance = values[, 2], generalizedChiSquare = values[, 3],
+       generalizedDegreesOfFreedom = values[, 4], generalizedSignificance = values[, 5],
+       standardizedMeanDifference = values[, 6], effectSize = values[, 7],
+       etsCategory = polytomous_category(values[, 7], values[, 2]))
+}
+
+# Mantel's chi-square against mantelhaen.test on the dichotomized item, where it is the Mantel-Haenszel chi-square
+# without the continuity correction, and the generalized test against Mantel's where the item has two categories.
+check_mantel <- function(data, focal) {
+  for (item in seq_len(ncol(data))) {
+    m <- match_scores(data, item, seq_len(ncol(data)))
+    y <- as.numeric(data[m$rows, item] > 0)
+    kept <- m$score %in% as.numeric(names(which(table(m$score) > 1)))
+    chi <- mantel_chi_square(y, focal[m$rows], split(seq_along(y), m$score))
+    reference <- unname(mantelhaen.test(table(factor(y[kept], 1:0), factor(focal[m$rows][kept], 0:1), m$score[kept]),
+                                        correct = FALSE)$statistic)
+    stopifnot(abs(chi - reference) < 1e-10 * max(1, reference),
+              abs(generalized_mantel_haenszel(y, focal[m$rows], m$score)[1] - reference) < 1e-10 * max(1, reference))
+  }
+}
+
+# The cumulative logit models of an item's responses by rms::lrm, lordif's engine, run to eps = 1e-14: the deviance
+# -2 ln L and the coefficient of the score, which is centered. MASS::polr, which stops where BFGS does, agrees in the
+# deviance within 1e-8 and in the coefficient within 1e-5. The deviance of the model with only thresholds is
+# -2 sum n_k ln(n_k / n); lrm agrees.
+ordinal_models <- function(y, g, score) {
+  score <- score - mean(score)
+  y <- factor(y, ordered = TRUE)
+  fit <- function(formula) {
+    model <- rms::lrm(formula, eps = 1e-14, maxit = 100)
+    check <- MASS::polr(formula, method = "logistic", control = list(reltol = 1e-14, maxit = 10000))
+    stopifnot(abs(deviance(check) - model$deviance[2]) < 1e-8,
+              abs(coef(check)[["score"]] - coef(model)[["score"]]) < 1e-5)
+    list(deviance = model$deviance[2], slope = unname(coef(model)[["score"]]), null = model$deviance[1])
+  }
+  counts <- table(y)
+  null_deviance <- -2 * sum(counts * log(counts / length(y)))
+  fits <- list(score = fit(y ~ score), group = fit(y ~ score + g), interaction = fit(y ~ score * g))
+  stopifnot(abs(fits$score$null - null_deviance) < 1e-8)
+  c(list(null = null_deviance), fits)
+}
+
+# Nagelkerke's R squared of a deviance, given the deviance of the thresholds alone.
+nagelkerke_r2 <- function(deviance, null_deviance, n) (1 - exp((deviance - null_deviance) / n)) / (1 - exp(-null_deviance / n))
+
+ordinal_rule <- function(data, focal, anchors, theta = NULL) {
+  tests <- lapply(seq_len(ncol(data)), function(item) {
+    if (is.null(theta)) {
+      m <- match_scores(data, item, anchors)
+    } else {
+      rows <- which(!is.na(data[, item]) & !is.na(theta))
+      m <- list(rows = rows, score = theta[rows])
+    }
+    y <- data[m$rows, item]
+    g <- focal[m$rows]
+    if (length(unique(y)) < 2 || length(unique(g)) < 2 || length(unique(m$score)) < 2) return(rep(NA_real_, 7))
+    fits <- ordinal_models(y, g, m$score)
+    n <- length(y)
+    r2 <- function(model) nagelkerke_r2(model$deviance, fits$null, n)
+    c(fits$score$deviance - fits$group$deviance, fits$group$deviance - fits$interaction$deviance,
+      fits$score$deviance - fits$interaction$deviance,
+      r2(fits$group) - r2(fits$score), r2(fits$interaction) - r2(fits$group), r2(fits$interaction) - r2(fits$score),
+      abs((fits$group$slope - fits$score$slope) / fits$score$slope))
+  })
+  values <- do.call(rbind, tests)
+  test <- function(column, r2, df) {
+    list(chiSquare = values[, column], significance = pchisq(values[, column], df, lower.tail = FALSE),
+         rSquaredChange = values[, r2])
+  }
+  list(uniform = test(1, 4, 1), nonuniform = test(2, 5, 1), both = test(3, 6, 2), slopeChange = values[, 7])
+}
+
+# lordif's rundif on complete data, with the matching score of every item given: its p-values, slope change and
+# Nagelkerke R squared changes, which it rounds to 4 decimals. Item i is matched on theta[, i].
+lordif_rundif <- function(data, focal, theta) {
+  rows <- lapply(seq_len(ncol(data)), function(item) {
+    stats <- lordif::rundif(item = 1, resp = data[, item, drop = FALSE], theta = theta[, item], gr = focal,
+                            criterion = "Chisqr", alpha = 0.05, beta.change = 0.1, pseudo.R2 = "Nagelkerke",
+                            R2.change = 0.02, wt = NULL)$stats
+    unlist(stats[, c("chi12", "chi23", "chi13", "beta12", "pseudo12.Nagelkerke", "pseudo23.Nagelkerke",
+                     "pseudo13.Nagelkerke")])
+  })
+  values <- do.call(rbind, rows)
+  list(uniform = list(significance = values[, 1], rSquaredChange = values[, 5]),
+       nonuniform = list(significance = values[, 2], rSquaredChange = values[, 6]),
+       both = list(significance = values[, 3], rSquaredChange = values[, 7]), slopeChange = values[, 4])
+}
+
+# On complete data the polytomous rule is lordif's: rundif given the rule's matching scores, which are the total score
+# over the anchors and the studied item.
+check_lordif <- function(data, focal, anchors, ordinal) {
+  theta <- sapply(seq_len(ncol(data)), function(item) rowSums(data[, union(anchors, item), drop = FALSE]))
+  reference <- lordif_rundif(data, focal, theta)
+  expect_rounded(ordinal, reference)
+  reference
+}
+
+# measurekit's p-values, R squared changes and slope change are within lordif's rounding to 4 decimals of its own.
+expect_rounded <- function(ordinal, reference) {
+  differences <- c(
+    unlist(lapply(c("uniform", "nonuniform", "both"), function(type) {
+      c(ordinal[[type]]$significance - reference[[type]]$significance,
+        ordinal[[type]]$rSquaredChange - reference[[type]]$rSquaredChange)
+    })),
+    ordinal$slopeChange - reference$slopeChange)
+  stopifnot(max(abs(differences)) < 5e-5 + 1e-9)
+}
+
+# The statistics of a response matrix under every matching criterion: the rule's, theta given, and purified.
+polytomous_statistics <- function(data, focal, theta) {
+  all_items <- seq_len(ncol(data))
+  list(
+    mantel = mantel_rule(data, focal, all_items),
+    ordinal = ordinal_rule(data, focal, all_items),
+    ordinalTheta = ordinal_rule(data, focal, all_items, theta),
+    purifiedMantel = purify_rule(data, focal, function(a) mantel_rule(data, focal, a), function(r) r$significance),
+    purifiedOrdinal = purify_rule(data, focal, function(a) ordinal_rule(data, focal, a), function(r) r$both$significance)
+  )
+}
+
+# theta: the EAP estimates of one graded response calibration of all persons, the criterion lordif matches on.
+eap_theta <- function(data) {
+  model <- mirt::mirt(data, 1, itemtype = "graded", TOL = 1e-7, technical = list(NCYCLES = 5000), verbose = FALSE)
+  as.numeric(mirt::fscores(model, method = "EAP", verbose = FALSE)[, 1])
+}
+
+polytomous_case <- function(name, data, focal) {
+  message(name, ": ", nrow(data), " persons, ", ncol(data), " items")
+  check_mantel(data, focal)
+  theta <- eap_theta(data)
+  complete <- polytomous_statistics(data, focal, theta)
+  # lordif's rundif on complete data: the total score, theta, and each item's final purified criterion.
+  all_items <- seq_len(ncol(data))
+  lordif <- check_lordif(data, focal, all_items, complete$ordinal)
+  theta_matrix <- matrix(theta, nrow(data), ncol(data))
+  lordif_theta <- lordif_rundif(data, focal, theta_matrix)
+  expect_rounded(complete$ordinalTheta, lordif_theta)
+  check_lordif(data, focal, complete$purifiedOrdinal$anchors, complete$purifiedOrdinal)
+  # 2% of the responses missing at random.
+  set.seed(SEED)
+  sparse <- data
+  sparse[matrix(runif(length(sparse)) < 0.02, nrow(sparse))] <- NA
+  message(name, ": ", sum(complete.cases(sparse)), " of ", nrow(sparse), " persons answered every item")
+  sparse_theta <- eap_theta(sparse)
+  list(
+    name = name,
+    responses = unname(lapply(seq_len(nrow(data)), function(i) as.numeric(data[i, ]))),
+    focal = as.numeric(focal),
+    theta = theta,
+    complete = c(complete, list(lordif = lordif, lordifTheta = lordif_theta)),
+    sparse = c(list(responses = unname(lapply(seq_len(nrow(sparse)), function(i) as.numeric(sparse[i, ]))),
+                    theta = sparse_theta),
+               polytomous_statistics(sparse, focal, sparse_theta))
+  )
+}
+
+# psych's bfi: N1 to N5, 6 categories recoded from 0, women (gender 2) focal, complete cases.
+bfi_data <- psych::bfi[complete.cases(psych::bfi[, c(paste0("N", 1:5), "gender")]), ]
+bfi_items <- as.matrix(bfi_data[, paste0("N", 1:5)]) - 1
+
+# Graded response simulation: 15 items of 4 categories, 1000 persons per group, the focal group's theta N(-0.5, 1).
+# Items 1 and 2 have thresholds 0.6 higher for the focal group (uniform DIF); item 3, with thresholds close together,
+# discriminates less in it, a = 0.5 instead of 1.5 (nonuniform DIF).
+set.seed(SEED)
+graded_items <- 15
+graded_categories <- 4
+a <- runif(graded_items, 0.8, 2)
+b <- t(apply(matrix(rnorm(graded_items * (graded_categories - 1)), graded_items), 1, sort))
+a[3] <- 1.5
+b[3, ] <- c(-0.3, 0, 0.3)
+focal_a <- a
+focal_a[3] <- 0.5
+focal_b <- b
+focal_b[1:2, ] <- b[1:2, ] + 0.6
+simulate_graded <- function(theta, a, b) {
+  t(sapply(theta, function(t) rowSums(runif(graded_items) < plogis(a * (t - b)))))
+}
+graded <- rbind(simulate_graded(rnorm(1000), a, b), simulate_graded(rnorm(1000, -0.5), focal_a, focal_b))
+colnames(graded) <- paste0("item", seq_len(graded_items))
+graded_focal <- rep(0:1, each = 1000)
+
+write_fixture("dif-polytomous", list(
+  source = "psych's bfi N1 to N5 (complete cases, women focal) and a graded response simulation with DIF in items 1 to 3.",
+  cases = list(
+    polytomous_case("bfi", bfi_items, as.numeric(bfi_data$gender == 2)),
+    polytomous_case("simulated", graded, graded_focal)
   )
 ))

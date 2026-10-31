@@ -1,0 +1,283 @@
+import { checkOptions } from "@measurekit/core";
+import type { ResponseMatrix } from "../data/response-matrix.js";
+import { chiSquareUpperTail } from "../math/chi-square.js";
+import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { type DifGroup, type ItemCases, itemCases, polytomousData } from "./groups.js";
+import {
+  type DifAnalysis,
+  type PurificationOptions,
+  purified,
+  SIGNIFICANCE_LEVEL,
+  significant,
+} from "./purification.js";
+
+/** The ETS category of a polytomous item's DIF: AA negligible, BB slight to moderate, CC moderate to large. */
+export type PolytomousEtsCategory = "AA" | "BB" | "CC";
+
+/** The generalized Mantel-Haenszel test of one item: general association of group and response. */
+export interface GeneralizedMantelHaenszel {
+  /** The chi-square, or `null` when the categories the item's persons used leave nothing to test. */
+  readonly chiSquare: number | null;
+  /** The number of categories the item's persons used in score groups of more than one person, less 1. */
+  readonly degreesOfFreedom: number;
+  /** The probability of a chi-square at least as large without DIF. */
+  readonly significance: number | null;
+}
+
+/** Mantel DIF statistics of one polytomous item. */
+export interface MantelTest {
+  /** The item id. */
+  readonly id: string;
+  /** Mantel's chi-square with one degree of freedom: the groups differ in their mean response, score group by score group. */
+  readonly chiSquare: number | null;
+  /** The probability of a chi-square at least as large without DIF. */
+  readonly significance: number | null;
+  /** The generalized Mantel-Haenszel test: the groups differ in their distribution of responses. */
+  readonly generalized: GeneralizedMantelHaenszel;
+  /**
+   * The standardized mean difference: the focal group's mean response less the reference group's, averaged over the
+   * score groups with the focal group's persons as weights. Positive when the item favors the focal group.
+   */
+  readonly standardizedMeanDifference: number | null;
+  /** The standardized mean difference over the standard deviation of the item's responses in both groups. */
+  readonly effectSize: number | null;
+  /** The ETS category by `effectSize` and `significance`. */
+  readonly etsCategory: PolytomousEtsCategory | null;
+}
+
+/**
+ * ETS's bounds of |SMD / SD| for categories BB and CC.
+ *
+ * @see {@link https://doi.org/10.1002/j.2333-8504.2012.tb02290.x | Zwick (2012)}
+ */
+const POLYTOMOUS_ETS_THRESHOLDS = { moderate: 0.17, large: 0.25 } as const;
+
+/**
+ * Returns the Mantel DIF statistics of every polytomous item: Mantel's chi-square, the generalized Mantel-Haenszel
+ * chi-square, the standardized mean difference and the ETS category.
+ *
+ * @remarks
+ * Persons are matched on their score over the matching items, all items or, with `purify`, the anchors, and the studied
+ * item; score groups of one person are left out. An item's highest possible score is its highest response in the
+ * matrix, at least 1. Each item uses the persons who answered it and another matching item, their score scaled from the
+ * matching items they answered (see the guide). A statistic is `null` where it is undefined, as for an item every
+ * person in a score group answered alike.
+ *
+ * In each score group of n persons, F is the sum of the focal group's responses, n_k the number of persons who
+ * responded k, and n_R and n_F the sizes of the groups: E(F) = n_F Σ k n_k / n and Var(F) = n_R n_F [n Σ k² n_k - (Σ k
+ * n_k)²] / (n² (n - 1)). Mantel's chi-square is (Σ (F - E(F)))² / Σ Var(F). The generalized test is the
+ * Cochran-Mantel-Haenszel statistic of general association of the 2 × K tables: Σ (a - E(a)) over the categories but
+ * the last, in the quadratic form of the inverse of Σ Cov(a), with one degree of freedom less than the categories
+ * used. It is `null` when that matrix is singular, as when the score groups hold disjoint sets of categories. The
+ * standardized mean difference is Σ (n_Fs / n_F) (m_Fs - m_Rs) over the score groups s with persons of both groups,
+ * m the mean response. The effect size divides it by the sample standard deviation of the item's responses over all
+ * persons the item uses.
+ *
+ * ETS categories: AA when Mantel's chi-square is not significant at 0.05 or |effect size| ≤ 0.17; CC when it is
+ * significant and |effect size| > 0.25; BB otherwise. Purification flags items whose Mantel chi-square is significant at
+ * 0.05.
+ *
+ * @throws `DataError` when the matrix or the groups are invalid, either group has no person with a response, or
+ * `purify` is not a boolean.
+ * @see {@link https://doi.org/10.1080/01621459.1963.10500879 | Mantel (1963)}
+ * @see {@link https://doi.org/10.1111/j.1745-3984.1993.tb00425.x | Zwick, Donoghue and Grima (1993)}
+ * @see {@link https://doi.org/10.1080/00031305.1986.10475371 | Somes (1986)}
+ * @see {@link https://doi.org/10.3102/10769986021003187 | Zwick and Thayer (1996)}
+ */
+export function mantelTest(
+  matrix: ResponseMatrix,
+  groups: readonly DifGroup[],
+  options: PurificationOptions = {},
+): DifAnalysis<MantelTest> {
+  checkOptions(options);
+  const { purify = false } = options;
+  const data = polytomousData(matrix, groups, "Mantel DIF");
+  return purified(
+    matrix.itemIds,
+    purify,
+    (anchors) =>
+      matrix.itemIds.map((id, item) => ({
+        id,
+        ...statistics(itemCases(data, item, anchors), (data.maxScores[item] ?? 1) + 1),
+      })),
+    (item) => significant(item.significance),
+  );
+}
+
+/** An item's persons counted by matching score and group: the sums the statistics are made of. */
+interface ScoreGroups {
+  /** The number of response categories, from 0. */
+  readonly categories: number;
+  /** The number of score groups: the matching scores from 0 to the highest. */
+  readonly scoreCount: number;
+  /** The persons in score group s and group g (1 for focal), at `2 s + g`. */
+  readonly sizes: Float64Array;
+  /** The sums of their responses, at `2 s + g`. */
+  readonly totals: Float64Array;
+  /** The sums of squared responses of both groups, at `s`. */
+  readonly squares: Float64Array;
+  /** The persons in score group s and group g who responded k, at `(2 s + g) categories + k`. */
+  readonly counts: Float64Array;
+}
+
+function countByScore({ responses, scores, focal, maxScore }: ItemCases, categories: number): ScoreGroups {
+  const groupCount = maxScore + 1;
+  const counted: ScoreGroups = {
+    categories,
+    scoreCount: groupCount,
+    sizes: new Float64Array(2 * groupCount),
+    totals: new Float64Array(2 * groupCount),
+    squares: new Float64Array(groupCount),
+    counts: new Float64Array(2 * groupCount * categories),
+  };
+  for (let person = 0; person < scores.length; person++) {
+    const score = scores[person] ?? 0;
+    const response = responses[person] ?? 0;
+    const cell = 2 * score + (focal[person] ?? 0);
+    counted.sizes[cell] = (counted.sizes[cell] ?? 0) + 1;
+    counted.totals[cell] = (counted.totals[cell] ?? 0) + response;
+    counted.squares[score] = (counted.squares[score] ?? 0) + response * response;
+    const category = cell * categories + response;
+    counted.counts[category] = (counted.counts[category] ?? 0) + 1;
+  }
+  return counted;
+}
+
+function statistics(cases: ItemCases, categories: number): Omit<MantelTest, "id"> {
+  const groups = countByScore(cases, categories);
+  const { excess, variance } = mantelSums(groups);
+  const chiSquare = variance > 0 ? (excess * excess) / variance : null;
+  const significance = chiSquare === null ? null : chiSquareUpperTail(chiSquare, 1);
+  const standardizedMeanDifference = meanDifference(groups);
+  const spread = standardDeviation(cases.responses);
+  const effectSize =
+    standardizedMeanDifference === null || spread === null || spread === 0 ? null : standardizedMeanDifference / spread;
+  return {
+    chiSquare,
+    significance,
+    generalized: generalizedTest(groups),
+    standardizedMeanDifference,
+    effectSize,
+    etsCategory: etsCategory(effectSize, significance),
+  };
+}
+
+/** Returns Σ (F - E(F)) and Σ Var(F) over the score groups of more than one person. */
+function mantelSums({ scoreCount: groupCount, sizes, totals, squares }: ScoreGroups): {
+  excess: number;
+  variance: number;
+} {
+  let excess = 0;
+  let variance = 0;
+  for (let s = 0; s < groupCount; s++) {
+    const reference = sizes[2 * s] ?? 0;
+    const focal = sizes[2 * s + 1] ?? 0;
+    const size = reference + focal;
+    if (size <= 1) continue;
+    const total = (totals[2 * s] ?? 0) + (totals[2 * s + 1] ?? 0);
+    excess += (totals[2 * s + 1] ?? 0) - (focal * total) / size;
+    variance += (reference * focal * (size * (squares[s] ?? 0) - total * total)) / (size * size * (size - 1));
+  }
+  return { excess, variance };
+}
+
+/** Returns Σ (n_Fs / n_F) (m_Fs - m_Rs) over the score groups with persons of both groups, or `null` without any. */
+function meanDifference({ scoreCount: groupCount, sizes, totals }: ScoreGroups): number | null {
+  let weighted = 0;
+  let focalPersons = 0;
+  for (let s = 0; s < groupCount; s++) {
+    const reference = sizes[2 * s] ?? 0;
+    const focal = sizes[2 * s + 1] ?? 0;
+    if (reference === 0 || focal === 0) continue;
+    weighted += focal * ((totals[2 * s + 1] ?? 0) / focal - (totals[2 * s] ?? 0) / reference);
+    focalPersons += focal;
+  }
+  return focalPersons === 0 ? null : weighted / focalPersons;
+}
+
+/** Returns the sample standard deviation of the responses, or `null` for fewer than two. */
+function standardDeviation(responses: Int32Array): number | null {
+  if (responses.length < 2) return null;
+  const mean = responses.reduce((sum, response) => sum + response, 0) / responses.length;
+  const squares = responses.reduce((sum, response) => sum + (response - mean) ** 2, 0);
+  return Math.sqrt(squares / (responses.length - 1));
+}
+
+/** Returns the persons in score group s and group g (1 for focal) who responded k. */
+function cell({ categories, counts }: ScoreGroups, s: number, g: number, k: number): number {
+  return counts[(2 * s + g) * categories + k] ?? 0;
+}
+
+/**
+ * Returns the generalized Mantel-Haenszel test on the categories used in the score groups of more than one person, all
+ * but the last of them.
+ */
+function generalizedTest(groups: ScoreGroups): GeneralizedMantelHaenszel {
+  const used = categoriesUsed(groups);
+  const degreesOfFreedom = Math.max(used.length - 1, 0);
+  const chiSquare = degreesOfFreedom < 1 ? null : associationChiSquare(groups, used.slice(0, degreesOfFreedom));
+  return {
+    chiSquare,
+    degreesOfFreedom,
+    significance: chiSquare === null ? null : chiSquareUpperTail(chiSquare, degreesOfFreedom),
+  };
+}
+
+/** Returns the categories at least one person of a score group of more than one person responded. */
+function categoriesUsed(groups: ScoreGroups): readonly number[] {
+  const used = new Set<number>();
+  for (let s = 0; s < groups.scoreCount; s++) {
+    if ((groups.sizes[2 * s] ?? 0) + (groups.sizes[2 * s + 1] ?? 0) <= 1) continue;
+    for (let k = 0; k < groups.categories; k++) if (cell(groups, s, 0, k) + cell(groups, s, 1, k) > 0) used.add(k);
+  }
+  return [...used].sort((a, b) => a - b);
+}
+
+/**
+ * Returns the chi-square of general association over `categories`: Σ (a - E(a)) in the quadratic form of the inverse of
+ * Σ Cov(a), a the focal group's counts in the categories, or `null` for a singular covariance matrix.
+ */
+function associationChiSquare(groups: ScoreGroups, categories: readonly number[]): number | null {
+  const dimension = categories.length;
+  const excess = new Float64Array(dimension);
+  const covariance = new Float64Array(dimension * dimension);
+  const column = new Float64Array(dimension);
+  for (let s = 0; s < groups.scoreCount; s++) {
+    const reference = groups.sizes[2 * s] ?? 0;
+    const focal = groups.sizes[2 * s + 1] ?? 0;
+    if (reference + focal <= 1) continue;
+    categories.forEach((k, a) => {
+      column[a] = cell(groups, s, 0, k) + cell(groups, s, 1, k);
+      excess[a] = (excess[a] ?? 0) + cell(groups, s, 1, k) - (focal * (column[a] ?? 0)) / (reference + focal);
+    });
+    addCovariance(covariance, column, reference, focal);
+  }
+  const inverse = invertPositiveDefinite(covariance, dimension);
+  if (inverse === null) return null;
+  let chiSquare = 0;
+  for (let i = 0; i < dimension; i++) {
+    for (let j = 0; j < dimension; j++)
+      chiSquare += (excess[i] ?? 0) * (inverse[i * dimension + j] ?? 0) * (excess[j] ?? 0);
+  }
+  return Math.max(0, chiSquare);
+}
+
+/** Adds the covariance of the focal group's counts in a score group with the given category totals. */
+function addCovariance(covariance: Float64Array, column: Float64Array, reference: number, focal: number): void {
+  const size = reference + focal;
+  const weight = (reference * focal) / (size * size * (size - 1));
+  const dimension = column.length;
+  column.forEach((a, i) => {
+    column.forEach((b, j) => {
+      covariance[i * dimension + j] =
+        (covariance[i * dimension + j] ?? 0) + weight * ((i === j ? size * a : 0) - a * b);
+    });
+  });
+}
+
+function etsCategory(effectSize: number | null, significance: number | null): PolytomousEtsCategory | null {
+  if (effectSize === null || significance === null) return null;
+  const size = Math.abs(effectSize);
+  if (significance >= SIGNIFICANCE_LEVEL || size <= POLYTOMOUS_ETS_THRESHOLDS.moderate) return "AA";
+  return size > POLYTOMOUS_ETS_THRESHOLDS.large ? "CC" : "BB";
+}

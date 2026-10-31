@@ -1,21 +1,9 @@
 import { checkOptions, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
-import { chiSquareUpperTail } from "../math/chi-square.js";
 import { invert } from "../math/linear-algebra.js";
 import { type DifGroup, dichotomousData, type ItemCases, itemCases } from "./groups.js";
+import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
-
-/** A likelihood-ratio test between two nested logistic regressions of an item. */
-export interface LikelihoodRatioTest {
-  /** The difference of the deviances. */
-  readonly chiSquare: number | null;
-  /** The number of parameters the larger model adds. */
-  readonly degreesOfFreedom: number;
-  /** The probability of a chi-square at least as large without the DIF tested. */
-  readonly significance: number | null;
-  /** The increase of Nagelkerke's R² from the smaller model to the larger: the effect size. */
-  readonly rSquaredChange: number | null;
-}
 
 /** Logistic regression DIF tests of one item. */
 export interface LogisticRegressionDif {
@@ -79,26 +67,9 @@ function itemTests(cases: ItemCases): Omit<LogisticRegressionDif, "id"> {
   const [none = 0, score = 0, group = 0, interaction = 0] = defined
     ? [1, 2, 3, 4].map((terms) => deviance(cases, terms))
     : [];
-  const test = (smaller: number, larger: number, degreesOfFreedom: number): LikelihoodRatioTest => {
-    if (!defined) return { chiSquare: null, degreesOfFreedom, significance: null, rSquaredChange: null };
-    // The larger model's deviance is at most the smaller's; rounding may break ties the other way.
-    const chiSquare = Math.max(0, smaller - larger);
-    return {
-      chiSquare,
-      degreesOfFreedom,
-      significance: chiSquareUpperTail(chiSquare, degreesOfFreedom),
-      rSquaredChange: nagelkerke(smaller - chiSquare, none, count) - nagelkerke(smaller, none, count),
-    };
-  };
+  const test = (smaller: number, larger: number, degreesOfFreedom: number): LikelihoodRatioTest =>
+    defined ? likelihoodRatioTest(smaller, larger, degreesOfFreedom, none, count) : undefinedTest(degreesOfFreedom);
   return { uniform: test(score, group, 1), nonuniform: test(group, interaction, 1), both: test(score, interaction, 2) };
-}
-
-/**
- * Returns Nagelkerke's R² of a model with deviance D, given the deviance D0 of the model with only an intercept:
- * (1 - e^((D - D0) / n)) / (1 - e^(-D0 / n)).
- */
-function nagelkerke(modelDeviance: number, nullDeviance: number, count: number): number {
-  return -Math.expm1((modelDeviance - nullDeviance) / count) / -Math.expm1(-nullDeviance / count);
 }
 
 /**
