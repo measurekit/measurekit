@@ -102,7 +102,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, Q-matrix validation, nonparametric classification
   src/fit/              item and person fit, local dependence
   src/dif/              differential item functioning
-  src/equating/         linking of IRT scales, observed-score and true-score equating, presmoothing
+  src/equating/         linking of IRT scales, observed-score equating with and without common items, bootstrap
+                        standard errors, the anchor screen, true-score equating, presmoothing
   src/standard-setting/ cut scores by the modified Angoff, Bookmark and Hofstee methods; classification accuracy
   src/rater/            rater agreement: kappa, intraclass correlations
   src/response-time/    response times: the lognormal model, speed, aberrant times, rapid guessing
@@ -169,7 +170,7 @@ behavior only, without "now", "no longer", "renamed" or "previously".
   written once, in core.
 - Code outside `packages/` imports a package by name.
 
-Psychometrics: every module of `cat/`, `irt/` and `sim/` may also import `checks.ts`.
+Psychometrics: every module of `cat/`, `equating/`, `irt/` and `sim/` may also import `checks.ts`.
 
 | Module                     | Imports                               |
 | -------------------------- | ------------------------------------- |

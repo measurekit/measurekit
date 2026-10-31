@@ -36,7 +36,7 @@ export function linearEquating(from: readonly number[], to: readonly number[]): 
 export function equipercentileEquating(from: readonly number[], to: readonly number[]): number[] {
   const sourceTotal = checkDistribution(from, "from");
   const targetTotal = checkDistribution(to, "to");
-  const cumulative = Float64Array.from(cumulativeSums(to));
+  const cumulative = cumulativeSums(to);
   const highest = to.length - 1;
   let below = 0;
   return from.map((count) => {
@@ -44,23 +44,44 @@ export function equipercentileEquating(from: readonly number[], to: readonly num
     // C(y) / targetTotal of `to` by cross-multiplication, exactly for counts of persons.
     const rank = 2 * below + count;
     below += count;
-    const compare = (y: number): number => rank * targetTotal - 2 * sourceTotal * (cumulative[y] ?? 0);
     if (rank === 0) return -0.5;
     if (rank === 2 * sourceTotal) return highest + 0.5;
-    const share = rank / (2 * sourceTotal);
-    const cumulativeShare = (y: number): number => (y < 0 ? 0 : (cumulative[y] ?? 0) / targetTotal);
-    // The smallest score whose cumulative share exceeds the rank, and the largest whose share is below it.
-    let upper = 0;
-    while (upper < highest && compare(upper) >= 0) upper++;
-    const fromUpper =
-      upper - 0.5 + (share - cumulativeShare(upper - 1)) / (cumulativeShare(upper) - cumulativeShare(upper - 1));
-    let lower = upper;
-    while (lower >= 0 && compare(lower) <= 0) lower--;
-    if (lower < 0) return fromUpper;
-    const fromLower =
-      lower + 0.5 + (share - cumulativeShare(lower)) / (cumulativeShare(lower + 1) - cumulativeShare(lower));
-    return (fromUpper + fromLower) / 2;
+    return scoreAtPercentileRank(
+      rank / (2 * sourceTotal),
+      cumulative,
+      targetTotal,
+      (y) => rank * targetTotal - 2 * sourceTotal * (cumulative[y] ?? 0),
+    );
   });
+}
+
+/**
+ * Returns the score of a distribution whose percentile rank is `share`, a rank above 0 and below 1.
+ *
+ * @param cumulative - The number of persons at or below each score.
+ * @param total - The number of persons.
+ * @param compare - The sign of the rank less the cumulative share at a score; it defaults to the difference of the
+ * floating-point numbers, and counts of persons can give an exact one.
+ */
+export function scoreAtPercentileRank(
+  share: number,
+  cumulative: Float64Array,
+  total: number,
+  compare: (score: number) => number = (y) => share * total - (cumulative[y] ?? 0),
+): number {
+  const highest = cumulative.length - 1;
+  const cumulativeShare = (y: number): number => (y < 0 ? 0 : (cumulative[y] ?? 0) / total);
+  // The smallest score whose cumulative share exceeds the rank, and the largest whose share is below it.
+  let upper = 0;
+  while (upper < highest && compare(upper) >= 0) upper++;
+  const fromUpper =
+    upper - 0.5 + (share - cumulativeShare(upper - 1)) / (cumulativeShare(upper) - cumulativeShare(upper - 1));
+  let lower = upper;
+  while (lower >= 0 && compare(lower) <= 0) lower--;
+  if (lower < 0) return fromUpper;
+  const fromLower =
+    lower + 0.5 + (share - cumulativeShare(lower)) / (cumulativeShare(lower + 1) - cumulativeShare(lower));
+  return (fromUpper + fromLower) / 2;
 }
 
 /**
@@ -88,12 +109,15 @@ export function checkDistribution(counts: readonly number[], label: string): num
   return total;
 }
 
-function cumulativeSums(counts: readonly number[]): number[] {
+/** Returns the number of persons at or below each score of a distribution. */
+export function cumulativeSums(counts: ArrayLike<number>): Float64Array {
+  const sums = new Float64Array(counts.length);
   let sum = 0;
-  return counts.map((count) => {
-    sum += count;
-    return sum;
-  });
+  for (let score = 0; score < counts.length; score++) {
+    sum += counts[score] ?? 0;
+    sums[score] = sum;
+  }
+  return sums;
 }
 
 /** Returns the mean and variance (denominator n - 1) of a score distribution, from Σ f x and Σ f x², as equate. */

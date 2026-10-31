@@ -348,7 +348,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../irt/**", "!../math/**"],
+                    "group": ["../*", "../*/**", "!../checks.js", "!../irt/**", "!../math/**"],
                     "message": "equating/ builds on irt/ and math/ only."
                   }
                 ]
