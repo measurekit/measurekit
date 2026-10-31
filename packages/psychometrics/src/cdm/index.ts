@@ -1,7 +1,7 @@
 /**
- * Cognitive diagnosis: the G-DINA, DINA and DINO models calibrated by marginal maximum likelihood, persons' attribute
- * mastery and profiles, classification accuracy and consistency, Q-matrix validation, and nonparametric
- * classification.
+ * Cognitive diagnosis: the G-DINA, DINA, DINO, A-CDM, LLM and R-RUM models calibrated by marginal maximum likelihood,
+ * persons' attribute mastery and profiles, classification accuracy and consistency, Q-matrix validation, and
+ * nonparametric classification.
  *
  * @module @measurekit/psychometrics/cdm
  */

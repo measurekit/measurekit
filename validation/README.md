@@ -18,13 +18,13 @@ Rscript validation/psychometrics/equating.R          # linking and equating: equ
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
 Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
-Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA and NPCD
+Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
 Rscript validation/psychometrics/interop.R           # mirt's coefficient forms of every item type
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
 ```
 
 They need R with the packages psych, mirt, ltm, catR, TAM, eRm, difR, equate, equateIRT, irr, cacIRT, sirt, nlme,
-LNIRT, numDeriv, GDINA, NPCD, CDM, cdcatR and jsonlite; `common.R` holds their shared helpers.
+LNIRT, numDeriv, GDINA, alabama, NPCD, CDM, cdcatR and jsonlite; `common.R` holds their shared helpers.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in

@@ -10,7 +10,7 @@ TypeScript tests; R runs when fixtures change.
 
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169, LNIRT 0.5.1, numDeriv 2016.8-1.1, GDINA
-2.13.2, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite 2.0.0.
+2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14, cdcatR 1.0.7 and jsonlite 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -135,6 +135,8 @@ equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
 | Classification accuracy and consistency                                    | GDINA's `CA` by MAP; by EAP, `CA`'s computation in base R                                                                              |
 | Q-matrix validation                                                        | GDINA's `Qval(method = "PVAF")`                                                                                                        |
 | Nonparametric classification                                               | NPCD's `AlphaNP(method = "Hamming")`: distances and ties; the profile where NPCD has no tie                                            |
+| Additive-model probabilities, coefficients, log-likelihood, AIC, BIC       | GDINA's `GDINA(model = "ACDM", "LLM", "RRUM")` at `conv.crit = 1e-8`, also with a model per item                                       |
+| One additive M-step on fixed expected counts                               | Base R: Newton's method on the bounds the maximum meets, certified by the KKT conditions                                               |
 | Simulation of cognitive diagnosis responses                                | Properties: frequencies, reproduction, recovery by calibration                                                                         |
 
 The scripts also check the references against each other: KR-20 equals alpha for 0/1 items, the base R item-total
@@ -226,6 +228,16 @@ Several results of the reference packages are not references:
   out. `coef` rounds to 4 digits unless given `digits`; GDINA breaks MAP ties at random. GDINA's
   `CA(what = "EAP")` classifies every person in the first profile, as its row matching `whichrow_AinB` returns 1
   for every row; the EAP reference is `CA`'s computation in base R with the profiles matched by their patterns.
+- **GDINA's additive models.** GDINA maximizes their M-steps with `constrOptim`'s barrier method, which stops near
+  1e-6, so its EM never reaches a change below about 5e-9 and misses `conv.crit = 1e-10`; the fixtures use `1e-8`.
+  `calibrateCdm` maximizes each M-step exactly and runs to `tolerance: 1e-10` for the comparison, where its
+  log-likelihood is at least GDINA's. A MAP between posteriors within 1e-4 of the best counts as a tie in these
+  fixtures, as GDINA's precision moves it. Persons and accuracy are compared at GDINA's own estimates, to which a
+  posterior is sensitive. The G-DINA, DINA and DINO coefficients are compared in the per-item mix.
+- **The additive M-step on fixed counts.** No solver reaches 1e-8 on boundary solutions: `constrOptim` fails on them,
+  and the candidates of `slsqp` and the augmented Lagrangian stop short. The reference is Newton's method on the
+  face of the bounds that a candidate meets, kept only when the KKT conditions hold: the objective is convex, so a
+  point that meets them is the maximum. Counts for which they fail are not in the fixture.
 - **Histograms.** The EM weights of an empirical histogram creep toward a spiky maximum without reaching it, in mirt
   as in `calibrate`, so a histogram is where EM stops; mirt stops by its items' change alone. The fixture checks the
   histogram on fixed items against base R's EM with the stopping rule of `calibrate`.
@@ -336,6 +348,8 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `rater.json`                           | irr's `anxiety` (20 subjects, 3 raters), also with two ratings missing; irr's `diagnoses` (30 subjects, 6 raters)                                                                                                      | Weighted kappa, nominal categories, missing ratings                                                           |
 | `response-time.json`                   | A lognormal simulation, `set.seed(20261029)`: 400 persons, 12 items, 5% of times missing; LNIRT's `CredentialForm1`, items 1 to 10, 1636 persons, times of 0 as missing                                                | Calibration, speeds, residuals; NT10 and NT15 with a 30 s cap                                                 |
 | `cdm.json`                             | GDINA's `realdata_Tatsuoka1990`, fraction subtraction: 536 persons, 20 items, 8 attributes, under the DINA; a G-DINA simulation, `set.seed(20261029)`: 1500 persons, 15 items, 4 attributes, under the G-DINA and DINO | 256 profiles, indistinguishable profiles; persons, accuracy, PVAF, nonparametric classification of 30 persons |
+| `cdm-additive.json`                    | GDINA's `realdata_ECPE` (2922 persons, 28 items, 3 attributes) and `sim30GDINA` (1000 persons, 30 items, 5 attributes)                                                                                                 | A-CDM, LLM, R-RUM and a mix of all six models per item                                                        |
+| `cdm-maximum.json`                     | 59 sets of expected counts of one item, `set.seed(20261029)`: 3 links, 2 to 4 attributes                                                                                                                               | DINA-like, DINO-like, non-monotone and extreme; 16 meet a bound                                               |
 
 The upper and lower groups use 27% of the persons. Edge cases (constant items, persons and items without responses,
 one item, two persons) are tested against values derived by hand in `test/ctt.test.ts`.
@@ -410,6 +424,10 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Effort-moderated EAP estimates                                          | 1e-10 absolute                                     | 3e-15                    |
 | Cognitive diagnosis probabilities, proportions, persons, accuracy, PVAF | 1e-5 absolute                                      | 1.1e-6                   |
 | Cognitive diagnosis log-likelihood, AIC, BIC                            | 1e-8 absolute                                      | 5e-11                    |
+| Additive-model probabilities, coefficients, proportions                 | 1e-5 absolute                                      | 2.1e-6                   |
+| Additive-model log-likelihood                                           | at least GDINA's less 1e-8                         | never below              |
+| Persons and accuracy at GDINA's additive estimates                      | 1e-6 absolute                                      | 6.7e-8                   |
+| One additive M-step on fixed counts                                     | 1e-8 absolute                                      | 1.0e-12                  |
 
 Entries of a covariance matrix are compared relative to √(Σ_ii Σ_jj) of the reference, so that an off-diagonal entry is
 on the correlation scale.

@@ -13,15 +13,17 @@ import {
 import { checkDichotomous } from "../data/dichotomous.js";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
 import { MIN_PROBABILITY } from "../irt/probability.js";
+import { type AdditiveMaximizer, additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
 import { type CdmDesign, cdmDesign, profilesOf, type QMatrix } from "./q-matrix.js";
 
 /**
  * A cognitive diagnosis model of an item's success probabilities: `"gdina"`, one per latent group of its attributes;
- * `"dina"`, one for mastering all of them and one otherwise; `"dino"`, one for mastering none and one otherwise.
+ * `"dina"`, one for mastering all of them and one otherwise; `"dino"`, one for mastering none and one otherwise;
+ * `"acdm"`, `"llm"` and `"rrum"`, an intercept and one effect per attribute on the identity, logit and log scale.
  *
  * @see {@link https://doi.org/10.1007/s11336-011-9207-7 | de la Torre (2011)}
  */
-export type CdmModel = "gdina" | "dina" | "dino";
+export type CdmModel = "gdina" | "dina" | "dino" | "acdm" | "llm" | "rrum";
 
 /** Options of {@link calibrateCdm}. */
 export interface CdmCalibrationOptions {
@@ -62,6 +64,13 @@ export interface CdmItem {
   readonly guessing: number;
   /** The probability of an incorrect response mastering all of them. */
   readonly slip: number;
+  /**
+   * The coefficients δ on the model's link scale, as GDINA's `coef(what = "delta")`. The additive models have the
+   * intercept, then one effect per attribute in the item's order. The G-DINA has the intercept, the main effects and
+   * the interactions on the identity scale, one per latent group in the order of `probabilities`. The DINA and DINO
+   * have the guessing and the rise from it to 1 - slip.
+   */
+  readonly coefficients: readonly number[];
 }
 
 /** A profile with its estimated share of the population. */
@@ -82,7 +91,10 @@ export interface CdmCalibration {
   readonly profiles: readonly ProfileProportion[];
   /** The marginal log-likelihood. */
   readonly logLikelihood: number;
-  /** -2 logLikelihood + 2p, p the items' probabilities, 2 per DINA or DINO item, and the proportions less 1. */
+  /**
+   * -2 logLikelihood + 2p, p the items' parameters (2^K_j per G-DINA item, 2 per DINA or DINO item and K_j + 1 per
+   * additive item, for K_j attributes) and the proportions less 1.
+   */
   readonly aic: number;
   /** -2 logLikelihood + p ln n, n the persons with responses. */
   readonly bic: number;
@@ -92,7 +104,9 @@ export interface CdmCalibration {
   readonly iterations: number;
 }
 
-const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino"];
+const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
+/** The link of each additive model (de la Torre, 2011): the identity for the A-CDM, the logit for the LLM, the log for the R-RUM. */
+const LINKS: Readonly<Partial<Record<CdmModel, CdmLink>>> = { acdm: "identity", llm: "logit", rrum: "log" };
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 2000;
 /** The starting success probability of a group mastering none of an item's attributes, and the rise to all mastered. */
@@ -112,10 +126,12 @@ const MIN_PROPORTION = Number.EPSILON;
  * @remarks
  * The E-step gives each person's posterior over the profiles; the M-step sets each latent group's success probability
  * to its expected correct responses over its expected persons, pooled over the groups the DINA or DINO model equates,
- * and each profile's proportion to its expected persons, the saturated joint distribution. As GDINA, a success
- * probability stays within [1e-4, 1 - 1e-4], a group with fewer than 0.001 expected persons takes 0.0005 more correct
- * over 0.001 more persons, and a proportion stays above the machine epsilon. Missing responses are skipped; persons
- * without responses change nothing.
+ * and each profile's proportion to its expected persons, the saturated joint distribution. The additive models
+ * (A-CDM, LLM, R-RUM) have no such closed form: their M-step maximizes the expected log-likelihood over the intercept
+ * and one effect per attribute, on the identity, logit or log scale, exactly. As GDINA, a success probability stays
+ * within [1e-4, 1 - 1e-4], a group with fewer than 0.001 expected persons takes 0.0005 more correct over 0.001 more
+ * persons, and a proportion stays above the machine epsilon. Missing responses are skipped; persons without responses
+ * change nothing.
  *
  * @throws `DataError` when the matrix, the Q-matrix or an option is invalid, a response is neither 0 nor 1, or there is
  * no response.
@@ -134,29 +150,35 @@ export function calibrateCdm(
   const data = dichotomousRows(matrix);
   if (data.respondents === 0) throw new DataError("Cognitive diagnosis needs at least one response.");
   const state = startingValues(design);
+  const steps = additiveSteps(models, design, state);
   let iterations = 0;
   let converged = false;
   while (!converged && iterations < maxIterations) {
     iterations++;
     const counts = expectedCounts(data, design, state);
-    converged = maximize(models, state, counts) <= tolerance;
+    converged = maximize(models, steps, state, counts) <= tolerance;
   }
   const logLikelihood = expectedCounts(data, design, state).logLikelihood;
   const parameters =
-    models.reduce((sum, model, j) => sum + (model === "gdina" ? (state.probabilities[j]?.length ?? 0) : 2), 0) +
+    design.itemAttributes.reduce((sum, indices, j) => sum + parameterCount(models[j], indices.length), 0) +
     design.profiles.length -
     1;
   return {
     attributes: design.attributes,
     items: matrix.itemIds.map((id, j) => {
       const probabilities = Array.from(state.probabilities[j] ?? []);
+      const model = models[j] ?? "gdina";
+      const step = steps[j];
       return {
         id,
         attributes: (design.itemAttributes[j] ?? []).map((k) => design.attributes[k] ?? ""),
-        model: models[j] ?? "gdina",
+        model,
         probabilities,
         guessing: probabilities[0] ?? 0,
         slip: 1 - (probabilities.at(-1) ?? 1),
+        coefficients: step
+          ? Array.from(step.coefficients)
+          : identityCoefficients(model, probabilities, design.itemAttributes[j]?.length ?? 0),
       };
     }),
     profiles: design.profiles.map((profile, c) => ({ profile, proportion: state.proportions[c] ?? 0 })),
@@ -166,6 +188,19 @@ export function calibrateCdm(
     converged,
     iterations,
   };
+}
+
+/** Returns the number of parameters of an item with `attributeCount` attributes: its success probabilities. */
+function parameterCount(model: CdmModel | undefined, attributeCount: number): number {
+  if (model === "dina" || model === "dino") return 2;
+  return model === undefined || model === "gdina" ? 2 ** attributeCount : attributeCount + 1;
+}
+
+/** Returns the coefficients of a G-DINA, DINA or DINO item from its success probabilities. */
+function identityCoefficients(model: CdmModel, probabilities: readonly number[], attributeCount: number): number[] {
+  if (model === "gdina") return saturatedCoefficients(probabilities, attributeCount);
+  const guessing = probabilities[0] ?? 0;
+  return [guessing, (probabilities.at(-1) ?? 0) - guessing];
 }
 
 /** Responses by person, then item: 0, 1, or -1 when missing. */
@@ -346,16 +381,42 @@ function addGroupValues(out: Float64Array, values: Float64Array, groupOf: Int32A
   for (let c = 0; c < out.length; c++) out[c] = (out[c] ?? 0) + (values[groupOf[c] ?? 0] ?? 0);
 }
 
+/** Builds the M-step of each additive item, starting from the item's starting probabilities. */
+function additiveSteps(
+  models: readonly CdmModel[],
+  design: CdmDesign,
+  state: CdmState,
+): readonly (AdditiveMaximizer | undefined)[] {
+  return models.map((model, j) => {
+    const link = LINKS[model];
+    if (link === undefined) return undefined;
+    return additiveMaximizer(
+      link,
+      design.itemAttributes[j]?.length ?? 0,
+      PROBABILITY_BOUNDS,
+      state.probabilities[j] ?? [],
+    );
+  });
+}
+
 /** Runs the M-step and returns the largest change of a probability or proportion. */
-function maximize(models: readonly CdmModel[], state: CdmState, counts: ExpectedCounts): number {
+function maximize(
+  models: readonly CdmModel[],
+  steps: readonly (AdditiveMaximizer | undefined)[],
+  state: CdmState,
+  counts: ExpectedCounts,
+): number {
   let change = 0;
   state.probabilities.forEach((probabilities, j) => {
-    const updated = groupProbabilities(
-      models[j] ?? "gdina",
-      counts.correct[j],
-      counts.persons[j],
-      probabilities.length,
-    );
+    const correct = counts.correct[j];
+    const persons = counts.persons[j];
+    const step = steps[j];
+    const updated = step
+      ? step.maximize(
+          Float64Array.from(correct ?? [], (value, l) => correctedCorrect(value, persons?.[l] ?? 0)),
+          Float64Array.from(persons ?? [], correctedPersons),
+        )
+      : groupProbabilities(models[j] ?? "gdina", correct, persons, probabilities.length);
     updated.forEach((value, l) => {
       change = Math.max(change, Math.abs(value - (probabilities[l] ?? 0)));
       probabilities[l] = value;
@@ -393,18 +454,30 @@ function groupProbabilities(
     }
     return bounded(r, n);
   };
-  if (model === "gdina") return Array.from({ length: groups }, (_, l) => pool(l, l + 1));
   if (model === "dina") {
     const below = pool(0, groups - 1);
     return Array.from({ length: groups }, (_, l) => (l === groups - 1 ? pool(groups - 1, groups) : below));
   }
-  const above = pool(1, groups);
-  return Array.from({ length: groups }, (_, l) => (l === 0 ? pool(0, 1) : above));
+  if (model === "dino") {
+    const above = pool(1, groups);
+    return Array.from({ length: groups }, (_, l) => (l === 0 ? pool(0, 1) : above));
+  }
+  return Array.from({ length: groups }, (_, l) => pool(l, l + 1));
+}
+
+/** Returns a group's expected correct responses, with GDINA's correction of a small group. */
+function correctedCorrect(correct: number, persons: number): number {
+  return persons < SMALL_GROUP ? correct + SMALL_GROUP / 2 : correct;
+}
+
+/** Returns a group's expected persons, with GDINA's correction of a small group. */
+function correctedPersons(persons: number): number {
+  return persons < SMALL_GROUP ? persons + SMALL_GROUP : persons;
 }
 
 /** Returns R / N, with GDINA's correction of a small group and its bounds. */
 function bounded(correct: number, persons: number): number {
-  const p = persons < SMALL_GROUP ? (correct + SMALL_GROUP / 2) / (persons + SMALL_GROUP) : correct / persons;
+  const p = correctedCorrect(correct, persons) / correctedPersons(persons);
   return Math.min(Math.max(p, PROBABILITY_BOUNDS[0]), PROBABILITY_BOUNDS[1]);
 }
 

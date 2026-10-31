@@ -1,5 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { additiveMaximizer, type CdmLink, saturatedCoefficients } from "../src/cdm/additive.js";
+import { profilesOf } from "../src/cdm/q-matrix.js";
 import {
   attributeProfiles,
   type CdmCalibration,
@@ -14,6 +16,8 @@ import {
   validateQMatrix,
 } from "../src/index.js";
 import fixture from "./fixtures/cdm.json" with { type: "json" };
+import additiveFixture from "./fixtures/cdm-additive.json" with { type: "json" };
+import maximumFixture from "./fixtures/cdm-maximum.json" with { type: "json" };
 import { defined, definedEntries, expectClose } from "./helpers.js";
 
 // Tolerances against GDINA, explained in docs/validation.md.
@@ -21,10 +25,92 @@ import { defined, definedEntries, expectClose } from "./helpers.js";
 const CDM_TOLERANCE = 1e-5;
 /** The log-likelihood and the information criteria. */
 const LOG_LIKELIHOOD_TOLERANCE = 1e-8;
+/** The success probabilities, coefficients and proportions of fits with additive items: GDINA's EM stops at a change of 1e-8. */
+const ADDITIVE_TOLERANCE = 1e-5;
+/** The maximum of one M-step on fixed counts, against the point that meets the KKT conditions. */
+const MAXIMUM_TOLERANCE = 1e-8;
+/** The person results from the success probabilities and proportions of GDINA's fit. */
+const REFERENCE_PERSON_TOLERANCE = 1e-6;
 
+const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
+const LINKS: readonly CdmLink[] = ["identity", "logit", "log"];
+/** The link of each additive model. */
+const LINK_OF: Readonly<Record<string, CdmLink>> = { acdm: "identity", llm: "logit", rrum: "log" };
+const PROBABILITY_BOUNDS = [1e-4, 1 - 1e-4] as const;
 function cdmModel(name: string): CdmModel {
-  if (name !== "gdina" && name !== "dina" && name !== "dino") throw new Error(`Unknown model ${name}.`);
-  return name;
+  const model = MODELS.find((candidate) => candidate === name);
+  if (model === undefined) throw new Error(`Unknown model ${name}.`);
+  return model;
+}
+
+function cdmLink(name: string): CdmLink {
+  const link = LINKS.find((candidate) => candidate === name);
+  if (link === undefined) throw new Error(`Unknown link ${name}.`);
+  return link;
+}
+
+/** The models of a fixture's fit: one for every item, or one per item. */
+function fitModels(model: string | readonly string[]): CdmModel | CdmModel[] {
+  return typeof model === "string" ? cdmModel(model) : model.map(cdmModel);
+}
+
+/** The name of a fixture's fit in a test title. */
+function fitName(model: string | readonly string[]): string {
+  return typeof model === "string" ? model.toUpperCase() : "per-item mix of";
+}
+
+/** The success probabilities that calibrateCdm starts from, for an item of `attributeCount` attributes. */
+function startingProbabilities(attributeCount: number): number[] {
+  return profilesOf(attributeCount).map(
+    (profile) => 0.2 + (0.6 * profile.reduce((sum, v) => sum + v, 0)) / attributeCount,
+  );
+}
+
+/** A link: the identity, the logit or the log of a probability. */
+function linked(link: CdmLink, probability: number): number {
+  if (link === "identity") return probability;
+  return link === "logit" ? Math.log(probability / (1 - probability)) : Math.log(probability);
+}
+
+/** The inverse of a link. */
+function inverse(link: CdmLink, predictor: number): number {
+  if (link === "identity") return predictor;
+  return link === "logit" ? 1 / (1 + Math.exp(-predictor)) : Math.exp(predictor);
+}
+
+/** The predictor of each latent group of an item with `attributeCount` attributes at `coefficients`. */
+function predictors(coefficients: readonly number[], attributeCount: number): number[] {
+  return profilesOf(attributeCount).map((profile) =>
+    profile.reduce((sum, mastered, k) => sum + mastered * (coefficients[k + 1] ?? 0), coefficients[0] ?? 0),
+  );
+}
+
+/** Returns the negative log-likelihood of expected counts at success probabilities. */
+function negativeLogLikelihood(correct: readonly number[], persons: readonly number[], p: readonly number[]): number {
+  return -p.reduce((sum, value, l) => {
+    const r = correct[l] ?? 0;
+    return sum + r * Math.log(value) + ((persons[l] ?? 0) - r) * Math.log1p(-value);
+  }, 0);
+}
+
+/** The calibration GDINA's fit holds: a calibration of the fixture's data with GDINA's success probabilities and proportions. */
+function referenceCalibration(
+  reference: (typeof additiveFixture.cases)[number],
+  fit: (typeof additiveFixture.cases)[number]["fits"][number],
+): CdmCalibration {
+  const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+  const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), { maxIterations: 1 });
+  return {
+    ...calibration,
+    items: calibration.items.map((item, j) => ({
+      ...item,
+      probabilities: defined(fit.items[j]),
+      guessing: defined(fit.guessing[j]),
+      slip: defined(fit.slip[j]),
+      coefficients: defined(fit.coefficients[j]),
+    })),
+    profiles: calibration.profiles.map((entry, c) => ({ ...entry, proportion: defined(fit.proportions[c]) })),
+  };
 }
 
 describe("cdmClassificationAccuracy", () => {
@@ -56,6 +142,29 @@ describe("cdmClassificationAccuracy", () => {
     }
   }
 
+  for (const reference of additiveFixture.cases) {
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    for (const fit of reference.fits) {
+      for (const accuracy of fit.accuracy ?? []) {
+        const classification = accuracy.classification === "eap" ? "eap" : "map";
+        it(`matches GDINA's CA by ${classification.toUpperCase()} for ${fitName(fit.model)} items on ${reference.name} data`, () => {
+          const result = cdmClassificationAccuracy(matrix, referenceCalibration(reference, fit), { classification });
+          expectClose(result.accuracy, accuracy.accuracy, REFERENCE_PERSON_TOLERANCE, "τ");
+          expectClose(result.consistency, accuracy.consistency, REFERENCE_PERSON_TOLERANCE, "γ");
+          result.attributeAccuracy.forEach((value, k) => {
+            expectClose(value, defined(accuracy.attributeAccuracy[k]), REFERENCE_PERSON_TOLERANCE, `τ_${k}`);
+          });
+          result.attributeConsistency.forEach((value, k) => {
+            expectClose(value, defined(accuracy.attributeConsistency[k]), REFERENCE_PERSON_TOLERANCE, `γ_${k}`);
+          });
+          result.profileAccuracy.forEach((value, c) => {
+            expectClose(value, defined(accuracy.profileAccuracy[c]), REFERENCE_PERSON_TOLERANCE, `τ_c ${c}`);
+          });
+        });
+      }
+    }
+  }
+
   it("rejects persons without responses alone, whose accuracy is undefined, and invalid options", () => {
     const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"] };
     const calibration = calibrateCdm(
@@ -80,6 +189,86 @@ describe("cdmClassificationAccuracy", () => {
     expect(() => cdmClassificationAccuracy(JSON.parse("null"), calibration)).toThrow(
       "A response matrix needs the arrays personIds, itemIds and responses.",
     );
+  });
+});
+
+describe("additiveMaximizer", () => {
+  maximumFixture.cases.forEach((reference, index) => {
+    const link = cdmLink(reference.link);
+    const { attributeCount, correct, persons } = reference;
+    const name = `case ${index + 1}, the ${reference.link} link, ${attributeCount} attributes, ${reference.kind} counts`;
+    it(`matches the maximum that meets the KKT conditions: ${name}`, () => {
+      const step = additiveMaximizer(link, attributeCount, PROBABILITY_BOUNDS, startingProbabilities(attributeCount));
+      const probabilities = step.maximize(Float64Array.from(correct), Float64Array.from(persons));
+      step.coefficients.forEach((value, i) => {
+        expectClose(value, defined(reference.delta[i]), MAXIMUM_TOLERANCE, `coefficient ${i}`);
+      });
+      probabilities.forEach((value, l) => {
+        expectClose(value, defined(reference.probabilities[l]), MAXIMUM_TOLERANCE, `group ${l}`);
+      });
+    });
+
+    it(`reaches the same maximum from a reversed start and from coefficients outside the bounds: ${name}`, () => {
+      const reversed = startingProbabilities(attributeCount).reverse();
+      const step = additiveMaximizer(link, attributeCount, PROBABILITY_BOUNDS, reversed);
+      step.maximize(Float64Array.from(correct), Float64Array.from(persons));
+      step.coefficients.forEach((value, i) => {
+        expectClose(value, defined(reference.delta[i]), MAXIMUM_TOLERANCE, `coefficient ${i}`);
+      });
+      step.coefficients.fill(1e6);
+      step.maximize(Float64Array.from(correct), Float64Array.from(persons));
+      step.coefficients.forEach((value, i) => {
+        expectClose(value, defined(reference.delta[i]), MAXIMUM_TOLERANCE, `coefficient ${i} after reset`);
+      });
+    });
+  });
+
+  it("stays at the maximum when run again on the same counts", () => {
+    const reference = defined(maximumFixture.cases.find((entry) => entry.activeBounds > 0));
+    const step = additiveMaximizer(
+      cdmLink(reference.link),
+      reference.attributeCount,
+      PROBABILITY_BOUNDS,
+      startingProbabilities(reference.attributeCount),
+    );
+    const correct = Float64Array.from(reference.correct);
+    const persons = Float64Array.from(reference.persons);
+    step.maximize(correct, persons);
+    const first = Array.from(step.coefficients);
+    step.maximize(correct, persons);
+    step.coefficients.forEach((value, i) => {
+      expectClose(value, defined(first[i]), 1e-12, `coefficient ${i}`);
+    });
+  });
+
+  it("keeps the probabilities within the bounds for groups without persons and groups answered by all or none", () => {
+    for (const link of LINKS) {
+      const step = additiveMaximizer(link, 2, PROBABILITY_BOUNDS, startingProbabilities(2));
+      const probabilities = step.maximize(Float64Array.of(0, 20, 0, 0), Float64Array.of(0, 20, 30, 0));
+      expect(probabilities.every((p) => p >= PROBABILITY_BOUNDS[0] && p <= PROBABILITY_BOUNDS[1])).toBe(true);
+      expect(step.coefficients.every(Number.isFinite)).toBe(true);
+      expect(probabilities[1]).toBeGreaterThan(0.9);
+      expect(probabilities[2]).toBeLessThan(0.3);
+    }
+  });
+
+  it("fits an item of one attribute exactly as its two group proportions", () => {
+    for (const link of LINKS) {
+      const step = additiveMaximizer(link, 1, PROBABILITY_BOUNDS, startingProbabilities(1));
+      const probabilities = step.maximize(Float64Array.of(30, 90), Float64Array.of(100, 120));
+      expectClose(defined(probabilities[0]), 0.3, 1e-9);
+      expectClose(defined(probabilities[1]), 0.75, 1e-9);
+    }
+  });
+
+  it("returns the coefficients of a saturated item from its probabilities", () => {
+    // P = [0.2, 0.5, 0.4, 0.9] over 00, 10, 01, 11: 0.2, 0.5 - 0.2, 0.4 - 0.2 and 0.9 - 0.5 - 0.4 + 0.2.
+    const [intercept, first, second, interaction] = saturatedCoefficients([0.2, 0.5, 0.4, 0.9], 2);
+    expectClose(defined(intercept), 0.2, 1e-15);
+    expectClose(defined(first), 0.3, 1e-15);
+    expectClose(defined(second), 0.2, 1e-15);
+    expectClose(defined(interaction), 0.2, 1e-15);
+    expect(saturatedCoefficients([0.3, 0.8], 1).map((value) => Math.round(value * 1e12) / 1e12)).toEqual([0.3, 0.5]);
   });
 });
 
@@ -117,6 +306,157 @@ describe("calibrateCdm", () => {
     }
   }
 
+  for (const reference of additiveFixture.cases) {
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    for (const fit of reference.fits) {
+      it(`matches GDINA's ${fitName(fit.model)} models on ${reference.name} data`, () => {
+        const result = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
+          model: fitModels(fit.model),
+          tolerance: 1e-10,
+          maxIterations: 10_000,
+        });
+        expect(result.converged).toBe(true);
+        expect(result.attributes).toEqual(reference.attributes);
+        result.items.forEach((item, j) => {
+          expect(item.model).toBe(typeof fit.model === "string" ? fit.model : fit.model[j]);
+          item.probabilities.forEach((p, l) => {
+            expectClose(p, defined(fit.items[j]?.[l]), ADDITIVE_TOLERANCE, `${item.id} group ${l}`);
+          });
+          item.coefficients.forEach((value, i) => {
+            expectClose(value, defined(fit.coefficients[j]?.[i]), ADDITIVE_TOLERANCE, `${item.id} coefficient ${i}`);
+          });
+          expectClose(item.guessing, defined(fit.guessing[j]), ADDITIVE_TOLERANCE, `${item.id} guessing`);
+          expectClose(item.slip, defined(fit.slip[j]), ADDITIVE_TOLERANCE, `${item.id} slip`);
+        });
+        result.profiles.forEach(({ proportion }, c) => {
+          expectClose(proportion, defined(fit.proportions[c]), ADDITIVE_TOLERANCE, `profile ${c}`);
+        });
+        // GDINA's M-steps stop short of the maximum, so the exact M-step reaches at least its log-likelihood.
+        expect(result.logLikelihood).toBeGreaterThanOrEqual(fit.logLikelihood - LOG_LIKELIHOOD_TOLERANCE);
+        // Both criteria add the same parameters to -2 logLikelihood.
+        expectClose(result.aic + 2 * result.logLikelihood, fit.aic + 2 * fit.logLikelihood, 1e-6, "AIC parameters");
+        expectClose(result.bic + 2 * result.logLikelihood, fit.bic + 2 * fit.logLikelihood, 1e-6, "BIC parameters");
+      });
+    }
+  }
+
+  it("gives coefficients that reproduce each item's success probabilities under its model", () => {
+    const reference = defined(additiveFixture.cases[1]);
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const models = defined(reference.fits[3]).model;
+    const result = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
+      model: fitModels(models),
+      maxIterations: 50,
+    });
+    const rates = new Set<CdmModel>();
+    result.items.forEach((item) => {
+      rates.add(item.model);
+      const groups = profilesOf(item.attributes.length);
+      expect(item.coefficients).toHaveLength(
+        item.model === "gdina"
+          ? groups.length
+          : item.model === "dina" || item.model === "dino"
+            ? 2
+            : item.attributes.length + 1,
+      );
+      item.probabilities.forEach((p, l) => {
+        const profile = defined(groups[l]);
+        if (item.model === "gdina") {
+          // The sum of the effects of the groups whose attributes the profile masters.
+          const sum = groups.reduce(
+            (total, other, a) =>
+              other.every((v, k) => v <= (profile[k] ?? 0)) ? total + defined(item.coefficients[a]) : total,
+            0,
+          );
+          expectClose(sum, p, 1e-12, `${item.id} group ${l}`);
+        } else if (item.model === "dina" || item.model === "dino") {
+          const raised = item.model === "dina" ? l === groups.length - 1 : l > 0;
+          expectClose(
+            defined(item.coefficients[0]) + (raised ? defined(item.coefficients[1]) : 0),
+            p,
+            1e-12,
+            `${item.id} group ${l}`,
+          );
+        } else {
+          const link = defined(LINK_OF[item.model]);
+          expectClose(
+            inverse(link, defined(predictors(item.coefficients, item.attributes.length)[l])),
+            p,
+            1e-9,
+            `${item.id} group ${l}`,
+          );
+        }
+      });
+    });
+    expect([...rates].sort()).toEqual([...MODELS].sort());
+  });
+
+  it("fits items of one attribute as the G-DINA does under every model", () => {
+    const reference = defined(additiveFixture.cases[1]);
+    const itemIds = reference.itemIds.slice(0, 10);
+    const matrix = responseMatrix(
+      reference.responses.map((row) => row.slice(0, 10)),
+      { itemIds },
+    );
+    const qMatrix = Object.fromEntries(Object.entries(definedEntries(reference.qmatrix)).slice(0, 10));
+    const options = { tolerance: 1e-10, maxIterations: 10_000 };
+    const saturated = calibrateCdm(matrix, qMatrix, { ...options, model: "gdina" });
+    for (const model of ["acdm", "llm", "rrum"] as const) {
+      const result = calibrateCdm(matrix, qMatrix, { ...options, model });
+      result.items.forEach((item, j) => {
+        item.probabilities.forEach((p, l) => {
+          expectClose(p, defined(saturated.items[j]?.probabilities[l]), 1e-6, `${model} ${item.id} group ${l}`);
+        });
+      });
+    }
+  });
+
+  it("fits no better than the G-DINA, which contains the additive models", () => {
+    const reference = defined(additiveFixture.cases[1]);
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const qMatrix = definedEntries(reference.qmatrix);
+    const saturated = calibrateCdm(matrix, qMatrix, { tolerance: 1e-8, maxIterations: 10_000 });
+    for (const model of ["acdm", "llm", "rrum"] as const) {
+      const result = calibrateCdm(matrix, qMatrix, { model, tolerance: 1e-8, maxIterations: 10_000 });
+      expect(result.logLikelihood).toBeLessThan(saturated.logLikelihood);
+    }
+  });
+
+  it("lists an item's attributes in any order without changing the calibration", () => {
+    const matrix = responseMatrix([
+      [1, 1, 0],
+      [0, 0, 1],
+      [1, 0, 0],
+      [1, 1, 1],
+      [0, 1, 0],
+      [0, 0, 0],
+      [1, 1, 1],
+      [1, 0, 1],
+    ]);
+    const first = calibrateCdm(matrix, { item1: ["a"], item2: ["a", "b"], item3: ["b"] }, { model: "llm" });
+    const second = calibrateCdm(matrix, { item1: ["a"], item2: ["b", "a"], item3: ["b"] }, { model: "llm" });
+    expect(second).toEqual(first);
+    expect(defined(first.items[1]).attributes).toEqual(["a", "b"]);
+  });
+
+  it("calibrates additive items that every person answered correctly or incorrectly", () => {
+    const matrix = responseMatrix([
+      [1, 0, 1, 1],
+      [1, 0, 0, 0],
+      [1, 0, 1, 1],
+      [1, 0, 0, 1],
+      [1, 0, 1, 0],
+    ]);
+    const qMatrix = { item1: ["a", "b"], item2: ["a", "b"], item3: ["a"], item4: ["b"] };
+    for (const model of ["acdm", "llm", "rrum"] as const) {
+      const result = calibrateCdm(matrix, qMatrix, { model });
+      const [correct, incorrect] = result.items;
+      expect(defined(correct).probabilities.every((p) => p > 0.99 && p <= 1 - 1e-4)).toBe(true);
+      expect(defined(incorrect).probabilities.every((p) => p < 0.01 && p >= 1e-4)).toBe(true);
+      for (const item of result.items) expect(item.coefficients.every(Number.isFinite)).toBe(true);
+    }
+  });
+
   it("rejects polytomous responses, a Q-matrix that does not fit the items and unknown models", () => {
     const matrix = responseMatrix([
       [1, 0],
@@ -139,8 +479,11 @@ describe("calibrateCdm", () => {
     expect(() => calibrateCdm(matrix, { item1: ["a", "a"], item2: ["b"] })).toThrow(
       'Item "item1" lists an attribute twice.',
     );
-    expect(() => calibrateCdm(matrix, qMatrix, { model: JSON.parse('"rrum"') })).toThrow(
-      'The option model must be "gdina", "dina" or "dino", found "rrum".',
+    expect(() => calibrateCdm(matrix, qMatrix, { model: JSON.parse('"mixture"') })).toThrow(
+      'The option model must be "gdina", "dina", "dino", "acdm", "llm" or "rrum", found "mixture".',
+    );
+    expect(() => calibrateCdm(matrix, qMatrix, { model: ["acdm", JSON.parse('"rasch"')] })).toThrow(
+      'The model of item 2 must be "gdina", "dina", "dino", "acdm", "llm" or "rrum", found "rasch".',
     );
     expect(() => calibrateCdm(matrix, qMatrix, { model: ["dina"] })).toThrow("Found 1 models for 2 items.");
     expect(() => calibrateCdm(responseMatrix([[null, null]]), qMatrix)).toThrow(
@@ -223,6 +566,27 @@ describe("attributeProfiles", () => {
         if (expected.map !== null && expected.map !== undefined) expect(person.map).toEqual(expected.map);
       });
     });
+  }
+
+  for (const additiveReference of additiveFixture.cases) {
+    const additiveMatrix = responseMatrix(additiveReference.responses, { itemIds: additiveReference.itemIds });
+    for (const fit of additiveReference.fits) {
+      it(`matches GDINA's personparm for ${fitName(fit.model)} items on ${additiveReference.name} data`, () => {
+        const persons = attributeProfiles(additiveMatrix, referenceCalibration(additiveReference, fit));
+        expect(fit.persons).toHaveLength(20);
+        (fit.persons ?? []).forEach((expected, i) => {
+          const person = defined(persons[i]);
+          person.mastery.forEach((p, k) => {
+            expectClose(p, defined(expected.mastery[k]), REFERENCE_PERSON_TOLERANCE, `mastery ${k}`);
+          });
+          person.posterior.forEach((p, c) => {
+            expectClose(p, defined(expected.posterior[c]), REFERENCE_PERSON_TOLERANCE, `posterior ${c}`);
+          });
+          expect(person.eap).toEqual(expected.eap);
+          if (expected.map !== null && expected.map !== undefined) expect(person.map).toEqual(expected.map);
+        });
+      });
+    }
   }
 
   it("gives a person without responses the calibrated proportions", () => {
@@ -343,7 +707,7 @@ describe("properties", () => {
       },
     );
     fc.assert(
-      fc.property(rows, fc.constantFrom<CdmModel>("gdina", "dina", "dino"), (data, model) => {
+      fc.property(rows, fc.constantFrom<CdmModel>(...MODELS), (data, model) => {
         try {
           const matrix = responseMatrix(data);
           const result = calibrateCdm(matrix, qMatrix, { model, maxIterations: 50 });
@@ -369,6 +733,107 @@ describe("properties", () => {
       { numRuns: 40 },
     );
   });
+
+  it("returns a point that no feasible change of the coefficients improves, for any counts", () => {
+    const group = fc.record({
+      persons: fc.oneof(fc.constant(0), fc.double({ min: 0, max: 300, noNaN: true })),
+      share: fc.oneof(fc.constantFrom(0, 1), fc.double({ min: 0, max: 1, noNaN: true })),
+    });
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...LINKS),
+        fc.integer({ min: 1, max: 3 }),
+        fc.array(group, { minLength: 8, maxLength: 8 }),
+        fc.integer({ min: 1, max: 2 ** 30 }),
+        (link, attributeCount, groups, seed) => {
+          const used = groups.slice(0, 2 ** attributeCount);
+          const persons = used.map((entry) => entry.persons);
+          const correct = used.map((entry) => entry.persons * entry.share);
+          const maximizer = additiveMaximizer(
+            link,
+            attributeCount,
+            PROBABILITY_BOUNDS,
+            startingProbabilities(attributeCount),
+          );
+          const probabilities = Array.from(maximizer.maximize(Float64Array.from(correct), Float64Array.from(persons)));
+          expect(probabilities.every((p) => p >= PROBABILITY_BOUNDS[0] && p <= PROBABILITY_BOUNDS[1])).toBe(true);
+          const best = negativeLogLikelihood(correct, persons, probabilities);
+          const random = createRandom(seed);
+          for (const scale of [1e-6, 1e-4, 1e-2, 0.3]) {
+            for (let trial = 0; trial < 25; trial++) {
+              const moved = Array.from(maximizer.coefficients, (value) => value + scale * random.normal());
+              const changed = predictors(moved, attributeCount).map((eta) => inverse(link, eta));
+              if (!changed.every((p) => p >= PROBABILITY_BOUNDS[0] && p <= PROBABILITY_BOUNDS[1])) continue;
+              expect(negativeLogLikelihood(correct, persons, changed)).toBeGreaterThanOrEqual(
+                best - 1e-9 * (1 + Math.abs(best)),
+              );
+            }
+          }
+        },
+      ),
+      { numRuns: 150 },
+    );
+  });
+
+  it("classifies persons identically with a calibration of any model after a JSON round trip", () => {
+    const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"], item4: ["a"], item5: ["b"] };
+    const rows = fc.array(fc.array(fc.constantFrom(0, 1), { minLength: 5, maxLength: 5 }), {
+      minLength: 4,
+      maxLength: 30,
+    });
+    fc.assert(
+      fc.property(rows, fc.constantFrom<CdmModel>(...MODELS), (data, model) => {
+        const matrix = responseMatrix(data);
+        const calibration = calibrateCdm(matrix, qMatrix, { model, maxIterations: 30 });
+        const stored: CdmCalibration = JSON.parse(JSON.stringify(calibration));
+        expect(attributeProfiles(matrix, stored)).toEqual(attributeProfiles(matrix, calibration));
+      }),
+      { numRuns: 30 },
+    );
+  });
+
+  for (const [model, link] of Object.entries(LINK_OF)) {
+    it(`recovers the success probabilities of simulated ${model} items`, () => {
+      const random = createRandom(20261029);
+      // From a success probability of 0.12 mastering none of an item's attributes to 0.88 mastering all of them.
+      const intercept = linked(link, 0.12);
+      const rise = linked(link, 0.88) - intercept;
+      const itemAttributes = [
+        ["a"],
+        ["b"],
+        ["c"],
+        ["a", "b"],
+        ["b", "c"],
+        ["a", "c"],
+        ["a"],
+        ["b"],
+        ["c"],
+        ["a", "b", "c"],
+      ];
+      const items = itemAttributes.map((attributes, j) => ({
+        id: `q${j + 1}`,
+        attributes,
+        probabilities: predictors(
+          [intercept, ...attributes.map(() => rise / attributes.length)],
+          attributes.length,
+        ).map((eta) => inverse(link, eta)),
+      }));
+      const profiles = Array.from({ length: 4000 }, () => [0, 1, 2].map(() => (random.uniform() < 0.5 ? 1 : 0)));
+      const matrix = simulateCdmResponses({ attributes: ["a", "b", "c"], items }, profiles, random);
+      const result = calibrateCdm(matrix, Object.fromEntries(items.map((item) => [item.id, item.attributes])), {
+        model: cdmModel(model),
+      });
+      // Five binomial standard errors of a latent group of an eighth of the persons.
+      const bound = 5 * Math.sqrt(0.25 / 500);
+      result.items.forEach((item, j) => {
+        expect(item.model).toBe(model);
+        expect(item.coefficients).toHaveLength(item.attributes.length + 1);
+        item.probabilities.forEach((p, l) => {
+          expect(Math.abs(p - defined(items[j]?.probabilities[l]))).toBeLessThan(bound);
+        });
+      });
+    });
+  }
 
   it("recovers the items of simulated responses", () => {
     const random = createRandom(20261029);

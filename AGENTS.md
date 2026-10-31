@@ -99,7 +99,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/irt/              item response theory: models, calibration, ability estimation, information, reliability
   src/sim/              simulation of thetas, item parameters and responses
   src/cat/              adaptive and multistage tests, their simulation, exposure control, form assembly
-  src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, Q-matrix validation, nonparametric classification
+  src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, A-CDM, LLM, R-RUM, Q-matrix validation,
+                        nonparametric classification
   src/fit/              item and person fit, local dependence
   src/dif/              differential item functioning
   src/equating/         linking of IRT scales, observed-score equating with and without common items, IRT true-score
