@@ -8,6 +8,12 @@ export interface PoolControls {
   /** The item's content area, which content balancing uses. */
   readonly contentArea?: string;
   /**
+   * The id of the item's testlet: a set, such as a stimulus with its questions, whose items are administered together.
+   * Items that share an id are one testlet; an item without one is administered alone. With content targets, the items
+   * of a testlet share one content area.
+   */
+  readonly testlet?: string;
+  /**
    * The Sympson-Hetter exposure parameter: the probability, from 0 to 1, that the item is administered when it is
    * selected.
    *

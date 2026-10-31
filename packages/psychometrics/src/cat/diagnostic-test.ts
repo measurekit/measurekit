@@ -9,6 +9,7 @@ import { profilePosterior } from "./profile-posterior.js";
 import { profileSpace } from "./profile-space.js";
 import type { ItemSelectionRule } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
+import type { WithinTestlet } from "./testlets.js";
 
 /** Options of {@link diagnosticAdaptiveTest}. */
 export interface DiagnosticAdaptiveTestOptions {
@@ -46,6 +47,14 @@ export interface DiagnosticAdaptiveTestOptions {
    * @defaultValue none
    */
   readonly enemies?: readonly (readonly string[])[];
+  /**
+   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order; `"adaptive"`,
+   * each next item the one the selection rule scores highest among the testlet's remaining items. It applies to pool
+   * items that have a `testlet`.
+   *
+   * @defaultValue `"in-order"`
+   */
+  readonly withinTestlet?: WithinTestlet;
 }
 
 /** The state of a diagnostic adaptive test: plain data, which JSON serializes, so that a test can resume from it. */
@@ -121,6 +130,7 @@ export function diagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): 
     selection = gdinaDiscriminationIndex,
     contentTargets,
     enemies = [],
+    withinTestlet,
   } = options;
   checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
   checkMethod(selection, "scores", "The option selection must be a selection rule, such as gdinaDiscriminationIndex");
@@ -133,6 +143,7 @@ export function diagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): 
     selection,
     contentTargets,
     enemies,
+    withinTestlet,
     estimate: (administered, responses) =>
       profileEstimate(profilePosterior(space.prior, administered, responses), space.profiles),
     checkResponse: (item, response) => {

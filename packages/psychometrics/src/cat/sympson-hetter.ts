@@ -18,15 +18,20 @@ export function checkExposure(item: PoolControls): void {
  * The item the rule selects is administered with probability equal to its exposure parameter; otherwise it is withheld
  * for the rest of the test and the rule selects again among the remaining eligible items. The last eligible item is not
  * withheld, and an item with an exposure parameter of 1 takes no draw. Withheld items are cleared in `context.eligible`
- * and appended to `withheld`.
+ * and appended to `withheld`. With `membersOf`, an item is withheld with the items that go with it, such as the rest of
+ * its testlet, and the last eligible unit is not withheld.
  *
+ * @param membersOf - Returns the pool indices of the items administered or withheld together with an item, itself
+ * included.
  * @throws `DataError` when the rule scores every eligible item `-Infinity`.
+ * @defaultValue `membersOf` returns the item alone
  * @see {@link https://doi.org/10.1037/10244-014 | Hetter and Sympson (1997)}
  */
 export function selectItem<TItem extends PoolControls, TEstimate>(
   rule: ItemSelectionRule<TItem, TEstimate>,
   context: SelectionContext<TItem, TEstimate>,
   withheld: number[],
+  membersOf: (index: number) => readonly number[] = (index) => [index],
 ): number {
   const { pool, eligible, random } = context;
   const scores = new Float64Array(pool.length);
@@ -36,9 +41,12 @@ export function selectItem<TItem extends PoolControls, TEstimate>(
     const index = highestScore(scores, eligible);
     if (index < 0) throw new DataError("The selection rule scored every eligible item -Infinity.");
     const exposure = pool[index]?.exposure ?? 1;
-    if (remaining === 1 || exposure >= 1 || random.uniform() < exposure) return index;
-    withheld.push(index);
-    eligible[index] = 0;
-    remaining--;
+    const unit = membersOf(index).filter((member) => eligible[member] === 1);
+    if (remaining === unit.length || exposure >= 1 || random.uniform() < exposure) return index;
+    for (const member of unit) {
+      withheld.push(member);
+      eligible[member] = 0;
+    }
+    remaining -= unit.length;
   }
 }

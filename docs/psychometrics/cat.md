@@ -5,8 +5,8 @@ model](irt.md), adaptive tests that classify a person's attribute profile with t
 model](cdm.md), and adaptive tests that estimate a vector of thetas with [multidimensional](multidimensional.md) items,
 simulates them, calibrates their exposure control and assembles fixed forms. Item selection, ability estimates, content
 balancing and stopping decisions are validated against catR step by step; diagnostic tests against a replay of every
-rule written out in base R and against cdcatR; multidimensional tests against a replay in base R and against mirtCAT
-([validation](validation.md)).
+rule written out in base R and against cdcatR; multidimensional tests against a replay in base R and against mirtCAT;
+testlets against a replay in base R and mirtCAT's ordered groups ([validation](validation.md)).
 
 ## Adaptive tests
 
@@ -56,12 +56,13 @@ state.estimate; // { theta, standardError }
 
 | Option           | Default                 | Meaning                                                                                             |
 | ---------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `pool`           | required                | Items `{ id, model, parameters }`, with an optional `contentArea` and `exposure`.                   |
+| `pool`           | required                | Items `{ id, model, parameters }`, with an optional `contentArea`, `testlet` and `exposure`.        |
 | `stopping`       | required                | A [stopping rule](#stopping-rules).                                                                 |
 | `selection`      | `maximumInformation`    | An [item selection rule](#item-selection).                                                          |
 | `estimator`      | `posteriorMeanEstimate` | An [estimator](#estimators).                                                                        |
 | `contentTargets` | none                    | Target proportions by content area, for [content balancing](#content-balancing). Need not sum to 1. |
 | `enemies`        | none                    | [Enemy sets](#enemy-sets): arrays of ids of items that must not appear in one test.                 |
+| `withinTestlet`  | `"in-order"`            | The order of the items of a [testlet](#testlets): `"in-order"` or `"adaptive"`.                     |
 
 A calibration's `items` are a valid pool. Ids must be unique. Before each item, the first included, the test:
 
@@ -71,6 +72,8 @@ A calibration's `items` are a valid pool. Ids must be unique. Before each item, 
 3. restricts the eligible items to one content area, with `contentTargets`;
 4. scores the eligible items with `selection` and selects the highest, the first in pool order on ties;
 5. administers it with probability `exposure`, or withholds it for the rest of the test and selects again.
+
+With [testlets](#testlets), the items of a testlet that has begun follow one after another, without steps 2, 3 and 5.
 
 ### State
 
@@ -162,6 +165,106 @@ are picked. Selection then considers that area's items only.
 share a stimulus. Once an item of a set is administered, the other items of the set are not eligible. An item may be in
 several sets. A withheld item does not exclude its enemies, as it was not administered.
 
+### Testlets
+
+A testlet is a set of items administered together, such as the questions on one reading passage or the parts of a data
+set. Give its items the same `testlet`, a non-empty string; an item without one is administered alone. The test
+selects a testlet as a unit, and then administers its items.
+
+```mermaid
+flowchart TD
+  E[Estimate theta] --> P{"Does the last item's testlet have eligible items?"}
+  P -->|yes| N["Administer its next item: pool order, or the highest score"]
+  P -->|no| S{"Does the stopping rule hold, or is no item left?"}
+  S -->|yes| X[End the test]
+  S -->|no| C[Content balancing picks an area]
+  C --> U["Score each testlet as a unit, and each item alone"]
+  U --> H[Select the highest unit]
+  H --> O{"Does exposure control administer its first item?"}
+  O -->|yes| A[Administer the first item of the testlet]
+  O -->|no| W[Withhold the whole testlet and select again]
+  W --> H
+```
+
+The selection rule scores a testlet by the mean of the scores it gives the testlet's eligible items, leaving out those it
+scores `-Infinity`; a testlet with none scores `-Infinity`. A testlet competes with single items by that mean, not by
+its best item. The score goes to the testlet's first item to be administered, and the other items score `-Infinity`
+for that step. Every rule works this way, `kullbackLeibler`, `aStratified`, `randomesque` and your own included. The
+first item to be administered is the first eligible one in pool order, whatever its own score, or with `"adaptive"`
+the one the rule scores highest among the eligible items, the first in pool order on ties.
+
+| Option or field | Default      | Meaning                                                                       |
+| --------------- | ------------ | ----------------------------------------------------------------------------- |
+| `testlet`       | none         | On a pool item: the id of its testlet, a non-empty string; equal ids, one set |
+| `withinTestlet` | `"in-order"` | The order of a testlet's items: `"in-order"` or `"adaptive"`                  |
+
+- `"in-order"` administers the items in pool order, as a passage lists its questions.
+- `"adaptive"` administers each next item the one `selection` scores highest among the testlet's remaining items at the
+  current estimate: the first in pool order on ties, and when none scores above `-Infinity`.
+
+Once the first item is administered, the testlet's other eligible items follow before anything else. The controls act
+at the first item and at the others as follows.
+
+| Control           | At the first item of a testlet                       | At the other items                                 |
+| ----------------- | ---------------------------------------------------- | -------------------------------------------------- |
+| Item selection    | Scores the testlet as a unit                         | Pool order, or the highest score with `"adaptive"` |
+| Stopping rule     | Checked: the test ends, or begins the testlet        | Not checked: the test ends after the testlet       |
+| Content balancing | Picks the area of the testlet                        | Not applied                                        |
+| Exposure control  | The first item's `exposure` decides for the testlet  | Not applied: `exposure` is unused, no random draw  |
+| Enemy sets        | Enemies of administered items are not in the testlet | An enemy of an administered item is skipped        |
+
+Content balancing picks one area for a testlet, so the items of a testlet share a content area, or the test throws.
+Exposure control withholds all of a testlet's eligible items when it withholds the first one, and never withholds the
+last eligible unit. `calibrateExposure` works on a pool with testlets: the items of a testlet are administered or
+withheld together, so they share one rate.
+
+A test ends between testlets, so it may pass its length: with `testLength(n)` it takes n items or, when a testlet is in
+progress at the nth, the rest of that testlet. A testlet is administered whole unless enemy sets leave some of its
+items out.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { adaptiveTest, testLength } from "@measurekit/psychometrics/cat";
+import { threeParameterLogistic } from "@measurekit/psychometrics/irt";
+
+const item = (id: string, a: number, b: number, c: number, testlet?: string) => ({
+  id,
+  model: threeParameterLogistic,
+  parameters: { a, b, c, d: 1 },
+  ...(testlet !== undefined && { testlet }),
+});
+// A passage of three questions, and three single items.
+const pool = [
+  item("q1", 1.2, -1, 0.2),
+  item("p1", 1, -0.4, 0.15, "passage"),
+  item("p2", 1.3, 0.3, 0.2, "passage"),
+  item("p3", 0.9, 1, 0.2, "passage"),
+  item("q2", 1.1, 0.4, 0.25),
+  item("q3", 1.5, 1.2, 0.2),
+];
+const answers: Record<string, number> = { q1: 1, p1: 1, p2: 0, p3: 1, q2: 0, q3: 1 };
+
+const run = (withinTestlet: "in-order" | "adaptive") => {
+  const test = adaptiveTest({ pool, stopping: testLength(3), withinTestlet });
+  const random = createRandom(1);
+  let state = test.start(random);
+  while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);
+  return state;
+};
+run("in-order").items; // ["q1", "p1", "p2", "p3"]
+run("adaptive").items; // ["q1", "p2", "p1", "p3"]
+```
+
+At theta 0 the passage's items have information 0.186, 0.251 and 0.089, a mean of 0.175, below `q1`'s 0.193, so `q1`
+comes first although `p2` is the most informative item: without the testlet, a test of length 3 administers `p2`, `q1`
+and `p1`. After `q1` the passage is the best unit. In order it starts with `p1`; adaptively with `p2`, the most
+informative at the estimate, and then `p1` before `p3`. The length of 3 is passed by the rest of the passage.
+
+The default estimators treat the items as independent given theta. For items that depend on each other beyond theta,
+use the [testlet response model](irt.md#testlets): an `estimator` of
+`(items, responses) => posteriorMeanEstimate(items, responses, { testlets })`, with the `testlets` of a calibration,
+integrates each testlet's effect out.
+
 ### Exposure control
 
 An item with an `exposure` parameter k in [0, 1] is subject to Sympson-Hetter control (Sympson and Hetter, 1985):
@@ -230,7 +333,7 @@ other adaptive tests run on the same engine as `adaptiveTest`.
 | `TestState`                                         | `TEstimate`                               | `AbilityEstimate`             |
 | `AdaptiveState`: a state with `withheld` and `next` | `TEstimate`                               | none                          |
 
-`PoolControls` is what every adaptive test needs of an item: `id`, `contentArea` and `exposure`. `PoolItem` adds the
+`PoolControls` is what every adaptive test needs of an item: `id`, `contentArea`, `testlet` and `exposure`. `PoolItem` adds the
 model and parameters of an IRT item. The context of a rule has the fields of the [table above](#item-selection) whatever
 the types: `estimate` is the estimate the test computes from the responses, an `AbilityEstimate` for `adaptiveTest`.
 
@@ -301,15 +404,16 @@ result.attributeAccuracy; // [0.938, 0.934, 0.946]
 result.meanLength; // 6.726
 ```
 
-| Option           | Default                    | Meaning                                                                                                  |
-| ---------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `pool`           | required                   | Items `{ id, attributes, probabilities }`, with an optional `contentArea` and `exposure`; see below.     |
-| `attributes`     | required                   | From 1 to 20 distinct attribute names, in the order of the profiles. A calibration's `attributes`.       |
-| `prior`          | uniform over the profiles  | `{ profile, proportion }` for each profile: a calibration's `profiles`. A [hierarchy](#prior) has zeros. |
-| `stopping`       | required                   | A [stopping rule](#stopping-of-diagnostic-tests).                                                        |
-| `selection`      | `gdinaDiscriminationIndex` | An [item selection rule](#selection-of-diagnostic-tests).                                                |
-| `contentTargets` | none                       | As for [`adaptiveTest`](#content-balancing).                                                             |
-| `enemies`        | none                       | As for [`adaptiveTest`](#enemy-sets).                                                                    |
+| Option           | Default                    | Meaning                                                                                                      |
+| ---------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `pool`           | required                   | Items `{ id, attributes, probabilities }`, with an optional `contentArea`, `testlet`, `exposure`; see below. |
+| `attributes`     | required                   | From 1 to 20 distinct attribute names, in the order of the profiles. A calibration's `attributes`.           |
+| `prior`          | uniform over the profiles  | `{ profile, proportion }` for each profile: a calibration's `profiles`. A [hierarchy](#prior) has zeros.     |
+| `stopping`       | required                   | A [stopping rule](#stopping-of-diagnostic-tests).                                                            |
+| `selection`      | `gdinaDiscriminationIndex` | An [item selection rule](#selection-of-diagnostic-tests).                                                    |
+| `contentTargets` | none                       | As for [`adaptiveTest`](#content-balancing).                                                                 |
+| `enemies`        | none                       | As for [`adaptiveTest`](#enemy-sets).                                                                        |
+| `withinTestlet`  | `"in-order"`               | As for [`adaptiveTest`](#testlets): items with a `testlet` are administered together.                        |
 
 The pool is an array of calibrated items; a calibration's `items` are one. `attributes` of an item lists the attributes
 it measures, each among the test's, and `probabilities` the probability of a correct response in each of its latent
@@ -459,18 +563,19 @@ result.rootMeanSquareError; // [0.538, 0.478]
 result.meanLength; // 16.34
 ```
 
-| Option           | Default                      | Meaning                                                                            |
-| ---------------- | ---------------------------- | ---------------------------------------------------------------------------------- |
-| `pool`           | required                     | Items `{ id, model, parameters }`, with an optional `contentArea` and `exposure`   |
-| `stopping`       | required                     | A [stopping rule](#stopping-rules-of-multidimensional-tests)                       |
-| `selection`      | `maximumDeterminant()`       | An [item selection rule](#selection-of-multidimensional-tests)                     |
-| `estimator`      | posterior mode under N(0, I) | A [multidimensional estimator](#estimates-of-multidimensional-tests), with a prior |
-| `contentTargets` | none                         | As for [`adaptiveTest`](#content-balancing)                                        |
-| `enemies`        | none                         | As for [`adaptiveTest`](#enemy-sets)                                               |
+| Option           | Default                      | Meaning                                                                                  |
+| ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `pool`           | required                     | Items `{ id, model, parameters }`, with an optional `contentArea`, `testlet`, `exposure` |
+| `stopping`       | required                     | A [stopping rule](#stopping-rules-of-multidimensional-tests)                             |
+| `selection`      | `maximumDeterminant()`       | An [item selection rule](#selection-of-multidimensional-tests)                           |
+| `estimator`      | posterior mode under N(0, I) | A [multidimensional estimator](#estimates-of-multidimensional-tests), with a prior       |
+| `contentTargets` | none                         | As for [`adaptiveTest`](#content-balancing)                                              |
+| `enemies`        | none                         | As for [`adaptiveTest`](#enemy-sets)                                                     |
+| `withinTestlet`  | `"in-order"`                 | As for [`adaptiveTest`](#testlets): items with a `testlet` are administered together     |
 
 The pool is an array of at least one item with a model of the [multidimensional models](multidimensional.md#models) and
 valid parameters for it, a string id and, as a calibration's `items` have, the same number of dimensions as every other;
-ids are unique. `contentArea` and `exposure` are as in an [adaptive test's pool](#adaptive-tests). Responses are
+ids are unique. `contentArea`, `testlet` and `exposure` are as in an [adaptive test's pool](#adaptive-tests). Responses are
 categories of the item: 0 or 1 for the logistic models. Before each item the steps are those of `adaptiveTest`.
 
 ### Estimates of multidimensional tests
@@ -678,6 +783,9 @@ form.contentCounts; // the number of items of each constrained area, within its 
 - Multidimensional selection by A-, E- and KL-optimality, which change no use that the D-rule does not serve; polytomous
   items are supported through any model of the pool.
 - Exposure calibration for multidimensional tests: `calibrateExposure` takes IRT tests only; set `exposure` by hand.
+- Testlets from which only some items are administered, such as a passage with more questions than a test takes, and
+  testlets whose items are in several content areas under content balancing.
+- A testlet-level exposure parameter: the `exposure` of the first item to be administered acts for its testlet.
 
 ## Differences from catR
 
@@ -692,6 +800,7 @@ form.contentCounts; // the number of items of each constrained area, within its 
 | Content balancing | Only areas with eligible items                                             | Fails when the area picked has no item left                              |
 | Exposure control  | Sympson-Hetter, calibrated by `calibrateExposure`                          | `simulateRespondents(rmax)`: the restricted and item eligibility methods |
 | `minInfo`         | Over items not administered or withheld                                    | Over items not administered                                              |
+| Testlets          | [Selected as a unit](#testlets), administered together                     | None                                                                     |
 
 ## Differences from cdcatR
 
@@ -709,15 +818,17 @@ form.contentCounts; // the number of items of each constrained area, within its 
 
 ## Differences from mirtCAT
 
-| Topic             | This package                                                      | mirtCAT                                                                             |
-| ----------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| D-rule            | `maximumDeterminant`: the precision of the prior is always added  | `DPrule` adds it, as this package does; `Drule` does not: every score is 0 at first |
-| Prior             | One `prior` for the rule and one for the estimator                | The `latent_covariance` of the model, for both                                      |
-| Estimates         | `MultidimensionalEstimate`: `theta`, `standardErrors`, covariance | A matrix of estimates by step, `thetas_history`, and `thetas_SE_history`            |
-| Estimators        | Posterior mode and mean, or your own function                     | MAP, EAP, ML, WLE and others, by the `method` of the design                         |
-| First item        | The D-rule at the prior                                           | `start_item = 1` by default; `"DPrule"` selects as this package does                |
-| Other rules       | `randomesque` of any rule, and your own                           | A-, E-, T- and W-optimality, and Kullback-Leibler rules                             |
-| Content, exposure | Kingsbury-Zara balancing, enemy sets, Sympson-Hetter              | Content proportions, exclusion sets and its own exposure control                    |
+| Topic             | This package                                                      | mirtCAT                                                                                       |
+| ----------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| D-rule            | `maximumDeterminant`: the precision of the prior is always added  | `DPrule` adds it, as this package does; `Drule` does not: every score is 0 at first           |
+| Prior             | One `prior` for the rule and one for the estimator                | The `latent_covariance` of the model, for both                                                |
+| Estimates         | `MultidimensionalEstimate`: `theta`, `standardErrors`, covariance | A matrix of estimates by step, `thetas_history`, and `thetas_SE_history`                      |
+| Estimators        | Posterior mode and mean, or your own function                     | MAP, EAP, ML, WLE and others, by the `method` of the design                                   |
+| First item        | The D-rule at the prior                                           | `start_item = 1` by default; `"DPrule"` selects as this package does                          |
+| Other rules       | `randomesque` of any rule, and your own                           | A-, E-, T- and W-optimality, and Kullback-Leibler rules                                       |
+| Content, exposure | Kingsbury-Zara balancing, enemy sets, Sympson-Hetter              | Content proportions, exclusion sets and its own exposure control                              |
+| Testlets          | A testlet is scored by the mean of its items; `withinTestlet`     | `ordered` and `unordered` groups: the group of the most informative item, from its first item |
+| Test length       | A test ends after a testlet that began; any stopping rule         | `min_SEM` ends after the group; `max_items` inside a group stops with an error                |
 
 ## Implementation
 
@@ -725,3 +836,5 @@ form.contentCounts; // the number of items of each constrained area, within its 
   through the model's methods, without allocating per item.
 - Estimates come from the [IRT estimators](irt.md#ability-estimation), so CAT and MST support every model, a custom
   `IrtModel` included.
+- Testlets are a wrapper around the selection rule, which scores testlets as units for any rule, and the engine reads
+  the testlet in progress from the last administered item, so a stored state holds nothing more than without testlets.

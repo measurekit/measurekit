@@ -9,6 +9,13 @@
 # install.packages("cdcatR") fails. Download the source with download.packages, remove cdmTools from the Imports of
 # DESCRIPTION and `import(cdmTools)` from NAMESPACE, and run R CMD INSTALL on the directory.
 #
+# Testlets: tests replayed step by step in base R, written out from the documented rules: a testlet scored as a unit by the
+# mean information of its eligible items at the EAP estimate, its items then administered together in pool order or by
+# information, the test ending between testlets. catR's Ii gives the information. catR has no testlets; mirtCAT's ordered
+# constraint administers a group in order once its most informative item is selected and does not end the test inside
+# it, which is the same where each group's items are equally informative, so mirtCAT replays that case, ended by precision:
+# at a length that falls inside a group mirtCAT stops with "Ran out of items to administer".
+#
 # Multidimensional adaptive tests: tests replayed step by step in base R, with the information matrices of the
 # compensatory logistic items written out and the posterior mode found to a gradient of 1e-12, and the item sequences of
 # mirtCAT's DPrule, which is the D-rule with the inverse of the prior covariance added.
@@ -567,5 +574,166 @@ write_fixture("cat-mirt", list(
     md_case("M3PL, 2 dimensions", pool2g$a, pool2g$d, pool2g$g, diag(2), thetas2, SEED + 6),
     md_case("M2PL, 2 dimensions, correlated", pool2$a, pool2$d, pool2$g, correlated, thetas2, SEED + 7),
     md_case("M2PL, 3 dimensions", pool3$a, pool3$d, pool3$g, diag(3), thetas3, SEED + 8)
+  )
+))
+
+# ---- Testlets -----------------------------------------------------------------------------------------------------
+
+# A 3PL bank of 30 items, 16 of them in five testlets of 3, 4, 2, 3 and 4 items scattered through the pool and 14 alone.
+# Four persons answer every item once, at their true thetas, so that each replay consumes a fixed set of responses.
+TESTLET_PERSONS <- c(-1.4, -0.2, 0.7, 1.6)
+TESTLET_LENGTH <- 12
+
+testlet_nodes <- seq(-6, 6, length.out = 61)
+testlet_weights <- dnorm(testlet_nodes) / sum(dnorm(testlet_nodes))
+
+# The 3PL probability of a correct response at each node, with catR's parameters a, b, c and d.
+testlet_probability <- function(bank, i, theta) bank[i, "c"] + (bank[i, "d"] - bank[i, "c"]) * plogis(bank[i, "a"] * (theta - bank[i, "b"]))
+
+# The posterior mean and SD of theta over the 61 nodes under N(0, 1), weights proportional to the density: measurekit's EAP.
+testlet_eap <- function(bank, out, x) {
+  posterior <- testlet_weights
+  for (k in seq_along(out)) {
+    p <- testlet_probability(bank, out[k], testlet_nodes)
+    posterior <- posterior * if (x[k] == 1) p else 1 - p
+  }
+  posterior <- posterior / sum(posterior)
+  theta <- sum(posterior * testlet_nodes)
+  list(theta = theta, standardError = sqrt(sum(posterior * (testlet_nodes - theta)^2)))
+}
+
+# A replay of one person's test. Rules: before each item, the estimate; items administered, withheld or enemies of an
+# administered item are not eligible; the testlet in progress, that of the last administered item while it has eligible
+# items, continues without the stopping rule or exposure control, with its first eligible item in pool order or, adaptively,
+# the one of highest information; otherwise the test ends if `stop` says so, else each testlet with eligible items is a unit
+# scored by the mean information of those items, given to its first item to be administered, and the highest unit is taken,
+# the first in pool order on ties, unless the entry item's exposure parameter, 0 or 1, withholds all its eligible items: a
+# parameter of 0 does, except for the last eligible unit.
+testlet_replay <- function(bank, testlet, exposure, enemies, within, stop, responses) {
+  n <- nrow(bank)
+  enemy_of <- lapply(seq_len(n), function(i) unlist(lapply(enemies, function(set) if (i %in% set) setdiff(set, i))))
+  out <- integer(0)
+  x <- numeric(0)
+  withheld <- integer(0)
+  estimates <- list()
+  repeat {
+    current <- testlet_eap(bank, out, x)
+    estimates[[length(estimates) + 1]] <- current
+    eligible <- rep(TRUE, n)
+    eligible[c(out, withheld)] <- FALSE
+    for (a in out) eligible[enemy_of[[a]]] <- FALSE
+    information <- Ii(current$theta, bank)$Ii
+    last <- if (length(out) > 0) out[length(out)] else NA
+    remaining <- if (!is.na(last) && !is.na(testlet[last])) which(eligible & !is.na(testlet) & testlet == testlet[last]) else integer(0)
+    entry_of <- function(members) if (within == "in-order") members[1] else members[which.max(information[members])]
+    if (length(remaining) > 0) {
+      item <- entry_of(remaining)
+    } else if (!any(eligible) || stop(out, current)) {
+      break
+    } else {
+      repeat {
+        scores <- rep(-Inf, n)
+        for (i in which(eligible)) {
+          members <- if (is.na(testlet[i])) i else which(eligible & !is.na(testlet) & testlet == testlet[i])
+          if (is.na(testlet[i])) {
+            scores[i] <- information[i]
+          } else if (i == entry_of(members)) {
+            scores[i] <- mean(information[members])
+          }
+        }
+        item <- which.max(scores)
+        unit <- if (is.na(testlet[item])) item else which(eligible & !is.na(testlet) & testlet == testlet[item])
+        if (sum(eligible) == length(unit) || exposure[item] >= 1) break
+        withheld <- c(withheld, unit)
+        eligible[unit] <- FALSE
+      }
+    }
+    out <- c(out, item)
+    x <- c(x, responses[item])
+  }
+  list(administered = I(item_id(out)), responses = I(x), estimates = estimates[-1], initial = estimates[[1]],
+       withheld = I(item_id(withheld)))
+}
+
+set.seed(SEED + 600)
+testlet_bank <- as.matrix(genDichoMatrix(items = 30, model = "3PL", seed = SEED + 601))
+testlet_sizes <- c(3, 4, 2, 3, 4)
+testlet_of <- rep(NA_character_, 30)
+members <- sample(30, sum(testlet_sizes))
+testlet_of[members] <- rep(sprintf("set%d", seq_along(testlet_sizes)), testlet_sizes)
+testlet_responses <- t(sapply(TESTLET_PERSONS, function(theta) {
+  as.numeric(runif(30) < sapply(seq_len(30), function(i) testlet_probability(testlet_bank, i, theta)))
+}))
+stopifnot(abs(testlet_probability(testlet_bank, 1, 0.3) - Pi(0.3, testlet_bank[1, , drop = FALSE])$Pi) < 1e-14,
+          abs(testlet_eap(testlet_bank, c(1, 2), c(1, 0))$theta -
+                thetaEst(testlet_bank[1:2, ], c(1, 0), method = "EAP", parInt = EAP_GRID)) < 1e-6)
+
+testlet_exposure <- rep(1, 30)
+testlet_exposure[which(testlet_of == "set2")] <- 0
+testlet_exposure[setdiff(which(is.na(testlet_of)), which(is.na(testlet_of))[1:6])[1:3]] <- 0
+set1 <- which(testlet_of == "set1")
+set3 <- which(testlet_of == "set3")
+testlet_enemies <- list(c(set1[1], set1[3]), c(set3[2], which(is.na(testlet_of))[2]))
+
+# mirtCAT's items for the same responses: criterion MI with the EAP estimate, from the item of most information at the prior
+# mean; each testlet an ordered group, whose first item is administered once any of its items is selected; the test ends
+# when the standard error is at most `precision`.
+testlet_mirtcat <- function(bank, testlet, precision, row) {
+  pars <- data.frame(a1 = bank[, "a"], d = -bank[, "a"] * bank[, "b"], g = bank[, "c"])
+  model <- generate.mirt_object(pars, "3PL")
+  groups <- lapply(unique(na.omit(testlet)), function(set) which(testlet == set))
+  result <- mirtCAT(mo = model, criteria = "MI", start_item = "MI", method = "EAP", local_pattern = matrix(row, 1),
+                    design = list(min_SEM = precision, constraints = setNames(groups, rep("ordered", length(groups)))),
+                    verbose = FALSE)
+  as.integer(result$items_answered)
+}
+
+testlet_case <- function(name, within, stopping, exposure = rep(1, 30), enemies = list(), bank = testlet_bank,
+                         mirtcat = FALSE) {
+  stop_rule <- if (stopping$type == "length") {
+    function(out, current) length(out) >= stopping$value
+  } else {
+    function(out, current) current$standardError <= stopping$value
+  }
+  persons <- lapply(seq_along(TESTLET_PERSONS), function(p) {
+    replay <- testlet_replay(bank, testlet_of, exposure, enemies, within, stop_rule, testlet_responses[p, ])
+    message(name, ", person ", p, ": ", length(replay$administered), " items ", paste(sub("item0*", "", replay$administered), collapse = " "))
+    reference <- NULL
+    if (mirtcat) {
+      reference <- item_id(testlet_mirtcat(bank, testlet_of, stopping$value, testlet_responses[p, ]))
+      if (!identical(reference, as.character(replay$administered))) {
+        stop(sprintf("%s, person %d: mirtCAT's items %s, written out %s", name, p, paste(reference, collapse = " "),
+                     paste(replay$administered, collapse = " ")))
+      }
+    }
+    c(replay, list(mirtCAT = if (is.null(reference)) NULL else I(reference)))
+  })
+  list(name = name, within = within, stopping = stopping, enemies = lapply(enemies, item_id),
+       items = lapply(seq_len(30), function(i) c(logistic_items(bank)[[i]],
+                                                  list(testlet = if (is.na(testlet_of[i])) NULL else testlet_of[i],
+                                                       exposure = exposure[i]))),
+       persons = persons)
+}
+
+# The same bank with each testlet's items given the parameters of its first item, which mirtCAT's selection of a group by its
+# most informative item agrees with.
+identical_bank <- testlet_bank
+for (set in unique(na.omit(testlet_of))) {
+  members <- which(testlet_of == set)
+  identical_bank[members, ] <- matrix(identical_bank[members[1], ], length(members), ncol(identical_bank), byrow = TRUE)
+}
+
+write_fixture("cat-testlets", list(
+  source = sprintf("catR's genDichoMatrix(items = 30, model = \"3PL\", seed = %d) with 16 items in five testlets; replays in base R, catR's Ii for the information, and mirtCAT's ordered groups.", SEED + 601),
+  responses = unname(testlet_responses),
+  cases = list(
+    testlet_case("testlets in order", "in-order", list(type = "length", value = TESTLET_LENGTH)),
+    testlet_case("testlets adaptively", "adaptive", list(type = "length", value = TESTLET_LENGTH)),
+    testlet_case("precision between testlets", "in-order", list(type = "precision", value = 0.45)),
+    testlet_case("withheld testlets", "adaptive", list(type = "length", value = TESTLET_LENGTH), testlet_exposure),
+    testlet_case("enemies inside and across testlets", "in-order", list(type = "length", value = TESTLET_LENGTH),
+                 enemies = testlet_enemies),
+    testlet_case("testlets of equally informative items", "in-order", list(type = "precision", value = 0.45),
+                 bank = identical_bank, mirtcat = TRUE)
   )
 ))

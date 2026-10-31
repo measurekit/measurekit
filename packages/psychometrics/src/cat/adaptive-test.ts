@@ -6,6 +6,7 @@ import { type AdaptiveState, adaptiveEngine } from "./engine.js";
 import { checkResponse, type PoolItem } from "./items.js";
 import { type ItemSelectionRule, maximumInformation } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
+import type { WithinTestlet } from "./testlets.js";
 
 /** Options of {@link adaptiveTest}. */
 export interface AdaptiveTestOptions {
@@ -39,6 +40,14 @@ export interface AdaptiveTestOptions {
    * @defaultValue none
    */
   readonly enemies?: readonly (readonly string[])[];
+  /**
+   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order; `"adaptive"`,
+   * each next item the one the selection rule scores highest among the testlet's remaining items. It applies to pool
+   * items that have a `testlet`.
+   *
+   * @defaultValue `"in-order"`
+   */
+  readonly withinTestlet?: WithinTestlet;
 }
 
 /** The state of an adaptive test: plain data, which JSON serializes, so that a test can resume from a stored state. */
@@ -71,11 +80,12 @@ export interface AdaptiveTest {
  * Before each item the test estimates theta from the responses so far and checks the stopping rule; unless the test
  * ends, content balancing restricts the eligible items to one content area, the selection rule selects among them, and
  * Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or enemies
- * of an administered item are not eligible.
+ * of an administered item are not eligible. Items that share a `testlet` are administered together: see the guide.
  *
  * @throws `DataError` when `stopping`, `selection` or `estimator` is not a rule or function, an item's id or
- * parameters are invalid, ids repeat, an exposure parameter is outside [0, 1], a content target is invalid or missing
- * for an item's area, or an enemy set does not name two or more distinct pool items.
+ * parameters are invalid, ids repeat, an exposure parameter is outside [0, 1], a testlet is not a non-empty string, a
+ * content target is invalid or missing for an item's area, an enemy set does not name two or more distinct pool items,
+ * or `withinTestlet` is unknown.
  *
  * @example
  * ```ts
@@ -104,6 +114,7 @@ export function adaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
     estimator = posteriorMeanEstimate,
     contentTargets,
     enemies = [],
+    withinTestlet,
   } = options;
   checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
   checkMethod(selection, "scores", "The option selection must be a selection rule, such as maximumInformation");
@@ -118,6 +129,7 @@ export function adaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
     selection,
     contentTargets,
     enemies,
+    withinTestlet,
     estimate: estimator,
     checkResponse,
   });

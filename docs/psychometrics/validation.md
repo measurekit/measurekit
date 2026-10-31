@@ -86,6 +86,7 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | Stopping decisions                                           | `checkStopRule` with `length`, `precision` and `minInfo` on the remaining items, alone and together     |
 | Randomesque, Sympson-Hetter, multistage routing, simulation  | Properties over seeded simulations and hand-derived routes (below)                                      |
 | Enemy sets, exposure calibration, form assembly              | Properties (below); catR has no enemy sets or form assembly                                             |
+| Testlet selection, administration, withholding and stopping  | Base R replay of the documented rules, with catR's `Ii`; mirtCAT's `ordered` groups (below)             |
 
 | Diagnostic CAT quantity                                    | Reference                                                                                                    |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -349,6 +350,25 @@ and a bias below 0.1 on each dimension, and the D-rule gives smaller standard er
 Properties: no test administers an item twice or two enemies, and every covariance is a symmetric matrix of the standard
 errors' squares.
 
+`validation/psychometrics/cat.R` also replays adaptive tests with testlets on a bank of 30 3PL items from catR's
+`genDichoMatrix`, 16 of them in five testlets of 3, 4, 2, 3 and 4 items scattered through the pool and 14 alone. The
+first four persons answer every item once, at their true thetas, so that each replay takes a fixed set of responses.
+The base R replay writes out the documented rules: the EAP estimate on the 61 points before each item, written out and
+checked against catR's `thetaEst` in the script; items administered, withheld or enemies of an administered item left
+out; the testlet in progress continued without the stopping rule or exposure control; otherwise each testlet scored by
+the mean of its eligible items' information, from catR's `Ii`, at its first item to be administered, the highest unit
+taken, and a testlet withheld whole when its first item's exposure parameter, 0 or 1, withholds it. Five cases run it:
+testlets in order, testlets adaptively, a precision stop at a standard error of 0.45, which falls between testlets, a
+pool with testlets withheld by exposure parameters of 0, and enemy sets inside and across testlets. The test replays the
+persons' responses through `adaptiveTest` and compares the items, the withheld items and every estimate. catR has no
+testlets. mirtCAT's `ordered` constraint administers a group in order once the group's most informative item is
+selected, and does not end the test inside it, as the package does where each testlet's items are equally informative;
+a sixth case gives each testlet the parameters of its first item and runs mirtCAT with `criteria = "MI"` and the EAP
+estimate on the same persons: the script stops if its item sequence differs from the replay's. Its stop is by precision,
+as at a `max_items` that falls inside a group mirtCAT stops with the error "Ran out of items to administer". The tests
+add properties: whatever the testlets, responses and order, each testlet is one block of the items, in pool order when
+the test administers them in order, and the test passes its length by less than the largest testlet.
+
 `validation/psychometrics/fit.R`, `dif.R` and `equating.R` store the inputs each reference used: the items, the
 thetas, the calibrations. The tests compute the statistics from those inputs, so a difference is the statistic's alone.
 
@@ -534,6 +554,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `cat-gpcm.json`                        | `genPolyMatrix(items = 40, nrCat = 4, model = "GPCM")`: 2 to 4 categories, 2 runs of 15 items                                                                                                                                                                                                | Polytomous MFI and KL; MAP, EAP then ML                                                                                                |
 | `cat-content.json`                     | `genDichoMatrix(items = 60, model = "3PL", cbControl)`: areas with targets 0.5, 0.3 and 0.2                                                                                                                                                                                                  | Content balancing                                                                                                                      |
 | `cat-cdm.json`                         | GDINA's `sim30GDINA` and `CDM::data.ecpe` calibrated by GDINA: G-DINA; ECPE also DINA and G-DINA under a linear hierarchy; 4 persons, 10 items, 5 rules each                                                                                                                                 | The five diagnostic selection rules, posterior thresholds, a prior with zeros, DINA items, fixed precision                             |
+| `cat-testlets.json`                    | catR's `genDichoMatrix(items = 30, model = "3PL", seed = 20261630)` with 16 items in five testlets; the first 4 persons answer all items at thetas of -1.4, -0.2, 0.7 and 1.6; the pool with equal items within each testlet                                                                 | In order, adaptively, precision stop, exposure parameters of 0, enemy sets; mirtCAT's ordered groups                                   |
 | `cat-mirt.json`                        | Seeded pools of 30 to 36 M2PL and M3PL items set in mirt (`generate.mirt_object`): 2 dimensions, 2 dimensions with correlation 0.5, 3 dimensions; 4 persons, 10 items                                                                                                                        | The D-rule on between- and within-dimension items, guessing, a correlated prior, the standard error stopping rule                      |
 | `interop-mirt.json`                    | 25 items set in mirt: 2PL, 3PL, 4PL, `graded` (one negative slope), `gpcm`, `Rasch`, `rsm`, `nominal`                                                                                                                                                                                        | Both coefficient forms, probabilities                                                                                                  |
 | `interop-multidimensional.json`        | 6 M2PL, 6 M3PL, 4 graded items on 2 dimensions and 5 graded items on 3 dimensions, set in mirt                                                                                                                                                                                               | Both models' coefficients, probabilities at vectors of theta                                                                           |
@@ -617,6 +638,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | CD-CAT posterior and attribute mastery                                                           | 1e-12 absolute                                     | 6e-16                    |
 | Multidimensional CAT scores of the D-rule against the written-out replay                         | 1e-12 relative                                     | 1.3e-15                  |
 | Multidimensional CAT theta, standard errors and covariance against the replay                    | 1e-8 absolute                                      | 5e-11                    |
+| CAT with testlets: theta and standard errors against the written-out replay                      | 1e-12 absolute                                     | 1.3e-15                  |
 | Theta of an item's largest information                                                           | 1e-10 absolute                                     | 4e-15                    |
 | Category probabilities against `probtrace`                                                       | 1e-15 absolute                                     | 4e-16                    |
 | Chi-square upper tail                                                                            | 1e-12 relative                                     | 2e-14                    |

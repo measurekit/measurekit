@@ -12,7 +12,7 @@ R scripts in `validation/psychometrics/`:
 Rscript validation/psychometrics/ctt.R               # classical test theory; the value of subscores by subscore's CTTsub
 Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
 Rscript validation/psychometrics/dimensionality.R    # polychoric correlations, parallel analysis: psych, polycor
-Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic: cdcatR; multidimensional: mirtCAT
+Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic: cdcatR; multidimensional: mirtCAT; testlets: base R and mirtCAT
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
 Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate

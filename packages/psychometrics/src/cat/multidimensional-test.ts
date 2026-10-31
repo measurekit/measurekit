@@ -12,6 +12,7 @@ import { maximumDeterminant } from "./maximum-determinant.js";
 import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
 import type { ItemSelectionRule } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
+import type { WithinTestlet } from "./testlets.js";
 
 /** Options of {@link multidimensionalAdaptiveTest}. */
 export interface MultidimensionalAdaptiveTestOptions {
@@ -46,6 +47,14 @@ export interface MultidimensionalAdaptiveTestOptions {
    * @defaultValue none
    */
   readonly enemies?: readonly (readonly string[])[];
+  /**
+   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order; `"adaptive"`,
+   * each next item the one the selection rule scores highest among the testlet's remaining items. It applies to pool
+   * items that have a `testlet`.
+   *
+   * @defaultValue `"in-order"`
+   */
+  readonly withinTestlet?: WithinTestlet;
 }
 
 /** The state of a multidimensional adaptive test: plain data, which JSON serializes, so that a test can resume from it. */
@@ -113,7 +122,15 @@ export function multidimensionalAdaptiveTest(
   options: MultidimensionalAdaptiveTestOptions,
 ): MultidimensionalAdaptiveTest {
   checkOptions(options);
-  const { pool, stopping, selection = maximumDeterminant(), estimator, contentTargets, enemies = [] } = options;
+  const {
+    pool,
+    stopping,
+    selection = maximumDeterminant(),
+    estimator,
+    contentTargets,
+    enemies = [],
+    withinTestlet,
+  } = options;
   checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
   checkMethod(selection, "scores", "The option selection must be a selection rule, such as maximumDeterminant()");
   if (estimator !== undefined) {
@@ -139,6 +156,7 @@ export function multidimensionalAdaptiveTest(
     selection,
     contentTargets,
     enemies,
+    withinTestlet,
     estimate,
     checkResponse: (item, response) => {
       checkCategory(item.id, item.model.categoryCount(item.parameters), response);

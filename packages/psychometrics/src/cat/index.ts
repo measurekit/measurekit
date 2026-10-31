@@ -1,6 +1,6 @@
 /**
  * Adaptive and multistage testing: adaptive test sessions with item selection rules, content balancing, enemy sets,
- * Sympson-Hetter exposure control and its calibration, and stopping rules; adaptive tests of cognitive diagnosis and of
+ * testlets, Sympson-Hetter exposure control and its calibration, and stopping rules; adaptive tests of cognitive diagnosis and of
  * multidimensional items; multistage panels with routing; simulation of all of them; and the assembly of fixed forms.
  *
  * @module @measurekit/psychometrics/cat
@@ -91,3 +91,4 @@ export {
   standardErrorThreshold,
   testLength,
 } from "./stopping.js";
+export type { WithinTestlet } from "./testlets.js";

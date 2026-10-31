@@ -2,10 +2,19 @@ import { checkRandom, DataError, type Random } from "@measurekit/core";
 import { contentBalancing, restrictToArea } from "./content-balancing.js";
 import { checkEnemies, enemyIndices, excludeEnemies } from "./enemies.js";
 import { indexOf, itemById, type PoolControls } from "./items.js";
-import type { AdaptiveTestContext, ItemSelectionRule } from "./selection.js";
+import type { AdaptiveTestContext, ItemSelectionRule, SelectionContext } from "./selection.js";
 import { checkDistinct, checkState, type TestState } from "./state.js";
 import type { StoppingRule } from "./stopping.js";
 import { checkExposure, selectItem } from "./sympson-hetter.js";
+import {
+  checkTestletAreas,
+  checkWithinTestlet,
+  nextInTestlet,
+  poolTestlets,
+  remainingInTestlet,
+  unitSelection,
+  type WithinTestlet,
+} from "./testlets.js";
 
 /**
  * The state of an adaptive test of any kind: plain data, which JSON serializes, so that a test can resume from a stored
@@ -34,6 +43,12 @@ export interface AdaptiveEngineOptions<TItem extends PoolControls, TEstimate> {
   readonly contentTargets?: Readonly<Record<string, number>>;
   /** The enemy sets. */
   readonly enemies: readonly (readonly string[])[];
+  /**
+   * How the items of a testlet are ordered. It applies to pool items that have a `testlet`.
+   *
+   * @defaultValue `"in-order"`
+   */
+  readonly withinTestlet?: WithinTestlet;
   /** Returns the estimate from the administered items and their responses, also without any. */
   readonly estimate: (administered: readonly TItem[], responses: readonly number[]) => TEstimate;
   /** Checks that a response is one the item can have. */
@@ -67,16 +82,43 @@ export interface AdaptiveEngine<TEstimate> {
  * Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or
  * enemies of an administered item are not eligible.
  *
- * @throws `DataError` when an exposure parameter is outside [0, 1], a content target is invalid or missing for an
- * item's area, or an enemy set does not name two or more distinct pool items.
+ * Items of a testlet are administered together. The selection rule scores each testlet as a unit, by the mean of its
+ * eligible items' scores, and the testlet's first item to be administered goes through content balancing, which takes
+ * the testlet's area, and exposure control for the whole testlet. The items that follow are administered without the
+ * stopping rule, content balancing or exposure control, in pool order or by the selection rule's scores among the
+ * testlet's remaining items, until the testlet has none left.
+ *
+ * @throws `DataError` when an exposure parameter is outside [0, 1], a testlet is not a non-empty string, a content
+ * target is invalid or missing for an item's area, the items of a testlet are in several content areas, an enemy set
+ * does not name two or more distinct pool items, or `withinTestlet` is unknown.
  */
 export function adaptiveEngine<TItem extends PoolControls, TEstimate>(
   options: AdaptiveEngineOptions<TItem, TEstimate>,
 ): AdaptiveEngine<TEstimate> {
   const { pool, indices, stopping, selection, contentTargets, enemies: enemySets, estimate, checkResponse } = options;
+  const { withinTestlet = "in-order" } = options;
+  checkWithinTestlet(withinTestlet);
   pool.forEach(checkExposure);
+  const testlets = poolTestlets(pool);
+  const unitRule = testlets === null ? selection : unitSelection(selection, testlets, withinTestlet);
+  const membersOf = (index: number): readonly number[] => {
+    const testlet = testlets?.of[index] ?? -1;
+    return testlet < 0 ? [index] : (testlets?.members[testlet] ?? [index]);
+  };
   const balancing = contentTargets === undefined ? null : contentBalancing(pool, contentTargets);
+  if (balancing !== null && testlets !== null) checkTestletAreas(pool, testlets);
   const enemies = enemyIndices(pool, indices, enemySets);
+
+  /** Returns the item to administer next, or `null` when the test ends: the rest of a testlet, else a selection. */
+  const selectNext = (context: SelectionContext<TItem, TEstimate>, withheld: number[]): number | null => {
+    const { administered, eligible, random } = context;
+    const remaining = testlets === null ? null : remainingInTestlet(testlets, administered, eligible);
+    if (remaining !== null) return nextInTestlet(selection, context, remaining, withinTestlet);
+    if (!eligible.includes(1) || stopping.stops(context)) return null;
+    const selectable = eligible.slice();
+    if (balancing !== null) restrictToArea(balancing, administered, selectable, random);
+    return selectItem(unitRule, { ...context, eligible: selectable }, withheld, membersOf);
+  };
 
   const advance = (
     administered: readonly number[],
@@ -99,12 +141,7 @@ export function adaptiveEngine<TItem extends PoolControls, TEstimate>(
       estimate: current,
       eligible,
     };
-    let next: number | null = null;
-    if (eligible.includes(1) && !stopping.stops(context)) {
-      const selectable = eligible.slice();
-      if (balancing !== null) restrictToArea(balancing, administered, selectable, random);
-      next = selectItem(selection, { ...context, eligible: selectable, random }, withheld);
-    }
+    const next = selectNext({ ...context, random }, withheld);
     const ids = (list: readonly number[]): string[] => list.flatMap((index) => pool[index]?.id ?? []);
     return {
       items: ids(administered),

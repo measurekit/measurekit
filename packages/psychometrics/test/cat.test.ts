@@ -4,6 +4,7 @@ import { informationPeak } from "../src/cat/a-stratified.js";
 import { bindPool, type DiagnosticTestItem } from "../src/cat/diagnostic-items.js";
 import { profileSpace } from "../src/cat/profile-space.js";
 import { highestScore } from "../src/cat/selection.js";
+import { poolTestlets, unitSelection } from "../src/cat/testlets.js";
 import { profileEstimate } from "../src/cdm/persons.js";
 import {
   type AbilityEstimate,
@@ -72,6 +73,7 @@ import {
   threeParameterLogistic,
   twoParameterLogistic,
   untilMixed,
+  type WithinTestlet,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
 import cat2pl from "./fixtures/cat-2pl.json" with { type: "json" };
@@ -80,6 +82,7 @@ import catCdm from "./fixtures/cat-cdm.json" with { type: "json" };
 import catContent from "./fixtures/cat-content.json" with { type: "json" };
 import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
 import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
+import catTestlets from "./fixtures/cat-testlets.json" with { type: "json" };
 import { arbitraryItem, defined, expectClose, item2pl, mean } from "./helpers.js";
 
 // Tolerances against catR, explained in docs/validation.md.
@@ -92,6 +95,8 @@ const CATR_MODAL_TOLERANCE = 1e-4;
 const CATR_EAP_TOLERANCE = 1e-6;
 /** Information and Kullback-Leibler scores, relative to max(1, |score|). */
 const SCORE_TOLERANCE = 1e-12;
+/** EAP theta and standard error against the written-out testlet replay, which sums over the same 61 points. */
+const REPLAY_TOLERANCE = 1e-12;
 /** The theta of an item's largest information against catR's closed form in thOpt. */
 const PEAK_TOLERANCE = 1e-10;
 
@@ -626,6 +631,393 @@ describe("enemy sets", () => {
   });
 });
 
+type TestletReference = (typeof catTestlets.cases)[number];
+
+const WITHIN_TESTLET = new Map<string, WithinTestlet>([
+  ["in-order", "in-order"],
+  ["adaptive", "adaptive"],
+]);
+
+/** The pool of a case of the written-out replay: 3PL items, with a testlet where the item has one. */
+function testletPool(items: TestletReference["items"]): PoolItem[] {
+  return items.map(({ id, testlet, exposure, ...parameters }) => ({
+    id,
+    model: threeParameterLogistic,
+    parameters,
+    exposure,
+    ...(testlet !== null && { testlet }),
+  }));
+}
+
+function expectReplayEstimate(actual: AbilityEstimate, expected: AbilityEstimate, label: string): void {
+  expectClose(actual.theta, expected.theta, REPLAY_TOLERANCE, `${label} theta`);
+  expectClose(actual.standardError, expected.standardError, REPLAY_TOLERANCE, `${label} standard error`);
+}
+
+/** Expects each testlet's items to be one block of `items`, in pool order if `inOrder`, and no item of it elsewhere. */
+function expectTestletBlocks(
+  items: readonly string[],
+  pool: readonly { readonly id: string; readonly testlet?: string }[],
+  inOrder: boolean,
+): void {
+  for (const testlet of new Set(pool.flatMap((item) => item.testlet ?? []))) {
+    const members = pool.filter((item) => item.testlet === testlet).map((item) => item.id);
+    const first = items.findIndex((id) => members.includes(id));
+    if (first < 0) continue;
+    const block = items.slice(first, first + members.length);
+    expect(inOrder ? block : block.slice().sort(), testlet).toEqual(inOrder ? members : members.slice().sort());
+    expect(
+      items.filter((id) => members.includes(id)),
+      testlet,
+    ).toHaveLength(members.length);
+  }
+}
+
+describe("testlets", () => {
+  // At theta 0, where every test starts, an item with difficulty 0 has information a² / 4: 0.36 for solo.
+  const solo: PoolItem = item2pl("solo", 1.2, 0);
+  // Pool order t2, t3, t1: in order the testlet starts with t2, adaptively with t1, its most informative item. The
+  // information at theta 0 is 0.0225, 0.0225 and 1, with the mean 0.348333, below solo's 0.36.
+  const lopsided: PoolItem[] = [
+    { ...item2pl("t2", 0.3, 0), testlet: "T" },
+    { ...item2pl("t3", 0.3, 0), testlet: "T" },
+    { ...item2pl("t1", 2, 0), testlet: "T" },
+  ];
+  const stopped = testLength(1);
+
+  for (const reference of catTestlets.cases) {
+    it(`selects the items, estimates and withheld testlets of the written-out replay and mirtCAT: ${reference.name}`, () => {
+      const pool = testletPool(reference.items);
+      const { stopping } = reference;
+      const test = adaptiveTest({
+        pool,
+        stopping: stopping.type === "length" ? testLength(stopping.value) : standardErrorThreshold(stopping.value),
+        enemies: reference.enemies,
+        withinTestlet: defined(WITHIN_TESTLET.get(reference.within)),
+      });
+      reference.persons.forEach((person, p) => {
+        const label = `person ${p + 1}`;
+        const row = defined(catTestlets.responses[p]);
+        const respond = (id: string): number => defined(row[poolIndex(pool, id)]);
+        const random = createRandom(1);
+        let state = test.start(random);
+        expectReplayEstimate(state.estimate, person.initial, `${label}, initial`);
+        person.estimates.forEach((estimate, k) => {
+          expect(state.next, `${label}, step ${k}`).toBe(person.administered[k]);
+          state = test.answer(state, respond(defined(state.next)), random);
+          expectReplayEstimate(state.estimate, estimate, `${label}, step ${k}`);
+        });
+        expect(state.next, label).toBeNull();
+        expect(state.items, label).toEqual(person.administered);
+        expect(state.withheld, label).toEqual(person.withheld);
+        // mirtCAT's ordered groups, where the items of a testlet are equally informative.
+        if (person.mirtCAT !== null) expect(person.mirtCAT, label).toEqual(person.administered);
+        // Enemies leave a testlet partly administered.
+        if (reference.enemies.length === 0) expectTestletBlocks(state.items, pool, reference.within === "in-order");
+      });
+    });
+  }
+
+  it("scores a testlet by the mean score of its items, at its first item to be administered", () => {
+    const pool = [solo, ...lopsided];
+    const testlets = defined(poolTestlets(pool));
+    const context: SelectionContext = {
+      ...contextOf(pool, 0, { theta: 0, standardError: 1 }),
+      random: createRandom(0),
+    };
+    for (const [within, entry] of [
+      ["in-order", 1],
+      ["adaptive", 3],
+    ] as const) {
+      const out = new Float64Array(pool.length);
+      unitSelection(maximumInformation, testlets, within).scores(context, out);
+      const expected = [0.36, ...[1, 2, 3].map((i) => (i === entry ? 1.045 / 3 : Number.NEGATIVE_INFINITY))];
+      expected.forEach((score, i) => {
+        if (score === Number.NEGATIVE_INFINITY) expect(out[i], `${within}, item ${i}`).toBe(score);
+        else expectClose(out[i] ?? 0, score, 1e-15, `${within}, item ${i}`);
+      });
+    }
+  });
+
+  it("scores only the eligible items of a testlet, and a testlet without scored items -Infinity", () => {
+    const pool = [solo, ...lopsided];
+    const testlets = defined(poolTestlets(pool));
+    // t3 is not eligible: the mean of t2 and t1 is 0.51125, at t1.
+    const context: SelectionContext = {
+      ...contextOf(pool, 0, { theta: 0, standardError: 1 }),
+      eligible: Uint8Array.from([1, 1, 0, 1]),
+      random: createRandom(0),
+    };
+    const out = new Float64Array(pool.length);
+    unitSelection(maximumInformation, testlets, "adaptive").scores(context, out);
+    expectClose(out[0] ?? 0, 0.36, 1e-15);
+    expect(out[1]).toBe(Number.NEGATIVE_INFINITY);
+    expectClose(out[3] ?? 0, 0.51125, 1e-15);
+    const noScores: ItemSelectionRule = {
+      scores(_, scores) {
+        scores.fill(Number.NEGATIVE_INFINITY);
+      },
+    };
+    unitSelection(noScores, testlets, "in-order").scores(context, out);
+    expect([0, 1, 3].map((i) => out[i])).toEqual([-Infinity, -Infinity, -Infinity]);
+  });
+
+  it("selects the testlet whose mean information is highest, not the one holding the most informative item", () => {
+    const withTestlet = adaptiveTest({ pool: [solo, ...lopsided], stopping: stopped });
+    expect(withTestlet.start(createRandom(1)).next).toBe("solo");
+    const withoutTestlet = adaptiveTest({
+      pool: [solo, ...lopsided].map(({ testlet, ...item }) => item),
+      stopping: stopped,
+    });
+    expect(withoutTestlet.start(createRandom(1)).next).toBe("t1");
+  });
+
+  it("administers the items of a testlet together, in pool order", () => {
+    const test = adaptiveTest({ pool: [solo, ...lopsided], stopping: testLength(2), withinTestlet: "in-order" });
+    expect(administer(test, () => 1).items).toEqual(["solo", "t2", "t3", "t1"]);
+    const defaults = adaptiveTest({ pool: [solo, ...lopsided], stopping: testLength(2) });
+    expect(administer(defaults, () => 0).items).toEqual(["solo", "t2", "t3", "t1"]);
+  });
+
+  it("administers the items of a testlet together, each next item the most informative at the estimate", () => {
+    const low = { ...item2pl("low", 1.5, -3), testlet: "T" };
+    const high = { ...item2pl("high", 1.5, 3), testlet: "T" };
+    const middle = { ...item2pl("middle", 1.5, 0), testlet: "T" };
+    const pool = [high, low, middle, item2pl("far", 1, 4)];
+    const adaptive = adaptiveTest({ pool, stopping: testLength(4), withinTestlet: "adaptive" });
+    // The testlet starts at its most informative item at theta 0; a correct response moves the estimate up, towards
+    // "high", and an incorrect one down, towards "low".
+    expect(administer(adaptive, () => 1).items).toEqual(["middle", "high", "low", "far"]);
+    expect(administer(adaptive, () => 0).items).toEqual(["middle", "low", "high", "far"]);
+    const inOrder = adaptiveTest({ pool, stopping: testLength(4) });
+    expect(administer(inOrder, () => 1).items).toEqual(["high", "low", "middle", "far"]);
+  });
+
+  it("orders a testlet's items by pool order where the rule scores none above -Infinity", () => {
+    const onlyT2: ItemSelectionRule = {
+      scores(context, scores) {
+        scores.fill(Number.NEGATIVE_INFINITY);
+        const index = context.pool.findIndex((item) => item.id === "t2");
+        if (context.eligible[index] === 1) scores[index] = 1;
+      },
+    };
+    const pool = [lopsided[2], lopsided[0], lopsided[1]].map((item) => defined(item));
+    const state = administer(
+      adaptiveTest({ pool, selection: onlyT2, stopping: stopped, withinTestlet: "adaptive" }),
+      () => 1,
+    );
+    expect(state.items).toEqual(["t2", "t1", "t3"]);
+  });
+
+  it("ends a test only between testlets", () => {
+    const pool = [solo, ...lopsided];
+    for (const stopping of [testLength(1), anyOf(testLength(1), standardErrorThreshold(0.01))]) {
+      const state = administer(adaptiveTest({ pool, stopping }), () => 1);
+      expect(state.items).toEqual(["solo"]);
+    }
+    const first = adaptiveTest({ pool: lopsided, stopping: stopped });
+    expect(administer(first, () => 1)).toMatchObject({ items: ["t2", "t3", "t1"], next: null });
+    const early = adaptiveTest({ pool: lopsided, stopping: standardErrorThreshold(1.5) });
+    expect(early.start(createRandom(1))).toMatchObject({ items: [], next: null });
+  });
+
+  it("behaves as without testlets where every testlet has one item", () => {
+    const pool = POOL_3PL.map((item, i) => ({ ...item, testlet: `single${i}` }));
+    for (const withinTestlet of ["in-order", "adaptive"] as const) {
+      const random = createRandom(5);
+      const responses = POOL_3PL.map(() => (random.uniform() < 0.5 ? 1 : 0));
+      const respond = (id: string): number => defined(responses[poolIndex(POOL_3PL, id)]);
+      const alone = administer(adaptiveTest({ pool: POOL_3PL, stopping: testLength(12) }), respond);
+      const single = administer(adaptiveTest({ pool, stopping: testLength(12), withinTestlet }), respond);
+      expect(single, withinTestlet).toEqual(alone);
+    }
+  });
+
+  it("withholds all items of a testlet when exposure control withholds its first item", () => {
+    const pool = [
+      { ...item2pl("t1", 2, 0), testlet: "T", exposure: 0 },
+      { ...item2pl("t2", 1.5, 0), testlet: "T" },
+      { ...item2pl("t3", 1.5, 0), testlet: "T" },
+      item2pl("other", 1, 0),
+    ];
+    const state = administer(adaptiveTest({ pool, stopping: testLength(4) }), () => 1);
+    expect(state).toMatchObject({ items: ["other"], withheld: ["t1", "t2", "t3"], next: null });
+  });
+
+  it("never withholds the last eligible testlet", () => {
+    const pool = lopsided.map((item) => ({ ...item, exposure: 0 }));
+    const state = administer(adaptiveTest({ pool, stopping: testLength(3) }), () => 1);
+    expect(state).toMatchObject({ items: ["t2", "t3", "t1"], withheld: [], next: null });
+  });
+
+  it("draws exposure for the testlet's first item only", () => {
+    // t3 has exposure 0, but only the first item to be administered, t2, is subject to control.
+    const pool = lopsided.map((item) => ({ ...item, exposure: item.id === "t3" ? 0 : 1 }));
+    const state = administer(adaptiveTest({ pool: [solo, ...pool], stopping: testLength(2) }), () => 1);
+    expect(state).toMatchObject({ items: ["solo", "t2", "t3", "t1"], withheld: [] });
+    const adaptive = administer(
+      adaptiveTest({ pool: [solo, ...pool], stopping: testLength(2), withinTestlet: "adaptive" }),
+      () => 1,
+    );
+    // Adaptively, t1 is first to be administered and has exposure 1.
+    expect(adaptive.items[1]).toBe("t1");
+    expect(adaptive.withheld).toEqual([]);
+  });
+
+  it("administers a testlet at the rate of its first item's exposure parameter", () => {
+    const pool = [
+      { ...item2pl("t1", 3, 0), testlet: "T", exposure: 0.3 },
+      { ...item2pl("t2", 2.8, 0.1), testlet: "T" },
+      { ...item2pl("t3", 2.8, -0.1), testlet: "T" },
+      ...POOL_3PL.slice(0, 6),
+    ];
+    const random = createRandom(21);
+    const thetas = Array.from({ length: 4000 }, () => random.normal());
+    const { persons } = simulateAdaptiveTest(adaptiveTest({ pool, stopping: testLength(3) }), thetas, random);
+    let administered = 0;
+    for (const { state } of persons) {
+      // At theta 0 the testlet is the best unit, so each test selects it first: it is administered whole, or withheld whole.
+      const reached = state.items.includes("t1");
+      expect(state.items.includes("t2"), "t2").toBe(reached);
+      expect(state.items.includes("t3"), "t3").toBe(reached);
+      expect(state.withheld.includes("t1"), "withheld").toBe(!reached);
+      if (!reached) expect(state.withheld).toEqual(expect.arrayContaining(["t2", "t3"]));
+      if (reached) administered++;
+    }
+    const rate = administered / thetas.length;
+    expect(Math.abs(rate - 0.3)).toBeLessThan(4 * Math.sqrt((0.3 * 0.7) / thetas.length));
+  });
+
+  it("skips an enemy of an administered item inside the testlet and goes on with the rest", () => {
+    const state = administer(adaptiveTest({ pool: lopsided, stopping: stopped, enemies: [["t2", "t3"]] }), () => 1);
+    expect(state.items).toEqual(["t2", "t1"]);
+  });
+
+  it("skips the enemies of administered items in other testlets, so that a testlet may be smaller", () => {
+    const other = [
+      { ...item2pl("u1", 0.4, 0), testlet: "U" },
+      { ...item2pl("u2", 0.4, 0.5), testlet: "U" },
+    ];
+    const test = adaptiveTest({ pool: [...lopsided, ...other], stopping: testLength(4), enemies: [["t1", "u1"]] });
+    // T, whose mean information is higher, first; u1 is the enemy of t1, so U has u2 only.
+    expect(administer(test, () => 1).items).toEqual(["t2", "t3", "t1", "u2"]);
+  });
+
+  it("balances content areas between testlets", () => {
+    const area = (testlet: string, ids: readonly string[], contentArea: string) =>
+      ids.map((id, i) => ({ ...item2pl(id, 1 + i / 10, i / 4), testlet, contentArea }));
+    const pool = [...area("X", ["x1", "x2", "x3"], "x"), ...area("Y", ["y1", "y2", "y3"], "y")];
+    const test = adaptiveTest({ pool, stopping: testLength(4), contentTargets: { x: 1, y: 1 } });
+    const firsts = new Set<string>();
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const { items } = administer(test, () => 1, createRandom(seed));
+      expect(items).toHaveLength(6);
+      expectTestletBlocks(items, pool, false);
+      firsts.add(defined(items[0]).charAt(0));
+    }
+    expect([...firsts].sort()).toEqual(["x", "y"]);
+  });
+
+  it("rejects the testlets of a content balanced test whose items are in several areas", () => {
+    const pool = [
+      { ...item2pl("a", 1, 0), testlet: "T", contentArea: "x" },
+      { ...item2pl("b", 1, 0), testlet: "T", contentArea: "y" },
+    ];
+    expect(() => adaptiveTest({ pool, stopping: stopped, contentTargets: { x: 1, y: 1 } })).toThrow(
+      'The items of testlet "T" are in content areas "x" and "y"; with content targets they must share one area.',
+    );
+    expect(() => adaptiveTest({ pool, stopping: stopped })).not.toThrow();
+  });
+
+  it("resumes from a state stored as JSON at every step of a testlet", () => {
+    const pool = [solo, ...lopsided];
+    const test = adaptiveTest({ pool, stopping: stopped, withinTestlet: "adaptive" });
+    const random = createRandom(3);
+    let state = test.start(random);
+    const direct = administer(test, (id) => Number(id !== "t2"), createRandom(3));
+    while (state.next !== null) {
+      const stored = JSON.parse(JSON.stringify(state)) as AdaptiveTestState;
+      state = test.answer(stored, Number(stored.next !== "t2"), random);
+    }
+    expect(state).toEqual(direct);
+  });
+
+  it("continues a testlet from its first item when the test resumes from a stored state", () => {
+    const test = adaptiveTest({ pool: [solo, ...lopsided], stopping: stopped, withinTestlet: "adaptive" });
+    const estimate = { theta: 0, standardError: 1 };
+    const stored = { items: [], responses: [], withheld: [], estimate, next: "t1" };
+    const state = test.answer(stored, 1, createRandom(1));
+    expect(state).toMatchObject({ items: ["t1"], next: "t2" });
+  });
+
+  it("estimates with the testlet effects integrated out when the estimator does", () => {
+    const pool = [solo, ...lopsided];
+    const testlets = [{ items: ["t2", "t3", "t1"], sd: 0.8 }];
+    const estimator: AbilityEstimator = (items, responses) => posteriorMeanEstimate(items, responses, { testlets });
+    const state = administer(adaptiveTest({ pool, stopping: testLength(2), estimator }), () => 1);
+    expect(state.items).toEqual(["solo", "t2", "t3", "t1"]);
+    const expected = posteriorMeanEstimate(
+      state.items.map((id) => defined(pool[poolIndex(pool, id)])),
+      [1, 1, 1, 1],
+      { testlets },
+    );
+    expectClose(state.estimate.theta, expected.theta, 1e-12);
+    expectClose(state.estimate.standardError, expected.standardError, 1e-12);
+    // The testlet's effect makes the estimate less certain than treating the items as independent.
+    expect(state.estimate.standardError).toBeGreaterThan(posteriorMeanEstimate(pool, [1, 1, 1, 1]).standardError);
+  });
+
+  it("rejects testlets that are not non-empty strings and unknown orders of the items", () => {
+    const poolOf = (testlet: string): PoolItem[] => [{ ...item2pl("a", 1, 0), testlet }];
+    expect(() => adaptiveTest({ pool: poolOf(""), stopping: stopped })).toThrow(
+      'The testlet of item "a" must be a non-empty string, found "".',
+    );
+    expect(() => adaptiveTest({ pool: poolOf(JSON.parse("5")), stopping: stopped })).toThrow(
+      'The testlet of item "a" must be a non-empty string, found 5.',
+    );
+    expect(() => adaptiveTest({ pool: poolOf(JSON.parse("null")), stopping: stopped })).toThrow(DataError);
+    const shuffled: WithinTestlet = JSON.parse('"shuffled"');
+    expect(() => adaptiveTest({ pool: lopsided, stopping: stopped, withinTestlet: shuffled })).toThrow(
+      'The option withinTestlet must be "in-order" or "adaptive", found "shuffled".',
+    );
+  });
+
+  it("administers testlets in multidimensional and diagnostic tests", () => {
+    const multidimensional = [
+      { ...multidimensionalItem("m1", [0.5, 0.5], 0), testlet: "T" },
+      { ...multidimensionalItem("m2", [0.5, 0.5], 0.2), testlet: "T" },
+      { ...multidimensionalItem("m3", [0.5, 0.5], -0.2), testlet: "T" },
+      multidimensionalItem("m4", [2, 0.1], 0),
+      multidimensionalItem("m5", [0.1, 2], 0),
+    ];
+    const items = (pool: readonly MultidimensionalPoolItem[]): readonly string[] =>
+      defined(
+        administerMultidimensional(multidimensionalAdaptiveTest({ pool, stopping: testLength(5) }), () => 1).at(-1),
+      ).items;
+    const together = items(multidimensional);
+    expectTestletBlocks(together, multidimensional, true);
+    expect(together.slice().sort()).toEqual(["m1", "m2", "m3", "m4", "m5"]);
+    expect(together).not.toEqual(items(multidimensional.map(({ testlet, ...item }) => item)));
+
+    const diagnostic = [
+      { id: "d1", attributes: ["add"], probabilities: [0.2, 0.9], testlet: "S" },
+      { id: "d2", attributes: ["add"], probabilities: [0.3, 0.6], testlet: "S" },
+      { id: "d3", attributes: ["subtract"], probabilities: [0.15, 0.85] },
+      { id: "d4", attributes: ["add", "subtract"], probabilities: [0.1, 0.4, 0.4, 0.9] },
+    ];
+    const diagnosed = (pool: readonly DiagnosticPoolItem[]): readonly string[] =>
+      defined(
+        administerDiagnostic(diagnosticAdaptiveTest({ pool, attributes: SKILLS, stopping: testLength(4) }), () => 1).at(
+          -1,
+        ),
+      ).items;
+    const grouped = diagnosed(diagnostic);
+    expectTestletBlocks(grouped, diagnostic, true);
+    expect(grouped).toHaveLength(4);
+    expect(grouped).not.toEqual(diagnosed(diagnostic.map(({ testlet, ...item }) => item)));
+  });
+});
+
 describe("untilMixed", () => {
   it("uses the initial estimator until one response is above its lowest category and one below its highest", () => {
     const calls: string[] = [];
@@ -680,6 +1072,23 @@ describe("calibrateExposure", () => {
     expect(Math.min(...parameters)).toBeLessThan(0.5);
     expect(parameters.filter((k) => k === 1).length).toBeGreaterThan(20);
     expect(calibrateExposure(test, thetas(5, 1500), createRandom(5), options)).toEqual(result);
+  });
+
+  it("brings the rate of a testlet near or below the largest rate allowed, the same for each of its items", () => {
+    const pool = POOL_3PL.slice(0, 24).map((item, i) =>
+      i < 12 ? { ...item, testlet: `set${Math.floor(i / 3)}` } : item,
+    );
+    const result = calibrateExposure({ pool, stopping: testLength(8) }, thetas(9, 1500), createRandom(9), {
+      maxRate: 0.4,
+      tolerance: 0.04,
+    });
+    expect(result.converged).toBe(true);
+    const rates = new Map(result.exposureRates.map(({ id, rate }) => [id, rate]));
+    for (let set = 0; set < 4; set++) {
+      const own = result.pool.filter((item) => item.testlet === `set${set}`).map((item) => defined(rates.get(item.id)));
+      expect(new Set(own).size).toBe(1);
+      expect(own[0]).toBeLessThanOrEqual(0.44);
+    }
   });
 
   it("keeps every parameter at 1 when no rate exceeds the largest allowed", () => {
@@ -2774,6 +3183,36 @@ describe("properties", () => {
       { numRuns: 60 },
     );
   });
+  it("testlets are administered whole in one block, and the test ends only between them", () => {
+    const assignments = fc.array(fc.constantFrom<string | undefined>("a", "b", "c", undefined), {
+      minLength: POOL_3PL.length,
+      maxLength: POOL_3PL.length,
+    });
+    fc.assert(
+      fc.property(
+        assignments,
+        fc.constantFrom<WithinTestlet>("in-order", "adaptive"),
+        fc.integer({ min: 1, max: 30 }),
+        fc.integer(),
+        (assignment, withinTestlet, length, seed) => {
+          const pool = POOL_3PL.map((item, i) => {
+            const testlet = assignment[i];
+            return testlet === undefined ? item : { ...item, testlet };
+          });
+          const random = createRandom(seed);
+          const test = adaptiveTest({ pool, stopping: testLength(length), withinTestlet });
+          const state = administer(test, () => (random.uniform() < 0.5 ? 1 : 0), random);
+          expectTestletBlocks(state.items, pool, withinTestlet === "in-order");
+          // The length is reached, and passed by less than the largest testlet.
+          const largest = Math.max(1, ...["a", "b", "c"].map((id) => assignment.filter((t) => t === id).length));
+          expect(state.items.length).toBeGreaterThanOrEqual(length);
+          expect(state.items.length).toBeLessThan(length + largest);
+        },
+      ),
+      { numRuns: 30 },
+    );
+  });
+
   describe("diagnostic tests", () => {
     const attributeNames = ["a", "b", "c"];
     /** A pool over the first `count` attributes: items of one to three of them, with any success probabilities. */
