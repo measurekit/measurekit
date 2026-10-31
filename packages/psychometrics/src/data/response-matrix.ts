@@ -49,6 +49,25 @@ export function responseMatrix(
   rows: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions = {},
 ): ResponseMatrix {
+  return buildResponseMatrix(rows, options, copyRows);
+}
+
+/**
+ * Builds a response matrix that holds the rows given, not copies of them: for a function that made the rows and gives
+ * them up. Checks what {@link responseMatrix} checks.
+ */
+export function responseMatrixOfRows(
+  rows: readonly (readonly (number | null)[])[],
+  options: ResponseMatrixOptions = {},
+): ResponseMatrix {
+  return buildResponseMatrix(rows, options, (owned) => owned);
+}
+
+function buildResponseMatrix(
+  rows: readonly (readonly (number | null)[])[],
+  options: ResponseMatrixOptions,
+  own: (rows: readonly (readonly (number | null)[])[]) => readonly (readonly (number | null)[])[],
+): ResponseMatrix {
   checkArray(rows, "The rows of a response matrix must be an array");
   checkOptions(options);
   const { personIds = defaultIds("person", rows.length), itemIds = defaultIds("item", rows[0]?.length ?? 0) } = options;
@@ -61,7 +80,7 @@ export function responseMatrix(
   checkResponseMatrix(matrix);
   return {
     ...matrix,
-    responses: copyRows(rows),
+    responses: own(rows),
     ...(matrix.times !== undefined && { times: copyRows(matrix.times) }),
   };
 }
@@ -113,8 +132,9 @@ export function checkResponseMatrix(matrix: ResponseMatrix): void {
         `Person "${personIds[person]}" has ${row.length} responses, but there are ${itemIds.length} item ids.`,
       );
     }
-    for (const [item, response] of row.entries()) {
-      if (response !== null && !(Number.isSafeInteger(response) && response >= 0)) {
+    for (let item = 0; item < row.length; item++) {
+      const response = row[item];
+      if (response !== null && !(typeof response === "number" && Number.isSafeInteger(response) && response >= 0)) {
         throw new DataError(
           `The response of person "${personIds[person]}" to item "${itemIds[item]}" must be a non-negative integer or null, found ${describe(response)}.`,
         );
@@ -148,7 +168,7 @@ function checkTimes({ personIds, itemIds, responses, times }: ResponseMatrix): v
 }
 
 function copyRows<T>(rows: readonly (readonly T[])[]): T[][] {
-  return rows.map((row) => [...row]);
+  return rows.map((row) => row.slice());
 }
 
 function defaultIds(prefix: string, count: number): string[] {

@@ -10,8 +10,9 @@ export function indexIds(kind: string, ids: readonly string[]): Map<string, numb
   const indices = new Map<string, number>();
   ids.forEach((id, index) => {
     if (typeof id !== "string") throw new DataError(`Every ${kind} id must be a string, found ${describe(id)}.`);
-    if (indices.has(id)) throw new DataError(`The ${kind} id "${id}" appears more than once.`);
+    const known = indices.size;
     indices.set(id, index);
+    if (indices.size === known) throw new DataError(`The ${kind} id "${id}" appears more than once.`);
   });
   return indices;
 }

@@ -1,5 +1,5 @@
 import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
-import { type ResponseMatrix, type ResponseMatrixOptions, responseMatrix } from "./response-matrix.js";
+import { type ResponseMatrix, type ResponseMatrixOptions, responseMatrixOfRows } from "./response-matrix.js";
 
 /** Multiple-choice responses scored against a key, with the chosen options kept for distractor analysis. */
 export interface ScoredResponses extends ResponseMatrix {
@@ -59,37 +59,47 @@ export function scoreResponses(
       throw new DataError(`Row ${person + 1} has ${row.length} choices, but the key has ${key.length} items.`);
     }
   });
-  const { optionLabels = foundLabels(choices, key) } = options;
-  checkArray(optionLabels, "The option labels must be an array");
-  const labels = new Set(optionLabels);
-  if (labels.size !== optionLabels.length) throw new DataError("Option labels must be unique.");
-  for (const [item, label] of key.entries()) checkLabel(label, labels, `the key of item ${item + 1}`);
-  const responses = choices.map((row, person) =>
-    row.map((choice, item) => {
-      if (choice === null) return null;
-      checkLabel(choice, labels, `row ${person + 1}, item ${item + 1}`);
-      return choice === key[item] ? 1 : 0;
-    }),
-  );
+  const { optionLabels } = options;
+  if (optionLabels !== undefined) checkArray(optionLabels, "The option labels must be an array");
+  const labels = new Set<string>();
+  for (const label of optionLabels ?? []) if (isOptionLabel(label)) labels.add(label);
+  if (optionLabels !== undefined && new Set(optionLabels).size !== optionLabels.length) {
+    throw new DataError("Option labels must be unique.");
+  }
+  // Without option labels, the labels of the key and the choices are the option labels.
+  const accepts = (label: unknown): boolean => {
+    if (typeof label === "string" && labels.has(label)) return true;
+    if (optionLabels !== undefined || !isOptionLabel(label)) return false;
+    labels.add(label);
+    return true;
+  };
+  for (const [item, label] of key.entries()) {
+    if (!accepts(label)) throw unexpectedLabel(label, `the key of item ${item + 1}`);
+  }
+  const responses = choices.map((row, person) => {
+    const scored: (number | null)[] = [];
+    for (let item = 0; item < row.length; item++) {
+      const choice = row[item];
+      if (choice === null) scored.push(null);
+      // The labels of the key are accepted, so a choice equal to the key needs no look-up.
+      else if (choice === key[item]) scored.push(1);
+      else if (accepts(choice)) scored.push(0);
+      else throw unexpectedLabel(choice, `row ${person + 1}, item ${item + 1}`);
+    }
+    return scored;
+  });
   return {
-    ...responseMatrix(responses, options),
-    choices: choices.map((row) => [...row]),
+    ...responseMatrixOfRows(responses, options),
+    choices: choices.map((row) => row.slice()),
     key: [...key],
-    optionLabels: [...optionLabels],
+    optionLabels: optionLabels === undefined ? [...labels].sort() : [...optionLabels],
   };
 }
 
-function checkLabel(label: unknown, labels: ReadonlySet<unknown>, place: string): void {
-  if (!(typeof label === "string" && label !== "" && labels.has(label))) {
-    throw new DataError(`Expected an option label in ${place}, found ${describe(label)}.`);
-  }
+function isOptionLabel(label: unknown): label is string {
+  return typeof label === "string" && label !== "";
 }
 
-/**
- * Returns the labels of the key and the choices, sorted. Labels that are not strings are left for the checks to name.
- */
-function foundLabels(choices: readonly (readonly (string | null)[])[], key: readonly string[]): string[] {
-  const labels = new Set<string>();
-  for (const label of [...key, ...choices.flat()]) if (typeof label === "string") labels.add(label);
-  return [...labels].sort();
+function unexpectedLabel(label: unknown, place: string): DataError {
+  return new DataError(`Expected an option label in ${place}, found ${describe(label)}.`);
 }
