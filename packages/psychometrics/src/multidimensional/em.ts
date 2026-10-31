@@ -1,6 +1,6 @@
 import { checkIntegerFrom, DataError, largestChange } from "@measurekit/core";
 import type { CompressedResponses } from "../irt/responses.js";
-import { type EmMap, squarem } from "./acceleration.js";
+import { type Iteration, squarem } from "../irt/squarem.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { setUp } from "./calibration-setup.js";
 import { latentDistribution } from "./correlation.js";
@@ -25,43 +25,25 @@ function checkEmDimensions(dimensions: number): void {
   }
 }
 
-/** Runs EM, accelerated, until no parameter changes by more than `tolerance` in an iteration or `maxIterations`. */
+/** Runs EM, with the extrapolation SQUAREM, until no parameter changes by more than `tolerance` or `maxIterations`. */
 function expectationMaximization<TParameters>(
   fit: Fit<TParameters>,
   tolerance: number,
   maxIterations: number,
 ): { readonly converged: boolean; readonly iterations: number } {
-  return squarem(emMap(fit), { tolerance, maxIterations });
+  return squarem(emIteration(fit), { tolerance, maxIterations });
 }
 
 /**
- * Returns EM as a map on the unbounded coordinates of the items' estimated entries, then the parameters of the
- * correlations, which any values keep a correlation matrix.
+ * Returns EM as an iteration on the unbounded coordinates of the items' estimated entries, then the parameters of the
+ * correlations, which any values keep a correlation matrix when it is positive definite.
  */
-function emMap<TParameters>(fit: Fit<TParameters>): EmMap {
+function emIteration<TParameters>(fit: Fit<TParameters>): Iteration {
   const { items, latent, correlated, maximization, eStep } = fit;
   const itemSize = items.reduce((sum, item) => sum + item.free.length, 0);
   const current = new Float64Array(parameterCount(fit));
   const previous = new Float64Array(current.length);
   return {
-    size: itemSize + (correlated ? latent.pairs.length : 0),
-    read(out) {
-      let slot = 0;
-      for (const item of items) {
-        out.set(maximization.coordinates(item), slot);
-        slot += item.free.length;
-      }
-      if (correlated) out.set(latent.parameters(), itemSize);
-    },
-    write(parameters) {
-      if (correlated && !latent.assign(parameters.subarray(itemSize))) return false;
-      let slot = 0;
-      for (const item of items) {
-        maximization.assign(item, parameters.subarray(slot, slot + item.free.length));
-        slot += item.free.length;
-      }
-      return true;
-    },
     step() {
       const logLikelihood = eStep.run();
       estimatesOf(fit, previous);
@@ -69,6 +51,25 @@ function emMap<TParameters>(fit: Fit<TParameters>): EmMap {
       if (correlated) latent.maximize(eStep.nodeCounts);
       estimatesOf(fit, current);
       return { logLikelihood, change: largestChange(previous, current) };
+    },
+    get() {
+      const state = new Float64Array(itemSize + (correlated ? latent.pairs.length : 0));
+      let slot = 0;
+      for (const item of items) {
+        state.set(maximization.coordinates(item), slot);
+        slot += item.free.length;
+      }
+      if (correlated) state.set(latent.parameters(), itemSize);
+      return state;
+    },
+    set(state) {
+      // Correlations that are not positive definite stay as they were: the log-likelihood at the jump decides.
+      if (correlated) latent.assign(state.subarray(itemSize));
+      let slot = 0;
+      for (const item of items) {
+        maximization.assign(item, state.subarray(slot, slot + item.free.length));
+        slot += item.free.length;
+      }
     },
   };
 }
