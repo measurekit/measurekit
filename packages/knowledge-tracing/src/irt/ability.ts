@@ -14,13 +14,14 @@ export interface Ability {
 }
 
 /** Returns Σ w_q f(q) / Σ w_q. */
-export function average(weights: readonly number[], f: (q: number) => number): number {
+export function average(weights: ArrayLike<number>, f: (q: number) => number): number {
   let total = 0;
   let sum = 0;
-  weights.forEach((weight, q) => {
+  for (let q = 0; q < weights.length; q++) {
+    const weight = weights[q] ?? 0;
     total += weight;
     sum += weight * f(q);
-  });
+  }
   return sum / total;
 }
 

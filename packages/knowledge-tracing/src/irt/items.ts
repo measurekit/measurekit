@@ -66,16 +66,29 @@ export function categoryTerms(item: IrtItem, k: number, theta: number, out: Floa
 }
 
 /**
+ * Returns the log-probability of category k at θ: the first of the terms {@link categoryTerms} writes, without the
+ * derivatives that a prediction does not use.
+ */
+function categoryLogProbability(item: IrtItem, k: number, theta: number, terms: Float64Array): number {
+  if ("model" in item) {
+    categoryTerms(item, k, theta, terms);
+    return terms[0] ?? 0;
+  }
+  const { a, b, c = 0, d = 1 } = item;
+  const z = a * (theta - b);
+  const floor = k === 1 ? c : 1 - d;
+  if (floor === 0) return Math.log(d - c) + logLogistic(k === 1 ? z : -z);
+  return Math.log(floor + (d - c) * (k === 1 ? logistic(z) : logistic(-z)));
+}
+
+/**
  * Returns the expected outcome at θ: the expected category over K - 1, P(correct) for a dichotomous item. `terms` is
- * the scratch array of {@link categoryTerms}, which callers evaluating many θ share.
+ * scratch space for a polytomous item's terms, which callers evaluating many θ share.
  */
 export function expectedOutcome(item: IrtItem, theta: number, terms: Float64Array): number {
   const count = categoryCount(item);
   let sum = 0;
-  for (let k = 1; k < count; k++) {
-    categoryTerms(item, k, theta, terms);
-    sum += k * Math.exp(terms[0] ?? 0);
-  }
+  for (let k = 1; k < count; k++) sum += k * Math.exp(categoryLogProbability(item, k, theta, terms));
   return sum / (count - 1);
 }
 

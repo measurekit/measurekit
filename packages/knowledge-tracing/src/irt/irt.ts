@@ -127,21 +127,27 @@ export function irt(options: IrtOptions): IrtModel {
     slope: grid.map((theta) => (prior.mean - theta) / (prior.sd * prior.sd)),
     curvature: z.map(() => -1 / (prior.sd * prior.sd)),
   });
+  const weightsOf = new Float64Array(points);
+  const terms = new Float64Array(3);
+  /** Writes the unnormalized posterior of a state, exp of its log-density, into the scratch weights. */
+  const weightsOfState = (state: IrtState): Float64Array => {
+    for (let q = 0; q < points; q++) weightsOf[q] = Math.exp(state.logDensity[q] ?? 0);
+    return weightsOf;
+  };
   /**
    * Returns the state after an outcome in category k, writing P(k | θ) at each grid point into `likelihood` if given.
    */
   const advance = (state: IrtState, item: IrtItem, k: number, likelihood?: Float64Array): IrtState => {
-    const terms = new Float64Array(3);
-    const logDensity = [...state.logDensity];
-    const slope = [...state.slope];
-    const curvature = [...state.curvature];
-    grid.forEach((theta, q) => {
-      categoryTerms(item, k, theta, terms);
+    const logDensity: number[] = [];
+    const slope: number[] = [];
+    const curvature: number[] = [];
+    for (let q = 0; q < points; q++) {
+      categoryTerms(item, k, grid[q] ?? 0, terms);
       if (likelihood !== undefined) likelihood[q] = Math.exp(terms[0] ?? 0);
-      logDensity[q] = (logDensity[q] ?? 0) + (terms[0] ?? 0);
-      slope[q] = (slope[q] ?? 0) + (terms[1] ?? 0);
-      curvature[q] = (curvature[q] ?? 0) + (terms[2] ?? 0);
-    });
+      logDensity.push((state.logDensity[q] ?? 0) + (terms[0] ?? 0));
+      slope.push((state.slope[q] ?? 0) + (terms[1] ?? 0));
+      curvature.push((state.curvature[q] ?? 0) + (terms[2] ?? 0));
+    }
     return { learner: state.learner, logDensity: shift(logDensity), slope, curvature };
   };
 
@@ -155,8 +161,8 @@ export function irt(options: IrtOptions): IrtModel {
       const predictions = log.map((event) => {
         const state = states.get(event.learner) ?? initial(event.learner);
         const item = itemOf(event.item);
-        const weights = state.logDensity.map(Math.exp);
-        const prediction = expectation(weights, item, grid);
+        const weights = weightsOfState(state);
+        const prediction = expectation(weights, item, grid, terms);
         states.set(event.learner, advance(state, item, categoryOf(item, event), likelihood));
         logLikelihood += Math.log(average(weights, (q) => likelihood[q] ?? 0));
         return prediction;
@@ -188,7 +194,7 @@ export function irt(options: IrtOptions): IrtModel {
       checkAttempt(attempt, "The attempt");
       checkLearner(state.learner, attempt);
       const item = itemOf(attempt.item);
-      return expectation(state.logDensity.map(Math.exp), item, grid);
+      return expectation(weightsOfState(state), item, grid, terms);
     },
     ability(state, abilityOptions = {}) {
       checkOptions(abilityOptions);
@@ -234,12 +240,13 @@ function categoryOf(item: IrtItem, event: Event): number {
 }
 
 /** Returns the mean over the grid, weighted by the posterior weights, of the item's expected outcome. */
-function expectation(weights: readonly number[], item: IrtItem, grid: readonly number[]): number {
-  const terms = new Float64Array(3);
+function expectation(weights: ArrayLike<number>, item: IrtItem, grid: readonly number[], terms: Float64Array): number {
   return average(weights, (q) => expectedOutcome(item, grid[q] ?? 0, terms));
 }
 
+/** Returns the values less their largest, in place. */
 function shift(values: number[]): number[] {
   const top = values[indexOfMax(values)] ?? 0;
-  return values.map((value) => value - top);
+  for (let q = 0; q < values.length; q++) values[q] = (values[q] ?? 0) - top;
+  return values;
 }

@@ -23,7 +23,7 @@ export function checkState(state: IrtState, points: number): void {
   const learner = checkLearnerState(state, "IRT");
   for (const name of ["logDensity", "slope", "curvature"] as const) {
     const values = state[name];
-    if (!(Array.isArray(values) && values.length === points && values.every(Number.isFinite))) {
+    if (!(Array.isArray(values) && values.length === points && allFinite(values))) {
       throw new DataError(
         `The IRT state of learner "${learner}" needs ${name}, an array of ${points} finite numbers, one per grid point.`,
       );
@@ -34,4 +34,10 @@ export function checkState(state: IrtState, points: number): void {
       `The IRT state of learner "${learner}" needs logDensity less its maximum, so that its largest value is 0.`,
     );
   }
+}
+
+/** Returns whether every entry is a finite number; a loop is several times as fast as `every` for a state's few values. */
+function allFinite(values: readonly unknown[]): boolean {
+  for (let i = 0; i < values.length; i++) if (!Number.isFinite(values[i])) return false;
+  return true;
 }
