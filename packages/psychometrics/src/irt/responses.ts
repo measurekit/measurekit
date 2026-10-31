@@ -95,12 +95,17 @@ export function categoryCounts({ itemIds, items, codes }: CompressedResponses): 
 }
 
 /**
- * Checks that an item's responses can be estimated with its model and returns its number of categories.
+ * Checks that an item's responses can be estimated with its model, of either kind, and returns its number of
+ * categories.
  *
  * @throws `DataError` when the item has a response above the model's categories, responses in fewer than two
  * categories, or no response in a category below its highest.
  */
-export function checkCategories(id: string, model: IrtModel<unknown>, counts: readonly number[]): number {
+export function checkCategories(
+  id: string,
+  model: Pick<IrtModel, "name" | "maxCategories">,
+  counts: readonly number[],
+): number {
   if (counts.length > model.maxCategories) {
     throw new DataError(
       `Item "${id}" has a response of ${counts.length - 1}, but the ${model.name} model allows responses from 0 to ${model.maxCategories - 1}.`,

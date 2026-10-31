@@ -40,9 +40,7 @@ export function simulateResponses(
   random: Random,
   options: ResponseSimulationOptions = {},
 ): ResponseMatrix {
-  checkOptions(options);
-  const { missingProbability = 0 } = options;
-  checkUnitInterval(missingProbability, "The option missingProbability");
+  const missingProbability = missingProbabilityOf(options);
   checkItemList(items, "A simulation");
   checkThetas(thetas);
   checkRandom(random);
@@ -50,6 +48,27 @@ export function simulateResponses(
   const rows: (number | null)[][] = thetas.map((theta) =>
     items.map((item) => simulateResponse(item, theta, random, probabilities)),
   );
+  return matrixWithMissing(rows, missingProbability, random);
+}
+
+/**
+ * Checks the options of a simulation of responses and returns its missing probability.
+ *
+ * @throws `DataError` when `missingProbability` is outside [0, 1].
+ */
+export function missingProbabilityOf(options: ResponseSimulationOptions): number {
+  checkOptions(options);
+  const { missingProbability = 0 } = options;
+  checkUnitInterval(missingProbability, "The option missingProbability");
+  return missingProbability;
+}
+
+/** Makes each response missing with `missingProbability`, in row order, and returns the matrix of the rows. */
+export function matrixWithMissing(
+  rows: (number | null)[][],
+  missingProbability: number,
+  random: Random,
+): ResponseMatrix {
   if (missingProbability > 0) {
     for (const row of rows) {
       for (let j = 0; j < row.length; j++) if (random.uniform() < missingProbability) row[j] = null;
@@ -65,7 +84,15 @@ export function simulateResponses(
  */
 export function simulateResponse(item: IrtItem, theta: number, random: Random, probabilities: Float64Array): number {
   item.model.probabilities(item.parameters, theta, probabilities);
-  const last = item.model.categoryCount(item.parameters) - 1;
+  return drawCategory(probabilities, item.model.categoryCount(item.parameters), random);
+}
+
+/**
+ * Draws a category from its `probabilities`, of which the first `categoryCount` are used, by inverting the
+ * distribution function at one uniform draw.
+ */
+export function drawCategory(probabilities: Float64Array, categoryCount: number, random: Random): number {
+  const last = categoryCount - 1;
   let remaining = random.uniform();
   let category = 0;
   while (category < last && remaining >= (probabilities[category] ?? 0)) {

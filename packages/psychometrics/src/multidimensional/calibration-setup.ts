@@ -1,10 +1,10 @@
 import { checkRecord, DataError } from "@measurekit/core";
 import { checkPrior, type ParameterPrior } from "../irt/prior.js";
-import { type CompressedResponses, categoryCounts } from "../irt/responses.js";
+import { type CompressedResponses, categoryCounts, checkCategories } from "../irt/responses.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import type { Design } from "./design.js";
 import type { ExpectationItem } from "./expectation.js";
-import { checkItemCategories, checkMultidimensionalModel } from "./items.js";
+import { checkMultidimensionalModel } from "./items.js";
 import type { MultidimensionalModel } from "./model.js";
 import { startingSlopes } from "./starting-slopes.js";
 
@@ -69,7 +69,7 @@ export function setUp<TParameters>(
   const items = models.map((model, column): ItemState<TParameters> => {
     const id = itemIds[column] ?? "";
     const itemCounts = counts[column] ?? [];
-    const categoryCount = checkItemCategories(id, model, itemCounts);
+    const categoryCount = checkCategories(id, model, itemCounts);
     const answered = itemCounts.reduce((sum, count) => sum + count, 0);
     const proportions = Float64Array.from(itemCounts, (count) => count / answered);
     const vector = model.toVector(model.startingValues(proportions, slopes[column] ?? new Float64Array(dimensions)));

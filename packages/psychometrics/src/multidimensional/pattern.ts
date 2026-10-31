@@ -1,3 +1,4 @@
+import { answeredItems, largestCategoryCount } from "../irt/items.js";
 import { MIN_PROBABILITY } from "../irt/probability.js";
 import type { MultidimensionalItem } from "./model.js";
 
@@ -20,11 +21,8 @@ export function answeredPattern(
   responses: readonly (number | null)[],
   dimensions: number,
 ): AnsweredPattern {
-  const answers = items.flatMap((item, index) => {
-    const response = responses[index];
-    return response === null || response === undefined ? [] : [{ item, response }];
-  });
-  const categories = answers.reduce((most, { item }) => Math.max(most, item.model.categoryCount(item.parameters)), 0);
+  const answers = answeredItems(items, responses);
+  const categories = largestCategoryCount(items);
   const probabilities = new Float64Array(categories);
   const gradients = new Float64Array(categories * dimensions);
   const matrix = new Float64Array(dimensions * dimensions);

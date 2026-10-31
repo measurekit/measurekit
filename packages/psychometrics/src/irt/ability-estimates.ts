@@ -1,4 +1,3 @@
-import { DataError } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
@@ -6,7 +5,7 @@ import { type AbilityEstimator, posteriorMeanEstimate } from "./ability.js";
 import { indexItems } from "./items.js";
 import type { PersonEstimate } from "./joint-maximum-likelihood.js";
 import type { TestItem } from "./model.js";
-import { compressResponses } from "./responses.js";
+import { estimatePersons } from "./person-estimates.js";
 
 /**
  * Returns the estimate of theta of every person, in the order of the data's person ids, from the person's answered
@@ -24,19 +23,9 @@ export function abilityEstimates(
   estimator: AbilityEstimator = posteriorMeanEstimate,
 ): PersonEstimate[] {
   checkFunction(estimator, "The estimator must be a function of items and responses, such as posteriorMeanEstimate");
-  const responses = compressResponses(data);
-  const indices = indexItems(items);
-  const columns = responses.itemIds.map((id) => {
-    const item = items[indices.get(id) ?? -1];
-    if (item === undefined) throw new DataError(`The data have item "${id}", which is not among the items.`);
-    return item;
-  });
-  return responses.personIds.map((id, person) => {
-    const start = responses.offsets[person] ?? 0;
-    const end = responses.offsets[person + 1] ?? 0;
-    if (end === start) return { id, theta: null, standardError: null };
-    const answered = Array.from(responses.items.subarray(start, end)).flatMap((column) => columns[column] ?? []);
-    const { theta, standardError } = estimator(answered, Array.from(responses.codes.subarray(start, end)));
-    return { id, theta, standardError };
-  });
+  return estimatePersons(data, items, indexItems, estimator).map(({ id, estimate }) => ({
+    id,
+    theta: estimate?.theta ?? null,
+    standardError: estimate?.standardError ?? null,
+  }));
 }

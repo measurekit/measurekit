@@ -10,7 +10,7 @@ import {
 } from "@measurekit/core";
 import type { Quadrature } from "../math/quadrature.js";
 import { findRoot } from "../math/root.js";
-import { checkPattern, indexItems, largestCategoryCount } from "./items.js";
+import { answeredItems, checkPattern, indexItems, largestCategoryCount } from "./items.js";
 import type { IrtItem } from "./model.js";
 import { MIN_PROBABILITY } from "./probability.js";
 import { type QuadratureOptions, quadratureRule } from "./quadrature.js";
@@ -352,10 +352,7 @@ interface AnsweredPattern {
  */
 function answered(items: readonly IrtItem[], responses: readonly (number | null)[], method?: string): AnsweredPattern {
   checkPattern(items, responses);
-  const answers = items.flatMap((item, index) => {
-    const response = responses[index];
-    return response === null || response === undefined ? [] : [{ item, response }];
-  });
+  const answers = answeredItems(items, responses);
   if (method !== undefined && answers.length === 0) {
     throw new DataError(`${method} estimation needs at least one response.`);
   }

@@ -1,16 +1,9 @@
-import {
-  checkArray,
-  checkFinite,
-  checkOptions,
-  checkRandom,
-  checkUnitInterval,
-  DataError,
-  type Random,
-} from "@measurekit/core";
-import { type ResponseMatrix, responseMatrix } from "../data/response-matrix.js";
+import { checkArray, checkFinite, checkRandom, DataError, type Random } from "@measurekit/core";
+import type { ResponseMatrix } from "../data/response-matrix.js";
+import { largestCategoryCount } from "../irt/items.js";
 import { checkMultidimensionalItems } from "../multidimensional/items.js";
 import type { MultidimensionalItem } from "../multidimensional/model.js";
-import type { ResponseSimulationOptions } from "./responses.js";
+import { drawCategory, matrixWithMissing, missingProbabilityOf, type ResponseSimulationOptions } from "./responses.js";
 
 /**
  * Simulates the responses of persons with known vectors of thetas to multidimensional items of any models.
@@ -32,26 +25,17 @@ export function simulateMultidimensionalResponses(
   random: Random,
   options: ResponseSimulationOptions = {},
 ): ResponseMatrix {
-  checkOptions(options);
-  const { missingProbability = 0 } = options;
-  checkUnitInterval(missingProbability, "The option missingProbability");
+  const missingProbability = missingProbabilityOf(options);
   const dimensions = checkMultidimensionalItems(items, "A simulation");
   checkThetas(thetas, dimensions);
   checkRandom(random);
   const theta = new Float64Array(dimensions);
-  const probabilities = new Float64Array(
-    items.reduce((most, { model, parameters }) => Math.max(most, model.categoryCount(parameters)), 0),
-  );
+  const probabilities = new Float64Array(largestCategoryCount(items));
   const rows: (number | null)[][] = thetas.map((person) => {
     theta.set(person);
     return items.map((item) => simulateResponse(item, theta, random, probabilities));
   });
-  if (missingProbability > 0) {
-    for (const row of rows) {
-      for (let j = 0; j < row.length; j++) if (random.uniform() < missingProbability) row[j] = null;
-    }
-  }
-  return responseMatrix(rows);
+  return matrixWithMissing(rows, missingProbability, random);
 }
 
 /**
@@ -65,14 +49,7 @@ function simulateResponse(
   probabilities: Float64Array,
 ): number {
   item.model.probabilities(item.parameters, theta, probabilities);
-  const last = item.model.categoryCount(item.parameters) - 1;
-  let remaining = random.uniform();
-  let category = 0;
-  while (category < last && remaining >= (probabilities[category] ?? 0)) {
-    remaining -= probabilities[category] ?? 0;
-    category++;
-  }
-  return category;
+  return drawCategory(probabilities, item.model.categoryCount(item.parameters), random);
 }
 
 /**

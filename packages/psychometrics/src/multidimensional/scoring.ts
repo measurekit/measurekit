@@ -2,7 +2,7 @@ import { checkOptions, checkPositiveInteger, DataError, describe, normalizeLogs 
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
-import { compressResponses } from "../irt/responses.js";
+import { estimatePersons } from "../irt/person-estimates.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
 import { checkMultidimensionalPattern, indexMultidimensionalItems } from "./items.js";
@@ -202,20 +202,7 @@ export function multidimensionalEstimates(
     estimator,
     "The estimator must be a function of items and responses, such as multidimensionalPosteriorModeEstimate",
   );
-  const responses = compressResponses(data);
-  const indices = indexMultidimensionalItems(items);
-  const columns = responses.itemIds.map((id) => {
-    const item = items[indices.get(id) ?? -1];
-    if (item === undefined) throw new DataError(`The data have item "${id}", which is not among the items.`);
-    return item;
-  });
-  return responses.personIds.map((id, person) => {
-    const start = responses.offsets[person] ?? 0;
-    const end = responses.offsets[person + 1] ?? 0;
-    if (end === start) return { id, estimate: null };
-    const answered = Array.from(responses.items.subarray(start, end)).flatMap((column) => columns[column] ?? []);
-    return { id, estimate: estimator(answered, Array.from(responses.codes.subarray(start, end))) };
-  });
+  return estimatePersons(data, items, indexMultidimensionalItems, estimator);
 }
 
 function standardGrid(dimensions: number, points: number): Grid {
