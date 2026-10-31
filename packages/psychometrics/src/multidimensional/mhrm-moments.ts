@@ -1,8 +1,8 @@
 import { unboundedDerivative } from "../irt/bounds.js";
 import { MIN_PROBABILITY } from "../irt/probability.js";
+import { symmetrized } from "../math/matrix.js";
 import { type ItemState, UNBOUNDED } from "./calibration-setup.js";
 import { assignCoordinates, itemCoordinates } from "./m-step.js";
-import { symmetrized } from "./matrix.js";
 import type { ItemResponses } from "./mhrm-chain.js";
 
 /** The relative step of the central differences of the complete-data score, about the cube root of epsilon. */

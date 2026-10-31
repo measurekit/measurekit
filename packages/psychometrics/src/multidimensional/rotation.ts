@@ -9,10 +9,10 @@ import {
   DataError,
 } from "@measurekit/core";
 import { invert } from "../math/linear-algebra.js";
+import { multiply, transpose } from "../math/matrix.js";
 import type { MultidimensionalCalibration } from "./calibration.js";
 import { gradientProjection, type RotationCriterion } from "./gradient-projection.js";
 import { checkMultidimensionalItem } from "./items.js";
-import { multiply, transpose } from "./matrix.js";
 import type { MultidimensionalTestItem } from "./model.js";
 
 /** The rotations: `"varimax"` is orthogonal, `"oblimin"` oblique. */

@@ -1,12 +1,12 @@
 import { unboundedDerivative } from "../irt/bounds.js";
 import type { CompressedResponses } from "../irt/responses.js";
 import { invert, invertPositiveDefinite } from "../math/linear-algebra.js";
+import { symmetrized } from "../math/matrix.js";
 import { type ItemState, UNBOUNDED } from "./calibration-setup.js";
 import type { Latent } from "./correlation.js";
 import type { ExpectationStep } from "./expectation.js";
 import type { Grid } from "./grid.js";
 import type { ItemMaximization } from "./m-step.js";
-import { symmetrized } from "./matrix.js";
 import { parameterCount, posteriorScoreMoments } from "./posterior-scores.js";
 
 export { parameterCount };

@@ -1,7 +1,7 @@
 import { cholesky } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
-import { identity, pairsOf } from "./correlation.js";
-import { multiply } from "./matrix.js";
+import { identity, multiply } from "../math/matrix.js";
+import { pairsOf } from "./correlation.js";
 
 /** The correlation matrix of the dimensions of an MH-RM calibration, with its inverse and log determinant. */
 export interface Correlations {

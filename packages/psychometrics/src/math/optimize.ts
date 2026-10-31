@@ -1,5 +1,6 @@
 import { backtrack, dot, maxAbs } from "@measurekit/core";
 import { invert } from "./linear-algebra.js";
+import { multiplyVector } from "./matrix.js";
 
 /** A function to minimize: it returns its value at `x` and writes its gradient into `gradient`. */
 export type GradientFunction = (x: Float64Array, gradient: Float64Array) => number;
@@ -71,7 +72,7 @@ export function newton(
     (gradient, direction) => {
       const inverse = invert(hessian, size);
       if (inverse !== null) {
-        multiply(inverse, gradient, direction);
+        multiplyVector(inverse, gradient, direction);
         negate(direction);
       }
       if (inverse === null || dot(gradient, direction) >= 0) steepest(gradient, direction);
@@ -112,7 +113,7 @@ export function bfgs(
     start,
     options,
     (gradient, direction) => {
-      multiply(inverseHessian, gradient, direction);
+      multiplyVector(inverseHessian, gradient, direction);
       negate(direction);
       if (dot(gradient, direction) >= 0) {
         reset();
@@ -229,7 +230,7 @@ function updateInverseHessian(
   product: Float64Array,
 ): void {
   const size = step.length;
-  multiply(inverseHessian, gradientChange, product);
+  multiplyVector(inverseHessian, gradientChange, product);
   const rho = 1 / curvature;
   const factor = rho + rho * rho * dot(gradientChange, product);
   for (let i = 0; i < size; i++) {
@@ -249,13 +250,4 @@ function negate(values: Float64Array): void {
 
 function steepest(gradient: Float64Array, direction: Float64Array): void {
   for (let i = 0; i < gradient.length; i++) direction[i] = -(gradient[i] ?? 0);
-}
-
-function multiply(matrix: Float64Array, vector: Float64Array, out: Float64Array): void {
-  const size = vector.length;
-  for (let i = 0; i < size; i++) {
-    let sum = 0;
-    for (let j = 0; j < size; j++) sum += (matrix[i * size + j] ?? 0) * (vector[j] ?? 0);
-    out[i] = sum;
-  }
 }

@@ -1,6 +1,6 @@
 import { symmetricEigen } from "../math/eigen.js";
 import { invert } from "../math/linear-algebra.js";
-import { multiply, transpose } from "./matrix.js";
+import { identity, multiply, transpose } from "../math/matrix.js";
 
 /** The criterion of the varimax rotation, which is orthogonal, or of the oblimin rotation, which is oblique. */
 export type RotationCriterion = { readonly kind: "varimax" } | { readonly kind: "oblimin"; readonly gamma: number };
@@ -245,12 +245,6 @@ function subtractColumnShares(values: Float64Array, rows: number, columns: numbe
     for (let i = 0; i < rows; i++) sum += values[i * columns + j] ?? 0;
     for (let i = 0; i < rows; i++) values[i * columns + j] = (values[i * columns + j] ?? 0) - share * sum;
   }
-}
-
-function identity(size: number): Float64Array {
-  const matrix = new Float64Array(size * size);
-  for (let i = 0; i < size; i++) matrix[i * size + i] = 1;
-  return matrix;
 }
 
 /** Returns the index of entry `k` of a `size` by `size` matrix in its transpose. */

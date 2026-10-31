@@ -1,4 +1,4 @@
-import { symmetrized } from "./matrix.js";
+import { symmetrized } from "../math/matrix.js";
 import { type PersonResponses, responsesByPerson } from "./mhrm-chain.js";
 import { latentObservedInformation, personLatentScores, secondMoments } from "./mhrm-latent.js";
 import { observedItemInformation, priorMoments, responseScores } from "./mhrm-moments.js";

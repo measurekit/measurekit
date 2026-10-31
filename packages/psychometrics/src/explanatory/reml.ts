@@ -1,5 +1,6 @@
 import { backtrack, cholesky, DataError } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { multiply, multiplyVector, traceOfProduct } from "../math/matrix.js";
 import { designCrossProducts } from "./cross-products.js";
 
 /** The estimates of a regression with a random residual and known sampling variances. */
@@ -123,7 +124,8 @@ function evaluation(
   const { normal, second, third, right } = weightedMoments(design, items, effects, y, weights);
   const covariance = invertPositiveDefinite(normal, effects);
   if (covariance === null) throw new DataError(UNDETERMINED);
-  const coefficients = multiply(covariance, right, effects);
+  const coefficients = new Float64Array(effects);
+  multiplyVector(covariance, right, coefficients);
   const { residualSquares, quadratic, logVariances } = residualSums(
     design,
     items,
@@ -137,18 +139,10 @@ function evaluation(
   const inverseSecond = product(covariance, second, effects);
   const inverseThird = product(covariance, third, effects);
   const traceP = sum(weights, 1) - trace(inverseSecond, effects);
-  const traceP2 = sum(weights, 2) - 2 * trace(inverseThird, effects) + traceOfSquare(inverseSecond, effects);
+  const traceP2 =
+    sum(weights, 2) - 2 * trace(inverseThird, effects) + traceOfProduct(inverseSecond, inverseSecond, effects);
   const logLikelihood = constant - logVariances / 2 - logDeterminant(normal, effects) / 2 - residualSquares / 2;
   return { logLikelihood, traceP, traceP2, quadratic, coefficients, covariance };
-}
-
-/** Returns the product of a `size` by `size` matrix, by rows, and a vector. */
-function multiply(matrix: Float64Array, vector: Float64Array, size: number): Float64Array {
-  const result = new Float64Array(size);
-  for (let j = 0; j < size; j++) {
-    for (let k = 0; k < size; k++) result[j] = (result[j] ?? 0) + (matrix[j * size + k] ?? 0) * (vector[k] ?? 0);
-  }
-  return result;
 }
 
 /** The weighted sum of squared residuals, the sum of their squares times squared weights, and Σ ln(v_i + τ²). */
@@ -224,27 +218,13 @@ function weightedMoments(
 /** Returns the product of two `size` by `size` matrices, by rows. */
 function product(a: Float64Array, b: Float64Array, size: number): Float64Array {
   const result = new Float64Array(size * size);
-  for (let i = 0; i < size; i++) {
-    for (let k = 0; k < size; k++) {
-      const x = a[i * size + k] ?? 0;
-      for (let j = 0; j < size; j++) result[i * size + j] = (result[i * size + j] ?? 0) + x * (b[k * size + j] ?? 0);
-    }
-  }
+  multiply(a, b, size, size, size, result);
   return result;
 }
 
 function trace(a: Float64Array, size: number): number {
   let sum = 0;
   for (let i = 0; i < size; i++) sum += a[i * size + i] ?? 0;
-  return sum;
-}
-
-/** Returns tr(A²) = Σ A_ij A_ji. */
-function traceOfSquare(a: Float64Array, size: number): number {
-  let sum = 0;
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j < size; j++) sum += (a[i * size + j] ?? 0) * (a[j * size + i] ?? 0);
-  }
   return sum;
 }
 

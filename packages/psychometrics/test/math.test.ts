@@ -5,6 +5,7 @@ import { chiSquareUpperTail } from "../src/math/chi-square.js";
 import { symmetricEigen } from "../src/math/eigen.js";
 import { numericalHessian } from "../src/math/hessian.js";
 import { invert, invertPositiveDefinite } from "../src/math/linear-algebra.js";
+import { identity, multiply, multiplyVector, symmetrized, traceOfProduct, transpose } from "../src/math/matrix.js";
 import { normalCdf, normalDensity } from "../src/math/normal.js";
 import { bfgs, newton } from "../src/math/optimize.js";
 import { gaussHermite, rectangular } from "../src/math/quadrature.js";
@@ -227,6 +228,55 @@ describe("invertPositiveDefinite", () => {
   it("returns null for a matrix that is not positive definite", () => {
     expect(invertPositiveDefinite(Float64Array.of(1, 2, 2, 1), 2)).toBeNull();
     expect(invertPositiveDefinite(Float64Array.of(1, 1, 1, 1), 2)).toBeNull();
+  });
+});
+
+describe("matrix helpers", () => {
+  const a = Float64Array.of(1, 2, 3, 4, 5, 6);
+  const b = Float64Array.of(7, 8, 9, 10, 11, 12);
+
+  it("multiplies a 2 by 3 matrix and a 3 by 2 matrix by rows", () => {
+    const out = new Float64Array(4);
+    multiply(a, b, 2, 3, 2, out);
+    expect(Array.from(out)).toEqual([58, 64, 139, 154]);
+  });
+
+  it("transposes and symmetrizes", () => {
+    expect(Array.from(transpose(a, 2, 3))).toEqual([1, 4, 2, 5, 3, 6]);
+    expect(Array.from(symmetrized(Float64Array.of(1, 2, 4, 3), 2))).toEqual([1, 3, 3, 3]);
+  });
+
+  it("returns the identity, which multiplies to the same matrix", () => {
+    expect(Array.from(identity(3))).toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    const out = new Float64Array(6);
+    multiply(a, identity(3), 2, 3, 3, out);
+    expect(Array.from(out)).toEqual(Array.from(a));
+  });
+
+  it("multiplies a square matrix and a vector as a matrix with one column", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.double({ min: -10, max: 10, noNaN: true }), { minLength: 12, maxLength: 12 }),
+        (values) => {
+          const matrix = Float64Array.from(values.slice(0, 9));
+          const vector = Float64Array.from(values.slice(9));
+          const direct = new Float64Array(3);
+          const asColumn = new Float64Array(3);
+          multiplyVector(matrix, vector, direct);
+          multiply(matrix, vector, 3, 3, 1, asColumn);
+          expect(Array.from(direct)).toEqual(Array.from(asColumn));
+        },
+      ),
+    );
+  });
+
+  it("takes tr(a b) as the trace of the product", () => {
+    const first = Float64Array.of(1, 2, 3, 4);
+    const second = Float64Array.of(5, 6, 7, 8);
+    const product = new Float64Array(4);
+    multiply(first, second, 2, 2, 2, product);
+    expect(traceOfProduct(first, second, 2)).toBe((product[0] ?? 0) + (product[3] ?? 0));
+    expect(traceOfProduct(first, second, 2)).toBe(69);
   });
 });
 

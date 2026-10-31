@@ -1,8 +1,8 @@
 import { cholesky } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { identity, multiply, traceOfProduct } from "../math/matrix.js";
 import { bfgs } from "../math/optimize.js";
 import { type Grid, normalLogWeights } from "./grid.js";
-import { multiply } from "./matrix.js";
 
 /** The gradient norm, per person, at which the M-step of the correlations has converged. */
 const CORRELATION_TOLERANCE = 1e-10;
@@ -270,18 +270,4 @@ function rowParameters(matrix: Float64Array, dimensions: number): Float64Array |
     for (let j = 0; j < i; j++) parameters.push((factor[i * dimensions + j] ?? 0) / (factor[i * dimensions + i] ?? 1));
   }
   return Float64Array.from(parameters);
-}
-
-/** Returns the identity matrix, by rows. */
-export function identity(dimensions: number): Float64Array {
-  const matrix = new Float64Array(dimensions * dimensions);
-  for (let i = 0; i < dimensions; i++) matrix[i * dimensions + i] = 1;
-  return matrix;
-}
-
-/** Returns tr(a b) of two `size` by `size` matrices. */
-function traceOfProduct(a: Float64Array, b: Float64Array, size: number): number {
-  let sum = 0;
-  for (let i = 0; i < size; i++) for (let k = 0; k < size; k++) sum += (a[i * size + k] ?? 0) * (b[k * size + i] ?? 0);
-  return sum;
 }
