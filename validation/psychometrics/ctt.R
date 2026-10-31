@@ -1,7 +1,8 @@
-# Classical test theory fixtures: item statistics, reliability and distractor analysis.
+# Classical test theory fixtures: item statistics, reliability, distractor analysis and the value of subscores.
 # References: psych::alpha (alpha, r.drop, raw.r, alpha if dropped), psych::splitHalf (Guttman split-half per split),
-# psych::omega (one factor), checked against base R's minres, and base R for everything else. measurekit
-# computes score-based statistics on the persons who answered every item, so psych runs on na.omit(x).
+# psych::omega (one factor), checked against base R's minres, and base R for everything else; the subscore package's
+# CTTsub (Haberman's PRMSEs), checked against base R. measurekit computes score-based statistics on the persons who
+# answered every item, so psych runs on na.omit(x).
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -186,3 +187,94 @@ sat12_fixture$key <- as.character(SAT12_KEY)
 sat12_fixture$optionLabels <- as.character(1:5)
 sat12_fixture$options <- distractor_fixture(sat12, SAT12_KEY, 1:5)
 write_fixture("ctt-sat12", sat12_fixture)
+
+# --- Subscore value (Haberman, 2008) ---------------------------------------------------------------------------------
+# A section's subscore s is the sum of its items and the total x the sum of the items of all sections. With rho the
+# alpha of the section's items, PRMSE(s) = rho and PRMSE(x) = [cov(s, x) - (1 - rho) var(s)]^2 / (rho var(s) var(x)):
+# the squared correlation of the true subscore and x. Persons who answered every item of the sections are used.
+
+# The PRMSEs of every section in base R; `sections` lists the item columns of each.
+haberman_base <- function(x, sections) {
+  x <- na.omit(x[, unlist(sections), drop = FALSE])
+  total <- rowSums(x)
+  t(sapply(sections, function(columns) {
+    s <- rowSums(x[, columns, drop = FALSE])
+    k <- length(columns)
+    alpha <- k / (k - 1) * (1 - sum(apply(x[, columns, drop = FALSE], 2, var)) / var(s))
+    true_covariance <- cov(s, total) - (1 - alpha) * var(s)
+    c(alpha = alpha, subscore = alpha, total = true_covariance^2 / (alpha * var(s) * var(total)))
+  }))
+}
+
+# CTTsub on the same persons: the data as a list of the sections' items and, last, the total test; the items of the
+# sections are put side by side, as data.prep takes them.
+haberman_ctt <- function(x, sections) {
+  x <- as.data.frame(na.omit(x[, unlist(sections), drop = FALSE]))
+  test_data <- subscore::data.prep(x, c(length(sections), lengths(sections)), c(names(sections), "total"))
+  info <- subscore::CTTsub(test_data)$PRMSE
+  info[names(sections), c("Alpha", "PRMSE.s", "PRMSE.x", "added.value.s")]
+}
+
+subscore_case <- function(name, x, sections) {
+  columns <- lapply(sections, function(ids) match(ids, colnames(x)))
+  base <- haberman_base(x, columns)
+  reference <- haberman_ctt(x, columns)
+  stopifnot(max(abs(base[, "alpha"] - reference[, "Alpha"])) < 1e-12,
+            max(abs(base[, "subscore"] - reference[, "PRMSE.s"])) < 1e-12,
+            max(abs(base[, "total"] - reference[, "PRMSE.x"])) < 1e-12,
+            all((base[, "subscore"] > base[, "total"]) == (reference[, "added.value.s"] == 1)))
+  message(name, ": ", nrow(na.omit(x[, unlist(columns)])), " complete cases; PRMSE of the subscores ",
+          paste(round(reference[, "PRMSE.s"], 3), collapse = ", "), ", of the total ",
+          paste(round(reference[, "PRMSE.x"], 3), collapse = ", "))
+  list(name = name, itemIds = colnames(x), responses = unname(lapply(seq_len(nrow(x)), function(i) as.numeric(x[i, ]))),
+       sections = sections, completeCases = nrow(na.omit(x[, unlist(columns)])),
+       sectionNames = names(sections), subscorePrmse = unname(reference[, "PRMSE.s"]),
+       totalPrmse = unname(reference[, "PRMSE.x"]), addedValue = unname(reference[, "added.value.s"] == 1))
+}
+
+# subscore's scored.data: 150 persons, 50 items in sections of 15, 15 and 20.
+data(scored.data, package = "subscore")
+scored <- as.matrix(scored.data)
+colnames(scored) <- sprintf("v%02d", 1:50)
+scored_sections <- list(Algebra = colnames(scored)[1:15], Geometry = colnames(scored)[16:30],
+                        Measurement = colnames(scored)[31:50])
+
+# subscore's TIMSS 2011 grade 8 mathematics: 765 persons; items 1 to 30 in four content domains, items 31 and 32 in none.
+data(TIMSS11G8M.data, package = "subscore")
+timss <- as.matrix(TIMSS11G8M.data)
+colnames(timss) <- sprintf("q%02d", 1:32)
+timss_sections <- list(Number = colnames(timss)[1:9], Algebra = colnames(timss)[10:18],
+                       Geometry = colnames(timss)[19:24], Data = colnames(timss)[25:30])
+
+# psych's bfi: the five domains of five items on a 0 to 5 scale, reverse-keyed items recoded, with missing responses.
+bfi_items <- as.matrix(psych::bfi[, 1:25]) - 1
+reversed <- c("A1", "C4", "C5", "E1", "E2", "O2", "O5")
+bfi_items[, reversed] <- 5 - bfi_items[, reversed]
+bfi_sections <- lapply(list(Agreeableness = "A", Conscientiousness = "C", Extraversion = "E", Neuroticism = "N",
+                            Openness = "O"), function(prefix) paste0(prefix, 1:5))
+
+# A simulation: 400 persons answer 8, 10 and 12 items of three correlated abilities (correlation 0.45), 2PL; 1% of the
+# responses are missing.
+set.seed(20261029)
+sizes <- c(8, 10, 12)
+abilities <- matrix(rnorm(400 * 3), 400) %*% chol(matrix(0.45, 3, 3) + diag(0.55, 3))
+slopes <- runif(sum(sizes), 0.6, 1.8)
+difficulties <- rnorm(sum(sizes))
+dimension <- rep(1:3, sizes)
+probability <- plogis(slopes * (abilities[, dimension] - rep(difficulties, each = 400)))
+simulated_sections_data <- matrix(rbinom(length(probability), 1, probability), 400)
+simulated_sections_data[matrix(runif(length(probability)) < 0.01, 400)] <- NA
+colnames(simulated_sections_data) <- sprintf("s%02d", seq_len(sum(sizes)))
+simulated_sections <- list(Reading = colnames(simulated_sections_data)[1:8],
+                           Listening = colnames(simulated_sections_data)[9:18],
+                           Writing = colnames(simulated_sections_data)[19:30])
+
+write_fixture("ctt-subscores", list(
+  source = "subscore's scored.data and TIMSS11G8M.data; psych's bfi by domain; a simulation of three correlated abilities, set.seed(20261029).",
+  cases = list(
+    subscore_case("scored.data", scored, scored_sections),
+    subscore_case("TIMSS11G8M.data", timss, timss_sections),
+    subscore_case("bfi", bfi_items, bfi_sections),
+    subscore_case("simulated", simulated_sections_data, simulated_sections)
+  )
+))

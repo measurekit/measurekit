@@ -9,7 +9,7 @@ References, datasets, versions and tolerances are listed in
 R scripts in `validation/psychometrics/`:
 
 ```bash
-Rscript validation/psychometrics/ctt.R               # classical test theory
+Rscript validation/psychometrics/ctt.R               # classical test theory; the value of subscores by subscore's CTTsub
 Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
 Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic tests: cdcatR
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
@@ -27,7 +27,7 @@ Rscript validation/psychometrics/interop.R           # mirt's coefficient forms 
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
 ```
 
-They need R with the packages psych, mirt, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
+They need R with the packages psych, mirt, subscore, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
 sirt, nlme, LNIRT, numDeriv, lme4, metafor, GDINA, alabama, NPCD, CDM, cdcatR, GPArotation, mvtnorm and jsonlite;
 `common.R` holds their shared helpers.
 

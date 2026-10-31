@@ -2,7 +2,7 @@
 "@measurekit/psychometrics": major
 ---
 
-Psychometrics for JavaScript and TypeScript, validated against R: classical test theory, item response theory,
+Psychometrics for JavaScript and TypeScript, validated against R: classical test theory with the value of subscores, item response theory,
 including multidimensional models with exploratory and confirmatory calibration, rotation and scoring, cognitive
 diagnosis (G-DINA, DINA, DINO, A-CDM, LLM and R-RUM), adaptive, diagnostic adaptive and multistage testing, item and
 person fit, differential item functioning for dichotomous and polytomous items, linking and equating, including

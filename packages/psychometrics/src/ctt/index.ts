@@ -1,5 +1,5 @@
 /**
- * Classical test theory: item statistics, distractor analysis, reliability and classification.
+ * Classical test theory: item statistics, distractor analysis, reliability, the value of subscores and classification.
  *
  * @module @measurekit/psychometrics/ctt
  */
@@ -27,3 +27,4 @@ export {
   splitHalf,
   standardErrorOfMeasurement,
 } from "./reliability.js";
+export { type SubscoreValue, subscoreValue } from "./subscores.js";

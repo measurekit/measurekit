@@ -17,17 +17,21 @@ import {
   scoreResponses,
   splitHalf,
   standardErrorOfMeasurement,
+  subscoreValue,
 } from "../src/index.js";
 import bfi from "./fixtures/ctt-bfi-neuroticism.json" with { type: "json" };
 import lsat7 from "./fixtures/ctt-lsat7.json" with { type: "json" };
 import sat12 from "./fixtures/ctt-sat12.json" with { type: "json" };
 import simulated from "./fixtures/ctt-simulated-2pl.json" with { type: "json" };
+import subscores from "./fixtures/ctt-subscores.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
 
 /** Absolute tolerance of CTT statistics against R. */
 const TOLERANCE = 1e-10;
 /** Minres loadings against base R's minimization, both to their rounding. */
 const OMEGA_LOADING_TOLERANCE = 1e-10;
+/** Subscore PRMSEs against the subscore package's CTTsub: closed forms of the same sums. */
+const SUBSCORE_TOLERANCE = 1e-12;
 
 const ITEM_FIELDS = [
   "mean",
@@ -300,6 +304,158 @@ describe("reliability", () => {
   });
 });
 
+describe("subscoreValue", () => {
+  for (const reference of subscores.cases) {
+    it(`matches the subscore package's CTTsub on ${reference.name}`, () => {
+      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const result = subscoreValue(matrix, sectionsOf(reference.sections));
+      expect(result.map(({ section }) => section)).toEqual(reference.sectionNames);
+      result.forEach((value, i) => {
+        expectClose(
+          value.subscorePrmse,
+          defined(reference.subscorePrmse[i]),
+          SUBSCORE_TOLERANCE,
+          `${value.section} PRMSE`,
+        );
+        expectClose(
+          value.totalPrmse,
+          defined(reference.totalPrmse[i]),
+          SUBSCORE_TOLERANCE,
+          `${value.section} total PRMSE`,
+        );
+        expect(value.addedValue, value.section).toBe(reference.addedValue[i]);
+      });
+    });
+  }
+
+  it("finds added value for the sections of weakly correlated abilities and none where the total predicts better", () => {
+    const added = (name: string): boolean[] =>
+      subscores.cases.find((reference) => reference.name === name)?.addedValue ?? [];
+    expect(added("bfi")).toEqual([true, true, true, true, true]);
+    expect(added("scored.data")).toEqual([false, false, false]);
+  });
+
+  /** Two sections of two items; the first section's items are equal, so that its subscore is its true score. */
+  const HandRows = [
+    [0, 0, 0, 0],
+    [0, 0, 1, 1],
+    [1, 1, 0, 1],
+    [1, 1, 1, 0],
+    [1, 1, 1, 1],
+  ];
+  const HandSections = { first: ["item1", "item2"], second: ["item3", "item4"] };
+
+  it("derives the PRMSEs of a small design by hand", () => {
+    // Subscores 2a and b1 + b2, with variances 6/5 and 7/10, and covariance 1/5; so var(x) = 6/5 + 7/10 + 2/5 = 23/10.
+    // First section: items equal, alpha = 1, true covariance with x = 6/5 + 1/5 = 7/5, PRMSE of x = (7/5)² / (6/5 × 23/10)
+    // = 49/69. Second: alpha = 2 (1 - 3/5 / (7/10)) = 2/7, true covariance = 9/10 - (5/7)(7/10) = 2/5, PRMSE of x =
+    // (2/5)² / (2/7 × 7/10 × 23/10) = 8/23.
+    const [first, second] = subscoreValue(responseMatrix(HandRows), HandSections);
+    expect(first).toEqual({
+      section: "first",
+      subscorePrmse: 1,
+      totalPrmse: expect.closeTo(49 / 69, 14),
+      addedValue: true,
+    });
+    expect(second?.subscorePrmse).toBeCloseTo(2 / 7, 14);
+    expect(second?.totalPrmse).toBeCloseTo(8 / 23, 14);
+    expect(second?.addedValue).toBe(false);
+  });
+
+  it("leaves out items in no section and the persons who missed an item of a section", () => {
+    const base = subscoreValue(responseMatrix(HandRows), HandSections);
+    const extra = HandRows.map((row, person) => [...row, person % 2]);
+    expect(subscoreValue(responseMatrix(extra), HandSections)).toEqual(base);
+    const missing = [...extra, [null, 1, 0, 1, 1], [0, 0, 1, null, 0]];
+    expect(subscoreValue(responseMatrix(missing), HandSections)).toEqual(base);
+    const outside = extra.map((row, person) => (person === 0 ? [...row.slice(0, 4), null] : row));
+    expect(subscoreValue(responseMatrix(outside), HandSections)).toEqual(base);
+  });
+
+  it("gives a section whose subscore is constant or whose alpha is not above 0 null PRMSEs and no added value", () => {
+    // The first section's items sum to 1 for everyone; the second's have covariance -0.1, so alpha = -1; the third's
+    // have covariance 0.1, so alpha = 1/2.
+    const rows = [
+      [0, 1, 1, 0, 1, 1],
+      [1, 0, 1, 0, 1, 0],
+      [0, 1, 0, 1, 0, 0],
+      [1, 0, 0, 1, 0, 1],
+      [0, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0],
+    ];
+    const [constant, anticorrelated, ordinary] = subscoreValue(responseMatrix(rows), {
+      constant: ["item1", "item2"],
+      anticorrelated: ["item3", "item4"],
+      ordinary: ["item5", "item6"],
+    });
+    const none = { subscorePrmse: null, totalPrmse: null, addedValue: false };
+    expect(constant).toEqual({ section: "constant", ...none });
+    expect(anticorrelated).toEqual({ section: "anticorrelated", ...none });
+    expect(ordinary?.subscorePrmse).toBeCloseTo(0.5, 14);
+    expect(ordinary?.totalPrmse).not.toBeNull();
+  });
+
+  it("rejects sections that are not an object of arrays of item ids, a single section, and a section of one item", () => {
+    const matrix = responseMatrix(HandRows);
+    expect(() => subscoreValue(matrix, JSON.parse("null"))).toThrow(
+      "The sections must be an object of item ids by section name, found null.",
+    );
+    expect(() => subscoreValue(matrix, JSON.parse('[["item1", "item2"]]'))).toThrow(
+      "The sections must be an object of item ids by section name, found an array.",
+    );
+    expect(() => subscoreValue(matrix, JSON.parse('{"first": "item1"}'))).toThrow(
+      'The items of section "first" must be an array of item ids, found "item1".',
+    );
+    expect(() => subscoreValue(matrix, { first: ["item1", "item2"] })).toThrow(
+      "Subscore value needs at least two sections, found 1.",
+    );
+    expect(() => subscoreValue(matrix, { first: ["item1", "item2"], second: ["item3"] })).toThrow(
+      'Section "second" needs at least two items, found 1.',
+    );
+    expect(() => subscoreValue(matrix, {})).toThrow("Subscore value needs at least two sections, found 0.");
+  });
+
+  it("rejects an item that is not in the matrix or is in two sections, and a matrix that is not valid", () => {
+    const matrix = responseMatrix(HandRows);
+    expect(() => subscoreValue(matrix, { first: ["item1", "item2"], second: ["item3", "other"] })).toThrow(
+      'Section "second" has the item "other", which is not an item of the matrix.',
+    );
+    expect(() => subscoreValue(matrix, { first: ["item1", "item2"], second: ["item2", "item3"] })).toThrow(
+      'The item "item2" is in the sections "first" and "second"; a section\'s items are its own.',
+    );
+    expect(() => subscoreValue(matrix, { first: ["item1", "item1"], second: ["item3", "item4"] })).toThrow(
+      'The item "item1" is in the sections "first" and "first"; a section\'s items are its own.',
+    );
+    expect(() => subscoreValue(JSON.parse("null"), HandSections)).toThrow(DataError);
+    expect(() => subscoreValue(matrix, { first: JSON.parse("[1, 2]"), second: ["item3", "item4"] })).toThrow(
+      'Section "first" has the item 1, which is not an item of the matrix.',
+    );
+  });
+
+  it("rejects fewer than two persons who answered every item and total scores without variance", () => {
+    expect(() =>
+      subscoreValue(
+        responseMatrix([
+          [1, 0, 1, 1],
+          [1, null, 0, 1],
+        ]),
+        HandSections,
+      ),
+    ).toThrow("Subscore value needs at least two persons who answered every item of the sections.");
+    expect(() =>
+      subscoreValue(
+        responseMatrix([
+          [1, 0, 1, 0],
+          [0, 1, 0, 1],
+          [1, 0, 0, 1],
+          [0, 1, 1, 0],
+        ]),
+        HandSections,
+      ),
+    ).toThrow("Subscore value needs total scores with variance.");
+  });
+});
+
 describe("edge cases", () => {
   it("gives a constant item null correlations, D of 0, and counts it in alpha", () => {
     const rows = [
@@ -428,6 +584,25 @@ const permutedRows = <T>(rows: fc.Arbitrary<T[][]>): fc.Arbitrary<[T[][], T[][]]
       .map((shuffled): [T[][], T[][]] => [original, shuffled]),
   );
 
+/** Returns the result of `compute`, or `null` when it throws a `DataError`. */
+function attempt<T>(compute: () => T): T | null {
+  try {
+    return compute();
+  } catch (error) {
+    if (error instanceof DataError) return null;
+    throw error;
+  }
+}
+
+/** The sections of a fixture, without the entries that the other cases' sections give the union type. */
+function sectionsOf(
+  sections: Readonly<Record<string, readonly string[] | undefined>>,
+): Record<string, readonly string[]> {
+  return Object.fromEntries(
+    Object.entries(sections).flatMap(([name, ids]) => (ids === undefined ? [] : [[name, ids]])),
+  );
+}
+
 /** Returns the result of `compute`, or "DataError" when it throws one. */
 function outcome(compute: () => unknown): unknown {
   try {
@@ -510,6 +685,59 @@ describe("properties", () => {
         const analyze = (rows: (string | null)[][]): unknown =>
           outcome(() => distractorAnalysis(scoreResponses(rows, key, { optionLabels: ["A", "B", "C", "D"] })));
         expectNear(analyze(shuffled), analyze(original));
+      }),
+    );
+  });
+
+  it("the subscore PRMSE is alpha of the section's items, whatever the order of persons, items and sections", () => {
+    fc.assert(
+      fc.property(permutedRows(arbitraryRows), ([rows, shuffled]) => {
+        const items = rows[0]?.length ?? 0;
+        if (items < 4) return;
+        const half = Math.floor(items / 2);
+        const ids = Array.from({ length: items }, (_, i) => `item${i + 1}`);
+        const sections = { first: ids.slice(0, half), second: ids.slice(half) };
+        const reversed = { second: [...sections.second].reverse(), first: [...sections.first].reverse() };
+        const forward = attempt(() => subscoreValue(responseMatrix(rows), sections));
+        const other = attempt(() => subscoreValue(responseMatrix(shuffled), reversed));
+        if (forward === null || other === null) return;
+        forward.forEach((value) => {
+          const same = defined(other.find(({ section }) => section === value.section));
+          // Summing the same item variances in another order moves alpha by rounding, which at exactly 0 decides null.
+          if (value.subscorePrmse === null || same.subscorePrmse === null) {
+            expect(Math.abs(value.subscorePrmse ?? same.subscorePrmse ?? 0)).toBeLessThan(1e-9);
+            return;
+          }
+          expectClose(same.subscorePrmse, value.subscorePrmse, 1e-9);
+          expectClose(same.totalPrmse, value.totalPrmse, 1e-9);
+          expect(value.addedValue).toBe(value.subscorePrmse > defined(value.totalPrmse));
+          if (Math.abs(value.subscorePrmse - defined(value.totalPrmse)) > 1e-9) {
+            expect(same.addedValue).toBe(value.addedValue);
+          }
+        });
+      }),
+    );
+  });
+
+  it("subscore PRMSEs equal alpha of the section's items and never contain NaN", () => {
+    fc.assert(
+      fc.property(arbitraryRows, (rows) => {
+        const items = rows[0]?.length ?? 0;
+        if (items < 4) return;
+        const half = Math.floor(items / 2);
+        const ids = Array.from({ length: items }, (_, i) => `item${i + 1}`);
+        const matrix = responseMatrix(rows);
+        const result = attempt(() => subscoreValue(matrix, { first: ids.slice(0, half), second: ids.slice(half) }));
+        if (result === null) return;
+        const complete = rows.filter((row) => !row.includes(null));
+        result.forEach((value, i) => {
+          for (const number of [value.subscorePrmse, value.totalPrmse])
+            expect(number === null || Number.isFinite(number)).toBe(true);
+          const columns = i === 0 ? [0, half] : [half, items];
+          const section = responseMatrix(complete.map((row) => row.slice(columns[0], columns[1])));
+          const alpha = attempt(() => cronbachAlpha(section));
+          if (value.subscorePrmse !== null && alpha !== null) expectClose(value.subscorePrmse, alpha, 1e-9);
+        });
       }),
     );
   });
