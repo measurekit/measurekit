@@ -1,4 +1,4 @@
-import { checkRandom, DataError, type Random } from "@measurekit/core";
+import { checkMethod, checkRandom, DataError, type Random } from "@measurekit/core";
 import { contentBalancing, restrictToArea } from "./content-balancing.js";
 import { checkEnemies, enemyIndices, excludeEnemies } from "./enemies.js";
 import { indexOf, itemById, type PoolControls } from "./items.js";
@@ -41,8 +41,12 @@ export interface AdaptiveEngineOptions<TItem extends PoolControls, TEstimate> {
   readonly selection: ItemSelectionRule<TItem, TEstimate>;
   /** The target proportions of the content areas, by area. */
   readonly contentTargets?: Readonly<Record<string, number>>;
-  /** The enemy sets. */
-  readonly enemies: readonly (readonly string[])[];
+  /**
+   * The enemy sets.
+   *
+   * @defaultValue none
+   */
+  readonly enemies?: readonly (readonly string[])[];
   /**
    * How the items of a testlet are ordered. It applies to pool items that have a `testlet`.
    *
@@ -73,6 +77,17 @@ export interface AdaptiveEngine<TEstimate> {
 }
 
 /**
+ * Checks the rules that an adaptive test takes.
+ *
+ * @param selectionExample - Names a selection rule for the message, such as `maximumInformation`.
+ * @throws `DataError` when `stopping` is not a stopping rule or `selection` is not a selection rule.
+ */
+export function checkRules(stopping: unknown, selection: unknown, selectionExample: string): void {
+  checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
+  checkMethod(selection, "scores", `The option selection must be a selection rule, such as ${selectionExample}`);
+}
+
+/**
  * Returns the steps of an adaptive test that estimates, selects and stops by the rules it is given, which every kind
  * of adaptive test shares.
  *
@@ -95,7 +110,16 @@ export interface AdaptiveEngine<TEstimate> {
 export function adaptiveEngine<TItem extends PoolControls, TEstimate>(
   options: AdaptiveEngineOptions<TItem, TEstimate>,
 ): AdaptiveEngine<TEstimate> {
-  const { pool, indices, stopping, selection, contentTargets, enemies: enemySets, estimate, checkResponse } = options;
+  const {
+    pool,
+    indices,
+    stopping,
+    selection,
+    contentTargets,
+    enemies: enemySets = [],
+    estimate,
+    checkResponse,
+  } = options;
   const { withinTestlet = "in-order" } = options;
   checkWithinTestlet(withinTestlet);
   pool.forEach(checkExposure);

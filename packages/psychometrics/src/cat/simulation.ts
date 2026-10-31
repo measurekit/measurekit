@@ -64,14 +64,14 @@ export function simulateAdaptiveTest(
   const indices = indexItems(pool);
   const probabilities = new Float64Array(largestCategoryCount(pool));
   checkThetas(thetas);
-  const persons = thetas.map((theta) => {
-    let state = test.start(random);
-    while (state.next !== null) {
-      const response = simulateResponse(itemById(pool, indices, state.next), theta, random, probabilities);
-      state = test.answer(state, response, random);
-    }
-    return { theta, state };
-  });
+  const persons = thetas.map((theta) => ({
+    theta,
+    state: administer(
+      test,
+      (id) => simulateResponse(itemById(pool, indices, id), theta, random, probabilities),
+      random,
+    ),
+  }));
   return summarize(persons, pool);
 }
 
@@ -128,28 +128,65 @@ function summarize<TState extends TestState>(
 ): TestSimulation<TState> {
   let error = 0;
   let squaredError = 0;
-  let length = 0;
   for (const { theta, state } of persons) {
     const difference = state.estimate.theta - theta;
     error += difference;
     squaredError += difference * difference;
-    length += state.items.length;
   }
   const n = persons.length;
   return {
     persons,
     bias: error / n,
     rootMeanSquareError: Math.sqrt(squaredError / n),
-    meanLength: length / n,
-    exposureRates: exposureRates(
+    ...summarizeAdministrations(
       items,
       persons.map(({ state }) => state),
     ),
   };
 }
 
+/**
+ * Administers a test to one person and returns the state at its end.
+ *
+ * @param respond - Returns the person's response to the item with an id.
+ */
+export function administer<TState extends { readonly next: string | null }>(
+  test: {
+    start(random: Random): TState;
+    answer(state: TState, response: number, random: Random): TState;
+  },
+  respond: (id: string) => number,
+  random: Random,
+): TState {
+  let state = test.start(random);
+  while (state.next !== null) state = test.answer(state, respond(state.next), random);
+  return state;
+}
+
+/** Returns the mean number of items administered, and the exposure rate of every item, in its order. */
+export function summarizeAdministrations(
+  items: readonly { readonly id: string }[],
+  states: readonly TestState<unknown>[],
+): { readonly meanLength: number; readonly exposureRates: ExposureRate[] } {
+  let length = 0;
+  for (const state of states) length += state.items.length;
+  return { meanLength: length / states.length, exposureRates: exposureRates(items, states) };
+}
+
+/**
+ * Returns the response of a person to the item with an id, from the simulated `responses` of persons, a row each, to
+ * the items `itemIds`, a column each. A response that is missing is 0.
+ */
+export function responseLookup(
+  responses: readonly (readonly (number | null)[])[],
+  itemIds: readonly string[],
+): (person: number, id: string) => number {
+  const columns = new Map(itemIds.map((id, column) => [id, column]));
+  return (person, id) => responses[person]?.[columns.get(id) ?? -1] ?? 0;
+}
+
 /** Returns the share of the states that administered each item, in the order of the items. */
-export function exposureRates(
+function exposureRates(
   items: readonly { readonly id: string }[],
   states: readonly TestState<unknown>[],
 ): ExposureRate[] {

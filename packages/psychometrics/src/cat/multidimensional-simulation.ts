@@ -1,7 +1,7 @@
 import { checkRandom, type Random } from "@measurekit/core";
 import { simulateMultidimensionalResponses } from "../sim/multidimensional-responses.js";
 import type { MultidimensionalAdaptiveTest, MultidimensionalAdaptiveTestState } from "./multidimensional-test.js";
-import { checkTest, type ExposureRate, exposureRates } from "./simulation.js";
+import { administer, checkTest, type ExposureRate, responseLookup, summarizeAdministrations } from "./simulation.js";
 
 /** One simulated person of a multidimensional test: the true thetas and the final state of the test. */
 export interface SimulatedMultidimensionalPerson {
@@ -42,15 +42,14 @@ export function simulateMultidimensionalAdaptiveTest(
   checkRandom(random);
   const { pool } = test;
   const matrix = simulateMultidimensionalResponses(pool, thetas, random);
-  const columns = new Map(pool.map((item, column) => [item.id, column]));
-  const persons = thetas.map((theta, person) => {
-    let state = test.start(random);
-    while (state.next !== null) {
-      const response = matrix.responses[person]?.[columns.get(state.next) ?? -1] ?? 0;
-      state = test.answer(state, response, random);
-    }
-    return { theta, state };
-  });
+  const response = responseLookup(
+    matrix.responses,
+    pool.map(({ id }) => id),
+  );
+  const persons = thetas.map((theta, person) => ({
+    theta,
+    state: administer(test, (id) => response(person, id), random),
+  }));
   const dimensions = thetas[0]?.length ?? 0;
   const errors = (d: number): number[] =>
     persons.map(({ theta, state }) => (state.estimate.theta[d] ?? 0) - (theta[d] ?? 0));
@@ -61,8 +60,7 @@ export function simulateMultidimensionalAdaptiveTest(
     rootMeanSquareError: perDimension.map((list) =>
       Math.sqrt(list.reduce((sum, error) => sum + error * error, 0) / list.length),
     ),
-    meanLength: persons.reduce((sum, { state }) => sum + state.items.length, 0) / persons.length,
-    exposureRates: exposureRates(
+    ...summarizeAdministrations(
       pool,
       persons.map(({ state }) => state),
     ),

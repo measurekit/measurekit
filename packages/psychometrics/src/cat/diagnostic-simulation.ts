@@ -1,7 +1,7 @@
 import { checkArray, checkRandom, type Random } from "@measurekit/core";
 import { simulateCdmResponses } from "../sim/cdm-responses.js";
 import type { DiagnosticAdaptiveTest, DiagnosticAdaptiveTestState } from "./diagnostic-test.js";
-import { checkTest, type ExposureRate, exposureRates } from "./simulation.js";
+import { administer, checkTest, type ExposureRate, responseLookup, summarizeAdministrations } from "./simulation.js";
 
 /** One simulated person of a diagnostic test: the true profile and the final state of the test. */
 export interface SimulatedDiagnosticPerson {
@@ -44,23 +44,18 @@ export function simulateDiagnosticTest(
   checkRandom(random);
   const { pool, attributes } = test;
   const matrix = simulateCdmResponses({ attributes, items: pool }, profiles, random);
-  const columns = new Map(matrix.itemIds.map((id, column) => [id, column]));
-  const persons = profiles.map((profile, person) => {
-    let state = test.start(random);
-    while (state.next !== null) {
-      const response = matrix.responses[person]?.[columns.get(state.next) ?? -1] ?? 0;
-      state = test.answer(state, response, random);
-    }
-    return { profile, state };
-  });
+  const response = responseLookup(matrix.responses, matrix.itemIds);
+  const persons = profiles.map((profile, person) => ({
+    profile,
+    state: administer(test, (id) => response(person, id), random),
+  }));
   const share = (agrees: (person: SimulatedDiagnosticPerson) => boolean): number =>
     persons.filter(agrees).length / persons.length;
   return {
     persons,
     patternAccuracy: share(({ profile, state }) => profile.every((value, k) => state.estimate.map[k] === value)),
     attributeAccuracy: attributes.map((_, k) => share(({ profile, state }) => state.estimate.map[k] === profile[k])),
-    meanLength: persons.reduce((sum, { state }) => sum + state.items.length, 0) / persons.length,
-    exposureRates: exposureRates(
+    ...summarizeAdministrations(
       pool,
       persons.map(({ state }) => state),
     ),

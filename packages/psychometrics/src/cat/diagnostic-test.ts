@@ -1,9 +1,9 @@
-import { checkMethod, checkOptions, type Random } from "@measurekit/core";
+import { checkOptions, type Random } from "@measurekit/core";
 import type { ProfileProportion } from "../cdm/calibration.js";
 import { type ProfileEstimate, profileEstimate } from "../cdm/persons.js";
 import { bindPool, type DiagnosticPoolItem, type DiagnosticTestItem } from "./diagnostic-items.js";
 import { gdinaDiscriminationIndex } from "./diagnostic-selection.js";
-import { type AdaptiveState, adaptiveEngine } from "./engine.js";
+import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
 import { checkCategory } from "./items.js";
 import { profilePosterior } from "./profile-posterior.js";
 import { profileSpace } from "./profile-space.js";
@@ -129,11 +129,10 @@ export function diagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): 
     stopping,
     selection = gdinaDiscriminationIndex,
     contentTargets,
-    enemies = [],
+    enemies,
     withinTestlet,
   } = options;
-  checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
-  checkMethod(selection, "scores", "The option selection must be a selection rule, such as gdinaDiscriminationIndex");
+  checkRules(stopping, selection, "gdinaDiscriminationIndex");
   const space = profileSpace(attributes, prior);
   const { items, indices } = bindPool(pool, space);
   const engine = adaptiveEngine({

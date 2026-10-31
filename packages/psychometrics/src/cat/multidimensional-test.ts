@@ -1,4 +1,4 @@
-import { checkMethod, checkOptions, type Random } from "@measurekit/core";
+import { checkOptions, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import { checkMultidimensionalItems, indexMultidimensionalItems } from "../multidimensional/items.js";
 import {
@@ -6,7 +6,7 @@ import {
   type MultidimensionalEstimator,
   multidimensionalPosteriorModeEstimate,
 } from "../multidimensional/scoring.js";
-import { type AdaptiveState, adaptiveEngine } from "./engine.js";
+import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
 import { checkCategory } from "./items.js";
 import { maximumDeterminant } from "./maximum-determinant.js";
 import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
@@ -128,11 +128,10 @@ export function multidimensionalAdaptiveTest(
     selection = maximumDeterminant(),
     estimator,
     contentTargets,
-    enemies = [],
+    enemies,
     withinTestlet,
   } = options;
-  checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
-  checkMethod(selection, "scores", "The option selection must be a selection rule, such as maximumDeterminant()");
+  checkRules(stopping, selection, "maximumDeterminant()");
   if (estimator !== undefined) {
     checkFunction(
       estimator,

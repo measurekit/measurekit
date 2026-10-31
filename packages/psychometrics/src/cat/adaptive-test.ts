@@ -1,8 +1,8 @@
-import { checkMethod, checkOptions, type Random } from "@measurekit/core";
+import { checkOptions, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import { type AbilityEstimate, type AbilityEstimator, posteriorMeanEstimate } from "../irt/ability.js";
 import { indexItems } from "../irt/items.js";
-import { type AdaptiveState, adaptiveEngine } from "./engine.js";
+import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
 import { checkResponse, type PoolItem } from "./items.js";
 import { type ItemSelectionRule, maximumInformation } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
@@ -113,11 +113,10 @@ export function adaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
     selection = maximumInformation,
     estimator = posteriorMeanEstimate,
     contentTargets,
-    enemies = [],
+    enemies,
     withinTestlet,
   } = options;
-  checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
-  checkMethod(selection, "scores", "The option selection must be a selection rule, such as maximumInformation");
+  checkRules(stopping, selection, "maximumInformation");
   checkFunction(
     estimator,
     "The option estimator must be a function of items and responses, such as posteriorMeanEstimate",
