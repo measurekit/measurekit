@@ -408,8 +408,16 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**"],
-                    "message": "rater/ imports no other module of the package."
+                    "group": [
+                      "../*",
+                      "../*/**",
+                      "!../checks.js",
+                      "!../data/**",
+                      "!../irt/**",
+                      "!../fit/**",
+                      "!../math/**"
+                    ],
+                    "message": "rater/ builds on data/, irt/, fit/ and math/ only."
                   }
                 ]
               }

@@ -17,7 +17,7 @@ Rscript validation/psychometrics/dif.R               # differential item functio
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
-Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych
+Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych; the many-facet Rasch model: base R, with TAM and sirt data
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
 Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
 Rscript validation/psychometrics/interop.R           # mirt's coefficient forms of every item type

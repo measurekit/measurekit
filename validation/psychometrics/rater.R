@@ -54,3 +54,398 @@ write_fixture("rater", list(
          fleiss = kappam.fleiss(diagnoses)$value, icc = icc_values(diagnoses))
   )
 ))
+
+# --- Many-facet Rasch model -----------------------------------------------------------------------------------------
+# References: the marginal likelihood written out in base R, with theta = mu + sigma z on the 61 rectangular points of
+# the package, maximized by BFGS and polished by Newton's method on numDeriv's gradient and Hessian, whose inverse gives
+# the standard errors; and TAM's tam.mml.mfr (constraint = "items"), run on the same scores as a check. Everything else
+# is base R written out at the maximum: person EAP, fair averages, element fit, separation and reliability.
+# Data: sirt's data.ratings1 (135 students, 5 criteria, 7 raters, each student rated by 1 to 7 of them), TAM's
+# data.sim.mfr (100 persons, 5 items, 5 raters and 3 topics, each person rated by one rater), and a simulation with an
+# incomplete design.
+
+suppressPackageStartupMessages({
+  library(numDeriv)
+  library(sirt)
+  library(TAM)
+})
+
+SEED <- 20261029
+Z <- seq(-6, 6, length.out = 61)
+LOG_WEIGHTS <- log(dnorm(Z) / sum(dnorm(Z)))
+
+# The scores in long format: a data frame with a person column, one column per facet and a score column. The design:
+# each distinct combination of the elements of the facets other than the person is a virtual item; a facet's measures
+# are effect coded, so that its n elements have n - 1 free parameters and the last is minus their sum, and a threshold
+# set of K thresholds has K - 1 free ones.
+facet_design <- function(long, facets, threshold_facet = NULL) {
+  person <- match(long$person, unique(long$person))
+  elements <- setNames(lapply(facets, function(f) unique(as.character(long[[f]]))), facets)
+  codes <- sapply(facets, function(f) match(as.character(long[[f]]), elements[[f]]))
+  codes <- matrix(codes, nrow = nrow(long))
+  key <- apply(codes, 1, paste, collapse = " ")
+  virtual <- match(key, unique(key))
+  combinations <- codes[!duplicated(key), , drop = FALSE]
+  contrasts <- lapply(elements, function(ids) {
+    if (length(ids) == 1) matrix(0, 1, 0) else rbind(diag(length(ids) - 1), -1)
+  })
+  X <- do.call(cbind, lapply(seq_along(facets), function(f) contrasts[[f]][combinations[, f], , drop = FALSE]))
+  set_of <- if (is.null(threshold_facet)) rep(1, nrow(combinations)) else combinations[, match(threshold_facet, facets)]
+  sets <- if (is.null(threshold_facet)) NA_character_ else elements[[threshold_facet]]
+  thresholds <- sapply(seq_along(sets), function(s) max(long$score[set_of[virtual] == s]))
+  list(long = long, facets = facets, person = person, elements = elements, contrasts = contrasts, virtual = virtual,
+       combinations = combinations, X = X, set_of = set_of, sets = sets, thresholds = thresholds,
+       threshold_facet = threshold_facet, persons = length(unique(person)))
+}
+
+# The parameter vector: location parameters of the facets in order, free thresholds of each set, mu, ln sigma.
+unpack <- function(design, phi) {
+  p <- ncol(design$X)
+  beta <- phi[seq_len(p)]
+  at <- p
+  thresholds <- vector("list", length(design$thresholds))
+  for (s in seq_along(thresholds)) {
+    free <- phi[at + seq_len(design$thresholds[s] - 1)]
+    at <- at + design$thresholds[s] - 1
+    thresholds[[s]] <- c(free, -sum(free))
+  }
+  list(beta = beta, thresholds = thresholds, mu = phi[at + 1], sigma = exp(phi[at + 2]))
+}
+
+# The log probability of every category of every virtual item at every node, theta = mu + sigma z: row (c - 1) * width
+# + k + 1 for item c and category k.
+node_tables <- function(design, phi) {
+  par <- unpack(design, phi)
+  theta <- par$mu + par$sigma * Z
+  location <- drop(design$X %*% par$beta)
+  width <- max(design$thresholds) + 1
+  table <- matrix(NA_real_, nrow(design$combinations) * width, length(Z))
+  for (c in seq_len(nrow(design$combinations))) {
+    steps <- location[c] + par$thresholds[[design$set_of[c]]]
+    logits <- rbind(0, outer(seq_along(steps), theta) - cumsum(steps))
+    top <- apply(logits, 2, max)
+    total <- top + log(colSums(exp(sweep(logits, 2, top))))
+    table[(c - 1) * width + seq_len(nrow(logits)), ] <- sweep(logits, 2, total)
+  }
+  list(par = par, width = width, table = table, rows = (design$virtual - 1) * width + design$long$score + 1)
+}
+
+# The log-likelihood of each person's scores at each node.
+person_node_loglik <- function(design, phi) {
+  tables <- node_tables(design, phi)
+  rowsum(tables$table[tables$rows, , drop = FALSE], design$person)
+}
+
+marginal_loglik <- function(design, phi) {
+  joint <- sweep(person_node_loglik(design, phi), 2, LOG_WEIGHTS, "+")
+  top <- apply(joint, 1, max)
+  sum(top + log(rowSums(exp(joint - top))))
+}
+
+# The gradient of the marginal log-likelihood, by Fisher's identity: the expected complete-data gradient, with the
+# posterior of each person over the nodes. For a virtual item with counts n_k of the expected persons in category k at a
+# node, N their total, S_j = P(X >= j) and M_j = the counts at or above j, the gradient with respect to step j is
+# N S_j - M_j, and with respect to theta sum(k n_k) - N E(X).
+marginal_gradient <- function(design, phi) {
+  tables <- node_tables(design, phi)
+  joint <- sweep(rowsum(tables$table[tables$rows, , drop = FALSE], design$person), 2, LOG_WEIGHTS, "+")
+  posterior <- exp(joint - apply(joint, 1, max))
+  posterior <- posterior / rowSums(posterior)
+  counts <- rowsum(posterior[design$person, , drop = FALSE], tables$rows)
+  expected <- matrix(0, nrow(tables$table), length(Z))
+  expected[as.integer(rownames(counts)), ] <- counts
+  p <- ncol(design$X)
+  starts <- p + cumsum(c(0, design$thresholds - 1))
+  gradient <- numeric(length(phi))
+  for (c in seq_len(nrow(design$combinations))) {
+    s <- design$set_of[c]
+    K <- design$thresholds[s]
+    rows <- (c - 1) * tables$width + seq_len(K + 1)
+    n <- expected[rows, , drop = FALSE]
+    probabilities <- exp(tables$table[rows, , drop = FALSE])
+    persons <- colSums(n)
+    tails <- function(x) apply(x, 2, function(column) rev(cumsum(rev(column))))[-1, , drop = FALSE]
+    step <- rowSums(sweep(tails(probabilities), 2, persons, "*") - tails(n))
+    theta <- colSums((0:K) * n) - persons * colSums((0:K) * probabilities)
+    gradient[seq_len(p)] <- gradient[seq_len(p)] + design$X[c, ] * sum(step)
+    gradient[starts[s] + seq_len(K - 1)] <- gradient[starts[s] + seq_len(K - 1)] + step[seq_len(K - 1)] - step[K]
+    gradient[length(phi) - 1] <- gradient[length(phi) - 1] + sum(theta)
+    gradient[length(phi)] <- gradient[length(phi)] + sum(theta * tables$par$sigma * Z)
+  }
+  gradient
+}
+
+# The maximum: BFGS on the exact gradient, then Newton's method on numDeriv's Jacobian of it. The gradient is checked
+# against numDeriv's gradient of the likelihood, and the information matrix is numDeriv's Hessian of the likelihood.
+maximize <- function(design) {
+  size <- ncol(design$X) + sum(design$thresholds - 1) + 2
+  negative <- function(phi) -marginal_loglik(design, phi)
+  negative_gradient <- function(phi) -marginal_gradient(design, phi)
+  probe <- seq(-0.3, 0.3, length.out = size)
+  stopifnot(max(abs(negative_gradient(probe) - grad(negative, probe))) < 1e-7 * max(abs(negative_gradient(probe))))
+  phi <- optim(rep(0, size), negative, negative_gradient, method = "BFGS",
+               control = list(maxit = 10000, reltol = 1e-15))$par
+  for (iteration in 1:100) {
+    step <- solve(jacobian(negative_gradient, phi), negative_gradient(phi))
+    phi <- phi - step
+    if (max(abs(step)) < 1e-11) break
+  }
+  stopifnot(max(abs(negative_gradient(phi))) < 1e-8)
+  information <- hessian(negative, phi)
+  stopifnot(max(abs(information - jacobian(negative_gradient, phi))) < 1e-5 * max(abs(information)))
+  list(phi = phi, information = information, logLikelihood = -negative(phi), size = size)
+}
+
+# Measures and standard errors by the delta method, and the thresholds with theirs.
+estimates <- function(design, fit) {
+  par <- unpack(design, fit$phi)
+  covariance <- solve(fit$information)
+  p <- ncol(design$X)
+  at <- 0
+  facets <- lapply(seq_along(design$facets), function(f) {
+    contrast <- design$contrasts[[f]]
+    index <- at + seq_len(ncol(contrast))
+    at <<- at + ncol(contrast)
+    list(facet = design$facets[f], ids = design$elements[[f]], measure = drop(contrast %*% par$beta[index]),
+         standardError = sqrt(diag(contrast %*% covariance[index, index, drop = FALSE] %*% t(contrast))))
+  })
+  at <- p
+  thresholds <- lapply(seq_along(design$thresholds), function(s) {
+    contrast <- rbind(diag(design$thresholds[s] - 1), -1)
+    index <- at + seq_len(design$thresholds[s] - 1)
+    at <<- at + design$thresholds[s] - 1
+    list(element = design$sets[s], thresholds = par$thresholds[[s]],
+         standardErrors = sqrt(diag(contrast %*% covariance[index, index, drop = FALSE] %*% t(contrast))))
+  })
+  list(facets = facets, thresholds = thresholds, mean = par$mu, sd = par$sigma)
+}
+
+# P(category) of a partial credit item with location `location` and thresholds `tau` at theta, a = 1.
+category_probabilities <- function(theta, location, tau) {
+  logits <- c(0, cumsum(theta - location - tau))
+  weights <- exp(logits - max(logits))
+  weights / sum(weights)
+}
+
+# The expected rating at theta with the elements `levels`, a character vector with an NA for each facet at its mean;
+# with the threshold facet at NA, the expected ratings under the thresholds of each of its elements are averaged.
+expected_rating <- function(est, threshold_facet, theta, levels) {
+  names <- sapply(est$facets, `[[`, "facet")
+  location <- sum(sapply(seq_along(levels), function(f) {
+    if (is.na(levels[f])) 0 else est$facets[[f]]$measure[match(levels[f], est$facets[[f]]$ids)]
+  }))
+  owner <- if (is.null(threshold_facet)) NA_character_ else levels[match(threshold_facet, names)]
+  keep <- if (is.na(owner)) rep(TRUE, length(est$thresholds)) else sapply(est$thresholds, function(s) identical(s$element, owner))
+  mean(sapply(est$thresholds[keep], function(s) {
+    sum(0:length(s$thresholds) * category_probabilities(theta, location, s$thresholds))
+  }))
+}
+
+# EAP estimates of the persons under N(mu, sigma^2) on the rule: the posterior mean and SD of theta.
+person_estimates <- function(design, fit) {
+  par <- unpack(design, fit$phi)
+  theta <- par$mu + par$sigma * Z
+  joint <- sweep(person_node_loglik(design, fit$phi), 2, LOG_WEIGHTS, "+")
+  posterior <- exp(joint - apply(joint, 1, max))
+  posterior <- posterior / rowSums(posterior)
+  mean_theta <- drop(posterior %*% theta)
+  list(id = unique(design$long$person), theta = mean_theta,
+       standardError = sqrt(rowSums(posterior * outer(mean_theta, theta, "-")^2)))
+}
+
+# Infit and outfit mean squares and their Wilson-Hilferty standardized forms (Wright and Masters, 1982) of every
+# element of every facet, from the residuals of its scores at the persons' estimates.
+element_fit <- function(design, fit, persons) {
+  par <- unpack(design, fit$phi)
+  location <- drop(design$X %*% par$beta)
+  moments <- t(sapply(seq_len(nrow(design$long)), function(i) {
+    c <- design$virtual[i]
+    tau <- par$thresholds[[design$set_of[c]]]
+    p <- category_probabilities(persons$theta[design$person[i]], location[c], tau)
+    k <- seq_along(p) - 1
+    mean <- sum(k * p)
+    c(design$long$score[i] - mean, sum((k - mean)^2 * p), sum((k - mean)^4 * p))
+  }))
+  standardized <- function(ms, q) (ms^(1 / 3) - 1) * (3 / q) + q / 3
+  result <- list()
+  for (f in seq_along(design$facets)) {
+    codes <- match(as.character(design$long[[design$facets[f]]]), design$elements[[f]])
+    for (e in seq_along(design$elements[[f]])) {
+      rows <- moments[codes == e, , drop = FALSE]
+      residual <- rows[, 1]; variance <- rows[, 2]; fourth <- rows[, 3]
+      n <- nrow(rows)
+      outfit <- mean(residual^2 / variance)
+      infit <- sum(residual^2) / sum(variance)
+      outfit_q <- sqrt(sum(fourth / variance^2) / n^2 - 1 / n)
+      infit_q <- sqrt(sum(fourth - variance^2) / sum(variance)^2)
+      result[[length(result) + 1]] <- list(facet = design$facets[f], id = design$elements[[f]][e],
+        infitMeanSquare = infit, outfitMeanSquare = outfit, infitStandardized = standardized(infit, infit_q),
+        outfitStandardized = standardized(outfit, outfit_q))
+    }
+  }
+  result
+}
+
+# Separation, reliability and the homogeneity chi-square of a facet's measures with their standard errors.
+facet_summary <- function(measure, error) {
+  observed <- mean((measure - mean(measure))^2)
+  mean_square_error <- mean(error^2)
+  true_variance <- max(observed - mean_square_error, 0)
+  weights <- 1 / error^2
+  chi_square <- max(sum(weights * measure^2) - sum(weights * measure)^2 / sum(weights), 0)
+  list(separation = sqrt(true_variance / mean_square_error), reliability = true_variance / observed,
+       homogeneity = list(chiSquare = chi_square, degreesOfFreedom = length(measure) - 1,
+                          significance = pchisq(chi_square, length(measure) - 1, lower.tail = FALSE)))
+}
+
+# TAM on the same scores: `wide` has a row per person and rater and a column per item, `facets` the rater of each row.
+tam_check <- function(wide, facets, pid, formula, design, est, fit) {
+  model <- tam.mml.mfr(resp = wide, facets = facets, pid = pid, formulaA = formula, constraint = "items",
+                       control = list(nodes = Z, conv = 1e-10, convD = 1e-10, maxiter = 3000), verbose = FALSE)
+  table <- model$xsi.facets
+  differences <- unlist(lapply(est$facets, function(facet) {
+    rows <- table[table$facet == facet$facet, ]
+    names <- if (facet$facet == "item") rows$parameter else sub(paste0("^", facet$facet), "", rows$parameter)
+    rows$xsi[match(facet$ids, names)] - facet$measure
+  }))
+  steps <- lapply(est$thresholds, function(set) {
+    rows <- table[table$facet == (if (is.na(set$element)) "step" else paste0(design$threshold_facet, ":step")), ]
+    if (!is.na(set$element)) rows <- rows[startsWith(rows$parameter, paste0(set$element, ":")), ]
+    rows$xsi[seq_along(set$thresholds)] - set$thresholds
+  })
+  list(logLikelihood = -model$deviance / 2, mean = drop(model$beta), sd = sqrt(drop(model$variance)),
+       iterations = model$iter, converged = model$iter < 3000,
+       measureDifference = max(abs(differences)), thresholdDifference = max(abs(unlist(steps))),
+       logLikelihoodDifference = -model$deviance / 2 - fit$logLikelihood,
+       sdDifference = sqrt(drop(model$variance)) - est$sd, meanDifference = drop(model$beta) - est$mean)
+}
+
+# One model of a dataset: the base R maximum with its summaries, fit and fair averages, and TAM's check.
+mfrm_case <- function(long, facets, threshold_facet, tam) {
+  design <- facet_design(long, facets, threshold_facet)
+  fit <- maximize(design)
+  est <- estimates(design, fit)
+  persons <- person_estimates(design, fit)
+  summaries <- lapply(seq_along(facets), function(f) {
+    codes <- match(as.character(long[[facets[f]]]), design$elements[[f]])
+    facet <- est$facets[[f]]
+    average <- function(e) {
+      levels <- rep(NA_character_, length(facets))
+      levels[f] <- facet$ids[e]
+      expected_rating(est, threshold_facet, est$mean, levels)
+    }
+    c(list(facet = facets[f], ids = facet$ids, measures = facet$measure, standardErrors = facet$standardError,
+           counts = as.numeric(table(factor(codes, seq_along(facet$ids)))),
+           observedAverages = as.numeric(tapply(long$score, factor(codes, seq_along(facet$ids)), mean)),
+           fairAverages = sapply(seq_along(facet$ids), average)),
+      if (length(facet$ids) > 1) facet_summary(facet$measure, facet$standardError))
+  })
+  probes <- lapply(c(-1, 0, 1.5), function(theta) {
+    levels <- rep(NA_character_, length(facets))
+    levels[1] <- est$facets[[1]]$ids[1]
+    levels[length(levels)] <- est$facets[[length(levels)]]$ids[2]
+    list(theta = theta, levels = setNames(as.list(levels[!is.na(levels)]), facets[!is.na(levels)]),
+         value = expected_rating(est, threshold_facet, theta, levels),
+         fair = expected_rating(est, threshold_facet, theta, rep(NA_character_, length(facets))))
+  })
+  message(paste(facets, collapse = " + "), if (is.null(threshold_facet)) "" else paste0(" (thresholds by ", threshold_facet, ")"),
+          ": ", design$persons, " persons, ", nrow(long), " scores, log-likelihood ", round(fit$logLikelihood, 6))
+  # TAM 4.3-25 cannot build the design for thresholds by a facet of more than three elements other than the items.
+  tam_result <- tryCatch(do.call(tam_check, c(tam, list(design = design, est = est, fit = fit))), error = function(e) {
+    message("  TAM failed: ", conditionMessage(e))
+    NULL
+  })
+  if (!is.null(tam_result)) {
+    message("  TAM: ", tam_result$iterations, " iterations; differences from the maximum: log-likelihood ",
+            signif(tam_result$logLikelihoodDifference, 3), ", mean ", signif(tam_result$meanDifference, 3), ", SD ",
+            signif(tam_result$sdDifference, 3), ", measures ", signif(tam_result$measureDifference, 3), ", thresholds ",
+            signif(tam_result$thresholdDifference, 3))
+  }
+  list(
+    facets = facets, thresholdFacet = if (is.null(threshold_facet)) NULL else threshold_facet,
+    summaries = summaries,
+    thresholds = lapply(est$thresholds, function(s) list(element = if (is.na(s$element)) NULL else s$element,
+                                                         thresholds = s$thresholds, standardErrors = s$standardErrors)),
+    mean = est$mean, sd = est$sd, logLikelihood = fit$logLikelihood, parameters = fit$size,
+    persons = persons, fit = element_fit(design, fit, persons), expectedRatings = probes,
+    tam = tam_result
+  )
+}
+
+# Scores in long format from a wide matrix with a row per person and rater, row by row.
+long_scores <- function(wide, person, facets) {
+  items <- ncol(wide)
+  data.frame(person = rep(as.character(person), each = items), item = rep(colnames(wide), times = nrow(wide)),
+             lapply(facets, function(f) rep(as.character(f), each = items)), score = as.vector(t(wide)),
+             stringsAsFactors = FALSE)
+}
+
+# Dataset 1: sirt's data.ratings1.
+data(data.ratings1)
+ratings1_wide <- as.matrix(data.ratings1[, paste0("k", 1:5)])
+ratings1 <- long_scores(ratings1_wide, data.ratings1$idstud, list(rater = data.ratings1$rater))
+ratings1_tam <- function(formula) {
+  list(wide = data.ratings1[, paste0("k", 1:5)], facets = data.frame(rater = as.character(data.ratings1$rater)),
+       pid = data.ratings1$idstud, formula = formula)
+}
+
+# Dataset 2: TAM's data.sim.mfr, a person per row, with its rater and topic.
+data(data.sim.mfr, data.sim.facets)
+sim_wide <- data.sim.mfr
+colnames(sim_wide) <- paste0("i", 1:5)
+sim_ids <- paste0("p", seq_len(nrow(sim_wide)))
+sim_facets <- list(rater = paste0("r", data.sim.facets$rater), topic = paste0("t", data.sim.facets$topic))
+tam_sim <- long_scores(sim_wide, sim_ids, sim_facets)
+tam_sim_tam <- function(formula) {
+  list(wide = as.data.frame(sim_wide), facets = data.frame(sim_facets), pid = sim_ids, formula = formula)
+}
+
+# Dataset 3: 300 persons, 4 items, 6 raters, 4 categories; each person is rated on every item by 2 raters of 6, and the
+# raters use the scale differently: their thresholds are the common ones times 0.8, 0.9, 1, 1.1, 1.2 and 1.
+set.seed(SEED)
+sim_severity <- c(-0.6, -0.3, 0, 0.1, 0.3, 0.5)
+sim_difficulty <- c(-0.8, -0.2, 0.3, 0.7)
+sim_tau <- c(-1.2, 0.1, 1.1)
+sim_spread <- c(0.8, 0.9, 1, 1.1, 1.2, 1)
+sim_theta <- rnorm(300, 0.3, 1.2)
+incomplete_rows <- list()
+for (person in seq_along(sim_theta)) {
+  for (rater in sample(6, 2)) {
+    scores <- sapply(sim_difficulty, function(difficulty) {
+      probabilities <- category_probabilities(sim_theta[person], difficulty + sim_severity[rater], sim_tau * sim_spread[rater])
+      sample(0:3, 1, prob = probabilities)
+    })
+    incomplete_rows[[length(incomplete_rows) + 1]] <- list(person = paste0("p", person), rater = paste0("r", rater), scores = scores)
+  }
+}
+incomplete_wide <- do.call(rbind, lapply(incomplete_rows, `[[`, "scores"))
+colnames(incomplete_wide) <- paste0("i", 1:4)
+incomplete_person <- sapply(incomplete_rows, `[[`, "person")
+incomplete_rater <- sapply(incomplete_rows, `[[`, "rater")
+incomplete <- long_scores(incomplete_wide, incomplete_person, list(rater = incomplete_rater))
+incomplete_tam <- function(formula) {
+  list(wide = as.data.frame(incomplete_wide), facets = data.frame(rater = incomplete_rater), pid = incomplete_person,
+       formula = formula)
+}
+
+scores_of <- function(long, facets) {
+  c(list(person = long$person), setNames(lapply(facets, function(f) long[[f]]), facets), list(score = long$score))
+}
+
+write_fixture("rater-many-facet", list(
+  source = "sirt's data.ratings1 (7 raters); TAM's data.sim.mfr (5 raters, 3 topics); a simulation, set.seed(20261029): 300 persons, 4 items, 6 raters, 2 raters per person.",
+  cases = list(
+    list(name = "ratings1", scores = scores_of(ratings1, c("item", "rater")),
+         models = list(
+           mfrm_case(ratings1, c("item", "rater"), NULL, ratings1_tam(~ item + rater + step)),
+           mfrm_case(ratings1, c("item", "rater"), "item", ratings1_tam(~ item + rater + item:step)))),
+    list(name = "data.sim.mfr", scores = scores_of(tam_sim, c("item", "rater", "topic")),
+         models = list(
+           mfrm_case(tam_sim, c("item", "rater"), NULL, tam_sim_tam(~ item + rater + step)),
+           mfrm_case(tam_sim, c("item", "rater", "topic"), NULL, tam_sim_tam(~ item + rater + topic + step)))),
+    list(name = "incomplete design", scores = scores_of(incomplete, c("item", "rater")),
+         models = list(
+           mfrm_case(incomplete, c("item", "rater"), NULL, incomplete_tam(~ item + rater + step)),
+           mfrm_case(incomplete, c("item", "rater"), "rater", incomplete_tam(~ item + rater + rater:step))))
+  )
+))

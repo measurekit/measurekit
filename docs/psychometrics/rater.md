@@ -1,8 +1,10 @@
-# Rater agreement
+# Rater agreement and effects
 
 `@measurekit/psychometrics/rater` measures how far raters agree: Cohen's kappa for two raters, unweighted, linear
-or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of scores. Each is validated
-against irr and psych ([validation](validation.md)).
+or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of scores. It also estimates what
+raters do to scores: the many-facet Rasch model puts persons, items and raters on one scale, so that a rater's severity
+is a number of logits and a person's score can be adjusted for the raters who gave it. The agreement statistics are
+validated against irr and psych, the model against base R and TAM ([validation](validation.md)).
 
 ## Ratings
 
@@ -73,13 +75,191 @@ Use the single-rater forms when one rater scores each subject in practice, the a
 is the raters' mean; absolute agreement when raters' leniency matters, consistency when only their ordering does. A
 coefficient whose denominator is 0, as when every rating is equal, is `null`.
 
+## Many-facet Rasch model
+
+`manyFacetRasch(scores, options)` estimates the many-facet Rasch model (Linacre, 1989) by marginal maximum likelihood.
+Each score names the element of every facet it was given at: the person, the item or task, the rater, and any further
+facet such as the occasion. The model says how much each element adds to the score, in logits.
+
+```ts
+import { expectedRating, manyFacetEstimates, manyFacetFit, manyFacetRasch } from "@measurekit/psychometrics/rater";
+
+// Twelve essays scored 0 to 3 on content and style by two of three raters: essay, rater, content, style.
+const rows = [
+  ["e1", "r1", 1, 1],
+  ["e1", "r2", 1, 2],
+  ["e2", "r2", 2, 2],
+  ["e2", "r3", 3, 2],
+  ["e3", "r1", 3, 2],
+  ["e3", "r3", 2, 3],
+  ["e4", "r1", 1, 1],
+  ["e4", "r2", 2, 1],
+  ["e5", "r2", 3, 2],
+  ["e5", "r3", 3, 1],
+  ["e6", "r1", 2, 0],
+  ["e6", "r3", 3, 3],
+  ["e7", "r1", 0, 0],
+  ["e7", "r2", 3, 2],
+  ["e8", "r2", 2, 0],
+  ["e8", "r3", 3, 0],
+  ["e9", "r1", 1, 0],
+  ["e9", "r3", 1, 1],
+  ["e10", "r1", 2, 2],
+  ["e10", "r2", 2, 2],
+  ["e11", "r2", 1, 2],
+  ["e11", "r3", 1, 2],
+  ["e12", "r1", 2, 1],
+  ["e12", "r3", 1, 2],
+] as const;
+const scores = rows.flatMap(([person, rater, content, style]) => [
+  { levels: { person, item: "content", rater }, score: content },
+  { levels: { person, item: "style", rater }, score: style },
+]);
+
+const model = manyFacetRasch(scores, { facets: ["item", "rater"] });
+model.facets[1]?.elements.map(({ id, measure }) => [id, measure]); // [["r1", 0.77], ["r2", -0.31], ["r3", -0.46]]
+model.facets[1]?.elements.map(({ fairAverage }) => fairAverage); // [1.15, 1.87, 1.96]: r1 is the severe rater
+model.facets[1]?.reliability; // 0.68
+expectedRating(model, 0.5, { rater: "r1" }); // 1.35: the score of a person of theta 0.5 from the severest rater
+expectedRating(model, 0.5, { rater: "r3" }); // 2.12
+const persons = manyFacetEstimates(scores, model); // EAP: e1 { theta: 0.03, standardError: 0.42 }
+manyFacetFit(scores, model, persons).find(({ id }) => id === "r3")?.infitMeanSquare; // 1.22
+```
+
+### Scores
+
+`scores` is an array of `FacetedScore`s, `{ levels, score }`, one for each score in long format ([data](data.md)):
+`levels` holds the element of each facet by facet name, as strings, and `score` an integer from 0.
+
+| Rule                                 | Meaning                                                                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| One element of each facet            | The person facet and the facets in `facets`; other keys of `levels` are ignored                                             |
+| Connected                            | Each score links its person to its elements; all persons and elements must form one set, or the measures are not comparable |
+| Categories 0 to the highest, no gaps | In each rating scale, at least two categories, and every category up to the highest used                                    |
+| Two persons                          | At least two persons                                                                                                        |
+
+A person may have several scores for one combination of elements, such as two ratings by one rater of the same item;
+they count as independent observations. A design in which raters have no person or item in common is not connected,
+and `manyFacetRasch` throws a `DataError` that names the subsets.
+
+### Model
+
+For a score in category k of a person with ability θ, with the measure δ of its element in each facet f, and the
+thresholds τ of the rating scale s, the log odds of k against k - 1 are
+
+θ - Σ_f δ_(f, element) - τ_(s, k),
+
+and θ is normal with a mean μ and a standard deviation σ that are estimated. Each distinct combination of the elements
+of the facets other than the person is a virtual item, so a person's scores are independent given θ. To identify the
+scale, the measures of each facet sum to 0 and the thresholds of each set sum to 0; positive measures are harder items
+and more severe raters, and μ carries the overall level.
+
+The model is estimated by the EM algorithm of `calibrate`, over partial credit items with a = 1, with Newton's method
+for all measures, thresholds, μ and σ together. Standard errors come from the Hessian of the marginal log-likelihood,
+and, for the element each facet's constraint leaves out and for the last threshold, from the delta method.
+
+| Option           | Default                 | Meaning                                                                                                 |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `person`         | `"person"`              | The facet that names the persons                                                                        |
+| `facets`         | required                | The other facets, such as `["item", "rater"]`: at least one, none repeated; facets beyond two add terms |
+| `thresholdFacet` | one scale shared by all | A facet whose elements each get their own thresholds, as the partial credit model: one of `facets`      |
+| `quadrature`     | 61 rectangular points   | The rule over theta, as `calibrate`                                                                     |
+| `standardErrors` | `"hessian"`             | `"none"` leaves out the standard errors, and with them the separation, reliability and homogeneity test |
+| `tolerance`      | `1e-4`                  | EM stops when no parameter changes by more than this                                                    |
+| `maxIterations`  | `500`                   | The most EM iterations                                                                                  |
+
+### Result
+
+| Field                         | Meaning                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `facets`                      | A `FacetSummary` for each facet in `facets`                                                                    |
+| `thresholds`                  | The thresholds and their standard errors for the shared scale, or for each element of `thresholdFacet`         |
+| `population`                  | The mean and the standard deviation of θ                                                                       |
+| `logLikelihood`, `aic`, `bic` | The marginal log-likelihood; -2 ln L + 2p; -2 ln L + p ln n, p the parameters, μ and σ included, n the persons |
+| `converged`, `iterations`     | Whether EM reached `tolerance`, and the iterations run                                                         |
+
+A `FacetSummary` holds the facet's `elements`, in order of first appearance, and the statistics of the facet:
+
+| Field                        | Meaning                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `elements[].measure`         | The element's measure in logits                                                                                          |
+| `elements[].standardError`   | Its standard error: 0 for the one element of a facet, `null` without standard errors                                     |
+| `elements[].count`           | Its number of scores                                                                                                     |
+| `elements[].observedAverage` | The mean of its scores                                                                                                   |
+| `elements[].fairAverage`     | Its expected score at θ = μ with the other facets at their means: the average the element would give to a typical person |
+| `separation`                 | The standard deviation of the measures net of error over the root mean square error                                      |
+| `reliability`                | The share of the variance of the measures that is not error                                                              |
+| `homogeneity`                | The chi-square that all elements have the same measure, with its degrees of freedom and significance                     |
+
+With V the variance of the measures (dividing by the number of elements) and M the mean of the squared standard errors,
+the true variance is max(V - M, 0), the separation is its square root over √M, and the reliability is the true variance
+over V (Wright and Masters, 1982). The homogeneity chi-square is Σ w d² - (Σ w d)² / Σ w with d the measures and
+w = 1 / SE², on as many degrees of freedom as elements less 1, as FACETS' "fixed (all same)" test. All three are `null`
+for a facet of one element and without standard errors.
+
+A threshold set has K - 1 thresholds for categories 0 to K - 1. A threshold the constraint fixes, as the one threshold of
+a two-category scale, has the standard error 0.
+
+### Persons, fair scores and fit
+
+| Function                                       | Returns                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| `manyFacetEstimates(scores, model, estimator)` | A `PersonEstimate` for each person in the scores, in order of first appearance |
+| `expectedRating(model, theta, levels)`         | The expected rating of a person at θ on the elements in `levels`               |
+| `manyFacetFit(scores, model, persons)`         | A `FacetFit` for each element of each facet                                    |
+
+`manyFacetEstimates` turns each of a person's scores into a response to a partial credit item with a = 1, whose steps are
+the sum of the measures of the score's elements plus the thresholds of its set, and passes them to an
+[ability estimator](irt.md): the default is the posterior mean under the normal population of the model; any other,
+such as `maximumLikelihoodEstimate`, works. The estimates account for the raters' and items' measures, so a person
+rated by severe raters is not penalized. Scores need elements the model has, in categories its thresholds give.
+
+`expectedRating` is the fair score, the severity-adjusted score that a platform reports for an essay: the rating a
+person of ability θ would get from raters and items at the given elements. A facet not in `levels` is at its mean, a
+measure of 0; with a `thresholdFacet` not in `levels`, the expected ratings under each of its elements' thresholds are
+averaged.
+
+`manyFacetFit` gives each element the infit and outfit mean squares and their standardized forms of the
+[residual fit](fit.md#infit-and-outfit), computed over the scores of the element at the persons' estimates. Mean squares near 1
+fit; above 1.5, a rater who departs from the others unpredictably; below 0.5, one whose scores are too predictable
+(Linacre, 2002). Scores of persons without an estimate are skipped.
+
+### Not included
+
+- Joint maximum likelihood (FACETS), whose measures are biased for short tests; marginal maximum likelihood is
+  consistent. Measures differ from FACETS' by its bias.
+- Bias (interaction) analysis, rater drift over time and the hierarchical rater model, each of which needs its own
+  terms in the model.
+- A person facet other than one: the persons are the only random facet.
+
+### Differences from FACETS
+
+| Topic          | This package                                                         | FACETS                                                                  |
+| -------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Estimation     | Marginal maximum likelihood, theta normal with estimated mean and SD | Joint maximum likelihood, persons as parameters: biased for short tests |
+| Identification | The measures of each facet and the thresholds of each set sum to 0   | Facets centered or anchored as specified; persons free                  |
+| Separation     | The variance of the measures divided by the number of elements       | Reports it for the population (N) and for the sample (N - 1)            |
+
+### Differences from TAM
+
+| Topic                 | This package                                                                              | TAM's `tam.mml.mfr`                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Quadrature            | Nodes μ + σ z on the 61 points of -6 to 6 standard deviations                             | Fixed nodes in theta units, weighted by the normal density at the estimated mean and SD |
+| Convergence           | EM with Newton's method for all parameters: 66 to 280 iterations to 1e-11 on the fixtures | EM that stops short of the maximum within 3000 iterations on the fixtures               |
+| Constraints           | Each facet and each set of thresholds sums to 0                                           | The same, with `constraint = "items"`                                                   |
+| Thresholds by a facet | Any facet                                                                                 | `rater:step` fails with more than three raters in TAM 4.3-25                            |
+
 ## References
 
 - Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and Psychological Measurement, 20,
   37-46.
 - Cohen, J. (1968). Weighted kappa. Psychological Bulletin, 70, 213-220.
 - Fleiss, J. L. (1971). Measuring nominal scale agreement among many raters. Psychological Bulletin, 76, 378-382.
+- Linacre, J. M. (1989). Many-facet Rasch measurement. MESA Press.
+- Linacre, J. M. (2002). What do infit and outfit, mean-square and standardized mean? Rasch Measurement Transactions,
+  16(2), 878.
 - McGraw, K. O., & Wong, S. P. (1996). Forming inferences about some intraclass correlation coefficients.
   Psychological Methods, 1, 30-46.
 - Shrout, P. E., & Fleiss, J. L. (1979). Intraclass correlations: Uses in assessing rater reliability. Psychological
   Bulletin, 86, 420-428.
+- Wright, B. D., & Masters, G. N. (1982). Rating scale analysis. MESA Press.
