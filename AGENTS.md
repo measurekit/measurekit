@@ -158,7 +158,7 @@ pnpm install
 pnpm lint             # Biome and cspell; `pnpm format` fixes formatting
 pnpm typecheck        # tsc over the sources, tests and examples of every package
 pnpm test             # Vitest, one project per package; `pnpm test --project psychometrics` runs one
-pnpm bench            # the benchmarks of every package, one after another, against the budgets of `test/budgets.ts`
+pnpm bench            # builds, then the benchmarks of every package, one after another, against the budgets of `test/budgets.ts`
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package: tsc -b after deleting dist/, so that no stale output ships
 pnpm check:packages   # builds, then publint and Are the Types Wrong on each packed package
