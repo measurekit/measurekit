@@ -7,13 +7,13 @@
 ### Where measurekit is slower
 
 ```mermaid
-%%{init: {"xyChart": {"height": 388, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 252, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Tasks that take more than 1.5 times as long as the reference"
-  x-axis ["rater.manyFacetRasch", "md.estimateMean", "cdm.attributeProfiles", "md.calibrateExploratory", "numerics.cholesky", "cdm.calibrateGdina", "cdm.calibrateDino"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 13
-  bar [13, 13, 9.3, 5.3, 4.6, 2, 1.5]
-  line [1, 1, 1, 1, 1, 1, 1]
+  x-axis ["cdm.attributeProfiles", "numerics.cholesky", "data.scoreResponses"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 4
+  bar [4, 4, 1.5]
+  line [1, 1, 1]
 ```
 
 A bar above the line takes longer than the reference, and md stands for multidimensional.
@@ -25,69 +25,69 @@ A bar above the line takes longer than the reference, and md stands for multidim
 xychart-beta horizontal
   title "Core: numerics, random"
   x-axis ["normalQuantile", "logistic", "cholesky", "uniform", "normal"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 5
-  bar [1, 0.44, 4.6, 1.1, 0.87]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 4
+  bar [0.83, 0.52, 4, 1.1, 0.94]
   line [1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 524, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 762, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: ctt, data, dif, dimensionality"
-  x-axis ["itemStatistics", "cronbachAlpha", "mcdonaldOmega", "subscoreValue", "scoreResponses", "mantelHaenszel", "logisticRegression", "lordChiSquare", "ordinalLogistic", "polychoricCorrelations", "parallelAnalysis"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.2, 0.033, 0.56, 0.016, 1.3, 0.052, 0.43, 0.55, 0.26, 0.0071, 0.0033]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  title "Psychometrics: cat, cdm, ctt, data"
+  x-axis ["simulateAdaptive", "simulateDiagnostic", "simulateMultidimensional", "calibrateGdina", "calibrateDina", "calibrateDino", "calibrateAcdm", "calibrateLlm", "calibrateRrum", "attributeProfiles", "accuracy", "validateQMatrix", "nonparametric", "itemStatistics", "cronbachAlpha", "mcdonaldOmega", "subscoreValue", "scoreResponses"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 4
+  bar [0.021, 0.037, 0.013, 0.85, 0.5, 0.62, 0.19, 0.17, 0.31, 4, 0.66, 1, 0.064, 0.2, 0.037, 0.62, 0.02, 1.5]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
 %%{init: {"xyChart": {"height": 728, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: equating, explanatory, fit"
-  x-axis ["linear", "equipercentile", "presmoothing", "bootstrapLinear", "tucker", "frequencyEstimation", "chainedEquipercentile", "stockingLordLinking", "haebaraLinking", "trueScore", "irtObservedScore", "itemFeatureRegression", "lltm", "itemFit", "personFit", "summedScoreFit", "yenQ3"]
+  title "Psychometrics: dif, dimensionality, equating"
+  x-axis ["mantelHaenszel", "logisticRegression", "lordChiSquare", "ordinalLogistic", "polychoricCorrelations", "parallelAnalysis", "linear", "equipercentile", "presmoothing", "bootstrapLinear", "tucker", "frequencyEstimation", "chainedEquipercentile", "stockingLordLinking", "haebaraLinking", "trueScore", "irtObservedScore"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.00081, 0.008, 0.029, 0.098, 0.0045, 0.0039, 0.015, 0.038, 0.029, 0.016, 0.12, 0.016, 0.66, 0.076, 0.21, 0.12, 0.042]
+  bar [0.076, 0.51, 0.76, 0.37, 0.0065, 0.0031, 0.00081, 0.0093, 0.035, 0.1, 0.0047, 0.0041, 0.015, 0.041, 0.037, 0.019, 0.14]
   line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 320, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 388, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: generalizability, mokken"
-  x-axis ["generalizabilityStudy", "scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering"]
+  title "Psychometrics: explanatory, fit, generalizability"
+  x-axis ["itemFeatureRegression", "lltm", "itemFit", "personFit", "summedScoreFit", "yenQ3", "generalizabilityStudy"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.0027, 0.0091, 0.024, 0.16, 0.16]
-  line [1, 1, 1, 1, 1]
-```
-
-```mermaid
-%%{init: {"xyChart": {"height": 694, "xAxis": {"labelFontSize": 11}}}}%%
-xychart-beta horizontal
-  title "Psychometrics: responseTime, sim, irt"
-  x-axis ["calibrateResponseTimes", "simulateResponses", "calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "testInformation"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.036, 0.35, 0.82, 0.63, 0.6, 0.33, 0.013, 0.27, 0.15, 0.0031, 0.7, 0.078, 0.11, 0.017, 0.47, 0.4]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.019, 0.29, 0.087, 0.23, 0.14, 0.047, 0.0028]
+  line [1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
 %%{init: {"xyChart": {"height": 592, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: cat, cdm"
-  x-axis ["simulateAdaptive", "simulateDiagnostic", "simulateMultidimensional", "calibrateGdina", "calibrateDina", "calibrateDino", "calibrateAcdm", "calibrateLlm", "calibrateRrum", "attributeProfiles", "accuracy", "validateQMatrix", "nonparametric"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 10
-  bar [0.021, 0.035, 0.013, 2, 1.2, 1.5, 0.39, 0.36, 0.62, 9.3, 1.2, 0.86, 0.06]
+  title "Psychometrics: mokken, rater, responseTime, sim"
+  x-axis ["scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering", "cohenKappa", "fleissKappa", "exactAgreement", "adjacentAgreement", "meanDifference", "intraclassCorrelation", "manyFacetRasch", "calibrateResponseTimes", "simulateResponses"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.011, 0.032, 0.18, 0.19, 0.2, 0.008, 0.061, 0.061, 1.2, 0.0028, 1.2, 0.04, 0.38]
   line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 660, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: rater, multidimensional"
-  x-axis ["cohenKappa", "fleissKappa", "exactAgreement", "adjacentAgreement", "meanDifference", "intraclassCorrelation", "manyFacetRasch", "calibrateConfirmatory", "calibrateGraded", "calibrateExploratory", "calibrateMhrm", "estimateMode", "estimateMean", "rotateOblimin", "rotateVarimax"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 13
-  bar [0.19, 0.0079, 0.057, 0.062, 1.2, 0.0026, 13, 1.2, 0.48, 5.3, 0.93, 0.051, 13, 0.14, 0.22]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  title "Psychometrics: irt"
+  x-axis ["calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "testInformation"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.87, 0.59, 0.58, 0.33, 0.016, 0.31, 0.25, 0.0036, 0.71, 0.074, 0.12, 0.016, 0.41, 0.46]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 422, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: multidimensional"
+  x-axis ["calibrateConfirmatory", "calibrateGraded", "calibrateExploratory", "calibrateMhrm", "estimateMode", "estimateMean", "rotateOblimin", "rotateVarimax"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.34, 0.17, 0.64, 0.73, 0.047, 0.76, 0.14, 0.24]
+  line [1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
@@ -96,7 +96,7 @@ xychart-beta horizontal
   title "Knowledge tracing: bkt, elo, evaluate, irt, kst"
   x-axis ["fit", "replay", "replay", "auc", "replay", "blim", "iita"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.012, 0.03, 0.52, 1.3, 0.22, 0.92, 0.000014]
+  bar [0.012, 0.034, 0.58, 1.3, 0.19, 0.97, 0.000015]
   line [1, 1, 1, 1, 1, 1, 1]
 ```
 
@@ -120,13 +120,13 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 ### Core
 
-| Task                       | Size                              | measurekit (ms) | Reference            | Reference (ms) |    Ratio |
-| -------------------------- | --------------------------------- | --------------: | -------------------- | -------------: | -------: |
-| Normal quantile function   | 1,000,000 probabilities           |            6.57 | stats 4.6.1 `qnorm`  |           6.50 |       1× |
-| Logistic function          | 1,000,000 points                  |            2.74 | stats 4.6.1 `plogis` |           6.22 |    0.44× |
-| **Cholesky factorization** | A correlation matrix of order 200 |           0.546 | base 4.6.1 `chol`    |          0.118 | **4.6×** |
-| Uniform draws              | 1,000,000 draws                   |            3.66 | stats 4.6.1 `runif`  |           3.38 |     1.1× |
-| Normal draws               | 1,000,000 draws                   |            11.5 | stats 4.6.1 `rnorm`  |           13.2 |    0.87× |
+| Task                       | Size                              | measurekit (ms) | Reference            | Reference (ms) |  Ratio |
+| -------------------------- | --------------------------------- | --------------: | -------------------- | -------------: | -----: |
+| Normal quantile function   | 1,000,000 probabilities           |            4.25 | stats 4.6.1 `qnorm`  |           5.12 |  0.83× |
+| Logistic function          | 1,000,000 points                  |            2.52 | stats 4.6.1 `plogis` |           4.80 |  0.52× |
+| **Cholesky factorization** | A correlation matrix of order 200 |           0.465 | base 4.6.1 `chol`    |          0.118 | **4×** |
+| Uniform draws              | 1,000,000 draws                   |            3.18 | stats 4.6.1 `runif`  |           3.00 |   1.1× |
+| Normal draws               | 1,000,000 draws                   |            11.1 | stats 4.6.1 `rnorm`  |           11.8 |  0.94× |
 
 - Cholesky factorization: R's BLAS is OpenBLAS, whose kernels fuse multiplication and addition in vector registers; JavaScript has neither, and measurekit's loops are at the speed of scalar code.
 
@@ -134,96 +134,97 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 | Task                                                                                   | Size                                                                          | measurekit (ms) | Reference                                                               | Reference (ms) |    Ratio |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------: | ----------------------------------------------------------------------- | -------------: | -------: |
-| Item difficulty, discrimination and the statistics of the items                        | 3,000 persons, 50 items                                                       |            10.3 | psych 2.6.9 `alpha`                                                     |           52.0 |     0.2× |
-| Cronbach's alpha                                                                       | 3,000 persons, 50 items                                                       |            1.82 | psych 2.6.9 `alpha`                                                     |           56.0 |   0.033× |
-| McDonald's omega total of one factor                                                   | 3,000 persons, 20 items                                                       |            5.27 | psych 2.6.9 `omega(nfactors = 1)`                                       |           9.33 |    0.56× |
-| The value of five subscores of ten items over the total score                          | 3,000 persons, 50 items                                                       |            2.15 | subscore 3.3 `CTTsub`                                                   |            135 |   0.016× |
-| Scoring of the choices of persons against a key                                        | 2,000 persons, 50 items of 4 options                                          |            1.13 | base 4.6.1 `t(t(choices) == key)`                                       |          0.843 |     1.3× |
-| The Mantel-Haenszel test of every item                                                 | 2,000 persons in two groups, 30 items                                         |            6.56 | difR 6.1.0 `difMH`                                                      |            127 |   0.052× |
-| Logistic regression for uniform and nonuniform DIF of every item                       | 2,000 persons in two groups, 30 items                                         |            43.0 | difR 6.1.0 `difLogistic`                                                |            101 |    0.43× |
-| Lord's chi-square of every item, with both groups calibrated by the 2PL                | 2,000 persons in two groups, 30 items                                         |             766 | difR 6.1.0 `difLord`                                                    |          1,392 |    0.55× |
-| Ordinal logistic regression of every item                                              | 1,000 persons in two groups, 10 items of 4 categories                         |            33.8 | rms 8.2.0 `lrm, three models for an item`                               |            131 |    0.26× |
-| Polychoric correlations of every pair of items                                         | 2,800 persons, 25 items of 6 categories                                       |            11.3 | psych 2.6.9 `polychoric`                                                |          1,599 |  0.0071× |
-| Parallel analysis of components and factors from polychoric correlations, 20 data sets | 2,800 persons, 25 items of 6 categories                                       |             113 | psych 2.6.9 `fa.parallel(cor = "poly")`                                 |         34,406 |  0.0033× |
-| Linear equating, random groups                                                         | 4,329 and 4,152 persons, 40 items                                             |           0.000 | equate 2.0.9 `equate(type = "linear")`                                  |          0.462 | 0.00081× |
-| Equipercentile equating, random groups                                                 | 4,329 and 4,152 persons, 40 items                                             |           0.002 | equate 2.0.9 `equate(type = "equipercentile")`                          |          0.308 |   0.008× |
-| Log-linear presmoothing of a score distribution, degree 3                              | 41 scores                                                                     |           0.022 | equate 2.0.9 `presmoothing(smoothmethod = "loglinear")`                 |          0.750 |   0.029× |
-| Standard errors of the linear equating by 100 bootstrap replications                   | 4,329 and 4,152 persons, 40 items                                             |            25.6 | equate 2.0.9 `bootstrap`                                                |            262 |   0.098× |
-| Tucker linear equating, nonequivalent groups                                           | 1,655 and 1,638 persons, 36 items, an anchor of 12                            |           0.006 | equate 2.0.9 `equate(method = "tucker")`                                |           1.40 |  0.0045× |
-| Frequency estimation equipercentile equating                                           | 1,655 and 1,638 persons, 36 items, an anchor of 12                            |           0.009 | equate 2.0.9 `equate(method = "frequency estimation")`                  |           2.18 |  0.0039× |
-| Chained equipercentile equating                                                        | 1,655 and 1,638 persons, 36 items, an anchor of 12                            |           0.011 | equate 2.0.9 `equate(method = "chained")`                               |          0.760 |   0.015× |
-| Stocking-Lord linking of the common items                                              | Two forms of 3PL items that share 10                                          |           0.064 | equateIRT 2.5.2 `direc(method = "Stocking-Lord")`                       |           1.69 |   0.038× |
-| Haebara linking of the common items                                                    | Two forms of 3PL items that share 10                                          |           0.058 | equateIRT 2.5.2 `direc(method = "Haebara")`                             |           2.00 |   0.029× |
-| IRT true score equating of the linked forms                                            | Two forms of 3PL items that share 10                                          |           0.050 | equateIRT 2.5.2 `score(method = "TSE")`                                 |           3.18 |   0.016× |
-| IRT observed score equating of the linked forms                                        | Two forms of 3PL items that share 10                                          |           0.295 | equateIRT 2.5.2 `score(method = "OSE")`                                 |           2.41 |    0.12× |
-| Regression of item difficulties on three features by REML                              | 300 items, 3 features                                                         |           0.342 | metafor 5.2.1 `rma(method = "REML")`                                    |           22.0 |   0.016× |
-| The linear logistic test model: the effects of three features on difficulty, by EM     | 1,000 persons, 20 items, 3 features                                           |             215 | mirt 1.48 `mirt(itemtype = "Rasch", itemdesign), Oakes standard errors` |            326 |    0.66× |
-| Infit and outfit of the items                                                          | 2,000 persons, 40 items                                                       |            1.83 | mirt 1.48 `itemfit(fit_stats = "infit")`                                |           24.0 |   0.076× |
-| Infit, outfit and the standardized log-likelihood of the persons                       | 2,000 persons, 40 items                                                       |            4.42 | mirt 1.48 `personfit`                                                   |           20.7 |    0.21× |
-| The summed-score statistic S-X2 of the items                                           | 2,000 persons, 40 items                                                       |            5.55 | mirt 1.48 `itemfit(fit_stats = "S_X2")`                                 |           45.0 |    0.12× |
-| Yen's Q3 of every pair of items                                                        | 2,000 persons, 40 items                                                       |            5.69 | mirt 1.48 `residuals(type = "Q3")`                                      |            134 |   0.042× |
-| Variance components of a fully crossed design of three facets                          | 200 persons, 10 items, 4 raters: 8,000 scores                                 |            2.26 | lme4 2.1.0 `lmer, six random effects, REML`                             |            852 |  0.0027× |
-| Scalability coefficients with standard errors                                          | 433 persons, 20 items of 5 categories                                         |            2.37 | mokken 3.1.2 `coefH(se = TRUE)`                                         |            261 |  0.0091× |
-| Automated item selection into Mokken scales                                            | 433 persons, 20 items of 5 categories                                         |            1.01 | mokken 3.1.2 `aisp`                                                     |           42.0 |   0.024× |
-| The check of monotonicity of every item                                                | 433 persons, 20 items of 5 categories                                         |            2.25 | mokken 3.1.2 `check.monotonicity`                                       |           14.0 |    0.16× |
-| The check of invariant item ordering, with selection of items                          | 433 persons, 20 items of 5 categories                                         |            14.0 | mokken 3.1.2 `check.iio(method = "MIIO")`                               |           90.0 |    0.16× |
-| The lognormal model of the response times                                              | 1,000 persons, 20 items                                                       |            6.88 | nlme 3.1.169 `lme(logtime ~ 0 + item, random = ~ 1                      |       person)` |      192 |
-| The joint model of speed and accuracy, with the 2PL                                    | 1,000 persons, 20 items                                                       |             600 | none                                                                    |                |          |
-| Speed of each person given the times of the items                                      | 1,000 persons, 20 items                                                       |            1.10 | none                                                                    |                |          |
-| A conversion table of the posterior mean of theta given each summed score              | 40 items                                                                      |           0.344 | none                                                                    |                |          |
-| A conversion table of the theta of each summed true score                              | 40 items                                                                      |           0.581 | none                                                                    |                |          |
-| The cut score of a bookmark in an ordered item booklet                                 | 40 items                                                                      |           0.032 | none                                                                    |                |          |
-| Accuracy and consistency of the classification by two cuts                             | 2,000 persons                                                                 |           0.359 | none                                                                    |                |          |
-| Conversion of 2PL items to mirt's slope-intercept form                                 | 10,000 items                                                                  |            1.25 | none                                                                    |                |          |
-| Conversion of 2PL items to mirt's IRT form                                             | 10,000 items                                                                  |            1.30 | none                                                                    |                |          |
-| Simulation of the abilities of persons and their responses to 2PL items                | 2,000 persons, 40 items                                                       |            2.64 | mirt 1.48 `simdata(itemtype = "dich")`                                  |           7.50 |    0.35× |
-| Calibration of the one-parameter model by EM                                           | 2,000 persons, 40 dichotomous items                                           |            86.4 | mirt 1.48 `mirt(itemtype = "Rasch")`                                    |            106 |    0.82× |
-| Calibration of the two-parameter model by EM                                           | 2,000 persons, 40 dichotomous items                                           |             120 | mirt 1.48 `mirt(itemtype = "2PL")`                                      |            190 |    0.63× |
-| Calibration of the three-parameter model by EM                                         | 2,000 persons, 40 dichotomous items                                           |             705 | mirt 1.48 `mirt(itemtype = "3PL")`                                      |          1,168 |     0.6× |
-| The two-parameter model with cross-product standard errors                             | 2,000 persons, 40 dichotomous items                                           |             131 | mirt 1.48 `mirt(SE.type = "crossprod")`                                 |            395 |    0.33× |
-| The two-parameter model with standard errors from the Hessian                          | 500 persons, 20 items                                                         |             102 | mirt 1.48 `mirt(SE.type = "Richardson")`                                |          7,932 |   0.013× |
-| Calibration of the graded response model by EM                                         | 1,500 persons, 20 items of 5 categories                                       |            53.9 | mirt 1.48 `mirt(itemtype = "graded")`                                   |            199 |    0.27× |
-| Calibration of the generalized partial credit model by EM                              | 1,500 persons, 20 items of 5 categories                                       |            87.4 | mirt 1.48 `mirt(itemtype = "gpcm")`                                     |            580 |    0.15× |
-| Calibration of the testlet model by EM                                                 | 1,000 persons, 6 testlets of 5 items                                          |            67.7 | mirt 1.48 `bfactor`                                                     |         21,712 |  0.0031× |
-| Ability by the posterior mean                                                          | 2,000 persons, the 40 items of the calibration                                |            24.4 | mirt 1.48 `fscores(method = "EAP")`                                     |           35.0 |     0.7× |
-| Ability by the posterior mode                                                          | 2,000 persons, the 40 items of the calibration                                |            79.9 | mirt 1.48 `fscores(method = "MAP")`                                     |          1,025 |   0.078× |
-| Ability by maximum likelihood                                                          | 2,000 persons, the 40 items of the calibration                                |            78.5 | mirt 1.48 `fscores(method = "ML")`                                      |            685 |    0.11× |
-| Ability by weighted likelihood                                                         | 2,000 persons, the 40 items of the calibration                                |             155 | mirt 1.48 `fscores(method = "WLE")`                                     |          9,318 |   0.017× |
-| Joint maximum likelihood calibration of the Rasch model                                | 2,000 persons, 40 items                                                       |            11.3 | TAM 4.3.25 `tam.jml`                                                    |           24.0 |    0.47× |
-| The posterior mean of the ability given each summed score                              | 40 items                                                                      |           0.201 | none                                                                    |                |          |
-| Information of a test at 121 values of theta                                           | 40 items                                                                      |           0.659 | mirt 1.48 `testinfo`                                                    |           1.64 |     0.4× |
-| Simulation of adaptive tests by maximum information and the posterior mean             | 200 persons, a pool of 500 3PL items, 30 items each                           |             223 | catR 3.17 `randomCAT`                                                   |         10,498 |   0.021× |
-| Simulation of adaptive tests that select testlets as units, by their mean information  | 200 persons, a pool of 500 3PL items with 400 in testlets of 4, 30 items each |             279 | none                                                                    |                |          |
-| Simulation of diagnostic adaptive tests by the G-DINA discrimination index             | 200 persons, a pool of 20 items over 4 attributes, 10 items each              |            13.9 | cdcatR 1.0.7 `cdcat`                                                    |            394 |   0.035× |
-| Simulation of multidimensional adaptive tests by the determinant of the information    | 100 persons, a pool of 200 two-dimensional items, 20 items each               |            75.2 | mirtCAT 1.14 `mirtCAT(criteria = "Drule")`                              |          5,769 |   0.013× |
-| **Calibration of the G-DINA model by EM**                                              | 1,000 persons, 20 items, 4 attributes                                         |             222 | GDINA 2.13.2 `GDINA(model = "GDINA")`                                   |            111 |   **2×** |
-| Calibration of the DINA model by EM                                                    | 1,000 persons, 20 items, 4 attributes                                         |            51.9 | GDINA 2.13.2 `GDINA(model = "DINA")`                                    |           43.0 |     1.2× |
-| **Calibration of the DINO model by EM**                                                | 1,000 persons, 20 items, 4 attributes                                         |             221 | GDINA 2.13.2 `GDINA(model = "DINO")`                                    |            146 | **1.5×** |
-| Calibration of the A-CDM model by EM                                                   | 1,000 persons, 20 items, 4 attributes                                         |            52.9 | GDINA 2.13.2 `GDINA(model = "ACDM")`                                    |            134 |    0.39× |
-| Calibration of the LLM model by EM                                                     | 1,000 persons, 20 items, 4 attributes                                         |            67.1 | GDINA 2.13.2 `GDINA(model = "LLM")`                                     |            188 |    0.36× |
-| Calibration of the R-RUM model by EM                                                   | 1,000 persons, 20 items, 4 attributes                                         |            68.8 | GDINA 2.13.2 `GDINA(model = "RRUM")`                                    |            111 |    0.62× |
-| **Posterior profiles of the persons of a calibration**                                 | 1,000 persons, 20 items, 4 attributes                                         |            1.48 | GDINA 2.13.2 `personparm(what = "EAP")`                                 |          0.160 | **9.3×** |
-| Accuracy and consistency of the classification                                         | 1,000 persons, 20 items, 4 attributes                                         |            1.58 | GDINA 2.13.2 `CA`                                                       |           1.33 |     1.2× |
-| Validation of the Q-matrix by the proportion of variance accounted for                 | 1,000 persons, 20 items, 4 attributes                                         |            3.04 | GDINA 2.13.2 `Qval(method = "PVAF")`                                    |           3.56 |    0.86× |
-| Nonparametric classification by the Hamming distance                                   | 1,000 persons, 20 items, 4 attributes                                         |            1.44 | NPCD 1.0.11 `AlphaNP`                                                   |           24.0 |    0.06× |
-| Cohen's kappa of two raters                                                            | 2,000 subjects, 5 categories                                                  |           0.054 | irr 0.85 `kappa2`                                                       |          0.280 |    0.19× |
-| Fleiss' kappa of five raters                                                           | 500 subjects, 5 raters, 5 categories                                          |           0.071 | irr 0.85 `kappam.fleiss`                                                |           9.00 |  0.0079× |
-| The share of subjects on whom five raters agree exactly                                | 500 subjects, 5 raters, 5 categories                                          |           0.023 | irr 0.85 `agree(tolerance = 0)`                                         |          0.412 |   0.057× |
-| The share of subjects whose ratings are within one category                            | 500 subjects, 5 raters, 5 categories                                          |           0.025 | irr 0.85 `agree(tolerance = 1)`                                         |          0.400 |   0.062× |
-| The standardized mean difference of two raters                                         | 2,000 subjects, 2 raters                                                      |           0.216 | effsize 0.8.1 `cohen.d`                                                 |          0.180 |     1.2× |
-| The six intraclass correlations of four raters                                         | 200 subjects, 4 raters                                                        |           0.017 | psych 2.6.9 `ICC`                                                       |           6.60 |  0.0026× |
-| **The many-facet Rasch model of items and raters, with standard errors**               | 200 persons, 10 items, 4 raters: 8,000 scores                                 |             733 | TAM 4.3.25 `tam.mml.mfr(formulaA = ~ item + rater + step)`              |           56.0 |  **13×** |
-| Calibration of a confirmatory two-dimensional 2PL by EM                                | 1,000 persons, 24 items, 2 correlated dimensions                              |           1,087 | mirt 1.48 `mirt(model, quadpts = 31)`                                   |            927 |     1.2× |
-| Calibration of a confirmatory two-dimensional graded model by EM                       | 1,000 persons, 20 items of 4 categories, 2 correlated dimensions              |           1,115 | mirt 1.48 `mirt(itemtype = "graded", quadpts = 31)`                     |          2,311 |    0.48× |
-| **Calibration of an exploratory two-dimensional 2PL by EM**                            | 1,000 persons, 20 items, 2 dimensions                                         |          17,392 | mirt 1.48 `mirt(data, 2, quadpts = 31)`                                 |          3,303 | **5.3×** |
-| Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro    | 800 persons, 25 items of 6 categories, 5 correlated dimensions                |          15,115 | mirt 1.48 `mirt(method = "MHRM")`                                       |         16,308 |    0.93× |
-| Abilities by the posterior mode, in two dimensions                                     | 1,000 persons, 24 items                                                       |            45.4 | mirt 1.48 `fscores(method = "MAP")`                                     |            893 |   0.051× |
-| **Abilities by the posterior mean, in two dimensions**                                 | 1,000 persons, 24 items                                                       |             694 | mirt 1.48 `fscores(method = "EAP")`                                     |           54.0 |  **13×** |
-| Oblimin rotation of the loadings of a calibration                                      | 20 items, 2 dimensions                                                        |           0.033 | GPArotation 2026.8.2 `oblimin`                                          |          0.240 |    0.14× |
-| Varimax rotation of the loadings of a calibration                                      | 20 items, 2 dimensions                                                        |           0.025 | GPArotation 2026.8.2 `Varimax`                                          |          0.115 |    0.22× |
+| Simulation of adaptive tests by maximum information and the posterior mean             | 200 persons, a pool of 500 3PL items, 30 items each                           |             196 | catR 3.17 `randomCAT`                                                   |          9,499 |   0.021× |
+| Simulation of adaptive tests that select testlets as units, by their mean information  | 200 persons, a pool of 500 3PL items with 400 in testlets of 4, 30 items each |             202 | none                                                                    |                |          |
+| Simulation of diagnostic adaptive tests by the G-DINA discrimination index             | 200 persons, a pool of 20 items over 4 attributes, 10 items each              |            12.2 | cdcatR 1.0.7 `cdcat`                                                    |            332 |   0.037× |
+| Simulation of multidimensional adaptive tests by the determinant of the information    | 100 persons, a pool of 200 two-dimensional items, 20 items each               |            57.6 | mirtCAT 1.14 `mirtCAT(criteria = "Drule")`                              |          4,271 |   0.013× |
+| Calibration of the G-DINA model by EM                                                  | 1,000 persons, 20 items, 4 attributes                                         |            74.4 | GDINA 2.13.2 `GDINA(model = "GDINA")`                                   |           87.0 |    0.85× |
+| Calibration of the DINA model by EM                                                    | 1,000 persons, 20 items, 4 attributes                                         |            17.9 | GDINA 2.13.2 `GDINA(model = "DINA")`                                    |           35.5 |     0.5× |
+| Calibration of the DINO model by EM                                                    | 1,000 persons, 20 items, 4 attributes                                         |            77.4 | GDINA 2.13.2 `GDINA(model = "DINO")`                                    |            124 |    0.62× |
+| Calibration of the A-CDM model by EM                                                   | 1,000 persons, 20 items, 4 attributes                                         |            22.3 | GDINA 2.13.2 `GDINA(model = "ACDM")`                                    |            116 |    0.19× |
+| Calibration of the LLM model by EM                                                     | 1,000 persons, 20 items, 4 attributes                                         |            28.4 | GDINA 2.13.2 `GDINA(model = "LLM")`                                     |            163 |    0.17× |
+| Calibration of the R-RUM model by EM                                                   | 1,000 persons, 20 items, 4 attributes                                         |            29.6 | GDINA 2.13.2 `GDINA(model = "RRUM")`                                    |           97.0 |    0.31× |
+| **Posterior profiles of the persons of a calibration**                                 | 1,000 persons, 20 items, 4 attributes                                         |           0.562 | GDINA 2.13.2 `personparm(what = "EAP")`                                 |          0.140 |   **4×** |
+| Accuracy and consistency of the classification                                         | 1,000 persons, 20 items, 4 attributes                                         |           0.695 | GDINA 2.13.2 `CA`                                                       |           1.06 |    0.66× |
+| Validation of the Q-matrix by the proportion of variance accounted for                 | 1,000 persons, 20 items, 4 attributes                                         |            2.79 | GDINA 2.13.2 `Qval(method = "PVAF")`                                    |           2.76 |       1× |
+| Nonparametric classification by the Hamming distance                                   | 1,000 persons, 20 items, 4 attributes                                         |            1.30 | NPCD 1.0.11 `AlphaNP`                                                   |           20.3 |   0.064× |
+| Item difficulty, discrimination and the statistics of the items                        | 3,000 persons, 50 items                                                       |            9.57 | psych 2.6.9 `alpha`                                                     |           47.0 |     0.2× |
+| Cronbach's alpha                                                                       | 3,000 persons, 50 items                                                       |            1.76 | psych 2.6.9 `alpha`                                                     |           47.0 |   0.037× |
+| McDonald's omega total of one factor                                                   | 3,000 persons, 20 items                                                       |            4.93 | psych 2.6.9 `omega(nfactors = 1)`                                       |           8.00 |    0.62× |
+| The value of five subscores of ten items over the total score                          | 3,000 persons, 50 items                                                       |            2.07 | subscore 3.3 `CTTsub`                                                   |            106 |    0.02× |
+| **Scoring of the choices of persons against a key**                                    | 2,000 persons, 50 items of 4 options                                          |            1.09 | base 4.6.1 `t(t(choices) == key)`                                       |          0.708 | **1.5×** |
+| The Mantel-Haenszel test of every item                                                 | 2,000 persons in two groups, 30 items                                         |            6.34 | difR 6.1.0 `difMH`                                                      |           84.0 |   0.076× |
+| Logistic regression for uniform and nonuniform DIF of every item                       | 2,000 persons in two groups, 30 items                                         |            42.7 | difR 6.1.0 `difLogistic`                                                |           84.0 |    0.51× |
+| Lord's chi-square of every item, with both groups calibrated by the 2PL                | 2,000 persons in two groups, 30 items                                         |             772 | difR 6.1.0 `difLord`                                                    |          1,015 |    0.76× |
+| Ordinal logistic regression of every item                                              | 1,000 persons in two groups, 10 items of 4 categories                         |            34.7 | rms 8.2.0 `lrm, three models for an item`                               |           93.0 |    0.37× |
+| Polychoric correlations of every pair of items                                         | 2,800 persons, 25 items of 6 categories                                       |            9.71 | psych 2.6.9 `polychoric`                                                |          1,496 |  0.0065× |
+| Parallel analysis of components and factors from polychoric correlations, 20 data sets | 2,800 persons, 25 items of 6 categories                                       |             101 | psych 2.6.9 `fa.parallel(cor = "poly")`                                 |         32,593 |  0.0031× |
+| Linear equating, random groups                                                         | 4,329 and 4,152 persons, 40 items                                             |           0.000 | equate 2.0.9 `equate(type = "linear")`                                  |          0.412 | 0.00081× |
+| Equipercentile equating, random groups                                                 | 4,329 and 4,152 persons, 40 items                                             |           0.002 | equate 2.0.9 `equate(type = "equipercentile")`                          |          0.260 |  0.0093× |
+| Log-linear presmoothing of a score distribution, degree 3                              | 41 scores                                                                     |           0.022 | equate 2.0.9 `presmoothing(smoothmethod = "loglinear")`                 |          0.640 |   0.035× |
+| Standard errors of the linear equating by 100 bootstrap replications                   | 4,329 and 4,152 persons, 40 items                                             |            24.6 | equate 2.0.9 `bootstrap`                                                |            242 |     0.1× |
+| Tucker linear equating, nonequivalent groups                                           | 1,655 and 1,638 persons, 36 items, an anchor of 12                            |           0.006 | equate 2.0.9 `equate(method = "tucker")`                                |           1.28 |  0.0047× |
+| Frequency estimation equipercentile equating                                           | 1,655 and 1,638 persons, 36 items, an anchor of 12                            |           0.008 | equate 2.0.9 `equate(method = "frequency estimation")`                  |           2.00 |  0.0041× |
+| Chained equipercentile equating                                                        | 1,655 and 1,638 persons, 36 items, an anchor of 12                            |           0.011 | equate 2.0.9 `equate(method = "chained")`                               |          0.710 |   0.015× |
+| Stocking-Lord linking of the common items                                              | Two forms of 3PL items that share 10                                          |           0.062 | equateIRT 2.5.2 `direc(method = "Stocking-Lord")`                       |           1.51 |   0.041× |
+| Haebara linking of the common items                                                    | Two forms of 3PL items that share 10                                          |           0.058 | equateIRT 2.5.2 `direc(method = "Haebara")`                             |           1.58 |   0.037× |
+| IRT true score equating of the linked forms                                            | Two forms of 3PL items that share 10                                          |           0.049 | equateIRT 2.5.2 `score(method = "TSE")`                                 |           2.62 |   0.019× |
+| IRT observed score equating of the linked forms                                        | Two forms of 3PL items that share 10                                          |           0.289 | equateIRT 2.5.2 `score(method = "OSE")`                                 |           2.00 |    0.14× |
+| Regression of item difficulties on three features by REML                              | 300 items, 3 features                                                         |           0.335 | metafor 5.2.1 `rma(method = "REML")`                                    |           18.0 |   0.019× |
+| The linear logistic test model: the effects of three features on difficulty, by EM     | 1,000 persons, 20 items, 3 features                                           |            74.6 | mirt 1.48 `mirt(itemtype = "Rasch", itemdesign), Oakes standard errors` |            253 |    0.29× |
+| Infit and outfit of the items                                                          | 2,000 persons, 40 items                                                       |            1.83 | mirt 1.48 `itemfit(fit_stats = "infit")`                                |           21.0 |   0.087× |
+| Infit, outfit and the standardized log-likelihood of the persons                       | 2,000 persons, 40 items                                                       |            4.18 | mirt 1.48 `personfit`                                                   |           18.0 |    0.23× |
+| The summed-score statistic S-X2 of the items                                           | 2,000 persons, 40 items                                                       |            5.35 | mirt 1.48 `itemfit(fit_stats = "S_X2")`                                 |           39.0 |    0.14× |
+| Yen's Q3 of every pair of items                                                        | 2,000 persons, 40 items                                                       |            5.46 | mirt 1.48 `residuals(type = "Q3")`                                      |            115 |   0.047× |
+| Variance components of a fully crossed design of three facets                          | 200 persons, 10 items, 4 raters: 8,000 scores                                 |            1.97 | lme4 2.1.0 `lmer, six random effects, REML`                             |            707 |  0.0028× |
+| Scalability coefficients with standard errors                                          | 433 persons, 20 items of 5 categories                                         |            2.12 | mokken 3.1.2 `coefH(se = TRUE)`                                         |            196 |   0.011× |
+| Automated item selection into Mokken scales                                            | 433 persons, 20 items of 5 categories                                         |           0.918 | mokken 3.1.2 `aisp`                                                     |           28.5 |   0.032× |
+| The check of monotonicity of every item                                                | 433 persons, 20 items of 5 categories                                         |            1.89 | mokken 3.1.2 `check.monotonicity`                                       |           10.6 |    0.18× |
+| The check of invariant item ordering, with selection of items                          | 433 persons, 20 items of 5 categories                                         |            12.7 | mokken 3.1.2 `check.iio(method = "MIIO")`                               |           66.0 |    0.19× |
+| Cohen's kappa of two raters                                                            | 2,000 subjects, 5 categories                                                  |           0.050 | irr 0.85 `kappa2`                                                       |          0.255 |     0.2× |
+| Fleiss' kappa of five raters                                                           | 500 subjects, 5 raters, 5 categories                                          |           0.065 | irr 0.85 `kappam.fleiss`                                                |           8.14 |   0.008× |
+| The share of subjects on whom five raters agree exactly                                | 500 subjects, 5 raters, 5 categories                                          |           0.021 | irr 0.85 `agree(tolerance = 0)`                                         |          0.353 |   0.061× |
+| The share of subjects whose ratings are within one category                            | 500 subjects, 5 raters, 5 categories                                          |           0.022 | irr 0.85 `agree(tolerance = 1)`                                         |          0.362 |   0.061× |
+| The standardized mean difference of two raters                                         | 2,000 subjects, 2 raters                                                      |           0.195 | effsize 0.8.1 `cohen.d`                                                 |          0.168 |     1.2× |
+| The six intraclass correlations of four raters                                         | 200 subjects, 4 raters                                                        |           0.016 | psych 2.6.9 `ICC`                                                       |           5.63 |  0.0028× |
+| The many-facet Rasch model of items and raters, with standard errors                   | 200 persons, 10 items, 4 raters: 8,000 scores                                 |            58.9 | TAM 4.3.25 `tam.mml.mfr(formulaA = ~ item + rater + step)`              |           49.0 |     1.2× |
+| The lognormal model of the response times                                              | 1,000 persons, 20 items                                                       |            6.40 | nlme 3.1.169 `lme(logtime ~ 0 + item, random = ~ 1                      |       person)` |      161 | 0.04× |
+| The joint model of speed and accuracy, with the 2PL                                    | 1,000 persons, 20 items                                                       |             545 | none                                                                    |                |          |
+| Speed of each person given the times of the items                                      | 1,000 persons, 20 items                                                       |           0.971 | none                                                                    |                |          |
+| A conversion table of the posterior mean of theta given each summed score              | 40 items                                                                      |           0.305 | none                                                                    |                |          |
+| A conversion table of the theta of each summed true score                              | 40 items                                                                      |           0.513 | none                                                                    |                |          |
+| The cut score of a bookmark in an ordered item booklet                                 | 40 items                                                                      |           0.030 | none                                                                    |                |          |
+| Accuracy and consistency of the classification by two cuts                             | 2,000 persons                                                                 |           0.345 | none                                                                    |                |          |
+| Conversion of 2PL items to mirt's slope-intercept form                                 | 10,000 items                                                                  |            1.15 | none                                                                    |                |          |
+| Conversion of 2PL items to mirt's IRT form                                             | 10,000 items                                                                  |            1.19 | none                                                                    |                |          |
+| Simulation of the abilities of persons and their responses to 2PL items                | 2,000 persons, 40 items                                                       |            2.34 | mirt 1.48 `simdata(itemtype = "dich")`                                  |           6.22 |    0.38× |
+| Calibration of the one-parameter model by EM                                           | 2,000 persons, 40 dichotomous items                                           |            80.9 | mirt 1.48 `mirt(itemtype = "Rasch")`                                    |           93.0 |    0.87× |
+| Calibration of the two-parameter model by EM                                           | 2,000 persons, 40 dichotomous items                                           |             100 | mirt 1.48 `mirt(itemtype = "2PL")`                                      |            171 |    0.59× |
+| Calibration of the three-parameter model by EM                                         | 2,000 persons, 40 dichotomous items                                           |             605 | mirt 1.48 `mirt(itemtype = "3PL")`                                      |          1,044 |    0.58× |
+| The two-parameter model with cross-product standard errors                             | 2,000 persons, 40 dichotomous items                                           |             118 | mirt 1.48 `mirt(SE.type = "crossprod")`                                 |            360 |    0.33× |
+| The two-parameter model with standard errors from the Hessian                          | 500 persons, 20 items                                                         |            94.8 | mirt 1.48 `mirt(SE.type = "Richardson")`                                |          5,972 |   0.016× |
+| Calibration of the graded response model by EM                                         | 1,500 persons, 20 items of 5 categories                                       |            48.0 | mirt 1.48 `mirt(itemtype = "graded")`                                   |            153 |    0.31× |
+| Calibration of the generalized partial credit model by EM                              | 1,500 persons, 20 items of 5 categories                                       |            80.5 | mirt 1.48 `mirt(itemtype = "gpcm")`                                     |            317 |    0.25× |
+| Calibration of the testlet model by EM                                                 | 1,000 persons, 6 testlets of 5 items                                          |            57.2 | mirt 1.48 `bfactor`                                                     |         15,759 |  0.0036× |
+| Ability by the posterior mean                                                          | 2,000 persons, the 40 items of the calibration                                |            21.7 | mirt 1.48 `fscores(method = "EAP")`                                     |           30.5 |    0.71× |
+| Ability by the posterior mode                                                          | 2,000 persons, the 40 items of the calibration                                |            69.7 | mirt 1.48 `fscores(method = "MAP")`                                     |            943 |   0.074× |
+| Ability by maximum likelihood                                                          | 2,000 persons, the 40 items of the calibration                                |            71.3 | mirt 1.48 `fscores(method = "ML")`                                      |            605 |    0.12× |
+| Ability by weighted likelihood                                                         | 2,000 persons, the 40 items of the calibration                                |             132 | mirt 1.48 `fscores(method = "WLE")`                                     |          8,106 |   0.016× |
+| Joint maximum likelihood calibration of the Rasch model                                | 2,000 persons, 40 items                                                       |            9.41 | TAM 4.3.25 `tam.jml`                                                    |           23.0 |    0.41× |
+| The posterior mean of the ability given each summed score                              | 40 items                                                                      |           0.181 | none                                                                    |                |          |
+| Information of a test at 121 values of theta                                           | 40 items                                                                      |           0.616 | mirt 1.48 `testinfo`                                                    |           1.35 |    0.46× |
+| Calibration of a confirmatory two-dimensional 2PL by EM                                | 1,000 persons, 24 items, 2 correlated dimensions                              |             254 | mirt 1.48 `mirt(model, quadpts = 31)`                                   |            756 |    0.34× |
+| Calibration of a confirmatory two-dimensional graded model by EM                       | 1,000 persons, 20 items of 4 categories, 2 correlated dimensions              |             310 | mirt 1.48 `mirt(itemtype = "graded", quadpts = 31)`                     |          1,781 |    0.17× |
+| Calibration of an exploratory two-dimensional 2PL by EM                                | 1,000 persons, 20 items, 2 dimensions                                         |           1,816 | mirt 1.48 `mirt(data, 2, quadpts = 31)`                                 |          2,855 |    0.64× |
+| Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro    | 800 persons, 25 items of 6 categories, 5 correlated dimensions                |          11,308 | mirt 1.48 `mirt(method = "MHRM")`                                       |         15,542 |    0.73× |
+| Abilities by the posterior mode, in two dimensions                                     | 1,000 persons, 24 items                                                       |            35.1 | mirt 1.48 `fscores(method = "MAP")`                                     |            753 |   0.047× |
+| Abilities by the posterior mean, in two dimensions                                     | 1,000 persons, 24 items                                                       |            35.8 | mirt 1.48 `fscores(method = "EAP")`                                     |           47.0 |    0.76× |
+| Oblimin rotation of the loadings of a calibration                                      | 20 items, 2 dimensions                                                        |           0.031 | GPArotation 2026.8.2 `oblimin`                                          |          0.226 |    0.14× |
+| Varimax rotation of the loadings of a calibration                                      | 20 items, 2 dimensions                                                        |           0.024 | GPArotation 2026.8.2 `Varimax`                                          |          0.100 |    0.24× |
 
-- The lognormal model of the response times: measurekit also estimates the item discriminations.
 - Simulation of adaptive tests that select testlets as units, by their mean information: catR has no testlets, so no reference does this task.
+- Posterior profiles of the persons of a calibration: personparm multiplies the log posterior that the fit stored by the profiles and returns the EAP classification; measurekit's calibration holds no posterior, so it computes each person's from the responses, and returns the posterior, the probability of each attribute and the MAP and EAP profiles.
+- The lognormal model of the response times: measurekit also estimates the item discriminations.
 - Calibration of an exploratory two-dimensional 2PL by EM: mirt stops at its limit of 500 cycles when it has not converged.
 - Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro: both draw the abilities, so the time depends on the seed; mirt runs with one.
 
@@ -231,17 +232,17 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 | Task                                                                                      | Size                                            | measurekit (ms) | Reference                               | Reference (ms) |     Ratio |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------: | --------------------------------------- | -------------: | --------: |
-| Fit of the skills of a log by EM from five starts                                         | 20,000 attempts of 200 learners at 5 skills     |             165 | pyBKT 1.4.3 `Model.fit`                 |         13,502 |    0.012× |
-| Replay of the log through the fitted model, a prediction and an update for each attempt   | 20,000 attempts of 200 learners at 5 skills     |            11.0 | pyBKT 1.4.3 `Model.predict`             |            363 |     0.03× |
-| Replay of a log through the learner-item Elo model                                        | 100,000 attempts of 2,000 learners at 400 items |            18.4 | base R, a loop over the attempts        |           35.5 |     0.52× |
-| The area under the ROC curve                                                              | 100,000 predictions                             |            23.8 | pROC 1.19.1 `auc(roc(direction = "<"))` |           19.0 |      1.3× |
-| The AUC, RMSE, log-loss and accuracy of the predictions                                   | 100,000 predictions                             |            30.8 | none                                    |                |           |
-| Replay of the responses of learners, the grid posterior of the ability updated after each | 2,000 learners, 40 responses each               |             451 | mirt 1.48 `fscores(method = "EAP")`     |          2,072 |     0.22× |
-| Fit of the basic local independence model of a chain of 12 items by EM                    | 1,000 persons, 12 items, 13 states              |            26.3 | pks 0.8.0 `blim`                        |           28.5 |     0.92× |
-| Inductive item tree analysis of the responses                                             | 1,000 persons, 12 items                         |            1.36 | DAKS 2.1.3 `iita(v = 1)`                |         97,144 | 0.000014× |
-| Fit of the additive factors model by maximum likelihood                                   | 20,000 attempts of 200 learners at 5 skills     |            25.1 | base R `glm`, binomial family           |            689 |    0.036× |
-| The candidates ranked by their distance to the band of success of a learner               | 500 candidate items, an Elo model               |           0.053 | none                                    |                |           |
-| A log built from and checked for events                                                   | 100,000 events                                  |            17.0 | none                                    |                |           |
+| Fit of the skills of a log by EM from five starts                                         | 20,000 attempts of 200 learners at 5 skills     |             126 | pyBKT 1.4.3 `Model.fit`                 |         10,453 |    0.012× |
+| Replay of the log through the fitted model, a prediction and an update for each attempt   | 20,000 attempts of 200 learners at 5 skills     |            9.71 | pyBKT 1.4.3 `Model.predict`             |            288 |    0.034× |
+| Replay of a log through the learner-item Elo model                                        | 100,000 attempts of 2,000 learners at 400 items |            17.5 | base R, a loop over the attempts        |           30.5 |     0.58× |
+| The area under the ROC curve                                                              | 100,000 predictions                             |            21.6 | pROC 1.19.1 `auc(roc(direction = "<"))` |           16.5 |      1.3× |
+| The AUC, RMSE, log-loss and accuracy of the predictions                                   | 100,000 predictions                             |            25.8 | none                                    |                |           |
+| Replay of the responses of learners, the grid posterior of the ability updated after each | 2,000 learners, 40 responses each               |             331 | mirt 1.48 `fscores(method = "EAP")`     |          1,735 |     0.19× |
+| Fit of the basic local independence model of a chain of 12 items by EM                    | 1,000 persons, 12 items, 13 states              |            24.3 | pks 0.8.0 `blim`                        |           25.0 |     0.97× |
+| Inductive item tree analysis of the responses                                             | 1,000 persons, 12 items                         |            1.10 | DAKS 2.1.3 `iita(v = 1)`                |         74,600 | 0.000015× |
+| Fit of the additive factors model by maximum likelihood                                   | 20,000 attempts of 200 learners at 5 skills     |            16.9 | base R `glm`, binomial family           |            469 |    0.036× |
+| The candidates ranked by their distance to the band of success of a learner               | 500 candidate items, an Elo model               |           0.047 | none                                    |                |           |
+| A log built from and checked for events                                                   | 100,000 events                                  |            13.4 | none                                    |                |           |
 
 - Replay of the responses of learners, the grid posterior of the ability updated after each: mirt scores each of the 40 prefixes of the responses from the first; measurekit updates the posterior by the one response and predicts it. A scoring of the final patterns alone takes a fortieth of the time.
 - Fit of the additive factors model by maximum likelihood: the proficiency of a learner is a fixed effect, as measurekit's default is none.
