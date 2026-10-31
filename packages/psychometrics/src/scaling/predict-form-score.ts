@@ -1,4 +1,4 @@
-import type { ThetaDistribution } from "../irt/ability.js";
+import type { ThetaDistribution } from "@measurekit/core";
 import { checkItemList } from "../irt/items.js";
 import type { IrtItem } from "../irt/model.js";
 import { scoreLikelihoods } from "../irt/summed-score.js";

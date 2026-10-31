@@ -1,12 +1,4 @@
-import { checkRecord, DataError, describe, isNonEmptyString } from "@measurekit/core";
-
-/**
- * A Q-matrix: the attributes each item measures, by item id, such
- * as `{ q1: ["fractions"], q2: ["fractions", "borrow"] }`. The `QMatrix` of `@measurekit/knowledge-tracing` has
- * the same shape, so a Q-matrix moves between the two packages unchanged.
- */
-// biome-ignore lint/style/useNamingConvention: Q-matrix and q-vector are the names of these in the field.
-export type QMatrix = Readonly<Record<string, readonly string[]>>;
+import { checkRecord, DataError, describe, isNonEmptyString, type QMatrix } from "@measurekit/core";
 
 /** A cognitive diagnosis design: the attributes, the profiles over them and each item's attributes. */
 export interface CdmDesign {

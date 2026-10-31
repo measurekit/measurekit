@@ -1,6 +1,6 @@
-import { checkArray, checkOptions, checkRecord, DataError } from "@measurekit/core";
+import { checkArray, checkOptions, checkRecord, DataError, type QMatrix } from "@measurekit/core";
 import { checkEvent, type Event } from "./event.js";
-import { checkItemSkills, type QMatrix, skillsOf } from "./q-matrix.js";
+import { checkItemSkills, skillsOf } from "./q-matrix.js";
 
 /**
  * Events in time order, as {@link eventLog} returns them: a learner's events are in the order they happened, and so

@@ -7,8 +7,8 @@ classification for small samples. Each is validated against GDINA or NPCD ([vali
 
 ## Q-matrix
 
-A `QMatrix` lists the attributes each item measures, by item id. It has the shape of the `QMatrix`
-of `@measurekit/knowledge-tracing`, so one Q-matrix serves both packages:
+A `QMatrix` lists the attributes each item measures, by item id. It is the `QMatrix` of
+`@measurekit/core`, which `@measurekit/knowledge-tracing` shares, so one Q-matrix serves both packages:
 
 ```ts
 import type { QMatrix } from "@measurekit/psychometrics/cdm";

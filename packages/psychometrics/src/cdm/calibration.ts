@@ -10,12 +10,13 @@ import {
   isUnitInterval,
   iterateToConvergence,
   normalizeLogs,
+  type QMatrix,
 } from "@measurekit/core";
 import { checkDichotomous } from "../data/dichotomous.js";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
 import { logProbability } from "../irt/probability.js";
 import { type AdditiveMaximizer, additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
-import { type CdmDesign, cdmDesign, profilesOf, type QMatrix } from "./q-matrix.js";
+import { type CdmDesign, cdmDesign, profilesOf } from "./q-matrix.js";
 
 /**
  * A cognitive diagnosis model of an item's success probabilities: `"gdina"`, one per latent group of its attributes;

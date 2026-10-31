@@ -58,7 +58,7 @@ Use these words with these meanings in code, comments and docs.
 | event               | An attempt with its outcome: one entry of a log.                                                                                |
 | outcome             | From 0 to 1: 1 correct, 0 incorrect, and between them partial credit.                                                           |
 | log                 | Events in time order.                                                                                                           |
-| Q-matrix            | The skills of each item, by item id: the shape of the `QMatrix` of psychometrics, so one moves between the packages.            |
+| Q-matrix            | The skills of each item, by item id: the `QMatrix` of core, which psychometrics shares, so one moves between the packages.      |
 | opportunity         | The number of times a learner has practiced a skill, the current event included.                                                |
 | state               | One learner's knowledge as a model tracks it: plain data, updated one event at a time.                                          |
 | parameters          | What a model estimates from a log, such as item difficulties: plain data.                                                       |
@@ -91,6 +91,8 @@ packages/core/                the published package @measurekit/core
   src/iteration.ts      Stopping, Convergence, iterateToConvergence
   src/line-search.ts    ARMIJO, backtrack
   src/vectors.ts        dot, largestChange, maxAbs, mean
+  src/q-matrix.ts       QMatrix
+  src/theta-distribution.ts ThetaDistribution
   test/<file>.test.ts   one file per concern; the numerics are validated by the fixtures of the packages
 packages/psychometrics/       the published package @measurekit/psychometrics
   src/index.ts          re-exports every module, and DataError, MeasurekitError and createRandom of core

@@ -12,5 +12,7 @@ export * from "./line-search.js";
 export * from "./logistic.js";
 export * from "./normal.js";
 export * from "./normalize-logs.js";
+export * from "./q-matrix.js";
 export * from "./random.js";
+export * from "./theta-distribution.js";
 export * from "./vectors.js";

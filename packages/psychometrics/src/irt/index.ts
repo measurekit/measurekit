@@ -5,6 +5,7 @@
  * @module @measurekit/psychometrics/irt
  */
 
+export type { ThetaDistribution } from "@measurekit/core";
 export {
   type AbilityEstimate,
   type AbilityEstimator,
@@ -15,7 +16,6 @@ export {
   posteriorModeEstimate,
   type RangeOptions,
   type TestletEffect,
-  type ThetaDistribution,
   type ThetaIntegrationOptions,
   type ThetaPrior,
   thetaPosterior,

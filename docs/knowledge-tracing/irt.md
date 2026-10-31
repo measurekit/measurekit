@@ -77,8 +77,8 @@ weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0
   with the fifth power of the spacing. A mode beyond the grid is reported at its end.
 
 `posterior(state)` returns the learner's whole posterior of θ as a `ThetaDistribution`, `{ nodes, weights }`: the grid
-and the state's density on it, normalized to sum to 1. `@measurekit/psychometrics` has the same shape, so a posterior
-moves between the packages as plain data.
+and the state's density on it, normalized to sum to 1. It is the `ThetaDistribution` of `@measurekit/core`, which `@measurekit/psychometrics` shares, so a posterior moves
+between the packages as plain data.
 
 The state, `{ learner, logDensity, slope, curvature }`, holds ℓ and its first two derivatives at each grid point: 3 ×
 `points` numbers, about 3.5 KB of JSON at the default grid, whatever the number of outcomes. ℓ is kept less its maximum,

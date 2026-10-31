@@ -1,5 +1,4 @@
-import { checkArray, checkRecord, DataError, describe } from "@measurekit/core";
-import type { ThetaDistribution } from "./ability.js";
+import { checkArray, checkRecord, DataError, describe, type ThetaDistribution } from "@measurekit/core";
 
 /** The tolerance of the sum of a distribution's weights from 1. */
 const WEIGHT_SUM_TOLERANCE = 1e-6;

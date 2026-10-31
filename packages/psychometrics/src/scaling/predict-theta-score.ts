@@ -1,5 +1,4 @@
-import { checkNonNegative, DataError } from "@measurekit/core";
-import type { ThetaDistribution } from "../irt/ability.js";
+import { checkNonNegative, DataError, type ThetaDistribution } from "@measurekit/core";
 import { checkThetaDistribution } from "../irt/theta-distribution.js";
 import { normalCdf } from "../math/normal.js";
 import {

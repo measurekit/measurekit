@@ -5,6 +5,8 @@
  *
  * @module @measurekit/psychometrics/cdm
  */
+
+export type { QMatrix } from "@measurekit/core";
 export { type CdmAccuracyOptions, type CdmClassificationAccuracy, cdmClassificationAccuracy } from "./accuracy.js";
 export {
   type CdmCalibration,
@@ -20,5 +22,4 @@ export {
   nonparametricClassification,
 } from "./nonparametric.js";
 export { type AttributeProfile, attributeProfiles, type ProfileEstimate } from "./persons.js";
-export type { QMatrix } from "./q-matrix.js";
 export { type QMatrixValidationOptions, type QVectorSuggestion, validateQMatrix } from "./q-validation.js";

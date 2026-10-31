@@ -7,8 +7,8 @@ or
 [`@measurekit/knowledge-tracing`](https://github.com/measurekit/measurekit/tree/main/packages/knowledge-tracing#readme),
 which depend on it and re-export `createRandom`, `Random`, `DataError` and `MeasurekitError`.
 
-It holds the errors the packages throw, the checks of their arguments, a seeded random number generator and the numerics
-that both packages use. It has no dependencies and runs in any JavaScript runtime.
+It holds the errors the packages throw, the checks of their arguments, a seeded random number generator, the numerics
+and the types that both packages use. It has no dependencies and runs in any JavaScript runtime.
 
 ```bash
 npm install @measurekit/core
@@ -22,6 +22,7 @@ npm install @measurekit/core
 | Random   | `createRandom(seed)`, a seeded xoshiro128\*\* generator, and its interface `Random`                                                                                                                                                                                                                                                     |
 | Checks   | `describe`; `isNonEmptyString`, `isPositive`, `isRecord`, `isUnitInterval`; `checkRecord`, `checkArray`, `checkOptions`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`, `checkPositive`, `checkNonNegative`, `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval`, `checkSeed`, `checkStopping` |
 | Numerics | `normalQuantile`, `logistic`, `logLogistic`, `normalizeLogs`, `cholesky`, `backtrack` and `ARMIJO` for line searches, `iterateToConvergence` with `Stopping` and `Convergence`, `dot`, `largestChange`, `maxAbs`, `mean`                                                                                                                |
+| Types    | `QMatrix`, the attributes or skills of each item by item id; `ThetaDistribution`, nodes of theta with weights that sum to 1                                                                                                                                                                                                             |
 
 A check throws `DataError` with a sentence that names the value and what was expected, such as
 `A seed must be a safe integer, found 1.5.`

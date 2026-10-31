@@ -6,6 +6,7 @@ import {
   checkPositive,
   checkRecord,
   DataError,
+  type ThetaDistribution,
 } from "@measurekit/core";
 import { checkAttempt, checkEvent, type Event } from "../data/event.js";
 import { checkLog, type EventLog } from "../data/event-log.js";
@@ -43,17 +44,6 @@ export interface IrtOptions {
    * @defaultValue `61`
    */
   readonly points?: number;
-}
-
-/**
- * A discrete distribution of θ: nodes with weights summing to 1. `@measurekit/psychometrics` has the same shape, so a
- * posterior moves between the packages as data.
- */
-export interface ThetaDistribution {
-  /** The values of θ, in ascending order. */
-  readonly nodes: readonly number[];
-  /** The probability of each node, summing to 1. */
-  readonly weights: readonly number[];
 }
 
 /** Options of {@link IrtModel.ability}. */

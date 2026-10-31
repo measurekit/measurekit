@@ -1,5 +1,4 @@
-import { checkOptions, checkRecord, checkUnitInterval } from "@measurekit/core";
-import type { ThetaDistribution } from "../irt/ability.js";
+import { checkOptions, checkRecord, checkUnitInterval, type ThetaDistribution } from "@measurekit/core";
 import { checkItemList } from "../irt/items.js";
 import type { IrtItem } from "../irt/model.js";
 import { quadratureRule } from "../irt/quadrature.js";

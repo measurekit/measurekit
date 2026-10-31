@@ -509,7 +509,7 @@ weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0
 ```
 
 A calibration's `GroupDistribution` has the same `nodes` and `weights`, so it is a `ThetaDistribution` too: the
-distribution of theta in a population. `@measurekit/knowledge-tracing` returns the same shape from its online IRT model.
+distribution of theta in a population. `@measurekit/knowledge-tracing` returns the same type, of `@measurekit/core`, from its online IRT model.
 
 ## Summed-score tables
 

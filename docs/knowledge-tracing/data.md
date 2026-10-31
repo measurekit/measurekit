@@ -55,8 +55,8 @@ other types are rejected.
 
 ## Q-matrices
 
-A `QMatrix` gives the skills of each item, `{ [item]: skills }`, for events that do not carry skills. Its shape is
-that of the `QMatrix` of `@measurekit/psychometrics`; a row may be empty here, as an item may practice no skill,
+A `QMatrix` gives the skills of each item, `{ [item]: skills }`, for events that do not carry skills. It is the
+`QMatrix` of `@measurekit/core`, which `@measurekit/psychometrics` shares; a row may be empty here, as an item may practice no skill,
 where its cognitive diagnosis needs at least one attribute per item.
 
 An event without skills whose item the Q-matrix lacks throws `DataError`:

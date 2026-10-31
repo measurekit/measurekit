@@ -7,6 +7,7 @@ import {
   DataError,
   describe,
   normalizeLogs,
+  type ThetaDistribution,
 } from "@measurekit/core";
 import type { Quadrature } from "../math/quadrature.js";
 import { findRoot } from "../math/root.js";
@@ -79,17 +80,6 @@ export interface ThetaIntegrationOptions {
    * @defaultValue 61 rectangular points
    */
   readonly quadrature?: QuadratureOptions;
-}
-
-/**
- * A discrete distribution of theta: a posterior, as {@link thetaPosterior} returns it, or a population, such as the
- * `GroupDistribution` of a calibration, which has these members.
- */
-export interface ThetaDistribution {
-  /** The values of theta, in ascending order. */
-  readonly nodes: readonly number[];
-  /** The probability of each node, summing to 1. */
-  readonly weights: readonly number[];
 }
 
 /** Options of {@link posteriorMeanEstimate}. */

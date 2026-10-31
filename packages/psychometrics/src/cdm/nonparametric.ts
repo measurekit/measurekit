@@ -1,7 +1,7 @@
-import { checkChoice, checkOptions } from "@measurekit/core";
+import { checkChoice, checkOptions, type QMatrix } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
 import { dichotomousRows } from "./calibration.js";
-import { cdmDesign, type QMatrix } from "./q-matrix.js";
+import { cdmDesign } from "./q-matrix.js";
 
 /** Options of {@link nonparametricClassification}. */
 export interface NonparametricOptions {

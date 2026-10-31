@@ -1,5 +1,5 @@
-import { DataError } from "@measurekit/core";
-import { checkItemSkills, type QMatrix } from "../data/q-matrix.js";
+import { DataError, type QMatrix } from "@measurekit/core";
+import { checkItemSkills } from "../data/q-matrix.js";
 import { compareStates, compile, holds, type KnowledgeStructure, seal } from "./structure.js";
 
 /**

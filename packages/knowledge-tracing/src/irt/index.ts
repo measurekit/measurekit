@@ -4,6 +4,8 @@
  *
  * @module @measurekit/knowledge-tracing/irt
  */
+
+export type { ThetaDistribution } from "@measurekit/core";
 export type { Ability } from "./ability.js";
 export {
   type AbilityOptions,
@@ -12,7 +14,6 @@ export {
   type IrtOptions,
   type IrtPrior,
   irt,
-  type ThetaDistribution,
 } from "./irt.js";
 export type { DichotomousItem, GradedItem, IrtItem, PartialCreditItem } from "./items.js";
 export type { IrtParameters } from "./parameters.js";
