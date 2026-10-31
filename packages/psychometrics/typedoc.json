@@ -9,6 +9,7 @@
     "src/cdm/index.ts",
     "src/explanatory/index.ts",
     "src/fit/index.ts",
+    "src/mokken/index.ts",
     "src/generalizability/index.ts",
     "src/dif/index.ts",
     "src/dimensionality/index.ts",

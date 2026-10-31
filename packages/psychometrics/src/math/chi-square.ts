@@ -13,7 +13,7 @@ const MAX_TERMS = 1000;
 const TINY = 1e-300;
 
 /** Returns ln Γ(x) for x ≥ 0.5 by the Lanczos approximation, accurate to about 1e-15. */
-function logGamma(x: number): number {
+export function logGamma(x: number): number {
   let sum = LANCZOS[0] ?? 0;
   for (let i = 1; i < LANCZOS.length; i++) sum += (LANCZOS[i] ?? 0) / (x - 1 + i);
   const t = x - 0.5 + LANCZOS_G;

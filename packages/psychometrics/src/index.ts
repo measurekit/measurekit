@@ -16,6 +16,7 @@ export * from "./fit/index.js";
 export * from "./generalizability/index.js";
 export * from "./interop/index.js";
 export * from "./irt/index.js";
+export * from "./mokken/index.js";
 export * from "./multidimensional/index.js";
 export * from "./rater/index.js";
 export * from "./response-time/index.js";

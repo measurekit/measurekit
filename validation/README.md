@@ -18,6 +18,7 @@ Rscript validation/psychometrics/dif.R               # differential item functio
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/explanatory.R       # item parameters regressed on item features: mirt, metafor and base R
 Rscript validation/psychometrics/generalizability.R  # variance components and decision studies of balanced designs: base R aov and lme4
+Rscript validation/psychometrics/mokken.R            # Mokken scale analysis: mokken's coefH, aisp, check.monotonicity and check.iio
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
 Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych; the many-facet Rasch model: base R, with TAM and sirt data
@@ -29,7 +30,7 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 ```
 
 They need R with the packages psych, mirt, subscore, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
-sirt, nlme, LNIRT, numDeriv, lme4, metafor, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm and jsonlite;
+sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm and jsonlite;
 `common.R` holds their shared helpers.
 
 `multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `exploratory`, `rotation` and

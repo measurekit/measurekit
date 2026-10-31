@@ -441,6 +441,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/mokken/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../math/**"],
+                    "message": "mokken/ builds on data/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/explanatory/**"],
       "linter": {
         "rules": {

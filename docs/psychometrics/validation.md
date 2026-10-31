@@ -10,8 +10,8 @@ TypeScript tests; R runs when fixtures change.
 
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 lordif 0.4-2, MASS 7.3-65, rms 8.2.0, subscore 3.3, equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
-LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14,
-cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
+LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, mokken 3.1.2, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11,
+CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                                             |
 | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -172,6 +172,13 @@ cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2 a
 | Separation, reliability, homogeneity                                        | Base R written out from the measures and standard errors                                                                                                                                                             |
 | Person EAP estimates, fair averages, expected ratings                       | Base R, from the same parameters                                                                                                                                                                                     |
 | Element infit, outfit and standardized forms                                | Base R written out, at the same person estimates                                                                                                                                                                     |
+
+| Mokken quantity                                                                     | Reference                                                                                                                           |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| H_ij, H_i, H and their standard errors                                              | mokken's `coefH(se = TRUE)`                                                                                                         |
+| Scales of the automated item selection                                              | mokken's `aisp(lowerbound, alpha)`, search `normal`                                                                                 |
+| Counts, violation sizes and sums, z statistics, criterion of the monotonicity check | mokken's `check.monotonicity`, aggregated as `summary` does; significant violations recounted at the exact quantile from its groups |
+| The same for the invariant item ordering, the items removed, H^T                    | mokken's `check.iio(method = "MIIO")` and `summary`, the criterion from the unrounded H_i                                           |
 
 | Generalizability quantity                         | Reference                                                                                                                                  |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -436,6 +443,20 @@ Several results of the reference packages are not references:
   estimate three times, after which the estimates agree within 3.3e-7; the test allows 1e-5. gtheory, which wraps lme4
   for G and D studies, was removed from CRAN in March 2025, so lme4 is the reference. REML keeps estimates at 0 or
   above, so the case with a negative component has the base R computation alone.
+- **mokken's summaries and rounded constants.** mokken's summaries round their results, so the script takes the statistics
+  of both checks from the raw `results` and aggregates them as the summary methods do, and asserts that the criteria it
+  computes from mokken's own values equal the summaries'. Two rounded values change a result; the fixture holds the
+  exact value and, under `mokkenRounded`, mokken's. `check.monotonicity` counts a violation as significant when z exceeds the
+  constant 1.6449, the 0.95 quantile rounded to four decimals, whatever the level. The script recounts from the groups
+  that the check returns, with the formulas of its source, at that constant, which must reproduce mokken's counts, and
+  at `qnorm(0.95)`, which this package uses. One item differs: `Item17` of `cavalini`, at a minimum violation of 0.05
+  and a minimum group size of 60, has a z between 1.64485 and 1.6449, so that it has 6 significant violations and a
+  criterion of 134 where mokken reports 5 and 131. The summary of the invariant item ordering rounds H_i to three
+  decimals before it computes the criterion, which this package does not: `withdrawn*` of `acl four scales` has a
+  criterion of 79 and mokken's summary reports 78. mokken's selection of the items to remove breaks ties between items
+  by adding random noise to H, and no fixture has such a tie, so that the removed items do not depend on its seed. `aisp`
+  stops where the lower bound is above every H_ij and `coefH` at an item without variance, so the references have
+  neither.
 - **mirt's exploratory models.** mirt estimates every slope of an exploratory model, so that the likelihood is flat along
   the rotations: on SAT12 scored with 31 points its EM does not converge in 5,000 iterations at `TOL = 1e-10`. The
   reference gives mirt the constraint of `calibrateMultidimensional`, the first D - 1 items' later slopes at 0, and
@@ -543,6 +564,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `rater.json`                           | irr's `anxiety` (20 subjects, 3 raters), also with two ratings missing; irr's `diagnoses` (30 subjects, 6 raters)                                                                                                                                                                            | Weighted kappa, nominal categories, missing ratings                                                                                    |
 | `rater-many-facet.json`                | sirt's `data.ratings1` (135 students, 5 criteria, 7 raters); TAM's `data.sim.mfr` (100 persons, 5 items, 5 raters, 3 topics); a simulation, `set.seed(20261029)`: 300 persons, 4 items, 6 raters, 2 raters per person, rater-specific thresholds                                             | Shared and per-item or per-rater thresholds; a third facet; nested and incomplete designs                                              |
 | `generalizability.json`                | Simulations, `set.seed(20261029)`: p x i (40 x 12), p x r x i (40 x 4 x 6), (r:p) x i (25 x 3 x 4), i:p, r:pi, i:r:p, (i:p) x (r:p); p x i (8 x 4) with a negative item component                                                                                                            | Crossed and nested designs; labels repeated within parents; a negative component; fixed facets and nesting in decision studies         |
+| `mokken.json`                          | mokken's `acl` (four 10-adjective scales), `cavalini`, `transreas`, `DS14`; simulations, `set.seed(20261029)`: 14 items of two dimensions and noise for 500 persons, 8 items with tied item steps for 300                                                                                    | Dichotomous and polytomous items; ties of steps; missing responses; 500 persons; item removal                                          |
 | `response-time.json`                   | A lognormal simulation, `set.seed(20261029)`: 400 persons, 12 items, 5% of times missing; LNIRT's `CredentialForm1`, items 1 to 10, 1636 persons, times of 0 as missing                                                                                                                      | Calibration, speeds, residuals; NT10 and NT15 with a 30 s cap                                                                          |
 | `response-time-speed-accuracy.json`    | LNIRT's `CredentialForm1`, items 1 to 10, times of 0 as missing, 1636 persons; LNIRT's `simLNIRT`, `set.seed(20261029)`: 800 persons, 12 items, ρ = 0.5, 2% of the responses and 3% of the times missing                                                                                     | A ρ that LNIRT and maximum likelihood do not share; missing responses and times                                                        |
 | `cdm.json`                             | GDINA's `realdata_Tatsuoka1990`, fraction subtraction: 536 persons, 20 items, 8 attributes, under the DINA; a G-DINA simulation, `set.seed(20261029)`: 1500 persons, 15 items, 4 attributes, under the G-DINA and DINO                                                                       | 256 profiles, indistinguishable profiles; persons, accuracy, PVAF, nonparametric classification of 30 persons                          |
@@ -641,6 +663,10 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Many-facet standard errors, separation, reliability, homogeneity                                 | 1e-6 relative                                      | 6.2e-8                   |
 | Many-facet EAP estimates, fit, fair and expected ratings, summaries from the same inputs         | 1e-10 absolute                                     | 2.4e-14                  |
 | Generalizability sums of squares, mean squares, components, relative to max(1, value)            | 1e-10                                              | 6e-15                    |
+| Scalability coefficients and their standard errors, relative to max(1, value)                    | 1e-10                                              | 3e-15                    |
+| Selected scales, counts, significant violations, criteria, removed items                         | exact                                              | 0                        |
+| Violation sizes and sums, z statistics                                                           | 1e-8 absolute                                      | 4e-15                    |
+| H^T of the items that remain                                                                     | 1e-10 absolute                                     | 4e-13                    |
 | Components against lme4's REML estimates                                                         | 1e-5 absolute                                      | 3.3e-7                   |
 | Decision study variances and coefficients, relative                                              | 1e-10                                              | 5e-15                    |
 | Testlet parameters and SDs against the base R maximum                                            | 2e-5 absolute                                      | 9e-6                     |
