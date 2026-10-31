@@ -1,4 +1,4 @@
-import { cholesky, DataError } from "@measurekit/core";
+import { backtrack, cholesky, DataError } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { designCrossProducts } from "./cross-products.js";
 
@@ -81,17 +81,20 @@ export function remlRegression(
       converged = true;
       break;
     }
-    let next = Math.max(0, tau2 + step);
-    let trial = evaluate(next);
-    for (
-      let halvings = 0;
-      halvings < MAX_HALVINGS &&
-      trial.logLikelihood < current.logLikelihood - LIKELIHOOD_ROUNDING * Math.abs(current.logLikelihood);
-      halvings++
-    ) {
-      next = tau2 + (next - tau2) / 2;
-      trial = evaluate(next);
-    }
+    const proposed = Math.max(0, tau2 + step);
+    let next = proposed;
+    let trial = current;
+    // The last step tried is taken when none lowers the likelihood.
+    backtrack(
+      (length) => {
+        next = tau2 + length * (proposed - tau2);
+        trial = evaluate(next);
+        return -trial.logLikelihood;
+      },
+      -current.logLikelihood,
+      0,
+      { decrease: 0, slack: LIKELIHOOD_ROUNDING * Math.abs(current.logLikelihood), maxHalvings: MAX_HALVINGS },
+    );
     converged = Math.abs(next - tau2) < tolerance;
     tau2 = next;
     current = trial;

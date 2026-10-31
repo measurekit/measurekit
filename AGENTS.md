@@ -88,6 +88,7 @@ packages/core/                the published package @measurekit/core
   src/logistic.ts       logistic, logLogistic
   src/normalize-logs.ts normalizeLogs
   src/cholesky.ts       cholesky
+  src/line-search.ts    ARMIJO, backtrack
   src/vectors.ts        dot, maxAbs, mean
   test/<file>.test.ts   one file per concern; the numerics are validated by the fixtures of the packages
 packages/psychometrics/       the published package @measurekit/psychometrics

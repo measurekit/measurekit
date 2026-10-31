@@ -7,6 +7,7 @@
 export * from "./checks.js";
 export * from "./cholesky.js";
 export * from "./errors.js";
+export * from "./line-search.js";
 export * from "./logistic.js";
 export * from "./normal.js";
 export * from "./normalize-logs.js";

@@ -1,4 +1,4 @@
-import { dot, maxAbs } from "@measurekit/core";
+import { backtrack, dot, maxAbs } from "@measurekit/core";
 import { invert } from "./linear-algebra.js";
 
 /** A function to minimize: it returns its value at `x` and writes its gradient into `gradient`. */
@@ -50,14 +50,6 @@ export interface OptimizationResult {
   readonly converged: boolean;
 }
 
-/**
- * The sufficient decrease of the Armijo condition, Nocedal and Wright's c1.
- *
- * @see {@link https://doi.org/10.1007/978-0-387-40065-5 | Nocedal and Wright (2006)}
- */
-const ARMIJO = 1e-4;
-/** The shortest step the line search tries, as a fraction of the full step, before it gives up. */
-const MIN_STEP = 1e-12;
 const DEFAULT_TOLERANCE = 1e-8;
 const DEFAULT_MAX_ITERATIONS = 100;
 
@@ -211,13 +203,16 @@ interface Point {
  * accepted point in `trial`. Returns whether a step was accepted.
  */
 function lineSearch(f: GradientFunction, point: Point, search: Float64Array, trial: Point): boolean {
-  const slope = dot(point.gradient, search);
-  for (let length = 1; length >= MIN_STEP; length /= 2) {
-    for (let i = 0; i < search.length; i++) trial.x[i] = (point.x[i] ?? 0) + length * (search[i] ?? 0);
-    trial.value = f(trial.x, trial.gradient);
-    if (trial.value <= point.value + ARMIJO * length * slope) return true;
-  }
-  return false;
+  const accepted = backtrack(
+    (length) => {
+      for (let i = 0; i < search.length; i++) trial.x[i] = (point.x[i] ?? 0) + length * (search[i] ?? 0);
+      trial.value = f(trial.x, trial.gradient);
+      return trial.value;
+    },
+    point.value,
+    dot(point.gradient, search),
+  );
+  return accepted !== null;
 }
 
 /** Returns whether a step lowered the value or the largest gradient component. */

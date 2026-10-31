@@ -1,4 +1,4 @@
-import { dot, logistic, logLogistic, maxAbs } from "@measurekit/core";
+import { backtrack, dot, logistic, logLogistic, maxAbs } from "@measurekit/core";
 import { choleskySolve, squares } from "./linear-algebra.js";
 import type { SparseMatrix } from "./sparse-matrix.js";
 
@@ -364,17 +364,6 @@ export function penalizedNewton(
 const ROUNDING = 1e-12;
 
 /**
- * The constant c₁ of the Armijo condition, the share of the predicted decrease a step must achieve; 1e-4 is the usual
- * value.
- *
- * @see {@link https://doi.org/10.1007/978-0-387-40065-5 | Nocedal and Wright (2006), section 3.1}
- */
-export const ARMIJO = 1e-4;
-
-/** The shortest step a line search tries, relative to the full step: a shorter one moves nothing. */
-export const SHORTEST_STEP = 1e-12;
-
-/**
  * Halves the step from (β, u) until the objective decreases enough (the Armijo condition), or rises by no more than
  * its rounding error, moving β and u there in place; returns the objective there, or `null` when no step does.
  */
@@ -388,19 +377,24 @@ function searchLine(
 ): number | null {
   const trialBeta = new Float64Array(beta.length);
   const trialIntercepts = new Float64Array(intercepts.length);
-  for (let length = 1; length >= SHORTEST_STEP; length /= 2) {
-    for (let j = 0; j < beta.length; j++) trialBeta[j] = (beta[j] ?? 0) + length * (step.beta[j] ?? 0);
-    for (let g = 0; g < intercepts.length; g++) {
-      trialIntercepts[g] = (intercepts[g] ?? 0) + length * (step.intercepts[g] ?? 0);
-    }
-    const trial = objective(trialBeta, trialIntercepts);
-    if (trial <= value + ARMIJO * length * slope + ROUNDING * (1 + Math.abs(value))) {
-      beta.set(trialBeta);
-      intercepts.set(trialIntercepts);
+  let trial = value;
+  const length = backtrack(
+    (fraction) => {
+      for (let j = 0; j < beta.length; j++) trialBeta[j] = (beta[j] ?? 0) + fraction * (step.beta[j] ?? 0);
+      for (let g = 0; g < intercepts.length; g++) {
+        trialIntercepts[g] = (intercepts[g] ?? 0) + fraction * (step.intercepts[g] ?? 0);
+      }
+      trial = objective(trialBeta, trialIntercepts);
       return trial;
-    }
-  }
-  return null;
+    },
+    value,
+    slope,
+    { slack: ROUNDING * (1 + Math.abs(value)) },
+  );
+  if (length === null) return null;
+  beta.set(trialBeta);
+  intercepts.set(trialIntercepts);
+  return trial;
 }
 
 /** Moves along a flat direction so that the intercepts of its groups have mean 0; the likelihood is unchanged. */

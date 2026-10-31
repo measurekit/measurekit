@@ -1,4 +1,4 @@
-import { dot } from "@measurekit/core";
+import { ARMIJO, backtrack, dot } from "@measurekit/core";
 import { symmetricEigen } from "./eigen.js";
 import { invertPositiveDefinite } from "./linear-algebra.js";
 
@@ -16,10 +16,6 @@ export interface MinresLoadings {
 const LOADING_STEP_TOLERANCE = 1e-8;
 /** The most Newton iterations of the minimum-residual loadings. */
 const MAX_ITERATIONS = 100;
-/** The sufficient decrease of the Armijo condition, Nocedal and Wright's c1. */
-const ARMIJO = 1e-4;
-/** The shortest step the line search tries, as a fraction of the full step, before it gives up. */
-const MIN_STEP = 1e-12;
 
 /**
  * Returns the loadings λ of the one-factor model of a correlation matrix that minimize the squared off-diagonal
@@ -45,21 +41,22 @@ export function minresLoadings(r: Float64Array, size: number, maxLoading = Numbe
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     const value = offDiagonalResiduals(r, size, x, gradient, hessian);
     newtonDirection(gradient, hessian, size, freeLoadings(x, gradient, maxLoading), direction);
-    // A step below the tolerance is taken in full: it is below the rounding of the loadings, so the decrease it makes
-    // is not visible in the value.
-    let step = 1;
-    let moved = project(x, direction, step, maxLoading, trial);
-    while (
-      moved >= LOADING_STEP_TOLERANCE &&
-      step >= MIN_STEP &&
-      residualSum(r, size, trial) > value + ARMIJO * (dot(gradient, trial) - dot(gradient, x))
-    ) {
-      step /= 2;
-      moved = project(x, direction, step, maxLoading, trial);
-    }
+    let moved = 0;
+    // The decrease is measured along the projected step, which a bound shortens. A step below the tolerance is taken
+    // in full: it is below the rounding of the loadings, so the decrease it makes is not visible in the value.
+    const step = backtrack(
+      (length) => {
+        moved = project(x, direction, length, maxLoading, trial);
+        if (moved < LOADING_STEP_TOLERANCE) return Number.NEGATIVE_INFINITY;
+        return residualSum(r, size, trial) - ARMIJO * (dot(gradient, trial) - dot(gradient, x));
+      },
+      value,
+      0,
+      { decrease: 0 },
+    );
     x.set(trial);
     const converged = moved < LOADING_STEP_TOLERANCE;
-    if (converged || step < MIN_STEP) return { loadings: signed(x), converged, iterations: iteration };
+    if (converged || step === null) return { loadings: signed(x), converged, iterations: iteration };
   }
   return { loadings: signed(x), converged: false, iterations: MAX_ITERATIONS };
 }

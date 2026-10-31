@@ -1,3 +1,4 @@
+import { backtrack } from "@measurekit/core";
 import { fromUnbounded, toUnbounded, unboundedDerivative } from "../irt/bounds.js";
 import { MIN_PROBABILITY } from "../irt/probability.js";
 import { invert } from "../math/linear-algebra.js";
@@ -76,11 +77,16 @@ export function itemMaximization<TParameters>(
       const value = objective(item, start, gradient, hessian);
       const direction = scoringDirection(gradient, hessian);
       const trial = new Float64Array(size);
-      for (let step = 1, halving = 0; halving <= MAX_HALVINGS; step /= 2, halving++) {
-        for (let l = 0; l < size; l++) trial[l] = (start[l] ?? 0) + step * (direction[l] ?? 0);
-        if (objective(item, trial) <= value) return;
-      }
-      assignCoordinates(item, start);
+      const step = backtrack(
+        (length) => {
+          for (let l = 0; l < size; l++) trial[l] = (start[l] ?? 0) + length * (direction[l] ?? 0);
+          return objective(item, trial);
+        },
+        value,
+        0,
+        { decrease: 0, maxHalvings: MAX_HALVINGS },
+      );
+      if (step === null) assignCoordinates(item, start);
     },
   };
 }

@@ -1,4 +1,4 @@
-import { dot, logistic, maxAbs } from "@measurekit/core";
+import { backtrack, dot, logistic, maxAbs } from "@measurekit/core";
 import { invert, invertPositiveDefinite } from "../math/linear-algebra.js";
 import { profileIndices, profilesOf } from "./q-matrix.js";
 
@@ -53,11 +53,8 @@ const MULTIPLIER_TOLERANCE = 1e-10;
 const BOUND_SLACK = 1e-12;
 /** The share of a vector that must lie outside the span of others for it to be independent of them. */
 const INDEPENDENCE = 1e-6;
-/** The sufficient decrease of the line search, as in `math/optimize.ts`. */
-const ARMIJO = 1e-4;
 /** The decrease the line search accepts as rounding, relative to the objective. */
 const ROUNDING = 1e-14;
-const MAX_BACKTRACKS = 40;
 const MAX_STEPS = 100;
 /** The slack of a predictor outside its bounds that still counts as inside them: rounding of the last step. */
 const FEASIBILITY_TOLERANCE = 1e-9;
@@ -422,18 +419,18 @@ function lineSearch(
   limit: number,
 ): number {
   const { trial, step } = problem;
-  const slope = dot(problem.gradient, step);
-  let fraction = limit;
-  for (let halving = 0; halving < MAX_BACKTRACKS; halving++) {
-    for (let i = 0; i < problem.size; i++) trial[i] = (coefficients[i] ?? 0) + fraction * (step[i] ?? 0);
-    const decreased = objective(problem, correct, persons, trial);
-    if (decreased <= value + ARMIJO * fraction * slope + ROUNDING * Math.abs(value)) {
-      coefficients.set(trial);
-      return fraction;
-    }
-    fraction /= 2;
-  }
-  return 0;
+  const fraction = backtrack(
+    (length) => {
+      for (let i = 0; i < problem.size; i++) trial[i] = (coefficients[i] ?? 0) + length * (step[i] ?? 0);
+      return objective(problem, correct, persons, trial);
+    },
+    value,
+    dot(problem.gradient, step),
+    { slack: ROUNDING * Math.abs(value), start: limit },
+  );
+  if (fraction === null) return 0;
+  coefficients.set(trial);
+  return fraction;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, DataError, describe, logistic, logLogistic } from "@measurekit/core";
+import { backtrack, checkArray, checkOptions, DataError, describe, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { invert } from "../math/linear-algebra.js";
 import { type DifData, type DifGroup, itemCases, polytomousData } from "./groups.js";
@@ -277,15 +277,22 @@ function halvedStep(
 ): { size: number; value: number } | null {
   const { parameters, saved } = regression;
   saved.set(parameters);
-  let size = 1;
-  for (let halves = 0; halves <= MAX_HALVES; halves++, size /= 2) {
-    for (let i = 0; i < parameters.length; i++) parameters[i] = (saved[i] ?? 0) - size * (direction[i] ?? 0);
-    if (!ordered(regression)) continue;
-    const trial = evaluate(cases, center, regression);
-    if (trial <= value + DEVIANCE_SLACK * Math.max(1, value)) return { size, value: trial };
+  let trial = value;
+  const size = backtrack(
+    (length) => {
+      for (let i = 0; i < parameters.length; i++) parameters[i] = (saved[i] ?? 0) - length * (direction[i] ?? 0);
+      trial = ordered(regression) ? evaluate(cases, center, regression) : Number.POSITIVE_INFINITY;
+      return trial;
+    },
+    value,
+    0,
+    { decrease: 0, slack: DEVIANCE_SLACK * Math.max(1, value), maxHalvings: MAX_HALVES },
+  );
+  if (size === null) {
+    parameters.set(saved);
+    return null;
   }
-  parameters.set(saved);
-  return null;
+  return { size, value: trial };
 }
 
 function maxAbs(values: Float64Array): number {

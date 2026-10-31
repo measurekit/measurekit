@@ -1,4 +1,4 @@
-import { createRandom } from "@measurekit/core";
+import { backtrack, createRandom } from "@measurekit/core";
 import type { CompressedResponses } from "../irt/responses.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import type { ItemState } from "./calibration-setup.js";
@@ -32,8 +32,6 @@ const GAIN = [0.1, 0.75] as const;
 const MAX_CORRECTION = 1;
 /** The successive cycles within the tolerance that end the third stage: mirt's `conv >= 3`. */
 const CONVERGED_CYCLES = 3;
-/** The halvings of a step of the correlations that are tried before it is dropped: the step is then 2^-40 of its size. */
-const MAX_HALVINGS = 40;
 
 /** How an MH-RM calibration runs. */
 export interface MhrmSettings {
@@ -173,15 +171,20 @@ function limited(value: number, clip: boolean): number {
 /** Adds `change` to the correlations, halving it until the matrix is positive definite. */
 function moveCorrelations(correlations: Correlations, change: Float64Array): void {
   const { dimensions, pairs, matrix } = correlations;
-  for (let halving = 0; halving < MAX_HALVINGS; halving++) {
-    const next = matrix.slice();
-    pairs.forEach(([i, j], a) => {
-      const value = (matrix[i * dimensions + j] ?? 0) + (change[a] ?? 0) / 2 ** halving;
-      next[i * dimensions + j] = value;
-      next[j * dimensions + i] = value;
-    });
-    if (correlations.set(next)) return;
-  }
+  backtrack(
+    (length) => {
+      const next = matrix.slice();
+      pairs.forEach(([i, j], a) => {
+        const value = (matrix[i * dimensions + j] ?? 0) + length * (change[a] ?? 0);
+        next[i * dimensions + j] = value;
+        next[j * dimensions + i] = value;
+      });
+      return correlations.set(next) ? 0 : Number.POSITIVE_INFINITY;
+    },
+    0,
+    0,
+    { decrease: 0 },
+  );
 }
 
 /** Stores the second stage's estimates and information. */

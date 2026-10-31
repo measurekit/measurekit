@@ -1,4 +1,4 @@
-import { maxAbs } from "@measurekit/core";
+import { backtrack, maxAbs } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import type { AnsweredPattern } from "./pattern.js";
 import type { CheckedPrior } from "./prior.js";
@@ -146,9 +146,14 @@ function halvedStep(
   current: number,
   trial: Float64Array,
 ): boolean {
-  for (let step = 1, halving = 0; halving <= MAX_HALVINGS; step /= 2, halving++) {
-    for (let k = 0; k < x.length; k++) trial[k] = (x[k] ?? 0) + step * (direction[k] ?? 0);
-    if (value(trial) <= current + ROUNDING * (1 + Math.abs(current))) return true;
-  }
-  return false;
+  const step = backtrack(
+    (length) => {
+      for (let k = 0; k < x.length; k++) trial[k] = (x[k] ?? 0) + length * (direction[k] ?? 0);
+      return value(trial);
+    },
+    current,
+    0,
+    { decrease: 0, slack: ROUNDING * (1 + Math.abs(current)), maxHalvings: MAX_HALVINGS },
+  );
+  return step !== null;
 }

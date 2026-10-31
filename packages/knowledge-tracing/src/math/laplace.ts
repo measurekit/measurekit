@@ -1,15 +1,5 @@
-import { dot, logistic, maxAbs } from "@measurekit/core";
-import {
-  ARMIJO,
-  assemble,
-  createSystem,
-  linear,
-  type Problem,
-  penalizedNewton,
-  rowLoss,
-  SHORTEST_STEP,
-  type System,
-} from "./arrow-system.js";
+import { ARMIJO, backtrack, dot, logistic, maxAbs } from "@measurekit/core";
+import { assemble, createSystem, linear, type Problem, penalizedNewton, rowLoss, type System } from "./arrow-system.js";
 import { choleskySolve, squares } from "./linear-algebra.js";
 
 /** Random group intercepts fitted by the Laplace approximation. */
@@ -134,14 +124,19 @@ function takeStep(
     [systems.current, systems.trial] = [systems.trial, systems.current];
     return accept(fullTau, full);
   }
-  for (let length = 0.5; length >= SHORTEST_STEP; length /= 2) {
-    const trialTau = move(length);
-    const value = laplace(problem, trialBeta, Math.exp(trialTau), trialModes, ridge, null).value;
-    if (value >= current.value + ARMIJO * length * slope) {
-      return accept(trialTau, laplace(problem, trialBeta, Math.exp(trialTau), trialModes, ridge, systems.current));
-    }
-  }
-  return null;
+  // The objective is the negative of the approximation, which the search maximizes; it starts after the full step.
+  let trialTau = fullTau;
+  const length = backtrack(
+    (fraction) => {
+      trialTau = move(fraction);
+      return -laplace(problem, trialBeta, Math.exp(trialTau), trialModes, ridge, null).value;
+    },
+    -current.value,
+    -slope,
+    { start: 0.5, maxHalvings: 38 },
+  );
+  if (length === null) return null;
+  return accept(trialTau, laplace(problem, trialBeta, Math.exp(trialTau), trialModes, ridge, systems.current));
 }
 
 /** Returns the gradient over β and τ as one vector, τ last. */
