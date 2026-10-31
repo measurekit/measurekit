@@ -1,5 +1,5 @@
-import { DataError, describe, isRecord, logistic } from "@measurekit/core";
-import { linearPredictor } from "./logistic.js";
+import { DataError, describe, isRecord } from "@measurekit/core";
+import { linearPredictor, logisticPair } from "./logistic.js";
 import type { MultidimensionalModel } from "./model.js";
 
 /**
@@ -13,6 +13,9 @@ export interface MultidimensionalGradedParameters {
   /** The intercepts of the K - 1 boundaries between adjacent categories, strictly decreasing. */
   readonly intercepts: readonly number[];
 }
+
+/** The values of {@link logisticPair} at a boundary: P(X ≥ k) and P(X < k), read at once. */
+const tails = new Float64Array(2);
 
 /** The multidimensional graded response model (Samejima): slopes and one intercept per boundary between categories. */
 export const multidimensionalGradedResponse: MultidimensionalModel<MultidimensionalGradedParameters> = {
@@ -65,10 +68,10 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
     const z = linearPredictor(a, theta);
     let above = 1;
     for (let k = 0; k < intercepts.length; k++) {
-      const boundary = z + (intercepts[k] ?? 0);
+      logisticPair(z + (intercepts[k] ?? 0), tails);
       const gap = k === 0 ? 1 : -Math.expm1((intercepts[k] ?? 0) - (intercepts[k - 1] ?? 0));
-      out[k] = above * logistic(-boundary) * gap;
-      above = logistic(boundary);
+      out[k] = above * (tails[1] ?? 0) * gap;
+      above = tails[0] ?? 0;
     }
     out[intercepts.length] = above;
   },
@@ -78,8 +81,8 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
     // Category k gains the slope of P(X ≥ k) and loses that of P(X ≥ k + 1), both multiples of a.
     let slope = 0;
     for (let k = 0; k < intercepts.length; k++) {
-      const boundary = z + (intercepts[k] ?? 0);
-      const next = logistic(boundary) * logistic(-boundary);
+      logisticPair(z + (intercepts[k] ?? 0), tails);
+      const next = (tails[0] ?? 0) * (tails[1] ?? 0);
       for (let j = 0; j < size; j++) out[k * size + j] = (slope - next) * (a[j] ?? 0);
       slope = next;
     }
@@ -92,8 +95,8 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
     out.fill(0, 0, categories * size);
     // Boundary k moves only P(X ≥ k), which adds to category k and subtracts from category k - 1; the slopes move all.
     for (let k = 1; k < categories; k++) {
-      const boundary = z + (intercepts[k - 1] ?? 0);
-      const density = logistic(boundary) * logistic(-boundary);
+      logisticPair(z + (intercepts[k - 1] ?? 0), tails);
+      const density = (tails[0] ?? 0) * (tails[1] ?? 0);
       for (let j = 0; j < a.length; j++) {
         const slope = density * (theta[j] ?? 0);
         out[(k - 1) * size + j] = (out[(k - 1) * size + j] ?? 0) - slope;
@@ -109,9 +112,9 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
     let above = 1;
     let slope = 0;
     for (let k = 0; k < intercepts.length; k++) {
-      const boundary = z + (intercepts[k] ?? 0);
-      const upper = logistic(boundary);
-      const lower = logistic(-boundary);
+      logisticPair(z + (intercepts[k] ?? 0), tails);
+      const upper = tails[0] ?? 0;
+      const lower = tails[1] ?? 0;
       const gap = k === 0 ? 1 : -Math.expm1((intercepts[k] ?? 0) - (intercepts[k - 1] ?? 0));
       const probability = above * lower * gap;
       const next = upper * lower;

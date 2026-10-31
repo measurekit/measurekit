@@ -119,7 +119,10 @@ or one per item. Missing responses are skipped, and persons without responses ch
   correlations and normalized to sum to 1. The E-step accumulates each item's expected counts at every node; the M-step
   takes a Fisher-scoring step for each item, halved until the expected log-likelihood does not fall, and maximizes the
   correlations, which keep a unit diagonal and stay positive definite, with BFGS on the weights of the grid, so that
-  it maximizes the reported likelihood.
+  it maximizes the reported likelihood. SQUAREM accelerates the iterations: every third one starts from a point
+  extrapolated along the last two, shortened toward the plain steps where the log-likelihood falls. It reaches the
+  fixed points of plain EM in a fraction of the iterations where EM contracts slowly, as for an exploratory model, and
+  `iterations` counts every EM iteration.
 - **MH-RM.** Each cycle draws every person's theta from its posterior given the current estimates, by 5 random-walk
   Metropolis-Hastings steps whose variance is tuned to an acceptance of 0.35, and moves the estimates by γ Γ⁻¹ g, with g
   the complete-data score at the draws and Γ the observed complete-data information. The stages, gains and tolerance
@@ -279,7 +282,7 @@ convert items to and from mirt.
 - Noncompensatory models; multidimensional GPCM and nominal models; bifactor and two-tier reduction (the testlet model
   of [IRT](irt.md#testlets) covers equal-slope testlets).
 - Multiple groups, fixed anchor items and multidimensional linking.
-- EM acceleration, QMC-EM and latent means other than 0.
+- QMC-EM and latent means other than 0.
 - Multidimensional person fit and DIF.
 
 ## Differences from mirt

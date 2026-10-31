@@ -252,7 +252,8 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 The iterations that each EM calibration of the tables needed to reach its tolerance, on the data of the benchmark. A ratio
 of times is the product of a ratio of iterations and a ratio of the time of one. The one-parameter to the generalized partial
-credit calibrations of measurekit extrapolate EM with SQUAREM, as mirt does with Ramsay's method; the others run plain EM.
+credit calibrations and the multidimensional ones of measurekit extrapolate EM with SQUAREM, as mirt does with Ramsay's
+method; the others run plain EM. Every EM iteration counts, those that follow an extrapolation included.
 
 | Calibration                         | measurekit | Reference |
 | ----------------------------------- | ---------: | --------: |
@@ -261,9 +262,9 @@ credit calibrations of measurekit extrapolate EM with SQUAREM, as mirt does with
 | Three-parameter model               |         81 |       183 |
 | Graded response model               |         12 |        11 |
 | Generalized partial credit model    |         19 |        37 |
-| Confirmatory two-dimensional 2PL    |         23 |        24 |
-| Confirmatory two-dimensional graded |         22 |        43 |
-| Exploratory two-dimensional 2PL     |        442 |       135 |
+| Confirmatory two-dimensional 2PL    |         13 |        24 |
+| Confirmatory two-dimensional graded |         12 |        43 |
+| Exploratory two-dimensional 2PL     |         93 |       135 |
 | G-DINA                              |        187 |       184 |
 | DINA                                |         44 |        45 |
 | DINO                                |        195 |       231 |

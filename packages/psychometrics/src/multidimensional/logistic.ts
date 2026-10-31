@@ -1,4 +1,4 @@
-import { DataError, describe, isRecord, logistic } from "@measurekit/core";
+import { DataError, describe, isRecord } from "@measurekit/core";
 import type { ModelParameter } from "../irt/model.js";
 import type { MultidimensionalModel } from "./model.js";
 
@@ -19,6 +19,9 @@ export interface MultidimensionalLogisticParameters {
 }
 
 const LOWER_ASYMPTOTE: ModelParameter = { name: "c", lower: 0, upper: 1 };
+
+/** The two logistic values of {@link logisticPair} that a model reads at once: the calls are synchronous. */
+const tails = new Float64Array(2);
 
 /** The multidimensional two-parameter logistic model (M2PL): slopes and an intercept per item, `c = 0`, `d = 1`. */
 export const multidimensionalTwoParameterLogistic: MultidimensionalModel<MultidimensionalLogisticParameters> =
@@ -78,10 +81,10 @@ function logisticModel(name: string, guessing: boolean): MultidimensionalModel<M
       };
     },
     probabilities({ a, intercept, c, d }, theta, out) {
-      const z = linearPredictor(a, theta) + intercept;
+      logisticPair(linearPredictor(a, theta) + intercept, tails);
       // 1 - P from the complementary logistic keeps the precision of small probabilities of a wrong response.
-      out[0] = 1 - d + (d - c) * logistic(-z);
-      out[1] = c + (d - c) * logistic(z);
+      out[0] = 1 - d + (d - c) * (tails[1] ?? 0);
+      out[1] = c + (d - c) * (tails[0] ?? 0);
     },
     thetaGradients({ a, intercept, c, d }, theta, out) {
       const slope = logisticSlope(a, theta, intercept, c, d);
@@ -91,9 +94,9 @@ function logisticModel(name: string, guessing: boolean): MultidimensionalModel<M
       });
     },
     parameterDerivatives({ a, intercept, c, d }, theta, out) {
-      const z = linearPredictor(a, theta) + intercept;
-      const upper = logistic(z);
-      const lower = logistic(-z);
+      logisticPair(linearPredictor(a, theta) + intercept, tails);
+      const upper = tails[0] ?? 0;
+      const lower = tails[1] ?? 0;
       const slope = (d - c) * upper * lower;
       const size = a.length + 1 + (guessing ? 1 : 0);
       // Category 0 is the complement of category 1, so its derivatives are the negatives.
@@ -109,10 +112,12 @@ function logisticModel(name: string, guessing: boolean): MultidimensionalModel<M
       }
     },
     information({ a, intercept, c, d }, theta, out) {
-      const z = linearPredictor(a, theta) + intercept;
-      const slope = (d - c) * logistic(z) * logistic(-z);
+      logisticPair(linearPredictor(a, theta) + intercept, tails);
+      const upper = tails[0] ?? 0;
+      const lower = tails[1] ?? 0;
+      const slope = (d - c) * upper * lower;
       // P (1 - P), which is 0 only where the probabilities underflow and the information vanishes.
-      const variance = (1 - d + (d - c) * logistic(-z)) * (c + (d - c) * logistic(z));
+      const variance = (1 - d + (d - c) * lower) * (c + (d - c) * upper);
       const factor = variance > 0 ? (slope * slope) / variance : 0;
       a.forEach((ai, i) => {
         a.forEach((aj, j) => {
@@ -132,6 +137,18 @@ export function linearPredictor(a: readonly number[], theta: Float64Array): numb
 
 /** Returns dP/dz of the logistic item at theta, with z the linear predictor, so that ∇P = dP/dz a. */
 function logisticSlope(a: readonly number[], theta: Float64Array, intercept: number, c: number, d: number): number {
-  const z = linearPredictor(a, theta) + intercept;
-  return (d - c) * logistic(z) * logistic(-z);
+  logisticPair(linearPredictor(a, theta) + intercept, tails);
+  return (d - c) * (tails[0] ?? 0) * (tails[1] ?? 0);
+}
+
+/**
+ * Writes logistic(x) to `out[0]` and logistic(-x) to `out[1]` from one exponential, each accurate in its own tail: with
+ * t = exp(-|x|) and s = 1 / (1 + t), the larger is s and the smaller t s.
+ */
+export function logisticPair(x: number, out: Float64Array): void {
+  const t = Math.exp(-Math.abs(x));
+  const larger = 1 / (1 + t);
+  const smaller = t * larger;
+  out[0] = x >= 0 ? larger : smaller;
+  out[1] = x >= 0 ? smaller : larger;
 }

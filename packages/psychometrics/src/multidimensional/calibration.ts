@@ -74,8 +74,9 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * EM: the grid has `points` equally spaced nodes per dimension from -6 to 6, weighted by the normal density of the
  * correlations, as mirt. The M-step takes a Fisher-scoring step for each item and maximizes the correlations, which keep
  * a unit diagonal and stay positive definite, with BFGS on the weights of the grid, so that it maximizes the reported
- * likelihood. Standard errors come from Louis' formula for the observed information of the marginal log-posterior, or
- * from the cross-product of the persons' score vectors.
+ * likelihood. SQUAREM accelerates the iterations, to the fixed points of plain EM. Standard errors come from Louis'
+ * formula for the observed information of the marginal log-posterior, or from the cross-product of the persons' score
+ * vectors.
  *
  * MH-RM: each cycle draws every person's theta from its posterior at the current estimates by Metropolis-Hastings and
  * moves the estimates by a Robbins-Monro step on the complete-data score, in the stages and with the gains of mirt's
