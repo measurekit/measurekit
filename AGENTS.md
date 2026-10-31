@@ -200,7 +200,7 @@ Psychometrics: every module of `cat/`, `equating/`, `irt/`, `multidimensional/`,
 | `generalizability/` | `data/`, `math/`                                      |
 | `scaling/`          | `irt/`, `equating/`, `math/`                          |
 | `rater/`            | `data/`, `irt/`, `fit/`, `math/`                      |
-| `cat/`              | `irt/`, `sim/`, `cdm/`, `math/`                       |
+| `cat/`              | `irt/`, `sim/`, `cdm/`, `multidimensional/`, `math/`  |
 
 Knowledge tracing: the model families never import each other, nor does anything import `evaluate/`, `practice/` or
 `sim/`: they use models only through `LearnerModel`.

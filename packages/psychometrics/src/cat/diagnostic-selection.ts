@@ -3,10 +3,13 @@ import { MIN_PROBABILITY } from "../irt/probability.js";
 import type { DiagnosticTestItem } from "./diagnostic-items.js";
 import type { ItemSelectionRule, SelectionContext } from "./selection.js";
 
-/** The Kullback-Leibler divergence of the response distribution at a probability of success q from that at p. */
+/**
+ * The Kullback-Leibler divergence of the response distribution at a probability of success q from that at p, as a
+ * difference of logarithms with q and 1 - q at least `MIN_PROBABILITY`, so that it is finite where a probability is 0.
+ */
 function divergence(p: number, q: number): number {
-  const right = p > 0 ? p * Math.log(p / Math.max(q, MIN_PROBABILITY)) : 0;
-  const wrong = p < 1 ? (1 - p) * Math.log((1 - p) / Math.max(1 - q, MIN_PROBABILITY)) : 0;
+  const right = p > 0 ? p * (Math.log(p) - Math.log(Math.max(q, MIN_PROBABILITY))) : 0;
+  const wrong = p < 1 ? (1 - p) * (Math.log(1 - p) - Math.log(Math.max(1 - q, MIN_PROBABILITY))) : 0;
   return right + wrong;
 }
 

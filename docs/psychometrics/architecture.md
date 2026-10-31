@@ -51,16 +51,17 @@ Modules form layers; a module imports only from lower layers, never from its own
 | 5     | `sim/`, `dif/`, `standard-setting/`, `scaling/`, `rater/`, `interop/`              |
 | 6     | `cat/`                                                                             |
 
-Analysis modules (`ctt/`, `irt/`, `dimensionality/` and `generalizability/`) build on `data/` and `math/`, not on each
-other. `sim/` builds on `irt/`, `cdm/` and `multidimensional/` to simulate their models, `interop/` on `irt/` and
-`multidimensional/` to convert their items, `cat/` on `sim/` for the same response simulation and on `cdm/` for the
-profile estimates of diagnostic tests, `dif/` and `standard-setting/` on `equating/` for linking and score
-distributions, `scaling/` on `equating/` for the linear transformation of a theta scale, and `rater/` on `irt/` for the
-Rasch model of its many facets and on `fit/` for the fit of their elements. `explanatory/` builds on `irt/` for the
-calibrated items it regresses, and `multidimensional/` on `irt/` for its priors, compressed responses and parameter
-bounds. [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces them, the
-absence of Node modules and platform globals in `src/`, and that code outside `packages/` imports
-`@measurekit/psychometrics` by name.
+Analysis modules (`ctt/`, `irt/`, `dimensionality/` and `generalizability/`) build on `data/` and `math/`, not on each other. `sim/` builds
+on `irt/`, `cdm/` and `multidimensional/` to simulate their models, `interop/` on `irt/` and `multidimensional/` to
+convert their items, `cat/` on `sim/` for the same response simulation, on `cdm/` for the profile estimates of
+diagnostic tests and on `multidimensional/` for the items, estimates and information of multidimensional tests, `dif/`
+and `standard-setting/` on `equating/` for linking and score distributions, `scaling/` on `equating/` for the linear
+transformation of a theta scale, and `rater/` on `irt/` for the Rasch model of its many facets and on `fit/` for the fit
+of their elements. `explanatory/` builds on `irt/` for the calibrated items it regresses, and `multidimensional/` on
+`irt/` for its priors, compressed responses and parameter bounds.
+[AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces them, the absence of
+Node modules and platform globals in `src/`, and that code outside `packages/` imports `@measurekit/psychometrics` by
+name.
 
 ## Numerics
 

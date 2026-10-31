@@ -308,9 +308,10 @@
                       "!../irt/**",
                       "!../sim/**",
                       "!../cdm/**",
+                      "!../multidimensional/**",
                       "!../math/**"
                     ],
-                    "message": "cat/ builds on irt/, sim/, cdm/ and math/ only."
+                    "message": "cat/ builds on irt/, sim/, cdm/, multidimensional/ and math/ only."
                   }
                 ]
               }

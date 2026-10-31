@@ -30,12 +30,23 @@ import {
   informationThreshold,
   itemInformation,
   kullbackLeibler,
+  type MultidimensionalAdaptiveTest,
+  type MultidimensionalAdaptiveTestState,
+  type MultidimensionalEstimate,
+  type MultidimensionalPoolItem,
   type MultistageModule,
   type MultistageTest,
+  type MultivariateNormalPrior,
   masteryThreshold,
+  maximumDeterminant,
   maximumInformation,
   maximumLikelihoodEstimate,
   modifiedPosteriorWeightedKullbackLeibler,
+  multidimensionalAdaptiveTest,
+  multidimensionalInformation,
+  multidimensionalPosteriorModeEstimate,
+  multidimensionalThreeParameterLogistic,
+  multidimensionalTwoParameterLogistic,
   multistageTest,
   type PoolItem,
   type ProfileEstimate,
@@ -52,6 +63,7 @@ import {
   simulateCdmResponses,
   simulateDiagnosticTest,
   simulateItems,
+  simulateMultidimensionalAdaptiveTest,
   simulateMultistageTest,
   standardErrorThreshold,
   testInformation,
@@ -66,6 +78,7 @@ import cat3pl from "./fixtures/cat-3pl.json" with { type: "json" };
 import catCdm from "./fixtures/cat-cdm.json" with { type: "json" };
 import catContent from "./fixtures/cat-content.json" with { type: "json" };
 import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
+import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
 import { arbitraryItem, defined, expectClose, item2pl, mean } from "./helpers.js";
 
 // Tolerances against catR, explained in docs/validation.md.
@@ -1779,6 +1792,34 @@ describe("diagnostic selection rules", () => {
     expectClose(defined(out[0]), expected, 1e-15);
   });
 
+  it("keeps every score finite where success probabilities are 0 or 1 and a latent group has no posterior", () => {
+    const pool: DiagnosticPoolItem[] = [
+      { id: "sure", attributes: ["c"], probabilities: [1, 0] },
+      { id: "never", attributes: ["c"], probabilities: [0, 0] },
+      { id: "faint", attributes: ["a", "b", "c"], probabilities: [1.7763568394002505e-15, 0, 0, 0, 0, 0, 0, 0] },
+    ];
+    const space = profileSpace(["a", "b", "c"], undefined);
+    const { items } = bindPool(pool, space);
+    // The posterior after a correct response to "sure": profiles that master c have none, and "faint" has groups of 0.
+    const posterior = space.profiles.map((profile) => (profile[2] === 1 ? 0 : 0.25));
+    const estimate = profileEstimate(posterior, space.profiles);
+    for (const rule of DIAGNOSTIC_RULES.values()) {
+      const out = new Float64Array(items.length);
+      rule.scores(
+        {
+          pool: items,
+          administered: [0],
+          responses: [1],
+          estimate,
+          eligible: Uint8Array.of(0, 1, 1),
+          random: createRandom(0),
+        },
+        out,
+      );
+      for (const score of [out[1], out[2]]) expect(Number.isFinite(score)).toBe(true);
+    }
+  });
+
   it("leaves the scores of items that are not eligible as they are", () => {
     const { items } = bindPool([...SKILL_POOL], profileSpace(SKILLS, undefined));
     const estimate = profileEstimate(
@@ -1989,6 +2030,614 @@ describe("simulateDiagnosticTest", () => {
   });
 });
 
+/** The estimate and the item scores of a multidimensional test against the written-out replay in base R. */
+const MULTIDIMENSIONAL_TOLERANCE = 1e-8;
+
+type MirtReference = (typeof catMirt.cases)[number];
+
+/** The priors of a case: its covariance, `undefined` for the identity that the test takes by default. */
+function priorOf(reference: MirtReference): MultivariateNormalPrior | undefined {
+  const identity = reference.covariance.every((row, i) => row.every((value, j) => value === (i === j ? 1 : 0)));
+  return identity
+    ? undefined
+    : { mean: reference.covariance.map(() => 0), covariance: reference.covariance.map((row) => [...row]) };
+}
+
+/** An item of a multidimensional pool: the M3PL when it has guessing, the M2PL otherwise. */
+function multidimensionalItem(id: string, a: readonly number[], intercept: number, c = 0): MultidimensionalPoolItem {
+  return {
+    id,
+    model: c > 0 ? multidimensionalThreeParameterLogistic : multidimensionalTwoParameterLogistic,
+    parameters: { a, intercept, c, d: 1 },
+  };
+}
+
+function multidimensionalPool(reference: MirtReference): MultidimensionalPoolItem[] {
+  return reference.items.map(({ id, a, intercept, c }) => multidimensionalItem(id, a, intercept, c));
+}
+
+function multidimensionalTest(
+  reference: MirtReference,
+  stopping: StoppingRule<MultidimensionalPoolItem, MultidimensionalEstimate> = testLength(catMirt.length),
+): MultidimensionalAdaptiveTest {
+  const prior = priorOf(reference);
+  return multidimensionalAdaptiveTest({
+    pool: multidimensionalPool(reference),
+    stopping,
+    ...(prior !== undefined && {
+      selection: maximumDeterminant(prior),
+      estimator: (items, answers) => multidimensionalPosteriorModeEstimate(items, answers, { prior }),
+    }),
+  });
+}
+
+/** Administers a multidimensional test to its end with the response `respond` gives each item; returns every state. */
+function administerMultidimensional(
+  test: MultidimensionalAdaptiveTest,
+  respond: (id: string) => number,
+  random = createRandom(1),
+): MultidimensionalAdaptiveTestState[] {
+  const states = [test.start(random)];
+  for (let state = defined(states[0]); state.next !== null; ) {
+    state = test.answer(state, respond(state.next), random);
+    states.push(state);
+  }
+  return states;
+}
+
+function expectMultidimensionalEstimate(
+  actual: MultidimensionalEstimate,
+  expected: {
+    readonly theta: readonly number[];
+    readonly standardErrors: readonly number[];
+    readonly covariance?: readonly (readonly number[])[];
+  },
+  label: string,
+): void {
+  expected.theta.forEach((value, d) => {
+    expectClose(defined(actual.theta[d]), value, MULTIDIMENSIONAL_TOLERANCE, `${label}, theta ${d + 1}`);
+  });
+  expected.standardErrors.forEach((value, d) => {
+    expectClose(
+      defined(actual.standardErrors[d]),
+      value,
+      MULTIDIMENSIONAL_TOLERANCE,
+      `${label}, standard error ${d + 1}`,
+    );
+  });
+  expected.covariance?.forEach((row, i) => {
+    row.forEach((value, j) => {
+      expectClose(
+        defined(actual.covariance[i])[j] ?? null,
+        value,
+        MULTIDIMENSIONAL_TOLERANCE,
+        `${label}, covariance ${i + 1}, ${j + 1}`,
+      );
+    });
+  });
+}
+
+/** Returns the determinant of a small square matrix by cofactor expansion along its first row. */
+function determinantOf(matrix: readonly (readonly number[])[]): number {
+  if (matrix.length === 1) return defined(defined(matrix[0])[0]);
+  return defined(matrix[0]).reduce((sum, value, column) => {
+    const minor = matrix.slice(1).map((row) => row.filter((_, c) => c !== column));
+    return sum + (column % 2 === 0 ? 1 : -1) * value * determinantOf(minor);
+  }, 0);
+}
+
+/** A multidimensional estimate at `theta` with standard errors of 1 and an identity covariance. */
+function estimateAt(...theta: number[]): MultidimensionalEstimate {
+  return {
+    theta,
+    standardErrors: theta.map(() => 1),
+    covariance: theta.map((_, i) => theta.map((__, j) => (i === j ? 1 : 0))),
+  };
+}
+
+/** A context of a multidimensional test with the first `count` items administered. */
+function multidimensionalContext(
+  pool: readonly MultidimensionalPoolItem[],
+  count: number,
+  estimate: MultidimensionalEstimate,
+): SelectionContext<MultidimensionalPoolItem, MultidimensionalEstimate> {
+  const administered = Array.from({ length: count }, (_, i) => i);
+  return {
+    pool,
+    administered,
+    responses: administered.map(() => 1),
+    estimate,
+    eligible: Uint8Array.from(pool, (_, i) => (i < count ? 0 : 1)),
+    random: createRandom(0),
+  };
+}
+
+describe("multidimensionalAdaptiveTest", () => {
+  for (const reference of catMirt.cases) {
+    it(`selects the items, estimates and stops of the written-out replay and mirtCAT on ${reference.name}`, () => {
+      const test = multidimensionalTest(reference);
+      for (const run of reference.runs) {
+        const label = `person ${run.person}`;
+        const row = defined(reference.responses[run.person - 1]);
+        const states = administerMultidimensional(test, (id) =>
+          defined(row[reference.items.findIndex((item) => item.id === id)]),
+        );
+        const ids = run.items.map((item) => defined(reference.items[item - 1]).id);
+        expect(states.map((state) => state.next).slice(0, ids.length), label).toEqual(ids);
+        expect(run.mirtCAT, label).toEqual(run.items);
+        run.steps.forEach((step, k) => {
+          expectMultidimensionalEstimate(defined(states[k]).estimate, step, `${label}, step ${k}`);
+        });
+        const last = defined(states.at(-1));
+        expectMultidimensionalEstimate(last.estimate, run.final, `${label}, final`);
+        expect(last.items, label).toEqual(ids);
+        expect(last.next).toBeNull();
+        // The standard error rule on the estimates of the replay, at every state.
+        run.stopping.forEach((decision) => {
+          const state = defined(states[decision.administered]);
+          catMirt.thresholds.forEach((threshold, t) => {
+            const context = {
+              pool: test.pool,
+              administered: [],
+              responses: [],
+              estimate: state.estimate,
+              eligible: new Uint8Array(test.pool.length),
+            };
+            expect(
+              standardErrorThreshold<MultidimensionalPoolItem, MultidimensionalEstimate>(threshold).stops(context),
+              `${label}, ${decision.administered} items, threshold ${threshold}`,
+            ).toBe(defined(decision.stops[t]));
+          });
+        });
+      }
+    });
+
+    it(`scores the items as the written-out D-rule does on ${reference.name}`, () => {
+      const pool = multidimensionalPool(reference);
+      const rule = maximumDeterminant(priorOf(reference));
+      for (const run of reference.runs) {
+        run.steps.forEach((step, k) => {
+          const administered = run.items.slice(0, k).map((item) => item - 1);
+          const context: SelectionContext<MultidimensionalPoolItem, MultidimensionalEstimate> = {
+            pool,
+            administered,
+            responses: administered.map(() => 1),
+            estimate: step,
+            eligible: Uint8Array.from(pool, (_, i) => (administered.includes(i) ? 0 : 1)),
+            random: createRandom(0),
+          };
+          const out = new Float64Array(pool.length);
+          rule.scores(context, out);
+          step.scores.forEach((expected, i) => {
+            if (expected === null) return;
+            expectClose(
+              defined(out[i]),
+              expected,
+              SCORE_TOLERANCE * Math.max(1, Math.abs(expected)),
+              `person ${run.person}, step ${k}, item ${i + 1}`,
+            );
+          });
+        });
+      }
+    });
+  }
+
+  it("starts at the prior, from the estimator's answer to the first item with a missing response", () => {
+    const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
+    const start = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) }).start(createRandom(1));
+    expect(start).toMatchObject({ items: [], responses: [], withheld: [] });
+    expect(start.estimate.theta).toEqual([0, 0]);
+    expect(start.estimate.standardErrors).toEqual([1, 1]);
+    expect(start.estimate.covariance).toEqual([
+      [1, 0],
+      [0, 1],
+    ]);
+    const prior = {
+      mean: [0.5, -1],
+      covariance: [
+        [4, 1],
+        [1, 2],
+      ],
+    };
+    const centered = multidimensionalAdaptiveTest({
+      pool,
+      stopping: testLength(2),
+      selection: maximumDeterminant(prior),
+      estimator: (items, answers) => multidimensionalPosteriorModeEstimate(items, answers, { prior }),
+    }).start(createRandom(1));
+    expect(centered.estimate.theta).toEqual([0.5, -1]);
+    prior.covariance.forEach((row, i) => {
+      row.forEach((value, j) => {
+        expectClose(defined(centered.estimate.covariance[i])[j] ?? null, value, 1e-14);
+      });
+    });
+  });
+
+  it("calls the estimator with the administered items, and with a missing response at the start", () => {
+    const pool = [
+      multidimensionalItem("q1", [1, 0], 0),
+      multidimensionalItem("q2", [0, 1], 0),
+      multidimensionalItem("q3", [1, 1], 0),
+    ];
+    const calls: { ids: string[]; answers: (number | null)[] }[] = [];
+    const test = multidimensionalAdaptiveTest({
+      pool,
+      stopping: testLength(2),
+      estimator: (items, answers) => {
+        calls.push({ ids: items.map((item) => (item as MultidimensionalPoolItem).id), answers: [...answers] });
+        return multidimensionalPosteriorModeEstimate(items, answers);
+      },
+    });
+    const states = administerMultidimensional(test, () => 1);
+    expect(calls[0]).toEqual({ ids: ["q1"], answers: [null] });
+    expect(calls[1]).toEqual({ ids: [defined(states[0]?.next)], answers: [1] });
+    expect(calls[2]?.answers).toEqual([1, 1]);
+  });
+
+  it("selects the item with the largest determinant, a within-dimension item first at the prior", () => {
+    const pool = [
+      multidimensionalItem("a", [1, 0], 0),
+      multidimensionalItem("b", [0, 1], 0),
+      multidimensionalItem("c", [1, 1], 0),
+    ];
+    const state = multidimensionalAdaptiveTest({ pool, stopping: testLength(1) }).start(createRandom(1));
+    expect(state.next).toBe("c");
+  });
+
+  it("stops when every standard error is at most the threshold, and at once when they already are", () => {
+    const random = createRandom(4);
+    const pool = Array.from({ length: 30 }, (_, i) =>
+      multidimensionalItem(`q${i}`, [i % 2 === 0 ? 1.4 : 0.3, i % 2 === 1 ? 1.4 : 0.3], random.normal() * 0.5),
+    );
+    const run = (threshold: number): MultidimensionalAdaptiveTestState[] =>
+      administerMultidimensional(
+        multidimensionalAdaptiveTest({
+          pool,
+          stopping: anyOf(
+            testLength(30),
+            standardErrorThreshold<MultidimensionalPoolItem, MultidimensionalEstimate>(threshold),
+          ),
+        }),
+        (id) => Number(id.slice(1)) % 2,
+      );
+    expect(run(1.5)).toHaveLength(1);
+    const states = run(0.7);
+    const last = defined(states.at(-1));
+    expect(last.items.length).toBeGreaterThan(0);
+    expect(last.items.length).toBeLessThan(30);
+    expect(Math.max(...last.estimate.standardErrors)).toBeLessThanOrEqual(0.7);
+    // The test did not stop before: the state one item earlier had a standard error above the threshold.
+    expect(Math.max(...defined(states.at(-2)).estimate.standardErrors)).toBeGreaterThan(0.7);
+  });
+
+  it("ends when the pool does, and selects by a custom rule", () => {
+    const pool = [
+      multidimensionalItem("q1", [1, 0], 0),
+      multidimensionalItem("q2", [0, 1], 0),
+      multidimensionalItem("q3", [1, 1], 0),
+    ];
+    const lastFirst: ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate> = {
+      scores({ eligible }, out) {
+        eligible.forEach((flag, i) => {
+          if (flag === 1) out[i] = i;
+        });
+      },
+    };
+    const test = multidimensionalAdaptiveTest({ pool, selection: lastFirst, stopping: testLength(10) });
+    expect(defined(administerMultidimensional(test, () => 0).at(-1))).toMatchObject({
+      items: ["q3", "q2", "q1"],
+      next: null,
+    });
+  });
+
+  it("balances content areas, keeps enemies apart and withholds items at their exposure parameters", () => {
+    const base = [
+      multidimensionalItem("q1", [1, 0], 0),
+      multidimensionalItem("q2", [0, 1], 0),
+      multidimensionalItem("q3", [1, 1], 0),
+    ];
+    const balanced = multidimensionalAdaptiveTest({
+      pool: base.map((item, i) => ({ ...item, contentArea: i === 2 ? "both" : "single" })),
+      contentTargets: { single: 0.5, both: 0.5 },
+      stopping: testLength(2),
+    });
+    for (let seed = 0; seed < 8; seed++) {
+      const { items } = defined(administerMultidimensional(balanced, () => 1, createRandom(seed)).at(-1));
+      expect(items.includes("q3")).toBe(true);
+    }
+    const apart = multidimensionalAdaptiveTest({ pool: base, enemies: [["q1", "q3"]], stopping: testLength(3) });
+    for (let seed = 0; seed < 8; seed++) {
+      const { items } = defined(administerMultidimensional(apart, () => 0, createRandom(seed)).at(-1));
+      expect(items.includes("q1") && items.includes("q3")).toBe(false);
+    }
+    const guarded = multidimensionalAdaptiveTest({
+      pool: base.map((item) => (item.id === "q3" ? { ...item, exposure: 0 } : item)),
+      stopping: testLength(2),
+    });
+    expect(guarded.start(createRandom(1))).toMatchObject({ withheld: ["q3"] });
+  });
+
+  it("continues identically from a state stored as JSON, and leaves the state it is given unchanged", () => {
+    const reference = defined(catMirt.cases[2]);
+    const test = multidimensionalTest(reference);
+    const row = defined(reference.responses[1]);
+    const respond = (id: string) => defined(row[reference.items.findIndex((item) => item.id === id)]);
+    const states = administerMultidimensional(test, respond, createRandom(3));
+    const stored: MultidimensionalAdaptiveTestState = JSON.parse(JSON.stringify(defined(states[4])));
+    expect(stored).toEqual(states[4]);
+    let resumed = stored;
+    while (resumed.next !== null) resumed = test.answer(resumed, respond(resumed.next), createRandom(3));
+    expect(resumed).toEqual(states.at(-1));
+    const copy: MultidimensionalAdaptiveTestState = JSON.parse(JSON.stringify(stored));
+    test.answer(stored, respond(defined(stored.next)), createRandom(3));
+    expect(stored).toEqual(copy);
+  });
+
+  it("rejects options, pools and rules of other types and invalid ones", () => {
+    const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
+    const options = { pool, stopping: testLength(2) };
+    const parse = (json: string) => JSON.parse(json);
+    expect(() => multidimensionalAdaptiveTest(parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => multidimensionalAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
+      "The option stopping must be a stopping rule, such as testLength(20)",
+    );
+    expect(() => multidimensionalAdaptiveTest({ ...options, selection: parse('"d"') })).toThrow(
+      "The option selection must be a selection rule, such as maximumDeterminant()",
+    );
+    expect(() => multidimensionalAdaptiveTest({ ...options, estimator: parse('"map"') })).toThrow(
+      "The option estimator must be a function of items and responses",
+    );
+    expect(() => multidimensionalAdaptiveTest({ ...options, pool: parse('"q1"') })).toThrow(
+      "A multidimensional adaptive test needs an array of items",
+    );
+    expect(() => multidimensionalAdaptiveTest({ ...options, pool: [] })).toThrow(
+      "A multidimensional adaptive test needs at least one item.",
+    );
+    expect(() =>
+      multidimensionalAdaptiveTest({
+        ...options,
+        pool: [defined(pool[0]), multidimensionalItem("q2", [0, 1, 0], 0)],
+      }),
+    ).toThrow("Item 2 has 3 dimensions, but item 1 has 2.");
+    expect(() => multidimensionalAdaptiveTest({ ...options, pool: [...pool, defined(pool[0])] })).toThrow(
+      'Item ids must be unique; "q1" appears twice.',
+    );
+    expect(() => multidimensionalAdaptiveTest({ ...options, pool: parse('[{"id":"x"}]') })).toThrow(DataError);
+    expect(() =>
+      multidimensionalAdaptiveTest({ ...options, pool: [{ ...defined(pool[0]), exposure: 2 }, ...pool.slice(1)] }),
+    ).toThrow('The exposure parameter of item "q1" must be a number from 0 to 1, found 2.');
+    expect(() => multidimensionalAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
+      'Item "q1" needs a content area among the targets (easy), found undefined.',
+    );
+    expect(() => multidimensionalAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
+      'Enemy set 1 names "zz", which is not a pool item.',
+    );
+  });
+
+  it("rejects states and responses of other types and invalid ones", () => {
+    const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
+    const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
+    const random = createRandom(1);
+    const state = test.start(random);
+    const parse = (json: string) => JSON.parse(json);
+    expect(() => test.start(parse("null"))).toThrow(DataError);
+    expect(() => test.answer(state, 1, parse("null"))).toThrow(DataError);
+    expect(() => test.answer(parse("null"), 1, random)).toThrow("A test state needs the arrays items and responses.");
+    expect(() => test.answer(state, 2, random)).toThrow(
+      `The response to item "${state.next}" must be an integer from 0 to 1, found 2.`,
+    );
+    expect(() => test.answer(state, parse('"1"'), random)).toThrow("must be an integer from 0 to 1");
+    expect(() => test.answer({ ...state, items: ["zz"], responses: [1] }, 1, random)).toThrow(
+      'The test has no item "zz".',
+    );
+    expect(() => test.answer({ ...state, withheld: parse("null") }, 1, random)).toThrow(
+      "An adaptive test state needs the array withheld.",
+    );
+    const ended = test.answer(test.answer(state, 1, random), 1, random);
+    expect(() => test.answer(ended, 1, random)).toThrow("The test has ended; it takes no more responses.");
+  });
+});
+
+describe("maximumDeterminant", () => {
+  it("scores the items by hand at the prior, where an item's information is a quarter of its slopes' outer product", () => {
+    // At theta 0, P = 1/2 and the information of an item is a aᵀ / 4. With the prior precision I: a = (1, 0) and (0, 1)
+    // give det diag(5/4, 1) = 5/4, and a = (1, 1) gives det [[5/4, 1/4], [1/4, 5/4]] = 25/16 - 1/16 = 3/2.
+    const pool = [
+      multidimensionalItem("a", [1, 0], 0),
+      multidimensionalItem("b", [0, 1], 0),
+      multidimensionalItem("c", [1, 1], 0),
+    ];
+    const out = new Float64Array(3);
+    maximumDeterminant().scores(multidimensionalContext(pool, 0, estimateAt(0, 0)), out);
+    expectClose(defined(out[0]), 1.25, 1e-15);
+    expectClose(defined(out[1]), 1.25, 1e-15);
+    expectClose(defined(out[2]), 1.5, 1e-15);
+  });
+
+  it("adds the information of the administered items and the inverse of the prior covariance", () => {
+    const pool = [
+      multidimensionalItem("a", [1, 0], 0),
+      multidimensionalItem("b", [0, 1], 0),
+      multidimensionalItem("c", [1, 1], 0),
+    ];
+    const prior = {
+      mean: [0, 0],
+      covariance: [
+        [4, 0],
+        [0, 4],
+      ],
+    };
+    const out = new Float64Array(3);
+    maximumDeterminant(prior).scores(multidimensionalContext(pool, 1, estimateAt(0, 0)), out);
+    // The precision is I / 4 and a adds diag(1/4, 0), giving diag(1/2, 1/4);
+    // b adds diag(0, 1/4) and c adds [[1, 1], [1, 1]] / 4.
+    expectClose(defined(out[1]), 0.5 * 0.5, 1e-15);
+    expectClose(defined(out[2]), (0.5 + 0.25) * (0.25 + 0.25) - 0.25 * 0.25, 1e-15);
+  });
+
+  it("agrees with the determinant of the public information matrix of the test", () => {
+    const pool = Array.from({ length: 8 }, (_, i) =>
+      multidimensionalItem(`q${i}`, [0.5 + i * 0.15, 1.6 - i * 0.12, 0.3 * (i % 3)], i * 0.2 - 0.7),
+    );
+    const theta = [0.4, -0.3, 0.8];
+    const out = new Float64Array(pool.length);
+    maximumDeterminant().scores(multidimensionalContext(pool, 3, estimateAt(...theta)), out);
+    for (let k = 3; k < pool.length; k++) {
+      const information = multidimensionalInformation([...pool.slice(0, 3), defined(pool[k])], theta);
+      const precisionPlus = information.map((row, r) => row.map((value, col) => value + (r === col ? 1 : 0)));
+      const determinant = determinantOf(precisionPlus);
+      expectClose(defined(out[k]), determinant, 1e-12 * Math.max(1, determinant), `item ${k + 1}`);
+    }
+  });
+
+  it("leaves the scores of the administered items as they are, and scores no item below the determinant", () => {
+    const pool = [multidimensionalItem("a", [1, 0], 0), multidimensionalItem("b", [0, 1], 0)];
+    const out = new Float64Array(2).fill(-7);
+    maximumDeterminant().scores(multidimensionalContext(pool, 1, estimateAt(0, 0)), out);
+    expect(out[0]).toBe(-7);
+    expect(defined(out[1])).toBeGreaterThanOrEqual(1);
+  });
+
+  it("is defined where an item's information has underflowed", () => {
+    const pool = [multidimensionalItem("far", [3, 3], 0)];
+    const out = new Float64Array(1);
+    maximumDeterminant().scores(multidimensionalContext(pool, 0, estimateAt(-300, -300)), out);
+    expect(out[0]).toBe(1);
+  });
+
+  it("rejects priors of other types and invalid ones, and priors of other dimensions in a test", () => {
+    const parse = (json: string) => JSON.parse(json);
+    expect(() => maximumDeterminant(parse('"prior"'))).toThrow(
+      "The option prior must be an object { mean, covariance }",
+    );
+    expect(() => maximumDeterminant(parse("null"))).toThrow(DataError);
+    expect(() => maximumDeterminant(parse('{"mean":[0,0],"covariance":"x"}'))).toThrow(
+      "The covariance of the prior must be an array of rows",
+    );
+    expect(() =>
+      maximumDeterminant({
+        mean: [0, 0],
+        covariance: [
+          [1, 2],
+          [2, 1],
+        ],
+      }),
+    ).toThrow("The covariance of the prior must be a symmetric positive definite matrix.");
+    const three = maximumDeterminant({
+      mean: [0, 0, 0],
+      covariance: [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ],
+    });
+    const pool = [multidimensionalItem("a", [1, 0], 0)];
+    expect(() => three.scores(multidimensionalContext(pool, 0, estimateAt(0, 0)), new Float64Array(1))).toThrow(
+      "The prior needs a mean of 2 values and a covariance of 2 rows.",
+    );
+  });
+});
+
+describe("simulateMultidimensionalAdaptiveTest", () => {
+  /** A pool of 80 items on two dimensions: half load on one, half on both, with intercepts around 0. */
+  function largePool(): MultidimensionalPoolItem[] {
+    const random = createRandom(17);
+    return Array.from({ length: 80 }, (_, i) => {
+      const slopes =
+        i % 4 === 0 ? [1.4, 0] : i % 4 === 1 ? [0, 1.4] : [0.9 + 0.3 * random.uniform(), 0.9 + 0.3 * random.uniform()];
+      return multidimensionalItem(`q${i}`, slopes, random.normal() * 0.7);
+    });
+  }
+  const randomThetas = (count: number, seed: number): number[][] => {
+    const random = createRandom(seed);
+    return Array.from({ length: count }, () => [random.normal(), random.normal()]);
+  };
+
+  it("recovers thetas on both dimensions with little bias, as the posterior mode shrinks toward the prior mean", () => {
+    // Thresholds fixed before the first run: an error of 0.5 and a bias of 0.1 for 20 items of slopes near 1.
+    const test = multidimensionalAdaptiveTest({ pool: largePool(), stopping: testLength(20) });
+    const result = simulateMultidimensionalAdaptiveTest(test, randomThetas(300, 3), createRandom(5));
+    for (const error of result.rootMeanSquareError) expect(error).toBeLessThan(0.5);
+    for (const bias of result.bias) expect(Math.abs(bias)).toBeLessThan(0.1);
+    expect(result.meanLength).toBe(20);
+    expect(result.persons).toHaveLength(300);
+  });
+
+  it("estimates more precisely by the D-rule than by items in random order", () => {
+    const pool = largePool();
+    const randomOrder: ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate> = {
+      scores({ eligible, random }, out) {
+        eligible.forEach((flag, i) => {
+          if (flag === 1) out[i] = random.uniform();
+        });
+      },
+    };
+    const thetas = randomThetas(200, 8);
+    const precision = (selection?: typeof randomOrder): number => {
+      const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(12), ...(selection && { selection }) });
+      const { persons } = simulateMultidimensionalAdaptiveTest(test, thetas, createRandom(9));
+      return mean(persons.map(({ state }) => mean(state.estimate.standardErrors)));
+    };
+    expect(precision()).toBeLessThan(precision(randomOrder));
+  });
+
+  it("reports the mean length and the exposure rate of every item", () => {
+    const pool = largePool();
+    const test = multidimensionalAdaptiveTest({
+      pool,
+      stopping: anyOf(testLength(25), standardErrorThreshold<MultidimensionalPoolItem, MultidimensionalEstimate>(0.5)),
+    });
+    const result = simulateMultidimensionalAdaptiveTest(test, randomThetas(60, 2), createRandom(4));
+    expect(result.exposureRates.map(({ id }) => id)).toEqual(pool.map(({ id }) => id));
+    expectClose(
+      result.exposureRates.reduce((sum, { rate }) => sum + rate, 0),
+      result.meanLength,
+      1e-12,
+    );
+    expect(result.meanLength).toBeLessThan(25);
+    expect(result.meanLength).toBeGreaterThan(0);
+  });
+
+  it("draws each person's responses from the true thetas and reproduces from its seed", () => {
+    const pool = largePool().slice(0, 12);
+    const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(6) });
+    const run = () => simulateMultidimensionalAdaptiveTest(test, randomThetas(15, 6), createRandom(31));
+    expect(run()).toEqual(run());
+    // Persons far above and below on both dimensions answer the easiest items alike.
+    const extremes = simulateMultidimensionalAdaptiveTest(
+      test,
+      [
+        [4, 4],
+        [-4, -4],
+      ],
+      createRandom(2),
+    );
+    const [high, low] = extremes.persons;
+    expect(mean(defined(high).state.responses)).toBeGreaterThan(mean(defined(low).state.responses));
+  });
+
+  it("rejects tests, thetas and generators of other types and invalid ones", () => {
+    const pool = largePool().slice(0, 6);
+    const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
+    const parse = (json: string) => JSON.parse(json);
+    const random = createRandom(1);
+    expect(() => simulateMultidimensionalAdaptiveTest(parse("null"), [[0, 0]], random)).toThrow(
+      "The test must be a multidimensional adaptive test from multidimensionalAdaptiveTest, found null.",
+    );
+    expect(() => simulateMultidimensionalAdaptiveTest(test, [[0, 0]], parse("null"))).toThrow(DataError);
+    expect(() => simulateMultidimensionalAdaptiveTest(test, parse('"00"'), random)).toThrow(
+      "A simulation needs an array of thetas by person",
+    );
+    expect(() => simulateMultidimensionalAdaptiveTest(test, [], random)).toThrow(
+      "A simulation needs at least one person's thetas.",
+    );
+    expect(() => simulateMultidimensionalAdaptiveTest(test, [[0]], random)).toThrow(
+      "Person 1 needs 2 thetas for items on 2 dimensions, found 1.",
+    );
+    expect(() => simulateMultidimensionalAdaptiveTest(test, [[0, Number.NaN]], random)).toThrow(DataError);
+  });
+});
+
 describe("rules of tests of other items and estimates", () => {
   interface Precision {
     readonly standardErrors: readonly number[];
@@ -2088,10 +2737,10 @@ describe("properties", () => {
     );
   });
   describe("diagnostic tests", () => {
-    const Attributes = ["a", "b", "c"];
+    const attributeNames = ["a", "b", "c"];
     /** A pool over the first `count` attributes: items of one to three of them, with any success probabilities. */
     const arbitraryDiagnosticPool = fc.integer({ min: 1, max: 3 }).chain((count) => {
-      const names = Attributes.slice(0, count);
+      const names = attributeNames.slice(0, count);
       const item = fc.subarray(names, { minLength: 1 }).chain((attributes) =>
         fc
           .array(fc.double({ min: 0, max: 1, noNaN: true }), {
@@ -2109,7 +2758,7 @@ describe("properties", () => {
       });
     });
     /** The profiles of `count` attributes in the order of the posterior. */
-    const profilesFor = (count: number) => profileSpace(Attributes.slice(0, count), undefined).profiles;
+    const profilesFor = (count: number) => profileSpace(attributeNames.slice(0, count), undefined).profiles;
 
     it("the posterior sums to 1, the estimates follow from it, and prior 0 stays 0", () => {
       fc.assert(
@@ -2226,5 +2875,68 @@ describe("properties", () => {
         { numRuns: 60 },
       );
     });
+  });
+  it("multidimensional tests administer each item once, keep enemies apart, and have a symmetric covariance", () => {
+    const arbitraryPool = fc.array(
+      fc.record({
+        a: fc.tuple(fc.double({ min: 0, max: 2, noNaN: true }), fc.double({ min: 0, max: 2, noNaN: true })),
+        intercept: fc.double({ min: -2, max: 2, noNaN: true }),
+        c: fc.double({ min: 0, max: 0.3, noNaN: true }),
+        exposure: fc.option(fc.double({ min: 0, max: 1, noNaN: true }), { nil: undefined }),
+      }),
+      { minLength: 2, maxLength: 7 },
+    );
+    fc.assert(
+      fc.property(arbitraryPool, fc.integer({ min: 1, max: 6 }), fc.integer(), (items, length, seed) => {
+        const pool = items.map(({ a, intercept, c, exposure }, i) => ({
+          ...multidimensionalItem(`q${i}`, [a[0] + 0.01, a[1]], intercept, c),
+          exposure,
+        }));
+        const test = multidimensionalAdaptiveTest({ pool, enemies: [["q0", "q1"]], stopping: testLength(length) });
+        const { persons } = simulateMultidimensionalAdaptiveTest(test, [[0.3, -0.5]], createRandom(seed));
+        const { state } = defined(persons[0]);
+        expect(new Set(state.items).size).toBe(state.items.length);
+        expect(state.items.filter((id) => state.withheld.includes(id))).toEqual([]);
+        expect(state.items.includes("q0") && state.items.includes("q1")).toBe(false);
+        expect(state.items.length).toBeLessThanOrEqual(length);
+        expect(state.next).toBeNull();
+        const { covariance, standardErrors, theta } = state.estimate;
+        theta.forEach((value) => {
+          expect(Number.isFinite(value)).toBe(true);
+        });
+        covariance.forEach((row, i) => {
+          expect(defined(standardErrors[i])).toBeCloseTo(Math.sqrt(defined(row[i])), 12);
+          row.forEach((value, j) => {
+            expect(value).toBeCloseTo(defined(covariance[j])[i] ?? Number.NaN, 12);
+          });
+        });
+      }),
+      { numRuns: 50 },
+    );
+  });
+
+  it("the D-rule never scores an item below the determinant of the precision it adds to", () => {
+    const pool = Array.from({ length: 6 }, (_, i) =>
+      multidimensionalItem(`q${i}`, [0.4 + 0.2 * i, 1.8 - 0.25 * i], 0.3 * i - 0.8),
+    );
+    const coordinate = fc.double({ min: -3, max: 3, noNaN: true });
+    fc.assert(
+      fc.property(coordinate, coordinate, fc.integer({ min: 0, max: 4 }), (x, y, count) => {
+        const out = new Float64Array(pool.length);
+        maximumDeterminant().scores(multidimensionalContext(pool, count, estimateAt(x, y)), out);
+        const information =
+          count === 0
+            ? [
+                [0, 0],
+                [0, 0],
+              ]
+            : multidimensionalInformation(pool.slice(0, count), [x, y]);
+        const baseline = determinantOf(information.map((row, r) => row.map((value, c) => value + (r === c ? 1 : 0))));
+        for (let k = count; k < pool.length; k++) {
+          expect(defined(out[k])).toBeGreaterThanOrEqual(baseline * (1 - 1e-12));
+        }
+      }),
+      { numRuns: 100 },
+    );
   });
 });

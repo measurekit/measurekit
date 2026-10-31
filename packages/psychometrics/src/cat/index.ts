@@ -1,7 +1,7 @@
 /**
  * Adaptive and multistage testing: adaptive test sessions with item selection rules, content balancing, enemy sets,
- * Sympson-Hetter exposure control and its calibration, and stopping rules; adaptive tests of cognitive diagnosis;
- * multistage panels with routing; simulation of all of them; and the assembly of fixed forms.
+ * Sympson-Hetter exposure control and its calibration, and stopping rules; adaptive tests of cognitive diagnosis and of
+ * multidimensional items; multistage panels with routing; simulation of all of them; and the assembly of fixed forms.
  *
  * @module @measurekit/psychometrics/cat
  */
@@ -46,6 +46,19 @@ export {
 } from "./form-assembly.js";
 export type { PoolControls, PoolItem } from "./items.js";
 export { kullbackLeibler } from "./kullback-leibler.js";
+export { maximumDeterminant } from "./maximum-determinant.js";
+export type { MultidimensionalPoolItem } from "./multidimensional-items.js";
+export {
+  type MultidimensionalTestSimulation,
+  type SimulatedMultidimensionalPerson,
+  simulateMultidimensionalAdaptiveTest,
+} from "./multidimensional-simulation.js";
+export {
+  type MultidimensionalAdaptiveTest,
+  type MultidimensionalAdaptiveTestOptions,
+  type MultidimensionalAdaptiveTestState,
+  multidimensionalAdaptiveTest,
+} from "./multidimensional-test.js";
 export {
   type MultistageModule,
   type MultistageRouting,

@@ -8,6 +8,10 @@
 # cdmTools, which only its nonparametric rules use and whose dependency clarabel needs a Rust compiler, so
 # install.packages("cdcatR") fails. Download the source with download.packages, remove cdmTools from the Imports of
 # DESCRIPTION and `import(cdmTools)` from NAMESPACE, and run R CMD INSTALL on the directory.
+#
+# Multidimensional adaptive tests: tests replayed step by step in base R, with the information matrices of the
+# compensatory logistic items written out and the posterior mode found to a gradient of 1e-12, and the item sequences of
+# mirtCAT's DPrule, which is the D-rule with the inverse of the prior covariance added.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages(library(catR))
@@ -391,5 +395,177 @@ write_fixture("cat-cdm", list(
     cd_case("ECPE with the DINA model", ecpe, ecpe_q, "DINA"),
     cd_case("ECPE with the G-DINA model and a linear hierarchy", ecpe, ecpe_q, "GDINA",
             hierarchy = c("000", "100", "110", "111"))
+  )
+))
+
+# ---- Multidimensional adaptive tests ----------------------------------------------------------------------------
+
+suppressPackageStartupMessages(library(mirtCAT))
+
+MD_LENGTH <- 10 # items per test
+MD_PERSONS <- 4 # persons per case
+
+# The sums over a person's items of the logistic M3PL item: P = g + (1 - g) logistic(a'theta + d), with the information
+# matrix ((1 - g) L (1 - L))^2 / (P (1 - P)) a a' of a dichotomous item.
+md_probability <- function(items, theta) {
+  logistic <- plogis(drop(items$a %*% theta) + items$d)
+  items$g + (1 - items$g) * logistic
+}
+md_information <- function(items, j, theta) {
+  logistic <- plogis(sum(items$a[j, ] * theta) + items$d[j])
+  p <- items$g[j] + (1 - items$g[j]) * logistic
+  slope <- (1 - items$g[j]) * logistic * (1 - logistic)
+  slope^2 / (p * (1 - p)) * outer(items$a[j, ], items$a[j, ])
+}
+md_total_information <- function(items, administered, theta) {
+  total <- matrix(0, ncol(items$a), ncol(items$a))
+  for (j in administered) total <- total + md_information(items, j, theta)
+  total
+}
+
+# The posterior mode of theta under N(mean, covariance) from the responses x to the items `administered`: BFGS, then
+# Fisher scoring to a gradient below 1e-12. Without items, the prior mean.
+md_mode <- function(items, administered, x, prior_mean, precision) {
+  if (length(administered) == 0) return(prior_mean)
+  log_posterior <- function(theta) {
+    p <- md_probability(list(a = items$a[administered, , drop = FALSE], d = items$d[administered],
+                             g = items$g[administered]), theta)
+    sum(ifelse(x == 1, log(p), log(1 - p))) - 0.5 * drop(t(theta - prior_mean) %*% precision %*% (theta - prior_mean))
+  }
+  gradient <- function(theta) {
+    g <- -drop(precision %*% (theta - prior_mean))
+    for (k in seq_along(administered)) {
+      j <- administered[k]
+      logistic <- plogis(sum(items$a[j, ] * theta) + items$d[j])
+      p <- items$g[j] + (1 - items$g[j]) * logistic
+      slope <- (1 - items$g[j]) * logistic * (1 - logistic)
+      g <- g + items$a[j, ] * slope * (if (x[k] == 1) 1 / p else -1 / (1 - p))
+    }
+    g
+  }
+  theta <- optim(prior_mean, function(t) -log_posterior(t), function(t) -gradient(t), method = "BFGS",
+                 control = list(reltol = 1e-16, maxit = 1000))$par
+  for (iteration in 1:50) {
+    step <- solve(precision + md_total_information(items, administered, theta), gradient(theta))
+    theta <- theta + step
+    if (max(abs(gradient(theta))) < 1e-12) break
+  }
+  stopifnot(max(abs(gradient(theta))) < 1e-10)
+  theta
+}
+
+# The estimate after the responses so far: the mode, the covariance (the inverse of the prior precision plus the
+# information of the administered items at the mode) and the standard errors.
+md_estimate <- function(items, administered, x, prior_mean, covariance) {
+  precision <- solve(covariance)
+  theta <- md_mode(items, administered, x, prior_mean, precision)
+  posterior_covariance <- solve(precision + md_total_information(items, administered, theta))
+  list(theta = theta, standardErrors = sqrt(diag(posterior_covariance)), covariance = posterior_covariance)
+}
+
+# The D-rule score of every item not administered: det(prior precision + information of the administered items + its
+# own) at the estimate; NA for the administered ones.
+md_scores <- function(items, administered, theta, precision) {
+  base <- precision + md_total_information(items, administered, theta)
+  scores <- sapply(seq_len(nrow(items$a)), function(j) det(base + md_information(items, j, theta)))
+  scores[administered] <- NA
+  scores
+}
+
+# A test of MD_LENGTH items for the responses `row` to every item: before each item the estimate from the responses so
+# far and the score of each item, then the first item with the highest score.
+md_replay <- function(items, covariance, row) {
+  precision <- solve(covariance)
+  prior_mean <- rep(0, ncol(items$a))
+  administered <- integer(0)
+  steps <- lapply(seq_len(MD_LENGTH), function(k) {
+    estimate <- md_estimate(items, administered, row[administered], prior_mean, covariance)
+    scores <- md_scores(items, administered, estimate$theta, precision)
+    item <- which.max(scores)
+    step <- list(theta = estimate$theta, standardErrors = estimate$standardErrors,
+                 covariance = unname(estimate$covariance), scores = scores, item = item, response = row[item])
+    administered <<- c(administered, item)
+    step
+  })
+  final <- md_estimate(items, administered, row[administered], prior_mean, covariance)
+  list(steps = steps, final = list(theta = final$theta, standardErrors = final$standardErrors,
+                                   covariance = unname(final$covariance)), items = administered)
+}
+
+# mirtCAT's item sequence for the same responses: DPrule with the MAP estimate, from the item DPrule selects at the
+# prior.
+md_mirtcat <- function(model, row) {
+  result <- mirtCAT(mo = model, criteria = "DPrule", start_item = "DPrule", method = "MAP",
+                    local_pattern = matrix(row, 1), design = list(max_items = MD_LENGTH), verbose = FALSE)
+  as.integer(result$items_answered)
+}
+
+# The stopping decisions along a replay: whether every standard error is at most each threshold before item k + 1.
+md_stopping <- function(run) {
+  states <- c(lapply(run$steps, function(step) step$standardErrors), list(run$final$standardErrors))
+  lapply(seq_along(states), function(k) {
+    list(administered = k - 1, stops = sapply(c(0.45, 0.6), function(threshold) all(states[[k]] <= threshold)))
+  })
+}
+
+md_case <- function(name, a, d, g, covariance, thetas, seed) {
+  items <- list(a = a, d = d, g = g)
+  J <- nrow(a)
+  pars <- data.frame(a, d = d, g = g)
+  colnames(pars)[seq_len(ncol(a))] <- paste0("a", seq_len(ncol(a)))
+  model <- generate.mirt_object(pars, if (any(g > 0)) "3PL" else "2PL", latent_covariance = covariance)
+  set.seed(seed)
+  responses <- t(sapply(seq_len(nrow(thetas)), function(i) rbinom(J, 1, md_probability(items, thetas[i, ]))))
+  runs <- lapply(seq_len(nrow(thetas)), function(i) {
+    run <- md_replay(items, covariance, responses[i, ])
+    reference <- md_mirtcat(model, responses[i, ])
+    if (!identical(reference, as.integer(run$items))) {
+      stop(sprintf("%s, person %d: mirtCAT's items %s, written out %s", name, i, paste(reference, collapse = " "),
+                   paste(run$items, collapse = " ")))
+    }
+    c(list(person = i, mirtCAT = I(reference), stopping = md_stopping(run)), run)
+  })
+  list(
+    name = name,
+    dimensions = ncol(a),
+    covariance = unname(covariance),
+    items = lapply(seq_len(J), function(j) {
+      list(id = sprintf("item%02d", j), a = I(a[j, ]), intercept = d[j], c = g[j], d = 1)
+    }),
+    responses = unname(responses),
+    runs = runs
+  )
+}
+
+# Pools of between-dimension items (one slope) and within-dimension items (several), with item intercepts around 0.
+md_pool <- function(J, dimensions, guessing, seed) {
+  set.seed(seed)
+  a <- matrix(runif(J * dimensions, 0.4, 1.6), J)
+  for (j in seq_len(J)) {
+    zero <- if (j <= J / 2) sample(dimensions, dimensions - 1) else integer(0)
+    a[j, zero] <- 0
+  }
+  list(a = a, d = rnorm(J, 0, 0.8), g = if (guessing) runif(J, 0, 0.2) else rep(0, J))
+}
+
+correlated <- matrix(c(1, 0.5, 0.5, 1), 2)
+pool2 <- md_pool(30, 2, FALSE, SEED + 1)
+pool2g <- md_pool(30, 2, TRUE, SEED + 2)
+pool3 <- md_pool(36, 3, FALSE, SEED + 3)
+set.seed(SEED + 4)
+thetas2 <- matrix(rnorm(MD_PERSONS * 2), MD_PERSONS)
+thetas3 <- matrix(rnorm(MD_PERSONS * 3), MD_PERSONS)
+
+write_fixture("cat-mirt", list(
+  source = paste("Pools of 30 to 36 compensatory logistic items on 2 and 3 dimensions, set in mirt",
+                 "(generate.mirt_object) and seeded; the first", MD_PERSONS, "persons of each case take a test of",
+                 MD_LENGTH, "items."),
+  length = MD_LENGTH,
+  thresholds = c(0.45, 0.6),
+  cases = list(
+    md_case("M2PL, 2 dimensions", pool2$a, pool2$d, pool2$g, diag(2), thetas2, SEED + 5),
+    md_case("M3PL, 2 dimensions", pool2g$a, pool2g$d, pool2g$g, diag(2), thetas2, SEED + 6),
+    md_case("M2PL, 2 dimensions, correlated", pool2$a, pool2$d, pool2$g, correlated, thetas2, SEED + 7),
+    md_case("M2PL, 3 dimensions", pool3$a, pool3$d, pool3$g, diag(3), thetas3, SEED + 8)
   )
 ))

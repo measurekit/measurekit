@@ -2,9 +2,11 @@
 
 `@measurekit/psychometrics/cat` runs computerized adaptive tests (CAT) and multistage tests (MST) on items of any [IRT
 model](irt.md), adaptive tests that classify a person's attribute profile with the items of a [cognitive diagnosis
-model](cdm.md), simulates them, calibrates their exposure control and assembles fixed forms. Item selection, ability
-estimates, content balancing and stopping decisions are validated against catR step by step; diagnostic tests against a
-replay of every rule written out in base R and against cdcatR ([validation](validation.md)).
+model](cdm.md), and adaptive tests that estimate a vector of thetas with [multidimensional](multidimensional.md) items,
+simulates them, calibrates their exposure control and assembles fixed forms. Item selection, ability estimates, content
+balancing and stopping decisions are validated against catR step by step; diagnostic tests against a replay of every
+rule written out in base R and against cdcatR; multidimensional tests against a replay in base R and against mirtCAT
+([validation](validation.md)).
 
 ## Adaptive tests
 
@@ -388,6 +390,149 @@ a seed reproduces the result.
 | `meanLength`        | Mean number of items administered                                               |
 | `exposureRates`     | `{ id, rate }` for every item of the pool: the share of persons administered it |
 
+## Multidimensional adaptive tests
+
+`multidimensionalAdaptiveTest(options)` administers items of a [multidimensional model](multidimensional.md), such as a
+calibration's, and estimates a vector of thetas, one per dimension. Like `adaptiveTest` it returns a test with `start`
+and `answer`, each returning a new state, and runs on the same engine: content balancing, enemy sets, exposure control
+and the stopping rules work alike. It selects by D-optimality: the next item is the one that shrinks the confidence
+ellipsoid of theta the most.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  anyOf,
+  maximumDeterminant,
+  multidimensionalAdaptiveTest,
+  simulateMultidimensionalAdaptiveTest,
+  standardErrorThreshold,
+  testLength,
+} from "@measurekit/psychometrics/cat";
+import {
+  multidimensionalPosteriorModeEstimate,
+  multidimensionalTwoParameterLogistic,
+} from "@measurekit/psychometrics/multidimensional";
+
+// 60 items: 20 on each of two dimensions and 20 on both, with intercepts around 0.
+const random = createRandom(5);
+const pool = Array.from({ length: 60 }, (_, i) => ({
+  id: `q${i + 1}`,
+  model: multidimensionalTwoParameterLogistic,
+  parameters: {
+    a: i < 20 ? [1.3, 0] : i < 40 ? [0, 1.3] : [0.9, 0.9],
+    intercept: random.normal() * 0.7,
+    c: 0,
+    d: 1,
+  },
+}));
+
+// The dimensions correlate by 0.5: the estimator and the selection rule take the same prior.
+const prior = {
+  mean: [0, 0],
+  covariance: [
+    [1, 0.5],
+    [0.5, 1],
+  ],
+};
+const test = multidimensionalAdaptiveTest({
+  pool,
+  stopping: anyOf(testLength(20), standardErrorThreshold(0.5)),
+  selection: maximumDeterminant(prior),
+  estimator: (items, responses) => multidimensionalPosteriorModeEstimate(items, responses, { prior }),
+});
+
+let state = test.start(random);
+state.next; // "q46", an item on both dimensions
+state = test.answer(state, 1, random); // the response to it
+state.next; // "q51"
+state.estimate.theta; // [0.421, 0.421] to three digits
+state.estimate.standardErrors; // [0.862, 0.862]
+
+// 300 persons with thetas from the prior.
+const thetas = Array.from({ length: 300 }, () => {
+  const z = [random.normal(), random.normal()];
+  return [z[0] ?? 0, 0.5 * (z[0] ?? 0) + Math.sqrt(0.75) * (z[1] ?? 0)];
+});
+const result = simulateMultidimensionalAdaptiveTest(test, thetas, random);
+result.bias; // [-0.045, -0.007]
+result.rootMeanSquareError; // [0.538, 0.478]
+result.meanLength; // 16.34
+```
+
+| Option           | Default                                 | Meaning                                                                             |
+| ---------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
+| `pool`           | required                                | Items `{ id, model, parameters }`, with an optional `contentArea` and `exposure`    |
+| `stopping`       | required                                | A [stopping rule](#stopping-rules-of-multidimensional-tests)                        |
+| `selection`      | `maximumDeterminant()`                  | An [item selection rule](#selection-of-multidimensional-tests)                      |
+| `estimator`      | `multidimensionalPosteriorModeEstimate` | A [multidimensional estimator](#estimates-of-multidimensional-tests), under N(0, I) |
+| `contentTargets` | none                                    | As for [`adaptiveTest`](#content-balancing)                                         |
+| `enemies`        | none                                    | As for [`adaptiveTest`](#enemy-sets)                                                |
+
+The pool is an array of at least one item with a model of the [multidimensional models](multidimensional.md#models) and
+valid parameters for it, a string id and, as a calibration's `items` have, the same number of dimensions as every other;
+ids are unique. `contentArea` and `exposure` are as in an [adaptive test's pool](#adaptive-tests). Responses are
+categories of the item: 0 or 1 for the logistic models. Before each item the steps are those of `adaptiveTest`.
+
+### Estimates of multidimensional tests
+
+The state has the fields of an [adaptive test's](#state), and its `estimate` is a `MultidimensionalEstimate`.
+
+| Field            | Meaning                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `theta`          | The estimate of each dimension                                                        |
+| `standardErrors` | The standard error of each dimension: the square root of the diagonal of `covariance` |
+| `covariance`     | The covariance of the estimate, by rows                                               |
+
+The estimator is a `MultidimensionalEstimator`, a function `(items, responses) => estimate`: one of
+`multidimensionalPosteriorModeEstimate` and `multidimensionalPosteriorMeanEstimate` ([multidimensional
+scoring](multidimensional.md#scoring)), or one with options, `(items, responses) =>
+multidimensionalPosteriorModeEstimate(items, responses, { prior })`. The test calls it with the administered items and
+their responses. Without responses it calls it with the first pool item and a missing response, `null`, which the
+built-in estimators take as no information and answer with the prior: the mean of the prior as theta, and its
+covariance. The default is the posterior mode under N(0, I). Pass the calibration's `correlations` as the covariance of
+the prior to the estimator and to `maximumDeterminant`.
+
+### Selection of multidimensional tests
+
+`maximumDeterminant(prior)` scores each eligible item k by det(Σ⁻¹ + Σ_j I_j(θ̂) + I_k(θ̂)): Σ is the covariance of the
+prior, the sum is over the administered items, I_j is the information matrix of item j and θ̂ the current estimate
+(Segall, 1996). The matrix is the precision of the posterior of theta after item k, and its determinant is the inverse
+of the volume of the confidence ellipsoid, so the highest score shrinks it the most. A rule that takes the prior into
+account chooses well from the first item: the information of one item alone is singular on two dimensions or more, and
+the inverse of the prior covariance makes the matrix positive definite.
+
+| Argument | Default | Meaning                                                                                                       |
+| -------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `prior`  | N(0, I) | `{ mean, covariance }` with a symmetric positive definite covariance of as many rows as the items' dimensions |
+
+The rule is an `ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate>`, so `randomesque(rule, count)`
+wraps it. A custom rule reads the [context of a selection rule](#item-selection) with these types: `context.pool` holds
+`MultidimensionalPoolItem`s, and `context.estimate` a `MultidimensionalEstimate`. A prior with another number of
+dimensions than the items' throws `DataError` when the test first selects.
+
+### Stopping rules of multidimensional tests
+
+`testLength`, `allOf` and `anyOf` work as for any test. `standardErrorThreshold(threshold)` stops the test once the
+standard error of every dimension is at most `threshold`: `anyOf(testLength(30), standardErrorThreshold(0.4))`. A test
+of `MultidimensionalPoolItem`s infers the types of a rule from where it is used; elsewhere give them:
+`standardErrorThreshold<MultidimensionalPoolItem, MultidimensionalEstimate>(0.4)`. `informationThreshold` is for IRT
+tests only.
+
+### Simulation of multidimensional tests
+
+`simulateMultidimensionalAdaptiveTest(test, thetas, random)` administers the test to one person per vector of true
+thetas, as many thetas as the items have dimensions. Each person's response to every pool item is drawn first from the
+item's category probabilities at the person's thetas, as [`simulateMultidimensionalResponses`](sim.md#responses) draws
+them; the same `random` then makes the test's random choices, so a seed reproduces the result.
+
+| Result                | Meaning                                                                         |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `persons`             | `{ theta, state }` per vector of thetas, in order: the final state of each      |
+| `bias`                | For each dimension, the mean of the estimate minus the true theta               |
+| `rootMeanSquareError` | For each dimension, √(mean of the squared differences)                          |
+| `meanLength`          | Mean number of items administered                                               |
+| `exposureRates`       | `{ id, rate }` for every item of the pool: the share of persons administered it |
+
 ## Multistage tests
 
 `multistageTest(options)` administers a panel: stages of modules, one module per stage. Every person takes the single
@@ -530,7 +675,9 @@ form.contentCounts; // the number of items of each constrained area, within its 
 - Exposure calibration for diagnostic tests: `calibrateExposure` takes IRT tests only; set `exposure` on the items.
 - The dual rule on the two largest posteriors, the Jensen-Shannon divergence rule, which ranks items as `shannonEntropy`
   does, and the nonparametric selection rules NPS and GNPS.
-- Multidimensional adaptive tests.
+- Multidimensional selection by A-, E- and KL-optimality, which change no use that the D-rule does not serve; polytomous
+  items are supported through any model of the pool.
+- Exposure calibration for multidimensional tests: `calibrateExposure` takes IRT tests only; set `exposure` by hand.
 
 ## Differences from catR
 
@@ -559,6 +706,18 @@ form.contentCounts; // the number of items of each constrained area, within its 
 | Exposure control | Sympson-Hetter, with `exposure` set by hand                 | The progressive method                                                                |
 | Estimates        | `ProfileEstimate`: posterior, mastery, MAP and EAP profiles | ML, MAP and EAP profiles by item in `est.cat`                                         |
 | Parallel runs    | One test at a time; a seed reproduces a simulation          | Persons in parallel on sockets, `seed + i` per person                                 |
+
+## Differences from mirtCAT
+
+| Topic             | This package                                                      | mirtCAT                                                                             |
+| ----------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| D-rule            | `maximumDeterminant`: the precision of the prior is always added  | `DPrule` adds it, as this package does; `Drule` does not: every score is 0 at first |
+| Prior             | One `prior` for the rule and one for the estimator                | The `latent_covariance` of the model, for both                                      |
+| Estimates         | `MultidimensionalEstimate`: `theta`, `standardErrors`, covariance | A matrix of estimates by step, `thetas_history`, and `thetas_SE_history`            |
+| Estimators        | Posterior mode and mean, or your own function                     | MAP, EAP, ML, WLE and others, by the `method` of the design                         |
+| First item        | The D-rule at the prior                                           | `start_item = 1` by default; `"DPrule"` selects as this package does                |
+| Other rules       | `randomesque` of any rule, and your own                           | A-, E-, T- and W-optimality, and Kullback-Leibler rules                             |
+| Content, exposure | Kingsbury-Zara balancing, enemy sets, Sympson-Hetter              | Content proportions, exclusion sets and its own exposure control                    |
 
 ## Implementation
 

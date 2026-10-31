@@ -11,7 +11,7 @@ TypeScript tests; R runs when fixtures change.
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 lordif 0.4-2, MASS 7.3-65, rms 8.2.0, subscore 3.3, equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
 LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14,
-cdcatR 1.0.7, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
+cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                                             |
 | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -94,6 +94,13 @@ cdcatR 1.0.7, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2 and jsonlite 2.
 | Item sequences                                             | The replay in base R, selecting the highest score, the first on ties; `cdcat()` for GDI, MPWKL and JSD (SHE) |
 | Fixed-precision test length                                | `cdcat(FIXED.LENGTH = FALSE, precision.cut = 0.8)` for GDI                                                   |
 | Posterior and mastery thresholds                           | Base R: the largest posterior at least p; every mastery at least p or at most 1 - p                          |
+
+| Multidimensional CAT quantity                                    | Reference                                                                                                                                                                                     |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Estimate after each response: theta, standard errors, covariance | Base R: BFGS then Fisher scoring on the exact gradient of the log posterior, to a gradient below 1e-12; the covariance is the inverse of the prior precision plus the information at the mode |
+| D-rule score of every eligible item                              | Base R: `det()` of the prior precision plus the written-out information matrices of the administered items and the item, at the estimate                                                      |
+| Item sequences                                                   | The replay in base R, selecting the highest score, the first on ties; mirtCAT's `DPrule` with MAP estimates from the item it starts with                                                      |
+| Standard error stopping decisions                                | Base R: every standard error at most the threshold                                                                                                                                            |
 
 | Fit statistic                                              | Reference                                                                 |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -306,6 +313,22 @@ dependency clarabel needs a Rust compiler; `cat.R` describes the installation. c
 m, so its PWKL item sequences are not reproducible and are not a reference. The PWKL scores are compared with its
 `PWKL.M` at the MAP profile instead.
 
+`validation/psychometrics/cat.R` also replays multidimensional adaptive tests on pools of 30 to 36 compensatory logistic
+items set in mirt: an M2PL and an M3PL pool on 2 dimensions, the M2PL pool with correlated dimensions, and an M2PL pool
+on 3 dimensions, with between-dimension items and items on every dimension. The first four persons of each case take a
+test of 10 items. The base R replay stores, before each item, the posterior mode, its standard errors and covariance,
+and the determinant of every item not administered; the test replays the persons' responses through
+`multidimensionalAdaptiveTest` and compares each estimate, then scores the items from the stored estimate with
+`maximumDeterminant`, so a difference in a score is the rule's alone. mirtCAT's `DPrule` runs the same tests with MAP
+estimates and must give the same item sequence: the script stops if it does not. `DPrule` adds the prior precision to
+the information of the administered items, as the package does; its `Drule` does not, and scores every item 0 at first
+on two dimensions or more, where one item's information has rank 1. The stopping rule is compared on every state of
+every replay at standard errors of 0.45 and 0.6. The tests add a simulation with thresholds fixed before its first run:
+300 simulated persons on a pool of 80 items and 2 dimensions, who take 20 items, are estimated with an error below 0.5
+and a bias below 0.1 on each dimension, and the D-rule gives smaller standard errors than items in random order.
+Properties: no test administers an item twice or two enemies, and every covariance is a symmetric matrix of the standard
+errors' squares.
+
 `validation/psychometrics/fit.R`, `dif.R` and `equating.R` store the inputs each reference used: the items, the
 thetas, the calibrations. The tests compute the statistics from those inputs, so a difference is the statistic's alone.
 
@@ -477,6 +500,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `cat-gpcm.json`                        | `genPolyMatrix(items = 40, nrCat = 4, model = "GPCM")`: 2 to 4 categories, 2 runs of 15 items                                                                                                                                                                                                | Polytomous MFI and KL; MAP, EAP then ML                                                                                                |
 | `cat-content.json`                     | `genDichoMatrix(items = 60, model = "3PL", cbControl)`: areas with targets 0.5, 0.3 and 0.2                                                                                                                                                                                                  | Content balancing                                                                                                                      |
 | `cat-cdm.json`                         | GDINA's `sim30GDINA` and `CDM::data.ecpe` calibrated by GDINA: G-DINA; ECPE also DINA and G-DINA under a linear hierarchy; 4 persons, 10 items, 5 rules each                                                                                                                                 | The five diagnostic selection rules, posterior thresholds, a prior with zeros, DINA items, fixed precision                             |
+| `cat-mirt.json`                        | Seeded pools of 30 to 36 M2PL and M3PL items set in mirt (`generate.mirt_object`): 2 dimensions, 2 dimensions with correlation 0.5, 3 dimensions; 4 persons, 10 items                                                                                                                        | The D-rule on between- and within-dimension items, guessing, a correlated prior, the standard error stopping rule                      |
 | `interop-mirt.json`                    | 25 items set in mirt: 2PL, 3PL, 4PL, `graded` (one negative slope), `gpcm`, `Rasch`, `rsm`, `nominal`                                                                                                                                                                                        | Both coefficient forms, probabilities                                                                                                  |
 | `interop-multidimensional.json`        | 6 M2PL, 6 M3PL, 4 graded items on 2 dimensions and 5 graded items on 3 dimensions, set in mirt                                                                                                                                                                                               | Both models' coefficients, probabilities at vectors of theta                                                                           |
 | `multidimensional-m2pl.json`           | `mirt::simdata` with `set.seed(20261029)`: 1500 persons, 12 dichotomous items, 6 on each of 2 dimensions correlated 0.4                                                                                                                                                                      | Correlated dimensions, Oakes and cross-product standard errors, EAP and MAP of 24 patterns, some with missing responses                |
@@ -554,6 +578,8 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | CAT information and KL scores                                                                    | 1e-12 relative                                     | 4e-15                    |
 | CD-CAT scores of every rule against the written-out replay                                       | 1e-12 relative                                     | 9e-16                    |
 | CD-CAT posterior and attribute mastery                                                           | 1e-12 absolute                                     | 6e-16                    |
+| Multidimensional CAT scores of the D-rule against the written-out replay                         | 1e-12 relative                                     | 1.3e-15                  |
+| Multidimensional CAT theta, standard errors and covariance against the replay                    | 1e-8 absolute                                      | 5e-11                    |
 | Theta of an item's largest information                                                           | 1e-10 absolute                                     | 4e-15                    |
 | Category probabilities against `probtrace`                                                       | 1e-15 absolute                                     | 4e-16                    |
 | Chi-square upper tail                                                                            | 1e-12 relative                                     | 2e-14                    |
