@@ -203,6 +203,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/dimensionality/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../data/**", "!../math/**"],
+                    "message": "dimensionality/ builds on data/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/irt/**"],
       "linter": {
         "rules": {

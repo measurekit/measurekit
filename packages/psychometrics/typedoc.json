@@ -11,6 +11,7 @@
     "src/fit/index.ts",
     "src/generalizability/index.ts",
     "src/dif/index.ts",
+    "src/dimensionality/index.ts",
     "src/equating/index.ts",
     "src/scaling/index.ts",
     "src/sim/index.ts",

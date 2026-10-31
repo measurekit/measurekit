@@ -96,6 +96,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/data/             response matrices and records, scoring
   src/math/             numerics
   src/ctt/              classical test theory
+  src/dimensionality/   polychoric correlations and parallel analysis
   src/irt/              item response theory: models, calibration, ability estimation, information, reliability
   src/multidimensional/ multidimensional item response theory: models, EM calibration, rotation, scoring, information
   src/sim/              simulation of thetas, item parameters and responses, multidimensional ones included
@@ -184,6 +185,7 @@ Psychometrics: every module of `cat/`, `equating/`, `irt/`, `multidimensional/`,
 | ------------------- | ----------------------------------------------------- |
 | `math/`, `data/`    | none                                                  |
 | `ctt/`              | `data/`, `math/`                                      |
+| `dimensionality/`   | `data/`, `math/`                                      |
 | `irt/`              | `data/`, `math/`                                      |
 | `interop/`          | `irt/`, `multidimensional/`                           |
 | `cdm/`              | `data/`, `irt/`, `math/`                              |

@@ -11,7 +11,7 @@ TypeScript tests; R runs when fixtures change.
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 lordif 0.4-2, MASS 7.3-65, rms 8.2.0, subscore 3.3, equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
 LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11, CDM 8.3.14,
-cdcatR 1.0.7, GPArotation 2026.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
+cdcatR 1.0.7, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
 
 | Statistic                                                                                                             | Reference                                                                                                                                             |
 | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -67,6 +67,13 @@ cdcatR 1.0.7, GPArotation 2026.8.2, mvtnorm 1.4.2 and jsonlite 2.0.0.
 | MAP theta; standard error                                          | `fscores(method = "MAP")`; the standard error from base R: the inverse of the information matrices plus the precision of the prior                    |
 | Information matrices                                               | Base R: the sum over categories of the outer products of the derivatives of the probabilities written out, checked against `probtrace` and `iteminfo` |
 | mirt's slope-intercept coefficients of items on 2 and 3 dimensions | `coef(simplify = TRUE)` and `probtrace` of the same items                                                                                             |
+
+| Dimensionality quantity                                              | Reference                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bivariate normal distribution function                               | `mvtnorm::pmvnorm(algorithm = Miwa(), abseps = 1e-16)`                                                                                                                                                                                   |
+| Polychoric and tetrachoric correlations, thresholds                  | Base R: the log-likelihood of the table from `pmvnorm` cells, maximized by `optimize(tol = 1e-12)` and polished at the root of its score; `psych::polychoric` and `tetrachoric` (`smooth = FALSE`); `polycor::polychor` on complete data |
+| Eigenvalues of the correlations and of the one-factor reduced matrix | Base R `eigen`; the minres loadings by L-BFGS-B, then Newton on the loadings not at a bound; `psych::fa(nfactors = 1, fm = "minres")`'s `values`                                                                                         |
+| Eigenvalues of random data, suggested numbers                        | `psych::fa.parallel(n.iter, fa = "both")`; for Pearson correlations of `psych::bfi`, 2,000 permuted data sets in base R                                                                                                                  |
 
 | CAT quantity                                                 | Reference                                                                                               |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
@@ -221,6 +228,39 @@ errors of 0.08 to 0.18 and τ = 0.3, whose 90% intervals for 100 held-out items 
 true difficulties (88.5% found), and a calibration of 3,000 simulated persons that recovers the effects within four
 standard errors and τ within 0.1. Properties cover the order of the items, shifts of the parameter, and the symmetry
 of the covariance.
+
+`validation/psychometrics/dimensionality.R` writes the likelihood of a pair of items in base R from `pmvnorm` cells,
+which is independent of the package's Genz quadrature. Its maximum is found twice, by `optimize` and by the root of the
+score, which are within 1e-6 of each other. The correlations are compared on the first 10 items of `bfi`, all 5 items of
+LSAT7 and all 32 items of SAT12; psych's matrices, which it computes for every pair, are compared in full. The pairs of
+SAT12 items 6 and 20 have an empty cell, so the correction of 0.5 enters; LSAT7 is also run with `correction = 0`.
+polycor takes each pair's own complete cases for its thresholds, so it is compared on the 2,436 persons of `bfi` who
+answered every item, where the thresholds agree. psych and polycor maximize with `optimize`, whose default tolerance
+leaves the correlation within 2e-5 of the maximum; the base R reference and the package agree within 1e-13.
+
+The observed eigenvalues of the package equal base R's `eigen` of the base R correlations, and the factor eigenvalues
+those of the matrix with the squared one-factor minres loadings on its diagonal, within 1e-8; psych's `fa` gives the
+same factor eigenvalues within 1e-6 on these data, as its optimizer stops short of the minimum. psych bounds each
+uniqueness below by 0.005, and so does the package, so that a loading is at most √0.995: matrices of random data, which
+one factor does not fit, otherwise have loadings that grow without limit. 2 of 60 correlation matrices of permuted `bfi`
+data have a loading at its bound. The fixture holds the first 11 of them and these two, with the eigenvalues of base R's
+bounded solution, which the package reproduces within 3e-9. psych's solution has smaller residuals for one of the two, a
+different local minimum, and is within 2e-4 of the package's for the others, where the residuals are flat.
+
+The eigenvalues of random data cannot be compared exactly, as R's generator differs from the package's. The tests
+compare the mean of each eigenvalue over the package's replications with the mean of the reference's, within 4 standard
+errors of their difference, from the standard deviation of the reference's replications: 1,000 replications of the
+package against psych's 2,000 for `bfi` with Pearson correlations, and 200 against 100 to 300 for the polychoric and
+tetrachoric cases. The 0.95 quantile, which `suggested` uses, has a larger error that is not normal for the first factor
+eigenvalue, which is large in the data sets whose loading is at its bound; the tests allow 6 standard errors of a normal
+variable's quantile. The numbers of components and factors that `suggested` reports equal psych's on every case.
+
+psych's `fa.parallel` draws its random data in two ways, and the package has both. Its resampled data, `simr`, draw each
+item's responses with replacement; the package permutes each item's responses among the persons, which keeps the item's
+distribution and missing responses exactly. The two give means that differ by less than the Monte Carlo error of the
+comparison, about 1e-3 for `bfi`. Its simulated data, `sim`, are normal data, which the package's `comparison: "normal"`
+draws; psych's own suggested numbers of components and factors come from them, even for polychoric correlations, so the
+tests compare those with the normal comparison for Pearson correlations only, and the resampled ones elsewhere.
 
 `validation/psychometrics/scaling.R` checks its references against each other: the base R EAP of the summed score equals
 mirt's EAPsum within 1e-10, and the base R percentile ranks equal equate's `px` of `ACTmath` within 1e-10. The tests add
@@ -459,6 +499,9 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `irt-latent.json`                      | 2PL simulations, `set.seed(20261029)`: 4 anchors of 12 items, θ ~ N(0.5, 1.2²); 2 × 1000 persons; 2,000 adaptive tests of 37 operational and 6 pretest items                                                                                                                                 | A free normal distribution, two groups, online calibration, a histogram                                                                |
 | `irt-scoring.json`                     | LSAT7 under the 2PL and Science under the GPCM, the calibrations of `irt-lsat7` and `irt-science`                                                                                                                                                                                            | Summed-score tables and marginal reliability under two priors; 1000 EAP estimates                                                      |
 | `irt-cross-product.json`               | LSAT7, the simulated 1PL with missing responses, Science under the GPCM                                                                                                                                                                                                                      | Cross-product standard errors, a shared slope                                                                                          |
+| `dimensionality-bivariate-normal.json` | `mvtnorm::pmvnorm` at 400 random points and 42 × 9 points at both sides of each switch of the algorithm (                                                                                                                                                                                    | ρ                                                                                                                                      | = 0.3, 0.75, 0.925), at | ρ   | near 1 and 0, and in the tails | The three quadrature rules, the high-correlation branch, thresholds to ±7.5 |
+| `dimensionality-polychoric.json`       | `mirt::LSAT7` expanded (5 items), `mirt::SAT12` scored with its key (32 items, 8 as missing), `psych::bfi` recoded 0-5 (25 items, 508 missing responses) and its complete cases                                                                                                              | Tetrachoric and polychoric correlations, a pair with an empty cell, missing responses, `correction = 0`                                |
+| `dimensionality-parallel.json`         | The same data: `psych::fa.parallel` of `bfi` with Pearson correlations (2,000 data sets) and of 8 `bfi` items, LSAT7 and 10 SAT12 items with polychoric and tetrachoric correlations; 60 permuted `bfi` data sets                                                                            | Resampled and normal random data, the numbers suggested, matrices with a loading at its bound                                          |
 | `irt-covariance.json`                  | The calibrations of `irt-lsat7` and `irt-science`; the LSAT7 2PL with a log-normal prior on a and priors by item                                                                                                                                                                             | Covariances between items; a prior replaced for one item                                                                               |
 | `irt-posterior.json`                   | The calibrations of `irt-lsat7` and `irt-science`: 36 patterns of LSAT7, 8 of Science; under N(0, 1) and N(0.4, 1.3²)                                                                                                                                                                        | Posteriors on 61 nodes, a prior other than N(0, 1), missing responses                                                                  |
 | `scaling-conversion.json`              | LSAT7 under the 2PL and Science under the GPCM, as mirt calibrates them; forms 1 and 2 of equateIRT's `est3pl` (20 3PL items each) set in mirt                                                                                                                                               | Tables of both methods on four scales, a prior other than N(0, 1), polytomous forms, scores with no theta                              |
@@ -551,6 +594,14 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Predictions of new items                                                                         | 1e-10 absolute                                     | 2e-11                    |
 | Marginal reliability, 61 nodes against `integrate`                                               | 1e-8 absolute                                      | 7e-10                    |
 | Empirical reliability, omega and its loadings                                                    | 1e-10 absolute                                     | 2e-14                    |
+| Bivariate normal distribution function                                                           | 1e-14 absolute                                     | 1.1e-16                  |
+| Polychoric and tetrachoric correlations against base R                                           | 1e-8 absolute                                      | 9.3e-14                  |
+| Thresholds of the correlations                                                                   | 1e-12 absolute                                     | 4.4e-16                  |
+| Correlations against psych and polycor                                                           | 1e-4 absolute                                      | 2.2e-5                   |
+| Eigenvalues of the correlations and of the reduced matrix, against base R                        | 1e-8 absolute                                      | 2.4e-9                   |
+| Factor eigenvalues of the data against psych's `fa`                                              | 1e-4 absolute                                      | 7.3e-7                   |
+| Means of random eigenvalues against the reference's                                              | 4 Monte Carlo standard errors                      | 3.0                      |
+| 0.95 quantiles of random eigenvalues against the reference's                                     | 6 standard errors of a normal quantile             | 5.2                      |
 | Purified and sparse Mantel-Haenszel statistics                                                   | 1e-12 absolute                                     | 4e-16                    |
 | Purified and sparse logistic regression                                                          | 1e-9 absolute                                      | 9e-11                    |
 | Mantel and generalized Mantel-Haenszel chi-squares, SMD, effect size                             | 1e-12 absolute                                     | 3.4e-13                  |

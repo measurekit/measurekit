@@ -1,6 +1,6 @@
 import { DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
-import { newton } from "../math/optimize.js";
+import { minresLoadings } from "../math/minres.js";
 import { covariance, variance } from "../math/statistics.js";
 import { itemScores } from "./complete-cases.js";
 import { reliabilityCases } from "./reliability.js";
@@ -16,11 +16,6 @@ export interface McDonaldOmega {
   /** Newton iterations run. */
   readonly iterations: number;
 }
-
-/** Newton's method converges quadratically: a step below 1e-8 leaves loadings exact to rounding. */
-const LOADING_STEP_TOLERANCE = 1e-8;
-/** The most Newton iterations of the minimum-residual loadings. */
-const MAX_ITERATIONS = 100;
 
 /**
  * Returns McDonald's omega total of a one-factor model, as psych's `omega(nfactors = 1)`.
@@ -63,54 +58,7 @@ export function mcdonaldOmega(matrix: ResponseMatrix): McDonaldOmega {
       "Omega is undefined when the item correlations sum to 0: the standardized total does not vary.",
     );
   }
-  const start = Array.from(
-    { length: k },
-    (_, i) => r.subarray(i * k, (i + 1) * k).reduce((sum, value) => sum + value, 0) / Math.sqrt(total),
-  );
-  const result = newton(
-    (loadings, gradient, hessian) => offDiagonalResiduals(r, k, loadings, gradient, hessian),
-    start,
-    {
-      tolerance: 0,
-      stepTolerance: LOADING_STEP_TOLERANCE,
-      maxIterations: MAX_ITERATIONS,
-    },
-  );
-  const sign = result.x.reduce((sum, value) => sum + value, 0) < 0 ? -1 : 1;
-  const loadings = Array.from(result.x, (value) => sign * value);
+  const { loadings, converged, iterations } = minresLoadings(r, k);
   const uniqueness = loadings.reduce((sum, loading) => sum + 1 - loading * loading, 0);
-  return { omega: 1 - uniqueness / total, loadings, converged: result.converged, iterations: result.iterations };
-}
-
-/**
- * Returns Σ_(i<j) (r_ij - λ_i λ_j)² and writes its gradient, -2 Σ_(j≠i) (r_ij - λ_i λ_j) λ_j, and Hessian: 2 Σ_(j≠i)
- * λ_j² on the diagonal, 4 λ_i λ_j - 2 r_ij off it.
- */
-function offDiagonalResiduals(
-  r: Float64Array,
-  k: number,
-  loadings: Float64Array,
-  gradient: Float64Array,
-  hessian: Float64Array,
-): number {
-  let value = 0;
-  let squares = 0;
-  for (const loading of loadings) squares += loading * loading;
-  for (let i = 0; i < k; i++) {
-    const li = loadings[i] ?? 0;
-    let slope = 0;
-    for (let j = 0; j < k; j++) {
-      const lj = loadings[j] ?? 0;
-      if (j === i) {
-        hessian[i * k + i] = 2 * (squares - li * li);
-        continue;
-      }
-      const residual = (r[i * k + j] ?? 0) - li * lj;
-      if (j > i) value += residual * residual;
-      slope -= 2 * residual * lj;
-      hessian[i * k + j] = 4 * li * lj - 2 * (r[i * k + j] ?? 0);
-    }
-    gradient[i] = slope;
-  }
-  return value;
+  return { omega: 1 - uniqueness / total, loadings: Array.from(loadings), converged, iterations };
 }
