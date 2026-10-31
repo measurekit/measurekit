@@ -4,6 +4,7 @@ import {
   type BivariateDistribution,
   bivariateLogLinearPresmoothing,
   bootstrapEquating,
+  calibrateWithCovariance,
   chainedEquipercentileEquating,
   chainedLinearEquating,
   createRandom,
@@ -15,6 +16,8 @@ import {
   gradedResponse,
   haebaraLinking,
   type IrtItem,
+  irtEquatingStandardErrors,
+  irtObservedScoreEquating,
   levineEquating,
   linearEquating,
   logLinearPresmoothing,
@@ -22,10 +25,16 @@ import {
   meanSigmaLinking,
   nominalResponse,
   oneParameterLogistic,
+  type ParameterCovariance,
   ratingScale,
   robustZ,
   type ScaleTransformation,
+  simulateItems,
+  simulateResponses,
+  simulateThetas,
   stockingLordLinking,
+  type TestItem,
+  type ThetaDistribution,
   threeParameterLogistic,
   transformItem,
   transformTheta,
@@ -35,13 +44,23 @@ import {
 } from "../src/index.js";
 import bivariatePresmoothing from "./fixtures/equating-bivariate-presmoothing.json" with { type: "json" };
 import bootstrap from "./fixtures/equating-bootstrap.json" with { type: "json" };
+import irtObserved from "./fixtures/equating-irt-observed-score.json" with { type: "json" };
+import standardErrors from "./fixtures/equating-irt-standard-errors.json" with { type: "json" };
 import linking from "./fixtures/equating-linking.json" with { type: "json" };
 import neat from "./fixtures/equating-neat.json" with { type: "json" };
 import observed from "./fixtures/equating-observed-score.json" with { type: "json" };
 import presmoothing from "./fixtures/equating-presmoothing.json" with { type: "json" };
 import robust from "./fixtures/equating-robust-z.json" with { type: "json" };
 import trueScore from "./fixtures/equating-true-score.json" with { type: "json" };
-import { arbitraryItem, arbitraryLocation, arbitraryLocations, defined, expectClose, fixtureItems } from "./helpers.js";
+import {
+  arbitraryItem,
+  arbitraryLocation,
+  arbitraryLocations,
+  defined,
+  expectClose,
+  fixtureItems,
+  MODELS,
+} from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Moment methods: closed forms. */
@@ -57,6 +76,8 @@ const PRESMOOTHING_TOLERANCE = 1e-11;
 /** Bootstrap standard errors above BOOTSTRAP_FLOOR against equate's, which have a Monte Carlo error of their own. */
 const BOOTSTRAP_TOLERANCE = 0.1;
 const BOOTSTRAP_FLOOR = 0.05;
+/** Delta-method standard errors against numDeriv's Jacobian, relative. */
+const STANDARD_ERROR_TOLERANCE = 1e-6;
 
 function expectTransformation(actual: ScaleTransformation, expected: ScaleTransformation, tolerance: number): void {
   expectClose(actual.slope, expected.slope, tolerance, "slope");
@@ -987,6 +1008,353 @@ describe("robustZ", () => {
   });
 });
 
+describe("irtObservedScoreEquating", () => {
+  for (const fixture of irtObserved.cases) {
+    it(`matches base R's IRT observed-score equating of the ${fixture.name} forms`, () => {
+      const from = fixtureItems(fixture.from);
+      const to = fixtureItems(fixture.to);
+      for (const { weight, equated } of fixture.results) {
+        const actual = irtObservedScoreEquating(from, to, { populations: fixture.populations, weight });
+        expect(actual).toHaveLength(equated.length);
+        actual.forEach((score, x) => {
+          expectClose(score, defined(equated[x]), SCORE_TOLERANCE, `weight ${weight}, score ${x}`);
+        });
+      }
+    });
+  }
+
+  /** The default population: N(0, 1) on 61 rectangular points from -6 to 6 standard deviations. */
+  function standardPopulation(): ThetaDistribution {
+    const nodes = Array.from({ length: 61 }, (_, q) => -6 + (12 * q) / 60);
+    const density = nodes.map((node) => Math.exp(-0.5 * node ** 2));
+    const total = density.reduce((sum, value) => sum + value, 0);
+    return { nodes, weights: density.map((value) => value / total) };
+  }
+
+  const forms = (() => {
+    const fixture = defined(irtObserved.cases[0]);
+    return { from: fixtureItems(fixture.from), to: fixtureItems(fixture.to), populations: fixture.populations };
+  })();
+
+  it("takes N(0, 1) for both groups and the weight 0.5 by default", () => {
+    const standard = standardPopulation();
+    const given = irtObservedScoreEquating(forms.from, forms.to, {
+      populations: { from: standard, to: standard },
+      weight: 0.5,
+    });
+    irtObservedScoreEquating(forms.from, forms.to).forEach((score, x) => {
+      expectClose(score, defined(given[x]), SCORE_TOLERANCE, `score ${x}`);
+    });
+  });
+
+  it("ignores the population of the other group when the weight is 1 or 0", () => {
+    const { from, to, populations } = forms;
+    const equated = (weight: number, other: ThetaDistribution): number[] =>
+      irtObservedScoreEquating(from, to, {
+        populations: weight === 1 ? { from: populations.from, to: other } : { from: other, to: populations.to },
+        weight,
+      });
+    for (const weight of [1, 0]) {
+      const reference = equated(weight, populations.to);
+      equated(weight, standardPopulation()).forEach((score, x) => {
+        expectClose(score, defined(reference[x]), SCORE_TOLERANCE, `weight ${weight}, score ${x}`);
+      });
+    }
+  });
+
+  it("accepts populations on any nodes, in any order, for each group", () => {
+    const { from, to } = forms;
+    const standard = standardPopulation();
+    const coarse = { nodes: [-1, 0, 1], weights: [0.25, 0.5, 0.25] };
+    const reversed = { nodes: [...coarse.nodes].reverse(), weights: [...coarse.weights].reverse() };
+    const equated = irtObservedScoreEquating(from, to, { populations: { from: coarse, to: standard } });
+    irtObservedScoreEquating(from, to, { populations: { from: reversed, to: standard } }).forEach((score, x) => {
+      expectClose(score, defined(equated[x]), SCORE_TOLERANCE, `score ${x}`);
+    });
+    expect(equated.every(Number.isFinite)).toBe(true);
+  });
+
+  it("equates a form to itself in the same population as the identity", () => {
+    const item = (a: number, b: number): IrtItem => ({ model: twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } });
+    const items = [item(1, -1), item(1.4, -0.3), item(0.9, 0.2), item(1.2, 1)];
+    irtObservedScoreEquating(items, items).forEach((score, x) => {
+      expectClose(score, x, 1e-9, `score ${x}`);
+    });
+  });
+
+  it("rejects invalid forms, populations and weights", () => {
+    const { from, to } = forms;
+    const standard = standardPopulation();
+    expect(() => irtObservedScoreEquating([], to)).toThrow("The from form needs at least one item.");
+    expect(() => irtObservedScoreEquating(from, JSON.parse("null"))).toThrow(
+      "The to form needs an array of items, found null.",
+    );
+    expect(() => irtObservedScoreEquating(from, JSON.parse("[1]"))).toThrow(DataError);
+    expect(() => irtObservedScoreEquating(from, to, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => irtObservedScoreEquating(from, to, { weight: JSON.parse('"half"') })).toThrow(
+      'The option weight must be a number from 0 to 1, found "half".',
+    );
+    expect(() => irtObservedScoreEquating(from, to, { weight: 1.5 })).toThrow(DataError);
+    expect(() => irtObservedScoreEquating(from, to, { populations: JSON.parse("null") })).toThrow(
+      "The option populations must be an object { from, to }, found null.",
+    );
+    expect(() => irtObservedScoreEquating(from, to, { populations: { from: JSON.parse("null") } })).toThrow(
+      "The population of the from group must be an object { nodes, weights }, found null.",
+    );
+    const populations = (population: unknown): { from: ThetaDistribution } =>
+      JSON.parse(JSON.stringify({ from: population }));
+    expect(() => irtObservedScoreEquating(from, to, { populations: populations({ nodes: 1, weights: [1] }) })).toThrow(
+      "The nodes of the population of the from group must be an array, found 1.",
+    );
+    expect(() =>
+      irtObservedScoreEquating(from, to, { populations: populations({ nodes: [0, 1], weights: [1] }) }),
+    ).toThrow("The population of the from group needs at least one node and as many weights as nodes, found 2 and 1.");
+    expect(() => irtObservedScoreEquating(from, to, { populations: populations({ nodes: [], weights: [] }) })).toThrow(
+      DataError,
+    );
+    expect(() =>
+      irtObservedScoreEquating(from, to, { populations: { from: { nodes: [0, Number.NaN], weights: [0.5, 0.5] } } }),
+    ).toThrow("The nodes of the population of the from group must be finite numbers, found NaN at 1.");
+    expect(() =>
+      irtObservedScoreEquating(from, to, { populations: { to: { nodes: [0, 1], weights: [1.5, -0.5] } } }),
+    ).toThrow("The weights of the population of the to group must be non-negative numbers, found -0.5 at 1.");
+    expect(() =>
+      irtObservedScoreEquating(from, to, { populations: { to: { nodes: [0, 1], weights: [0.5, 0.4] } } }),
+    ).toThrow("The weights of the population of the to group must sum to 1, found 0.9.");
+    expect(() =>
+      irtObservedScoreEquating(from, to, {
+        populations: { from: { nodes: [0, 1], weights: [0.5, JSON.parse('"x"')] } },
+      }),
+    ).toThrow(DataError);
+    expect(irtObservedScoreEquating(from, to, { populations: { from: standard } })).toHaveLength(
+      from.length > 0 ? trueScoreEquating(from, to).length : 0,
+    );
+  });
+});
+
+/** Returns the item with one entry of its parameter vector, such as the slope at 0, set to `value`. */
+function withEntry<TItem extends TestItem>(item: TItem, entry: number, value: number): TItem {
+  const vector = item.model.toVector(item.parameters);
+  vector[entry] = value;
+  return { ...item, parameters: item.model.fromVector(vector) };
+}
+
+/** Returns the slope of an item, the first entry of its parameter vector. */
+function slopeOf(item: TestItem): number {
+  return defined(item.model.toVector(item.parameters)[0]);
+}
+
+describe("irtEquatingStandardErrors", () => {
+  /** The items of a case by id, with the ids of its forms and its covariance. */
+  function standardErrorCase(fixture: (typeof standardErrors.cases)[number]): {
+    from: TestItem[];
+    to: TestItem[];
+    covariance: ParameterCovariance;
+  } {
+    const items = new Map(
+      fixture.items.map(({ id, model, parameters }) => [id, { id, model: defined(MODELS[model]), parameters }]),
+    );
+    const form = (ids: readonly string[]): TestItem[] => ids.map((id) => defined(items.get(id)));
+    return { from: form(fixture.from), to: form(fixture.to), covariance: fixture.covariance };
+  }
+
+  for (const fixture of standardErrors.cases) {
+    it(`matches the Jacobian of base R's equating times the covariance for the ${fixture.name} forms`, () => {
+      const { from, to, covariance } = standardErrorCase(fixture);
+      for (const { method, equated, standardErrors: expected } of fixture.results) {
+        const kind = method === "true-score" ? "true-score" : "observed-score";
+        const actual = irtEquatingStandardErrors(from, to, covariance, {
+          method: kind,
+          populations: fixture.populations,
+          weight: fixture.weight,
+        });
+        expect(actual).toHaveLength(expected.length);
+        const reference =
+          kind === "true-score"
+            ? trueScoreEquating(from, to)
+            : irtObservedScoreEquating(from, to, {
+                populations: fixture.populations,
+                weight: fixture.weight,
+              });
+        actual.forEach((error, x) => {
+          const target = defined(expected[x]);
+          expectClose(error, target, STANDARD_ERROR_TOLERANCE * target + 1e-9, `${method} ${x}`);
+          expectClose(defined(reference[x]), defined(equated[x]), 1e-9, `${method} equated ${x}`);
+        });
+      }
+    });
+  }
+
+  const concurrent = standardErrorCase(defined(standardErrors.cases[0]));
+
+  it("takes the true-score method by default", () => {
+    const { from, to, covariance } = concurrent;
+    const explicit = irtEquatingStandardErrors(from, to, covariance, { method: "true-score" });
+    irtEquatingStandardErrors(from, to, covariance).forEach((error, x) => {
+      expect(error).toBe(defined(explicit[x]));
+    });
+  });
+
+  it("scales with the square root of the covariance, and is 0 for a covariance of 0", () => {
+    const { from, to, covariance } = concurrent;
+    const scaled = (factor: number): ParameterCovariance => ({
+      parameters: covariance.parameters,
+      matrix: covariance.matrix.map((row) => row.map((value) => value * factor)),
+    });
+    const base = irtEquatingStandardErrors(from, to, covariance);
+    irtEquatingStandardErrors(from, to, scaled(4)).forEach((error, x) => {
+      expectClose(error, 2 * defined(base[x]), 1e-9, `score ${x}`);
+    });
+    expect(irtEquatingStandardErrors(from, to, scaled(0))).toEqual(base.map(() => 0));
+  });
+
+  it("leaves out the rows of items that are on neither form", () => {
+    const { from, to, covariance } = concurrent;
+    const extended: ParameterCovariance = {
+      parameters: [...covariance.parameters, { item: "other", name: "a" }],
+      matrix: [...covariance.matrix.map((row) => [...row, 0.3]), [...(covariance.matrix[0]?.map(() => 0.3) ?? []), 5]],
+    };
+    const base = irtEquatingStandardErrors(from, to, covariance);
+    irtEquatingStandardErrors(from, to, extended).forEach((error, x) => {
+      expectClose(error, defined(base[x]), 1e-12, `score ${x}`);
+    });
+  });
+
+  it("moves the parameters of an item on both forms together", () => {
+    // The standard error of an equating that depends on the slope of one common item, from the central difference of the
+    // equating with that slope changed on both forms.
+    const { from, to } = concurrent;
+    const a = slopeOf(defined(from.find(({ id }) => id === "C1")));
+    const variance = 0.01;
+    const covariance: ParameterCovariance = { parameters: [{ item: "C1", name: "a" }], matrix: [[variance]] };
+    const slope = (item: TestItem, shift: number): TestItem =>
+      item.id === "C1" ? withEntry(item, 0, a + shift) : item;
+    const equated = (shift: number): number[] =>
+      trueScoreEquating(
+        from.map((item) => slope(item, shift)),
+        to.map((item) => slope(item, shift)),
+      );
+    const step = 1e-5;
+    const above = equated(step);
+    const below = equated(-step);
+    irtEquatingStandardErrors(from, to, covariance).forEach((error, x) => {
+      const expected = (Math.abs(defined(above[x]) - defined(below[x])) / (2 * step)) * Math.sqrt(variance);
+      expectClose(error, expected, 1e-6 * expected + 1e-9, `score ${x}`);
+    });
+  });
+
+  it("treats a parameter that items share as one", () => {
+    const random = createRandom(7);
+    const items = simulateItems(oneParameterLogistic, 10, random).map((item, j) => ({ ...item, id: `q${j}` }));
+    const a = slopeOf(defined(items[0]));
+    const parameters = items.map(({ id }) => ({ item: id, name: "a" }));
+    const variance = 0.0004;
+    // One shared slope: every pair of entries has the same covariance, as a calibration lists it.
+    const covariance: ParameterCovariance = {
+      parameters,
+      matrix: parameters.map(() => parameters.map(() => variance)),
+    };
+    const equated = (shift: number): number[] => {
+      const moved = items.map((item) => withEntry(item, 0, a + shift));
+      return trueScoreEquating(moved.slice(0, 6), moved.slice(3));
+    };
+    const step = 1e-5;
+    const [above, below] = [equated(step), equated(-step)];
+    irtEquatingStandardErrors(items.slice(0, 6), items.slice(3), covariance).forEach((error, x) => {
+      const expected = (Math.abs(defined(above[x]) - defined(below[x])) / (2 * step)) * Math.sqrt(variance);
+      expectClose(error, expected, 1e-6 * expected + 1e-9, `score ${x}`);
+    });
+  });
+
+  it("works from a calibration's covariance, with errors that shrink as the sample grows", () => {
+    const random = createRandom(11);
+    // The default ids of a simulated response matrix.
+    const items = simulateItems(twoParameterLogistic, 16, random).map((item, j) => ({ ...item, id: `item${j + 1}` }));
+    const from = items.slice(0, 10);
+    const to = items.slice(6);
+    const errorsFor = (persons: number): number[] => {
+      const thetas = simulateThetas(persons, random);
+      const { covariance } = calibrateWithCovariance(simulateResponses(items, thetas, random), {
+        model: twoParameterLogistic,
+        standardErrors: "hessian",
+      });
+      const result = irtEquatingStandardErrors(from, to, defined(covariance), { method: "observed-score" });
+      expect(result.every((error) => Number.isFinite(error) && error >= 0)).toBe(true);
+      return result;
+    };
+    const rms = (errors: readonly number[]): number =>
+      Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length);
+    expect(rms(errorsFor(4000))).toBeLessThan(rms(errorsFor(500)));
+  });
+
+  it("rejects invalid items, covariances and options", () => {
+    const { from, to, covariance } = concurrent;
+    expect(() => irtEquatingStandardErrors(from, to, covariance, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => irtEquatingStandardErrors(from, to, covariance, { method: JSON.parse('"delta"') })).toThrow(
+      'The option method must be "true-score" or "observed-score", found "delta".',
+    );
+    expect(() => irtEquatingStandardErrors(JSON.parse("null"), to, covariance)).toThrow(DataError);
+    expect(() => irtEquatingStandardErrors(from, to, JSON.parse("null"))).toThrow(
+      "The covariance must be an object { parameters, matrix }, found null.",
+    );
+    expect(() => irtEquatingStandardErrors(from, to, { ...covariance, matrix: JSON.parse("1") })).toThrow(DataError);
+    expect(() => irtEquatingStandardErrors(from, to, { ...covariance, parameters: JSON.parse("{}") })).toThrow(
+      DataError,
+    );
+    expect(() =>
+      irtEquatingStandardErrors(from, to, { parameters: [{ item: "C1", name: "a" }], matrix: [[1], [2]] }),
+    ).toThrow("The covariance needs a row for each of its 1 parameters, found 2.");
+    expect(() =>
+      irtEquatingStandardErrors(from, to, { parameters: [{ item: "C1", name: "a" }], matrix: [[1, 2]] }),
+    ).toThrow("The covariance matrix must be square: row 1 has 2 entries for 1 parameters.");
+    expect(() =>
+      irtEquatingStandardErrors(from, to, { parameters: [{ item: "C1", name: "a" }], matrix: [[Number.NaN]] }),
+    ).toThrow("Entry (1, 1) of the covariance matrix must be a finite number, found NaN.");
+    expect(() =>
+      irtEquatingStandardErrors(from, to, { parameters: JSON.parse('[{"item": 1, "name": "a"}]'), matrix: [[1]] }),
+    ).toThrow('Parameter 1 of the covariance needs a string item and name, found 1 and "a".');
+    expect(() =>
+      irtEquatingStandardErrors(from, to, { parameters: [{ item: "C1", name: "c" }], matrix: [[1]] }),
+    ).toThrow(
+      'The covariance has the parameter "c" of item "C1", which its 2PL model does not estimate; it estimates a, b.',
+    );
+    expect(() =>
+      irtEquatingStandardErrors(from, to, { parameters: [{ item: "other", name: "a" }], matrix: [[1]] }),
+    ).toThrow("The covariance has no parameter of the items of the forms; its labels must name the items by id.");
+    expect(() =>
+      irtEquatingStandardErrors(from, to, { parameters: [{ item: "C1", name: "a" }], matrix: [[-1]] }),
+    ).toThrow(/The covariance matrix is not positive semidefinite: the equated score of \d+ has a negative variance/);
+    const changed = to.map((item) => (item.id === "C1" ? withEntry(item, 1, 3) : item));
+    expect(() => irtEquatingStandardErrors(from, changed, covariance)).toThrow(
+      'Item "C1" is on both forms with different parameters; a common item has one set of parameters on the scale of one calibration.',
+    );
+    const unnamed = from.map(({ model, parameters }) => ({ model, parameters }));
+    expect(() => irtEquatingStandardErrors(JSON.parse(JSON.stringify(unnamed)), to, covariance)).toThrow(DataError);
+    const repeated = [defined(from[0]), defined(from[0])];
+    expect(() => irtEquatingStandardErrors(repeated, to, covariance)).toThrow(
+      'Item ids must be unique; "X1" appears twice.',
+    );
+    const atBound: TestItem = {
+      id: "B",
+      model: threeParameterLogistic,
+      parameters: { a: 1, b: 0, c: 0, d: 1 },
+    };
+    expect(() =>
+      irtEquatingStandardErrors([atBound], [atBound], { parameters: [{ item: "B", name: "c" }], matrix: [[1]] }),
+    ).toThrow(
+      'The parameter "c" of item "B" is 0, on a bound of its range; the standard error needs it inside the range.',
+    );
+    const nominal: TestItem = { id: "N", model: nominalResponse, parameters: { a: [1, 2], c: [0, 1] } };
+    expect(() =>
+      irtEquatingStandardErrors([nominal], to, { parameters: [{ item: "N", name: "a1" }], matrix: [[1]] }),
+    ).toThrow(DataError);
+  });
+});
+
 describe("properties", () => {
   /** Items whose expected score increases with theta: the 3PL, GRM and GPCM with positive slopes. */
   const risingItem: fc.Arbitrary<IrtItem> = fc.oneof(
@@ -1135,6 +1503,73 @@ describe("properties", () => {
           expectClose(defined(reversed[z.length - 1 - j]), value, 1e-12, `item ${j}`);
         });
       }),
+    );
+  });
+
+  /** The highest summed score of a form. */
+  const highestScore = (items: readonly IrtItem[]): number =>
+    items.reduce((sum, item) => sum + item.model.categoryCount(item.parameters) - 1, 0);
+
+  it("IRT observed-score equating is monotone, within the scale, the identity from a form to itself and free of the order of items", () => {
+    fc.assert(
+      fc.property(form, form, (from, to) => {
+        const equated = irtObservedScoreEquating(from, to);
+        expect(equated).toHaveLength(highestScore(from) + 1);
+        equated.forEach((score, x) => {
+          expect(score).toBeGreaterThanOrEqual(-0.5);
+          expect(score).toBeLessThanOrEqual(highestScore(to) + 0.5);
+          expect(score).toBeGreaterThanOrEqual(equated[x - 1] ?? Number.NEGATIVE_INFINITY);
+        });
+        irtObservedScoreEquating(from, from).forEach((score, x) => {
+          expectClose(score, x, 1e-9, `score ${x}`);
+        });
+        irtObservedScoreEquating([...from].reverse(), [...to].reverse()).forEach((score, x) => {
+          expectClose(score, defined(equated[x]), 1e-9, `score ${x}`);
+        });
+      }),
+      { numRuns: 30 },
+    );
+  });
+
+  it("the standard errors of IRT equating are finite and not negative, and scale with the root of the covariance", () => {
+    const item = fc.record({
+      a: fc.double({ min: 0.5, max: 2, noNaN: true }),
+      b: fc.double({ min: -2, max: 2, noNaN: true }),
+    });
+    const items = (prefix: string, parameters: readonly { a: number; b: number }[]): TestItem[] =>
+      parameters.map(({ a, b }, j) => ({
+        id: `${prefix}${j}`,
+        model: twoParameterLogistic,
+        parameters: { a, b, c: 0, d: 1 },
+      }));
+    fc.assert(
+      fc.property(
+        fc.array(item, { minLength: 2, maxLength: 6 }),
+        fc.array(item, { minLength: 2, maxLength: 6 }),
+        fc.double({ min: 0.001, max: 0.05, noNaN: true }),
+        fc.constantFrom("true-score" as const, "observed-score" as const),
+        (fromParameters, toParameters, variance, method) => {
+          const from = items("f", fromParameters);
+          const to = items("t", toParameters);
+          const covariance = (factor: number): ParameterCovariance => {
+            const parameters = [...from, ...to].flatMap(({ id }) => [
+              { item: id, name: "a" },
+              { item: id, name: "b" },
+            ]);
+            return {
+              parameters,
+              matrix: parameters.map((_, i) => parameters.map((__, j) => (i === j ? factor * variance : 0))),
+            };
+          };
+          const base = irtEquatingStandardErrors(from, to, covariance(1), { method });
+          const scaled = irtEquatingStandardErrors(from, to, covariance(9), { method });
+          base.forEach((error, x) => {
+            expect(Number.isFinite(error) && error >= 0).toBe(true);
+            expectClose(defined(scaled[x]), 3 * error, 1e-9 * Math.max(1, error), `score ${x}`);
+          });
+        },
+      ),
+      { numRuns: 20 },
     );
   });
 

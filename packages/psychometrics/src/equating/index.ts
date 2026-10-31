@@ -2,7 +2,8 @@
  * Linking and equating: scale transformations from common items by the mean-mean, mean-sigma, Haebara and
  * Stocking-Lord methods; linear and equipercentile equating of observed scores from random groups, with log-linear
  * presmoothing; equating through common items from nonequivalent groups by the Tucker, Levine, chained and frequency
- * estimation methods; bootstrap standard errors; the robust z screen of common items; and IRT true-score equating.
+ * estimation methods; bootstrap standard errors; the robust z screen of common items; IRT true-score and observed-score
+ * equating; and delta-method standard errors of IRT equating.
  *
  * @module @measurekit/psychometrics/equating
  */
@@ -20,6 +21,12 @@ export {
   type LinkingOptions,
   stockingLordLinking,
 } from "./characteristic-curve.js";
+export {
+  type EquatingPopulations,
+  type IrtObservedScoreOptions,
+  irtObservedScoreEquating,
+} from "./irt-observed-score.js";
+export { type IrtEquatingErrorOptions, irtEquatingStandardErrors } from "./irt-standard-errors.js";
 export {
   meanMeanLinking,
   meanSigmaLinking,

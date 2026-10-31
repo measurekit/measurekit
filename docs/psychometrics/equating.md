@@ -3,7 +3,8 @@
 `@measurekit/psychometrics/equating` puts the item parameters of two calibrations on one theta scale (linking)
 and converts the scores of one form to the scale of another (equating). Linking is validated against equateIRT and
 base R, observed-score equating, with or without common items, and its bootstrap standard errors against the equate
-package and base R, and true-score equating against base R and equateIRT ([validation](validation.md)).
+package and base R, true-score equating against base R and equateIRT, IRT observed-score equating against base R and
+equateIRT, and the standard errors of IRT equating against base R and mirt ([validation](validation.md)).
 
 ## Linking
 
@@ -360,23 +361,115 @@ score of each X score from 0 to the highest (Lord, 1980; Kolen and Brennan, 2014
 
 The items' expected scores must increase with theta: built-in models with a > 0, not the NRM.
 
+## IRT observed-score equating
+
+`irtObservedScoreEquating(from, to, options)` takes the items of two forms on a common scale, as after linking, and the
+distribution of theta of the group that took each form on that scale. It computes each form's distribution of summed
+scores in a synthetic population of the two groups and equates them by `equipercentileEquating` (Lord and Wingersky,
+1984; Kolen and Brennan, 2014). With P(x | θ) the probability of the summed score x at theta, from the Lord-Wingersky
+recursion, g₁ and g₂ the populations and w₁ the weight of `from`'s:
+
+f(x) = w₁ Σ_q P_X(x | θ_q) g₁(θ_q) + (1 - w₁) Σ_q P_X(x | θ_q) g₂(θ_q)
+
+and g(y) likewise for the form to equate to. Items of any model are supported, polytomous items included, with the sum
+of the categories as the score. The result is the form Y score of each form X score from 0 to its highest, as the other
+equating functions give it; scores whose percentile rank is 0 or 1 map to -0.5 and the highest score plus 0.5.
+
+| Option        | Default                                   | Meaning                                                                                                                                            |
+| ------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `populations` | N(0, 1) on 61 rectangular points for both | `{ from, to }`: each a `ThetaDistribution`, `{ nodes, weights }` with finite nodes in any order and non-negative weights that sum to 1 within 1e-6 |
+| `weight`      | `0.5`                                     | w₁, a number from 0 to 1; equateIRT's `w`                                                                                                          |
+
+A group linked to the scale of the other by A and B has the nodes A θ + B of the other's, with the same weights. A
+calibration's group distribution, a posterior from `thetaPosterior` or any other discrete distribution works as a
+population.
+
+```ts
+import { irtObservedScoreEquating } from "@measurekit/psychometrics/equating";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+
+const item = (a: number, b: number) => ({ model: twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } });
+const formX = [item(1.1, -0.8), item(0.9, -0.2), item(1.3, 0.3), item(1, 0.9)];
+const formY = [item(1, -1.1), item(1.2, -0.4), item(0.8, 0.2), item(1.1, 1)];
+// Form X's group is N(0, 1) and form Y's is N(0.4, 1.2²), on the common scale, on five nodes each.
+const nodes = [-2, -1, 0, 1, 2];
+const weights = [0.06, 0.24, 0.4, 0.24, 0.06];
+irtObservedScoreEquating(formX, formY, {
+  populations: { from: { nodes, weights }, to: { nodes: nodes.map((z) => 0.4 + 1.2 * z), weights } },
+}); // [0.145, 1.163, 2.118, 3.05, 4.004], after rounding
+```
+
+## Standard errors of IRT equating
+
+`irtEquatingStandardErrors(from, to, covariance, options)` returns the standard error of the equated score at each
+score of the form to equate, by the delta method (Lord, 1982; Ogasawara, 2001). The equated score e(x) is a function of
+the item parameters of both forms, so with g its gradient with respect to the parameters and Σ their covariance
+matrix, the standard error is √(gᵀ Σ g). The gradient comes from central differences.
+
+| Option        | Default        | Meaning                                                                                   |
+| ------------- | -------------- | ----------------------------------------------------------------------------------------- |
+| `method`      | `"true-score"` | `"true-score"` for `trueScoreEquating`, `"observed-score"` for `irtObservedScoreEquating` |
+| `populations` | as above       | Used by the observed-score method only                                                    |
+| `weight`      | `0.5`          | Used by the observed-score method only                                                    |
+
+The covariance is a `ParameterCovariance`, as `calibrateWithCovariance` returns it, with a label `{ item, name }` for
+each row. The items of both forms need string ids, distinct within a form, and are matched to the labels by id and
+parameter name; the names are those the model estimates, such as `a` and `b`, `b1` to `b3`, `c`. An item on both forms
+is one set of parameters, so it must have the same model and parameters on both. Items and parameters that the
+covariance lacks are known: fixed items, and the parameters of the model that calibration does not estimate. The
+populations are known too. A label of an item on neither form is ignored. A parameter that items share, such as the
+slope of the 1PL, is listed once for each item with a correlation of 1 and is moved as one. Every parameter of the
+covariance that belongs to an item of the forms must lie inside its range, so that c = 0 of a 3PL item is rejected.
+
+The standard errors are valid when both forms are on the scale of one calibration: a concurrent calibration of both
+forms, or a calibration of one form with the other's common items fixed to their values. A response left `null` for an
+item a person did not take makes a NEAT design one calibration. The covariance of a linking of two calibrations
+requires the joint covariance of the linking coefficients and of both calibrations, which is not available.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { irtEquatingStandardErrors, trueScoreEquating } from "@measurekit/psychometrics/equating";
+import { calibrateWithCovariance, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+const random = createRandom(7);
+const truth = simulateItems(twoParameterLogistic, 14, random);
+const matrix = simulateResponses(truth, simulateThetas(2000, random), random);
+const { calibration, covariance } = calibrateWithCovariance(matrix, {
+  model: twoParameterLogistic,
+  standardErrors: "hessian",
+});
+if (covariance === null) throw new Error("The calibration has no covariance.");
+// Form X is items 1 to 9 and form Y items 6 to 14, so that items 6 to 9 are common.
+const formX = calibration.items.slice(0, 9);
+const formY = calibration.items.slice(5);
+trueScoreEquating(formX, formY); // [0, 1.477, 2.642, 3.627, 4.527, 5.404, 6.29, 7.195, 8.101, 9], after rounding
+irtEquatingStandardErrors(formX, formY, covariance);
+// [0, 0.094, 0.071, 0.048, 0.036, 0.035, 0.043, 0.049, 0.033, 0], after rounding
+irtEquatingStandardErrors(formX, formY, covariance, { method: "observed-score" });
+// [0.04, 0.048, 0.042, 0.035, 0.033, 0.033, 0.034, 0.034, 0.029, 0.022], after rounding
+```
+
 ## Not included
 
-- IRT observed-score equating, and standard errors of IRT equating.
+- Standard errors of IRT equating across separate calibrations joined by linking: they need the joint covariance of the
+  linking coefficients and both calibrations (Ogasawara, 2001).
 - Braun-Holland linear, circle-arc and nominal weights equating, kernel equating, and cubic-spline postsmoothing:
   presmoothing covers smoothing, and the others see little use.
 - Analytic standard errors of observed-score equating: the bootstrap is equate's method.
 
 ## Differences from the references
 
-| Topic                          | This package                                                             | Reference                                                                                                                                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rasch items                    | A estimated by every method; 1 by mean-mean                              | equateIRT fixes A = 1 for its Rasch model                                                                                                                                                                 |
-| Polytomous items               | Every method; NRM by the characteristic curves only                      | equateIRT's `direc`: dichotomous items                                                                                                                                                                    |
-| Percentile ranks               | Exact                                                                    | equate rounds them and the cumulative shares to 10 decimals: up to 1e-7 apart                                                                                                                             |
-| X scores above Y's scale       | Rank 1 gives Y's highest score plus 0.5                                  | equate returns the X score itself                                                                                                                                                                         |
-| True scores below Σ c          | Kolen and Brennan's line from 0                                          | equateIRT's `score` leaves them out                                                                                                                                                                       |
-| Frequency estimation weights   | `weight` is w₁ of the synthetic population                               | equate's `ws` also multiplies the groups' numbers of persons, so its default weights `from` by n₁² / (n₁² + n₂²); `ws = w₁ n₂ / (w₁ n₂ + (1 - w₁) n₁)` gives w₁, and the two agree for groups of one size |
-| Anchor score of one group only | `DataError` naming the score                                             | equate gives the persons at it their own group's weight alone, so the synthetic distributions lose mass                                                                                                   |
-| Bivariate presmoothing degrees | `degrees: [total, anchor]` and `crossDegree`, at most the smaller degree | `degrees = list(c(total, anchor), cross)`, with the cross products as in `crossDegree`                                                                                                                    |
-| Bootstrap                      | The seeded `Random` of the package; replications default to 500          | R's `sample`, 100 replications; the standard errors agree within their Monte Carlo error                                                                                                                  |
+| Topic                          | This package                                                                      | Reference                                                                                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rasch items                    | A estimated by every method; 1 by mean-mean                                       | equateIRT fixes A = 1 for its Rasch model                                                                                                                                                                 |
+| Polytomous items               | Every method; NRM by the characteristic curves only                               | equateIRT's `direc`: dichotomous items                                                                                                                                                                    |
+| Percentile ranks               | Exact                                                                             | equate rounds them and the cumulative shares to 10 decimals: up to 1e-7 apart                                                                                                                             |
+| X scores above Y's scale       | Rank 1 gives Y's highest score plus 0.5                                           | equate returns the X score itself                                                                                                                                                                         |
+| True scores below Σ c          | Kolen and Brennan's line from 0                                                   | equateIRT's `score` leaves them out                                                                                                                                                                       |
+| Frequency estimation weights   | `weight` is w₁ of the synthetic population                                        | equate's `ws` also multiplies the groups' numbers of persons, so its default weights `from` by n₁² / (n₁² + n₂²); `ws = w₁ n₂ / (w₁ n₂ + (1 - w₁) n₁)` gives w₁, and the two agree for groups of one size |
+| Anchor score of one group only | `DataError` naming the score                                                      | equate gives the persons at it their own group's weight alone, so the synthetic distributions lose mass                                                                                                   |
+| Bivariate presmoothing degrees | `degrees: [total, anchor]` and `crossDegree`, at most the smaller degree          | `degrees = list(c(total, anchor), cross)`, with the cross products as in `crossDegree`                                                                                                                    |
+| Bootstrap                      | The seeded `Random` of the package; replications default to 500                   | R's `sample`, 100 replications; the standard errors agree within their Monte Carlo error                                                                                                                  |
+| IRT observed-score populations | Any discrete distribution per group; default N(0, 1) on 61 rectangular points     | equateIRT's `score(method = "OSE")`: N(0, 1) on `theta` for one group and N(B, A²) on A `theta` + B for the other                                                                                         |
+| IRT equating standard errors   | Delta method on one calibration's covariance, parameters of the populations known | equateIRT's include the uncertainty of the linking coefficients across separate calibrations                                                                                                              |

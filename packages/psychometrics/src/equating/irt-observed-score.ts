@@ -1,0 +1,169 @@
+import { checkArray, checkOptions, checkRecord, checkUnitInterval, DataError, describe } from "@measurekit/core";
+import type { ThetaDistribution } from "../irt/ability.js";
+import { checkItemList } from "../irt/items.js";
+import type { IrtItem } from "../irt/model.js";
+import { quadratureRule } from "../irt/quadrature.js";
+import { itemTrace, summedScoreLikelihoods } from "../irt/summed-score.js";
+import { equipercentileEquating } from "./observed-score.js";
+
+/** The populations of the groups that took the two forms, on the scale of the forms' items. */
+export interface EquatingPopulations {
+  /**
+   * The population of the group that took the form to equate.
+   *
+   * @defaultValue N(0, 1) on 61 rectangular points
+   */
+  readonly from?: ThetaDistribution;
+  /**
+   * The population of the group that took the form to equate to. A group linked to the scale of the other by A and B
+   * has the nodes A θ + B of the other's, with the same weights.
+   *
+   * @defaultValue N(0, 1) on 61 rectangular points
+   */
+  readonly to?: ThetaDistribution;
+}
+
+/** Options of {@link irtObservedScoreEquating}. */
+export interface IrtObservedScoreOptions {
+  /** The populations of the two groups. */
+  readonly populations?: EquatingPopulations;
+  /**
+   * The weight w₁ of the `from` group's population in the synthetic population, from 0 to 1; the `to` group's is 1 -
+   * w₁.
+   *
+   * @defaultValue `0.5`
+   */
+  readonly weight?: number;
+}
+
+/** The tolerance of the sum of a population's weights from 1. */
+const WEIGHT_SUM_TOLERANCE = 1e-6;
+
+/** A population checked: its nodes and weights. */
+interface Population {
+  readonly nodes: Float64Array;
+  readonly weights: Float64Array;
+}
+
+/** The populations and weight of an equating, checked. */
+export interface ObservedScoreSetup {
+  readonly from: Population;
+  readonly to: Population;
+  readonly weight: number;
+}
+
+/**
+ * Returns the IRT observed-score equating of a form to another.
+ *
+ * @remarks
+ * The forms' items must be on a common scale, as after linking, and `populations` are the groups' distributions of
+ * theta on it. With P_X(x | θ) the probability of the summed score x on the form to equate at theta, from the recursion
+ * of Lord and Wingersky, and g₁, g₂ the groups' populations, the form's score distribution in the synthetic population
+ * is f(x) = w₁ Σ_q P_X(x | θ_q) g₁(θ_q) + w₂ Σ_q P_X(x | θ_q) g₂(θ_q), and the distribution g(y) of the form to equate to
+ * likewise. Equipercentile equating of f and g gives the result, as {@link equipercentileEquating}. Items of any model
+ * are supported, polytomous ones included; the summed score is the sum of the categories. It is the observed-score
+ * method of the equateIRT package's `score(method = "OSE")`, which takes the populations N(0, 1) and N(B, A²) on
+ * Gauss-Hermite points.
+ *
+ * @throws `DataError` when a form's items are not an array or there are none, an item is invalid, `populations` is not
+ * an object of populations with finite nodes, non-negative weights that sum to 1 within 1e-6 and as many weights as
+ * nodes, or `weight` is not a number from 0 to 1.
+ * @see {@link https://doi.org/10.1177/014662168400800409 | Lord and Wingersky (1984)}
+ * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
+ */
+export function irtObservedScoreEquating(
+  from: readonly IrtItem[],
+  to: readonly IrtItem[],
+  options: IrtObservedScoreOptions = {},
+): number[] {
+  checkItemList(from, "The from form");
+  checkItemList(to, "The to form");
+  return observedScoreEquivalents(from, to, observedScoreSetup(options));
+}
+
+/**
+ * Checks the options of an IRT observed-score equating and returns its populations and weight.
+ *
+ * @throws `DataError` as {@link irtObservedScoreEquating} does for the options.
+ */
+export function observedScoreSetup(options: IrtObservedScoreOptions): ObservedScoreSetup {
+  checkOptions(options);
+  const { populations = {}, weight = 0.5 } = options;
+  checkRecord(populations, "The option populations must be an object { from, to }");
+  checkUnitInterval(weight, "The option weight");
+  const { from, to } = populations;
+  const standard = quadratureRule();
+  return {
+    from: from === undefined ? standard : checkPopulation(from, "from"),
+    to: to === undefined ? standard : checkPopulation(to, "to"),
+    weight,
+  };
+}
+
+/** Returns the equivalents of the checked items of the forms. */
+export function observedScoreEquivalents(
+  from: readonly IrtItem[],
+  to: readonly IrtItem[],
+  { from: fromPopulation, to: toPopulation, weight }: ObservedScoreSetup,
+): number[] {
+  const synthetic = (items: readonly IrtItem[]): number[] => {
+    const first = scoreDistribution(items, fromPopulation);
+    const second = scoreDistribution(items, toPopulation);
+    return Array.from(first, (probability, score) => weight * probability + (1 - weight) * (second[score] ?? 0));
+  };
+  return equipercentileEquating(synthetic(from), synthetic(to));
+}
+
+/**
+ * Checks a population and returns its nodes and weights.
+ *
+ * @throws `DataError` when it is not an object with arrays of finite nodes and as many non-negative weights that sum
+ * to 1 within the tolerance.
+ */
+function checkPopulation(population: ThetaDistribution, label: string): Population {
+  checkRecord(population, `The population of the ${label} group must be an object { nodes, weights }`);
+  const { nodes, weights } = population;
+  checkArray(nodes, `The nodes of the population of the ${label} group must be an array`);
+  checkArray(weights, `The weights of the population of the ${label} group must be an array`);
+  if (nodes.length === 0 || nodes.length !== weights.length) {
+    throw new DataError(
+      `The population of the ${label} group needs at least one node and as many weights as nodes, found ${nodes.length} and ${weights.length}.`,
+    );
+  }
+  let sum = 0;
+  nodes.forEach((node, q) => {
+    const weight: unknown = weights[q];
+    if (!Number.isFinite(node)) {
+      throw new DataError(
+        `The nodes of the population of the ${label} group must be finite numbers, found ${describe(node)} at ${q}.`,
+      );
+    }
+    if (!(typeof weight === "number" && Number.isFinite(weight) && weight >= 0)) {
+      throw new DataError(
+        `The weights of the population of the ${label} group must be non-negative numbers, found ${describe(weight)} at ${q}.`,
+      );
+    }
+    sum += weight;
+  });
+  if (!(Math.abs(sum - 1) <= WEIGHT_SUM_TOLERANCE)) {
+    throw new DataError(`The weights of the population of the ${label} group must sum to 1, found ${sum}.`);
+  }
+  return { nodes: Float64Array.from(nodes), weights: Float64Array.from(weights) };
+}
+
+/** Returns the probability of each summed score of the items in a population: Σ_q g(θ_q) P(score | θ_q). */
+function scoreDistribution(items: readonly IrtItem[], population: Population): Float64Array {
+  const counts = items.map((item) => item.model.categoryCount(item.parameters));
+  const traces = items.map((item, j) => itemTrace(item, counts[j] ?? 0, population.nodes));
+  const likelihoods = summedScoreLikelihoods(traces, counts, -1, population.nodes.length);
+  const nodeCount = population.nodes.length;
+  const distribution = new Float64Array(likelihoods.length / nodeCount);
+  for (let score = 0; score < distribution.length; score++) {
+    let probability = 0;
+    for (let q = 0; q < nodeCount; q++) {
+      probability += (population.weights[q] ?? 0) * (likelihoods[score * nodeCount + q] ?? 0);
+    }
+    distribution[score] = probability;
+  }
+  return distribution;
+}

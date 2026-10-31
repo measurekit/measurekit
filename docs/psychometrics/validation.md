@@ -103,6 +103,8 @@ equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
 | Bivariate log-linear presmoothing                          | Base R's Poisson `glm` to a deviance change of 1e-15; equate's `presmoothing` within 1e-6                      |
 | Bootstrap standard errors                                  | equate's `bootstrap(reps = 2000)`, within the Monte Carlo error of both                                        |
 | Robust z of common items                                   | Base R: `median` and `IQR`                                                                                     |
+| IRT observed-score equating                                | Base R: Lord and Wingersky's recursion; equateIRT's `score(method = "OSE")` within 1e-8                        |
+| Delta-method standard errors of IRT equating               | Base R: numDeriv's Jacobian times the covariance of a mirt `multipleGroup` calibration                         |
 
 | Standard-setting quantity                              | Reference                                                                         |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
@@ -263,6 +265,10 @@ Several results of the reference packages are not references:
   the standard deviation of B values has a relative standard error of 1 / √(2 (B - 1)). The test compares standard
   errors above 0.05 within 10%, about three standard deviations of the difference. Frequency estimation resamples are
   smoothed, which takes seconds, so the test runs 500 replications of it.
+- **mirt's covariance of a concurrent calibration** is of the slopes and intercepts (a1, d); the script converts it to
+  that of a and b = -d / a1 with the Jacobian of the transformation, and takes the means and variances of the groups
+  from the same calibration as known populations. The standard errors of equating then come from numDeriv's
+  Richardson Jacobian, which agrees with the central differences of the package within 1e-8.
 
 No package among the references implements the modified Angoff, Bookmark or Hofstee method, so their references are
 base R written out from each method's definition. The tests add values derived by hand: the Bookmark locations
@@ -324,6 +330,8 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `equating-bivariate-presmoothing.json` | The X group of each case of `equating-neat.json`                                                                                                                                                                       | Degrees (4, 3), (3, 3), (2, 2), (4, 2); cross degrees 0 to 2                                                  |
 | `equating-bootstrap.json`              | equate's `bootstrap`, 2000 replications, `set.seed(20261029)`: `KBneat`, `ACTmath`, a single group of 800 persons under a 2PL                                                                                          | Five NEAT methods, random groups, a single group; smoothed resamples                                          |
 | `equating-robust-z.json`               | A Rasch simulation, `set.seed(20261029)`: 15 items, 2 drifting; equateIRT's `est2pl`, forms 1 to 2, I1-I10; the mixed-format linking items                                                                             | Flagged items; polytomous locations                                                                           |
+| `equating-irt-observed-score.json`     | Form 2 of equateIRT's `est3pl` and form 1 moved to its scale by Haebara; the mixed-format items of `equating-linking.json`                                                                                             | Weights 0.3 to 0.7; N(0, 1) and N(B, A²) populations; polytomous items                                        |
+| `equating-irt-standard-errors.json`    | A concurrent mirt `multipleGroup` calibration, `set.seed(20261029)`: two 20-item 2PL forms sharing 8 items, 1500 persons per group; the mixed-format items with a made-up covariance                                   | Common items; true-score and observed-score methods; 3PL, GRM and GPCM parameters                             |
 | `irt-testlet.json`                     | A 2PL testlet simulation, `set.seed(20261029)`: 1000 persons, 3 testlets of 4 items, SDs 0.5, 0.8 and 1; sirt's `data.read`, 328 persons, 3 passages of 4 items                                                        | 21 nodes, as mirt's `bfactor`; EAP of 10 patterns                                                             |
 | `rater.json`                           | irr's `anxiety` (20 subjects, 3 raters), also with two ratings missing; irr's `diagnoses` (30 subjects, 6 raters)                                                                                                      | Weighted kappa, nominal categories, missing ratings                                                           |
 | `response-time.json`                   | A lognormal simulation, `set.seed(20261029)`: 400 persons, 12 items, 5% of times missing; LNIRT's `CredentialForm1`, items 1 to 10, 1636 persons, times of 0 as missing                                                | Calibration, speeds, residuals; NT10 and NT15 with a 30 s cap                                                 |
@@ -375,6 +383,8 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Bivariate presmoothed counts, relative to max(1, count)                 | 1e-11                                              | 5.5e-14                  |
 | Bootstrap standard errors above 0.05 against equate's                   | 10% relative                                       | 4.4%                     |
 | Robust z                                                                | 1e-12 absolute                                     | 1.5e-15                  |
+| IRT observed-score equivalents                                          | 1e-12 absolute                                     | 2.5e-14                  |
+| Delta-method standard errors of IRT equating, relative                  | 1e-6                                               | 8.5e-9                   |
 | Cut scores, Bookmark locations                                          | 1e-12 absolute                                     | 4e-15                    |
 | Normal distribution function                                            | 1e-14 relative                                     | 1.5e-16                  |
 | Distributions of theta: parameters, mean, SD                            | 1e-7 absolute                                      | 3e-9                     |

@@ -1,11 +1,15 @@
 # Linking and equating fixtures. References: equateIRT (direc: mean-mean, mean-sigma, Haebara and Stocking-Lord
-# linking of dichotomous items; score: true-score equating), equate (linear and equipercentile equating), and base R
-# written out below: the linking criteria for mixed-format items and true-score equating by uniroot.
+# linking of dichotomous items; score: true-score and observed-score equating), equate (linear, equipercentile and
+# anchor-test equating, bootstrap), mirt (the covariance of a concurrent calibration), numDeriv (Jacobians), and base R
+# written out below: the linking criteria for mixed-format items, true-score equating by uniroot, and the equating
+# methods that no package implements for the designs used.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
   library(equateIRT)
   library(equate)
+  library(mirt)
+  library(numDeriv)
 })
 
 SEED <- 20261029
@@ -484,5 +488,228 @@ write_fixture("equating-robust-z", list(
     c(list(name = "est2pl"), robust_z(form_items(est2pl_mods, 1, est2pl_items, "2pl"),
                                       form_items(est2pl_mods, 2, est2pl_items, "2pl"))),
     c(list(name = "mixed format"), robust_z(mixed_from, mixed_to))
+  )
+))
+
+# --- IRT observed-score equating: base R and equateIRT -------------------------------------------------------------------
+# Lord and Wingersky's recursion at each node of a population, the groups' score distributions mixed with weight w for
+# the group of the form to equate, and the equipercentile equating of the two mixtures. equateIRT's score(method = "OSE")
+# takes the populations N(0, 1) on the nodes theta and N(B, A^2) on A theta + B with the same weights; its results are
+# compared with the base R ones for form 2 of est3pl and form 1 moved to its scale.
+
+response_probabilities <- function(item, theta) {
+  if (item$model == "2pl") item$model <- "3pl"
+  category_probabilities(item, theta)
+}
+
+score_probabilities <- function(items, theta) {
+  distribution <- 1
+  for (item in items) {
+    p <- as.vector(response_probabilities(item, theta))
+    following <- numeric(length(distribution) + length(p) - 1)
+    for (k in seq_along(p)) {
+      positions <- k - 1 + seq_along(distribution)
+      following[positions] <- following[positions] + distribution * p[k]
+    }
+    distribution <- following
+  }
+  distribution
+}
+
+population <- function(mean, sd) list(nodes = mean + sd * nodes, weights = weights)
+
+form_distribution <- function(items, pop) {
+  rowSums(mapply(function(theta, w) w * score_probabilities(items, theta), pop$nodes, pop$weights))
+}
+
+irt_observed_score <- function(from, to, populations, w) {
+  mixture <- function(items) {
+    w * form_distribution(items, populations$from) + (1 - w) * form_distribution(items, populations$to)
+  }
+  equipercentile(mixture(from), mixture(to))
+}
+
+ose_populations <- function(transformation) {
+  list(from = population(0, 1), to = population(transformation$intercept, transformation$slope))
+}
+
+est3pl_populations <- ose_populations(list(slope = haebara3$A, intercept = haebara3$B))
+ose_case <- function(name, from, to, populations, ws, reference = NULL) {
+  list(name = name, from = from, to = to, populations = populations, results = lapply(ws, function(w) {
+    equated <- irt_observed_score(from, to, populations, w)
+    if (!is.null(reference)) {
+      stopifnot(max(abs(equated - reference(w))) < 1e-8)
+    }
+    list(weight = w, equated = equated)
+  }))
+}
+
+equateirt_ose <- function(w) {
+  score(haebara3, method = "OSE", se = FALSE, theta = nodes, weights = weights, w = w)[[2]]
+}
+
+write_fixture("equating-irt-observed-score", list(
+  source = paste("Form 2 of equateIRT's est3pl and form 1 moved to its scale by Haebara, with equateIRT's OSE as a",
+                 "second reference; the mixed-format items of the linking fixture, from `to` to `from` moved by Haebara;",
+                 "populations N(0, 1) and N(B, A^2) on 61 rectangular points."),
+  cases = list(
+    ose_case("3PL", form2, form1, est3pl_populations, c(0.5, 0.3), equateirt_ose),
+    ose_case("mixed format", mixed_to, mixed_linked, ose_populations(mixed_case$transformations$haebara), c(0.5, 0.7))
+  )
+))
+
+# --- Delta-method standard errors of IRT equating: base R and mirt ------------------------------------------------------
+# The Jacobian of the equated scores with respect to the item parameters by numDeriv, times the covariance of the
+# parameters: SE^2 = J V J'. A pool lists the items of both forms once, a common item once; the parameter vector is
+# the estimated parameters of the pool's items in order, named as measurekit names them.
+
+parameter_names <- function(item) {
+  switch(item$model,
+    "2pl" = c("a", "b"),
+    "3pl" = c("a", "b", "c"),
+    c("a", paste0("b", seq_along(item$parameters$b)))
+  )
+}
+parameter_vector <- function(item) {
+  p <- item$parameters
+  switch(item$model, "2pl" = c(p$a, p$b), "3pl" = c(p$a, p$b, p$c), c(p$a, p$b))
+}
+with_vector <- function(item, v) {
+  p <- item$parameters
+  item$parameters <- switch(item$model,
+    "2pl" = modifyList(p, list(a = v[1], b = v[2])),
+    "3pl" = modifyList(p, list(a = v[1], b = v[2], c = v[3])),
+    list(a = v[1], b = v[-1])
+  )
+  item
+}
+
+# The true-score equating of two forms of the pool, with the limit at 0 of a form without lower asymptotes taken as 0.
+total_score <- function(items, theta) {
+  sum(sapply(items, function(item) {
+    probabilities <- response_probabilities(item, theta)
+    sum(probabilities * (seq_len(ncol(probabilities)) - 1))
+  }))
+}
+lower_asymptotes <- function(items) sum(sapply(items, function(item) if (item$model %in% c("3pl")) item$parameters$c else 0))
+true_score_equating <- function(from, to) {
+  highest <- highest_score(from)
+  sapply(0:highest, function(x) {
+    lower <- lower_asymptotes(from)
+    if (x <= lower) return(if (lower > 0) x * lower_asymptotes(to) / lower else lower_asymptotes(to))
+    if (x >= highest) return(highest_score(to))
+    theta <- uniroot(function(t) total_score(from, t) - x, c(-30, 30), tol = 1e-14)$root
+    total_score(to, theta)
+  })
+}
+
+delta_case <- function(name, pool, from_ids, to_ids, covariance, populations, w) {
+  ids <- sapply(pool, function(item) item$id)
+  sizes <- sapply(pool, function(item) length(parameter_names(item)))
+  starts <- cumsum(c(0, sizes))[seq_along(pool)]
+  forms <- function(vector) {
+    moved <- lapply(seq_along(pool), function(j) with_vector(pool[[j]], vector[starts[j] + seq_len(sizes[j])]))
+    list(from = moved[match(from_ids, ids)], to = moved[match(to_ids, ids)])
+  }
+  start <- unlist(lapply(pool, parameter_vector))
+  labels <- data.frame(item = rep(ids, sizes), name = unlist(lapply(pool, parameter_names)))
+  stopifnot(nrow(covariance) == length(start))
+  results <- lapply(c("true-score", "observed-score"), function(method) {
+    equate <- function(vector) {
+      f <- forms(vector)
+      if (method == "true-score") true_score_equating(f$from, f$to)
+      else irt_observed_score(f$from, f$to, populations, w)
+    }
+    jacobian <- numDeriv::jacobian(equate, start)
+    list(method = method, equated = equate(start), standardErrors = sqrt(rowSums((jacobian %*% covariance) * jacobian)))
+  })
+  list(
+    name = name,
+    items = lapply(pool, function(item) c(list(id = item$id, model = item$model), parameters = list(item$parameters))),
+    from = from_ids, to = to_ids,
+    covariance = list(parameters = lapply(seq_len(nrow(labels)), function(k) as.list(labels[k, ])),
+                      matrix = unname(covariance)),
+    populations = populations, weight = w, results = results
+  )
+}
+
+# A concurrent calibration of two 20-item 2PL forms that share 8 items: group P, 1500 persons, theta ~ N(0, 1), took
+# form X; group Q, 1500 persons, theta ~ N(0.3, 1.1^2), took form Y. Both groups' items are one set of estimates, the
+# group means and variances free, and mirt's covariance of the slopes and intercepts becomes that of a and b = -d / a1.
+set.seed(SEED)
+n_unique <- 12
+n_common <- 8
+pool_size <- 2 * n_unique + n_common
+true_a <- runif(pool_size, 0.8, 1.8)
+true_b <- rnorm(pool_size)
+pool_ids <- c(paste0("X", seq_len(n_unique)), paste0("Y", seq_len(n_unique)), paste0("C", seq_len(n_common)))
+x_columns <- c(seq_len(n_unique), 2 * n_unique + seq_len(n_common))
+y_columns <- n_unique + c(seq_len(n_unique), n_unique + seq_len(n_common))
+simulate_group <- function(theta, columns) {
+  sapply(columns, function(j) rbinom(length(theta), 1, plogis(true_a[j] * (theta - true_b[j]))))
+}
+concurrent <- matrix(NA_integer_, 3000, pool_size, dimnames = list(NULL, pool_ids))
+concurrent[1:1500, x_columns] <- simulate_group(rnorm(1500), x_columns)
+concurrent[1501:3000, y_columns] <- simulate_group(rnorm(1500, 0.3, 1.1), y_columns)
+calibration <- multipleGroup(concurrent, 1, group = rep(c("P", "Q"), each = 1500), itemtype = "2PL",
+                             invariance = c("slopes", "intercepts", "free_means", "free_var"), SE = TRUE,
+                             verbose = FALSE)
+estimates <- mod2values(calibration)
+estimates <- estimates[estimates$group == "P" & estimates$name %in% c("a1", "d"), ]
+slopes <- estimates$value[estimates$name == "a1"]
+intercepts <- estimates$value[estimates$name == "d"]
+stopifnot(identical(as.character(estimates$item[estimates$name == "a1"]), pool_ids))
+
+# The rows of vcov are named name.parnum.parnum; the first parnum of the first group gives the item, four parameters
+# (a1, d, g, u) to each.
+full <- vcov(calibration)
+parnum <- as.integer(sapply(strsplit(rownames(full), ".", fixed = TRUE), function(parts) parts[2]))
+item_rows <- which(substr(rownames(full), 1, 1) %in% c("a", "d"))
+stopifnot(length(item_rows) == 2 * pool_size)
+item_of_row <- (parnum[item_rows] - 1) %/% 4 + 1
+is_slope <- substr(rownames(full)[item_rows], 1, 2) == "a1"
+sub_covariance <- full[item_rows, item_rows]
+# Parameters in the order of the pool, a then b for each item: b = -d / a1.
+position <- function(item, slope) which(item_of_row == item & is_slope == slope)
+transform <- matrix(0, 2 * pool_size, 2 * pool_size)
+for (j in seq_len(pool_size)) {
+  a1 <- slopes[j]
+  d <- intercepts[j]
+  transform[2 * j - 1, position(j, TRUE)] <- 1
+  transform[2 * j, position(j, TRUE)] <- d / a1^2
+  transform[2 * j, position(j, FALSE)] <- -1 / a1
+}
+concurrent_covariance <- transform %*% sub_covariance %*% t(transform)
+
+values_q <- mod2values(calibration)
+group_q <- c(values_q$value[values_q$group == "Q" & values_q$name == "MEAN_1"],
+             values_q$value[values_q$group == "Q" & values_q$name == "COV_11"])
+concurrent_pool <- lapply(seq_len(pool_size), function(j) {
+  list(id = pool_ids[j], model = "2pl", parameters = list(a = slopes[j], b = -intercepts[j] / slopes[j], c = 0, d = 1))
+})
+concurrent_populations <- list(from = population(0, 1), to = population(group_q[1], sqrt(group_q[2])))
+
+# A mixed-format pool of the linking fixture's items (3PL, GRM and GPCM), a form and its moved copy as the two forms,
+# with a made-up positive definite covariance: the delta method does not depend on where the covariance comes from.
+mixed_pool <- c(
+  lapply(seq_along(mixed_to), function(j) c(list(id = paste0("from", j)), mixed_to[[j]])),
+  lapply(seq_along(mixed_linked), function(j) c(list(id = paste0("to", j)), mixed_linked[[j]]))
+)
+mixed_size <- sum(sapply(mixed_pool, function(item) length(parameter_names(item))))
+set.seed(SEED)
+draws <- matrix(rnorm(mixed_size * (mixed_size + 4)), mixed_size)
+mixed_covariance <- 0.0004 * tcrossprod(draws) / (mixed_size + 4) + diag(0.0004, mixed_size)
+mixed_transformation <- mixed_case$transformations$haebara
+
+write_fixture("equating-irt-standard-errors", list(
+  source = paste("A concurrent mirt multipleGroup calibration of two 2PL forms sharing 8 items, set.seed(20261029):",
+                 "1500 persons per group, covariance of a and b; the mixed-format items of the linking fixture with a",
+                 "made-up covariance. numDeriv's Jacobian times the covariance."),
+  cases = list(
+    delta_case("concurrent 2PL", concurrent_pool, pool_ids[c(seq_len(n_unique), 2 * n_unique + seq_len(n_common))],
+               pool_ids[c(n_unique + seq_len(n_unique), 2 * n_unique + seq_len(n_common))], concurrent_covariance,
+               concurrent_populations, 0.5),
+    delta_case("mixed format", mixed_pool, paste0("from", seq_along(mixed_to)), paste0("to", seq_along(mixed_linked)),
+               mixed_covariance, ose_populations(mixed_transformation), 0.5)
   )
 ))

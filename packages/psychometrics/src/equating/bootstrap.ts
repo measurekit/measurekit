@@ -71,7 +71,7 @@ const DESIGNS = ["random-groups", "single-group", "neat"];
  * @throws `DataError` when the sample is invalid or its counts are not whole numbers, `equate` is not a function or does
  * not return a finite equated score at each score, `random` is not a random number generator, or `replications` is
  * not an integer from 2.
- * @see {@link https://doi.org/10.1201/9780429246593 | Efron and Tibshirani (1993)}
+ * @see {@link https://doi.org/10.1007/978-1-4899-4541-9 | Efron and Tibshirani (1993)}
  */
 export function bootstrapEquating<TSample extends EquatingSample>(
   sample: TSample,
