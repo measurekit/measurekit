@@ -53,5 +53,5 @@ bench_task("cdm.classificationAccuracy", "Accuracy and consistency of the classi
            reference("GDINA", "CA"), function() CA(gdina_fit))
 bench_task("cdm.validateQMatrix", "Validation of the Q-matrix by the proportion of variance accounted for", size,
            reference("GDINA", "Qval(method = \"PVAF\")"), function() Qval(gdina_fit, method = "PVAF", eps = 0.95))
-bench_task("cdm.nonparametricClassification", "Nonparametric classification by the Hamming distance", size,
+bench_task("cdm.nonparametric", "Nonparametric classification by the Hamming distance", size,
            reference("NPCD", "AlphaNP"), function() AlphaNP(responses, Q, gate = "AND", method = "Hamming"))

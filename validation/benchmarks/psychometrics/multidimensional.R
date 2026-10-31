@@ -81,10 +81,10 @@ bench_task("multidimensional.calibrateGraded", "Calibration of a confirmatory tw
 bench_task("multidimensional.calibrateExploratory", "Calibration of an exploratory two-dimensional 2PL by EM",
            sprintf("%s persons, 20 items, 2 dimensions", count(persons)), reference("mirt", "mirt(data, 2, quadpts = 31)"),
            calibrate_exploratory, note = "mirt stops at its limit of 500 cycles when it has not converged")
-bench_task("multidimensional.estimatePosteriorMode", "Abilities by the posterior mode, in two dimensions",
+bench_task("multidimensional.estimateMode", "Abilities by the posterior mode, in two dimensions",
            sprintf("%s persons, 24 items", count(persons)), reference("mirt", "fscores(method = \"MAP\")"),
            function() fscores(confirmatory_fit, method = "MAP", quadpts = POINTS, verbose = FALSE))
-bench_task("multidimensional.estimatePosteriorMean", "Abilities by the posterior mean, in two dimensions",
+bench_task("multidimensional.estimateMean", "Abilities by the posterior mean, in two dimensions",
            sprintf("%s persons, 24 items", count(persons)), reference("mirt", "fscores(method = \"EAP\")"),
            function() fscores(confirmatory_fit, method = "EAP", quadpts = POINTS, verbose = FALSE))
 bench_task("multidimensional.rotateOblimin", "Oblimin rotation of the loadings of a calibration",

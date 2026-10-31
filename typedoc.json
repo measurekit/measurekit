@@ -4,7 +4,10 @@
   "entryPointStrategy": "packages",
   "entryPoints": ["packages/core", "packages/psychometrics", "packages/knowledge-tracing"],
   "readme": "README.md",
+  "projectDocuments": ["docs/performance.md"],
   "out": "docs/api",
   "treatWarningsAsErrors": true,
-  "ignoredHighlightLanguages": ["mermaid", "r"]
+  "plugin": ["typedoc-plugin-mermaid"],
+  "mermaidVersion": "11.17.2",
+  "ignoredHighlightLanguages": ["r"]
 }

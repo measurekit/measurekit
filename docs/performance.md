@@ -1,56 +1,120 @@
 # Performance
 
-The benchmarks time the hot path of every module, and the same task on the same data in the reference implementation that
-the [validation](psychometrics/validation.md) uses, so that a slow path shows as a ratio. A reference is an R package, or
-base R where no package does the task, or pyBKT.
+## Ratios
 
-## Method
+<!-- charts -->
 
-| Part       | How                                                                                                                                                                                                                                                                                                          |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Data       | `Rscript validation/benchmarks.R` simulates the inputs with a fixed seed, or takes a public dataset, and writes them to `packages/<package>/test/fixtures/bench-<module>.json`. Both sides read the same data.                                                                                               |
-| measurekit | `packages/<package>/test/<module>.bench.ts`, run by Vitest on Node.js with one thread. A benchmark takes at least 10 samples, 5 when it takes a second or more, after a warm-up. The table gives the median.                                                                                                 |
-| References | `validation/benchmarks/<package>/<module>.R`, run with one thread: R's BLAS is set by `OPENBLAS_NUM_THREADS=1` and `OMP_NUM_THREADS=1`. A task takes 15 samples under a second, 7 under 15 seconds, 3 under a minute and 2 above, after one call to warm up. A call under 50 ms is repeated within a sample. |
-| pyBKT      | `validation/benchmarks.py`, on the log of `bench-bkt.json`, with its processes off. It times what R does not.                                                                                                                                                                                                |
-| Settings   | A reference runs with the settings that make its work that of measurekit: the same quadrature, the same convergence tolerance and the same starts. The notes of a table name where they differ.                                                                                                              |
-| Ratio      | The median of measurekit over the median of the reference. A row in bold is more than 1.5 times slower.                                                                                                                                                                                                      |
+### Where measurekit is slower
 
-An EM calibration stops when its estimates stop changing, so two programs that agree on the criterion can take different
-numbers of iterations; the ratio is that of the time to the same answer, not of one iteration. The ability estimators and
-the replays compare the work of a person, not the algorithms: the notes say where the reference does less.
-
-## Running
-
-```bash
-pnpm install
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R               # the inputs and the references
-validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py                  # pyBKT
-pnpm bench                                                                              # measurekit, against the budgets
+```mermaid
+%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Tasks that take more than 1.5 times as long as the reference"
+  x-axis ["irt.replay", "multi.estimateMean", "rater.manyFacetRasch", "cdm.attributeProfiles", "numerics.cholesky", "multi.calibrateExploratory", "data.scoreResponses", "irt.abilityPosteriorMean", "numerics.logistic", "numerics.normalQuantile", "irt.calibrate1pl", "cdm.calibrateGdina", "cdm.classificationAccuracy", "cdm.calibrateDino"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 29
+  bar [29, 24, 14, 9.8, 6.4, 5.3, 5.3, 5.2, 4.8, 4.2, 2.2, 2.1, 1.7, 1.6]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
-`Rscript validation/benchmarks.R irt mokken` runs the modules named. To refresh the tables below, run each package with the
-JSON reporter, three times with the run number in the name of the file (`-1`, `-2`, `-3`): the table takes the median of the
-runs, and the budgets the median of their fastest samples. Then `Rscript validation/benchmarks.R table`:
+### Every task
 
-```bash
-pnpm --filter @measurekit/core bench --reporter json --outputFile validation/benchmarks/results/measurekit-core-1.json
-pnpm --filter @measurekit/psychometrics bench --reporter json --outputFile validation/benchmarks/results/measurekit-psychometrics-1.json
-pnpm --filter @measurekit/knowledge-tracing bench --reporter json --outputFile validation/benchmarks/results/measurekit-knowledge-tracing-1.json
-Rscript validation/benchmarks.R table
+A bar above the line takes longer than the reference.
+
+```mermaid
+%%{init: {"xyChart": {"height": 320, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Core: numerics, random"
+  x-axis ["normalQuantile", "logistic", "cholesky", "uniform", "normal"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 7
+  bar [4.2, 4.8, 6.4, 1, 1.3]
+  line [1, 1, 1, 1, 1]
 ```
 
-## Budgets
+```mermaid
+%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: irt"
+  x-axis ["calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "testInformation"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 6
+  bar [2.2, 1.4, 0.68, 0.42, 0.015, 0.45, 0.47, 0.013, 5.2, 0.2, 0.31, 0.045, 0.2, 0.23]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
 
-A benchmark fails when its fastest sample is above its budget, which is in `packages/<package>/test/budgets.ts`. The fastest
-sample is the least affected by the other work of a shared machine. The budget of a time is five times the median of the
-fastest samples of several runs, rounded up to one significant digit. The factor allows for CI hardware two to three times
-slower than the laptop, and for noise; it is far below the cost of the changes that the budgets exist to catch. The `bench`
-job of the CI workflow runs the benchmarks on every change. A budget changes only with the reason in the commit that
-changes it.
+```mermaid
+%%{init: {"xyChart": {"height": 490, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: multidimensional, cat"
+  x-axis ["calibrateConfirmatory", "calibrateGraded", "calibrateExploratory", "estimateMode", "estimateMean", "rotateOblimin", "rotateVarimax", "simulateAdaptive", "simulateDiagnostic", "simulateMultidimensional"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 24
+  bar [0.68, 0.58, 5.3, 0.097, 24, 0.14, 0.25, 0.043, 0.028, 0.029]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 660, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: cdm, ctt, data"
+  x-axis ["calibrateGdina", "calibrateDina", "calibrateDino", "calibrateAcdm", "calibrateLlm", "calibrateRrum", "attributeProfiles", "classificationAccuracy", "validateQMatrix", "nonparametric", "itemStatistics", "cronbachAlpha", "mcdonaldOmega", "subscoreValue", "scoreResponses"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 10
+  bar [2.1, 1.3, 1.6, 0.4, 0.38, 0.64, 9.8, 1.7, 1.1, 0.072, 0.22, 0.042, 0.63, 0.021, 5.3]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 728, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: dif, dimensionality, equating"
+  x-axis ["mantelHaenszel", "logisticRegression", "lordChiSquare", "ordinalLogistic", "polychoricCorrelations", "parallelAnalysis", "linear", "equipercentile", "presmoothing", "bootstrapLinear", "tucker", "frequencyEstimation", "chainedEquipercentile", "stockingLordLinking", "haebaraLinking", "trueScore", "irtObservedScore"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.077, 0.85, 0.88, 0.58, 0.013, 0.0086, 0.00072, 0.0076, 0.024, 0.081, 0.0044, 0.0039, 0.015, 0.13, 0.092, 0.056, 0.17]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 388, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: explanatory, fit, generalizability"
+  x-axis ["itemFeatureRegression", "lltm", "itemFit", "personFit", "summedScoreFit", "yenQ3", "generalizabilityStudy"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.02, 0.8, 0.23, 0.39, 0.097, 0.067, 0.0026]
+  line [1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 490, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: mokken, rater, responseTime, sim"
+  x-axis ["scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering", "cohenKappa", "fleissKappa", "intraclassCorrelation", "manyFacetRasch", "calibrateResponseTimes", "simulateResponses"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 14
+  bar [0.0081, 0.025, 0.22, 0.19, 0.2, 0.008, 0.0029, 14, 0.042, 0.77]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 388, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Knowledge tracing: bkt, elo, evaluate, irt, kst"
+  x-axis ["fit", "replay", "replay", "auc", "replay", "blim", "iita"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 29
+  bar [0.012, 0.049, 1.3, 1.2, 29, 1.2, 0.000024]
+  line [1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 184, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Knowledge tracing: logistic"
+  x-axis ["afm"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.041]
+  line [1]
+```
+
+<!-- /charts -->
 
 ## Results
 
-<!-- benchmarks -->
+<!-- tables -->
 
 Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R version 4.6.1 (2026-06-24).
 
@@ -156,24 +220,24 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 ### Knowledge tracing
 
-| Task                                                                                          | Size                                            | measurekit (ms) | Reference                               | Reference (ms) |    Ratio |
-| --------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------: | --------------------------------------- | -------------: | -------: |
-| Fit of the skills of a log by EM from five starts                                             | 20,000 attempts of 200 learners at 5 skills     |             126 | pyBKT 1.4.3 `Model.fit`                 |         10,888 |   0.012× |
-| Replay of the log through the fitted model, a prediction and an update for each attempt       | 20,000 attempts of 200 learners at 5 skills     |            15.7 | pyBKT 1.4.3 `Model.predict`             |            318 |   0.049× |
-| Replay of a log through the learner-item Elo model                                            | 100,000 attempts of 2,000 learners at 400 items |            40.8 | base R, a loop over the attempts        |           32.5 |     1.3× |
-| The area under the ROC curve                                                                  | 100,000 predictions                             |            23.4 | pROC 1.19.1 `auc(roc(direction = "<"))` |           19.3 |     1.2× |
-| The AUC, RMSE, log-loss and accuracy of the predictions                                       | 100,000 predictions                             |            26.9 | none                                    |                |          |
-| **Replay of the responses of learners, the grid posterior of the ability updated after each** | 2,000 learners, 40 responses each               |             987 | mirt 1.48 `fscores(method = "EAP")`     |           34.0 |  **29×** |
-| Fit of the basic local independence model of a chain of 12 items by EM                        | 1,000 persons, 12 items, 13 states              |            33.5 | pks 0.8.0 `blim`                        |           29.0 |     1.2× |
-| Inductive item tree analysis of the responses                                                 | 1,000 persons, 12 items                         |            2.01 | DAKS 2.1.3 `iita(v = 1)`                |         84,720 | 2.4e-05× |
-| Fit of the additive factors model by maximum likelihood                                       | 20,000 attempts of 200 learners at 5 skills     |            22.0 | base R `glm`, binomial family           |            534 |   0.041× |
-| The candidates ranked by their distance to the band of success of a learner                   | 500 candidate items, an Elo model               |           0.115 | none                                    |                |          |
-| A log built from and checked for events                                                       | 100,000 events                                  |            18.0 | none                                    |                |          |
+| Task                                                                                          | Size                                            | measurekit (ms) | Reference                               | Reference (ms) |     Ratio |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------: | --------------------------------------- | -------------: | --------: |
+| Fit of the skills of a log by EM from five starts                                             | 20,000 attempts of 200 learners at 5 skills     |             126 | pyBKT 1.4.3 `Model.fit`                 |         10,888 |    0.012× |
+| Replay of the log through the fitted model, a prediction and an update for each attempt       | 20,000 attempts of 200 learners at 5 skills     |            15.7 | pyBKT 1.4.3 `Model.predict`             |            318 |    0.049× |
+| Replay of a log through the learner-item Elo model                                            | 100,000 attempts of 2,000 learners at 400 items |            40.8 | base R, a loop over the attempts        |           32.5 |      1.3× |
+| The area under the ROC curve                                                                  | 100,000 predictions                             |            23.4 | pROC 1.19.1 `auc(roc(direction = "<"))` |           19.3 |      1.2× |
+| The AUC, RMSE, log-loss and accuracy of the predictions                                       | 100,000 predictions                             |            26.9 | none                                    |                |           |
+| **Replay of the responses of learners, the grid posterior of the ability updated after each** | 2,000 learners, 40 responses each               |             987 | mirt 1.48 `fscores(method = "EAP")`     |           34.0 |   **29×** |
+| Fit of the basic local independence model of a chain of 12 items by EM                        | 1,000 persons, 12 items, 13 states              |            33.5 | pks 0.8.0 `blim`                        |           29.0 |      1.2× |
+| Inductive item tree analysis of the responses                                                 | 1,000 persons, 12 items                         |            2.01 | DAKS 2.1.3 `iita(v = 1)`                |         84,720 | 0.000024× |
+| Fit of the additive factors model by maximum likelihood                                       | 20,000 attempts of 200 learners at 5 skills     |            22.0 | base R `glm`, binomial family           |            534 |    0.041× |
+| The candidates ranked by their distance to the band of success of a learner                   | 500 candidate items, an Elo model               |           0.115 | none                                    |                |           |
+| A log built from and checked for events                                                       | 100,000 events                                  |            18.0 | none                                    |                |           |
 
 - Replay of the responses of learners, the grid posterior of the ability updated after each: mirt scores each pattern once; measurekit updates the posterior after every response.
 - Fit of the additive factors model by maximum likelihood: the proficiency of a learner is a fixed effect, as measurekit's default is none.
 
-<!-- /benchmarks -->
+<!-- /tables -->
 
 ## Iterations
 
@@ -196,3 +260,64 @@ of times is the product of a ratio of iterations and a ratio of the time of one.
 | A-CDM                               |         40 |        33 |
 | LLM                                 |         52 |        61 |
 | R-RUM                               |         53 |        27 |
+
+## Method
+
+```mermaid
+flowchart LR
+  S["validation/benchmarks.R: simulate the inputs"] --> F[("bench-module.json fixtures")]
+  F --> M["measurekit: test/module.bench.ts, Vitest"]
+  F --> R["References: R packages, one thread"]
+  F --> P["pyBKT: validation/benchmarks.py"]
+  M --> T["Tables and charts of this page"]
+  R --> T
+  P --> T
+  M --> B["Budgets: the fastest sample, in CI"]
+```
+
+Each benchmark times the hot path of a module, and the same task on the same data in the reference implementation that the
+[validation](psychometrics/validation.md) uses: an R package, base R where no package does the task, or pyBKT. The ratio is
+the time of measurekit over the time of the reference, so a ratio above 1 means that measurekit is slower. A ratio above
+1.5 is in bold in the tables.
+
+| Part       | How                                                                                                                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Data       | `validation/benchmarks.R` simulates the inputs with a fixed seed, or takes a public dataset, and writes them to `packages/<package>/test/fixtures/bench-<module>.json`. measurekit and its reference read the same data.                               |
+| measurekit | `packages/<package>/test/<module>.bench.ts`, run by Vitest on Node.js with one thread. A benchmark takes at least 10 samples, or 5 when it takes a second or more, after a warm-up. The tables give the median of the medians of three runs.           |
+| References | `validation/benchmarks/<package>/<module>.R`, run with one thread: `OPENBLAS_NUM_THREADS=1` and `OMP_NUM_THREADS=1` set R's BLAS. A task takes 15 samples under a second, 7 under 15 seconds, 3 under a minute and 2 above, after one call to warm up. |
+| pyBKT      | `validation/benchmarks.py`, on the log of `bench-bkt.json`, with its processes off. It times what R does not.                                                                                                                                          |
+| Settings   | A reference runs with the settings that make its work that of measurekit: the same quadrature, convergence tolerance and starts. The notes under a table name where they differ.                                                                       |
+| Ratio      | The median of measurekit over the median of the reference.                                                                                                                                                                                             |
+
+An EM calibration stops when its estimates stop changing, so two programs that agree on the criterion can need different
+numbers of iterations: the ratio is that of the time to the same answer, not of one iteration. The ability estimators and the
+replays compare the work for each person, and the notes say where the reference does less.
+
+## Running
+
+```bash
+pnpm install
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R               # the inputs and the references
+validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py                  # pyBKT
+pnpm bench                                                                              # measurekit, against the budgets
+```
+
+`Rscript validation/benchmarks.R irt mokken` runs the modules named, and `knowledge-tracing/irt` one module of a package.
+To refresh the charts and tables, run each package with the JSON reporter three times, with the run number in the name of the
+file, then `Rscript validation/benchmarks.R table`:
+
+```bash
+pnpm --filter @measurekit/core bench --reporter json --outputFile validation/benchmarks/results/measurekit-core-1.json
+pnpm --filter @measurekit/psychometrics bench --reporter json --outputFile validation/benchmarks/results/measurekit-psychometrics-1.json
+pnpm --filter @measurekit/knowledge-tracing bench --reporter json --outputFile validation/benchmarks/results/measurekit-knowledge-tracing-1.json
+Rscript validation/benchmarks.R table
+```
+
+## Budgets
+
+A benchmark fails when its fastest sample is above its budget, which is in `packages/<package>/test/budgets.ts`. The fastest
+sample is the least affected by the other work of a shared machine. The budget of a time is five times the median of the
+fastest samples of three runs, rounded up to one significant digit. The factor allows for CI hardware two to three times
+slower than the laptop, and for noise; it is far below the cost of the changes that the budgets exist to catch. The `bench`
+job of the CI workflow runs the benchmarks on every change. A budget changes only with the reason in the commit that
+changes it.

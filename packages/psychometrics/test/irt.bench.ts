@@ -76,7 +76,7 @@ test("calibrates the generalized partial credit model of 1,500 persons and 20 it
   expect(calibrate(graded, { model: generalizedPartialCredit }).converged).toBe(true);
   await benchmark(
     context,
-    "irt.calibrateGeneralizedPartialCredit",
+    "irt.calibrateGpcm",
     () => calibrate(graded, { model: generalizedPartialCredit }),
     SLOW_OPTIONS,
   );

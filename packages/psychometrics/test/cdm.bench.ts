@@ -39,5 +39,5 @@ test("classifies the persons of a calibration, and measures the accuracy of the 
 });
 
 test("classifies 1,000 persons nonparametrically", async (context) => {
-  await benchmark(context, "cdm.nonparametricClassification", () => nonparametricClassification(matrix, qMatrix));
+  await benchmark(context, "cdm.nonparametric", () => nonparametricClassification(matrix, qMatrix));
 });

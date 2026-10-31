@@ -32,6 +32,6 @@
   "readme": "README.md",
   "excludePrivate": true,
   "projectDocuments": ["../../docs/psychometrics/*.md"],
-  "ignoredHighlightLanguages": ["mermaid", "r"],
+  "ignoredHighlightLanguages": ["r"],
   "treatWarningsAsErrors": true
 }

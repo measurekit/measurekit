@@ -111,7 +111,7 @@ bench_task("irt.calibrate2plHessian", "The two-parameter model with standard err
            function() calibrate(pilot, "2PL", SE = TRUE, SE.type = "Richardson"))
 bench_task("irt.calibrateGraded", "Calibration of the graded response model by EM", sizes$graded,
            reference("mirt", "mirt(itemtype = \"graded\")"), function() calibrate(graded, "graded"))
-bench_task("irt.calibrateGeneralizedPartialCredit", "Calibration of the generalized partial credit model by EM",
+bench_task("irt.calibrateGpcm", "Calibration of the generalized partial credit model by EM",
            sizes$graded, reference("mirt", "mirt(itemtype = \"gpcm\")"), function() calibrate(graded, "gpcm"))
 bench_task("irt.calibrateTestlets", "Calibration of the testlet model by EM", sizes$testlet,
            reference("mirt", "bfactor"), function() testlet_fit(testlet_data, testlet_of))

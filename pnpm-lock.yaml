@@ -193,6 +193,9 @@ importers:
       typedoc:
         specifier: ^0.28.20
         version: 0.28.20(typescript@6.0.3)
+      typedoc-plugin-mermaid:
+        specifier: 1.12.0
+        version: 1.12.0(typedoc@0.28.20(typescript@6.0.3))
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -1313,6 +1316,9 @@ packages:
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
 
+  html-escaper@3.0.3:
+    resolution: {integrity: sha512-RuMffC89BOWQoY0WKGpIhn5gX3iI54O6nRA0yC124NYVtzjmFWBIiFd8M0x+ZdX0P9R4lADg1mgP8C7PxGOWuQ==}
+
   human-id@4.2.2:
     resolution: {integrity: sha512-Z+8unD6em/MJwyrkWQ2M3wygRGI1+MztbutiNwk1DCuEPXOZRWGjtcMPZYP1exY9iNZMhd7ZOSMQSo9WYtiQRw==}
     hasBin: true
@@ -1676,6 +1682,12 @@ packages:
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
+
+  typedoc-plugin-mermaid@1.12.0:
+    resolution: {integrity: sha512-CRjw29j0YbQEh4ygG7xeGjq8zKUikgd1BBBrW3ttzTeCPLrNKZopWFPd1/leSb9dUEJ3p9exOO84aP4CgjYp3g==}
+    engines: {node: '>=16.0.0'}
+    peerDependencies:
+      typedoc: '>=0.23.0 || 0.24.x || 0.25.x || 0.26.x'
 
   typedoc@0.28.20:
     resolution: {integrity: sha512-uSKqkh8Cr48vllnEy+jdaAgOeR6Y+QCBW7usgUsKj7gJEfR7stw9U/fE49LBnj2tPRKPY0c0EBJSWe9Appmplg==}
@@ -2791,6 +2803,8 @@ snapshots:
 
   highlight.js@10.7.3: {}
 
+  html-escaper@3.0.3: {}
+
   human-id@4.2.2: {}
 
   import-fresh@4.0.1: {}
@@ -3150,6 +3164,11 @@ snapshots:
 
   tslib@2.8.1:
     optional: true
+
+  typedoc-plugin-mermaid@1.12.0(typedoc@0.28.20(typescript@6.0.3)):
+    dependencies:
+      html-escaper: 3.0.3
+      typedoc: 0.28.20(typescript@6.0.3)
 
   typedoc@0.28.20(typescript@6.0.3):
     dependencies:

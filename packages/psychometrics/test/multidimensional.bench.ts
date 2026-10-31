@@ -57,10 +57,8 @@ test("calibrates an exploratory two-dimensional 2PL of 1,000 persons and 20 item
 
 test("estimates the abilities of 1,000 persons on 24 items in two dimensions", async (context) => {
   const { items } = calibrateMultidimensional(confirmatory, confirmatoryOptions);
-  await benchmark(context, "multidimensional.estimatePosteriorMode", () =>
-    multidimensionalEstimates(confirmatory, items),
-  );
-  await benchmark(context, "multidimensional.estimatePosteriorMean", () =>
+  await benchmark(context, "multidimensional.estimateMode", () => multidimensionalEstimates(confirmatory, items));
+  await benchmark(context, "multidimensional.estimateMean", () =>
     multidimensionalEstimates(confirmatory, items, multidimensionalPosteriorMeanEstimate),
   );
 });

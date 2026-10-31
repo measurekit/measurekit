@@ -294,6 +294,8 @@ Knowledge tracing: the model families never import each other, nor does anything
     its comments come from running it.
   - No other tags and no boilerplate.
 - `//` comments only explain why something non-obvious is done, or cite a source. No commented-out code.
+- Docs lead with a picture, then tables, then prose. Diagrams and charts are Mermaid in Markdown: GitHub renders them, and
+  `typedoc-plugin-mermaid`, pinned in `typedoc.json` with the Mermaid version it loads, renders them on the docs site.
 - US English. Docs state facts in short sentences; prefer a table or list to prose. Code samples are complete: they
   show their imports. Values shown in samples come from running them. No marketing language, emojis or filler. A
   section of a source is cited in words ("section 3.1").

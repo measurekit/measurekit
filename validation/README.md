@@ -80,7 +80,7 @@ them to `packages/<package>/test/fixtures/bench-<module>.json` and times the ref
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R               # every module
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R irt mokken    # the modules named
 validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py                  # pyBKT
-Rscript validation/benchmarks.R table                                                   # the tables of docs/performance.md
+Rscript validation/benchmarks.R table                                                   # the charts and tables of docs/performance.md
 ```
 
 They need the packages of the scripts above, and for the tasks of
