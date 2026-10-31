@@ -5,6 +5,7 @@ import type { ResponseRecords } from "../data/response-records.js";
 import { estimatePersons } from "../irt/person-estimates.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
+import { type GridLikelihood, gridLikelihood } from "./grid-likelihood.js";
 import { checkMultidimensionalPattern, indexMultidimensionalItems } from "./items.js";
 import type { MultidimensionalItem, MultidimensionalTestItem } from "./model.js";
 import { answeredPattern } from "./pattern.js";
@@ -69,6 +70,20 @@ export interface MultidimensionalPersonEstimate {
 const STANDARD_GRIDS = new Map<string, Grid>();
 
 /**
+ * The most log probabilities of items over a grid that the posterior means of the persons of one call keep, 8 bytes
+ * each: 64 MiB.
+ */
+const MAX_KEPT_LOG_PROBABILITIES = 2 ** 23;
+
+/** What the posterior mean of a person needs of the prior and the grid, which persons with one prior share. */
+interface PosteriorSetup {
+  readonly grid: Grid;
+  /** The log weights of the prior at the nodes, normalized. */
+  readonly logPrior: Float64Array;
+  readonly likelihood: GridLikelihood;
+}
+
+/**
  * Returns the expected a posteriori estimate (EAP) of the thetas under a multivariate normal prior.
  *
  * @remarks
@@ -90,17 +105,52 @@ export function multidimensionalPosteriorMeanEstimate(
   const dimensions = checkMultidimensionalPattern(items, responses, priorDimensions(options.prior));
   const prior = checkedPrior(options.prior, dimensions);
   const points = checkedPoints(options.points, dimensions);
-  const pattern = answeredPattern(items, responses, dimensions);
   const grid = priorGrid(standardGrid(dimensions, points), prior);
+  return posteriorMean(posteriorSetup(grid, prior, 0), items, responses);
+}
+
+/** Returns the grid, the prior's log weights on it and the likelihoods of the items over it. */
+function posteriorSetup(grid: Grid, prior: CheckedPrior, maxKept: number): PosteriorSetup {
+  const logPrior = new Float64Array(grid.count);
+  normalLogWeights(grid, prior.mean, prior.precision, logPrior);
+  return { grid, logPrior, likelihood: gridLikelihood(grid, maxKept) };
+}
+
+/** Returns the posterior mean and covariance of the thetas given checked items and their responses. */
+function posteriorMean(
+  { grid, logPrior, likelihood }: PosteriorSetup,
+  items: readonly MultidimensionalItem[],
+  responses: readonly (number | null)[],
+): MultidimensionalEstimate {
+  const sums = new Float64Array(grid.count);
+  items.forEach((item, index) => {
+    const response = responses[index];
+    if (response !== null && response !== undefined) likelihood.add(item, response, sums);
+  });
   const posterior = new Float64Array(grid.count);
-  normalLogWeights(grid, prior.mean, prior.precision, posterior);
-  const theta = new Float64Array(dimensions);
-  for (let q = 0; q < grid.count; q++) {
-    for (let d = 0; d < dimensions; d++) theta[d] = grid.nodes[q * dimensions + d] ?? 0;
-    posterior[q] = (posterior[q] ?? 0) + pattern.logLikelihood(theta);
-  }
+  for (let q = 0; q < grid.count; q++) posterior[q] = (logPrior[q] ?? 0) + (sums[q] ?? 0);
   normalizeLogs(posterior);
   return posteriorMoments(grid, posterior);
+}
+
+/**
+ * Returns {@link multidimensionalPosteriorMeanEstimate} with its default options, for the persons of one call of
+ * {@link multidimensionalEstimates}: the prior's grid and the log probabilities of each item over it are computed once,
+ * not for each person.
+ */
+function sharedPosteriorMean(): MultidimensionalEstimator {
+  const setups = new Map<number, PosteriorSetup>();
+  return (items, responses) => {
+    const dimensions = checkMultidimensionalPattern(items, responses);
+    let setup = setups.get(dimensions);
+    if (setup === undefined) {
+      const prior = checkedPrior(undefined, dimensions);
+      const grid = priorGrid(standardGrid(dimensions, checkedPoints(undefined, dimensions)), prior);
+      setup = posteriorSetup(grid, prior, MAX_KEPT_LOG_PROBABILITIES);
+      setups.set(dimensions, setup);
+    }
+    return posteriorMean(setup, items, responses);
+  };
 }
 
 /**
@@ -201,7 +251,8 @@ export function multidimensionalEstimates(
     estimator,
     "The estimator must be a function of items and responses, such as multidimensionalPosteriorModeEstimate",
   );
-  return estimatePersons(data, items, indexMultidimensionalItems, estimator);
+  const posteriorMeans = estimator === multidimensionalPosteriorMeanEstimate;
+  return estimatePersons(data, items, indexMultidimensionalItems, posteriorMeans ? sharedPosteriorMean() : estimator);
 }
 
 function standardGrid(dimensions: number, points: number): Grid {

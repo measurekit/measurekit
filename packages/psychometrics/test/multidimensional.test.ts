@@ -35,6 +35,7 @@ import { setUp } from "../src/multidimensional/calibration-setup.js";
 import { latentDistribution } from "../src/multidimensional/correlation.js";
 import { designOf } from "../src/multidimensional/design.js";
 import { productGrid } from "../src/multidimensional/grid.js";
+import { gridLikelihood } from "../src/multidimensional/grid-likelihood.js";
 import { createChain, responsesByItem, responsesByPerson } from "../src/multidimensional/mhrm-chain.js";
 import {
   createCorrelations,
@@ -1794,6 +1795,33 @@ describe("scoring", () => {
       expect(results[1]?.estimate).toBeNull();
       const direct = multidimensionalPosteriorModeEstimate(items, defined(data.responses[2]));
       expect(results[2]?.estimate).toEqual(direct);
+    });
+
+    it("gives the posterior means of the persons exactly as the estimator gives them one at a time", () => {
+      const results = multidimensionalEstimates(data, items, multidimensionalPosteriorMeanEstimate);
+      expect(results[1]?.estimate).toBeNull();
+      for (const p of [0, 2]) {
+        expect(results[p]?.estimate).toEqual(
+          multidimensionalPosteriorMeanEstimate(items, defined(data.responses[p]), { points: 31 }),
+        );
+      }
+    });
+
+    it("keeps the sums of log-likelihoods whether or not the log probabilities of the items are kept", () => {
+      const grid = productGrid(2, 9);
+      const kept = gridLikelihood(grid, Number.POSITIVE_INFINITY);
+      const recomputed = gridLikelihood(grid, 0);
+      const sums = [new Float64Array(grid.count), new Float64Array(grid.count)];
+      for (const [item, response] of [
+        [defined(items[0]), 1],
+        [defined(items[3]), 0],
+        [defined(items[0]), 0],
+      ] as const) {
+        kept.add(item, response, defined(sums[0]));
+        recomputed.add(item, response, defined(sums[1]));
+      }
+      expect(sums[0]).toEqual(sums[1]);
+      expect(defined(sums[0])[0]).toBeLessThan(0);
     });
 
     it("takes the estimator as an argument and sparse records", () => {
