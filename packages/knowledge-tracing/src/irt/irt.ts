@@ -1,11 +1,11 @@
 import {
   checkChoice,
   checkFinite,
+  checkIntegerFrom,
   checkOptions,
   checkPositive,
   checkRecord,
   DataError,
-  describe,
 } from "@measurekit/core";
 import { checkAttempt, checkEvent, type Event } from "../data/event.js";
 import { checkLog, type EventLog } from "../data/event-log.js";
@@ -125,9 +125,7 @@ export function irt(options: IrtOptions): IrtModel {
   checkRecord(prior, "The prior must be an object { mean, sd }");
   checkFinite(prior.mean, "The mean of the prior");
   checkPositive(prior.sd, "The sd of the prior");
-  if (!(Number.isSafeInteger(points) && points >= MIN_POINTS)) {
-    throw new DataError(`The grid needs an integer number of points from ${MIN_POINTS}, found ${describe(points)}.`);
-  }
+  checkIntegerFrom(points, "The option points", MIN_POINTS);
   const z = Array.from({ length: points }, (_, q) => GRID_HALF_WIDTH * ((2 * q) / (points - 1) - 1));
   const grid = z.map((value) => prior.mean + prior.sd * value);
   checkGrid(grid, prior);

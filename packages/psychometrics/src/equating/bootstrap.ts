@@ -1,8 +1,8 @@
 import {
   checkArray,
   checkChoice,
+  checkIntegerFrom,
   checkOptions,
-  checkPositiveInteger,
   checkRandom,
   checkRecord,
   DataError,
@@ -85,10 +85,7 @@ export function bootstrapEquating<TSample extends EquatingSample>(
   checkRandom(random);
   checkOptions(options);
   const { replications = DEFAULT_REPLICATIONS } = options;
-  checkPositiveInteger(replications, "The option replications");
-  if (replications < 2) {
-    throw new DataError(`The option replications must be an integer from 2, found ${replications}.`);
-  }
+  checkIntegerFrom(replications, "The option replications", 2);
   const resample = resampler(sample);
   const scores = equated(equate(sample), undefined).length;
   const mean = new Float64Array(scores);

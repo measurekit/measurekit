@@ -593,7 +593,7 @@ describe("manyFacetRasch", () => {
     expect(() => manyFacetRasch(scores, { facets, maxIterations: JSON.parse('"many"') })).toThrow(DataError);
     expect(() => manyFacetRasch(scores, { facets, quadrature: JSON.parse("null") })).toThrow(DataError);
     expect(() => manyFacetRasch(scores, { facets, quadrature: { points: 1 } })).toThrow(
-      "Quadrature needs an integer number of points from 2, found 1.",
+      "The quadrature points must be an integer from 2, found 1.",
     );
     expect(() => manyFacetRasch(JSON.parse("null"), { facets })).toThrow(DataError);
   });

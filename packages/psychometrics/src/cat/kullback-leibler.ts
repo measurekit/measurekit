@@ -1,5 +1,5 @@
 import { largestCategoryCount } from "../irt/items.js";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability, MIN_PROBABILITY } from "../irt/probability.js";
 import type { PoolItem } from "./items.js";
 import type { ItemSelectionRule } from "./selection.js";
 
@@ -62,7 +62,7 @@ function likelihoodWeights(
     if (item === undefined) return;
     for (let q = 0; q < KL_POINTS; q++) {
       item.model.probabilities(item.parameters, KL_NODES[q] ?? 0, probabilities);
-      logLikelihood[q] = (logLikelihood[q] ?? 0) + Math.log(Math.max(probabilities[response] ?? 0, MIN_PROBABILITY));
+      logLikelihood[q] = (logLikelihood[q] ?? 0) + logProbability(probabilities[response] ?? 0);
     }
   });
   const largest = logLikelihood.reduce((most, value) => Math.max(most, value), Number.NEGATIVE_INFINITY);

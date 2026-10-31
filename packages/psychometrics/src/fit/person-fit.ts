@@ -1,7 +1,7 @@
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { largestCategoryCount } from "../irt/items.js";
 import type { IrtItem } from "../irt/model.js";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability } from "../irt/probability.js";
 import { checkItems, checkPersonThetas, isExtreme, scoreMoments } from "./inputs.js";
 import { addResponse, type MeanSquareFit, meanSquares, SUM_COUNT } from "./mean-squares.js";
 
@@ -68,17 +68,13 @@ function addLogLikelihood(probabilities: Float64Array, count: number, response: 
   let variance = 0;
   for (let k = 0; k < count; k++) {
     const p = probabilities[k] ?? 0;
-    const logP = logProbability(probabilities, k);
+    const logP = logProbability(p);
     mean += p * logP;
     for (let h = k + 1; h < count; h++) {
-      variance += p * (probabilities[h] ?? 0) * (logP - logProbability(probabilities, h)) ** 2;
+      variance += p * (probabilities[h] ?? 0) * (logP - logProbability(probabilities[h] ?? 0)) ** 2;
     }
   }
-  out[0] = (out[0] ?? 0) + logProbability(probabilities, response);
+  out[0] = (out[0] ?? 0) + logProbability(probabilities[response] ?? 0);
   out[1] = (out[1] ?? 0) + mean;
   out[2] = (out[2] ?? 0) + variance;
-}
-
-function logProbability(probabilities: Float64Array, k: number): number {
-  return Math.log(Math.max(probabilities[k] ?? 0, MIN_PROBABILITY));
 }

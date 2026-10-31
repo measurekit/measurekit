@@ -17,7 +17,7 @@ import { setUp } from "../irt/calibration-setup.js";
 import { indexItems } from "../irt/items.js";
 import type { IrtModel } from "../irt/model.js";
 import type { ParameterPrior } from "../irt/prior.js";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability } from "../irt/probability.js";
 import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
 import { calibrateResponseTimes } from "./lognormal.js";
 import { expectation, iterate, jointModel } from "./speed-accuracy-em.js";
@@ -353,7 +353,7 @@ function logProbabilityTables<TParameters>(
     nodes.forEach((theta, q) => {
       item.model.probabilities(item.parameters, theta, probabilities);
       for (let k = 0; k < categories; k++) {
-        table[q * categories + k] = Math.log(Math.max(probabilities[k] ?? 0, MIN_PROBABILITY));
+        table[q * categories + k] = logProbability(probabilities[k] ?? 0);
       }
     });
     return { categories, table };

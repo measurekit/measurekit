@@ -82,7 +82,7 @@ packages/core/                the published package @measurekit/core
   src/checks.ts         checks of one value: describe; the predicates isNonEmptyString, isPositive, isRecord,
                         isUnitInterval; and checkRecord, checkArray, checkOptions, checkMethod, checkRandom,
                         checkBoolean, checkChoice, checkFinite, checkPositive, checkNonNegative,
-                        checkPositiveInteger, checkUnitInterval, checkSeed, checkStopping
+                        checkPositiveInteger, checkIntegerFrom, checkUnitInterval, checkSeed, checkStopping
   src/random.ts         Random and createRandom
   src/normal.ts         normalQuantile
   src/logistic.ts       logistic, logLogistic
@@ -250,7 +250,7 @@ Knowledge tracing: the model families never import each other, nor does anything
   function of `@measurekit/core`: options with `checkOptions`, arrays with `checkArray`, objects with `checkRecord`,
   an object with a method with `checkMethod`, a function with `checkFunction` (`checks.ts` of psychometrics), a
   `Random` with `checkRandom`, a number with `checkFinite`, `checkPositive`, `checkNonNegative`,
-  `checkPositiveInteger` or `checkUnitInterval`, `tolerance` and `maxIterations` with `checkStopping`, a seed
+  `checkPositiveInteger`, `checkIntegerFrom` or `checkUnitInterval`, `tolerance` and `maxIterations` with `checkStopping`, a seed
   with `checkSeed`, a boolean with `checkBoolean` and a string option with
   `checkChoice`: `<Label> must be a positive number, found <value>.` An option's label is `The option <name>`. A
   field of a record is tested with a predicate of core or the language, such as `isUnitInterval` or
@@ -272,8 +272,8 @@ Knowledge tracing: the model families never import each other, nor does anything
 - Numerics work on `Float64Array` and do not allocate in inner loops.
 - Numerics stay defined at extreme parameters. A weight that underflows to 0 is skipped before it divides; a loop that
   grows or shrinks a value until a test passes also stops when the value is not finite. In psychometrics, a response's
-  probability enters a log-likelihood as at least `MIN_PROBABILITY` of `irt/probability.ts`, so that no likelihood is
-  0; knowledge tracing throws `DataError` for outcomes of probability 0.
+  probability enters a log-likelihood as at least `MIN_PROBABILITY` of `irt/probability.ts`, through its `logProbability`,
+  so that no likelihood is 0; knowledge tracing throws `DataError` for outcomes of probability 0.
 - A number with a meaning is a named constant with its source, such as the reference's name for it.
 - No speculative options, abstractions or modules. Add a method only when a real use needs it, with its validation.
 

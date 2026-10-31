@@ -1,5 +1,5 @@
 import { answeredItems, largestCategoryCount } from "../irt/items.js";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability, MIN_PROBABILITY } from "../irt/probability.js";
 import type { MultidimensionalItem } from "./model.js";
 
 /** The likelihood of a response pattern and its derivatives, over the answered items. */
@@ -31,7 +31,7 @@ export function answeredPattern(
       let sum = 0;
       for (const { item, response } of answers) {
         item.model.probabilities(item.parameters, theta, probabilities);
-        sum += Math.log(Math.max(probabilities[response] ?? 0, MIN_PROBABILITY));
+        sum += logProbability(probabilities[response] ?? 0);
       }
       return sum;
     },

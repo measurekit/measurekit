@@ -1,4 +1,4 @@
-import { checkOptions, DataError, describe, isRecord } from "@measurekit/core";
+import { checkIntegerFrom, checkOptions, DataError, describe, isRecord } from "@measurekit/core";
 import { compareStates, type KnowledgeStructure, seal } from "./structure.js";
 
 /** The default limit on the number of knowledge states a structure is built with. */
@@ -134,8 +134,6 @@ function countBelow(below: Uint8Array, m: number, e: number): number {
 }
 
 function checkMaxStates(maxStates: number = DEFAULT_MAX_STATES): number {
-  if (!(Number.isSafeInteger(maxStates) && maxStates >= 2)) {
-    throw new DataError(`The option maxStates must be an integer of at least 2, found ${describe(maxStates)}.`);
-  }
+  checkIntegerFrom(maxStates, "The option maxStates", 2);
   return maxStates;
 }

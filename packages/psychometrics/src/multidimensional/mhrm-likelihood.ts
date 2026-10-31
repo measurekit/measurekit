@@ -1,5 +1,5 @@
 import { cholesky, normalizeLogs, type Random } from "@measurekit/core";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability } from "../irt/probability.js";
 import type { CompressedResponses } from "../irt/responses.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import type { ItemState } from "./calibration-setup.js";
@@ -86,7 +86,7 @@ function addResponseLogs<TParameters>(
     for (let r = 0; r < LOG_LIKELIHOOD_DRAWS; r++) {
       for (let d = 0; d < dimensions; d++) point[d] = draws[r * dimensions + d] ?? 0;
       item.model.probabilities(item.parameters, point, probabilities);
-      logWeights[r] = (logWeights[r] ?? 0) + Math.log(Math.max(probabilities[codes[k] ?? 0] ?? 0, MIN_PROBABILITY));
+      logWeights[r] = (logWeights[r] ?? 0) + logProbability(probabilities[codes[k] ?? 0] ?? 0);
     }
   });
 }

@@ -1,5 +1,5 @@
 import { normalizeLogs } from "@measurekit/core";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability } from "../irt/probability.js";
 import type { CompressedResponses } from "../irt/responses.js";
 import type { Grid } from "./grid.js";
 import type { MultidimensionalModel } from "./model.js";
@@ -129,7 +129,7 @@ function tabulate(
       item.model.probabilities(item.parameters, theta, probabilities);
       const start = tableStarts[i] ?? 0;
       for (let k = 0; k < item.categoryCount; k++) {
-        logTable[start + k * count + q] = Math.log(Math.max(probabilities[k] ?? 0, MIN_PROBABILITY));
+        logTable[start + k * count + q] = logProbability(probabilities[k] ?? 0);
       }
     }
   }

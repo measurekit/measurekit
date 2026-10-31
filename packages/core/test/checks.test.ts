@@ -4,6 +4,7 @@ import {
   checkBoolean,
   checkChoice,
   checkFinite,
+  checkIntegerFrom,
   checkMethod,
   checkNonNegative,
   checkOptions,
@@ -48,6 +49,7 @@ describe("checks of one value", () => {
       checkPositive(0.5, "A number");
       checkNonNegative(0, "A number");
       checkPositiveInteger(1, "A number");
+      checkIntegerFrom(2, "A number", 2);
       checkUnitInterval(1, "A number");
       checkSeed(-3);
       checkStopping(0, 1);
@@ -77,6 +79,15 @@ describe("checks of one value", () => {
     expect(() => checkNonNegative(-1, "A rating")).toThrow("A rating must be a non-negative number, found -1.");
     expect(() => checkPositiveInteger(1.5, "The option maxIterations")).toThrow(
       "The option maxIterations must be a positive integer, found 1.5.",
+    );
+    expect(() => checkIntegerFrom(1, "The option points", 2)).toThrow(
+      "The option points must be an integer from 2, found 1.",
+    );
+    expect(() => checkIntegerFrom(json('"3"'), "The option points", 2)).toThrow(
+      'The option points must be an integer from 2, found "3".',
+    );
+    expect(() => checkIntegerFrom(2.5, "The option points", 2)).toThrow(
+      "The option points must be an integer from 2, found 2.5.",
     );
     expect(() => checkUnitInterval(2, "A probability")).toThrow("A probability must be a number from 0 to 1, found 2.");
     expect(() => checkSeed(1.5)).toThrow("A seed must be a safe integer, found 1.5.");

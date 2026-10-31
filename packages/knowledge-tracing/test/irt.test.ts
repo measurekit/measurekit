@@ -265,7 +265,7 @@ describe("IRT edge cases", () => {
     expect(() => irt({ parameters: { items }, prior: { mean: 0, sd: 0 } })).toThrow(
       "The sd of the prior must be a positive number, found 0.",
     );
-    expect(() => irt({ parameters: { items }, points: 2 })).toThrow("integer number of points from 3");
+    expect(() => irt({ parameters: { items }, points: 2 })).toThrow("The option points must be an integer from 3");
     expect(() => irt({ parameters: { items }, prior: { mean: 0, sd: 1e-300 } })).toThrow(
       "The prior needs a mean and an sd whose grid has distinct, finite points, with finite squares of their spacing and of 1 / sd, found mean 0 and sd 1e-300.",
     );

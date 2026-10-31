@@ -1,4 +1,4 @@
-import { checkChoice, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkChoice, checkIntegerFrom, checkRecord } from "@measurekit/core";
 import { gaussHermite, type Quadrature, rectangular } from "../math/quadrature.js";
 
 /** How to place quadrature nodes over theta. */
@@ -36,9 +36,7 @@ const STANDARD_RULES = new Map<string, Quadrature>();
 export function quadratureRule(options: QuadratureOptions = {}, mean = 0, sd = 1): Quadrature {
   checkRecord(options, "The option quadrature must be an object { method, points }");
   const { method = "rectangular", points = 61 } = options;
-  if (!(Number.isSafeInteger(points) && points >= 2)) {
-    throw new DataError(`Quadrature needs an integer number of points from 2, found ${describe(points)}.`);
-  }
+  checkIntegerFrom(points, "The quadrature points", 2);
   checkChoice(method, "The quadrature method", METHODS);
   const key = `${method} ${points}`;
   let rule = STANDARD_RULES.get(key);

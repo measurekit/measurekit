@@ -1,7 +1,7 @@
 import { normalizeLogs } from "@measurekit/core";
 import type { Population } from "./latent.js";
 import type { IrtModel } from "./model.js";
-import { MIN_PROBABILITY } from "./probability.js";
+import { logProbability } from "./probability.js";
 import type { CompressedResponses } from "./responses.js";
 import type { TestletDesign } from "./testlets.js";
 
@@ -80,7 +80,7 @@ export function expectationStep(
       let index = tableStarts[i] ?? 0;
       for (const theta of item.nodes) {
         item.model.probabilities(item.parameters, theta, probabilities);
-        for (let k = 0; k < size; k++) logTable[index++] = Math.log(Math.max(probabilities[k] ?? 0, MIN_PROBABILITY));
+        for (let k = 0; k < size; k++) logTable[index++] = logProbability(probabilities[k] ?? 0);
       }
     });
   };

@@ -155,6 +155,19 @@ export function checkPositiveInteger(value: unknown, label: string): asserts val
 }
 
 /**
+ * Checks that a value is a safe integer of at least `minimum`.
+ *
+ * @param label - Names the value in the error message, such as `The option points`.
+ * @param minimum - The least value allowed.
+ * @throws `DataError` when it is not.
+ */
+export function checkIntegerFrom(value: unknown, label: string, minimum: number): asserts value is number {
+  if (!(typeof value === "number" && Number.isSafeInteger(value) && value >= minimum)) {
+    throw new DataError(`${label} must be an integer from ${minimum}, found ${describe(value)}.`);
+  }
+}
+
+/**
  * Checks that a value is a number from 0 to 1.
  *
  * @param label - Names the value in the error message, such as `The option missingProbability`.

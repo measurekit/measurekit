@@ -232,11 +232,11 @@ describe("splits", () => {
     );
     expect(() => splitByItem(log, 5, createRandom(1))).toThrow("needs at least 5 items, found 4.");
     expect(() => splitByLearner(log, 1, createRandom(1))).toThrow(
-      "The number of folds must be an integer of at least 2, found 1.",
+      "The number of folds must be an integer from 2, found 1.",
     );
-    expect(() => splitByTime(log, 1.5)).toThrow("The number of folds must be an integer of at least 1, found 1.5.");
+    expect(() => splitByTime(log, 1.5)).toThrow("The number of folds must be an integer from 1, found 1.5.");
     expect(() => splitByTime(log, JSON.parse('"2"'))).toThrow(
-      'The number of folds must be an integer of at least 1, found "2".',
+      'The number of folds must be an integer from 1, found "2".',
     );
     expect(() => splitByTime(one, 1)).toThrow("The log's times do not divide into 2 blocks for 1 folds");
     expect(() => splitByTime([...log].reverse(), 1)).toThrow(
@@ -280,10 +280,8 @@ describe("data input from JavaScript", () => {
     }
     const log = eventLog([{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }]);
     expect(() => splitByItem(log, JSON.parse('"2"'), createRandom(1))).toThrow(
-      'The number of folds must be an integer of at least 2, found "2".',
+      'The number of folds must be an integer from 2, found "2".',
     );
-    expect(() => splitByTime(log, missing)).toThrow(
-      "The number of folds must be an integer of at least 1, found null.",
-    );
+    expect(() => splitByTime(log, missing)).toThrow("The number of folds must be an integer from 1, found null.");
   });
 });

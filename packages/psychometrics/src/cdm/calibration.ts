@@ -13,7 +13,7 @@ import {
 } from "@measurekit/core";
 import { checkDichotomous } from "../data/dichotomous.js";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability } from "../irt/probability.js";
 import { type AdditiveMaximizer, additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
 import { type CdmDesign, cdmDesign, profilesOf, type QMatrix } from "./q-matrix.js";
 
@@ -353,8 +353,8 @@ export function forEachPosterior(
 ): void {
   const { itemCount, responses } = data;
   const logProbabilities = state.probabilities.map((p) => ({
-    correct: p.map((value) => Math.log(Math.max(value, MIN_PROBABILITY))),
-    incorrect: p.map((value) => Math.log(Math.max(1 - value, MIN_PROBABILITY))),
+    correct: p.map(logProbability),
+    incorrect: p.map((value) => logProbability(1 - value)),
   }));
   const logProportions = state.proportions.map(Math.log);
   const posterior = new Float64Array(design.profiles.length);

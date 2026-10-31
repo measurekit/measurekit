@@ -2006,7 +2006,7 @@ describe("errors", () => {
       'The option correlated must be a boolean, found "yes".',
     );
     expect(() => calibrateMultidimensional(data, { ...options, points: 1 })).toThrow(
-      "The option points must be at least 2, found 1.",
+      "The option points must be an integer from 2, found 1.",
     );
     expect(() => calibrateMultidimensional(data, { ...options, points: JSON.parse('"31"') })).toThrow(DataError);
     expect(() => calibrateMultidimensional(data, { ...options, points: 2000 })).toThrow(
@@ -2226,7 +2226,7 @@ describe("input of other types", () => {
       }),
     ).toThrow("The covariance of the prior must be a symmetric positive definite matrix.");
     expect(() => multidimensionalPosteriorMeanEstimate([item], [1], { points: 1 })).toThrow(
-      "The option points must be at least 2, found 1.",
+      "The option points must be an integer from 2, found 1.",
     );
     expect(() => multidimensionalPosteriorMeanEstimate([item], [1], { points: JSON.parse('"9"') })).toThrow(DataError);
   });

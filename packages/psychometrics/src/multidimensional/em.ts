@@ -1,4 +1,4 @@
-import { checkPositiveInteger, DataError, describe, iterateToConvergence, largestChange } from "@measurekit/core";
+import { checkIntegerFrom, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
 import type { CompressedResponses } from "../irt/responses.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { setUp } from "./calibration-setup.js";
@@ -69,7 +69,7 @@ export function calibrateByEm<TParameters>(
   const dimensions = design.dimensionNames.length;
   checkEmDimensions(dimensions);
   const points = settings.points ?? defaultPoints(dimensions);
-  checkPoints(points);
+  checkIntegerFrom(points, "The option points", 2);
   const grid = productGrid(dimensions, points);
   const items = setUp(responses, options, design, grid.count);
   const latent = latentDistribution(grid);
@@ -94,11 +94,6 @@ export function calibrateByEm<TParameters>(
     converged,
     iterations,
   };
-}
-
-function checkPoints(points: unknown): asserts points is number {
-  checkPositiveInteger(points, "The option points");
-  if (points < 2) throw new DataError(`The option points must be at least 2, found ${describe(points)}.`);
 }
 
 /** Returns the covariance matrix of the estimated parameters by the method, or `null` without standard errors. */

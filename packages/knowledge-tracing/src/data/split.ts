@@ -1,4 +1,4 @@
-import { checkRandom, DataError, describe, type Random } from "@measurekit/core";
+import { checkIntegerFrom, checkRandom, DataError, type Random } from "@measurekit/core";
 import { permutation } from "../math/permutation.js";
 import type { Event } from "./event.js";
 import { checkLog, type EventLog } from "./event-log.js";
@@ -86,7 +86,5 @@ function splitByKey(log: EventLog, folds: number, random: Random, kind: string, 
 }
 
 function checkFolds(folds: number, minimum: number): void {
-  if (!(Number.isSafeInteger(folds) && folds >= minimum)) {
-    throw new DataError(`The number of folds must be an integer of at least ${minimum}, found ${describe(folds)}.`);
-  }
+  checkIntegerFrom(folds, "The number of folds", minimum);
 }

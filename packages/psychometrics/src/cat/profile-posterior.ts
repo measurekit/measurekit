@@ -1,4 +1,4 @@
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability } from "../irt/probability.js";
 import type { DiagnosticTestItem } from "./diagnostic-items.js";
 
 /**
@@ -15,9 +15,7 @@ export function profilePosterior(
   const logPosterior = prior.map((probability) => (probability > 0 ? Math.log(probability) : Number.NEGATIVE_INFINITY));
   items.forEach(({ probabilities, groups }, j) => {
     const correct = responses[j] === 1;
-    const logProbabilities = Float64Array.from(probabilities, (p) =>
-      Math.log(Math.max(correct ? p : 1 - p, MIN_PROBABILITY)),
-    );
+    const logProbabilities = Float64Array.from(probabilities, (p) => logProbability(correct ? p : 1 - p));
     for (let c = 0; c < logPosterior.length; c++) {
       logPosterior[c] = (logPosterior[c] ?? 0) + (logProbabilities[groups[c] ?? 0] ?? 0);
     }

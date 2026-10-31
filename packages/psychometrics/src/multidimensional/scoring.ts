@@ -1,4 +1,4 @@
-import { checkOptions, checkPositiveInteger, DataError, describe, normalizeLogs } from "@measurekit/core";
+import { checkIntegerFrom, checkOptions, DataError, normalizeLogs } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
@@ -110,8 +110,7 @@ export function multidimensionalPosteriorMeanEstimate(
  */
 function checkedPoints(points: number | undefined, dimensions: number): number {
   const checked = points === undefined ? defaultPoints(dimensions) : points;
-  checkPositiveInteger(checked, "The option points");
-  if (checked < 2) throw new DataError(`The option points must be at least 2, found ${describe(checked)}.`);
+  checkIntegerFrom(checked, "The option points", 2);
   if (!(checked ** dimensions <= MAX_GRID_NODES)) {
     throw new DataError(
       `A grid of ${checked} points in ${dimensions} dimensions has more than ${MAX_GRID_NODES} nodes; use fewer points or multidimensionalPosteriorModeEstimate.`,

@@ -12,7 +12,7 @@ import type { Quadrature } from "../math/quadrature.js";
 import { findRoot } from "../math/root.js";
 import { answeredItems, checkPattern, indexItems, largestCategoryCount } from "./items.js";
 import type { IrtItem } from "./model.js";
-import { MIN_PROBABILITY } from "./probability.js";
+import { logProbability, MIN_PROBABILITY } from "./probability.js";
 import { type QuadratureOptions, quadratureRule } from "./quadrature.js";
 
 /** An estimate of a person's theta with its standard error. */
@@ -365,7 +365,7 @@ function answered(items: readonly IrtItem[], responses: readonly (number | null)
       let sum = 0;
       for (const { item, response } of answers) {
         item.model.probabilities(item.parameters, theta, probabilities);
-        sum += Math.log(Math.max(probabilities[response] ?? 0, MIN_PROBABILITY));
+        sum += logProbability(probabilities[response] ?? 0);
       }
       return sum;
     },

@@ -1,5 +1,5 @@
 import type { Random } from "@measurekit/core";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { logProbability } from "../irt/probability.js";
 import type { CompressedResponses } from "../irt/responses.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Correlations } from "./mhrm-latent.js";
@@ -126,7 +126,7 @@ export function createChain<TParameters>(
         const person = data.respondents[r] ?? 0;
         for (let d = 0; d < dimensions; d++) point[d] = at[person * dimensions + d] ?? 0;
         item.model.probabilities(item.parameters, point, probabilities);
-        out[person] = (out[person] ?? 0) + Math.log(Math.max(probabilities[data.codes[r] ?? 0] ?? 0, MIN_PROBABILITY));
+        out[person] = (out[person] ?? 0) + logProbability(probabilities[data.codes[r] ?? 0] ?? 0);
       }
     });
   };

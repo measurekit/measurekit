@@ -6,7 +6,7 @@ import { findIncreasingRoot } from "../math/root.js";
 import type { CalibratedItem } from "./calibration.js";
 import { type LogisticParameters, oneParameterLogistic } from "./logistic.js";
 import { partialCredit, partialCreditInformation, partialCreditProbabilities, stepStarts } from "./partial-credit.js";
-import { MIN_PROBABILITY } from "./probability.js";
+import { logProbability } from "./probability.js";
 import { categoryCounts, checkCategories, compressResponses, responseCodes } from "./responses.js";
 import type { ThresholdParameters } from "./thresholds.js";
 
@@ -296,7 +296,7 @@ function estimationSteps(data: JointData): JointEstimation {
     let value = 0;
     for (let k = 0; k < count; k++) {
       const observed = table[offset + k] ?? 0;
-      if (observed > 0) value -= observed * Math.log(Math.max(probabilities[k] ?? 0, MIN_PROBABILITY));
+      if (observed > 0) value -= observed * logProbability(probabilities[k] ?? 0);
     }
     addGradient(table, offset, count, persons, out);
     addCovariance(count, persons, curvature);

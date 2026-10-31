@@ -572,7 +572,7 @@ describe("thetaPosterior", () => {
     );
     expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], { prior: { mean: 0, sd: 0 } })).toThrow(DataError);
     expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], { quadrature: { points: 1 } })).toThrow(
-      "Quadrature needs an integer number of points from 2, found 1.",
+      "The quadrature points must be an integer from 2, found 1.",
     );
     expect(() => thetaPosterior(JSON.parse("null"), [])).toThrow("The items must be an array, found null.");
     expect(() => thetaPosterior(ITEMS_2PL, JSON.parse("null"))).toThrow("The responses must be an array, found null.");

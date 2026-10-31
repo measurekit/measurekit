@@ -529,7 +529,7 @@ describe("calibrateSpeedAccuracy", () => {
     expect(() => calibrateSpeedAccuracy(matrix, { model, tolerance: -1 })).toThrow(DataError);
     expect(() => calibrateSpeedAccuracy(matrix, { model, maxIterations: JSON.parse('"many"') })).toThrow(DataError);
     expect(() => calibrateSpeedAccuracy(matrix, { model, quadrature: { points: 1 } })).toThrow(
-      "Quadrature needs an integer number of points from 2, found 1.",
+      "The quadrature points must be an integer from 2, found 1.",
     );
     expect(() => calibrateSpeedAccuracy(matrix, { model, priors: JSON.parse('{"a": 3}') })).toThrow(DataError);
     expect(() => calibrateSpeedAccuracy(matrix, { model: [model] })).toThrow("Found 1 models for 3 items.");

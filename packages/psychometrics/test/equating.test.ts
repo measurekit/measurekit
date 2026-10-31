@@ -919,7 +919,7 @@ describe("bootstrapEquating", () => {
       "The option replications must be an integer from 2, found 1.",
     );
     expect(() => bootstrapEquating(sample, equate, random, { replications: 2.5 })).toThrow(
-      "The option replications must be a positive integer, found 2.5.",
+      "The option replications must be an integer from 2, found 2.5.",
     );
     expect(() => bootstrapEquating(sample, equate, random, { replications: JSON.parse('"5"') })).toThrow(DataError);
     expect(() => bootstrapEquating(sample, equate, random, JSON.parse("null"))).toThrow(DataError);
