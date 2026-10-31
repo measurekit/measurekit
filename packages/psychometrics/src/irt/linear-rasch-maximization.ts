@@ -162,10 +162,10 @@ function sumOverNodes(
   work.stepLogSd.fill(0);
   work.theta.fill(0);
   let value = 0;
-  nodes.forEach((z, q) => {
-    const row = counts.subarray(q * (count + 1), (q + 1) * (count + 1));
-    value += nodeValue(mean + sd * z, sd * z, row, count, work);
-  });
+  for (let q = 0; q < nodes.length; q++) {
+    const z = nodes[q] ?? 0;
+    value += nodeValue(mean + sd * z, sd * z, counts, q * (count + 1), count, work);
+  }
   return value;
 }
 
@@ -173,7 +173,14 @@ function sumOverNodes(
  * Returns the node's term Σ_k n_k ln P_k and adds its derivatives to the item's sums, for a node at theta with the
  * counts `row`, where `scaled` = σ z is the derivative of theta with respect to the log standard deviation.
  */
-function nodeValue(theta: number, scaled: number, row: Float64Array, count: number, work: Work): number {
+function nodeValue(
+  theta: number,
+  scaled: number,
+  counts: Float64Array,
+  from: number,
+  count: number,
+  work: Work,
+): number {
   const { steps, logits, probabilities } = work;
   logits[0] = 0;
   let largest = 0;
@@ -188,14 +195,14 @@ function nodeValue(theta: number, scaled: number, row: Float64Array, count: numb
   let persons = 0;
   for (let k = 0; k <= count; k++) {
     probabilities[k] = Math.exp((logits[k] ?? 0) - logTotal);
-    value += (row[k] ?? 0) * ((logits[k] ?? 0) - logTotal);
-    persons += row[k] ?? 0;
+    value += (counts[from + k] ?? 0) * ((logits[k] ?? 0) - logTotal);
+    persons += counts[from + k] ?? 0;
   }
   if (persons > 0) {
     categoryMoments(count, work);
-    tailSums(count, row, work);
+    tailSums(count, counts, from, work);
     addStepSums(persons, scaled, count, work);
-    addThetaSums(persons, scaled, row, work);
+    addThetaSums(persons, scaled, counts, from, count, work);
   }
   return value;
 }
@@ -213,7 +220,8 @@ function categoryMoments(count: number, { probabilities, moments }: Work): void 
 /** Writes P(X ≥ j), Cov(1{X ≥ j}, X) and the expected counts at or above j, for j from 1 to the number of steps. */
 function tailSums(
   count: number,
-  row: Float64Array,
+  counts: Float64Array,
+  from: number,
   { probabilities, moments, tails, covariances, observedTails }: Work,
 ): void {
   tails[count + 1] = 0;
@@ -222,7 +230,7 @@ function tailSums(
   for (let j = count; j >= 1; j--) {
     tails[j] = (tails[j + 1] ?? 0) + (probabilities[j] ?? 0);
     covariances[j] = (covariances[j + 1] ?? 0) + (probabilities[j] ?? 0) * (j - (moments[0] ?? 0));
-    observedTails[j] = (observedTails[j + 1] ?? 0) + (row[j] ?? 0);
+    observedTails[j] = (observedTails[j + 1] ?? 0) + (counts[from + j] ?? 0);
   }
 }
 
@@ -242,11 +250,16 @@ function addStepSums(persons: number, scaled: number, count: number, work: Work)
 }
 
 /** Adds the node's gradient and Hessian with respect to the mean and the log standard deviation of theta. */
-function addThetaSums(persons: number, scaled: number, row: Float64Array, { moments, theta }: Work): void {
+function addThetaSums(
+  persons: number,
+  scaled: number,
+  counts: Float64Array,
+  from: number,
+  count: number,
+  { moments, theta }: Work,
+): void {
   let observed = 0;
-  row.forEach((n, k) => {
-    observed += k * n;
-  });
+  for (let k = 0; k <= count; k++) observed += k * (counts[from + k] ?? 0);
   const gradient = observed - persons * (moments[0] ?? 0);
   const curvature = -persons * (moments[1] ?? 0);
   theta[0] = (theta[0] ?? 0) + gradient;

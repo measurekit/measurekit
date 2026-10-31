@@ -83,7 +83,7 @@ const M_STEP_TOLERANCE = 1e-10;
  * converges quadratically, so the error after such a step is far below the rounding of the parameters, while rounding
  * of the log-likelihood would make a line search reject it.
  */
-const M_STEP_STEP_TOLERANCE = 1e-8;
+const M_STEP_STEP_TOLERANCE = 1e-6;
 const M_STEP_ITERATIONS = 50;
 
 /**
