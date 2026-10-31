@@ -198,7 +198,11 @@ export function posteriorMeanEstimate(
     testlets.length === 0
       ? (theta: number): number => pattern.logLikelihood(theta)
       : testletLogLikelihood(items, responses, testlets, testletOf, quadratureRule(options.quadrature));
-  const posterior = posteriorWeights(nodes, weights, logLikelihood);
+  return posteriorMoments(nodes, posteriorWeights(nodes, weights, logLikelihood));
+}
+
+/** Returns the mean of a distribution on the nodes, with its standard deviation as the standard error. */
+export function posteriorMoments(nodes: Float64Array, posterior: Float64Array): AbilityEstimate {
   let theta = 0;
   for (let q = 0; q < nodes.length; q++) theta += (posterior[q] ?? 0) * (nodes[q] ?? 0);
   let variance = 0;

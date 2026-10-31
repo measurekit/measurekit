@@ -418,6 +418,35 @@ describe("ability estimation", () => {
     expect(() => responseRecords([{ person: "p", item: "q1", response: 0.5 }])).toThrow(DataError);
   });
 
+  it("gives every person the estimate of posteriorMeanEstimate by default, for dichotomous and polytomous items", () => {
+    const named = (items: readonly IrtItem[]): (IrtItem & { id: string })[] =>
+      items.map((item, i) => ({ ...item, id: `q${i + 1}` }));
+    for (const items of [named(ITEMS_2PL), named(ITEMS_GPCM)]) {
+      const patterns = items.reduce<(number | null)[][]>(
+        (rows, item) =>
+          rows.flatMap((row) =>
+            [null, ...Array.from({ length: item.model.categoryCount(item.parameters) }, (_, k) => k)].map(
+              (response) => [...row, response],
+            ),
+          ),
+        [[]],
+      );
+      const estimates = abilityEstimates(responseMatrix(patterns, { itemIds: items.map((item) => item.id) }), items);
+      patterns.forEach((pattern, person) => {
+        const answered = items.flatMap((item, i) => (pattern[i] === null ? [] : [item]));
+        const responses = pattern.filter((response) => response !== null);
+        const estimate = estimates[person];
+        if (answered.length === 0)
+          expect(estimate).toEqual({ id: `person${person + 1}`, theta: null, standardError: null });
+        else expect(estimate).toEqual({ id: `person${person + 1}`, ...posteriorMeanEstimate(answered, responses) });
+      });
+    }
+    const items = named(ITEMS_2PL);
+    expect(() =>
+      abilityEstimates(responseMatrix([[2, 0, 1, 0]], { itemIds: ["q1", "q2", "q3", "q4"] }), items),
+    ).toThrow("The response to item 1 must be null or an integer from 0 to 1, found 2.");
+  });
+
   it("rejects invalid items, responses, ranges and priors", () => {
     expect(() => maximumLikelihoodEstimate(ITEMS_2PL, [1, 0])).toThrow("Found 2 responses to 4 items.");
     expect(() => maximumLikelihoodEstimate(ITEMS_2PL, [1, 0, 2, 1])).toThrow(
