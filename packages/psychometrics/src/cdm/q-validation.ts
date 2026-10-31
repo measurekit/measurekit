@@ -1,6 +1,7 @@
 import { checkOptions, checkUnitInterval } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
-import { type CdmCalibration, calibratedModel, forEachPosterior } from "./calibration.js";
+import { type CdmCalibration, calibratedModel } from "./calibration.js";
+import { forEachPosterior } from "./expectation.js";
 import { profilesOf } from "./q-matrix.js";
 
 const DEFAULT_EPS = 0.95;

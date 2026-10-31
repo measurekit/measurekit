@@ -734,6 +734,40 @@ describe("properties", () => {
     );
   });
 
+  it("has the marginal log-likelihood of the responses that are not missing, summed over the profiles", () => {
+    const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"], item4: ["a"] };
+    const matrix = responseMatrix([
+      [1, 0, 1, null],
+      [0, null, 0, 0],
+      [1, 1, 1, 1],
+      [null, null, null, null],
+      [0, 1, null, 1],
+      [null, 0, 1, 0],
+    ]);
+    for (const model of MODELS) {
+      const { items, attributes, profiles, logLikelihood } = calibrateCdm(matrix, qMatrix, { model, maxIterations: 7 });
+      const likelihood = (row: readonly (number | null)[], profile: readonly number[]): number =>
+        row.reduce((product: number, response, j) => {
+          const item = defined(items[j]);
+          const reduced = item.attributes.map((name) => defined(profile[attributes.indexOf(name)]));
+          const group = profilesOf(reduced.length).findIndex((candidate) =>
+            candidate.every((v, k) => v === reduced[k]),
+          );
+          const p = defined(item.probabilities[group]);
+          return response === null ? product : product * (response === 1 ? p : 1 - p);
+        }, 1);
+      const expected = matrix.responses
+        .filter((row) => row.some((response) => response !== null))
+        .reduce(
+          (total, row) =>
+            total +
+            Math.log(profiles.reduce((sum, { profile, proportion }) => sum + proportion * likelihood(row, profile), 0)),
+          0,
+        );
+      expectClose(logLikelihood, expected, 1e-9, model);
+    }
+  });
+
   it("returns a point that no feasible change of the coefficients improves, for any counts", () => {
     const group = fc.record({
       persons: fc.oneof(fc.constant(0), fc.double({ min: 0, max: 300, noNaN: true })),

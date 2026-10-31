@@ -9,13 +9,12 @@ import {
   isRecord,
   isUnitInterval,
   iterateToConvergence,
-  normalizeLogs,
   type QMatrix,
 } from "@measurekit/core";
 import { checkDichotomous } from "../data/dichotomous.js";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
-import { logProbability } from "../irt/probability.js";
 import { type AdditiveMaximizer, additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
+import { type CdmState, type DichotomousRows, type ExpectedCounts, expectedCounts } from "./expectation.js";
 import { type CdmDesign, cdmDesign, profilesOf } from "./q-matrix.js";
 
 /**
@@ -202,14 +201,6 @@ function identityCoefficients(model: CdmModel, probabilities: readonly number[],
   return [guessing, (probabilities.at(-1) ?? 0) - guessing];
 }
 
-/** Responses by person, then item: 0, 1, or -1 when missing. */
-export interface DichotomousRows {
-  readonly itemCount: number;
-  readonly responses: Int8Array;
-  /** The number of persons with at least one response. */
-  readonly respondents: number;
-}
-
 /**
  * Checks that every response is 0 or 1 and returns the responses.
  *
@@ -220,16 +211,18 @@ export function dichotomousRows(matrix: ResponseMatrix): DichotomousRows {
   const itemCount = matrix.itemIds.length;
   const responses = new Int8Array(matrix.responses.length * itemCount).fill(-1);
   let respondents = 0;
+  let complete = true;
   matrix.responses.forEach((row, person) => {
-    let answered = false;
+    let answers = 0;
     row.forEach((response, item) => {
       if (response === null) return;
       responses[person * itemCount + item] = response;
-      answered = true;
+      answers++;
     });
-    if (answered) respondents++;
+    if (answers > 0) respondents++;
+    if (answers > 0 && answers < itemCount) complete = false;
   });
-  return { itemCount, responses, respondents };
+  return { itemCount, responses, respondents, complete };
 }
 
 function itemModels(model: CdmCalibrationOptions["model"], itemCount: number): readonly CdmModel[] {
@@ -246,12 +239,6 @@ function itemModels(model: CdmCalibrationOptions["model"], itemCount: number): r
   return model;
 }
 
-/** The parameters during EM: each item's success probability per latent group, and the profile proportions. */
-export interface CdmState {
-  readonly probabilities: readonly Float64Array[];
-  readonly proportions: Float64Array;
-}
-
 /** Starts at P = 0.2 + 0.6 m / K_j for a group mastering m of the item's K_j attributes, and at equal proportions. */
 function startingValues(design: CdmDesign): CdmState {
   const probabilities = design.itemAttributes.map((indices) =>
@@ -261,123 +248,6 @@ function startingValues(design: CdmDesign): CdmState {
     }),
   );
   return { probabilities, proportions: new Float64Array(design.profiles.length).fill(1 / design.profiles.length) };
-}
-
-/** The expected counts of an E-step: correct responses and persons per item group, persons per profile. */
-interface ExpectedCounts {
-  readonly correct: readonly Float64Array[];
-  readonly persons: readonly Float64Array[];
-  readonly profiles: Float64Array;
-  readonly logLikelihood: number;
-}
-
-/**
- * Runs the E-step: each person's posterior over the profiles, from the proportions and the success probabilities of
- * the answered items, gives the expected counts and the marginal log-likelihood. The loop over profiles is outside the
- * loop over a person's items, so that consecutive additions go to different counts; each count still receives its
- * terms in the order of persons, then profiles.
- */
-function expectedCounts(data: DichotomousRows, design: CdmDesign, state: CdmState): ExpectedCounts {
-  const { itemCount, responses } = data;
-  const profileCount = design.profiles.length;
-  // Every item's counts in one array, persons then correct responses per latent group; every item's groups in one.
-  const starts = new Int32Array(itemCount + 1);
-  state.probabilities.forEach((p, j) => {
-    starts[j + 1] = (starts[j] ?? 0) + 2 * p.length;
-  });
-  const counts = new Float64Array(starts[itemCount] ?? 0);
-  const groups = new Int32Array(itemCount * profileCount);
-  design.groupOf.forEach((groupOf, j) => {
-    groups.set(groupOf, j * profileCount);
-  });
-  const profiles = new Float64Array(profileCount);
-  // For each count the current person adds to: its offset in `counts` and the offset of its item's groups.
-  const countOffsets = new Int32Array(2 * itemCount);
-  const groupOffsets = new Int32Array(2 * itemCount);
-  let logLikelihood = 0;
-  forEachPosterior(data, design, state, (person, posterior, logMarginal) => {
-    logLikelihood += logMarginal;
-    let size = 0;
-    for (let j = 0; j < itemCount; j++) {
-      const response = responses[person * itemCount + j] ?? -1;
-      if (response < 0) continue;
-      const start = starts[j] ?? 0;
-      countOffsets[size] = start;
-      groupOffsets[size++] = j * profileCount;
-      if (response === 1) {
-        countOffsets[size] = start + ((starts[j + 1] ?? 0) - start) / 2;
-        groupOffsets[size++] = j * profileCount;
-      }
-    }
-    addPosterior(posterior, profiles, counts, groups, countOffsets.subarray(0, size), groupOffsets);
-  });
-  return {
-    persons: state.probabilities.map((p, j) => counts.subarray(starts[j], (starts[j] ?? 0) + p.length)),
-    correct: state.probabilities.map((p, j) => counts.subarray((starts[j] ?? 0) + p.length, starts[j + 1])),
-    profiles,
-    logLikelihood,
-  };
-}
-
-/**
- * Adds a person's posterior to the profile counts and, for each entry a of `countOffsets`, each profile's posterior to
- * the count at `countOffsets[a]` plus the profile's group, read at `groupOffsets[a]` in `groups`.
- */
-function addPosterior(
-  posterior: Float64Array,
-  profiles: Float64Array,
-  counts: Float64Array,
-  groups: Int32Array,
-  countOffsets: Int32Array,
-  groupOffsets: Int32Array,
-): void {
-  for (let c = 0; c < profiles.length; c++) {
-    const p = posterior[c] ?? 0;
-    profiles[c] = (profiles[c] ?? 0) + p;
-    for (let a = 0; a < countOffsets.length; a++) {
-      const index = (countOffsets[a] ?? 0) + (groups[(groupOffsets[a] ?? 0) + c] ?? 0);
-      counts[index] = (counts[index] ?? 0) + p;
-    }
-  }
-}
-
-/**
- * Calls `visit` with each person who answered an item, the posterior over the profiles and the log of the person's
- * marginal likelihood. `posterior` is reused between calls. A response's probability enters the likelihood as at least
- * `MIN_PROBABILITY`, so that responses no profile can give still have a posterior.
- */
-export function forEachPosterior(
-  data: DichotomousRows,
-  design: CdmDesign,
-  state: CdmState,
-  visit: (person: number, posterior: Float64Array, logMarginal: number) => void,
-): void {
-  const { itemCount, responses } = data;
-  const logProbabilities = state.probabilities.map((p) => ({
-    correct: p.map(logProbability),
-    incorrect: p.map((value) => logProbability(1 - value)),
-  }));
-  const logProportions = state.proportions.map(Math.log);
-  const posterior = new Float64Array(design.profiles.length);
-  const personCount = responses.length / itemCount;
-  for (let person = 0; person < personCount; person++) {
-    posterior.set(logProportions);
-    let answered = false;
-    for (let j = 0; j < itemCount; j++) {
-      const response = responses[person * itemCount + j] ?? -1;
-      const table = logProbabilities[j];
-      const groupOf = design.groupOf[j];
-      if (response < 0 || table === undefined || groupOf === undefined) continue;
-      answered = true;
-      addGroupValues(posterior, response === 1 ? table.correct : table.incorrect, groupOf);
-    }
-    if (answered) visit(person, posterior, normalizeLogs(posterior));
-  }
-}
-
-/** Adds `values[group(c)]` to `out[c]` for each profile c. */
-function addGroupValues(out: Float64Array, values: Float64Array, groupOf: Int32Array): void {
-  for (let c = 0; c < out.length; c++) out[c] = (out[c] ?? 0) + (values[groupOf[c] ?? 0] ?? 0);
 }
 
 /** Builds the M-step of each additive item, starting from the item's starting probabilities. */

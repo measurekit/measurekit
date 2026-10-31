@@ -1,5 +1,6 @@
 import type { ResponseMatrix } from "../data/response-matrix.js";
-import { type CdmCalibration, calibratedModel, forEachPosterior } from "./calibration.js";
+import { type CdmCalibration, calibratedModel } from "./calibration.js";
+import { forEachPosterior } from "./expectation.js";
 
 /** A posterior over the profiles of a cognitive diagnosis model with the estimates from it. */
 export interface ProfileEstimate {
@@ -24,11 +25,23 @@ export function profileEstimate(
   posterior: readonly number[],
   profiles: readonly (readonly number[])[],
 ): ProfileEstimate {
-  const mastery = Array.from({ length: profiles[0]?.length ?? 0 }, (_, k) =>
-    posterior.reduce((sum, p, c) => sum + p * (profiles[c]?.[k] ?? 0), 0),
-  );
-  const best = posterior.reduce((top, p, c) => (p > (posterior[top] ?? 0) ? c : top), 0);
+  const mastery: number[] = new Array<number>(profiles[0]?.length ?? 0).fill(0);
+  let best = 0;
+  for (let c = 0; c < posterior.length; c++) {
+    const p = posterior[c] ?? 0;
+    const profile = profiles[c];
+    if (profile !== undefined)
+      for (let k = 0; k < mastery.length; k++) mastery[k] = (mastery[k] ?? 0) + p * (profile[k] ?? 0);
+    if (p > (posterior[best] ?? 0)) best = c;
+  }
   return { posterior, mastery, map: profiles[best] ?? [], eap: mastery.map((p) => (p > 0.5 ? 1 : 0)) };
+}
+
+/** Returns the values as an array: a loop is several times faster than `Array.from` on a typed array. */
+function copyOf(values: Float64Array): number[] {
+  const copy = new Array<number>(values.length);
+  for (let c = 0; c < values.length; c++) copy[c] = values[c] ?? 0;
+  return copy;
 }
 
 /**
@@ -46,12 +59,12 @@ export function profileEstimate(
  */
 export function attributeProfiles(matrix: ResponseMatrix, calibration: CdmCalibration): AttributeProfile[] {
   const { data, design, state } = calibratedModel(matrix, calibration);
-  const posteriors: (readonly number[])[] = matrix.personIds.map(() => Array.from(state.proportions));
+  const estimates: (ProfileEstimate | undefined)[] = [];
   forEachPosterior(data, design, state, (person, posterior) => {
-    posteriors[person] = Array.from(posterior);
+    estimates[person] = profileEstimate(copyOf(posterior), design.profiles);
   });
   return matrix.personIds.map((id, person) => ({
     id,
-    ...profileEstimate(posteriors[person] ?? [], design.profiles),
+    ...(estimates[person] ?? profileEstimate(Array.from(state.proportions), design.profiles)),
   }));
 }
