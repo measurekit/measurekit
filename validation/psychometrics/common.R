@@ -58,3 +58,20 @@ weighted_share <- function(weights, x) sum(weights * x) / sum(weights)
 
 # Pearson correlation, NA when either variable is constant.
 correlation <- function(x, y) suppressWarnings(cor(x, y))
+
+# The probability of each total score at each node, by score then node, by the recursion of Lord and Wingersky (1984),
+# from mirt's probtrace.
+score_likelihoods <- function(fit, nodes) {
+  likelihoods <- matrix(1, 1, length(nodes))
+  for (i in seq_len(extract.mirt(fit, "nitems"))) {
+    trace <- probtrace(extract.item(fit, i), nodes)
+    scores <- nrow(likelihoods)
+    updated <- matrix(0, scores + ncol(trace) - 1, length(nodes))
+    for (k in seq_len(ncol(trace))) {
+      rows <- k:(k + scores - 1)
+      updated[rows, ] <- updated[rows, ] + likelihoods * matrix(trace[, k], scores, length(nodes), byrow = TRUE)
+    }
+    likelihoods <- updated
+  }
+  likelihoods
+}

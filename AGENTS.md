@@ -107,6 +107,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
                         and observed-score equating, bootstrap and delta-method standard errors, the anchor screen,
                         presmoothing
   src/standard-setting/ cut scores by the modified Angoff, Bookmark and Hofstee methods; classification accuracy
+  src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction
   src/rater/            rater agreement: kappa, intraclass correlations
   src/response-time/    response times: the lognormal model, speed, aberrant times, rapid guessing
   src/interop/          conversion of item parameters to and from mirt
@@ -187,6 +188,7 @@ Psychometrics: every module of `cat/`, `equating/`, `irt/` and `sim/` may also i
 | `sim/`                     | `data/`, `irt/`, `cdm/`, `math/`      |
 | `dif/`                     | `data/`, `irt/`, `equating/`, `math/` |
 | `standard-setting/`        | `irt/`, `equating/`, `math/`          |
+| `scaling/`                 | `irt/`, `equating/`, `math/`          |
 | `cat/`                     | `irt/`, `sim/`, `cdm/`, `math/`       |
 
 Knowledge tracing: the model families never import each other, nor does anything import `evaluate/`, `practice/` or

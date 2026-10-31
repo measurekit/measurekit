@@ -359,6 +359,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/scaling/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../irt/**", "!../equating/**", "!../math/**"],
+                    "message": "scaling/ builds on irt/, equating/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/standard-setting/**"],
       "linter": {
         "rules": {

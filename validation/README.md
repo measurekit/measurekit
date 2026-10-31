@@ -15,6 +15,7 @@ Rscript validation/psychometrics/cat.R               # adaptive testing: catR; d
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
 Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
+Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
 Rscript validation/psychometrics/rater.R             # rater agreement: irr and psych
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R

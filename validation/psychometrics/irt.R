@@ -1036,22 +1036,6 @@ write_fixture("irt-latent", list(
 # another prior, with the nodes placed on it, measurekit's rule. mirt's marginal_rxx and empirical_rxx; base
 # R's integrate for the marginal reliability under another prior.
 
-# The probability of each total score at each node, by the recursion of Lord and Wingersky (1984).
-score_likelihoods <- function(fit, nodes) {
-  likelihoods <- matrix(1, 1, length(nodes))
-  for (i in seq_len(extract.mirt(fit, "nitems"))) {
-    trace <- probtrace(extract.item(fit, i), nodes)
-    scores <- nrow(likelihoods)
-    updated <- matrix(0, scores + ncol(trace) - 1, length(nodes))
-    for (k in seq_len(ncol(trace))) {
-      rows <- k:(k + scores - 1)
-      updated[rows, ] <- updated[rows, ] + likelihoods * matrix(trace[, k], scores, length(nodes), byrow = TRUE)
-    }
-    likelihoods <- updated
-  }
-  likelihoods
-}
-
 summed_score_table <- function(fit, prior) {
   z <- seq(-6, 6, length.out = POINTS)
   nodes <- prior$mean + prior$sd * z

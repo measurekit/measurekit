@@ -1,9 +1,10 @@
-import { checkArray, checkOptions, checkRecord, checkUnitInterval, DataError, describe } from "@measurekit/core";
+import { checkOptions, checkRecord, checkUnitInterval } from "@measurekit/core";
 import type { ThetaDistribution } from "../irt/ability.js";
 import { checkItemList } from "../irt/items.js";
 import type { IrtItem } from "../irt/model.js";
 import { quadratureRule } from "../irt/quadrature.js";
-import { itemTrace, summedScoreLikelihoods } from "../irt/summed-score.js";
+import { scoreLikelihoods } from "../irt/summed-score.js";
+import { type CheckedThetaDistribution, checkThetaDistribution } from "../irt/theta-distribution.js";
 import { equipercentileEquating } from "./observed-score.js";
 
 /** The populations of the groups that took the two forms, on the scale of the forms' items. */
@@ -36,19 +37,10 @@ export interface IrtObservedScoreOptions {
   readonly weight?: number;
 }
 
-/** The tolerance of the sum of a population's weights from 1. */
-const WEIGHT_SUM_TOLERANCE = 1e-6;
-
-/** A population checked: its nodes and weights. */
-interface Population {
-  readonly nodes: Float64Array;
-  readonly weights: Float64Array;
-}
-
 /** The populations and weight of an equating, checked. */
 export interface ObservedScoreSetup {
-  readonly from: Population;
-  readonly to: Population;
+  readonly from: CheckedThetaDistribution;
+  readonly to: CheckedThetaDistribution;
   readonly weight: number;
 }
 
@@ -94,8 +86,8 @@ export function observedScoreSetup(options: IrtObservedScoreOptions): ObservedSc
   const { from, to } = populations;
   const standard = quadratureRule();
   return {
-    from: from === undefined ? standard : checkPopulation(from, "from"),
-    to: to === undefined ? standard : checkPopulation(to, "to"),
+    from: from === undefined ? standard : checkThetaDistribution(from, "population of the from group"),
+    to: to === undefined ? standard : checkThetaDistribution(to, "population of the to group"),
     weight,
   };
 }
@@ -114,48 +106,9 @@ export function observedScoreEquivalents(
   return equipercentileEquating(synthetic(from), synthetic(to));
 }
 
-/**
- * Checks a population and returns its nodes and weights.
- *
- * @throws `DataError` when it is not an object with arrays of finite nodes and as many non-negative weights that sum
- * to 1 within the tolerance.
- */
-function checkPopulation(population: ThetaDistribution, label: string): Population {
-  checkRecord(population, `The population of the ${label} group must be an object { nodes, weights }`);
-  const { nodes, weights } = population;
-  checkArray(nodes, `The nodes of the population of the ${label} group must be an array`);
-  checkArray(weights, `The weights of the population of the ${label} group must be an array`);
-  if (nodes.length === 0 || nodes.length !== weights.length) {
-    throw new DataError(
-      `The population of the ${label} group needs at least one node and as many weights as nodes, found ${nodes.length} and ${weights.length}.`,
-    );
-  }
-  let sum = 0;
-  nodes.forEach((node, q) => {
-    const weight: unknown = weights[q];
-    if (!Number.isFinite(node)) {
-      throw new DataError(
-        `The nodes of the population of the ${label} group must be finite numbers, found ${describe(node)} at ${q}.`,
-      );
-    }
-    if (!(typeof weight === "number" && Number.isFinite(weight) && weight >= 0)) {
-      throw new DataError(
-        `The weights of the population of the ${label} group must be non-negative numbers, found ${describe(weight)} at ${q}.`,
-      );
-    }
-    sum += weight;
-  });
-  if (!(Math.abs(sum - 1) <= WEIGHT_SUM_TOLERANCE)) {
-    throw new DataError(`The weights of the population of the ${label} group must sum to 1, found ${sum}.`);
-  }
-  return { nodes: Float64Array.from(nodes), weights: Float64Array.from(weights) };
-}
-
 /** Returns the probability of each summed score of the items in a population: Σ_q g(θ_q) P(score | θ_q). */
-function scoreDistribution(items: readonly IrtItem[], population: Population): Float64Array {
-  const counts = items.map((item) => item.model.categoryCount(item.parameters));
-  const traces = items.map((item, j) => itemTrace(item, counts[j] ?? 0, population.nodes));
-  const likelihoods = summedScoreLikelihoods(traces, counts, -1, population.nodes.length);
+function scoreDistribution(items: readonly IrtItem[], population: CheckedThetaDistribution): Float64Array {
+  const likelihoods = scoreLikelihoods(items, population.nodes);
   const nodeCount = population.nodes.length;
   const distribution = new Float64Array(likelihoods.length / nodeCount);
   for (let score = 0; score < distribution.length; score++) {

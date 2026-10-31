@@ -442,7 +442,12 @@ export function modalTheta(
   return previousSlope > 0 && valueAt(upper, value) > bestValue ? upper : best;
 }
 
-function checkRange(range: readonly [number, number] = DEFAULT_THETA_RANGE): readonly [number, number] {
+/**
+ * Checks the interval of theta that the estimators search, `[-6, 6]` by default, and returns it.
+ *
+ * @throws `DataError` unless it is an array of two finite numbers with the lower below the upper.
+ */
+export function checkRange(range: readonly [number, number] = DEFAULT_THETA_RANGE): readonly [number, number] {
   checkArray(range, "The option range must be an array [lower, upper]");
   const [lower, upper] = range;
   checkFinite(lower, "The lower bound of the range");

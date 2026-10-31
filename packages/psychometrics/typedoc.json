@@ -9,6 +9,7 @@
     "src/fit/index.ts",
     "src/dif/index.ts",
     "src/equating/index.ts",
+    "src/scaling/index.ts",
     "src/sim/index.ts",
     "src/standard-setting/index.ts",
     "src/rater/index.ts",

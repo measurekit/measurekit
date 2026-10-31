@@ -37,9 +37,7 @@ export function summedScoreTable(
   checkOptions(options);
   const { mean, sd } = checkThetaPrior(options.prior);
   const { nodes, weights } = quadratureRule(options.quadrature, mean, sd);
-  const counts = items.map((item) => item.model.categoryCount(item.parameters));
-  const traces = items.map((item, i) => itemTrace(item, counts[i] ?? 0, nodes));
-  const likelihoods = summedScoreLikelihoods(traces, counts, -1, nodes.length);
+  const likelihoods = scoreLikelihoods(items, nodes);
   const scores = likelihoods.length / nodes.length;
   return Array.from({ length: scores }, (_, score) => {
     let probability = 0;
@@ -57,6 +55,16 @@ export function summedScoreTable(
     }
     return { score, theta, standardError: Math.sqrt(second / probability), probability };
   });
+}
+
+/**
+ * Returns the probability of each total score of the items at each node, by score, then node, by the recursion of Lord
+ * and Wingersky.
+ */
+export function scoreLikelihoods(items: readonly IrtItem[], nodes: Float64Array): Float64Array {
+  const counts = items.map((item) => item.model.categoryCount(item.parameters));
+  const traces = items.map((item, i) => itemTrace(item, counts[i] ?? 0, nodes));
+  return summedScoreLikelihoods(traces, counts, -1, nodes.length);
 }
 
 /** Returns an item's category probabilities at each node, by node, then category. */

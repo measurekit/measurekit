@@ -15,5 +15,6 @@ export * from "./interop/index.js";
 export * from "./irt/index.js";
 export * from "./rater/index.js";
 export * from "./response-time/index.js";
+export * from "./scaling/index.js";
 export * from "./sim/index.js";
 export * from "./standard-setting/index.js";
