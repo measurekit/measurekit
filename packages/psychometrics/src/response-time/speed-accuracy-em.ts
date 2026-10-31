@@ -1,6 +1,6 @@
+import { iterateToConvergence, largestChange } from "@measurekit/core";
 import type { Setup } from "../irt/calibration-setup.js";
 import { type ExpectationStep, expectationStep } from "../irt/expectation.js";
-import { largestChange } from "../irt/iteration.js";
 import type { Maximization } from "../irt/m-step.js";
 import { maximization } from "../irt/m-step.js";
 import {
@@ -102,17 +102,15 @@ export function iterate<TParameters>(
   const { setup, mStep, timed, sums, parameters, itemCounts, moments } = joint;
   const previousItems = new Float64Array(setup.values.length);
   const previousTimes = new Float64Array(parameters.length);
-  let iterations = 0;
-  let converged = false;
-  while (!converged && iterations < maxIterations) {
-    iterations++;
-    expectation(joint);
-    previousItems.set(setup.values);
-    previousTimes.set(parameters);
-    for (const block of mStep.blocks) mStep.maximize(block);
-    maximizeTimes(timed, sums, parameters, itemCounts, moments);
-    converged =
-      Math.max(largestChange(previousItems, setup.values), largestChange(previousTimes, parameters)) <= tolerance;
-  }
-  return { converged, iterations };
+  return iterateToConvergence(
+    () => {
+      expectation(joint);
+      previousItems.set(setup.values);
+      previousTimes.set(parameters);
+      for (const block of mStep.blocks) mStep.maximize(block);
+      maximizeTimes(timed, sums, parameters, itemCounts, moments);
+      return Math.max(largestChange(previousItems, setup.values), largestChange(previousTimes, parameters));
+    },
+    { tolerance, maxIterations },
+  );
 }

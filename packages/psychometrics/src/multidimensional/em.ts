@@ -1,4 +1,4 @@
-import { checkPositiveInteger, DataError, describe } from "@measurekit/core";
+import { checkPositiveInteger, DataError, describe, iterateToConvergence, largestChange } from "@measurekit/core";
 import type { CompressedResponses } from "../irt/responses.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { setUp } from "./calibration-setup.js";
@@ -33,18 +33,17 @@ function expectationMaximization<TParameters>(
   const { items, latent, correlated, maximization, eStep } = fit;
   const current = new Float64Array(parameterCount(fit));
   const previous = new Float64Array(current.length);
-  let iterations = 0;
-  let converged = false;
-  while (!converged && iterations < maxIterations) {
-    iterations++;
-    eStep.run();
-    estimatesOf(fit, previous);
-    for (const item of items) maximization.maximize(item);
-    if (correlated) latent.maximize(eStep.nodeCounts);
-    estimatesOf(fit, current);
-    converged = largestChange(previous, current) <= tolerance;
-  }
-  return { converged, iterations };
+  return iterateToConvergence(
+    () => {
+      eStep.run();
+      estimatesOf(fit, previous);
+      for (const item of items) maximization.maximize(item);
+      if (correlated) latent.maximize(eStep.nodeCounts);
+      estimatesOf(fit, current);
+      return largestChange(previous, current);
+    },
+    { tolerance, maxIterations },
+  );
 }
 
 /** Writes the estimated parameters, on their own scale, into `out`: the items' estimated entries, then the correlations. */
@@ -52,13 +51,6 @@ function estimatesOf<TParameters>({ items, latent, correlated }: Fit<TParameters
   let slot = 0;
   for (const item of items) for (const j of item.free) out[slot++] = item.vector[j] ?? 0;
   if (correlated) for (const [i, j] of latent.pairs) out[slot++] = latent.matrix[i * latent.dimensions + j] ?? 0;
-}
-
-function largestChange(previous: Float64Array, current: Float64Array): number {
-  let largest = 0;
-  for (let j = 0; j < current.length; j++)
-    largest = Math.max(largest, Math.abs((current[j] ?? 0) - (previous[j] ?? 0)));
-  return largest;
 }
 
 /**

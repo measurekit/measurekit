@@ -1,3 +1,5 @@
+import { type Convergence, iterateToConvergence, type Stopping } from "@measurekit/core";
+
 /** The outcome of one EM iteration from some parameters. */
 export interface ExpectationMaximizationStep<TParameters> {
   /** The log-likelihood at the parameters the step started from: the E-step's. */
@@ -6,24 +8,12 @@ export interface ExpectationMaximizationStep<TParameters> {
   readonly parameters: TParameters;
 }
 
-/** Stopping rules of expectation maximization. */
-export interface ExpectationMaximizationOptions {
-  /** The largest change of the log-likelihood between iterations at which EM has converged. */
-  readonly tolerance: number;
-  /** The most iterations to run: at least 1. */
-  readonly maxIterations: number;
-}
-
-/** The outcome of expectation maximization. */
-export interface ExpectationMaximization<TParameters> {
+/** The outcome of expectation maximization: the iterations are the E-steps computed. */
+export interface ExpectationMaximization<TParameters> extends Convergence {
   /** The last parameters whose log-likelihood was computed. */
   readonly parameters: TParameters;
   /** The log-likelihood at `parameters`. */
   readonly logLikelihood: number;
-  /** Iterations run: E-steps computed. */
-  readonly iterations: number;
-  /** Whether the log-likelihood changed by at most the tolerance in the last iteration. */
-  readonly converged: boolean;
 }
 
 /**
@@ -34,15 +24,16 @@ export interface ExpectationMaximization<TParameters> {
 export function expectationMaximization<TParameters>(
   start: TParameters,
   step: (parameters: TParameters) => ExpectationMaximizationStep<TParameters>,
-  { tolerance, maxIterations }: ExpectationMaximizationOptions,
+  stopping: Stopping,
 ): ExpectationMaximization<TParameters> {
+  let next = start;
   let parameters = start;
-  let previous = Number.NEGATIVE_INFINITY;
-  for (let iteration = 1; ; iteration++) {
-    const { logLikelihood, parameters: next } = step(parameters);
-    const converged = Math.abs(logLikelihood - previous) <= tolerance;
-    if (converged || iteration >= maxIterations) return { parameters, logLikelihood, iterations: iteration, converged };
-    previous = logLikelihood;
+  let logLikelihood = Number.NEGATIVE_INFINITY;
+  const { converged, iterations } = iterateToConvergence(() => {
     parameters = next;
-  }
+    const previous = logLikelihood;
+    ({ logLikelihood, parameters: next } = step(parameters));
+    return Math.abs(logLikelihood - previous);
+  }, stopping);
+  return { parameters, logLikelihood, iterations, converged };
 }

@@ -1,5 +1,5 @@
-import { DataError, normalizeLogs } from "@measurekit/core";
-import { type ExpectationMaximizationOptions, expectationMaximization } from "../math/expectation-maximization.js";
+import { DataError, normalizeLogs, type Stopping } from "@measurekit/core";
+import { expectationMaximization } from "../math/expectation-maximization.js";
 import { minimum } from "../math/extremes.js";
 
 /** A learner's answers to one item: the item, the states that master it, the count and the sum of outcomes. */
@@ -138,11 +138,7 @@ function maximize(counts: Counts, previous: Blim): Blim {
  *
  * @throws `DataError` when a group's answers have probability 0 under a step's parameters.
  */
-export function maximumLikelihood(
-  groups: readonly Group[],
-  start: Blim,
-  options: ExpectationMaximizationOptions,
-): BlimFit {
+export function maximumLikelihood(groups: readonly Group[], start: Blim, options: Stopping): BlimFit {
   const scratch = new Float64Array(start.probabilities.length);
   return expectationMaximization(
     start,

@@ -88,8 +88,9 @@ packages/core/                the published package @measurekit/core
   src/logistic.ts       logistic, logLogistic
   src/normalize-logs.ts normalizeLogs
   src/cholesky.ts       cholesky
+  src/iteration.ts      Stopping, Convergence, iterateToConvergence
   src/line-search.ts    ARMIJO, backtrack
-  src/vectors.ts        dot, maxAbs, mean
+  src/vectors.ts        dot, largestChange, maxAbs, mean
   test/<file>.test.ts   one file per concern; the numerics are validated by the fixtures of the packages
 packages/psychometrics/       the published package @measurekit/psychometrics
   src/index.ts          re-exports every module, and DataError, MeasurekitError and createRandom of core

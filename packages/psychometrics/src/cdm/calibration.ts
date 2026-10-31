@@ -8,6 +8,7 @@ import {
   DataError,
   isRecord,
   isUnitInterval,
+  iterateToConvergence,
   normalizeLogs,
 } from "@measurekit/core";
 import { checkDichotomous } from "../data/dichotomous.js";
@@ -151,13 +152,10 @@ export function calibrateCdm(
   if (data.respondents === 0) throw new DataError("Cognitive diagnosis needs at least one response.");
   const state = startingValues(design);
   const steps = additiveSteps(models, design, state);
-  let iterations = 0;
-  let converged = false;
-  while (!converged && iterations < maxIterations) {
-    iterations++;
-    const counts = expectedCounts(data, design, state);
-    converged = maximize(models, steps, state, counts) <= tolerance;
-  }
+  const { converged, iterations } = iterateToConvergence(
+    () => maximize(models, steps, state, expectedCounts(data, design, state)),
+    { tolerance, maxIterations },
+  );
   const logLikelihood = expectedCounts(data, design, state).logLikelihood;
   const parameters =
     design.itemAttributes.reduce((sum, indices, j) => sum + parameterCount(models[j], indices.length), 0) +

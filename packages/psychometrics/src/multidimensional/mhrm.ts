@@ -1,4 +1,4 @@
-import { backtrack, createRandom } from "@measurekit/core";
+import { backtrack, createRandom, largestChange } from "@measurekit/core";
 import type { CompressedResponses } from "../irt/responses.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import type { ItemState } from "./calibration-setup.js";
@@ -271,11 +271,4 @@ function averageInformation(moments: Moments, cycle: Moments, gain: number): voi
     const fresh = cycle.blocks[b];
     for (let k = 0; k < block.length; k++) block[k] = (block[k] ?? 0) + gain * ((fresh?.[k] ?? 0) - (block[k] ?? 0));
   });
-}
-
-function largestChange(previous: Float64Array, current: Float64Array): number {
-  let largest = 0;
-  for (let k = 0; k < current.length; k++)
-    largest = Math.max(largest, Math.abs((current[k] ?? 0) - (previous[k] ?? 0)));
-  return largest;
 }

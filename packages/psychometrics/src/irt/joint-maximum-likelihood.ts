@@ -1,10 +1,9 @@
-import { checkOptions, checkStopping, DataError } from "@measurekit/core";
+import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
 import { invert } from "../math/linear-algebra.js";
 import { newton, type OptimizerOptions } from "../math/optimize.js";
 import { findIncreasingRoot } from "../math/root.js";
 import type { CalibratedItem } from "./calibration.js";
-import { largestChange } from "./iteration.js";
 import { type LogisticParameters, oneParameterLogistic } from "./logistic.js";
 import { partialCredit, partialCreditInformation, partialCreditProbabilities, stepStarts } from "./partial-credit.js";
 import { MIN_PROBABILITY } from "./probability.js";
@@ -99,18 +98,17 @@ export function jointMaximumLikelihood(
 
   const previousTheta = new Float64Array(theta.length);
   const previousThresholds = new Float64Array(thresholds.length);
-  let iterations = 0;
-  let converged = false;
-  while (!converged && iterations < maxIterations) {
-    iterations++;
-    previousTheta.set(theta);
-    previousThresholds.set(thresholds);
-    for (let group = 0; group < theta.length; group++) theta[group] = estimation.solveTheta(group);
-    estimation.center();
-    for (let item = 0; item < itemIds.length; item++) estimation.stepItem(item);
-    const change = Math.max(largestChange(previousTheta, theta), largestChange(previousThresholds, thresholds));
-    converged = change <= tolerance;
-  }
+  const { converged, iterations } = iterateToConvergence(
+    () => {
+      previousTheta.set(theta);
+      previousThresholds.set(thresholds);
+      for (let group = 0; group < theta.length; group++) theta[group] = estimation.solveTheta(group);
+      estimation.center();
+      for (let item = 0; item < itemIds.length; item++) estimation.stepItem(item);
+      return Math.max(largestChange(previousTheta, theta), largestChange(previousThresholds, thresholds));
+    },
+    { tolerance, maxIterations },
+  );
 
   const correction = (itemIds.length - 1) / itemIds.length;
   return {

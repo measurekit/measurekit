@@ -12,6 +12,15 @@ export function maxAbs(values: Float64Array): number {
   return largest;
 }
 
+/** Returns the largest absolute change from `previous` to `current`, over the length of `current`. */
+export function largestChange(previous: Float64Array, current: Float64Array): number {
+  let largest = 0;
+  for (let j = 0; j < current.length; j++) {
+    largest = Math.max(largest, Math.abs((current[j] ?? 0) - (previous[j] ?? 0)));
+  }
+  return largest;
+}
+
 /** Returns the mean of at least one value. */
 export function mean(values: ArrayLike<number>): number {
   let sum = 0;

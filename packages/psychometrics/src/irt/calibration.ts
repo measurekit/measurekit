@@ -1,4 +1,11 @@
-import { checkChoice, checkOptions, checkStopping, DataError } from "@measurekit/core";
+import {
+  checkChoice,
+  checkOptions,
+  checkStopping,
+  DataError,
+  iterateToConvergence,
+  largestChange,
+} from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
 import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
@@ -6,7 +13,6 @@ import { type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
 import { type ExpectationStep, expectationStep } from "./expectation.js";
 import { hessianCovariance } from "./hessian-covariance.js";
-import { largestChange } from "./iteration.js";
 import {
   type GroupDistribution,
   groupDistributions,
@@ -219,18 +225,17 @@ function iterate<TParameters>(
   const previous = new Float64Array(values.length);
   const histograms = new Float64Array(histogramParameters(latent) + latent.groups.length);
   histogramChange(latent, histograms);
-  let iterations = 0;
-  let converged = false;
-  while (!converged && iterations < maxIterations) {
-    iterations++;
-    eStep.run();
-    previous.set(values);
-    for (const block of mStep.blocks) mStep.maximize(block);
-    maximizeDistributions(latent, values, nodes);
-    if (design !== null) maximizeTestlets(design, values, nodes);
-    converged = Math.max(largestChange(previous, values), histogramChange(latent, histograms)) <= tolerance;
-  }
-  return { converged, iterations };
+  return iterateToConvergence(
+    () => {
+      eStep.run();
+      previous.set(values);
+      for (const block of mStep.blocks) mStep.maximize(block);
+      maximizeDistributions(latent, values, nodes);
+      if (design !== null) maximizeTestlets(design, values, nodes);
+      return Math.max(largestChange(previous, values), histogramChange(latent, histograms));
+    },
+    { tolerance, maxIterations },
+  );
 }
 
 /**

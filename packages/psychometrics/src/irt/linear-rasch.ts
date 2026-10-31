@@ -1,9 +1,9 @@
+import { iterateToConvergence, largestChange } from "@measurekit/core";
 import { numericalHessian } from "../math/hessian.js";
 import { invert } from "../math/linear-algebra.js";
 import { type HessianFunction, newton } from "../math/optimize.js";
 import type { Quadrature } from "../math/quadrature.js";
 import { type ExpectationItem, type ExpectationStep, expectationStep } from "./expectation.js";
-import { largestChange } from "./iteration.js";
 import type { Population } from "./latent.js";
 import {
   type LocationRow,
@@ -115,16 +115,17 @@ export function fitLinearRasch(model: LinearRaschModel, options: LinearRaschOpti
   let parameters = startingValues(model, layout);
   if (held !== null) parameters[held.index] = held.value;
   const assign = assigner(layout, nodes, items, steps);
-  let converged = false;
-  let iterations = 0;
-  while (!converged && iterations < maxIterations) {
-    iterations++;
-    assign(parameters);
-    step.run();
-    const next = maximize(objective, parameters, held);
-    converged = largestChange(parameters, next) <= tolerance;
-    parameters = next;
-  }
+  const { converged, iterations } = iterateToConvergence(
+    () => {
+      assign(parameters);
+      step.run();
+      const next = maximize(objective, parameters, held);
+      const change = largestChange(parameters, next);
+      parameters = next;
+      return change;
+    },
+    { tolerance, maxIterations },
+  );
   assign(parameters);
   const logLikelihood = step.run();
   const covariance = options.standardErrors ? covarianceOf(layout, parameters, assign, step, objective, held) : null;

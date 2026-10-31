@@ -5,6 +5,8 @@ import {
   backtrack,
   cholesky,
   dot,
+  iterateToConvergence,
+  largestChange,
   logistic,
   logLogistic,
   maxAbs,
@@ -94,6 +96,49 @@ describe("vectors", () => {
   it("averages arrays and typed arrays alike in mean", () => {
     expect(mean([1, 2, 6])).toBe(3);
     expect(mean(Float64Array.of(0.5))).toBe(0.5);
+  });
+
+  it("takes the largest absolute change in largestChange, 0 for no values", () => {
+    expect(largestChange(Float64Array.of(1, 5, -2), Float64Array.of(1.5, 2, -2))).toBe(3);
+    expect(largestChange(Float64Array.of(0, 0), Float64Array.of(0, -4))).toBe(4);
+    expect(largestChange(new Float64Array(0), new Float64Array(0))).toBe(0);
+  });
+});
+
+describe("iterateToConvergence", () => {
+  it("stops at the first cycle whose change is at most the tolerance", () => {
+    const changes = [4, 2, 1, 0.5, 0.25];
+    let cycles = 0;
+    const outcome = iterateToConvergence(() => changes[cycles++] ?? Number.NaN, { tolerance: 1, maxIterations: 10 });
+    expect(outcome).toEqual({ converged: true, iterations: 3 });
+    expect(cycles).toBe(3);
+  });
+
+  it("runs the most cycles and reports no convergence when the change stays above the tolerance", () => {
+    let cycles = 0;
+    const outcome = iterateToConvergence(
+      () => {
+        cycles++;
+        return 2;
+      },
+      { tolerance: 1, maxIterations: 4 },
+    );
+    expect(outcome).toEqual({ converged: false, iterations: 4 });
+    expect(cycles).toBe(4);
+  });
+
+  it("converges on the last cycle that is allowed", () => {
+    expect(iterateToConvergence(() => 0, { tolerance: 0, maxIterations: 1 })).toEqual({
+      converged: true,
+      iterations: 1,
+    });
+  });
+
+  it("never converges on a change that is NaN", () => {
+    expect(iterateToConvergence(() => Number.NaN, { tolerance: 1, maxIterations: 3 })).toEqual({
+      converged: false,
+      iterations: 3,
+    });
   });
 });
 

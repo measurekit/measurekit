@@ -1,7 +1,6 @@
-import { checkOptions, checkStopping, DataError } from "@measurekit/core";
+import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
-import { largestChange } from "../irt/iteration.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { forEachTime, type TimedResponses, type TimeItem, timedResponses } from "./timed-responses.js";
 
@@ -88,14 +87,14 @@ export function calibrateResponseTimes(
   });
   const state = startingValues(timed, counts);
   const previous = new Float64Array(state.values.length);
-  let iterations = 0;
-  let converged = false;
-  while (!converged && iterations < maxIterations) {
-    iterations++;
-    previous.set(state.values);
-    emCycle(timed, state, counts);
-    converged = largestChange(previous, state.values) <= tolerance;
-  }
+  const { converged, iterations } = iterateToConvergence(
+    () => {
+      previous.set(state.values);
+      emCycle(timed, state, counts);
+      return largestChange(previous, state.values);
+    },
+    { tolerance, maxIterations },
+  );
   const { intensity, discrimination } = state;
   const speedSd = state.values[2 * itemCount] ?? 1;
   const persons = new Set<number>();

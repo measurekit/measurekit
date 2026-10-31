@@ -1,7 +1,7 @@
-import { createRandom, DataError, type Random } from "@measurekit/core";
+import { createRandom, DataError, type Random, type Stopping } from "@measurekit/core";
 import type { EventLog } from "../data/event-log.js";
 import { entry } from "../data/record.js";
-import { type ExpectationMaximizationOptions, expectationMaximization } from "../math/expectation-maximization.js";
+import { expectationMaximization } from "../math/expectation-maximization.js";
 import { forwardBackward } from "../math/hidden-markov.js";
 import { type BktGuessSlip, type BktLearning, type BktSkill, guessSlipOf, learningOf, priorOf } from "./parameters.js";
 
@@ -161,7 +161,7 @@ export function estimate(
   sequences: readonly Sequence[],
   starts: readonly [BktSkill, ...BktSkill[]],
   forgetting: boolean,
-  options: ExpectationMaximizationOptions,
+  options: Stopping,
 ): SkillEstimate {
   const fits = starts.map((start): SkillEstimate => {
     const result = expectationMaximization(
