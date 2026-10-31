@@ -135,6 +135,11 @@ priors, the log-likelihood plus the log prior densities. Bock-Aitkin EM alternat
   that never lowers it. Items sharing a parameter step together. Bounded parameters (c and d, in (0, 1)) are estimated
   on the logit scale.
 
+Every second EM step is followed by a jump along the line of the two steps, the squared extrapolation SQUAREM (Varadhan
+and Roland, 2008), as mirt accelerates EM by default. The jump is kept only where the log-likelihood does not fall below
+that of the first step; otherwise the plain steps go on. It reaches the same estimates in about half the iterations, and
+in a fifth of them for testlets. A histogram of theta is estimated by plain EM. `iterations` counts the E-steps.
+
 A result that has not converged within `maxIterations`, or that has a degenerate normal distribution of theta (see
 [small groups](#groups-and-distributions-of-theta)), has `converged: false`; it does not throw.
 

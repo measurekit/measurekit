@@ -8,6 +8,7 @@ import {
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
+import { toUnbounded } from "./bounds.js";
 import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
 import { type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
@@ -25,6 +26,7 @@ import { type Maximization, maximization } from "./m-step.js";
 import type { TestItem } from "./model.js";
 import { quadratureRule } from "./quadrature.js";
 import { type CompressedResponses, compressResponses } from "./responses.js";
+import { squarem } from "./squarem.js";
 import { maximizeTestlets, type TestletEstimate, testletEstimates } from "./testlets.js";
 
 /** An item with its calibrated parameters. */
@@ -212,7 +214,10 @@ export function calibrateWithCovariance<TParameters>(
   };
 }
 
-/** Runs EM cycles of the E-step and M-step until no parameter changes by more than `tolerance` or `maxIterations`. */
+/**
+ * Runs EM cycles of the E-step and M-step until no parameter changes by more than `tolerance` or `maxIterations`: with
+ * the extrapolation SQUAREM, except for a histogram of theta, whose weights it does not extrapolate.
+ */
 function iterate<TParameters>(
   setup: Setup<TParameters>,
   mStep: Maximization<TParameters>,
@@ -221,20 +226,27 @@ function iterate<TParameters>(
   tolerance: number,
   maxIterations: number,
 ): { readonly converged: boolean; readonly iterations: number } {
-  const { values, population: latent, design } = setup;
+  const { values, population: latent, design, free } = setup;
   const previous = new Float64Array(values.length);
   const histograms = new Float64Array(histogramParameters(latent) + latent.groups.length);
   histogramChange(latent, histograms);
-  return iterateToConvergence(
-    () => {
-      eStep.run();
-      previous.set(values);
-      for (const block of mStep.blocks) mStep.maximize(block);
-      maximizeDistributions(latent, values, nodes);
-      if (design !== null) maximizeTestlets(design, values, nodes);
-      return Math.max(largestChange(previous, values), histogramChange(latent, histograms));
+  const step = (): { readonly logLikelihood: number; readonly change: number } => {
+    const logLikelihood = eStep.run();
+    previous.set(values);
+    for (const block of mStep.blocks) mStep.maximize(block);
+    maximizeDistributions(latent, values, nodes);
+    if (design !== null) maximizeTestlets(design, values, nodes);
+    return { logLikelihood, change: Math.max(largestChange(previous, values), histogramChange(latent, histograms)) };
+  };
+  const stopping = { tolerance, maxIterations };
+  if (histogramParameters(latent) > 0) return iterateToConvergence(() => step().change, stopping);
+  return squarem(
+    {
+      step,
+      get: () => Float64Array.from(values, (x, j) => toUnbounded(x, free[j]?.lower ?? 0, free[j]?.upper ?? 0)),
+      set: (state) => mStep.assign(mStep.all, state),
     },
-    { tolerance, maxIterations },
+    stopping,
   );
 }
 
