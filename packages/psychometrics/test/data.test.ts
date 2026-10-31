@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { checkFacetedScores } from "../src/data/faceted-scores.js";
 import {
   DataError,
+  type FacetedScore,
   itemStatistics,
   type ResponseMatrix,
   responseMatrix,
@@ -8,6 +10,54 @@ import {
   responseRecords,
   scoreResponses,
 } from "../src/index.js";
+
+describe("checkFacetedScores", () => {
+  const scores: FacetedScore[] = [
+    { levels: { person: "p1", item: "essay", rater: "r2" }, score: 3 },
+    { levels: { person: "p2", item: "essay", rater: "r1", occasion: "a" }, score: 0.5 },
+  ];
+
+  it("accepts scores with an element for each facet, and ignores other facets and the kind of score", () => {
+    expect(() => checkFacetedScores(scores, ["person", "item", "rater"])).not.toThrow();
+    expect(() => checkFacetedScores(scores, [])).not.toThrow();
+    expect(() => checkFacetedScores([], ["person"])).not.toThrow();
+  });
+
+  it("names the score and the facet of an element that is missing or not a string", () => {
+    expect(() => checkFacetedScores(scores, ["person", "occasion"])).toThrow(
+      'Score 1 needs a string element for the facet "occasion", found undefined.',
+    );
+    expect(() => checkFacetedScores(JSON.parse('[{ "levels": { "person": 1 }, "score": 1 }]'), ["person"])).toThrow(
+      'Score 1 needs a string element for the facet "person", found 1.',
+    );
+    expect(() => checkFacetedScores(scores, ["constructor"])).toThrow(DataError);
+  });
+
+  it.each([
+    ["a missing score", '[{ "levels": { "person": "p1" } }]', "Score 1 needs a finite score, found undefined."],
+    ["a score that is a string", '[{ "levels": { "person": "p1" }, "score": "3" }]', 'found "3"'],
+    ["a score that is null", '[{ "levels": { "person": "p1" }, "score": null }]', "found null"],
+    [
+      "levels that are null",
+      '[{ "levels": null, "score": 1 }]',
+      "Score 1 needs levels, an object of elements by facet",
+    ],
+    ["levels that are an array", '[{ "levels": ["p1"], "score": 1 }]', "Score 1 needs levels"],
+    ["a score that is a number", "[3]", "Score 1 must be an object { levels, score }, found 3."],
+    ["scores that are an object", "{}", "The scores must be an array of objects { levels, score }, found an object."],
+  ])("rejects %s from JSON", (_, json, message) => {
+    expect(() => checkFacetedScores(JSON.parse(json), ["person"])).toThrow(message);
+  });
+
+  it("rejects a score that is not finite", () => {
+    expect(() => checkFacetedScores([{ levels: { person: "p1" }, score: Number.NaN }], ["person"])).toThrow(
+      "Score 1 needs a finite score, found NaN.",
+    );
+    expect(() =>
+      checkFacetedScores([{ levels: { person: "p1" }, score: Number.POSITIVE_INFINITY }], ["person"]),
+    ).toThrow("found Infinity");
+  });
+});
 
 describe("responseMatrix", () => {
   it("builds a matrix with default ids", () => {

@@ -12,6 +12,7 @@ export {
   type IrtOptions,
   type IrtPrior,
   irt,
+  type ThetaDistribution,
 } from "./irt.js";
 export type { DichotomousItem, GradedItem, IrtItem, PartialCreditItem } from "./items.js";
 export type { IrtParameters } from "./parameters.js";

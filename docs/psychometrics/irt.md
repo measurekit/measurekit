@@ -112,18 +112,19 @@ result.logLikelihood; // also aic, bic, converged and iterations
 data, [response records](data.md#response-records): both give the same calibration, and records take memory
 in proportion to the responses only.
 
-| Option           | Default             | Meaning                                                                                                                 |
-| ---------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `model`          | required            | One model for every item, or an array with one per item, such as the 3PL and the GPCM.                                  |
-| `fixed`          | none                | Parameters of anchor items by item id. They are not estimated; the others take their scale.                             |
-| `priors`         | none                | A prior per vector entry name, such as `{ c: betaPrior(5, 17) }`, for every item estimating it.                         |
-| `quadrature`     | 61 rectangular      | Nodes over theta: `{ method: "rectangular" \| "gauss-hermite", points }`.                                               |
-| `groups`         | one group           | Each person's group label, for [several groups on one scale](#groups-and-distributions-of-theta).                       |
-| `latent`         | `"standard-normal"` | The distribution of theta, for every group or by group label: `"standard-normal"`, `"normal"`, `"empirical-histogram"`. |
-| `standardErrors` | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                        |
-| `testlets`       | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                             |
-| `tolerance`      | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                     |
-| `maxIterations`  | `500`               | The most EM iterations.                                                                                                 |
+| Option           | Default             | Meaning                                                                                                                  |
+| ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `model`          | required            | One model for every item, or an array with one per item, such as the 3PL and the GPCM.                                   |
+| `fixed`          | none                | Parameters of anchor items by item id. They are not estimated; the others take their scale.                              |
+| `priors`         | none                | A prior per vector entry name, such as `{ c: betaPrior(5, 17) }`, for every item estimating it.                          |
+| `itemPriors`     | none                | Priors by item id, then entry name, such as `{ new1: { b: normalPrior(0.4, 0.8) } }`: [priors of single items](#priors). |
+| `quadrature`     | 61 rectangular      | Nodes over theta: `{ method: "rectangular" \| "gauss-hermite", points }`.                                                |
+| `groups`         | one group           | Each person's group label, for [several groups on one scale](#groups-and-distributions-of-theta).                        |
+| `latent`         | `"standard-normal"` | The distribution of theta, for every group or by group label: `"standard-normal"`, `"normal"`, `"empirical-histogram"`.  |
+| `standardErrors` | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                         |
+| `testlets`       | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                              |
+| `tolerance`      | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                      |
+| `maxIterations`  | `500`               | The most EM iterations.                                                                                                  |
 
 The estimates maximize the marginal log-likelihood, theta integrated over its distribution, N(0, 1) by default; with
 priors, the log-likelihood plus the log prior densities. Bock-Aitkin EM alternates two steps:
@@ -169,6 +170,44 @@ Missing responses are skipped; persons without responses change nothing. An esti
 its highest response; it needs responses in every one of them, at least two, and no more than its model allows: a
 dichotomous item with only correct responses throws `DataError`, as its difficulty has no finite estimate. A fixed item
 may have more categories than its responses reach.
+
+### Covariance of the item parameters
+
+`calibrateWithCovariance(data, options)` calibrates as `calibrate` does, with the same options, and also returns the
+covariance matrix of all the estimated item parameters, with the covariances between items that the items' own
+standard errors leave out. A function of the parameters of several items, such as an equated score, has the variance
+gᵀ Σ g by the delta method, g its gradient and Σ this matrix.
+
+```ts
+import { betaPrior, calibrateWithCovariance, logNormalPrior } from "@measurekit/psychometrics/irt";
+
+// `matrix` and `models` are those of the example above.
+const { covariance } = calibrateWithCovariance(matrix, {
+  model: models,
+  fixed: { item1: { a: 1.2, b: -0.5, c: 0.2, d: 1 } },
+  priors: { a: logNormalPrior(0, 0.5), c: betaPrior(5, 17) },
+  standardErrors: "hessian",
+});
+
+covariance?.parameters; // [{ item: "item2", name: "a" }, ..., { item: "item4", name: "b2" }]
+covariance?.matrix[0]?.[0]; // 0.160, the square of the standard error of item2's a
+```
+
+| Member        | Meaning                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `calibration` | The result of `calibrate`.                                                                                                                       |
+| `covariance`  | `{ parameters, matrix }`, or `null`.                                                                                                             |
+| `parameters`  | The `item` and `name` of each row and column: the estimated items in item order, each with the names of its `standardErrors`.                    |
+| `matrix`      | The covariance matrix by rows, symmetric, on the parameters' own scale: `matrix[i][j]` is the covariance of `parameters[i]` and `parameters[j]`. |
+
+- **Which parameters.** The matrix is the part for the item parameters of the covariance matrix of all the estimated
+  parameters, so it includes the uncertainty of estimated distributions of theta and of testlets, whose own parameters
+  it does not list. Fixed items are not listed.
+- **Shared parameters.** Items whose model shares a parameter, as RSM items share a and the steps, list it once for each
+  item, with the same variance and a correlation of 1.
+- **`null`.** Without standard errors (`standardErrors: "none"`), with no estimated item, and where the information
+  cannot be inverted or gives a variance that is not positive.
+- **Plain data.** The matrix is nested arrays, so it round-trips through JSON.
 
 ### Groups and distributions of theta
 
@@ -322,6 +361,25 @@ thousands of iterations. Adaptive tests select single items; selecting whole tes
 Priors apply to a parameter on its own scale, not on the logit scale. A custom prior implements `ParameterPrior`:
 `logDensity`, `logDensityDerivative` and `logDensitySecondDerivative`.
 
+`priors` applies one prior per parameter name to every estimated item whose model has it. `itemPriors` sets the prior
+of a parameter of one item, by item id and then name, and replaces the `priors` entry of that name for that item:
+information about a new item from outside its responses, such as a regression of difficulty on its features.
+
+```ts
+import { calibrate, normalPrior, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+
+// `responses` holds the anchor items, whose parameters `fixed` gives, and "new1", which few persons answered.
+calibrate(responses, {
+  model: twoParameterLogistic,
+  fixed,
+  itemPriors: { new1: { b: normalPrior(0.4, 0.8) } },
+});
+```
+
+The items must be estimated, ones in `fixed` have no prior, and the names must be ones the item's model has. A parameter
+that items of a model share, as RSM items share a and the steps, takes `priors` only. Each of these cases throws
+`DataError`.
+
 ### Quadrature
 
 | `method`        | Nodes                                                                                   |
@@ -434,6 +492,24 @@ Estimates are never `NaN`. A standard error is `Infinity` only where the items g
 person's answered items, matched to `items` by id, as a calibration's items are; `estimator` defaults to
 `posteriorMeanEstimate` and can be any of the four or `untilMixed` of two. It returns `{ id, theta, standardError }` per
 person, `null` for a person without responses.
+
+### Posterior distribution
+
+`thetaPosterior(items, responses, options)` returns the whole posterior of theta that `posteriorMeanEstimate`
+summarizes, as a `ThetaDistribution`: `nodes`, the quadrature nodes placed on the prior, and `weights`, their
+probabilities, which sum to 1. `options` are the `prior` and the `quadrature` of the estimators; testlets are not
+taken. Without responses the posterior is the prior's quadrature.
+
+```ts
+import { thetaPosterior } from "@measurekit/psychometrics/irt";
+
+const { nodes, weights } = thetaPosterior(items, [1, 0, null]);
+nodes.length; // 61, from -6 to 6
+weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // 0.482, P(theta > 0)
+```
+
+A calibration's `GroupDistribution` has the same `nodes` and `weights`, so it is a `ThetaDistribution` too: the
+distribution of theta in a population. `@measurekit/knowledge-tracing` returns the same shape from its online IRT model.
 
 ## Summed-score tables
 

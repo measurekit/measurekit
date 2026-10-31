@@ -78,6 +78,30 @@ data.personIds; // ["ana", "budi"], in order of first appearance
 Calibration works internally on the answered responses of each person, whichever input it takes, so both give the
 same results. The other statistics compare persons over whole rows or items, and take a matrix.
 
+## Faceted scores
+
+A `FacetedScore` is one score in long format with the element of each facet it was observed at, for designs in which a
+score depends on several facets, such as the person, the task and the rater. It is a plain object, so it can be built by
+hand or loaded from JSON.
+
+```ts
+import type { FacetedScore } from "@measurekit/psychometrics/data";
+
+const scores: FacetedScore[] = [
+  { levels: { person: "p1", task: "essay", rater: "r1" }, score: 3 },
+  { levels: { person: "p1", task: "essay", rater: "r2" }, score: 4 },
+  { levels: { person: "p2", task: "essay", rater: "r1" }, score: 2 },
+];
+```
+
+| Field    | Meaning                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------ |
+| `levels` | The element of each facet by facet name, as a string: `{ person: "p1", rater: "r2" }`.     |
+| `score`  | The score, a finite number. What else it must be, such as an integer, is for the analysis. |
+
+Scores need not form a complete design: each combination of elements occurs as often as it was observed, and a facet
+may have elements that others do not meet.
+
 ## Missing responses
 
 `null` marks a missing response. Each analysis states how it treats them; in classical test theory, statistics of

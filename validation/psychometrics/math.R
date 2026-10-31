@@ -43,3 +43,35 @@ write_fixture("math-gauss-hermite", list(
   source = "Golub-Welsch: eigen() of the Jacobi matrix of the probabilists' Hermite polynomials.",
   rules = lapply(c(1, 2, 5, 21, 61), gauss_hermite)
 ))
+
+# Symmetric eigendecompositions by base R's eigen(symmetric = TRUE), which calls LAPACK dsyevr, an algorithm other than
+# the package's Jacobi method. Eigenvectors are stored by rows, in the order of the eigenvalues, largest first; they are
+# unique up to sign where the eigenvalues are distinct.
+eigen_case <- function(name, matrix) {
+  decomposition <- eigen(matrix, symmetric = TRUE)
+  distinct <- all(diff(decomposition$values) < -1e-8)
+  list(name = name, size = nrow(matrix), matrix = unname(matrix), values = I(decomposition$values),
+       vectors = if (distinct) unname(t(decomposition$vectors)) else NULL)
+}
+
+set.seed(20261029)
+random_symmetric <- crossprod(matrix(rnorm(25), 5)) - diag(c(0.5, 1, 1.5, 2, 2.5))
+rotation <- qr.Q(qr(matrix(rnorm(9), 3)))
+repeated <- rotation %*% diag(c(5, 2, 2)) %*% t(rotation)
+repeated <- (repeated + t(repeated)) / 2
+lsat7_correlation <- cor(mirt::expand.table(mirt::LSAT7))
+bfi_correlation <- cor(psych::bfi[, 1:25], use = "pairwise.complete.obs")
+write_fixture("math-eigen", list(
+  source = paste("Base R eigen(symmetric = TRUE): a random symmetric matrix with negative eigenvalues, a matrix with a",
+                 "repeated eigenvalue, mirt::LSAT7's correlations, psych::bfi's pairwise correlations (25 items), and",
+                 "small matrices."),
+  cases = list(
+    eigen_case("a random symmetric matrix with negative eigenvalues", random_symmetric),
+    eigen_case("a matrix with a repeated eigenvalue", repeated),
+    eigen_case("the correlations of LSAT7", lsat7_correlation),
+    eigen_case("the pairwise correlations of bfi items 1 to 25", bfi_correlation),
+    eigen_case("a 2 by 2 matrix", matrix(c(2, 1, 1, 3), 2)),
+    eigen_case("the identity matrix of order 3", diag(3)),
+    eigen_case("one entry", matrix(-4, 1, 1))
+  )
+))

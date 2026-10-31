@@ -31,6 +31,15 @@ export interface CalibrationOptions<TParameters> {
    */
   readonly priors?: Readonly<Record<string, ParameterPrior>>;
   /**
+   * Priors by item id, then parameter name, such as `{ new1: { b: normalPrior(0.4, 0.8) } }`, for the items whose
+   * parameters have information beyond their responses, such as a regression on their features. An item's prior of a
+   * parameter replaces the prior of `priors` for that parameter. The items must be estimated, and the parameters must
+   * be ones its model does not share among items.
+   *
+   * @defaultValue none
+   */
+  readonly itemPriors?: Readonly<Record<string, Readonly<Record<string, ParameterPrior>>>>;
+  /**
    * The quadrature rule over theta.
    *
    * @defaultValue 61 rectangular points

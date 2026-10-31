@@ -43,6 +43,11 @@ export interface ExpectationStep {
  * the bifactor dimension reduction: a person's likelihood at θ_q multiplies Σ_g w_g Π_j P_j(x_j | θ_q + γ_g) over each
  * testlet, integrated once per run for each frequent pattern of responses to the testlet.
  *
+ * `logTerms` adds a log-likelihood term the items do not give to a person's log joint density at each node, such as the
+ * density of the person's response times given theta in a joint model of speed and accuracy. It is by person, then
+ * node, with the persons of `data`, and it is read at each run, so that a caller whose term depends on its own
+ * parameters rewrites it between runs. The log-likelihood a run returns includes it.
+ *
  * @see {@link https://doi.org/10.1007/BF02295430 | Gibbons and Hedeker (1992)}
  */
 export function expectationStep(
@@ -51,6 +56,7 @@ export function expectationStep(
   nodes: Float64Array,
   { groups, groupOf }: Population,
   design: TestletDesign | null = null,
+  logTerms: Float64Array | null = null,
 ): ExpectationStep {
   const nodeCount = nodes.length;
   const { offsets, codes } = data;
@@ -79,9 +85,17 @@ export function expectationStep(
     });
   };
 
+  /** Adds the person's entries of `logTerms`, if there are any, to `posterior`. */
+  const addTerm = (person: number): void => {
+    if (logTerms === null) return;
+    const first = person * nodeCount;
+    for (let q = 0; q < nodeCount; q++) posterior[q] = (posterior[q] ?? 0) + (logTerms[first + q] ?? 0);
+  };
+
   /** Writes a person's log joint densities over the nodes into `posterior`, from the weights of the person's group. */
-  const joint = (start: number, end: number, logWeights: Float64Array): void => {
+  const joint = (person: number, start: number, end: number, logWeights: Float64Array): void => {
     posterior.set(logWeights);
+    addTerm(person);
     for (let r = start; r < end; r++) {
       const item = responseItems[r] ?? 0;
       if ((testletOf[item] ?? -1) >= 0) continue;
@@ -126,7 +140,7 @@ export function expectationStep(
       forEachRespondent((person, start, end, g) => {
         const group = groups[g];
         if (group === undefined) return;
-        joint(start, end, group.logWeights);
+        joint(person, start, end, group.logWeights);
         reduction?.integrate(person, start, end, posterior);
         logLikelihood += normalizeLogs(posterior);
         count(start, end, group.counts);
@@ -139,7 +153,7 @@ export function expectationStep(
       forEachRespondent((person, start, end, g) => {
         const group = groups[g];
         if (group === undefined) return;
-        joint(start, end, group.logWeights);
+        joint(person, start, end, group.logWeights);
         normalizeLogs(posterior);
         visit(person, posterior);
       });

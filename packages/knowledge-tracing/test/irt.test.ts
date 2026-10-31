@@ -12,9 +12,10 @@ import {
   type IrtState,
   irt,
   splitByLearner,
+  type ThetaDistribution,
 } from "../src/index.js";
 import reference from "./fixtures/irt-abilities.json" with { type: "json" };
-import { expectAllClose } from "./helpers.js";
+import { expectAllClose, expectClose } from "./helpers.js";
 
 /** Absolute tolerance of EAP estimates, predictions and log-probabilities against the written-out grid posterior. */
 const GRID_TOLERANCE = 1e-10;
@@ -25,6 +26,13 @@ const GRID_TOLERANCE = 1e-10;
 const MODE_TOLERANCE = 1e-5;
 /** Absolute tolerance of the MAP standard error at the default spacing, growing with its fourth power. */
 const MODE_ERROR_TOLERANCE = 1e-4;
+
+/** Returns the mean and the standard deviation of a distribution of θ. */
+function momentsOf({ nodes, weights }: ThetaDistribution): [number, number] {
+  const mean = weights.reduce((sum, weight, q) => sum + weight * (nodes[q] ?? 0), 0);
+  const variance = weights.reduce((sum, weight, q) => sum + weight * ((nodes[q] ?? 0) - mean) ** 2, 0);
+  return [mean, Math.sqrt(variance)];
+}
 
 const items = reference.items as Record<string, IrtItem>;
 const log = eventLog(reference.events);
@@ -37,12 +45,14 @@ describe("IRT ability estimates against R", () => {
       const model = irt({ parameters: { items }, prior: prior as IrtPrior, points });
       const fit = model.fit(log);
       const eap: number[] = [];
+      const moments: number[] = [];
       const map: number[] = [];
       const states = new Map<string, IrtState>();
       for (const event of log) {
         const state = model.update(states.get(event.learner) ?? model.initialState(event.learner), event);
         states.set(event.learner, state);
         eap.push(model.ability(state).theta, model.ability(state).standardError);
+        moments.push(...momentsOf(model.posterior(state)));
         map.push(model.ability(state, { estimator: "map" }).theta);
       }
       expectAllClose(fit.predictions, trace.prediction, GRID_TOLERANCE, "prediction");
@@ -52,6 +62,7 @@ describe("IRT ability estimates against R", () => {
         GRID_TOLERANCE,
         "EAP",
       );
+      expectAllClose(moments, eap, GRID_TOLERANCE, "posterior mean and standard deviation");
       expectAllClose(map, trace.map, MODE_TOLERANCE * spacing ** 5, "MAP");
       const errors = [...states.values()].map((state) => model.ability(state, { estimator: "map" }).standardError);
       const lastOfEach = [...states.keys()].map((learner) => log.findLastIndex((event) => event.learner === learner));
@@ -145,6 +156,60 @@ describe("IRT model", () => {
         expect(state).toEqual(direct);
       }),
     );
+  });
+
+  it("gives the posterior of θ on the grid, a distribution that sums to 1", () => {
+    fc.assert(
+      fc.property(answers, (pairs) => {
+        let state = model.initialState("ana");
+        for (const event of eventsOf(pairs)) state = model.update(state, event);
+        const { nodes, weights } = model.posterior(state);
+        expect(nodes).toHaveLength(61);
+        expect(weights).toHaveLength(61);
+        expect(nodes[0]).toBe(-6);
+        expect(nodes[60]).toBe(6);
+        expect(nodes.every((node, q) => q === 0 || node > (nodes[q - 1] ?? 0))).toBe(true);
+        expect(weights.every((weight) => weight >= 0)).toBe(true);
+        expectClose(
+          weights.reduce((sum, weight) => sum + weight, 0),
+          1,
+          1e-12,
+        );
+        const [mean, sd] = momentsOf({ nodes, weights });
+        expectClose(mean, model.ability(state).theta, 1e-12);
+        expectClose(sd, model.ability(state).standardError, 1e-12);
+      }),
+    );
+  });
+
+  it("starts from the prior, on the grid of the prior", () => {
+    const shifted = irt({ parameters: { items }, prior: { mean: 0.5, sd: 2 }, points: 41 });
+    const { nodes, weights } = shifted.posterior(shifted.initialState("ana"));
+    expect(nodes[0]).toBe(0.5 - 12);
+    expect(nodes[40]).toBe(0.5 + 12);
+    const density = nodes.map((node) => Math.exp(-(((node - 0.5) / 2) ** 2) / 2));
+    const total = density.reduce((sum, value) => sum + value, 0);
+    expectAllClose(
+      weights,
+      density.map((value) => value / total),
+      1e-15,
+      "prior weights",
+    );
+  });
+
+  it("returns a posterior that does not change the state, and is the same from a state stored as JSON", () => {
+    const state = model.update(model.initialState("ana"), {
+      learner: "ana",
+      item: "g1",
+      skills: [],
+      time: 0,
+      outcome: 1,
+    });
+    const frozen = Object.freeze(state);
+    const posterior = model.posterior(frozen);
+    expect(model.posterior(JSON.parse(JSON.stringify(frozen)))).toEqual(posterior);
+    (posterior.nodes as number[]).fill(0);
+    expect(model.posterior(frozen).nodes[0]).toBe(-6);
   });
 
   it("updates and estimates on a grid of more points than a spread into Math.max takes", () => {
@@ -263,6 +328,10 @@ describe("IRT edge cases", () => {
       "needs logDensity less its maximum, so that its largest value is 0",
     );
     expect(() => model.ability(state, { estimator: "mle" as "eap" })).toThrow('"eap" or "map"');
+    expect(() => model.posterior({ ...state, curvature: [] })).toThrow(
+      "needs curvature, an array of 61 finite numbers",
+    );
+    expect(() => model.posterior(JSON.parse("null"))).toThrow(DataError);
     expect(() => model.initialState("")).toThrow(DataError);
   });
 });

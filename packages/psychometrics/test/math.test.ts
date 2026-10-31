@@ -2,12 +2,14 @@ import { logistic, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { chiSquareUpperTail } from "../src/math/chi-square.js";
+import { symmetricEigen } from "../src/math/eigen.js";
 import { numericalHessian } from "../src/math/hessian.js";
 import { invert, invertPositiveDefinite } from "../src/math/linear-algebra.js";
 import { normalCdf, normalDensity } from "../src/math/normal.js";
 import { bfgs, newton } from "../src/math/optimize.js";
 import { gaussHermite, rectangular } from "../src/math/quadrature.js";
 import { findIncreasingRoot, findRoot } from "../src/math/root.js";
+import eigen from "./fixtures/math-eigen.json" with { type: "json" };
 import functions from "./fixtures/math-functions.json" with { type: "json" };
 import hermite from "./fixtures/math-gauss-hermite.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
@@ -18,6 +20,8 @@ const FUNCTION_TOLERANCE = 1e-14;
 const CHI_SQUARE_TOLERANCE = 1e-12;
 /** Absolute tolerance of Gauss-Hermite nodes and weights against R's eigenvalue method. */
 const QUADRATURE_TOLERANCE = 1e-12;
+/** Absolute tolerance of eigenvalues and, up to sign, eigenvectors against R's eigen. */
+const EIGEN_TOLERANCE = 1e-12;
 
 function expectRelative(actual: number, expected: number, tolerance: number, label: string): void {
   expect(Math.abs(actual - expected), label).toBeLessThanOrEqual(tolerance * Math.abs(expected));
@@ -33,6 +37,118 @@ describe("chiSquareUpperTail", () => {
     });
   });
 });
+
+describe("symmetricEigen", () => {
+  for (const { name, size, matrix, values, vectors } of eigen.cases) {
+    it(`matches R's eigen for ${name}`, () => {
+      const result = symmetricEigen(Float64Array.from(matrix.flat()), size);
+      expect(result.converged).toBe(true);
+      values.forEach((expected, k) => {
+        expectClose(defined(result.values[k]), expected, EIGEN_TOLERANCE, `value ${k}`);
+      });
+      // The sign of an eigenvector is arbitrary: compare with the sign that makes it agree with R's.
+      vectors?.forEach((expected, k) => {
+        const actual = result.vectors.subarray(k * size, (k + 1) * size);
+        const sign = expected.reduce((sum, value, i) => sum + value * defined(actual[i]), 0) < 0 ? -1 : 1;
+        expected.forEach((value, i) => {
+          expectClose(sign * defined(actual[i]), value, EIGEN_TOLERANCE, `vector ${k}, entry ${i}`);
+        });
+      });
+    });
+  }
+
+  it("gives an orthonormal basis for a repeated eigenvalue", () => {
+    const { matrix, size } = defined(eigen.cases.find(({ name }) => name.includes("repeated")));
+    const { vectors } = symmetricEigen(Float64Array.from(matrix.flat()), size);
+    expectOrthonormal(vectors, size);
+  });
+
+  it("returns a diagonal matrix's entries in decreasing order with the unit vectors that belong to them", () => {
+    const result = symmetricEigen(Float64Array.of(1, 0, 0, 0, 3, 0, 0, 0, 2), 3);
+    expect([...result.values]).toEqual([3, 2, 1]);
+    expect([...result.vectors]).toEqual([0, 1, 0, 0, 0, 1, 1, 0, 0]);
+    expect(result).toMatchObject({ converged: true, iterations: 0 });
+  });
+
+  it("gives zeros and the identity for the zero matrix", () => {
+    const result = symmetricEigen(new Float64Array(9), 3);
+    expect([...result.values]).toEqual([0, 0, 0]);
+    expect([...result.vectors]).toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    expect(result.converged).toBe(true);
+  });
+
+  it("stays defined for entries of very different magnitudes", () => {
+    for (const scale of [1e-150, 1e150]) {
+      const result = symmetricEigen(Float64Array.of(2 * scale, scale, scale, 3 * scale), 2);
+      expectClose(defined(result.values[0]) / scale, (5 + Math.sqrt(5)) / 2, 1e-12);
+      expectClose(defined(result.values[1]) / scale, (5 - Math.sqrt(5)) / 2, 1e-12);
+    }
+    const stretched = symmetricEigen(Float64Array.of(1e-300, 1e-310, 1e-310, 1), 2);
+    expect([...stretched.values]).toEqual([1, 1e-300]);
+  });
+
+  it("stops at the iteration limit and reports it", () => {
+    const matrix = Float64Array.of(4, 1, 2, 1, 3, 0, 2, 0, 5);
+    expect(symmetricEigen(matrix, 3, { maxIterations: 0 })).toMatchObject({ converged: false, iterations: 0 });
+    const one = symmetricEigen(matrix, 3, { maxIterations: 1 });
+    expect(one).toMatchObject({ converged: false, iterations: 1 });
+    expect(symmetricEigen(matrix, 3, { tolerance: 0.5 }).iterations).toBeLessThan(symmetricEigen(matrix, 3).iterations);
+  });
+
+  it("leaves the matrix unchanged and reports no convergence for non-finite entries", () => {
+    const matrix = Float64Array.of(1, Number.NaN, Number.NaN, 1);
+    const result = symmetricEigen(matrix, 2);
+    expect(result.converged).toBe(false);
+    expect(Number.isNaN(matrix[0])).toBe(false);
+  });
+
+  it("satisfies A v = λ v for orthonormal v and keeps the trace, for any symmetric matrix", () => {
+    const symmetric = fc
+      .integer({ min: 1, max: 7 })
+      .chain((size) =>
+        fc.array(fc.double({ min: -10, max: 10, noNaN: true }), { minLength: size * size, maxLength: size * size }),
+      );
+    fc.assert(
+      fc.property(symmetric, (values) => {
+        const size = Math.sqrt(values.length);
+        const a = new Float64Array(size * size);
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++)
+            a[i * size + j] = (defined(values[i * size + j]) + defined(values[j * size + i])) / 2;
+        }
+        const { values: lambda, vectors, converged } = symmetricEigen(a, size);
+        expect(converged).toBe(true);
+        expectOrthonormal(vectors, size);
+        for (let k = 0; k < size; k++) {
+          if (k > 0) expect(defined(lambda[k])).toBeLessThanOrEqual(defined(lambda[k - 1]));
+          for (let i = 0; i < size; i++) {
+            let product = 0;
+            for (let j = 0; j < size; j++) product += defined(a[i * size + j]) * defined(vectors[k * size + j]);
+            expectClose(product, defined(lambda[k]) * defined(vectors[k * size + i]), 1e-12 * size * 10);
+          }
+        }
+        let trace = 0;
+        for (let i = 0; i < size; i++) trace += defined(a[i * size + i]);
+        expectClose(
+          lambda.reduce((sum, value) => sum + value, 0),
+          trace,
+          1e-12 * size * 10,
+        );
+      }),
+    );
+  });
+});
+
+/** Expects the rows of a `size` by `size` matrix to be orthonormal. */
+function expectOrthonormal(rows: Float64Array, size: number): void {
+  for (let j = 0; j < size; j++) {
+    for (let k = 0; k <= j; k++) {
+      let product = 0;
+      for (let i = 0; i < size; i++) product += defined(rows[j * size + i]) * defined(rows[k * size + i]);
+      expectClose(product, j === k ? 1 : 0, 1e-13, `rows ${j} and ${k}`);
+    }
+  }
+}
 
 describe("numericalHessian", () => {
   it("differentiates a gradient to the Hessian", () => {

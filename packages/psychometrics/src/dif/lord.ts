@@ -1,7 +1,7 @@
 import { checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { meanSigmaLinking, type ScaleTransformation, transformItem } from "../equating/linking.js";
-import { type Calibration, calibrateWithCovariance } from "../irt/calibration.js";
+import { type Calibration, calibrateWithCovariance, type ParameterCovariance } from "../irt/calibration.js";
 import type { CalibrationOptions } from "../irt/calibration-options.js";
 import { isLogisticModel, type LogisticParameters } from "../irt/logistic.js";
 import type { IrtItem } from "../irt/model.js";
@@ -69,12 +69,14 @@ export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[
   const reference = calibrateWithCovariance(groupMatrix(matrix, groups, "reference"), groupOptions);
   const focal = calibrateWithCovariance(groupMatrix(matrix, groups, "focal"), groupOptions);
   const transformation = meanSigmaLinking(focal.calibration.items, reference.calibration.items);
+  const referenceBlocks = itemBlocks(reference.covariance);
+  const focalBlocks = itemBlocks(focal.covariance);
   return {
     items: matrix.itemIds.map((id, i) => ({
       id,
       ...statistic(
-        { item: reference.calibration.items[i], covariance: reference.covariances[i] ?? null },
-        { item: focal.calibration.items[i], covariance: focal.covariances[i] ?? null },
+        { item: reference.calibration.items[i], covariance: referenceBlocks.get(id) ?? null },
+        { item: focal.calibration.items[i], covariance: focalBlocks.get(id) ?? null },
         transformation,
       ),
     })),
@@ -88,6 +90,25 @@ export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[
 interface GroupEstimate {
   readonly item: IrtItem<LogisticParameters> | undefined;
   readonly covariance: Float64Array | null;
+}
+
+/** Returns the covariance matrix of each item's estimated parameters by rows, in the order of its parameter names. */
+function itemBlocks(covariance: ParameterCovariance | null): Map<string, Float64Array> {
+  const rows = new Map<string, number[]>();
+  covariance?.parameters.forEach(({ item }, row) => {
+    const own = rows.get(item);
+    if (own === undefined) rows.set(item, [row]);
+    else own.push(row);
+  });
+  return new Map(
+    [...rows].map(([item, own]) => [
+      item,
+      Float64Array.from({ length: own.length ** 2 }, (_, index) => {
+        const row = own[Math.floor(index / own.length)] ?? 0;
+        return covariance?.matrix[row]?.[own[index % own.length] ?? 0] ?? 0;
+      }),
+    ]),
+  );
 }
 
 function statistic(

@@ -15,12 +15,21 @@ export {
   posteriorModeEstimate,
   type RangeOptions,
   type TestletEffect,
+  type ThetaDistribution,
   type ThetaIntegrationOptions,
   type ThetaPrior,
+  thetaPosterior,
   weightedLikelihoodEstimate,
 } from "./ability.js";
 export { abilityEstimates } from "./ability-estimates.js";
-export { type CalibratedItem, type Calibration, calibrate } from "./calibration.js";
+export {
+  type CalibratedItem,
+  type Calibration,
+  type CovarianceCalibration,
+  calibrate,
+  calibrateWithCovariance,
+  type ParameterCovariance,
+} from "./calibration.js";
 export type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
 export { gradedResponse } from "./graded.js";
 export { conditionalStandardError, itemInformation, testInformation } from "./information.js";

@@ -6,6 +6,7 @@ import {
   checkRecord,
   DataError,
   describe,
+  normalizeLogs,
 } from "@measurekit/core";
 import type { Quadrature } from "../math/quadrature.js";
 import { findRoot } from "../math/root.js";
@@ -78,6 +79,17 @@ export interface ThetaIntegrationOptions {
    * @defaultValue 61 rectangular points
    */
   readonly quadrature?: QuadratureOptions;
+}
+
+/**
+ * A discrete distribution of theta: a posterior, as {@link thetaPosterior} returns it, or a population, such as the
+ * `GroupDistribution` of a calibration, which has these members.
+ */
+export interface ThetaDistribution {
+  /** The values of theta, in ascending order. */
+  readonly nodes: readonly number[];
+  /** The probability of each node, summing to 1. */
+  readonly weights: readonly number[];
 }
 
 /** Options of {@link posteriorMeanEstimate}. */
@@ -196,25 +208,46 @@ export function posteriorMeanEstimate(
     testlets.length === 0
       ? (theta: number): number => pattern.logLikelihood(theta)
       : testletLogLikelihood(items, responses, testlets, testletOf, quadratureRule(options.quadrature));
-  const posterior = new Float64Array(nodes.length);
-  let largest = Number.NEGATIVE_INFINITY;
-  for (let q = 0; q < nodes.length; q++) {
-    const value = Math.log(weights[q] ?? 0) + logLikelihood(nodes[q] ?? 0);
-    posterior[q] = value;
-    largest = Math.max(largest, value);
-  }
-  let total = 0;
-  let first = 0;
-  for (let q = 0; q < nodes.length; q++) {
-    const weight = Math.exp((posterior[q] ?? 0) - largest);
-    posterior[q] = weight;
-    total += weight;
-    first += weight * (nodes[q] ?? 0);
-  }
-  const theta = first / total;
-  let second = 0;
-  for (let q = 0; q < nodes.length; q++) second += (posterior[q] ?? 0) * ((nodes[q] ?? 0) - theta) ** 2;
-  return { theta, standardError: Math.sqrt(second / total) };
+  const posterior = posteriorWeights(nodes, weights, logLikelihood);
+  let theta = 0;
+  for (let q = 0; q < nodes.length; q++) theta += (posterior[q] ?? 0) * (nodes[q] ?? 0);
+  let variance = 0;
+  for (let q = 0; q < nodes.length; q++) variance += (posterior[q] ?? 0) * ((nodes[q] ?? 0) - theta) ** 2;
+  return { theta, standardError: Math.sqrt(variance) };
+}
+
+/**
+ * Returns the posterior distribution of theta on the quadrature nodes placed on the prior.
+ *
+ * @remarks
+ * The weight of the node θ_q is w_q L(θ_q) / Σ w L, with w_q the prior's quadrature weight and L the likelihood of the
+ * answered responses; the nodes are `mean + sd * z_q`, as for `posteriorMeanEstimate`, whose estimate is the mean of
+ * this distribution. Missing responses are skipped; without responses the posterior is the prior.
+ *
+ * @throws `DataError` when the items, responses, prior or quadrature are invalid.
+ */
+export function thetaPosterior(
+  items: readonly IrtItem[],
+  responses: readonly (number | null)[],
+  options: ThetaIntegrationOptions = {},
+): ThetaDistribution {
+  checkOptions(options);
+  const pattern = answered(items, responses);
+  const { mean, sd } = checkThetaPrior(options.prior);
+  const { nodes, weights } = quadratureRule(options.quadrature, mean, sd);
+  const posterior = posteriorWeights(nodes, weights, (theta) => pattern.logLikelihood(theta));
+  return { nodes: Array.from(nodes), weights: Array.from(posterior) };
+}
+
+/** Returns w_q L(θ_q) at each node, normalized to sum to 1, from the prior weights w and the log-likelihood ln L. */
+function posteriorWeights(
+  nodes: Float64Array,
+  weights: Float64Array,
+  logLikelihood: (theta: number) => number,
+): Float64Array {
+  const posterior = Float64Array.from(nodes, (theta, q) => Math.log(weights[q] ?? 0) + logLikelihood(theta));
+  normalizeLogs(posterior);
+  return posterior;
 }
 
 /**

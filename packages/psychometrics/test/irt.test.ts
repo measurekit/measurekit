@@ -7,6 +7,7 @@ import {
   betaPrior,
   type CalibrationOptions,
   calibrate,
+  calibrateWithCovariance,
   conditionalStandardError,
   createRandom,
   DataError,
@@ -26,6 +27,7 @@ import {
   nominalResponse,
   normalPrior,
   oneParameterLogistic,
+  type ParameterCovariance,
   type ParameterPrior,
   partialCredit,
   posteriorMeanEstimate,
@@ -38,16 +40,24 @@ import {
   simulateResponses,
   simulateThetas,
   summedScoreTable,
+  type ThetaDistribution,
   type ThresholdParameters,
   testInformation,
   testLength,
+  thetaPosterior,
   threeParameterLogistic,
   twoParameterLogistic,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
+import { type ExpectationItem, expectationStep } from "../src/irt/expectation.js";
+import { population } from "../src/irt/latent.js";
+import { compressResponses } from "../src/irt/responses.js";
+import { rectangular } from "../src/math/quadrature.js";
+import covariance from "./fixtures/irt-covariance.json" with { type: "json" };
 import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json" };
 import latent from "./fixtures/irt-latent.json" with { type: "json" };
 import lsat7 from "./fixtures/irt-lsat7.json" with { type: "json" };
+import posterior from "./fixtures/irt-posterior.json" with { type: "json" };
 import science from "./fixtures/irt-science.json" with { type: "json" };
 import scoring from "./fixtures/irt-scoring.json" with { type: "json" };
 import simulated1pl from "./fixtures/irt-simulated-1pl.json" with { type: "json" };
@@ -107,6 +117,13 @@ const TESTLET_PARAMETER_TOLERANCE = 2e-5;
 /** Their standard errors, relative: numerical Hessians on both sides. */
 const TESTLET_STANDARD_ERROR_TOLERANCE = 1e-4;
 
+/** Covariance matrices against the delta method on mirt's vcov and the base R Hessian, relative to √(Σ_ii Σ_jj). */
+const COVARIANCE_TOLERANCE = 1e-4;
+/** The GPCM's, where mirt's EM stops short of the optimum. */
+const FLAT_COVARIANCE_TOLERANCE = 1e-3;
+/** Posteriors of theta against the base R weights. */
+const POSTERIOR_TOLERANCE = 1e-12;
+
 /** Models whose calibrations mirt stops short of the optimum. */
 const FLAT_MODELS = new Set(["4pl", "grm", "gpcm", "pcm", "rsm", "nrm"]);
 
@@ -148,6 +165,39 @@ function logitNormalPrior(mean: number, sd: number): ParameterPrior {
 function prior(description: PriorDescription): ParameterPrior {
   const { type, alpha = 0, beta = 0, mean = 0, sd = 0 } = description;
   return type === "beta" ? betaPrior(alpha, beta) : logitNormalPrior(mean, sd);
+}
+
+/** A prior of the covariance fixture: a normal or a log-normal prior. */
+interface DescribedPrior {
+  readonly type: string;
+  readonly mean?: number;
+  readonly sd?: number;
+  readonly meanLog?: number;
+  readonly sdLog?: number;
+}
+
+function describedPrior({ type, mean = 0, sd = 1, meanLog = 0, sdLog = 1 }: DescribedPrior): ParameterPrior {
+  return type === "log-normal" ? logNormalPrior(meanLog, sdLog) : normalPrior(mean, sd);
+}
+
+/** Expects a covariance to have the labels of the reference and entries within `tolerance` of its correlation scale. */
+function expectCovariance(
+  actual: ParameterCovariance | null,
+  expected: {
+    readonly parameters: readonly { item: string; name: string }[];
+    readonly matrix: readonly (readonly number[])[];
+  },
+  tolerance: number,
+): void {
+  const result = defined(actual);
+  expect(result.parameters).toEqual(expected.parameters);
+  expect(result.matrix).toHaveLength(expected.matrix.length);
+  expected.matrix.forEach((row, i) => {
+    row.forEach((value, j) => {
+      const scale = Math.sqrt(defined(expected.matrix[i]?.[i]) * defined(expected.matrix[j]?.[j]));
+      expectClose(defined(result.matrix[i]?.[j]), value, tolerance * scale, `covariance (${i + 1}, ${j + 1})`);
+    });
+  });
 }
 
 /** A calibration of a fixture. */
@@ -426,6 +476,111 @@ describe("ability estimation", () => {
     );
     expect(() => posteriorModeEstimate(ITEMS_2PL, responses, { range: JSON.parse('[-6, "6"]') })).toThrow(
       'The upper bound of the range must be a finite number, found "6".',
+    );
+  });
+});
+
+describe("thetaPosterior", () => {
+  for (const form of posterior.forms) {
+    it(`matches the base R posterior of theta for the ${modelNames(form)} items`, () => {
+      const pool = fixtureItems(form);
+      for (const { prior, nodes, weights } of form.priors) {
+        form.patterns.forEach((pattern, row) => {
+          const actual = thetaPosterior(pool, pattern, { prior });
+          expect(actual.nodes).toHaveLength(nodes.length);
+          nodes.forEach((node, q) => {
+            expectClose(defined(actual.nodes[q]), node, 1e-13, `node ${q}`);
+          });
+          defined(weights[row]).forEach((weight, q) => {
+            expectClose(defined(actual.weights[q]), weight, POSTERIOR_TOLERANCE, `pattern ${row + 1}, node ${q}`);
+          });
+        });
+      }
+    });
+  }
+
+  it("has the mean and standard deviation of the EAP estimate, with any prior and rule", () => {
+    const quadratures = [{}, { method: "gauss-hermite", points: 21 }, { points: 15 }] as const;
+    const patterns = fc.tuple(...ITEMS_2PL.map(() => fc.constantFrom(0, 1, null)));
+    fc.assert(
+      fc.property(
+        patterns,
+        fc.double({ min: -1, max: 1, noNaN: true }),
+        fc.double({ min: 0.3, max: 2, noNaN: true }),
+        fc.constantFrom(...quadratures),
+        (responses, mean, sd, quadrature) => {
+          const options = { prior: { mean, sd }, quadrature };
+          const { nodes, weights } = thetaPosterior(ITEMS_2PL, responses, options);
+          expectClose(
+            weights.reduce((sum, weight) => sum + weight, 0),
+            1,
+            1e-12,
+          );
+          expect(weights.every((weight) => weight >= 0)).toBe(true);
+          const eap = posteriorMeanEstimate(ITEMS_2PL, responses, options);
+          const theta = weights.reduce((sum, weight, q) => sum + weight * defined(nodes[q]), 0);
+          const variance = weights.reduce((sum, weight, q) => sum + weight * (defined(nodes[q]) - theta) ** 2, 0);
+          expectClose(theta, eap.theta, 1e-12);
+          expectClose(Math.sqrt(variance), eap.standardError, 1e-12);
+        },
+      ),
+    );
+  });
+
+  it("is the prior without responses, as a calibration's group distribution describes it", () => {
+    const sample = simulate(20261029, 100, ITEMS_2PL);
+    const group: ThetaDistribution = defined(
+      calibrate(responseMatrix(sample), { model: twoParameterLogistic }).groups[0],
+    );
+    const none = thetaPosterior(ITEMS_2PL, [null, null, null, null]);
+    group.nodes.forEach((node, q) => {
+      expectClose(defined(none.nodes[q]), node, 1e-14);
+    });
+    group.weights.forEach((weight, q) => {
+      expectClose(defined(none.weights[q]), weight, 1e-15);
+    });
+  });
+
+  it("concentrates where the responses point, and narrows with more of them", () => {
+    const high = thetaPosterior(ITEMS_2PL, [1, 1, 1, 1]);
+    const low = thetaPosterior(ITEMS_2PL, [0, 0, 0, 0]);
+    const spread = (distribution: ThetaDistribution): number => {
+      const theta = distribution.weights.reduce((sum, weight, q) => sum + weight * defined(distribution.nodes[q]), 0);
+      return distribution.weights.reduce(
+        (sum, weight, q) => sum + weight * (defined(distribution.nodes[q]) - theta) ** 2,
+        0,
+      );
+    };
+    const mode = (distribution: ThetaDistribution): number =>
+      defined(distribution.nodes[distribution.weights.indexOf(Math.max(...distribution.weights))]);
+    expect(mode(high)).toBeGreaterThan(0.5);
+    expect(mode(low)).toBeLessThan(-0.5);
+    expect(spread(thetaPosterior(ITEMS_2PL, [1, 0, 1, 0]))).toBeLessThan(
+      spread(thetaPosterior(ITEMS_2PL, [1, null, null, null])),
+    );
+  });
+
+  it("is plain data that JSON serializes", () => {
+    const result = thetaPosterior(ITEMS_GPCM, [1, null, 3]);
+    expect(JSON.parse(JSON.stringify(result))).toEqual(result);
+  });
+
+  it("rejects invalid items, responses, prior, quadrature and options", () => {
+    expect(() => thetaPosterior(ITEMS_2PL, [1, 0])).toThrow("Found 2 responses to 4 items.");
+    expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 2, 1])).toThrow(
+      "The response to item 3 must be null or an integer from 0 to 1, found 2.",
+    );
+    expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], { prior: { mean: 0, sd: 0 } })).toThrow(DataError);
+    expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], { quadrature: { points: 1 } })).toThrow(
+      "Quadrature needs an integer number of points from 2, found 1.",
+    );
+    expect(() => thetaPosterior(JSON.parse("null"), [])).toThrow("The items must be an array, found null.");
+    expect(() => thetaPosterior(ITEMS_2PL, JSON.parse("null"))).toThrow("The responses must be an array, found null.");
+    expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], { prior: JSON.parse('"normal"') })).toThrow(
+      'The option prior must be an object { mean, sd }, found "normal".',
     );
   });
 });
@@ -735,6 +890,295 @@ describe("calibrate", () => {
     expect(() => calibrate(matrix, { model: gradedResponse, fixed: { item1: { a: 1, b: [0] } } })).toThrow(
       'Item "item2" has responses in fewer than two categories; calibration needs at least two.',
     );
+  });
+});
+
+describe("calibrateWithCovariance", () => {
+  const sample = simulate(20261029, 300, ITEMS_2PL);
+  const options = { model: twoParameterLogistic, standardErrors: "hessian" } as const;
+
+  for (const reference of covariance.cases) {
+    const source = reference.data === "irt-lsat7" ? lsat7 : science;
+    it(`matches the covariance matrix of ${reference.name}`, () => {
+      const matrix = responseMatrix(source.responses, { itemIds: source.itemIds });
+      const result = calibrateWithCovariance(matrix, {
+        model: reference.models.map(model),
+        quadrature: { method: "rectangular", points: reference.quadrature.points },
+        ...(reference.priors && {
+          priors: Object.fromEntries(
+            Object.entries(reference.priors).map(([name, value]) => [name, describedPrior(value)]),
+          ),
+        }),
+        ...(reference.itemPriors && {
+          itemPriors: Object.fromEntries(
+            Object.entries(reference.itemPriors).map(([id, byName]) => [
+              id,
+              Object.fromEntries(Object.entries(byName).map(([name, value]) => [name, describedPrior(value)])),
+            ]),
+          ),
+        }),
+        tolerance: EM_TOLERANCE,
+        maxIterations: 10_000,
+        standardErrors: "hessian",
+      });
+      expect(result.calibration.converged).toBe(true);
+      const tolerance = reference.models.some((name) => FLAT_MODELS.has(name))
+        ? FLAT_COVARIANCE_TOLERANCE
+        : COVARIANCE_TOLERANCE;
+      expectCovariance(result.covariance, reference.covariance, tolerance);
+    });
+  }
+
+  it("calibrates as calibrate does", () => {
+    const matrix = responseMatrix(sample);
+    expect(calibrateWithCovariance(matrix, options).calibration).toEqual(calibrate(matrix, options));
+  });
+
+  it("has the squares of the standard errors on its diagonal, with either method", () => {
+    const matrix = responseMatrix(sample);
+    for (const standardErrors of ["hessian", "cross-product"] as const) {
+      const { calibration, covariance: result } = calibrateWithCovariance(matrix, { ...options, standardErrors });
+      const { parameters, matrix: entries } = defined(result);
+      parameters.forEach(({ item, name }, k) => {
+        const errors = defined(defined(calibration.items.find(({ id }) => id === item)).standardErrors);
+        expectClose(Math.sqrt(defined(entries[k]?.[k])), defined(errors[name]), 1e-15, `${item} ${name}`);
+      });
+    }
+  });
+
+  it("is symmetric and covers the estimated items in item order, leaving out the fixed ones", () => {
+    const fixed = { item1: defined(PARAMETERS_2PL[0]), item3: defined(PARAMETERS_2PL[2]) };
+    const { covariance: result } = calibrateWithCovariance(responseMatrix(sample), { ...options, fixed });
+    const { parameters, matrix } = defined(result);
+    expect(parameters).toEqual([
+      { item: "item2", name: "a" },
+      { item: "item2", name: "b" },
+      { item: "item4", name: "a" },
+      { item: "item4", name: "b" },
+    ]);
+    matrix.forEach((row, i) => {
+      row.forEach((value, j) => {
+        expect(value).toBe(defined(matrix[j]?.[i]));
+      });
+    });
+    expect(defined(matrix[0]?.[2])).not.toBe(0);
+  });
+
+  it("lists a parameter that items share once for each item, with correlation 1", () => {
+    const { covariance: result } = calibrateWithCovariance(
+      responseMatrix(science.responses, { itemIds: science.itemIds }),
+      {
+        model: ratingScale,
+        standardErrors: "hessian",
+      },
+    );
+    const { parameters, matrix } = defined(result);
+    expect(parameters.map(({ item }) => item)).toEqual(science.itemIds.flatMap((id) => [id, id, id, id]));
+    const shared = parameters.flatMap(({ name }, k) => (name === "a" ? [k] : []));
+    expect(shared).toHaveLength(4);
+    for (const j of shared) for (const k of shared) expect(matrix[j]?.[k]).toBe(matrix[0]?.[0]);
+  });
+
+  it("is null without standard errors, with every item fixed, and where the information matrix is singular", () => {
+    const matrix = responseMatrix(sample);
+    expect(calibrateWithCovariance(matrix, { model: twoParameterLogistic }).covariance).toBeNull();
+    const fixed = Object.fromEntries(ITEMS_2PL.map((item, i) => [`item${i + 1}`, item.parameters]));
+    const normal = calibrateWithCovariance(matrix, { ...options, fixed, latent: "normal" });
+    expect(normal.covariance).toBeNull();
+    expect(normal.calibration.groups[0]?.standardErrors).not.toBeNull();
+    const pair = responseMatrix([
+      [1, 0],
+      [0, 1],
+    ]);
+    expect(calibrateWithCovariance(pair, options).covariance).toBeNull();
+  });
+
+  it("is plain data that JSON serializes", () => {
+    const { covariance: result } = calibrateWithCovariance(responseMatrix(sample), options);
+    expect(JSON.parse(JSON.stringify(result))).toEqual(result);
+  });
+
+  it("rejects options of other types from JavaScript", () => {
+    const matrix = responseMatrix(sample);
+    expect(() => calibrateWithCovariance(matrix, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => calibrateWithCovariance(matrix, { ...options, standardErrors: JSON.parse('"full"') })).toThrow(
+      'The option standardErrors must be "none", "hessian" or "cross-product", found "full".',
+    );
+  });
+});
+
+describe("item priors", () => {
+  const sample = simulate(20261029, 300, ITEMS_2PL);
+  const matrix = responseMatrix(sample);
+  const options = { model: twoParameterLogistic } as const;
+
+  it("replace the priors of the option for the parameter they name, and only for that item", () => {
+    const priors = { a: logNormalPrior(0.3, 0.5), b: normalPrior(0, 0.5) };
+    const general = calibrate(matrix, { ...options, priors });
+    const replaced = calibrate(matrix, { ...options, priors, itemPriors: { item2: { b: normalPrior(1, 0.01) } } });
+    expect(Math.abs(defined(replaced.items[1]).parameters.b - 1)).toBeLessThan(0.05);
+    expect(defined(general.items[1]).parameters.b).toBeLessThan(0.5);
+  });
+
+  it("give the result of the option priors when every item has the same prior", () => {
+    const prior = logNormalPrior(0.2, 0.4);
+    const itemPriors = Object.fromEntries(ITEMS_2PL.map((_, i) => [`item${i + 1}`, { a: prior }]));
+    const byItem = calibrate(matrix, { ...options, itemPriors, standardErrors: "hessian" });
+    expect(byItem).toEqual(calibrate(matrix, { ...options, priors: { a: prior }, standardErrors: "hessian" }));
+  });
+
+  it("change nothing when empty", () => {
+    expect(calibrate(matrix, { ...options, itemPriors: {} })).toEqual(calibrate(matrix, options));
+    expect(calibrate(matrix, { ...options, itemPriors: { item1: {} } })).toEqual(calibrate(matrix, options));
+  });
+
+  it("apply to the parameters of models that do not share them", () => {
+    const grades = responseMatrix(science.responses, { itemIds: science.itemIds });
+    const free = calibrate(grades, { model: generalizedPartialCredit });
+    const tight = calibrate(grades, {
+      model: generalizedPartialCredit,
+      itemPriors: { [defined(science.itemIds[0])]: { a: logNormalPrior(0, 0.05) } },
+    });
+    expect(Math.abs(Math.log(defined(tight.items[0]).parameters.a))).toBeLessThan(
+      Math.abs(Math.log(defined(free.items[0]).parameters.a)),
+    );
+  });
+
+  it("reject items that are unknown or fixed, parameters the model lacks or shares, and priors of other types", () => {
+    const fixed = { item1: defined(PARAMETERS_2PL[0]) };
+    expect(() => calibrate(matrix, { ...options, itemPriors: { q1: { a: normalPrior(1, 1) } } })).toThrow(
+      'Priors are given for "q1", which is not an item id.',
+    );
+    expect(() => calibrate(matrix, { ...options, fixed, itemPriors: { item1: { a: normalPrior(1, 1) } } })).toThrow(
+      'Priors are given for item "item1", which is fixed.',
+    );
+    expect(() => calibrate(matrix, { ...options, itemPriors: { item2: { c: betaPrior(5, 17) } } })).toThrow(
+      'A prior is given for "c" of item "item2", whose model has no such parameter.',
+    );
+    const grades = responseMatrix(science.responses, { itemIds: science.itemIds });
+    expect(() =>
+      calibrate(grades, {
+        model: ratingScale,
+        itemPriors: { [defined(science.itemIds[1])]: { a: normalPrior(1, 1) } },
+      }),
+    ).toThrow(`A prior is given for "a" of item "${science.itemIds[1]}", whose model shares it among items`);
+    const rejected = (value: string): DataError | undefined => {
+      try {
+        calibrate(matrix, { ...options, itemPriors: JSON.parse(value) });
+      } catch (error) {
+        return error instanceof DataError ? error : undefined;
+      }
+      return undefined;
+    };
+    expect(rejected("null")?.message).toBe(
+      "The option itemPriors must be an object of priors by item id and parameter name, found null.",
+    );
+    expect(rejected('{ "item1": null }')?.message).toBe(
+      'The priors of item "item1" must be an object of priors by parameter name, found null.',
+    );
+    expect(rejected('{ "item1": { "a": null } }')?.message).toBe(
+      'The prior of "a" of item "item1" must be a prior such as normalPrior(0, 1), found null.',
+    );
+  });
+
+  it("treat an item id such as constructor as an id", () => {
+    expect(() => calibrate(matrix, { ...options, itemPriors: JSON.parse('{ "constructor": {} }') })).toThrow(
+      'Priors are given for "constructor", which is not an item id.',
+    );
+  });
+});
+
+describe("expectationStep", () => {
+  const rule = rectangular(61);
+  const rows = simulate(5, 30, ITEMS_2PL).map((row, person) => (person === 7 ? row.map(() => null) : row));
+  const data = compressResponses(responseMatrix(rows));
+  const answered = rows.map((row) => row.some((response) => response !== null));
+
+  function items(): ExpectationItem[] {
+    return ITEMS_2PL.map(({ model: itemModel, parameters }) => ({
+      model: itemModel,
+      categoryCount: 2,
+      nodes: rule.nodes,
+      parameters,
+      counts: new Float64Array(rule.nodes.length * 2),
+    }));
+  }
+
+  function groups(logWeights?: Float64Array) {
+    const result = population({}, answered, rule, true, false, () => 0);
+    if (logWeights !== undefined) result.groups[0]?.logWeights.set(logWeights);
+    return result;
+  }
+
+  const logWeights = rule.weights.map(Math.log);
+  const flat = new Float64Array(rule.nodes.length);
+  const respondents = answered.flatMap((any, person) => (any ? [person] : []));
+
+  it("treats a term of the log prior weights, by node, as the prior weights", () => {
+    const standard = items();
+    const standardGroups = groups();
+    const expected = expectationStep(data, standard, rule.nodes, standardGroups).run();
+    const terms = new Float64Array(rows.length * rule.nodes.length);
+    for (let person = 0; person < rows.length; person++) terms.set(logWeights, person * rule.nodes.length);
+    const termItems = items();
+    const termGroups = groups(flat);
+    const actual = expectationStep(data, termItems, rule.nodes, termGroups, null, terms).run();
+    expectClose(actual, expected, 1e-10);
+    termItems.forEach((item, i) => {
+      item.counts.forEach((count, k) => {
+        expectClose(count, defined(standard[i]?.counts[k]), 1e-10);
+      });
+    });
+    termGroups.groups[0]?.counts.forEach((count, q) => {
+      expectClose(count, defined(standardGroups.groups[0]?.counts[q]), 1e-10);
+    });
+  });
+
+  it("adds a term that is constant over the nodes to the log-likelihood and changes nothing else", () => {
+    const base = items();
+    const baseLogLikelihood = expectationStep(data, base, rule.nodes, groups()).run();
+    const terms = new Float64Array(rows.length * rule.nodes.length);
+    const shifts = rows.map((_, person) => (person % 5) - 2);
+    shifts.forEach((shift, person) => {
+      terms.fill(shift, person * rule.nodes.length, (person + 1) * rule.nodes.length);
+    });
+    const shifted = items();
+    const logLikelihood = expectationStep(data, shifted, rule.nodes, groups(), null, terms).run();
+    expectClose(
+      logLikelihood,
+      baseLogLikelihood + respondents.reduce((sum, person) => sum + defined(shifts[person]), 0),
+      1e-10,
+    );
+    shifted.forEach((item, i) => {
+      item.counts.forEach((count, k) => {
+        expectClose(count, defined(base[i]?.counts[k]), 1e-10);
+      });
+    });
+  });
+
+  it("reads the term at each run and ignores it for persons without responses", () => {
+    const terms = new Float64Array(rows.length * rule.nodes.length);
+    const step = expectationStep(data, items(), rule.nodes, groups(), null, terms);
+    const first = step.run();
+    terms.fill(3, 7 * rule.nodes.length, 8 * rule.nodes.length);
+    expect(step.run()).toBe(first);
+    terms.fill(-2, 0, rule.nodes.length);
+    expectClose(step.run(), first - 2, 1e-10);
+  });
+
+  it("gives posteriors that follow the term", () => {
+    const terms = new Float64Array(rows.length * rule.nodes.length).fill(-1000);
+    for (let person = 0; person < rows.length; person++) terms[person * rule.nodes.length + 40] = 0;
+    const step = expectationStep(data, items(), rule.nodes, groups(), null, terms);
+    step.run();
+    let visited = 0;
+    step.forEachPosterior((person, posteriorWeights) => {
+      visited++;
+      expectClose(defined(posteriorWeights[40]), 1, 1e-12, `person ${person}`);
+    });
+    expect(visited).toBe(respondents.length);
   });
 });
 

@@ -105,20 +105,55 @@ export function calibrate<TParameters>(
   return calibrateWithCovariance(data, options).calibration;
 }
 
-/** A calibration with the covariance matrix of each item's estimated parameters. */
+/**
+ * The covariance matrix of the estimated parameters of a calibration's items, labeled by item id and parameter name.
+ * Plain data, which JSON serializes.
+ */
+export interface ParameterCovariance {
+  /**
+   * The item and the parameter name of each row and column: the estimated items in item order, each with the names of
+   * its `standardErrors`. Items whose model shares a parameter, as the rating scale model shares its steps, repeat the
+   * shared parameter, with the same variance and a correlation of 1.
+   */
+  readonly parameters: readonly {
+    /** The item id. */
+    readonly item: string;
+    /** The parameter's name in the item's parameter vector. */
+    readonly name: string;
+  }[];
+  /**
+   * The covariance matrix by rows: `matrix[i][j]` is the covariance of `parameters[i]` and `parameters[j]`, on the
+   * parameters' own scale.
+   */
+  readonly matrix: readonly (readonly number[])[];
+}
+
+/** A calibration with the covariance matrix of its estimated item parameters. */
 export interface CovarianceCalibration<TParameters> {
   /** The calibration. */
   readonly calibration: Calibration<TParameters>;
   /**
-   * For each item, the covariance matrix of its vector entries by rows, in the order of its `standardErrors`; `null`
-   * where its standard errors are `null`.
+   * The covariance of the estimated item parameters, including the covariances between items; `null` where the
+   * calibration has no standard errors: with `standardErrors` `"none"`, with no estimated item, and when the
+   * information matrix cannot be inverted or gives a variance that is not positive. The parameters of the
+   * distributions of theta and of the testlets are estimated with the items but not listed.
    */
-  readonly covariances: readonly (Float64Array | null)[];
+  readonly covariance: ParameterCovariance | null;
 }
 
 const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
 
-/** Calibrates as {@link calibrate} does and also returns the covariance matrix of each item's estimates. */
+/**
+ * Calibrates as {@link calibrate} does and also returns the covariance matrix of the estimated item parameters.
+ *
+ * @remarks
+ * The covariance comes from the method of the option `standardErrors`, and the standard errors of the calibration are
+ * the square roots of its diagonal. It is the part for the item parameters of the covariance matrix of all the
+ * estimated parameters, so it includes the uncertainty of the distributions of theta estimated with the items. A
+ * delta method for a function of the item parameters, such as an equated score, is `gᵀ Σ g` with `g` the gradient.
+ *
+ * @throws `DataError` as {@link calibrate} does.
+ */
 export function calibrateWithCovariance<TParameters>(
   data: ResponseMatrix | ResponseRecords,
   options: CalibrationOptions<TParameters>,
@@ -146,24 +181,19 @@ export function calibrateWithCovariance<TParameters>(
   const size = values.length;
   const covariance = size > 0 ? covarianceOf(standardErrors, setup, mStep, eStep, responses, nodes) : null;
   const standardError = covariance === null ? null : (slot: number) => Math.sqrt(covariance[slot * size + slot] ?? 0);
-  const itemCovariances = covariancesOfItems(items, covariance, size);
 
   const parameterCount = size + histogramParameters(latent);
   return {
     calibration: {
-      items: items.map((item, i) => {
-        const block = itemCovariances[i] ?? null;
-        const count = item.slots.length;
-        return {
-          id: item.id,
-          model: item.model,
-          parameters: item.parameters,
-          standardErrors:
-            block === null
-              ? null
-              : Object.fromEntries(item.names.map((name, p) => [name, Math.sqrt(block[p * count + p] ?? 0)])),
-        };
-      }),
+      items: items.map((item) => ({
+        id: item.id,
+        model: item.model,
+        parameters: item.parameters,
+        standardErrors:
+          standardError === null || !item.estimated
+            ? null
+            : Object.fromEntries(item.names.map((name, p) => [name, standardError(item.slots[p] ?? 0)])),
+      })),
       groups: groupDistributions(latent, values, nodes, standardError),
       testlets: design === null ? [] : testletEstimates(design, responses.itemIds, values, standardError),
       logLikelihood,
@@ -172,7 +202,7 @@ export function calibrateWithCovariance<TParameters>(
       converged,
       iterations,
     },
-    covariances: itemCovariances,
+    covariance: parameterCovariance(items, covariance, size),
   };
 }
 
@@ -204,22 +234,24 @@ function iterate<TParameters>(
 }
 
 /**
- * Returns, for each item, the part of the covariance matrix of the free parameters at its slots; `null` for a fixed
- * item.
+ * Returns the part of the covariance matrix of the free parameters at the estimated items' parameters, labeled and
+ * symmetrized.
  */
-function covariancesOfItems<TParameters>(
+function parameterCovariance<TParameters>(
   items: Setup<TParameters>["items"],
   covariance: Float64Array | null,
   size: number,
-): (Float64Array | null)[] {
-  return items.map((item) => {
-    if (!item.estimated || covariance === null) return null;
-    const { slots } = item;
-    return Float64Array.from({ length: slots.length ** 2 }, (_, index) => {
-      const row = slots[Math.floor(index / slots.length)] ?? 0;
-      return covariance[row * size + (slots[index % slots.length] ?? 0)] ?? 0;
-    });
-  });
+): ParameterCovariance | null {
+  const estimated = items.filter((item) => item.estimated);
+  if (covariance === null || estimated.length === 0) return null;
+  const slots = estimated.flatMap((item) => Array.from(item.slots));
+  return {
+    parameters: estimated.flatMap((item) => item.names.map((name) => ({ item: item.id, name }))),
+    // The inverse of the Hessian is symmetric only to rounding.
+    matrix: slots.map((row) =>
+      slots.map((column) => ((covariance[row * size + column] ?? 0) + (covariance[column * size + row] ?? 0)) / 2),
+    ),
+  };
 }
 
 /** Returns the covariance matrix of the free parameters by the method, or `null` without standard errors. */

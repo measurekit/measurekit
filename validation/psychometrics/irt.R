@@ -1276,3 +1276,162 @@ write_fixture("irt-testlet", list(
   points = TESTLET_POINTS,
   cases = list(simulated_case, read_case)
 ))
+
+# --- Covariance of the item parameters, item priors and posteriors of theta -----------------------------------------
+# The full covariance matrix of the package's estimated item parameters, by the delta method on mirt's vcov() with the
+# Jacobian by central differences; item priors by direct maximization of the log-posterior in base R; the posterior of
+# theta given a response pattern, written out on mirt's probtrace.
+
+# The covariance of every item's estimated parameters (a and b for the 2PL, the polytomous parameters as in
+# delta_errors), with the item and the name of each row.
+parameter_covariance <- function(fit, models) {
+  items <- colnames(extract.mirt(fit, "data"))
+  covariance <- vcov(fit)
+  values <- mod2values(fit)
+  parnums <- lapply(strsplit(colnames(covariance), ".", fixed = TRUE), function(x) as.integer(x[-1]))
+  base <- sapply(parnums, function(p) values$value[values$parnum == p[1]])
+  estimates <- function(x) {
+    for (j in seq_along(x)) values$value[values$parnum %in% parnums[[j]]] <- x[j]
+    lapply(seq_along(items), function(i) {
+      v <- item_values(values, items[i])
+      if (models[i] %in% LOGISTIC) return(c(a = v[["a1"]], b = -v[["d"]] / v[["a1"]]))
+      estimated_parameters(models[i], polytomous_parameters(models[i], v))
+    })
+  }
+  centers <- estimates(base)
+  jacobian <- sapply(seq_along(base), function(j) {
+    h <- 1e-6 * max(1, abs(base[j]))
+    up <- base
+    down <- base
+    up[j] <- up[j] + h
+    down[j] <- down[j] - h
+    (unlist(estimates(up)) - unlist(estimates(down))) / (2 * h)
+  })
+  list(
+    parameters = data.frame(item = rep(items, lengths(centers)), name = unlist(lapply(centers, names)),
+                            row.names = NULL),
+    matrix = unname(jacobian %*% covariance %*% t(jacobian))
+  )
+}
+
+covariance_case <- function(name, fit, models) {
+  covariance <- parameter_covariance(fit, models)
+  # The diagonal reproduces the standard errors of the calibration fixtures.
+  errors <- unlist(lapply(psychometrics_items(fit, models), function(item) unlist(item$standardErrors)))
+  stopifnot(max(abs(sqrt(diag(covariance$matrix)) - errors) / errors) < 1e-6)
+  list(name = name, quadrature = list(method = "rectangular", points = POINTS), models = I(models),
+       covariance = covariance)
+}
+
+# Maximizes the marginal log-likelihood of the 2PL plus the log priors of a and b by BFGS, then by Newton steps, and
+# returns the estimates with the covariance from the Hessian of the log-posterior (optimHess). `log_prior` takes the
+# items' parameters (a, b, c, d) by rows and returns the sum of the log prior densities; `prior_gradient` returns their
+# derivatives with respect to a and b, items by rows.
+item_prior_mode <- function(x, start, log_prior, prior_gradient) {
+  k <- nrow(start)
+  # The parameters are a of every item, then b of every item; the covariance is returned item by item, a then b.
+  order <- as.vector(rbind(seq_len(k), k + seq_len(k)))
+  parameters <- function(v) cbind(matrix(v, k, 2), 0, 1)
+  objective <- function(v) -(marginal(x, parameters(v))$logLikelihood + log_prior(parameters(v)))
+  gradient <- function(v) {
+    g <- marginal(x, parameters(v))$gradient[, 1:2] + prior_gradient(parameters(v))
+    -as.vector(g)
+  }
+  estimate <- optim(as.vector(start), objective, gradient, method = "BFGS",
+                    control = list(reltol = 1e-16, maxit = 10000))$par
+  for (step in 1:4) {
+    estimate <- estimate - solve(optimHess(estimate, objective, gradient), gradient(estimate))
+  }
+  stopifnot(max(abs(gradient(estimate))) < 1e-8)
+  pars <- parameters(estimate)
+  list(items = lapply(seq_len(k), function(i) list(parameters = list(a = pars[i, 1], b = pars[i, 2], c = 0, d = 1))),
+       covariance = unname(solve(optimHess(estimate, objective, gradient))[order, order]),
+       logLikelihood = marginal(x, pars)$logLikelihood, logPosterior = -objective(estimate))
+}
+
+# a ~ lognormal(0.3, 0.5) for every item but the fourth, whose a is lognormal(0, 0.3); b of the second item is
+# normal(0.5, 0.4). The package's `priors` and `itemPriors` options.
+general_a <- list(meanLog = 0.3, sdLog = 0.5)
+item_priors <- list(`Item.4` = list(a = list(type = "log-normal", meanLog = 0, sdLog = 0.3)),
+                    `Item.2` = list(b = list(type = "normal", mean = 0.5, sd = 0.4)))
+a_specs <- rep(list(general_a), 5)
+a_specs[[4]] <- list(meanLog = 0, sdLog = 0.3)
+a_mean_log <- sapply(a_specs, `[[`, "meanLog")
+a_sd_log <- sapply(a_specs, `[[`, "sdLog")
+b_prior <- list(item = 2, mean = 0.5, sd = 0.4)
+prior_mode <- item_prior_mode(
+  lsat7,
+  parameter_matrix(psychometrics_items(two_pl, models_2pl))[, 1:2],
+  function(p) {
+    sum(dlnorm(p[, 1], a_mean_log, a_sd_log, log = TRUE)) +
+      dnorm(p[b_prior$item, 2], b_prior$mean, b_prior$sd, log = TRUE)
+  },
+  function(p) {
+    g <- cbind(-(1 + (log(p[, 1]) - a_mean_log) / a_sd_log^2) / p[, 1], 0)
+    g[b_prior$item, 2] <- (b_prior$mean - p[b_prior$item, 2]) / b_prior$sd^2
+    g
+  }
+)
+prior_mode$parameters <- data.frame(item = rep(colnames(lsat7), each = 2), name = rep(c("a", "b"), 5), row.names = NULL)
+# The marginal likelihood of the written-out 2PL reproduces mirt's log-likelihood at mirt's estimates.
+two_pl_parameters <- cbind(parameter_matrix(psychometrics_items(two_pl, models_2pl))[, 1:2], 0, 1)
+stopifnot(abs(marginal(lsat7, two_pl_parameters)$logLikelihood - logLik(two_pl)) < 1e-6)
+
+write_fixture("irt-covariance", list(
+  source = paste("mirt::LSAT7 under the 2PL and mirt::Science under the GPCM, the calibrations of irt-lsat7 and",
+                 "irt-science: the covariance matrix of all estimated item parameters. The 2PL with priors on a and b",
+                 "is the base R maximum of the log-posterior."),
+  cases = list(
+    c(list(data = "irt-lsat7"), covariance_case("2PL, mirt Richardson", two_pl, models_2pl)),
+    c(list(data = "irt-science"),
+      covariance_case("GPCM, mirt Richardson", polytomous_fits$gpcm, science_models("gpcm"))),
+    list(
+      data = "irt-lsat7",
+      name = "2PL with a lognormal prior on a, and item priors on the a of item 4 and the b of item 2, base R mode",
+      quadrature = list(method = "rectangular", points = POINTS), models = I(models_2pl),
+      priors = list(a = list(type = "log-normal", meanLog = general_a$meanLog, sdLog = general_a$sdLog)),
+      itemPriors = item_priors, items = prior_mode$items, logLikelihood = prior_mode$logLikelihood,
+      covariance = list(parameters = prior_mode$parameters, matrix = prior_mode$covariance)
+    )
+  )
+))
+
+# The posterior of theta given a response pattern under a normal prior on `rule`'s nodes: the weights of the prior's
+# rectangular rule times the likelihood of the answered responses, normalized.
+posterior_weights <- function(fit, pattern, prior) {
+  z <- seq(-6, 6, length.out = POINTS)
+  nodes <- prior$mean + prior$sd * z
+  log_weights <- log(dnorm(z) / sum(dnorm(z)))
+  for (i in which(!is.na(pattern))) {
+    log_weights <- log_weights + log(probtrace(extract.item(fit, i), nodes)[, pattern[i] + 1])
+  }
+  weights <- exp(log_weights - max(log_weights))
+  weights / sum(weights)
+}
+
+posterior_case <- function(fit, models, patterns) {
+  standard <- list(mean = 0, sd = 1)
+  shifted <- list(mean = 0.4, sd = 1.3)
+  # Under the standard normal prior the posterior mean is mirt's EAP.
+  z <- seq(-6, 6, length.out = POINTS)
+  eap <- fscores(fit, method = "EAP", response.pattern = patterns, quadpts = POINTS)[, 1]
+  means <- sapply(seq_len(nrow(patterns)), function(r) sum(posterior_weights(fit, patterns[r, ], standard) * z))
+  stopifnot(max(abs(means - eap)) < 1e-8)
+  list(
+    models = I(models),
+    parameters = lapply(psychometrics_items(fit, models), `[[`, "parameters"),
+    patterns = patterns,
+    priors = lapply(list(standard, shifted), function(prior) {
+      list(prior = prior, nodes = prior$mean + prior$sd * z,
+           weights = t(sapply(seq_len(nrow(patterns)), function(r) posterior_weights(fit, patterns[r, ], prior))))
+    })
+  )
+}
+
+science_selected <- rbind(c(0, 0, 0, 0), c(3, 3, 3, 3), c(1, 2, 3, 0), c(2, 2, 1, 3), science_patterns[-seq_len(256), ])
+write_fixture("irt-posterior", list(
+  source = paste("mirt::LSAT7 under the 2PL and mirt::Science under the GPCM, the calibrations of irt-lsat7 and",
+                 "irt-science: the posterior of theta on 61 rectangular points by base R, on mirt's probtrace."),
+  forms = list(posterior_case(two_pl, models_2pl, patterns),
+               posterior_case(polytomous_fits$gpcm, science_models("gpcm"), science_selected))
+))

@@ -63,6 +63,9 @@ ana = model.update(ana, { ...attempt, item: "essay", time: 2, outcome: 2 / 3 });
 model.ability(ana); // { theta: 0.508, standardError: 0.748 }, EAP
 model.ability(ana, { estimator: "map" }); // the posterior mode
 model.predict(ana, { ...attempt, item: "q2", time: 3 }); // 0.625
+const { nodes, weights } = model.posterior(ana);
+nodes.length; // 61, from -6 to 6
+weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // 0.706, P(θ > 0)
 ```
 
 `ability(state, { estimator })` returns:
@@ -72,6 +75,10 @@ model.predict(ana, { ...attempt, item: "q2", time: 3 }); // 0.625
   highest grid point locates the mode; the quintic polynomial matching ℓ and its first two derivatives at the two
   nearest points gives it between them. At the default grid, the mode is within 1e-5 of the exact one; the error grows
   with the fifth power of the spacing. A mode beyond the grid is reported at its end.
+
+`posterior(state)` returns the learner's whole posterior of θ as a `ThetaDistribution`, `{ nodes, weights }`: the grid
+and the state's density on it, normalized to sum to 1. `@measurekit/psychometrics` has the same shape, so a posterior
+moves between the packages as plain data.
 
 The state, `{ learner, logDensity, slope, curvature }`, holds ℓ and its first two derivatives at each grid point: 3 ×
 `points` numbers, about 3.5 KB of JSON at the default grid, whatever the number of outcomes. ℓ is kept less its maximum,

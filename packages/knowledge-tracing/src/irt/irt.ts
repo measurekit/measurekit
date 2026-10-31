@@ -45,6 +45,17 @@ export interface IrtOptions {
   readonly points?: number;
 }
 
+/**
+ * A discrete distribution of θ: nodes with weights summing to 1. `@measurekit/psychometrics` has the same shape, so a
+ * posterior moves between the packages as data.
+ */
+export interface ThetaDistribution {
+  /** The values of θ, in ascending order. */
+  readonly nodes: readonly number[];
+  /** The probability of each node, summing to 1. */
+  readonly weights: readonly number[];
+}
+
 /** Options of {@link IrtModel.ability}. */
 export interface AbilityOptions {
   /**
@@ -71,6 +82,12 @@ export interface IrtModel extends LearnerModel<IrtState, IrtParameters> {
    * @throws `DataError` when the state is malformed or the estimator unknown.
    */
   ability(state: IrtState, options?: AbilityOptions): Ability;
+  /**
+   * Returns the posterior of the learner's θ on the model's grid: the state's density, normalized to sum to 1.
+   *
+   * @throws `DataError` when the state is malformed.
+   */
+  posterior(state: IrtState): ThetaDistribution;
 }
 
 /** The outcome of running a log through an IRT model. */
@@ -191,6 +208,12 @@ export function irt(options: IrtOptions): IrtModel {
       checkState(state, points);
       checkChoice(estimator, "The estimator", ESTIMATORS);
       return estimator === "eap" ? posteriorMean(state, grid) : posteriorMode(state, grid);
+    },
+    posterior(state) {
+      checkState(state, points);
+      const weights = state.logDensity.map(Math.exp);
+      const total = weights.reduce((sum, weight) => sum + weight, 0);
+      return { nodes: [...grid], weights: weights.map((weight) => weight / total) };
     },
   };
   return model;

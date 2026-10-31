@@ -89,7 +89,7 @@ learningCurve(log).skills.fractions; // [{ opportunity: 1, count: 2, errorRate: 
 | `@measurekit/knowledge-tracing/elo`      | `elo`: learner-item Elo with Pelánek's uncertainty function, and concept-specific Elo with skill abilities                                 |
 | `@measurekit/knowledge-tracing/bkt`      | `bkt`: Bayesian knowledge tracing with forgetting, item guess and slip, item learning and prior groups; mastery                            |
 | `@measurekit/knowledge-tracing/logistic` | `afm`, `pfa`, `logistic`: AFM, PFA and LKT features, with no, fixed or random proficiency and a ridge                                      |
-| `@measurekit/knowledge-tracing/irt`      | `irt`: online EAP and MAP ability from calibrated 1PL to 4PL, graded response and generalized partial credit items                         |
+| `@measurekit/knowledge-tracing/irt`      | `irt`: online EAP and MAP ability and the posterior of θ from calibrated 1PL to 4PL, graded response and generalized partial credit items  |
 | `@measurekit/knowledge-tracing/kst`      | `kst`: BLIM by ML or MD and adaptive assessment; `surmiseStructure`, `isKnowledgeSpace`, `isLearningSpace`, `fringes`, `delineate`; `iita` |
 | `@measurekit/knowledge-tracing/practice` | `recommend`; `streakMastery`, `thresholdMastery`; `opportunitiesToStreak`                                                                  |
 | `@measurekit/knowledge-tracing/sim`      | `simulate`: outcomes drawn from any learner model, seeded                                                                                  |

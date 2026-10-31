@@ -62,13 +62,14 @@ export function setUp<TParameters>(
   const { itemIds } = responses;
   const itemCounts = categoryCounts(responses);
   const models = itemModels(options.model, itemIds.length);
-  const { fixed = {}, priors = {} } = options;
+  const { fixed = {}, priors = {}, itemPriors = {} } = options;
   checkRecord(fixed, "The option fixed must be an object of item parameters by item id");
   checkRecord(priors, "The option priors must be an object of priors by parameter name");
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);
   for (const id of Object.keys(fixed)) {
     if (!itemIds.includes(id)) throw new DataError(`Fixed parameters are given for "${id}", which is not an item id.`);
   }
+  const priorsOfItem = itemPriorMap(itemPriors, itemIds, fixed);
   const free: FreeParameter[] = [];
   const values: number[] = [];
   const addFree = (lower: number, start: number): number => {
@@ -90,12 +91,18 @@ export function setUp<TParameters>(
     const start = model.toVector(model.startingValues(Float64Array.from(counts, (count) => count / answered)));
     const specifications = model.parameters(categoryCount);
     const shared = sharedSlots(sharing, model, { id, categoryCount, specifications });
+    const own = priorsOfItem.get(id);
     const slots = Int32Array.from(
       specifications,
       ({ name, lower = Number.NEGATIVE_INFINITY, upper = Number.POSITIVE_INFINITY, shared: common }, p) => {
+        if (common === true && own?.has(name) === true) {
+          throw new DataError(
+            `A prior is given for "${name}" of item "${id}", whose model shares it among items; use the option priors.`,
+          );
+        }
         const existing = common === true ? shared.get(name) : undefined;
         if (existing !== undefined) return existing;
-        free.push({ lower, upper, prior: priors[name] });
+        free.push({ lower, upper, prior: own?.get(name) ?? priors[name] });
         values.push(start[p] ?? 0);
         if (common === true) shared.set(name, values.length - 1);
         return values.length - 1;
@@ -119,12 +126,56 @@ export function setUp<TParameters>(
   for (const name of Object.keys(priors)) {
     if (!estimatedNames.has(name)) throw new DataError(`A prior is given for "${name}", which no estimated item has.`);
   }
+  checkItemPriorNames(priorsOfItem, items);
   const groups = population(options, answered, rule, rectangular, Object.keys(fixed).length > 0, addFree);
   if (design !== null) {
     checkTestletOptions(options, groups);
     testletWeights(design, Float64Array.from(values), rule.nodes);
   }
   return { items, population: groups, design, free, values: Float64Array.from(values) };
+}
+
+/**
+ * Checks the priors by item id and parameter name against the items and returns them as maps, so that an id such as
+ * "constructor" finds only its own priors.
+ *
+ * @throws `DataError` when the priors are not objects of priors, an id is not an item id, or the item is fixed.
+ */
+function itemPriorMap(
+  itemPriors: NonNullable<CalibrationOptions<unknown>["itemPriors"]>,
+  itemIds: readonly string[],
+  fixed: Readonly<Record<string, unknown>>,
+): Map<string, Map<string, ParameterPrior>> {
+  checkRecord(itemPriors, "The option itemPriors must be an object of priors by item id and parameter name");
+  return new Map(
+    Object.entries(itemPriors).map(([id, byName]) => {
+      if (!itemIds.includes(id)) throw new DataError(`Priors are given for "${id}", which is not an item id.`);
+      if (Object.keys(fixed).includes(id)) throw new DataError(`Priors are given for item "${id}", which is fixed.`);
+      checkRecord(byName, `The priors of item "${id}" must be an object of priors by parameter name`);
+      for (const [name, prior] of Object.entries(byName)) checkPrior(prior, `The prior of "${name}" of item "${id}"`);
+      return [id, new Map(Object.entries(byName))];
+    }),
+  );
+}
+
+/**
+ * Checks that the items have the parameters the priors name.
+ *
+ * @throws `DataError` when an item's model has no parameter of that name.
+ */
+function checkItemPriorNames<TParameters>(
+  priorsOfItem: ReadonlyMap<string, ReadonlyMap<string, ParameterPrior>>,
+  items: readonly ItemState<TParameters>[],
+): void {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  for (const [id, byName] of priorsOfItem) {
+    const names = byId.get(id)?.names ?? [];
+    for (const name of byName.keys()) {
+      if (!names.includes(name)) {
+        throw new DataError(`A prior is given for "${name}" of item "${id}", whose model has no such parameter.`);
+      }
+    }
+  }
 }
 
 /** The parameters the estimated items of a model share, as its first estimated item has them. */

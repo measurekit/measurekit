@@ -21,6 +21,7 @@ equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
 | Scoring against a key                                                                                                 | `mirt::key2binary`                                                                                                              |
 | Normal quantile, density and distribution function, logistic function, chi-square upper tail                          | `qnorm`, `dnorm`, `pnorm`, `plogis`, `pchisq(lower.tail = FALSE)`                                                               |
 | Gauss-Hermite nodes and weights                                                                                       | Golub-Welsch: `eigen` of the Jacobi matrix, a different algorithm                                                               |
+| Eigenvalues and eigenvectors of a symmetric matrix                                                                    | Base R `eigen(symmetric = TRUE)` (LAPACK), a different algorithm from the package's Jacobi method                               |
 
 | IRT quantity                                                           | Reference                                                                                                                                                                                                                 |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -45,6 +46,9 @@ equate 2.0.9, equateIRT 2.5.2, irr 0.85, cacIRT 1.4, sirt 4.2-133, nlme 3.1-169,
 | Testlet model: estimates, SEs, log-likelihood                          | Base R: the bifactor likelihood by dimension reduction, maximized by BFGS and Newton on central-difference gradients; `optimHess` for the SEs; mirt's `bfactor` with equal slopes and free testlet variances cross-checks |
 | EAP with testlet effects integrated out                                | Base R: the double sum over the nodes written out                                                                                                                                                                         |
 | Cross-product standard errors                                          | `mirt(SE.type = "crossprod")`                                                                                                                                                                                             |
+| Covariance of the item parameters                                      | The delta method on mirt's `vcov()`, Jacobian by central differences; with priors by item, base R: `optimHess` inverted                                                                                                   |
+| Priors by item                                                         | Base R: direct maximization of the log-posterior, the log-likelihood plus the log priors (BFGS, then Newton)                                                                                                              |
+| Posterior of theta on 61 points                                        | Base R: the prior's rectangular weights times the likelihood from mirt's `probtrace`; its mean is mirt's EAP                                                                                                              |
 | EAP summed-score tables                                                | `fscores(method = "EAPsum")`; base R's Lord-Wingersky recursion on `probtrace` for another prior                                                                                                                          |
 | Marginal and empirical reliability                                     | `marginal_rxx`, `empirical_rxx`; base R's `integrate` for another prior                                                                                                                                                   |
 
@@ -138,6 +142,9 @@ psych enumerates splits only up to 15,000 of them, so for SAT12's 32 items the G
 - mirt's GRM, GPCM, PCM and NRM estimates in this library's parameters equal `coef(IRTpars = TRUE)` within 1e-12.
 - mirt's WLE equals the base R WLE for the 1PL, 2PL, PCM, GPCM, RSM and NRM, and catR's `thetaEst(method = "WL")`
   agrees wherever Warm's equation has a single root.
+- The diagonal of the covariance matrix of the item parameters reproduces the standard errors above within 1e-6
+  relative, the written-out 2PL likelihood reproduces mirt's log-likelihood at mirt's estimates within 1e-6, and the
+  posterior mean under N(0, 1) is mirt's EAP within 1e-8.
 - TAM's JML estimates are within 4e-9 of the base R solution of its steps, and its log-likelihood within 1e-6. For
   dichotomous items, the base R standard error equals TAM's `errorP` within 1e-6.
 
@@ -272,6 +279,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `ctt-sat12.json`               | `mirt::SAT12` with its key, 8 as missing: 600 persons, 32 items, 28 incomplete                                                                                                                                         | Scoring, distractor analysis, omitted responses                                                               |
 | `math-functions.json`          | 18 probabilities from 1e-300 to 1 - 1e-10, 13 points from -30 to 30; chi-squares from 0 to 400, 1 to 100 df                                                                                                            | Tails of the normal quantile and of the chi-square                                                            |
 | `math-gauss-hermite.json`      | Rules of 1, 2, 5, 21 and 61 points                                                                                                                                                                                     | Small and large rules                                                                                         |
+| `math-eigen.json`              | Base R `eigen`: a random symmetric 5 × 5 matrix, a repeated eigenvalue, LSAT7's and `psych::bfi`'s (25 items) correlations, small matrices                                                                             | Negative and repeated eigenvalues, 25 rows                                                                    |
 | `irt-lsat7.json`               | `mirt::LSAT7`, expanded: 2PL, 2PL with two anchors, 3PL with a prior                                                                                                                                                   | All 32 patterns and 4 with missing responses                                                                  |
 | `irt-simulated-1pl.json`       | 1PL simulation, `set.seed(20261029)`: 800 persons, 12 items, a = 1.3, 10% missing                                                                                                                                      | Missing responses, a shared parameter                                                                         |
 | `irt-simulated-4pl.json`       | 4PL simulation, `set.seed(20261029)`: 2000 persons, 12 items                                                                                                                                                           | Four parameters, priors on both asymptotes                                                                    |
@@ -295,6 +303,8 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `irt-latent.json`              | 2PL simulations, `set.seed(20261029)`: 4 anchors of 12 items, θ ~ N(0.5, 1.2²); 2 × 1000 persons; 2,000 adaptive tests of 37 operational and 6 pretest items                                                           | A free normal distribution, two groups, online calibration, a histogram                                       |
 | `irt-scoring.json`             | LSAT7 under the 2PL and Science under the GPCM, the calibrations of `irt-lsat7` and `irt-science`                                                                                                                      | Summed-score tables and marginal reliability under two priors; 1000 EAP estimates                             |
 | `irt-cross-product.json`       | LSAT7, the simulated 1PL with missing responses, Science under the GPCM                                                                                                                                                | Cross-product standard errors, a shared slope                                                                 |
+| `irt-covariance.json`          | The calibrations of `irt-lsat7` and `irt-science`; the LSAT7 2PL with a log-normal prior on a and priors by item                                                                                                       | Covariances between items; a prior replaced for one item                                                      |
+| `irt-posterior.json`           | The calibrations of `irt-lsat7` and `irt-science`: 36 patterns of LSAT7, 8 of Science; under N(0, 1) and N(0.4, 1.3²)                                                                                                  | Posteriors on 61 nodes, a prior other than N(0, 1), missing responses                                         |
 | `equating-presmoothing.json`   | ACTmath's X and KBneat's X totals                                                                                                                                                                                      | Degrees 2, 3, 4 and 6                                                                                         |
 | `irt-testlet.json`             | A 2PL testlet simulation, `set.seed(20261029)`: 1000 persons, 3 testlets of 4 items, SDs 0.5, 0.8 and 1; sirt's `data.read`, 328 persons, 3 passages of 4 items                                                        | 21 nodes, as mirt's `bfactor`; EAP of 10 patterns                                                             |
 | `rater.json`                   | irr's `anxiety` (20 subjects, 3 raters), also with two ratings missing; irr's `diagnoses` (30 subjects, 6 raters)                                                                                                      | Weighted kappa, nominal categories, missing ratings                                                           |
@@ -311,6 +321,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | CTT statistics                                                          | 1e-10 absolute                                     | 4e-14                    |
 | Normal quantile and density, logistic function                          | 1e-14 relative                                     | 3e-16                    |
 | Gauss-Hermite nodes and weights                                         | 1e-12 absolute                                     | 3e-14                    |
+| Eigenvalues and eigenvectors, up to sign                                | 1e-12 absolute                                     | 2e-14                    |
 | IRT item parameters                                                     | 1e-5 absolute                                      | 6e-7                     |
 | IRT standard errors                                                     | 1e-4 relative                                      | 9e-6                     |
 | IRT log-likelihood, AIC, BIC at the estimates                           | 1e-6 absolute                                      | 3e-10                    |
@@ -346,7 +357,10 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Distributions of theta: standard errors                                 | 1e-6 relative                                      | 1.6e-9                   |
 | Histogram weights on fixed items                                        | 1e-12 absolute                                     | 6e-15                    |
 | Cross-product standard errors                                           | as the Hessian's: 1e-4, flat models 1e-3, relative | 4.4e-7; GPCM 2e-5        |
+| Covariance of item parameters: 2PL, base R maximum                      | 1e-4 of √(Σ_ii Σ_jj)                               | 1.6e-5                   |
+| Covariance of GPCM parameters                                           | 1e-3 of √(Σ_ii Σ_jj)                               | 6.4e-5                   |
 | Summed-score tables                                                     | 1e-12 absolute                                     | 3e-15                    |
+| Posterior of theta                                                      | 1e-12 absolute                                     | 3e-15                    |
 | Marginal reliability, 61 nodes against `integrate`                      | 1e-8 absolute                                      | 7e-10                    |
 | Empirical reliability, omega and its loadings                           | 1e-10 absolute                                     | 2e-14                    |
 | Purified and sparse Mantel-Haenszel statistics                          | 1e-12 absolute                                     | 4e-16                    |
@@ -362,6 +376,9 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Effort-moderated EAP estimates                                          | 1e-10 absolute                                     | 3e-15                    |
 | Cognitive diagnosis probabilities, proportions, persons, accuracy, PVAF | 1e-5 absolute                                      | 1.1e-6                   |
 | Cognitive diagnosis log-likelihood, AIC, BIC                            | 1e-8 absolute                                      | 5e-11                    |
+
+Entries of a covariance matrix are compared relative to √(Σ_ii Σ_jj) of the reference, so that an off-diagonal entry is
+on the correlation scale.
 
 Calibrations run with `tolerance: 1e-10`, mirt's `TOL`. The parameter and SE tolerances cover where EM stops in
 mirt: ltm and the base R mode, which converge further, agree within 3e-9. mirt's EM stops short on the flat
