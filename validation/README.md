@@ -10,6 +10,7 @@ R scripts in `validation/psychometrics/`:
 
 ```bash
 Rscript validation/psychometrics/ctt.R               # classical test theory; the value of subscores by subscore's CTTsub
+Rscript validation/psychometrics/augmented-subscores.R  # augmented subscores: the subscore package's subscore.Wainer, base R, a simulation with known true subscores
 Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
 Rscript validation/psychometrics/latent-regression.R # latent regression in `calibrate`: mirt's covdata and formula, TAM's tam.mml(Y = x)
 Rscript validation/psychometrics/dimensionality.R    # polychoric correlations, parallel analysis: psych, polycor
@@ -27,6 +28,7 @@ Rscript validation/psychometrics/generalizability.R  # variance components and d
 Rscript validation/psychometrics/generalizability-unbalanced.R  # variance components with empty cells: Henderson's Method 1 in base R
 validation/psychometrics/.venv/bin/python validation/psychometrics/generalizability-unbalanced.py  # the same components by GeneralizIT
 Rscript validation/psychometrics/mokken.R            # Mokken scale analysis: mokken's coefH, aisp, check.monotonicity and check.iio
+Rscript validation/psychometrics/mokken-reliability.R  # Molenaar-Sijtsma reliability: mokken's check.reliability on exact proportions of item steps; shares the data of mokken.R through mokken-data.R
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
 Rscript validation/psychometrics/rater.R             # rater agreement: irr, psych and effsize; the many-facet Rasch model: base R, with TAM and sirt data
@@ -40,7 +42,7 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
 sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm, clinicalsignificance and jsonlite;
-`common.R` holds their shared helpers, and `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share.
+`common.R` holds their shared helpers, `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share, and `mokken-data.R` the data that `mokken.R` and `mokken-reliability.R` share.
 
 `generalizability-unbalanced.py` checks the fixture that `generalizability-unbalanced.R` writes against GeneralizIT 0.1.2. It
 runs in a Python 3.12 environment in `validation/psychometrics/.venv`, which git ignores, and writes nothing:

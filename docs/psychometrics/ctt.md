@@ -1,7 +1,7 @@
 # Classical test theory
 
 `@measurekit/psychometrics/ctt` computes item statistics, distractor analysis, reliability, McDonald's omega, the
-standard error of measurement and the value of subscores from a [response matrix](data.md). Every statistic is validated against R
+standard error of measurement, the value of subscores and augmented subscores from a [response matrix](data.md). Every statistic is validated against R
 ([validation](validation.md)).
 
 ## Missing responses
@@ -132,8 +132,6 @@ both PRMSEs are `null` and `addedValue` is `false`.
 
 ### Not included
 
-- Augmented subscores (Wainer et al.), which borrow strength from the other sections; the subscores of a
-  [multidimensional model](multidimensional.md) do the same.
 - The comparison of the PRMSEs' significance (Olkin, Williams): `addedValue` is the plain comparison, as CTTsub's
   `added.value.s`.
 
@@ -145,6 +143,88 @@ both PRMSEs are `null` and `addedValue` is `false`.
 | Missing responses | Persons who answered every item of the sections     | `rowSums` of the answered items, `na.rm = TRUE`: a missing response counts as 0 |
 | Total test        | The sum of the items of the sections                | Any matrix; the formulas assume it is the sum of the sections                   |
 | Reliability       | Alpha of the section's items, from sample variances | The same (`CTT::itemAnalysis`)                                                  |
+
+## Augmented subscores
+
+A section of few items gives an unreliable subscore, and the other sections carry information about it when abilities
+correlate. `augmentedSubscores(matrix, sections)` estimates each person's true subscore of every section from the
+observed subscores of all sections, which Wainer et al. call augmenting.
+
+```mermaid
+flowchart LR
+  X["Observed subscores x, S = cov(x)"] --> T["S_true: S with each variance times alpha"]
+  X --> B["B = S_true S⁻¹"]
+  T --> B
+  B --> A["Augmented subscore: mean + B (x - mean)"]
+  B --> R["Reliability of each augmented subscore"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { augmentedSubscores } from "@measurekit/psychometrics/ctt";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// The reading and listening items of the example above.
+const random = createRandom(2026);
+const reading = simulateThetas(400, random);
+const listening = reading.map((theta) => 0.6 * theta + 0.8 * random.normal());
+const readingResponses = simulateResponses(simulateItems(twoParameterLogistic, 12, random), reading, random).responses;
+const listeningResponses = simulateResponses(
+  simulateItems(twoParameterLogistic, 12, random),
+  listening,
+  random,
+).responses;
+const matrix = responseMatrix(readingResponses.map((row, person) => [...row, ...(listeningResponses[person] ?? [])]));
+
+const result = augmentedSubscores(matrix, {
+  reading: matrix.itemIds.slice(0, 12),
+  listening: matrix.itemIds.slice(12),
+});
+result.sections.map(({ section, reliability, augmentedReliability }) => [
+  section,
+  Math.round(reliability * 1000) / 1000,
+  Math.round(augmentedReliability * 1000) / 1000,
+]);
+// [["reading", 0.678, 0.721], ["listening", 0.67, 0.717]]
+result.weights.map((row) => row.map((weight) => Math.round(weight * 100) / 100)); // [[0.63, 0.14], [0.14, 0.62]]
+```
+
+`sections` is as for `subscoreValue`. The result has these fields:
+
+| Field      | Meaning                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sections` | For each section in the order given: `reliability` (alpha of its items), `augmentedReliability`, `mean`, `standardDeviation` of the augmented subscores |
+| `persons`  | The indices in the matrix of the persons scored: those who answered every item of the sections                                                          |
+| `scores`   | The augmented subscores by person, then section                                                                                                         |
+| `weights`  | B by section, then section: the deviation of an augmented subscore is its row times the deviations of the observed subscores                            |
+
+With x the observed subscores and S their covariance matrix, S_true is S with each variance S_jj replaced by ρ_j S_jj, ρ_j
+being alpha of section j: the errors of different sections are taken as uncorrelated. The augmented subscores are
+x̄ + B (x - x̄) with B = S_true S⁻¹, the regression of the true subscores on all observed ones. The reliability of the
+augmented subscore j is [B B S_true]_jj / [B S_true]_jj. Sections that do not correlate get B = diag(ρ), the reliability of
+the subscore itself, shrunk toward the mean; sections that do correlate lend each other their items.
+
+| Situation                                                                      | Result                                                                                                                                                           |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A section with a constant subscore or alpha not above 0                        | Throws: it has no true-score variance to estimate                                                                                                                |
+| Subscores that are linearly dependent, or fewer persons than sections          | Throws: S cannot be inverted                                                                                                                                     |
+| Sections that correlate, corrected for unreliability, above 1                  | S_true is not positive definite, as in the example data of the subscore package; a reliability can leave 0 to 1 and the sections do not measure different things |
+| Fewer than two sections, a section of one item, an unknown or repeated item id | Throws                                                                                                                                                           |
+
+The statistics use the persons who answered every item of the sections, as `subscoreValue` does. On a simulation of
+three abilities that correlate at 0.8, with six items in each section and known true subscores, the observed subscores
+correlate 0.744 with the true ones and the augmented 0.824 ([validation](validation.md)).
+
+### Differences from subscore.Wainer
+
+| Topic             | This package                                       | `subscore.Wainer`                                               |
+| ----------------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| Sections          | Item ids by name; items in no section are left out | The sections' item columns, and the total test as a last matrix |
+| Missing responses | Persons who answered every item of the sections    | `rowSums` of the answered items and pairwise covariances        |
+| Reliability       | Alpha of the section's items; it must be above 0   | `CTT::itemAnalysis`, whatever its sign                          |
+| Weights           | Returned as `weights`                              | Not returned                                                    |
 
 ## Classification
 

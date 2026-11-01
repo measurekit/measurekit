@@ -1,9 +1,8 @@
-import { checkArray, checkRecord, DataError, describe } from "@measurekit/core";
-import { indexIds } from "../data/ids.js";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { DataError } from "@measurekit/core";
+import type { ResponseMatrix } from "../data/response-matrix.js";
 import { covariance, variance } from "../math/statistics.js";
-import { completeCases, itemScores } from "./complete-cases.js";
-import { alphaFromVariances } from "./reliability.js";
+import type { CompleteCases } from "./complete-cases.js";
+import { sectionCases, sectionStatistics } from "./sections.js";
 
 /** Whether the subscore of one section is worth reporting: how well it and the total score predict its true score. */
 export interface SubscoreValue {
@@ -52,81 +51,22 @@ export function subscoreValue(
   matrix: ResponseMatrix,
   sections: Readonly<Record<string, readonly string[]>>,
 ): SubscoreValue[] {
-  checkResponseMatrix(matrix);
-  const items = sectionItems(matrix, sections);
-  const used = items.flatMap(({ columns }) => columns);
-  const cases = completeCases({
-    ...matrix,
-    itemIds: used.map((column) => matrix.itemIds[column] ?? ""),
-    responses: matrix.responses.map((row) => used.map((column) => row[column] ?? null)),
-  });
-  if (cases.persons.length < 2) {
-    throw new DataError("Subscore value needs at least two persons who answered every item of the sections.");
-  }
+  const { cases, names, indices } = sectionCases(matrix, sections, "Subscore value");
   const totalVariance = variance(cases.totals);
   if (totalVariance === 0) throw new DataError("Subscore value needs total scores with variance.");
-  let start = 0;
-  return items.map(({ section, columns }) => {
-    const indices = columns.map((_, i) => start + i);
-    start += columns.length;
-    return sectionValue(section, indices, cases, totalVariance);
-  });
-}
-
-/** The columns of the matrix that make up each section, by name. */
-interface SectionItems {
-  readonly section: string;
-  readonly columns: readonly number[];
-}
-
-/** Checks the sections against the matrix and returns each one's item columns, in the order given. */
-function sectionItems(matrix: ResponseMatrix, sections: Readonly<Record<string, readonly string[]>>): SectionItems[] {
-  checkRecord(sections, "The sections must be an object of item ids by section name");
-  const columns = indexIds("item", matrix.itemIds);
-  const owner = new Map<string, string>();
-  const result = Object.entries(sections).map(([section, ids]) => {
-    checkArray(ids, `The items of section "${section}" must be an array of item ids`);
-    if (ids.length < 2) {
-      throw new DataError(`Section "${section}" needs at least two items, found ${ids.length}.`);
-    }
-    return {
-      section,
-      columns: ids.map((id) => {
-        const column = columns.get(id);
-        if (column === undefined) {
-          throw new DataError(`Section "${section}" has the item ${describe(id)}, which is not an item of the matrix.`);
-        }
-        const first = owner.get(id);
-        if (first !== undefined) {
-          throw new DataError(
-            `The item "${id}" is in the sections "${first}" and "${section}"; a section's items are its own.`,
-          );
-        }
-        owner.set(id, section);
-        return column;
-      }),
-    };
-  });
-  if (result.length < 2) {
-    throw new DataError(`Subscore value needs at least two sections, found ${result.length}.`);
-  }
-  return result;
+  return names.map((section, i) => sectionValue(section, indices[i] ?? [], cases, totalVariance));
 }
 
 /** Returns one section's PRMSEs from the complete cases, its items at `indices` of the cases' columns. */
 function sectionValue(
   section: string,
   indices: readonly number[],
-  cases: ReturnType<typeof completeCases>,
+  cases: CompleteCases,
   totalVariance: number,
 ): SubscoreValue {
-  const subscores = itemScores(cases, indices);
-  const subscoreVariance = variance(subscores);
-  let itemVariance = 0;
-  for (const item of indices) itemVariance += variance(itemScores(cases, [item]));
-  const reliability = subscoreVariance === 0 ? 0 : alphaFromVariances(indices.length, itemVariance, subscoreVariance);
+  const { scores, variance: subscoreVariance, alpha: reliability } = sectionStatistics(cases, indices);
   if (!(reliability > 0)) return { section, subscorePrmse: null, totalPrmse: null, addedValue: false };
-  const trueCovariance = covariance(subscores, cases.totals) - (1 - reliability) * subscoreVariance;
+  const trueCovariance = covariance(scores, cases.totals) - (1 - reliability) * subscoreVariance;
   const totalPrmse = (trueCovariance * trueCovariance) / (reliability * subscoreVariance * totalVariance);
   return { section, subscorePrmse: reliability, totalPrmse, addedValue: reliability > totalPrmse };
 }

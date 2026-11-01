@@ -35,3 +35,6 @@ links.
 items. With items that estimate their slopes, σ is 1 and the coefficients are in units of the residual SD; with `fixed`
 items, which set the scale, σ is estimated. The result has a `regression` with the coefficients, the residual SD and, with
 standard errors from the Hessian, the standard errors of the coefficients.
+
+Augmented subscores borrow strength from the other sections of a test, with the reliability of each, and Mokken scale
+analysis reports the reliability of the total score by the Molenaar-Sijtsma method.

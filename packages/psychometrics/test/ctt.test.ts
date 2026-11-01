@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  augmentedSubscores,
   classifyDifficulty,
   classifyDiscrimination,
   cronbachAlpha,
@@ -19,6 +20,7 @@ import {
   standardErrorOfMeasurement,
   subscoreValue,
 } from "../src/index.js";
+import augmented from "./fixtures/ctt-augmented-subscores.json" with { type: "json" };
 import bfi from "./fixtures/ctt-bfi-neuroticism.json" with { type: "json" };
 import lsat7 from "./fixtures/ctt-lsat7.json" with { type: "json" };
 import sat12 from "./fixtures/ctt-sat12.json" with { type: "json" };
@@ -32,6 +34,10 @@ const TOLERANCE = 1e-10;
 const OMEGA_LOADING_TOLERANCE = 1e-10;
 /** Subscore PRMSEs against the subscore package's CTTsub: closed forms of the same sums. */
 const SUBSCORE_TOLERANCE = 1e-12;
+/** Augmented subscores against subscore.Wainer: the same matrices, inverted by another method. */
+const AUGMENTED_SCORE_TOLERANCE = 1e-10;
+/** Augmented reliabilities and weights against subscore.Wainer and base R. */
+const AUGMENTED_TOLERANCE = 1e-10;
 
 const ITEM_FIELDS = [
   "mean",
@@ -456,6 +462,203 @@ describe("subscoreValue", () => {
   });
 });
 
+describe("augmentedSubscores", () => {
+  for (const reference of augmented.cases) {
+    it(`matches subscore.Wainer on ${reference.name}`, () => {
+      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const result = augmentedSubscores(matrix, sectionsOf(reference.sections));
+      expect(result.sections.map(({ section }) => section)).toEqual(reference.sectionNames);
+      expect(result.persons).toEqual(reference.persons);
+      expect(result.scores).toHaveLength(reference.scores.length);
+      result.scores.forEach((row, person) => {
+        row.forEach((score, j) => {
+          expectClose(score, defined(reference.scores[person]?.[j]), AUGMENTED_SCORE_TOLERANCE, `person ${person}`);
+        });
+      });
+      result.sections.forEach((section, j) => {
+        expectClose(section.reliability, defined(reference.reliability[j]), AUGMENTED_TOLERANCE, "alpha");
+        expectClose(
+          section.augmentedReliability,
+          defined(reference.augmentedReliability[j]),
+          AUGMENTED_TOLERANCE,
+          `${section.section} augmented reliability`,
+        );
+        expectClose(section.mean, defined(reference.mean[j]), AUGMENTED_SCORE_TOLERANCE, `${section.section} mean`);
+        expectClose(
+          section.standardDeviation,
+          defined(reference.standardDeviation[j]),
+          AUGMENTED_SCORE_TOLERANCE,
+          `${section.section} standard deviation`,
+        );
+        result.weights[j]?.forEach((weight, k) => {
+          expectClose(weight, defined(reference.weights[j]?.[k]), AUGMENTED_TOLERANCE, `weight ${j}, ${k}`);
+        });
+      });
+    });
+  }
+
+  it("is closer to the true subscores than the observed subscores are, as in the simulation", () => {
+    const reference = defined(augmented.cases.find(({ name }) => name === "simulated"));
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const sections = sectionsOf(reference.sections);
+    const result = augmentedSubscores(matrix, sections);
+    const truth = defined(reference.truth);
+    Object.values(sections).forEach((ids, j) => {
+      const columns = ids.map((id) => reference.itemIds.indexOf(id));
+      const observed = result.persons.map((person) =>
+        columns.reduce((sum, column) => sum + defined(reference.responses[person]?.[column]), 0),
+      );
+      const trueScores = result.persons.map((_, i) => defined(truth[i]?.[j]));
+      const augmentedScores = result.scores.map((row) => defined(row[j]));
+      expectClose(correlationOf(augmentedScores, trueScores), defined(reference.augmentedCorrelation?.[j]), 1e-10);
+      expectClose(correlationOf(observed, trueScores), defined(reference.observedCorrelation?.[j]), 1e-10);
+      expect(correlationOf(augmentedScores, trueScores)).toBeGreaterThan(correlationOf(observed, trueScores) + 0.05);
+    });
+  });
+
+  /** Two sections of two equal items, the four combinations of their scores once each. */
+  const AgreeingRows = [
+    [0, 0, 0, 0],
+    [0, 0, 1, 1],
+    [1, 1, 0, 0],
+    [1, 1, 1, 1],
+  ];
+  const AgreeingSections = { first: ["item1", "item2"], second: ["item3", "item4"] };
+
+  it("leaves subscores that are perfectly reliable as they are", () => {
+    // Alpha is 1 for both sections, so S_true is S, B is the identity, and the reliabilities stay 1.
+    const result = augmentedSubscores(responseMatrix(AgreeingRows), AgreeingSections);
+    expect(result.weights).toEqual([
+      [1, 0],
+      [0, 1],
+    ]);
+    expect(result.sections.map(({ augmentedReliability }) => augmentedReliability)).toEqual([1, 1]);
+    expect(result.scores).toEqual([
+      [0, 0],
+      [0, 2],
+      [2, 0],
+      [2, 2],
+    ]);
+  });
+
+  it("shrinks uncorrelated subscores toward their means by their reliabilities", () => {
+    // Each section's items take the patterns 00, 11 and 10, each with every pattern of the other section, so the
+    // subscores 0, 2 and 1 are uncorrelated. Their variance is 3/4 and each item's 1/4, so alpha = 2 (1 - (1/2) / (3/4))
+    // = 2/3; then B is the diagonal of the alphas, and so are the augmented reliabilities.
+    const patterns = [
+      [0, 0],
+      [1, 1],
+      [1, 0],
+    ];
+    const rows = patterns.flatMap((first) => patterns.map((second) => [...first, ...second]));
+    const result = augmentedSubscores(responseMatrix(rows), AgreeingSections);
+    result.weights.forEach((row, j) => {
+      row.forEach((weight, k) => {
+        expect(weight).toBeCloseTo(j === k ? 2 / 3 : 0, 14);
+      });
+    });
+    result.sections.forEach((section) => {
+      expect(section.reliability).toBeCloseTo(2 / 3, 14);
+      expect(section.augmentedReliability).toBeCloseTo(2 / 3, 14);
+      expect(section.mean).toBeCloseTo(1, 14);
+    });
+    rows.forEach((row, person) => {
+      const sums = [(row[0] ?? 0) + (row[1] ?? 0), (row[2] ?? 0) + (row[3] ?? 0)];
+      sums.forEach((sum, j) => {
+        expect(result.scores[person]?.[j]).toBeCloseTo(1 + (2 / 3) * (sum - 1), 14);
+      });
+    });
+  });
+
+  it("gives the augmented subscores as the means plus the weights times the deviations", () => {
+    const reference = defined(augmented.cases.find(({ name }) => name === "TIMSS11G8M.data"));
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const sections = sectionsOf(reference.sections);
+    const result = augmentedSubscores(matrix, sections);
+    const sums = reference.responses.map((row) =>
+      Object.values(sections).map((ids) =>
+        ids.reduce((sum, id) => sum + defined(row[reference.itemIds.indexOf(id)]), 0),
+      ),
+    );
+    const means = result.sections.map(({ mean }) => mean);
+    result.scores.forEach((row, person) => {
+      row.forEach((score, j) => {
+        const deviations = defined(sums[defined(result.persons[person])]).map((sum, k) => sum - defined(means[k]));
+        const expected =
+          defined(means[j]) + deviations.reduce((total, d, k) => total + defined(result.weights[j]?.[k]) * d, 0);
+        expect(score).toBeCloseTo(expected, 10);
+      });
+    });
+  });
+
+  it("scores the persons who answered every item of the sections and ignores other items", () => {
+    const base = augmentedSubscores(responseMatrix(ThreeSectionRows), ThreeSections);
+    const extra = ThreeSectionRows.map((row, person) => [...row, person % 2]);
+    expect(augmentedSubscores(responseMatrix(extra), ThreeSections)).toEqual(base);
+    const missing = [...extra, [null, 1, 0, 1, 1, 0, 1], [0, 0, 1, null, 0, 1, 0]];
+    const withMissing = augmentedSubscores(responseMatrix(missing), ThreeSections);
+    expect(withMissing).toEqual(base);
+    expect(withMissing.persons).toHaveLength(ThreeSectionRows.length);
+  });
+
+  it("does not change its input or share it with the result", () => {
+    const rows = ThreeSectionRows.map((row) => [...row]);
+    const matrix = responseMatrix(rows);
+    const result = augmentedSubscores(matrix, ThreeSections);
+    expect(rows).toEqual(ThreeSectionRows);
+    expect(result.scores).not.toBe(matrix.responses);
+  });
+
+  it("rejects sections that cannot be augmented", () => {
+    const matrix = responseMatrix(ThreeSectionRows);
+    expect(() => augmentedSubscores(matrix, { first: ["item1", "item2"] })).toThrow(
+      "Augmented subscores needs at least two sections, found 1.",
+    );
+    expect(() => augmentedSubscores(matrix, { first: ["item1", "item2"], second: ["item3"] })).toThrow(
+      'Section "second" needs at least two items, found 1.',
+    );
+    expect(() => augmentedSubscores(matrix, { first: ["item1", "item2"], second: ["item3", "other"] })).toThrow(
+      'Section "second" has the item "other", which is not an item of the matrix.',
+    );
+    expect(() => augmentedSubscores(matrix, { first: ["item1", "item2"], second: ["item2", "item3"] })).toThrow(
+      'The item "item2" is in the sections "first" and "second"; a section\'s items are its own.',
+    );
+  });
+
+  it("rejects sections whose subscores are linearly dependent and fewer than two complete persons", () => {
+    const copy = [
+      [0, 1, 0, 1],
+      [1, 1, 1, 1],
+      [0, 0, 0, 0],
+      [1, 0, 1, 0],
+      [1, 1, 1, 1],
+    ];
+    expect(() => augmentedSubscores(responseMatrix(copy), AgreeingSections)).toThrow(
+      "Augmented subscores need observed subscores that are not linearly dependent, with more persons than sections.",
+    );
+    expect(() =>
+      augmentedSubscores(
+        responseMatrix([
+          [1, 0, 1, 1],
+          [1, null, 0, 1],
+        ]),
+        AgreeingSections,
+      ),
+    ).toThrow("Augmented subscores needs at least two persons who answered every item of the sections.");
+  });
+
+  it("rejects input of other types, as JavaScript or JSON pass it", () => {
+    const matrix = responseMatrix(ThreeSectionRows);
+    expect(() => augmentedSubscores(JSON.parse("null"), ThreeSections)).toThrow(DataError);
+    expect(() => augmentedSubscores(matrix, JSON.parse("null"))).toThrow(
+      "The sections must be an object of item ids by section name, found null.",
+    );
+    expect(() => augmentedSubscores(matrix, JSON.parse('{"first": "item1", "second": ["item3", "item4"]}'))).toThrow(
+      'The items of section "first" must be an array of item ids, found "item1".',
+    );
+  });
+});
+
 describe("edge cases", () => {
   it("gives a constant item null correlations, D of 0, and counts it in alpha", () => {
     const rows = [
@@ -592,6 +795,41 @@ function attempt<T>(compute: () => T): T | null {
     if (error instanceof DataError) return null;
     throw error;
   }
+}
+
+/** Persons answering three sections of two items each, and a seventh item that belongs to none. */
+const ThreeSectionRows = [
+  [0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 1, 0, 0],
+  [1, 1, 0, 0, 0, 0],
+  [0, 0, 1, 1, 0, 0],
+  [1, 1, 1, 0, 1, 0],
+  [1, 0, 1, 1, 0, 1],
+  [0, 1, 0, 0, 1, 1],
+  [1, 1, 1, 1, 1, 1],
+  [1, 1, 0, 1, 1, 1],
+  [1, 1, 1, 1, 0, 1],
+  [0, 0, 1, 1, 1, 1],
+  [1, 0, 0, 0, 0, 0],
+  [0, 1, 1, 1, 0, 0],
+  [0, 0, 0, 0, 1, 1],
+  [1, 1, 0, 0, 1, 1],
+];
+const ThreeSections = { first: ["item1", "item2"], second: ["item3", "item4"], third: ["item5", "item6"] };
+
+/** Returns the Pearson correlation of two lists of numbers. */
+function correlationOf(x: readonly number[], y: readonly number[]): number {
+  const meanX = x.reduce((sum, value) => sum + value, 0) / x.length;
+  const meanY = y.reduce((sum, value) => sum + value, 0) / y.length;
+  let products = 0;
+  let squaresX = 0;
+  let squaresY = 0;
+  x.forEach((value, i) => {
+    products += (value - meanX) * (defined(y[i]) - meanY);
+    squaresX += (value - meanX) ** 2;
+    squaresY += (defined(y[i]) - meanY) ** 2;
+  });
+  return products / Math.sqrt(squaresX * squaresY);
 }
 
 /** The sections of a fixture, without the entries that the other cases' sections give the union type. */
@@ -738,6 +976,27 @@ describe("properties", () => {
           const alpha = attempt(() => cronbachAlpha(section));
           if (value.subscorePrmse !== null && alpha !== null) expectClose(value.subscorePrmse, alpha, 1e-9);
         });
+      }),
+    );
+  });
+
+  it("augmented reliabilities are finite and do not depend on the order of persons", () => {
+    fc.assert(
+      fc.property(permutedRows(arbitraryRows), ([rows, shuffled]) => {
+        const items = rows[0]?.length ?? 0;
+        if (items < 4) return;
+        const half = Math.floor(items / 2);
+        const ids = Array.from({ length: items }, (_, i) => `item${i + 1}`);
+        const sections = { first: ids.slice(0, half), second: ids.slice(half) };
+        const forward = attempt(() => augmentedSubscores(responseMatrix(rows), sections));
+        const other = attempt(() => augmentedSubscores(responseMatrix(shuffled), sections));
+        if (forward === null || other === null) return;
+        for (const { augmentedReliability, mean } of forward.sections) {
+          expect(Number.isFinite(augmentedReliability)).toBe(true);
+          expect(Number.isFinite(mean)).toBe(true);
+        }
+        expectNear(other.sections, forward.sections);
+        expectNear(other.weights, forward.weights);
       }),
     );
   });

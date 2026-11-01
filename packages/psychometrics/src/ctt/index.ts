@@ -1,8 +1,10 @@
 /**
- * Classical test theory: item statistics, distractor analysis, reliability, the value of subscores and classification.
+ * Classical test theory: item statistics, distractor analysis, reliability, the value of subscores, augmented subscores and
+ * classification.
  *
  * @module @measurekit/psychometrics/ctt
  */
+export { type AugmentedSection, type AugmentedSubscores, augmentedSubscores } from "./augmented-subscores.js";
 export {
   classifyDifficulty,
   classifyDiscrimination,

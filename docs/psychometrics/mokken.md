@@ -4,8 +4,8 @@
 the items' curves: it measures how well items scale together, selects items into scales, and checks the two
 assumptions that make the total score a good measure. It suits questionnaires and attitude scales, and screens
 achievement items for response curves that fall with ability. The coefficients and their standard errors, the
-item selection, the monotonicity check and the invariant item ordering check are validated against the mokken
-package ([validation](validation.md)).
+item selection, the monotonicity check, the invariant item ordering check and the reliability of the total score are
+validated against the mokken package ([validation](validation.md)).
 
 Items may be dichotomous or polytomous: scores are integers, and the lowest score of all items is taken as 0, so scores
 from 1 to 5 work as scores from 0 to 4. Scores may span at most 10 categories, as in mokken. Every function uses the
@@ -17,6 +17,7 @@ persons who answered every item, and needs at least two of them. The functions t
 | `automatedItemSelection(matrix, options)` | Scales of items, and the items in none                                |
 | `monotonicity(matrix, options)`           | Violations of monotone response curves, by item                       |
 | `invariantItemOrdering(matrix, options)`  | Violations of the order of items, by item, the items removed, and H^T |
+| `molenaarSijtsmaReliability(matrix)`      | The reliability of the total score, MS                                |
 
 ## Scalability
 
@@ -216,25 +217,75 @@ Math.round((result.coefficient ?? 0) * 1000) / 1000; // 0.366
 Math.round((invariantItemOrdering(matrix, { selection: false }).coefficient ?? 0) * 1000) / 1000; // 0.3
 ```
 
+## Reliability
+
+The total score of items that fit the model of double monotonicity has a reliability that coefficient alpha, a lower bound,
+understates. `molenaarSijtsmaReliability(matrix)` returns the Molenaar-Sijtsma coefficient MS, the method that Sijtsma and
+van der Ark (2017) name as the last step of a Mokken scale analysis.
+
+```mermaid
+flowchart LR
+  S["Item steps: P(X_i >= x), ordered by P"] --> O["Joint proportions of steps of different items: observed"]
+  S --> E["Joint proportions of steps of one item: estimated from the nearest steps"]
+  O --> V["Variance of the total score under the model"]
+  E --> V
+  V --> M["MS = (sum of joint proportions less products) / observed variance of the total score"]
+```
+
+Under local independence, the variance of the true score is the sum over all pairs of item steps of P(pass both) - P(pass
+one) P(pass the other), the pairs of steps of one item included; the reliability is that variance over the variance of the
+total score. The pairs of steps of one item are never observed together, so the method estimates each from the pairs of that step with the steps next to it
+in the order of the proportions, which double monotonicity fixes for every person, and bounds it by the product of the two
+proportions and the smaller of them. Steps that every person or no person passes drop out.
+
+```ts
+import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { molenaarSijtsmaReliability } from "@measurekit/psychometrics/mokken";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// The 8 items of the simulation above, without the reversed item.
+const random = createRandom(11);
+const items = simulateItems(twoParameterLogistic, 8, random);
+const simulated = simulateResponses(items, simulateThetas(400, random), random);
+const matrix = responseMatrix(simulated.responses, { itemIds: simulated.itemIds });
+
+Math.round(molenaarSijtsmaReliability(matrix) * 1000) / 1000; // 0.541
+Math.round(cronbachAlpha(matrix) * 1000) / 1000; // 0.531
+```
+
+MS is not limited to 1 and is meant for items that fit the model: check [monotonicity](#monotonicity) first. On 20 seeded
+data sets of the graded response model with one slope, which has double monotonicity, MS averages 0.737 against 0.751 for
+the correlation of two parallel forms, and alpha 0.733 ([validation](validation.md)).
+
+| Situation                              | Result                                      |
+| -------------------------------------- | ------------------------------------------- |
+| Total scores without variance          | Throws                                      |
+| Fewer than two items or complete cases | Throws, as every function of the module     |
+| An item without variance               | Its steps drop out; the other items give MS |
+
 ## Not included
 
 - The genetic algorithm and the extended search of the automated item selection, the Wald-based and range-preserving
   tests of the item selection (`type.z`), and its test of H_i against the lower bound (`test.Hi`).
-- The other checks of the package: `check.reliability` (MS, λ₂ and LCRC), `check.pmatrix` and `check.restscore`.
+- The other coefficients of `check.reliability` (λ₂ and LCRC, which needs a latent class model), `check.pmatrix` and
+  `check.restscore`; `monotonicity` covers the checks of the curves.
 - The other methods of the invariant item ordering check, item steps and the scale-level conditional proportions
   (`IT` and `MSCPM`), and clustered items with a fixed item order.
 - Two-level scalability for clustered persons, such as raters, and the imputation of missing responses.
 
 ## Differences from the references
 
-| Topic                                   | This package                                                                 | mokken                                                                      |
-| --------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Missing responses                       | The persons who answered every item are used                                 | Stops at a missing response; the references run on the complete cases       |
-| Items without variance                  | `null` coefficients; unscalable; left out of the other coefficients          | `coefH` and `aisp` stop                                                     |
-| Lower bound above every H_ij            | All items unscalable                                                         | `aisp` stops                                                                |
-| Critical z of the monotonicity check    | The quantile of the standard normal distribution for `alpha`                 | The constant 1.6449; the check has no level                                 |
-| H_i in the criterion of the order check | Not rounded                                                                  | Rounded to three decimals by `summary`, which can change the criterion by 1 |
-| z of an item without violations         | `null`                                                                       | 0                                                                           |
-| Ties in the item selection of the order | The candidate that leaves the larger H, else the first in the order of means | The larger H plus random noise of SD 1e-5                                   |
-| Groups with equal paired differences    | Significant, without a statistic                                             | `t.test` stops                                                              |
-| Order of the results                    | The order of the matrix's items                                              | `check.iio` lists items from the highest mean to the lowest                 |
+| Topic                                   | This package                                                                 | mokken                                                                                                                                                                                                                                         |
+| --------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing responses                       | The persons who answered every item are used                                 | Stops at a missing response; the references run on the complete cases                                                                                                                                                                          |
+| Items without variance                  | `null` coefficients; unscalable; left out of the other coefficients          | `coefH` and `aisp` stop                                                                                                                                                                                                                        |
+| Lower bound above every H_ij            | All items unscalable                                                         | `aisp` stops                                                                                                                                                                                                                                   |
+| Critical z of the monotonicity check    | The quantile of the standard normal distribution for `alpha`                 | The constant 1.6449; the check has no level                                                                                                                                                                                                    |
+| H_i in the criterion of the order check | Not rounded                                                                  | Rounded to three decimals by `summary`, which can change the criterion by 1                                                                                                                                                                    |
+| z of an item without violations         | `null`                                                                       | 0                                                                                                                                                                                                                                              |
+| Ties in the item selection of the order | The candidate that leaves the larger H, else the first in the order of means | The larger H plus random noise of SD 1e-5                                                                                                                                                                                                      |
+| Groups with equal paired differences    | Significant, without a statistic                                             | `t.test` stops                                                                                                                                                                                                                                 |
+| Order of the results                    | The order of the matrix's items                                              | `check.iio` lists items from the highest mean to the lowest                                                                                                                                                                                    |
+| Item steps passed by equal numbers      | Tied exactly, by their counts                                                | Tied when the proportions from `mean()` agree to the last bit, which depends on the order of the persons; the references run mokken's own code with exact proportions, and differ from `check.reliability` by up to 0.021 where it splits ties |

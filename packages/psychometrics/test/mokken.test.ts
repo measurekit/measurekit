@@ -5,12 +5,14 @@ import {
   DataError,
   type ItemCheck,
   invariantItemOrdering,
+  molenaarSijtsmaReliability,
   monotonicity,
   type ResponseMatrix,
   responseMatrix,
   scalability,
 } from "../src/index.js";
 import fixture from "./fixtures/mokken.json" with { type: "json" };
+import reliability from "./fixtures/mokken-reliability.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
@@ -18,6 +20,14 @@ import { defined, expectClose } from "./helpers.js";
 const COEFFICIENT_TOLERANCE = 1e-10;
 /** Violation sizes, sums and test statistics against the checks' results. */
 const STATISTIC_TOLERANCE = 1e-8;
+/** MS against check.reliability: sums of the same proportions in another order. */
+const RELIABILITY_TOLERANCE = 1e-10;
+/** MS against mokken's own value where no tie of item steps is split by the rounding of its proportions. */
+const ROUNDING_TOLERANCE = 1e-12;
+/** The largest gap between MS and mokken's own value where the rounding of its proportions splits ties: 0.021 in the fixture. */
+const SPLIT_TIES_GAP = 0.03;
+/** How far the mean of MS may lie from the mean reliability of parallel forms in the study: it was 0.014 in the fixture. */
+const STUDY_BIAS = 0.03;
 
 interface ReferenceCheck {
   readonly id: string;
@@ -514,6 +524,110 @@ describe("invariantItemOrdering", () => {
   });
 });
 
+describe("molenaarSijtsmaReliability", () => {
+  for (const reference of reliability.cases) {
+    it(`matches check.reliability of the mokken package on ${reference.name}`, () => {
+      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      expectClose(molenaarSijtsmaReliability(matrix), reference.ms, RELIABILITY_TOLERANCE, reference.name);
+    });
+  }
+
+  it("equals mokken's own value where its rounding does not split tied steps, and stays within 0.03 where it does", () => {
+    for (const reference of [...reliability.cases, ...reliability.study]) {
+      const gap = Math.abs(reference.ms - reference.mokkenMs);
+      expect(gap).toBeLessThanOrEqual(reference.splitTies === 0 ? ROUNDING_TOLERANCE : SPLIT_TIES_GAP);
+    }
+  });
+
+  it("estimates the reliability of parallel forms in a study of the graded response model", () => {
+    const estimates = reliability.study.map((set) => molenaarSijtsmaReliability(responseMatrix(set.responses)));
+    estimates.forEach((estimate, i) => {
+      expectClose(estimate, defined(reliability.study[i]).ms, RELIABILITY_TOLERANCE, `set ${i}`);
+    });
+    const average = (values: readonly number[]): number =>
+      values.reduce((sum, value) => sum + value, 0) / values.length;
+    const parallel = average(reliability.study.map(({ parallelForms }) => parallelForms));
+    expect(Math.abs(average(estimates) - parallel)).toBeLessThan(STUDY_BIAS);
+    // Coefficient alpha is a lower bound of the reliability, and MS is the closer estimate.
+    const alpha = average(reliability.study.map((set) => set.alpha));
+    expect(alpha).toBeLessThan(average(estimates));
+  });
+
+  it("derives the coefficient of three response patterns by hand", () => {
+    // One person with no item passed, one passing the first, two passing both. The steps pass 3/4 (item 1) and 1/2
+    // (item 2), observed together by 1/2. The step of item 2 pairs with itself 1/3 and 1/2 from its neighbors, 5/12 on
+    // average; that of item 1, 3/4 and 5/8, 11/16. Together the joint proportions exceed the products by 5/12 +
+    // 2 (1/2 - 3/8) + 11/16 - 9/16 = 13/24 and the total's variance is 11/16, so MS = 26/33.
+    const rows = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [1, 1],
+    ];
+    expect(molenaarSijtsmaReliability(responseMatrix(rows))).toBeCloseTo(26 / 33, 14);
+  });
+
+  it("is 1 minus the error variance share, so a Guttman scale is more reliable than independent items", () => {
+    const scale = molenaarSijtsmaReliability(responseMatrix(guttman(6, 20)));
+    expect(scale).toBeGreaterThan(0.8);
+  });
+
+  it("takes the lowest score of all items as 0", () => {
+    const rows = [
+      [0, 1, 2, 1],
+      [1, 1, 2, 0],
+      [2, 0, 1, 2],
+      [3, 2, 3, 2],
+      [0, 0, 0, 1],
+      [2, 2, 1, 1],
+    ];
+    expect(molenaarSijtsmaReliability(responseMatrix(rows.map((row) => row.map((score) => score + 2))))).toBe(
+      molenaarSijtsmaReliability(responseMatrix(rows)),
+    );
+  });
+
+  it("uses the persons who answered every item", () => {
+    const rows = [
+      [0, 0, 1],
+      [1, 0, 0],
+      [1, 1, 1],
+      [1, 1, 0],
+      [0, 1, 1],
+      [1, 0, 1],
+    ];
+    const withMissing = [...rows, [null, 1, 1], [1, null, 0]];
+    expect(molenaarSijtsmaReliability(responseMatrix(withMissing))).toBe(
+      molenaarSijtsmaReliability(responseMatrix(rows)),
+    );
+  });
+
+  it("rejects a matrix of the wrong shape or of scores without variance", () => {
+    expect(() => molenaarSijtsmaReliability(responseMatrix([[1], [0], [1]]))).toThrow(
+      "Molenaar-Sijtsma reliability needs at least 2 items, found 1.",
+    );
+    expect(() => molenaarSijtsmaReliability(responseMatrix([[1, 0]]))).toThrow(
+      "Molenaar-Sijtsma reliability needs at least 2 persons who answered every item, found 1.",
+    );
+    expect(() =>
+      molenaarSijtsmaReliability(
+        responseMatrix([
+          [1, 0],
+          [0, 1],
+        ]),
+      ),
+    ).toThrow("Molenaar-Sijtsma reliability needs total scores with variance.");
+    expect(() =>
+      molenaarSijtsmaReliability(
+        responseMatrix([
+          [0, 0],
+          [10, 0],
+        ]),
+      ),
+    ).toThrow("needs scores from at most 10 categories, as the mokken package does, found 11.");
+    expect(() => molenaarSijtsmaReliability(JSON.parse("null"))).toThrow(DataError);
+  });
+});
+
 describe("properties", () => {
   /** Dichotomous scores of 60 to 120 persons on 4 to 6 items, with every item varying. */
   const matrix = fc
@@ -588,5 +702,31 @@ describe("properties", () => {
       }),
       { numRuns: 20 },
     );
+  });
+
+  it("the reliability of the total score does not depend on the order of persons or items", () => {
+    fc.assert(
+      fc.property(matrix, (rows) => {
+        const forward = molenaarSijtsmaReliability(responseMatrix(rows));
+        expect(molenaarSijtsmaReliability(responseMatrix([...rows].reverse()))).toBeCloseTo(forward, 12);
+        expect(molenaarSijtsmaReliability(responseMatrix(rows.map((row) => [...row].reverse())))).toBeCloseTo(
+          forward,
+          12,
+        );
+      }),
+      { numRuns: 30 },
+    );
+  });
+
+  it("the reliability of the total score is finite and is the same after a JSON round trip", () => {
+    for (const reference of reliability.cases) {
+      const value = molenaarSijtsmaReliability(responseMatrix(reference.responses, { itemIds: reference.itemIds }));
+      expect(Number.isFinite(value), reference.name).toBe(true);
+      expect(
+        molenaarSijtsmaReliability(
+          JSON.parse(JSON.stringify(responseMatrix(reference.responses, { itemIds: reference.itemIds }))),
+        ),
+      ).toBe(value);
+    }
   });
 });
