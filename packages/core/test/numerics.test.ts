@@ -18,6 +18,29 @@ import {
 /** Relative tolerance of the sums that the normalization of logs rounds. */
 const NORMALIZATION_TOLERANCE = 1e-12;
 
+/** Absolute tolerance of L Lᵀ against the correlation matrix that was factored, whose entries are at most 1. */
+const FACTORIZATION_TOLERANCE = 1e-14;
+
+/** Returns the correlation matrix that decay by 0.9 with each step between two variables, 0.9 ** |i - j|, which is positive definite. */
+function decayingCorrelations(size: number): Float64Array {
+  const matrix = new Float64Array(size * size);
+  for (let i = 0; i < size; i++) for (let j = 0; j < size; j++) matrix[i * size + j] = 0.9 ** Math.abs(i - j);
+  return matrix;
+}
+
+/** Returns the largest absolute difference between L Lᵀ and the matrix. */
+function largestError(lower: Float64Array, matrix: Float64Array, size: number): number {
+  let largest = 0;
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++) {
+      let sum = 0;
+      for (let k = 0; k < size; k++) sum += (lower[i * size + k] ?? 0) * (lower[j * size + k] ?? 0);
+      largest = Math.max(largest, Math.abs(sum - (matrix[i * size + j] ?? 0)));
+    }
+  }
+  return largest;
+}
+
 describe("normalQuantile", () => {
   it("returns infinite quantiles at 0 and 1 and NaN outside [0, 1]", () => {
     expect(normalQuantile(0)).toBe(Number.NEGATIVE_INFINITY);
@@ -53,11 +76,37 @@ describe("cholesky", () => {
     expect(Array.from(lower ?? [])).toEqual([2, 0, 1, 2]);
   });
 
+  it("reproduces the matrix at every order, whether or not its columns and rows fill the blocks", () => {
+    for (let size = 1; size <= 16; size++) {
+      const matrix = decayingCorrelations(size);
+      const lower = cholesky(matrix, size);
+      expect(lower, `The factor of order ${size}`).not.toBeNull();
+      expect(largestError(lower ?? new Float64Array(0), matrix, size), `The error of order ${size}`).toBeLessThan(
+        FACTORIZATION_TOLERANCE,
+      );
+    }
+  });
+
+  it("leaves the entries above the diagonal at 0", () => {
+    const lower = cholesky(decayingCorrelations(10), 10) ?? new Float64Array(0);
+    for (let i = 0; i < 10; i++) for (let j = i + 1; j < 10; j++) expect(lower[i * 10 + j]).toBe(0);
+  });
+
   it("returns null for a matrix that is singular or indefinite to working precision", () => {
     expect(cholesky(Float64Array.of(1, 1, 1, 1), 2)).toBeNull();
     expect(cholesky(Float64Array.of(1, 1, 1, 1 + 1e-17), 2)).toBeNull();
     expect(cholesky(Float64Array.of(1, 2, 2, 1), 2)).toBeNull();
     expect(cholesky(Float64Array.of(0), 1)).toBeNull();
+  });
+
+  it("returns null when the pivot fails at any column of any order", () => {
+    for (let size = 1; size <= 10; size++) {
+      for (let broken = 0; broken < size; broken++) {
+        const matrix = decayingCorrelations(size);
+        matrix[broken * size + broken] = -1;
+        expect(cholesky(matrix, size), `Order ${size} with column ${broken} broken`).toBeNull();
+      }
+    }
   });
 });
 

@@ -7,7 +7,7 @@ import { benchmarksOf } from "../../../bench/harness.js";
 const BUDGETS = {
   "numerics.normalQuantile": 30,
   "numerics.logistic": 20,
-  "numerics.cholesky": 3,
+  "numerics.cholesky": 2,
   "random.uniform": 20,
   "random.normal": 60,
 } as const;

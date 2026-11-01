@@ -15,8 +15,10 @@ bench_task("numerics.logistic", "Logistic function", "1,000,000 points", referen
            function() plogis(points))
 bench_task("numerics.cholesky", "Cholesky factorization", "A correlation matrix of order 200",
            reference("base", "chol"), function() chol(correlations),
-           note = paste("R's BLAS is OpenBLAS, whose kernels fuse multiplication and addition in vector registers;",
-                        "JavaScript has neither, and measurekit's loops are at the speed of scalar code"))
+           note = paste("R's LAPACK calls OpenBLAS, whose kernels add and multiply two doubles per instruction and fuse each pair;",
+                        "JavaScript has neither. measurekit's loops share their reads across a block of 4 rows and 3 columns, and the",
+                        "same loops in C compiled without vector instructions or fused multiply-add take 0.24 ms against measurekit's",
+                        "0.31 ms and, compiled with both, 0.15 ms"))
 bench_task("random.uniform", "Uniform draws", "1,000,000 draws", reference("stats", "runif"),
            function() runif(POINTS))
 bench_task("random.normal", "Normal draws", "1,000,000 draws", reference("stats", "rnorm"), function() rnorm(POINTS))
