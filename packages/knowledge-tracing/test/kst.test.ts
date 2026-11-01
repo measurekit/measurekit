@@ -1223,6 +1223,17 @@ describe("BLIM constraints and diagnostics", () => {
     ).toBeGreaterThanOrEqual(1e-6);
   });
 
+  it("holds a rate at 0 through an MDML fit, and rejects answers that no state gives without an error", () => {
+    const fit = kst({ structure: chain, over: "items", method: "mdml", fixed: { slip: { a: 0, c: 0 } } }).fit(chainLog);
+    expect(fit.converged).toBe(true);
+    expect(defined(fit.model.parameters.items.a).slip).toBe(0);
+    expect(defined(fit.model.parameters.items.c).slip).toBe(0);
+    const none = { guess: { a: 0, b: 0, c: 0 }, slip: { a: 0, b: 0, c: 0 } };
+    expect(() => kst({ structure: chain, over: "items", method: "mdml", fixed: none }).fit(chainLog)).toThrow(
+      "probability 0 under the parameters",
+    );
+  });
+
   it("restricts MDML to the states of least discrepancy, so its estimates differ from those of ML", () => {
     const ml = kst({ structure: chain, over: "items" }).fit(chainLog);
     const mdml = kst({ structure: chain, over: "items", method: "mdml" }).fit(chainLog);

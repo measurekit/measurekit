@@ -47,42 +47,52 @@ export interface RateConstraints {
   readonly group: Int32Array;
 }
 
-/** What limits the states of a group to those of least discrepancy: the constraints, and room for the states chosen. */
-interface Restriction {
-  readonly constraints: Constraints;
-  readonly nearest: Float64Array;
+/** The logarithms that the posteriors of one E-step are built from. */
+interface Logs {
+  /** The log of each state's probability. */
+  readonly prior: Float64Array;
+  /** Four per item: the log of 1 - slip, slip, guess and 1 - guess. */
+  readonly rates: Float64Array;
 }
 
 /**
  * Writes into `out` the posterior of a group's states and returns the log of its likelihood: ln Σ π(K) L(K), with
  * L(K) the product over rows of (1 - slip)^y slip^(n - y) where K masters the item and guess^y (1 - guess)^(n - y)
  * where it does not. Each state's log-likelihood is summed on its own, so a rate of 0 or 1 excludes states exactly. With
- * a restriction only the states of least discrepancy have weight, and the likelihood is theirs.
+ * `nearest`, which holds 1 from `at` for each state of least discrepancy, only those states have weight, and the
+ * likelihood is theirs.
  */
-function posterior(
-  group: Group,
-  parameters: Blim,
-  logPrior: Float64Array,
-  out: Float64Array,
-  restriction: Restriction | undefined,
-): number {
+function posterior(group: Group, logs: Logs, out: Float64Array, nearest: Uint8Array | undefined, at: number): number {
   out.fill(0);
-  for (const row of group.rows) addRow(row, parameters, out);
-  for (let k = 0; k < out.length; k++) out[k] = (logPrior[k] ?? 0) + (out[k] ?? 0);
-  if (restriction !== undefined) {
-    nearestStates(group, parameters, restriction.constraints, restriction.nearest);
-    for (let k = 0; k < out.length; k++) if (restriction.nearest[k] === 0) out[k] = Number.NEGATIVE_INFINITY;
+  for (const row of group.rows) addRow(row, logs.rates, out);
+  for (let k = 0; k < out.length; k++) out[k] = (logs.prior[k] ?? 0) + (out[k] ?? 0);
+  if (nearest !== undefined) {
+    for (let k = 0; k < out.length; k++) if (nearest[at + k] === 0) out[k] = Number.NEGATIVE_INFINITY;
   }
   return normalizeLogs(out);
 }
 
 /** Adds a row's log-likelihood to each state's. */
-function addRow({ item, mask, count, sum }: Row, parameters: Blim, out: Float64Array): void {
-  const guess = parameters.guess[item] ?? 0;
-  const slip = parameters.slip[item] ?? 0;
-  const known = xlogy(sum, 1 - slip) + xlogy(count - sum, slip);
-  const unknown = xlogy(sum, guess) + xlogy(count - sum, 1 - guess);
+function addRow({ item, mask, count, sum }: Row, rates: Float64Array, out: Float64Array): void {
+  const at = 4 * item;
+  const known = xlogy(sum, rates[at] ?? 0) + xlogy(count - sum, rates[at + 1] ?? 0);
+  const unknown = xlogy(sum, rates[at + 2] ?? 0) + xlogy(count - sum, rates[at + 3] ?? 0);
   for (let k = 0; k < out.length; k++) out[k] = (out[k] ?? 0) + (mask[k] === 1 ? known : unknown);
+}
+
+/** Returns the logarithms of the probabilities and rates of the parameters. */
+function logsOf(parameters: Blim): Logs {
+  const items = parameters.guess.length;
+  const rates = new Float64Array(4 * items);
+  for (let item = 0; item < items; item++) {
+    const slip = parameters.slip[item] ?? 0;
+    const guess = parameters.guess[item] ?? 0;
+    rates[4 * item] = Math.log(1 - slip);
+    rates[4 * item + 1] = Math.log(slip);
+    rates[4 * item + 2] = Math.log(guess);
+    rates[4 * item + 3] = Math.log(1 - guess);
+  }
+  return { prior: parameters.probabilities.map(Math.log), rates };
 }
 
 /**
@@ -212,10 +222,30 @@ export function minimumDiscrepancyMaximumLikelihood(
   constraints: Constraints,
   options: Stopping,
 ): BlimFit {
-  const nearest = new Float64Array(start.probabilities.length);
-  const fit = expectationMaximizationFit(groups, start, constraints, options, { constraints, nearest });
+  const fit = expectationMaximizationFit(
+    groups,
+    start,
+    constraints,
+    options,
+    nearestStatesOf(groups, start, constraints),
+  );
   const scratch = new Float64Array(start.probabilities.length);
   return { ...fit, logLikelihood: sumLogLikelihoods(groups, fit.parameters, scratch, () => undefined, undefined) };
+}
+
+/**
+ * Returns 1 for each state of least discrepancy from each group's answers, group after group. The discrepancy counts
+ * answers, and a rate held at 0 rules some out: the held rates never change, so neither do the states.
+ */
+function nearestStatesOf(groups: readonly Group[], start: Blim, constraints: Constraints): Uint8Array {
+  const states = start.probabilities.length;
+  const nearest = new Uint8Array(groups.length * states);
+  const scratch = new Float64Array(states);
+  groups.forEach((group, g) => {
+    nearestStates(group, start, constraints, scratch);
+    for (let k = 0; k < states; k++) nearest[g * states + k] = (scratch[k] ?? 0) > 0 ? 1 : 0;
+  });
+  return nearest;
 }
 
 function expectationMaximizationFit(
@@ -223,7 +253,7 @@ function expectationMaximizationFit(
   start: Blim,
   constraints: Constraints,
   options: Stopping,
-  restriction: Restriction | undefined,
+  nearest: Uint8Array | undefined,
 ): BlimFit {
   const scratch = new Float64Array(start.probabilities.length);
   return expectationMaximization(
@@ -235,7 +265,7 @@ function expectationMaximizationFit(
         parameters,
         scratch,
         (group) => addGroup(counts, group, scratch),
-        restriction,
+        nearest,
       );
       return { logLikelihood, parameters: maximize(counts, parameters, constraints) };
     },
@@ -318,7 +348,7 @@ function heldAtZero({ held }: RateConstraints, rates: Float64Array, item: number
 
 /**
  * Returns the log-likelihood of the groups, finding each one's posterior in `scratch` and passing the group to `use`
- * while it is there; with a restriction, that of the restricted model.
+ * while it is there; with `nearest`, as {@link nearestStatesOf} returns it, that of the restricted model.
  *
  * @throws `DataError` when a group's answers have probability 0.
  */
@@ -327,12 +357,14 @@ function sumLogLikelihoods(
   parameters: Blim,
   scratch: Float64Array,
   use: (group: Group) => void,
-  restriction: Restriction | undefined,
+  nearest: Uint8Array | undefined,
 ): number {
-  const logPrior = parameters.probabilities.map(Math.log);
+  const logs = logsOf(parameters);
   let logLikelihood = 0;
-  for (const group of groups) {
-    const value = posterior(group, parameters, logPrior, scratch, restriction);
+  for (let g = 0; g < groups.length; g++) {
+    const group = groups[g];
+    if (group === undefined) continue;
+    const value = posterior(group, logs, scratch, nearest, g * scratch.length);
     if (value === Number.NEGATIVE_INFINITY) {
       throw new DataError(
         "A learner's outcomes have probability 0 under the parameters, as with a guess or slip of 0.",
@@ -344,7 +376,7 @@ function sumLogLikelihoods(
   return logLikelihood;
 }
 
-/** Returns x ln y, 0 when x is 0. */
-function xlogy(x: number, y: number): number {
-  return x === 0 ? 0 : x * Math.log(y);
+/** Returns x times a logarithm, 0 when x is 0: x ln y, which is 0 at y = 0 as well. */
+function xlogy(x: number, logarithm: number): number {
+  return x === 0 ? 0 : x * logarithm;
 }

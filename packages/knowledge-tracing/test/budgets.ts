@@ -18,7 +18,7 @@ const BUDGETS = {
   "irt.replay": 2_000,
   "irt.drift": 1_000,
   "kst.blim": 200,
-  "kst.mdml": 600,
+  "kst.mdml": 500,
   "kst.identifiability": 70,
   "kst.validity": 6,
   "kst.diffTest": 3,
