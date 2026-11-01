@@ -6,15 +6,22 @@ import {
   crossValidate,
   DataError,
   type Event,
+  type EventLog,
   eventLog,
+  type IrtDrift,
   type IrtItem,
+  type IrtParameters,
   type IrtPrior,
   type IrtState,
   irt,
   splitByLearner,
   type ThetaDistribution,
 } from "../src/index.js";
+import { differences } from "../src/irt/ability.js";
+import { reflectedWalk } from "../src/math/reflected-walk.js";
 import reference from "./fixtures/irt-abilities.json" with { type: "json" };
+import drifting from "./fixtures/irt-drift.json" with { type: "json" };
+import stored from "./fixtures/stored-state.json" with { type: "json" };
 import { allPredicted, defined, expectAllClose, expectClose, expectUnaffectedByLessons } from "./helpers.js";
 
 /** Absolute tolerance of EAP estimates, predictions and log-probabilities against the written-out grid posterior. */
@@ -362,5 +369,355 @@ describe("IRT with events that have no outcome", () => {
     const next = model.update(state, { learner: "ana", item: "lesson", skills: [], time: 99, outcome: null });
     expect(next).toEqual(state);
     expect(next.logDensity).not.toBe(state.logDensity);
+  });
+});
+
+/** Mean, SD and MAP of the posterior at the end of a pattern, against the grid of 1921 points, by number of points. */
+const FINE_TOLERANCES = {
+  61: { mean: 0.03, sd: 0.01, mode: 0.06, steady: 0.17 },
+  121: { mean: 0.004, sd: 0.003, mode: 0.009, steady: 0.1 },
+  241: { mean: 0.001, sd: 0.0007, mode: 0.003, steady: 0.04 },
+} as const;
+/** The mean through the reversal at a = 1.2 against the grid of 1921 points, by number of points. */
+const REVERSAL_TOLERANCES = { 121: 0.07, 241: 0.006 } as const;
+/** Mean, SD and log-likelihood against the same chain computed in logs, while no grid point the mass reaches underflowed. */
+const SAME_GRID_TOLERANCE = 1e-9;
+/** Mean and SD against the same chain in logs once the final mode sank below where exp underflows, at -744.4. */
+const DEEP_TOLERANCE = 1e-3;
+const UNDERFLOW_DEPTH = -Math.log(Number.MIN_VALUE);
+/** The variance added by pure drift, relative to the due variance. */
+const VARIANCE_TOLERANCE = 1e-6;
+/** The mass after a step of the walk, relative to the mass before, after as many as 942 parts at the cap. */
+const MASS_TOLERANCE = 1e-11;
+/** The posterior after a gap past the cap, relative to the uniform distribution on the grid. */
+const UNIFORM_TOLERANCE = 1e-11;
+/** The posterior after two gaps against the posterior after one gap of their sum. */
+const COMPOSITION_TOLERANCE = 1e-12;
+
+const DRIFT = drifting.drift as IrtDrift;
+const MINUTE = 60_000;
+const DAY = 86_400_000;
+const WEEK = 7 * DAY;
+const START = 1_767_225_600_000;
+
+type DriftCase = (typeof drifting.cases)[number];
+
+/** Returns a case of the drift fixture, by name. */
+function caseNamed(name: string): DriftCase {
+  return defined(drifting.cases.find((driftCase) => driftCase.name === name));
+}
+
+/** Returns the items and the log of a case of the drift fixture, with an item of its own for each event. */
+function caseLog({ events }: DriftCase): { parameters: IrtParameters; log: EventLog } {
+  const items = Object.fromEntries(events.a.map((a, i) => [`item${i}`, { a, b: defined(events.b[i]) }]));
+  const log = eventLog(
+    events.time.map((time, i) => ({
+      learner: "ana",
+      item: `item${i}`,
+      skills: [],
+      time,
+      outcome: defined(events.outcome[i]),
+    })),
+  );
+  return { parameters: { items }, log };
+}
+
+/** Runs a case through a model with drift on `points` points: EAP, SD and MAP at its checkpoints, and the fit. */
+function runCase(driftCase: DriftCase, points: number) {
+  const { parameters, log } = caseLog(driftCase);
+  const model = irt({ parameters, points, drift: DRIFT });
+  const checkpoints = new Set(driftCase.checkpoints);
+  const trace = { mean: [] as number[], sd: [] as number[], mode: [] as number[] };
+  let state = model.initialState("ana");
+  log.forEach((event, i) => {
+    state = model.update(state, event);
+    if (!checkpoints.has(i)) return;
+    const eap = model.ability(state);
+    trace.mean.push(eap.theta);
+    trace.sd.push(eap.standardError);
+    trace.mode.push(model.ability(state, { estimator: "map" }).theta);
+  });
+  return { ...trace, logLikelihood: model.fit(log).logLikelihood };
+}
+
+/** Returns the absolute difference of the last entries of two lists. */
+function lastGap(actual: readonly number[], expected: readonly number[]): number {
+  return Math.abs(defined(actual.at(-1)) - defined(expected.at(-1)));
+}
+
+describe("IRT with drift against R", () => {
+  it("follows the same chain computed in logs, event by event, on the same grid", () => {
+    for (const driftCase of drifting.cases) {
+      const run = runCase(driftCase, drifting.points);
+      const { mean, sd, logLikelihood, depth } = driftCase.sameGrid;
+      const deep = depth > UNDERFLOW_DEPTH;
+      const tolerance = deep ? DEEP_TOLERANCE : SAME_GRID_TOLERANCE;
+      expectAllClose(run.mean, mean, tolerance, `${driftCase.name} mean`);
+      expectAllClose(run.sd, sd, tolerance, `${driftCase.name} SD`);
+      if (!deep) expectClose(run.logLikelihood, logLikelihood, SAME_GRID_TOLERANCE, `${driftCase.name} likelihood`);
+    }
+  });
+
+  it("meets the tolerances of each number of points against a grid of 1921 points", () => {
+    for (const [points, tolerance] of Object.entries(FINE_TOLERANCES)) {
+      for (const driftCase of drifting.cases.filter(({ kind }) => kind !== "reversal")) {
+        const run = runCase(driftCase, Number(points));
+        const label = `${driftCase.name} on ${points} points`;
+        if (driftCase.kind === "steady") {
+          expect(lastGap(run.mean, driftCase.fine.mean), label).toBeLessThanOrEqual(tolerance.steady);
+          continue;
+        }
+        expect(lastGap(run.mean, driftCase.fine.mean), `${label}, mean`).toBeLessThanOrEqual(tolerance.mean);
+        expect(lastGap(run.sd, driftCase.fine.sd), `${label}, SD`).toBeLessThanOrEqual(tolerance.sd);
+        expect(lastGap(run.mode, driftCase.fine.mode), `${label}, MAP`).toBeLessThanOrEqual(tolerance.mode);
+      }
+    }
+    const reversal = caseNamed("reversal-60-120");
+    for (const [points, tolerance] of Object.entries(REVERSAL_TOLERANCES)) {
+      expectAllClose(runCase(reversal, Number(points)).mean, reversal.fine.mean, tolerance, `reversal on ${points}`);
+    }
+  });
+
+  it("needs 481 points for a reversal at a = 2, and 961 at a = 3, where the posterior is narrower than 241 resolve", () => {
+    for (const [name, points, tolerance] of [
+      ["reversal-90-200", 481, 0.03],
+      ["reversal-150-300", 961, 0.07],
+    ] as const) {
+      const driftCase = caseNamed(name);
+      const coarse = runCase(driftCase, drifting.points);
+      expect(defined(coarse.sd.at(-1)), name).toBeLessThan(3 * (12 / (drifting.points - 1)));
+      expect(lastGap(coarse.mean, driftCase.fine.mean), name).toBeGreaterThan(REVERSAL_TOLERANCES[241]);
+      expect(lastGap(runCase(driftCase, points).mean, driftCase.fine.mean), name).toBeLessThanOrEqual(tolerance);
+    }
+  });
+
+  it("matches a particle filter of the continuous model within three Monte Carlo errors", () => {
+    const { case: name, mean, meanError } = drifting.particleFilter;
+    const run = runCase(caseNamed(name), drifting.points);
+    expect(Math.abs(defined(run.mean.at(-1)) - mean)).toBeLessThanOrEqual(3 * meanError);
+  });
+});
+
+describe("IRT with drift", () => {
+  const items: Record<string, IrtItem> = { easy: { a: 1.5, b: -1 }, hard: { a: 1.5, b: 1 } };
+  const model = irt({ parameters: { items }, points: 241, drift: DRIFT });
+  const attempt = { learner: "ana", item: "easy", skills: [], time: START };
+  /** A state at START whose posterior has an SD of about 0.4, after 10 outcomes at one time. */
+  const settled = Array.from({ length: 10 }, (_, k) => k).reduce(
+    (state, k) => model.update(state, { ...attempt, item: k % 2 ? "easy" : "hard", outcome: k % 3 ? 1 : 0 }),
+    model.initialState("ana"),
+  );
+  const varianceOf = (posterior: ThetaDistribution): number => momentsOf(posterior)[1] ** 2;
+
+  it("adds exactly the due variance, and keeps the mean, at gaps from a second to four weeks", () => {
+    const before = model.posterior(settled);
+    for (const gap of [1000, MINUTE, 60 * MINUTE, DAY, WEEK, 4 * WEEK]) {
+      const after = model.posterior(settled, { at: START + gap });
+      const due = (DRIFT.variance * gap) / DRIFT.per;
+      expect(Math.abs((varianceOf(after) - varianceOf(before)) / due - 1), `gap ${gap}`).toBeLessThan(
+        VARIANCE_TOLERANCE,
+      );
+      expect(momentsOf(after)[0]).toBeCloseTo(momentsOf(before)[0], 12);
+    }
+  });
+
+  it("conserves mass and keeps every density finite and above its lower bound, however long the gap", () => {
+    const walk = reflectedWalk(241);
+    const logDensity = settled.logDensity;
+    const mass = (values: readonly number[]): number => values.reduce((sum, value) => sum + Math.exp(value), 0);
+    for (const jumps of [1e-9, 1e-3, 0.5, 8, 499, 501, 2e4, 1e12]) {
+      const next = walk(logDensity, jumps);
+      expect(Math.abs(mass(next) / mass(logDensity) - 1), `${jumps} jumps`).toBeLessThan(MASS_TOLERANCE);
+      expect(next.every((value, q) => Number.isFinite(value) && value >= (logDensity[q] ?? 0) - jumps)).toBe(true);
+    }
+  });
+
+  it("composes: the posterior after two gaps is the posterior after one gap of their sum", () => {
+    const lesson = { ...attempt, item: "lesson", outcome: null };
+    for (const [first, second] of [
+      [1000, 59_000],
+      [MINUTE, DAY],
+      [3 * DAY, 4 * DAY],
+      [WEEK, 3 * WEEK],
+    ] as const) {
+      const once = model.posterior(settled, { at: START + first + second });
+      const halfway = model.update(settled, { ...lesson, time: START + first });
+      const twice = model.posterior(halfway, { at: START + first + second });
+      expectAllClose(twice.weights, once.weights, COMPOSITION_TOLERANCE, `${first} then ${second}`);
+    }
+    let minutes = settled;
+    for (let k = 1; k <= 60; k++) minutes = model.update(minutes, { ...lesson, time: START + k * MINUTE });
+    expectAllClose(
+      model.posterior(minutes).weights,
+      model.posterior(settled, { at: START + 60 * MINUTE }).weights,
+      1e-12,
+    );
+  });
+
+  it("predicts and estimates from the posterior advanced to the attempt's time or to `at`", () => {
+    const later = START + 2 * WEEK;
+    const { nodes, weights } = model.posterior(settled, { at: later });
+    const expected = weights.reduce((sum, weight, q) => sum + weight / (1 + Math.exp(-1.5 * ((nodes[q] ?? 0) + 1))), 0);
+    expect(model.predict(settled, { ...attempt, time: later })).toBeCloseTo(expected, 12);
+    expect(model.predict(settled, { ...attempt, time: later })).not.toBeCloseTo(model.predict(settled, attempt), 4);
+    const [mean, sd] = momentsOf(model.posterior(settled, { at: later }));
+    expect(model.ability(settled, { at: later }).theta).toBeCloseTo(mean, 12);
+    expect(model.ability(settled, { at: later }).standardError).toBeCloseTo(sd, 12);
+    expect(model.ability(settled).standardError).toBeLessThan(sd);
+  });
+
+  it("takes no drift for an event, attempt or time before the state's time, and keeps that time", () => {
+    const early = START - DAY;
+    const fixed = irt({ parameters: { items }, points: 241 });
+    const static_ = fixed.update(fixed.initialState("ana"), { ...attempt, outcome: 1 });
+    const next = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
+    const back = model.update(next, { ...attempt, item: "hard", time: early, outcome: 0 });
+    expect(back.time).toBe(START);
+    expect(back.logDensity).toEqual(
+      fixed.update(static_, { ...attempt, item: "hard", time: early, outcome: 0 }).logDensity,
+    );
+    expect(model.predict(settled, { ...attempt, time: early })).toBe(model.predict(settled, attempt));
+    expect(model.ability(settled, { at: early })).toEqual(model.ability(settled));
+    expect(model.posterior(settled, { at: early })).toEqual(model.posterior(settled));
+  });
+
+  it("starts without a time, takes its first event's time with no drift, and keeps no derivatives", () => {
+    const fixed = irt({ parameters: { items }, points: 241 });
+    expect(model.initialState("ana")).toEqual({ learner: "ana", logDensity: fixed.initialState("ana").logDensity });
+    const first = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
+    expect(first).toEqual({
+      learner: "ana",
+      logDensity: fixed.update(fixed.initialState("ana"), { ...attempt, outcome: 1 }).logDensity,
+      time: START,
+    });
+    expect(model.predict(model.initialState("ana"), attempt)).toBe(fixed.predict(fixed.initialState("ana"), attempt));
+  });
+
+  it("advances the state to the time of an event without an outcome", () => {
+    const lesson = { ...attempt, item: "video", time: START + DAY, outcome: null };
+    const next = model.update(settled, lesson);
+    expect(next.time).toBe(START + DAY);
+    expect(model.posterior(next)).toEqual(model.posterior(settled, { at: START + DAY }));
+  });
+
+  it("fits with the forward likelihood, and gives the states and predictions that updates give, lessons included", () => {
+    const events: Event[] = [
+      { ...attempt, outcome: 1 },
+      { ...attempt, item: "hard", time: START + DAY, outcome: 0 },
+      { ...attempt, item: "lesson", time: START + 3 * DAY, outcome: null },
+      { ...attempt, item: "hard", time: START + WEEK, outcome: 1 },
+      { ...attempt, item: "lesson", time: START + 2 * WEEK, outcome: null },
+    ];
+    const fit = model.fit(eventLog(events));
+    let state = model.initialState("ana");
+    let likelihood = 0;
+    const predictions = events.map((event) => {
+      const prediction = event.outcome === null ? null : model.predict(state, event);
+      if (prediction !== null) likelihood += Math.log(event.outcome ? prediction : 1 - prediction);
+      state = model.update(state, event);
+      return prediction;
+    });
+    expect(fit.states).toEqual({ ana: state });
+    expect(state.time).toBe(START + 2 * WEEK);
+    expect(fit.predictions).toEqual(predictions);
+    expect(fit.logLikelihood).toBeCloseTo(likelihood, 12);
+  });
+
+  it("goes flat after a gap past its cap, and returns at once for a wrong unit of time", () => {
+    const wrongUnit = irt({ parameters: { items }, points: 241, drift: { variance: 0.02, per: 7 } });
+    const state = wrongUnit.update(wrongUnit.initialState("ana"), { ...attempt, outcome: 1 });
+    const { weights } = wrongUnit.posterior(state, { at: START + 30 * DAY });
+    for (const weight of weights) expect(Math.abs(241 * weight - 1)).toBeLessThan(UNIFORM_TOLERANCE);
+  });
+
+  it("derives the derivatives of the log-density by differences exact for a polynomial of degree 4", () => {
+    const h = 0.05;
+    const f = (x: number) => 1 - 2 * x + 0.5 * x ** 2 - 0.3 * x ** 3 + 0.1 * x ** 4;
+    const slope = (x: number) => -2 + x - 0.9 * x ** 2 + 0.4 * x ** 3;
+    const curvature = (x: number) => 1 - 1.8 * x + 1.2 * x ** 2;
+    const grid = Array.from({ length: 9 }, (_, q) => -0.2 + q * h);
+    const derived = differences(grid.map(f), h);
+    grid.forEach((x, q) => {
+      expect(derived(q)[0], `slope at ${q}`).toBeCloseTo(slope(x), 9);
+      expect(derived(q)[1], `curvature at ${q}`).toBeCloseTo(curvature(x), 7);
+    });
+  });
+
+  it("reads a stored state of a model without drift, and drops its derivatives at the first event", () => {
+    const found = JSON.parse(JSON.stringify(stored.models.irt));
+    const fixed = irt({ parameters: found.parameters });
+    const reading = irt({ parameters: found.parameters, points: 61, drift: DRIFT });
+    const state: IrtState = found.states[found.attempt.learner];
+    expect(reading.predict(state, found.attempt)).toBe(found.prediction);
+    expect(reading.ability(state)).toEqual(fixed.ability(state));
+    expect(reading.ability(state, { estimator: "map" }).theta).toBeCloseTo(
+      fixed.ability(state, { estimator: "map" }).theta,
+      3,
+    );
+    expect(reading.update(state, found.answered.event)).toEqual({
+      learner: found.attempt.learner,
+      logDensity: found.answered.state.logDensity,
+      time: found.answered.event.time,
+    });
+    expect(reading.update(state, found.lesson.event)).toEqual({
+      learner: found.attempt.learner,
+      logDensity: state.logDensity,
+      time: found.lesson.event.time,
+    });
+  });
+
+  it("continues identically from a state stored as JSON, and never changes the state it is given", () => {
+    fc.assert(
+      fc.property(fc.array(fc.tuple(fc.boolean(), fc.nat({ max: 10 * DAY })), { maxLength: 8 }), (steps) => {
+        let state = model.initialState("ana");
+        let time = START;
+        for (const [correct, gap] of steps) {
+          time += gap;
+          const event = { ...attempt, time, outcome: correct ? 1 : 0 };
+          const copy = JSON.parse(JSON.stringify(state));
+          const next = model.update(state, event);
+          expect(state).toEqual(copy);
+          expect(model.update(copy, event)).toEqual(next);
+          state = next;
+        }
+        expect(model.predict(state, { ...attempt, time: time + DAY })).toBe(
+          model.predict(JSON.parse(JSON.stringify(state)), { ...attempt, time: time + DAY }),
+        );
+      }),
+      { numRuns: 30 },
+    );
+  });
+
+  it("rejects drift without points, invalid drift and points, and states and times it cannot read", () => {
+    const parameters = { items };
+    expect(() => irt({ parameters, drift: DRIFT })).toThrow(
+      "The option drift needs the option points: 241 is recommended, or the number of points of stored states.",
+    );
+    expect(() => irt({ parameters, points: 5, drift: DRIFT })).toThrow(
+      "The option points must be an integer from 6, found 5.",
+    );
+    expect(() => irt({ parameters, points: 241, drift: JSON.parse("null") })).toThrow(
+      "The option drift must be an object { variance, per }, found null.",
+    );
+    expect(() => irt({ parameters, points: 241, drift: { variance: 0, per: 1 } })).toThrow(
+      "The variance of the drift must be a positive number, found 0.",
+    );
+    expect(() => irt({ parameters, points: 241, drift: { variance: 1, per: JSON.parse('"7"') } })).toThrow(
+      'The per of the drift must be a positive number, found "7".',
+    );
+    const fixed = irt({ parameters, points: 241 });
+    expect(() => fixed.predict(settled, attempt)).toThrow(
+      'The IRT state of learner "ana" has no slope, which a model without the option drift needs: a state written by a model with drift is read by a model with it.',
+    );
+    expect(() => model.predict({ ...settled, time: JSON.parse("null") }, attempt)).toThrow(
+      'The IRT state of learner "ana" needs time, a finite number, or none before its first event, found null.',
+    );
+    expect(() => model.ability(settled, { at: Number.NaN })).toThrow(
+      "The option at must be a finite number, found NaN.",
+    );
+    expect(() => model.posterior(settled, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => fixed.posterior(fixed.initialState("ana"), { at: JSON.parse('"1"') })).toThrow(
+      'The option at must be a finite number, found "1".',
+    );
   });
 });

@@ -91,13 +91,13 @@ itself from `fit`.
 
 The interface covers the classical families of learner models:
 
-| Family        | Parameters                                                                                    | State                                                     | `update`                                  | `mastery`                    | `fit`                                                                   |
-| ------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
-| Elo           | Item difficulties                                                                             | Global and skill abilities                                | One Elo step                              | none                         | One replay of the log                                                   |
-| BKT           | Per skill: prior, learn, forget, guess, slip; per group, resource or item with the extensions | P(L) per skill                                            | Condition on the outcome, then transition | P(L)                         | EM from the model's parameters                                          |
-| AFM, PFA, LKT | Per skill: an intercept and a coefficient per feature; per learner: θ                         | Per skill: successes, failures, last time, decayed counts | Count the event in each of its skills     | none                         | Newton, by the Schur complement of the learners; Laplace for a random θ |
-| IRT           | Given item parameters: 1PL to 4PL, graded, partial credit                                     | The log-posterior of θ and its derivatives on a grid      | Add the outcome's log-probability         | none                         | None: the parameters are given; the states after the log                |
-| KST           | π of each knowledge state; per item: guess, slip                                              | The probability of each knowledge state                   | Bayes' rule                               | P(the state holds the skill) | EM, or minimum discrepancy in one pass                                  |
+| Family        | Parameters                                                                                    | State                                                                           | `update`                                  | `mastery`                    | `fit`                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| Elo           | Item difficulties                                                                             | Global and skill abilities                                                      | One Elo step                              | none                         | One replay of the log                                                   |
+| BKT           | Per skill: prior, learn, forget, guess, slip; per group, resource or item with the extensions | P(L) per skill                                                                  | Condition on the outcome, then transition | P(L)                         | EM from the model's parameters                                          |
+| AFM, PFA, LKT | Per skill: an intercept and a coefficient per feature; per learner: θ                         | Per skill: successes, failures, last time, decayed counts                       | Count the event in each of its skills     | none                         | Newton, by the Schur complement of the learners; Laplace for a random θ |
+| IRT           | Given item parameters: 1PL to 4PL, graded, partial credit                                     | The log-posterior of θ on a grid, with its derivatives or the time of its drift | Add the outcome's log-probability         | none                         | None: the parameters are given; the states after the log                |
+| KST           | π of each knowledge state; per item: guess, slip                                              | The probability of each knowledge state                                         | Bayes' rule                               | P(the state holds the skill) | EM, or minimum discrepancy in one pass                                  |
 
 `predict` takes the attempt's time, so time-aware features such as recency decay need no other member, and
 `initialState` takes the learner id for learner-level parameters.
@@ -182,14 +182,18 @@ Evaluation, practice and simulation check that a model passed in is an object wi
 - A fit's predictions and states come from replaying the log with the model's steps, `data/replay.ts`: the arithmetic of
   online updates without their checks, as the log was checked as a whole, so they equal the same events applied online,
   to the last bit. Elo's and IRT's fits make one pass over the log with their own step, `onePass` of the same file, which
-  also moves Elo's item ratings; an event without an outcome leaves the learner's state as it was.
+  also moves Elo's item ratings; an event without an outcome leaves the learner's state as it was, or with IRT's drift
+  advances it to its time.
 - Newton's line search takes a step that raises the objective by no more than its rounding error, 1e-12 relative: near
   the optimum a Newton step lowers it by less, and the gradient decides convergence.
 - Logistic regressions with an intercept per learner have an arrow-shaped Hessian; Newton steps solve it by the Schur
   complement of the learners' diagonal block, in time and memory linear in learners and events. A random intercept
   takes each learner's conditional mode by one-dimensional Newton steps, and the Laplace approximation's exact gradient.
 - IRT keeps the log-posterior and its first two derivatives at each grid point, so EAP is a sum over the grid and MAP
-  the root of a quintic between the two points nearest the mode, accurate to about 1e-5 at the default grid.
+  the root of a quintic between the two points nearest the mode, accurate to about 1e-5 at the default grid. With drift,
+  it keeps the log-posterior and its time; a gap is a reflecting walk on the grid, summed by uniformization in
+  `math/reflected-walk.ts` with a lower bound for the points that underflow, and MAP takes the derivatives by
+  differences.
 - KST keeps knowledge states as bitsets. A quasi-ordinal space is enumerated with prerequisites first, so every branch
   ends in a state, and stops at `maxStates`. BLIM's EM merges learners with equal answers and sums each state's
   log-likelihood on its own, so a rate of 0 or 1 excludes states without `NaN`.

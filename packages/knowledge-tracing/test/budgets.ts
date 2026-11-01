@@ -12,6 +12,7 @@ const BUDGETS = {
   "elo.replay": 200,
   "logistic.afm": 200,
   "irt.replay": 2_000,
+  "irt.drift": 1_000,
   "kst.blim": 200,
   "kst.iita": 9,
   "evaluate.auc": 200,

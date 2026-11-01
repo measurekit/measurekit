@@ -82,18 +82,18 @@ learningCurve(log).skills.fractions; // [{ opportunity: 1, count: 2, errorRate: 
 
 ## API
 
-| Import                                   | Contents                                                                                                                                          |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@measurekit/knowledge-tracing/data`     | `eventLog` with Q-matrices, and events without an outcome; `firstAttempts`; `splitByLearner`, `splitByItem`, `splitByTime`                        |
-| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `metrics`, `calibration`, `observedPairs`; `crossValidate`, `compareModels`; `learningCurve`                |
-| `@measurekit/knowledge-tracing/elo`      | `elo`: learner-item Elo with Pelánek's uncertainty function, and concept-specific Elo with skill abilities                                        |
-| `@measurekit/knowledge-tracing/bkt`      | `bkt`: Bayesian knowledge tracing with forgetting, item guess and slip, resource and pair learning, prior groups, fixed rates and bounds; mastery |
-| `@measurekit/knowledge-tracing/logistic` | `afm`, `pfa`, `logistic`: AFM, PFA and LKT features, with no, fixed or random proficiency and a ridge                                             |
-| `@measurekit/knowledge-tracing/irt`      | `irt`: online EAP and MAP ability and the posterior of θ from calibrated 1PL to 4PL, graded response and generalized partial credit items         |
-| `@measurekit/knowledge-tracing/kst`      | `kst`: BLIM by ML or MD and adaptive assessment; `surmiseStructure`, `isKnowledgeSpace`, `isLearningSpace`, `fringes`, `delineate`; `iita`        |
-| `@measurekit/knowledge-tracing/practice` | `recommend`; `streakMastery`, `thresholdMastery`; `opportunitiesToStreak`                                                                         |
-| `@measurekit/knowledge-tracing/sim`      | `simulate`: outcomes drawn from any learner model, seeded, with lessons that draw none                                                            |
-| `@measurekit/knowledge-tracing`          | All of the above, the `LearnerModel` interface, `createRandom` (a seeded random number generator), `DataError` and `MeasurekitError`              |
+| Import                                   | Contents                                                                                                                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@measurekit/knowledge-tracing/data`     | `eventLog` with Q-matrices, and events without an outcome; `firstAttempts`; `splitByLearner`, `splitByItem`, `splitByTime`                                                       |
+| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `metrics`, `calibration`, `observedPairs`; `crossValidate`, `compareModels`; `learningCurve`                                               |
+| `@measurekit/knowledge-tracing/elo`      | `elo`: learner-item Elo with Pelánek's uncertainty function, and concept-specific Elo with skill abilities                                                                       |
+| `@measurekit/knowledge-tracing/bkt`      | `bkt`: Bayesian knowledge tracing with forgetting, item guess and slip, resource and pair learning, prior groups, fixed rates and bounds; mastery                                |
+| `@measurekit/knowledge-tracing/logistic` | `afm`, `pfa`, `logistic`: AFM, PFA and LKT features, with no, fixed or random proficiency and a ridge                                                                            |
+| `@measurekit/knowledge-tracing/irt`      | `irt`: online EAP and MAP ability and the posterior of θ from calibrated 1PL to 4PL, graded response and generalized partial credit items, with an optional drift of θ over time |
+| `@measurekit/knowledge-tracing/kst`      | `kst`: BLIM by ML or MD and adaptive assessment; `surmiseStructure`, `isKnowledgeSpace`, `isLearningSpace`, `fringes`, `delineate`; `iita`                                       |
+| `@measurekit/knowledge-tracing/practice` | `recommend`; `streakMastery`, `thresholdMastery`; `opportunitiesToStreak`                                                                                                        |
+| `@measurekit/knowledge-tracing/sim`      | `simulate`: outcomes drawn from any learner model, seeded, with lessons that draw none                                                                                           |
+| `@measurekit/knowledge-tracing`          | All of the above, the `LearnerModel` interface, `createRandom` (a seeded random number generator), `DataError` and `MeasurekitError`                                             |
 
 Invalid input throws `DataError`. A statistic that is undefined for the data, such as the AUC of outcomes that are all
 correct, is `null` in a table of metrics and a `DataError` from a function that returns only that statistic. Results
@@ -115,7 +115,7 @@ absence means the old behavior.
 - [Logistic models](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/logistic.md): AFM, PFA
   and LKT features, proficiency, ridge, fitting, online use.
 - [Item response theory](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/irt.md):
-  online ability from calibrated items, EAP and MAP, scales.
+  online ability from calibrated items, EAP and MAP, scales, drift.
 - [Knowledge space theory](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/kst.md):
   structures, prerequisites, fringes, BLIM, adaptive assessment, IITA.
 - [Practice](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/practice.md): the next

@@ -55,13 +55,14 @@ Rscript validation/knowledge-tracing/evaluate.R  # AUC by pROC; RMSE, log-loss, 
 Rscript validation/knowledge-tracing/elo.R       # Elo updates written out, held-out predictions, the recovery simulation
 Rscript validation/knowledge-tracing/exposures.R # the exposure features, written out in base R, and their fit by glm
 Rscript validation/knowledge-tracing/logistic.R  # LKT's features; AFM, PFA and LKT fits by glm, lme4's Laplace approximation, LiblineaR
-Rscript validation/knowledge-tracing/irt.R       # the grid posterior and exact mode of θ, against mirt's fscores
+Rscript validation/knowledge-tracing/irt.R       # the grid posterior and exact mode of θ, against mirt's fscores; with drift, passes in logs and a particle filter
 Rscript validation/knowledge-tracing/kst.R       # structures, fringes, BLIM, IITA and assessment by kst, pks and DAKS
 validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/bkt.py  # BKT by pyBKT: inference, EM from given and random starts, recovery; lessons as correct = -1, fixed rates, multipair
 ```
 
 The R scripts need R with the packages pROC, lme4, LiblineaR, LKT, mirt, kst, pks, DAKS, sets and jsonlite; `common.R`
-holds their shared helpers. `bkt.py` needs the Python environment below, and takes under a minute.
+holds their shared helpers. `irt.R` takes about two minutes, most of them on the grid of 1,921 points; `irt.R abilities`
+or `irt.R drift` runs one part. `bkt.py` needs the Python environment below, and takes under a minute.
 
 ### Python
 

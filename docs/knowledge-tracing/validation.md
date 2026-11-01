@@ -164,6 +164,42 @@ posterior within 1.3e-15. Its MAP stops at its optimizer's tolerance, 2e-6 from 
 3.7e-5 from the exact curvature, so the exact mode is the reference. mirt's default grid differs slightly from 61
 points over ±6, by up to 2.5e-8 in EAP; the script sets it.
 
+### Drift
+
+`validation/knowledge-tracing/irt.R drift` runs learners through the chain of `drift` in base R, at 0.02 a week on a
+clock in milliseconds, with each outcome drawn from a 2PL item: the ordinary patterns, the steady rise and the
+reversals of the [guide](irt.md#drift), 26 cases with 3 seeds of each pattern and rise. No package filters an IRT
+posterior with drift, so the references are written out:
+
+```mermaid
+flowchart LR
+  C[Cases] --> S["Same grid, 241 points:<br/>forward pass in logs"]
+  C --> F["1,921 points:<br/>forward pass in logs"]
+  C --> P["Particle filter of the<br/>continuous model, 10⁶ particles"]
+  F -. within three Monte Carlo errors .- P
+```
+
+| Check                                                  | Reference                                                                                                                                                                                                                                        | Tolerance                                                                                                                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The chain, deep tails included                         | The same grid: a forward pass in logs with the kernel e^-t I_d(t), the positive series of I_d in logs with `lgamma`, checked against `besselI(expon.scaled = TRUE)` to 1e-11, summed over the images of the reflecting ends within 4 × 241 cells | Mean and SD at 10 points through each case and the forward log-likelihood 1e-9; mean and SD 1e-3 once the final mode sank below -744.4, where exp underflows |
+| Filtering against the continuous model                 | The same pass on 1,921 points, the kernel cut where it falls below 1e-300                                                                                                                                                                        | The tolerances per number of points in the [guide](irt.md#drift), after the last event                                                                       |
+| A reversal at a = 2 and at a = 3                       | The same                                                                                                                                                                                                                                         | Mean after the last event 0.03 at 481 points and 0.07 at 961, while at 241 the posterior SD is under 3 spacings                                              |
+| One scenario by simulation                             | A bootstrap particle filter of 10 × 10⁵ particles, 5 items a week for 26 weeks                                                                                                                                                                   | Three Monte Carlo errors, for the 1,921 points in R and for 241 points in the test                                                                           |
+| Variance added by pure drift, from a second to 4 weeks | The closed form, variance Δt / per                                                                                                                                                                                                               | 1e-6 of the due variance                                                                                                                                     |
+| Composition                                            | Two gaps against one, and 60 one-minute gaps against an hour                                                                                                                                                                                     | 1e-12 in each weight of the posterior                                                                                                                        |
+| Mass                                                   | The step's mass before and after, at up to 10¹² jumps                                                                                                                                                                                            | 1e-11 relative                                                                                                                                               |
+
+The lower bound matches the pass in logs to 5e-14 while no grid point the posterior ends at underflowed, and to 6.4e-5
+on the deepest case, 300 failed then 600 correct at a = 3, where a point's bound recovers less than the pass. The thresholds per number of points were fixed as the worst measured times 1.5, rounded
+up, before these cases were run. The reversals of the guide's second table, measured against 1,921 points, rest on a
+reference that is itself still moving there: on 3,841 points, the hourly reversal ends 0.034 lower and the reversal at
+a = 3 0.014 lower, and the others within 0.002.
+
+Two wrong steps fail these tests. A Gaussian kernel sampled on the grid adds almost none of the due variance at short
+gaps, and fails the variance, composition and both pass comparisons. Uniformization with a floor of the smallest
+double on the density gives a false fat tail, and fails the same-grid comparison by 3.0 in the mean of the reversal at
+a = 2.
+
 ## Knowledge space theory
 
 `validation/knowledge-tracing/kst.R` runs kst, pks and DAKS on their example data and on data simulated by

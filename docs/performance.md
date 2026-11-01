@@ -91,13 +91,13 @@ xychart-beta horizontal
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 388, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 490, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Knowledge tracing: bkt, elo, evaluate, irt, kst"
-  x-axis ["fit", "fit, lessons", "fit, pairs", "replay", "replay", "auc", "replay", "blim", "iita"]
+  x-axis ["fit", "fit, lessons", "fit, pairs", "replay", "replay", "auc", "replay", "drift", "blim", "iita"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.012, 0.013, 0.020, 0.034, 0.58, 1.3, 0.19, 0.97, 0.000015]
-  line [1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.012, 0.013, 0.020, 0.034, 0.58, 1.3, 0.19, 0.032, 0.97, 0.000015]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
@@ -240,6 +240,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | The area under the ROC curve                                                                  | 100,000 predictions                             |            21.6 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           16.5 |      1.3× |
 | The AUC, RMSE, log-loss and accuracy of the predictions                                       | 100,000 predictions                             |            25.8 | none                                      |                |           |
 | Replay of the responses of learners, the grid posterior of the ability updated after each     | 2,000 learners, 40 responses each               |             331 | mirt 1.48 `fscores(method = "EAP")`       |          1,735 |     0.19× |
+| Replay of the responses of learners, the posterior advanced by drift and updated after each   | 200 learners, 40 responses each, 241 points     |             190 | base R, the forward pass in logs          |          6,026 |    0.032× |
 | Fit of the basic local independence model of a chain of 12 items by EM                        | 1,000 persons, 12 items, 13 states              |            24.3 | pks 0.8.0 `blim`                          |           25.0 |     0.97× |
 | Inductive item tree analysis of the responses                                                 | 1,000 persons, 12 items                         |            1.10 | DAKS 2.1.3 `iita(v = 1)`                  |         74,600 | 0.000015× |
 | Fit of the additive factors model by maximum likelihood                                       | 20,000 attempts of 200 learners at 5 skills     |            16.9 | base R `glm`, binomial family             |            469 |    0.036× |

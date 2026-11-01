@@ -36,3 +36,41 @@ bench_task("irt.replay", "Replay of the responses of learners, the grid posterio
            },
            note = paste("mirt scores each of the 40 prefixes of the responses from the first; measurekit updates the posterior",
                         "by the one response and predicts it. A scoring of the final patterns alone takes a fortieth of the time"))
+
+# The responses of the first 200 learners a minute apart, with a drift of variance 0.02 a week, on 241 points: the
+# forward pass in logs of validation/knowledge-tracing/irt.R, with the kernel e^-t I_d(t) of besselI folded at the
+# grid's ends, which is the same for every gap. besselI warns where the kernel falls below the range of doubles, and
+# reads 0 there.
+drift_learners <- 200
+drift_points <- 241
+drift_jumps <- 0.02 / (7 * 24 * 60) / (12 / (drift_points - 1))^2
+drift_replay <- function() {
+  z <- seq(-6, 6, length.out = drift_points)
+  kernel <- suppressWarnings(besselI(drift_jumps, 0:(4 * drift_points), expon.scaled = TRUE))
+  transition <- matrix(0, drift_points, drift_points)
+  from <- 0:(drift_points - 1)
+  for (offset in -(4 * drift_points):(4 * drift_points)) {
+    folded <- (from + offset) %% (2 * drift_points)
+    index <- cbind(from + 1, ifelse(folded < drift_points, folded, 2 * drift_points - 1 - folded) + 1)
+    transition[index] <- transition[index] + kernel[abs(offset) + 1]
+  }
+  transition <- log(transition)
+  for (person in seq_len(drift_learners)) {
+    log_density <- -z^2 / 2
+    for (item in seq_len(item_count)) {
+      if (item > 1) {
+        terms <- transition + log_density
+        top <- apply(terms, 2, max)
+        log_density <- top + log(colSums(exp(terms - rep(top, each = drift_points))))
+      }
+      weights <- exp(log_density - max(log_density))
+      p <- plogis(coefficients[item, "a"] * (z - coefficients[item, "b"]))
+      prediction <- sum(weights * p) / sum(weights)
+      log_density <- log_density + log(if (data[person, item] == 1) p else 1 - p)
+    }
+  }
+}
+bench_task("irt.drift",
+           "Replay of the responses of learners, the posterior advanced by drift and updated after each",
+           sprintf("%s learners, %d responses each, 241 points", count(drift_learners), item_count),
+           "base R, the forward pass in logs", drift_replay)

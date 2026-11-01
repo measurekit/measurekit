@@ -60,19 +60,22 @@ export interface Pass<TState> extends Replay<TState> {
 
 /**
  * Passes over a log once, for a model whose parameters are given or updated with the events: `step` takes each event
- * with an outcome, and an event without one leaves its learner's state as it was.
+ * with an outcome, and `idle` each event without one.
+ *
+ * @defaultValue `idle` leaves the learner's state as it was
  */
 export function onePass<TState>(
   log: EventLog,
   initialState: (learner: string) => TState,
   step: (state: TState, event: ObservedEvent) => PassStep<TState>,
+  idle: (state: TState, event: Event) => TState = (state) => state,
 ): Pass<TState> {
   const states = new Map<string, TState>();
   let logLikelihood = 0;
   const predictions = log.map((event) => {
     const state = states.get(event.learner) ?? initialState(event.learner);
     if (!isObserved(event)) {
-      states.set(event.learner, state);
+      states.set(event.learner, idle(state, event));
       return null;
     }
     const result = step(state, event);
