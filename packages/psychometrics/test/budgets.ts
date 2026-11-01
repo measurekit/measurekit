@@ -51,6 +51,7 @@ const BUDGETS = {
   "cat.simulateMultidimensional": 700,
   "cat.multistageCuts": 10,
   "cat.contentBoundsStep": 0.7,
+  "cat.assembleForms": 60,
   "fit.itemFit": 30,
   "fit.personFit": 40,
   "fit.summedScoreFit": 30,

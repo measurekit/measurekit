@@ -103,10 +103,12 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | Stopping decisions                                           | `checkStopRule` with `length`, `precision` and `minInfo` on the remaining items, alone and together     |
 | Randomesque, Sympson-Hetter, multistage routing, simulation  | Properties over seeded simulations and hand-derived routes (below)                                      |
 | Routing cuts by information and by shares                    | Base R over mirt's `iteminfo` and `expected.item` (below)                                               |
-| Enemy sets, exposure calibration, form assembly              | Properties (below); catR has no enemy sets or form assembly                                             |
+| Enemy sets, exposure calibration                             | Properties (below); catR has no enemy sets                                                              |
 | Testlet selection, administration, withholding and stopping  | Base R replay of the documented rules, with catR's `Ii`; mirtCAT's `ordered` groups (below)             |
 | Content bounds: items, estimates, withholding and stopping   | Base R replay of the documented rules, with catR's `Ii` (below)                                         |
 | Content bounds: tests outside the bounds, precision          | mirtCAT's shadow test, `findNextItem` with `lp` (below)                                                 |
+| Form assembly: forms with enemies, testlets and overlap      | Base R replay of the documented rules, with catR's `Ii` (below)                                         |
+| Form assembly: bounds and information of 340 forms           | highs: the blueprints are feasible, and the minimax forms' gap from the target (below)                  |
 
 | Diagnostic CAT quantity                                    | Reference                                                                                                    |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -409,9 +411,10 @@ exactly; the largest difference over the fixture is 2e-14. Properties cover the 
 cross at the midpoints of their centers, and cuts by shares ascend and are whole scores on the scale number-correct. Enemy sets: over random
 sets and responses, no test administers two items of a set. Exposure calibration: every rate of the last simulation
 is within its tolerance of r, the result reproduces with its seed, and a test too long for r does not converge.
-Form assembly is a heuristic without a reference solution: an assembled form of 30 from 300 items meets every
-content constraint and comes within 5% of the information target, a target above any form's information selects the
-most informative items, and the counts and information it reports equal those of its items.
+Form assembly: a target above any form's information selects the most informative items, the counts and information a
+form reports equal those of its items, and whatever the pool, the enemies, the testlets, the number of forms and the overlap,
+no form has more items than its length, two items of an enemy set, part of a testlet or more shared items with another form
+than the overlap.
 
 `validation/psychometrics/cat.R` also replays diagnostic adaptive tests on the items of GDINA calibrations: `sim30GDINA`
 with the G-DINA model (30 items, 5 attributes), and ECPE (`CDM::data.ecpe`, 28 items, 3 attributes) with the G-DINA
@@ -492,6 +495,23 @@ bounds and a root mean square error at most 1.05 times the shadow test's. The sh
 and 0.330; the rules have none outside, with errors 2% and 3% above them. The tests add properties: whatever the blueprint, no test
 gives more items than its length or more of an area than its maximum, and on blueprints built from a hidden feasible form in
 the cases of a fixed seed, every bound is met.
+
+`validation/psychometrics/form-assembly.R` replays the assembly of forms in base R on a bank of 60 3PL items from catR's
+`genDichoMatrix`, with catR's `Ii` for the information. The replay writes out the documented rules: the units, items alone and
+testlets taken whole; the rotation of the forms, in order and then in reverse; the availability of a unit to a form by the
+places left, the items on the form, the enemies on the form and the overlap; and the choice of the unit with the smallest
+weighted sum of the deviations of its projected properties, the first on ties. The sums run item by item in pool order,
+as the code adds them, and deviations that differ by less than a share of 1e-12 are ties. Eleven cases run it: one form,
+three forms with no item in common, with enemies, four forms that share two items, two forms that share one item with
+enemies, testlets taken whole, testlets with enemies and shared items, a testlet whose items are enemies, forms short of
+items, content only and information only. The test compares the items of every form in order, the counts, and the information (1e-10).
+
+The same script builds 85 blueprints on two banks of 300 items, of two and three facets, each from a hidden feasible form of
+30 items whose area counts, less or plus a margin of 0 or 1, are the bounds and whose information at three thetas is the
+target. highs confirms that four forms with no item in common meet the bounds, and for six blueprints finds the four forms whose
+largest relative gap from the target is smallest, within 30 seconds: 0.2% to 0.3%. The test assembles four forms for each
+blueprint: every bound of all 340 forms is met; the largest gap from the target is 7.3% and 3 forms are beyond 5%, the median 1.4%.
+The estimates of the rotation are those of a heuristic with default weights; the solver's are minimax.
 
 `validation/psychometrics/fit.R`, `dif.R` and `equating.R` store the inputs each reference used: the items, the
 thetas, the calibrations. The tests compute the statistics from those inputs, so a difference is the statistic's alone.
@@ -747,6 +767,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `cat-cdm.json`                           | GDINA's `sim30GDINA` and `CDM::data.ecpe` calibrated by GDINA: G-DINA; ECPE also DINA and G-DINA under a linear hierarchy; 4 persons, 10 items, 5 rules each                                                                                                                                                                                | The five diagnostic selection rules, posterior thresholds, a prior with zeros, DINA items, fixed precision                             |
 | `cat-testlets.json`                      | catR's `genDichoMatrix(items = 30, model = "3PL", seed = 20261630)` with 16 items in five testlets; the first 4 persons answer all items at thetas of -1.4, -0.2, 0.7 and 1.6; the pool with equal items within each testlet                                                                                                                | In order, adaptively, precision stop, exposure parameters of 0, enemy sets; mirtCAT's ordered groups                                   |
 | `cat-bounds.json`                        | catR's `genDichoMatrix(items = 60, model = "3PL", seed = 20261730)` in 12 cells of 4 domains and 3 types, and two banks of 300 items; 15 replays of 5 persons, and the shadow test of 2,000 persons on each bank                                                                                                                            | content bounds: item sequences and estimates; tests outside the bounds and the error of the shadow test                                |
+| `form-assembly.json`                     | catR's `genDichoMatrix(items = 60, model = "3PL", seed = 20261730)` for 11 replays; two banks of 300 items with 85 blueprints, whose four disjoint forms highs confirms feasible                                                                                                                                                            | assembly of forms: items, counts and information of the replays; bounds and information of 340 forms on the blueprints                 |
 | `cat-mirt.json`                          | Seeded pools of 30 to 36 M2PL and M3PL items set in mirt (`generate.mirt_object`): 2 dimensions, 2 dimensions with correlation 0.5, 3 dimensions; 4 persons, 10 items                                                                                                                                                                       | The D-rule on between- and within-dimension items, guessing, a correlated prior, the standard error stopping rule                      |
 | `parameterization-mirt.json`             | 25 items set in mirt: 2PL, 3PL, 4PL, `graded` (one negative slope), `gpcm`, `Rasch`, `rsm`, `nominal`                                                                                                                                                                                                                                       | Both coefficient forms, probabilities                                                                                                  |
 | `parameterization-multidimensional.json` | 6 M2PL, 6 M3PL, 4 graded items on 2 dimensions and 5 graded items on 3 dimensions, set in mirt                                                                                                                                                                                                                                              | Both models' coefficients, probabilities at vectors of theta                                                                           |

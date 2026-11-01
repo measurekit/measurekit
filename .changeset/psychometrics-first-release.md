@@ -74,3 +74,6 @@ Adaptive tests keep to a blueprint. An item is in several content areas (`conten
 and a maximum number of items in each area for any selection rule, `maximumPriorityIndex` orders the items by how near their
 areas are to their bounds, and `contentMinimumsMet` keeps a stop on precision from coming before the minimums. A test ends
 when its selection rule scores every eligible item `-Infinity`.
+
+Fixed forms are assembled in parallel: `assembleForms` takes several forms from one pool in rotation, with enemy sets,
+testlets taken whole, items in several content areas and a most of `overlap` items that two forms may share.

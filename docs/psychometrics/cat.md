@@ -934,28 +934,52 @@ result.rootMeanSquareError; // also bias, meanLength, exposureRates and persons
 
 ## Form assembly
 
-`assembleForm({ pool, length, content, target })` assembles a fixed form, such as a multistage module or a parallel
-form, by Swanson and Stocking's (1993) weighted deviations method, a heuristic that needs no solver. It selects the
-items one at a time; for each candidate it projects every property of the finished form, as the value of the items
-selected, plus the candidate's, plus the mean of the remaining items times the places left, and selects the candidate
-with the smallest weighted sum of deviations of the projections from their bounds.
+`assembleForms({ pool, length, content, target, enemies, forms, overlap, random })` assembles fixed forms, such as the modules
+of a multistage panel or parallel forms, by Swanson and Stocking's weighted deviations method, a heuristic that needs no
+solver. The forms take one unit each in rotation, so that no form always chooses first. A unit is an item, or the items of
+a testlet, which a form takes whole.
 
-| Option    | Default  | Meaning                                                                                                |
-| --------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| `pool`    | required | Items with ids and `contentAreas`, as for an adaptive test                                             |
-| `length`  | required | The number of items, from 1 to the pool size                                                           |
-| `content` | none     | `{ area, minimum, maximum, weight }`: bounds on the number of items of an area; `weight` defaults to 1 |
-| `target`  | none     | `{ theta, information, weight }`: the test information wanted at a theta; `weight` defaults to 1       |
+```mermaid
+flowchart LR
+  R1["Round 1: forms 1, 2, ..., F"] --> R2["Round 2: forms F, ..., 2, 1"]
+  R2 --> R3["Round 3: forms 1, 2, ..., F"]
+  R3 --> E["until each form is full or has no unit available"]
+  U["Available units of a form"] --> P["Project every property of the finished form"]
+  P --> C["Take the unit with the smallest weighted deviation from the bounds"]
+```
 
-The result holds the `items` in the order of selection, the `contentCounts` of the constrained areas and the test
-`information` at each target theta, to check the form against its specification. A count deviates by items and
-information by its own units: weight the targets, such as 1 / information, to balance them. The method meets feasible
-constraints in practice but does not prove optimality or feasibility as integer programming does; the tests check the
-constraints and the information of assembled forms rather than a reference solution.
+| Option    | Default                            | Meaning                                                                                                    |
+| --------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `pool`    | required                           | Items with ids and `contentAreas`, as for an adaptive test; items with one `testlet` go on a form together |
+| `length`  | required                           | The number of items of each form, from 1 to the pool size                                                  |
+| `content` | none                               | `{ area, minimum, maximum, weight }`: bounds on the number of items of an area; `weight` defaults to 1     |
+| `target`  | none                               | `{ theta, information, weight }`: the test information wanted at a theta; `weight` defaults to 1           |
+| `enemies` | none                               | Sets of item ids of which a form holds at most one                                                         |
+| `forms`   | `1`                                | The number of forms, a positive integer                                                                    |
+| `overlap` | `0`                                | The most items two forms may share, an integer from 0                                                      |
+| `random`  | none: ties go to the first in pool | A `Random` that orders the pool before assembly, which settles ties                                        |
+
+| Rule                | Meaning                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rotation            | Round r lets the forms take a unit in order, round r + 1 in reverse                                                                                                            |
+| Available to a form | The unit fits the places left; none of its items is on the form or an enemy of one on the form; for each other form holding its items, the shared count stays within `overlap` |
+| Choice              | The unit whose projection has the smallest weighted sum of deviations from the bounds; deviations that differ by less than a share of 1e-12 are ties                           |
+| Projection          | For each property, the value of the units taken, plus the unit's, plus the mean value per item of the other available units times the places left                              |
+| Value               | A content area: 1 for each item with the area among its `contentAreas`. A target: the item's information at its theta. A unit has the sum of its items'                        |
+
+`assembleForms` returns one result for each form: the `items` in the order of selection, the `contentCounts` of the
+constrained areas and the test `information` at each target theta, to check the forms against their specification. One
+form is `assembleForms(options)[0]`. A form is short, with fewer than `length` items, where the pool, the enemies or
+`overlap` leave it no unit; two forms share the ids that their items share. A count deviates by items and information by its own units:
+weight the targets to balance them. The method meets feasible blueprints in practice, but it does not prove optimality or
+feasibility as integer programming does: on 85 blueprints built from a hidden feasible form of 30 items, two or three facets and margins of 0
+or 1, it met every bound of four forms, 340 forms in all, and kept all but 3 within 5% of the information target, the worst
+within 7.3% and the median within 1.4%. A solver's minimax forms were within 0.3% of the target. Check the counts,
+the information and the length of each form.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { assembleForm } from "@measurekit/psychometrics/cat";
+import { assembleForms } from "@measurekit/psychometrics/cat";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems } from "@measurekit/psychometrics/sim";
 
@@ -965,9 +989,10 @@ const pool = simulateItems(twoParameterLogistic, 300, createRandom(4)).map((item
   id: `q${i + 1}`,
   contentAreas: [areas[i % 3]],
 }));
-const form = assembleForm({
+const forms = assembleForms({
   pool,
   length: 30,
+  forms: 3,
   content: [
     { area: "algebra", minimum: 12, maximum: 14 },
     { area: "geometry", minimum: 8, maximum: 10 },
@@ -977,9 +1002,23 @@ const form = assembleForm({
     { theta: 0, information: 8 },
     { theta: 1, information: 6 },
   ],
+  enemies: [
+    ["q1", "q4"],
+    ["q2", "q5", "q8"],
+  ],
 });
-form.contentCounts; // the number of items of each constrained area, within its bounds
+forms.map((form) => form.items.length); // [30, 30, 30]
+forms.map((form) => form.contentCounts); // algebra 12, 13 and 14; geometry 9, 8 and 9: within the bounds
+forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // [[6.05, 7.92, 6.07], [6.09, 7.83, 6.13], [6.03, 7.75, 6.07]]
 ```
+
+| Situation                                                                                | Result                                                |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| An invalid `forms`, `overlap`, `enemies` or `random`, or an invalid constraint or target | `DataError`                                           |
+| An item whose `contentAreas` is not an array of distinct non-empty strings               | `DataError`                                           |
+| The pool, the enemies or `overlap` leave a form short                                    | The form has fewer than `length` items                |
+| The bounds are not met                                                                   | The counts and the information are returned, to check |
+| A testlet with two items that are enemies                                                | No form takes it                                      |
 
 ## Not included
 
@@ -997,6 +1036,10 @@ form.contentCounts; // the number of items of each constrained area, within its 
   cover for items in several areas; a shadow test fits `ItemSelectionRule` as a rule, so a later start changes no type.
 - Content bounds across the stages of a multistage panel: a module is assembled by [form assembly](#form-assembly), which
   holds bounds per module.
+- Exact assembly: a solver proves a blueprint infeasible and finds a smaller gap from the target, by integer programming
+  with the minimax model; measurekit has no solver dependency, and a later one fits an option with no type changed.
+- Items every form must hold, such as the anchors of a NEAT design: assemble the rest around them, lowering the bounds
+  and the targets by the anchors' values.
 - A testlet-level exposure parameter: the `exposure` of the first item to be administered acts for its testlet.
 - Routing cuts by other rules than equal information and shares of a population, such as optimizing the accuracy of
   classification, and cuts that differ with the route that led to a module, except through the items on the scale

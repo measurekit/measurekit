@@ -13,11 +13,12 @@ import {
   type AdaptiveTest,
   type AdaptiveTestContext,
   type AdaptiveTestState,
+  type AssembledForm,
   adaptiveTest,
   allOf,
   anyOf,
   aStratified,
-  assembleForm,
+  assembleForms,
   type ContentConstraint,
   calibrateExposure,
   contentBounds,
@@ -29,6 +30,7 @@ import {
   type DiagnosticPoolItem,
   diagnosticAdaptiveTest,
   diagnosticKullbackLeibler,
+  type FormAssemblyOptions,
   gdinaDiscriminationIndex,
   generalizedPartialCredit,
   gradedResponse,
@@ -95,6 +97,7 @@ import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
 import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
 import cutsFixture from "./fixtures/cat-multistage-cuts.json" with { type: "json" };
 import catTestlets from "./fixtures/cat-testlets.json" with { type: "json" };
+import catForms from "./fixtures/form-assembly.json" with { type: "json" };
 import { arbitraryItem, defined, expectClose, item2pl, MODELS, mean } from "./helpers.js";
 
 // Tolerances against catR, explained in docs/validation.md.
@@ -1842,7 +1845,7 @@ describe("calibrateExposure", () => {
   });
 });
 
-describe("assembleForm", () => {
+describe("assembleForms", () => {
   const random = createRandom(20261029);
   const areas = ["algebra", "geometry", "number"];
   const pool: PoolItem[] = simulateItems(twoParameterLogistic, 300, random).map((item, i) => ({
@@ -1850,6 +1853,101 @@ describe("assembleForm", () => {
     id: `q${i + 1}`,
     contentAreas: [defined(areas[i % 3])],
   }));
+  /** The one form of a call that asks for one. */
+  const first = (options: FormAssemblyOptions): AssembledForm => defined(assembleForms(options)[0]);
+  const idsOf = (form: AssembledForm): string[] => form.items.map((item) => item.id);
+  /** A pool of 2PL items whose information falls with their rank, alone or in areas. */
+  const ranked = (count: number, extra: (rank: number) => Partial<PoolItem> = () => ({})): PoolItem[] =>
+    Array.from({ length: count }, (_, rank) => ({ ...item2pl(`r${rank}`, 2 - rank / 40, 0), ...extra(rank) }));
+
+  describe("replays", () => {
+    for (const c of catForms.replays) {
+      it(`takes the items of a replay in base R of the case ${c.name}`, () => {
+        const items: PoolItem[] = c.items.map((item) => ({
+          id: item.id,
+          model: threeParameterLogistic,
+          parameters: { a: item.a, b: item.b, c: item.c, d: item.d },
+          contentAreas: item.contentAreas,
+          ...("testlet" in item && { testlet: item.testlet }),
+        }));
+        const forms = assembleForms({
+          pool: items,
+          length: c.length,
+          content: c.constraints,
+          target: c.target,
+          enemies: c.enemies,
+          forms: c.forms,
+          overlap: c.overlap,
+        });
+        expect(forms).toHaveLength(c.expected.length);
+        c.expected.forEach((expected, f) => {
+          const form = defined(forms[f]);
+          expect(idsOf(form), `${c.name}, form ${f + 1}`).toEqual(expected.items);
+          c.constraints.forEach(({ area }, k) => {
+            expect(form.contentCounts[area], `${c.name}, form ${f + 1}, ${area}`).toBe(expected.counts[k]);
+          });
+          c.target.forEach((_, t) => {
+            expectClose(
+              defined(form.information[t]),
+              defined(expected.information[t]),
+              REPLAY_TOLERANCE * 100,
+              `${c.name}, form ${f + 1}`,
+            );
+          });
+        });
+      });
+    }
+  });
+
+  describe("on blueprints that a solver proves feasible", () => {
+    const blueprints = catForms.pools.flatMap(({ name, items, blueprints: list }) =>
+      list.map((blueprint, index) => ({ name, items, blueprint, index })),
+    );
+    it("meets every bound of 340 forms on 85 blueprints, with all but 3 of them within 5% of the target", () => {
+      expect(blueprints).toHaveLength(85);
+      let formsMet = 0;
+      const gaps: number[] = [];
+      for (const { name, items, blueprint, index } of blueprints) {
+        const bank: PoolItem[] = items.map(({ id, a, b, c, d, contentAreas }) => ({
+          id,
+          model: threeParameterLogistic,
+          parameters: { a, b, c, d },
+          contentAreas,
+        }));
+        const forms = assembleForms({
+          pool: bank,
+          length: catForms.length,
+          content: blueprint.constraints,
+          target: blueprint.target,
+          forms: catForms.forms,
+        });
+        expect(forms, `${name}, blueprint ${index + 1}`).toHaveLength(catForms.forms);
+        forms.forEach((form, f) => {
+          const label = `${name}, blueprint ${index + 1}, form ${f + 1}`;
+          expect(form.items, label).toHaveLength(catForms.length);
+          for (const { area, minimum, maximum } of blueprint.constraints) {
+            expect(form.contentCounts[area], `${label}, ${area}`).toBeGreaterThanOrEqual(minimum);
+            expect(form.contentCounts[area], `${label}, ${area}`).toBeLessThanOrEqual(maximum);
+          }
+          gaps.push(
+            Math.max(
+              ...blueprint.target.map(
+                ({ information }, t) => Math.abs(defined(form.information[t]) - information) / information,
+              ),
+            ),
+          );
+          formsMet++;
+        });
+        expect(new Set(forms.flatMap(idsOf)).size, `${name}, blueprint ${index + 1}`).toBe(
+          catForms.forms * catForms.length,
+        );
+      }
+      expect(formsMet).toBe(340);
+      // The rotation is a heuristic: the gaps have a median of 1.4% and a tail; a solver's minimax gaps are 0.2% to 0.3%.
+      expect(gaps.filter((gap) => gap >= 0.05).length).toBeLessThanOrEqual(3);
+      expect(Math.max(...gaps)).toBeLessThan(0.08);
+    });
+  });
 
   it("meets the content constraints and comes near the information target", () => {
     const content = [
@@ -1862,7 +1960,7 @@ describe("assembleForm", () => {
       { theta: 0, information: 8 },
       { theta: 1, information: 6 },
     ];
-    const form = assembleForm({ pool, length: 30, content, target });
+    const form = first({ pool, length: 30, content, target });
     expect(new Set(form.items.map((item) => item.id)).size).toBe(30);
     for (const { area, minimum, maximum } of content) {
       const count = form.items.filter((item) => item.contentAreas?.includes(area)).length;
@@ -1877,40 +1975,170 @@ describe("assembleForm", () => {
   });
 
   it("takes the most informative items for a target above any form's information", () => {
-    const form = assembleForm({ pool, length: 10, target: [{ theta: 0.5, information: 1000 }] });
-    const ranked = [...pool].sort((x, y) => itemInformation(y, 0.5) - itemInformation(x, 0.5));
-    expect(new Set(form.items.map((item) => item.id))).toEqual(new Set(ranked.slice(0, 10).map((item) => item.id)));
+    const form = first({ pool, length: 10, target: [{ theta: 0.5, information: 1000 }] });
+    const sorted = [...pool].sort((x, y) => itemInformation(y, 0.5) - itemInformation(x, 0.5));
+    expect(new Set(form.items.map((item) => item.id))).toEqual(new Set(sorted.slice(0, 10).map((item) => item.id)));
   });
 
   it("assembles the whole pool and is deterministic", () => {
     const small = pool.slice(0, 6);
-    const form = assembleForm({ pool: small, length: 6, content: [{ area: "algebra", minimum: 2, maximum: 2 }] });
+    const form = first({ pool: small, length: 6, content: [{ area: "algebra", minimum: 2, maximum: 2 }] });
     expect(new Set(form.items)).toEqual(new Set(small));
-    const options = { pool, length: 12, target: [{ theta: 0, information: 3 }] };
-    expect(assembleForm(options)).toEqual(assembleForm(options));
+    const options = { pool, length: 12, target: [{ theta: 0, information: 3 }], forms: 2 };
+    expect(assembleForms(options)).toEqual(assembleForms(options));
   });
 
-  it("rejects an invalid length, constraint or target", () => {
-    expect(() => assembleForm({ pool, length: 301 })).toThrow(
+  describe("forms in rotation", () => {
+    const items = ranked(12);
+    const target = [{ theta: 0, information: 1000 }];
+
+    it("lets the forms choose in order, then in reverse, so that none always chooses first", () => {
+      const [one, two] = assembleForms({ pool: items, length: 6, target, forms: 2 });
+      expect(idsOf(defined(one))).toEqual(["r0", "r3", "r4", "r7", "r8", "r11"]);
+      expect(idsOf(defined(two))).toEqual(["r1", "r2", "r5", "r6", "r9", "r10"]);
+    });
+
+    it("gives forms with no item in common unless overlap allows it", () => {
+      const forms = assembleForms({ pool: items, length: 4, target, forms: 3 });
+      expect(new Set(forms.flatMap(idsOf)).size).toBe(12);
+      const shared = assembleForms({ pool: items, length: 8, target, forms: 2, overlap: 4 });
+      const [x, y] = shared.map(idsOf);
+      expect(defined(x).filter((id) => defined(y).includes(id)).length).toBeLessThanOrEqual(4);
+      expect(shared.every((form) => form.items.length === 8)).toBe(true);
+    });
+
+    it("lets forms share every item where overlap is the length", () => {
+      const [one, two] = assembleForms({ pool: items.slice(0, 5), length: 5, target, forms: 2, overlap: 5 });
+      expect(new Set(idsOf(defined(one)))).toEqual(new Set(idsOf(defined(two))));
+    });
+
+    it("leaves a form short where the pool, the enemies or overlap leave it no unit", () => {
+      const forms = assembleForms({ pool: items, length: 8, target, forms: 2 });
+      expect(forms.map((form) => form.items.length)).toEqual([6, 6]);
+      expect(forms.map((form) => form.information.length)).toEqual([1, 1]);
+      const enemies = [["r0", "r1", "r2", "r3", "r4"]];
+      const [only] = assembleForms({ pool: items.slice(0, 6), length: 6, target, enemies });
+      expect(defined(only).items).toHaveLength(2);
+    });
+
+    it("keeps the enemies of a set on different forms or apart on one", () => {
+      const enemies = [
+        ["r0", "r1"],
+        ["r2", "r3", "r4"],
+      ];
+      const forms = assembleForms({ pool: items, length: 6, target, enemies, forms: 2 });
+      for (const form of forms) {
+        const ids = idsOf(form);
+        for (const set of enemies) expect(set.filter((id) => ids.includes(id)).length).toBeLessThanOrEqual(1);
+      }
+      expect(idsOf(defined(forms[0]))).toContain("r0");
+      expect(idsOf(defined(forms[1]))).toContain("r1");
+    });
+
+    it("takes a testlet whole or not at all, and skips one that does not fit", () => {
+      const withTestlets = ranked(12, (rank) =>
+        rank >= 1 && rank <= 3 ? { testlet: "T" } : rank >= 8 && rank <= 10 ? { testlet: "U" } : {},
+      );
+      const forms = assembleForms({ pool: withTestlets, length: 5, target, forms: 2 });
+      for (const form of forms) {
+        const ids = idsOf(form);
+        for (const set of [
+          ["r1", "r2", "r3"],
+          ["r8", "r9", "r10"],
+        ]) {
+          expect(set.filter((id) => ids.includes(id)).length % 3).toBe(0);
+        }
+      }
+      // Two places left cannot take a testlet of three.
+      const [fits] = assembleForms({ pool: withTestlets, length: 2, target });
+      expect(defined(fits).items.every((item) => item.testlet === undefined)).toBe(true);
+      const [whole] = assembleForms({ pool: withTestlets, length: 3, target });
+      expect([0, 3]).toContain(idsOf(defined(whole)).filter((id) => ["r1", "r2", "r3"].includes(id)).length);
+    });
+
+    it("never takes a testlet whose items are enemies", () => {
+      const withTestlet = ranked(8, (rank) => (rank < 3 ? { testlet: "T" } : {}));
+      const [form] = assembleForms({ pool: withTestlet, length: 4, target, enemies: [["r0", "r2"]] });
+      expect(idsOf(defined(form)).filter((id) => ["r0", "r1", "r2"].includes(id))).toEqual([]);
+    });
+
+    it("settles ties by a random order of the pool, the same for a seed", () => {
+      const twins = Array.from({ length: 20 }, (_, i) => item2pl(`t${i}`, 1, 0));
+      const options = { pool: twins, length: 5, target: [{ theta: 0, information: 1 }] };
+      expect(idsOf(first(options))).toEqual(["t0", "t1", "t2", "t3", "t4"]);
+      const seeded = idsOf(first({ ...options, random: createRandom(5) }));
+      expect(seeded).toEqual(idsOf(first({ ...options, random: createRandom(5) })));
+      expect(seeded).not.toEqual(["t0", "t1", "t2", "t3", "t4"]);
+      expect(idsOf(first({ ...options, random: createRandom(6) }))).not.toEqual(seeded);
+    });
+
+    it("leaves its inputs unchanged and returns items of the pool", () => {
+      const copy = items.map((item) => ({ ...item }));
+      const forms = assembleForms({ pool: items, length: 4, target, forms: 2 });
+      expect(items).toEqual(copy);
+      for (const item of forms.flatMap((form) => form.items)) expect(items).toContain(item);
+    });
+  });
+
+  it("rejects options of other types and invalid ones", () => {
+    const base = { pool, length: 5 };
+    expect(() => assembleForms({ ...base, length: 301 })).toThrow(
       "The option length must be an integer from 1 to the pool size 300, found 301.",
     );
-    expect(() => assembleForm({ pool, length: 5, content: [{ area: "algebra", minimum: 3, maximum: 2 }] })).toThrow(
+    expect(() => assembleForms({ ...base, content: [{ area: "algebra", minimum: 3, maximum: 2 }] })).toThrow(
       'The constraint on "algebra" needs the minimum at most the maximum, found 3 and 2.',
     );
-    expect(() =>
-      assembleForm({ pool, length: 5, content: [{ area: "algebra", minimum: 1, maximum: 2, weight: 0 }] }),
-    ).toThrow('The weight of the constraint on "algebra" must be a positive number, found 0.');
-    expect(() => assembleForm({ pool, length: 5, target: [{ theta: 0, information: Number.NaN }] })).toThrow(
+    expect(() => assembleForms({ ...base, content: [{ area: "algebra", minimum: 1, maximum: 2, weight: 0 }] })).toThrow(
+      'The weight of the constraint on "algebra" must be a positive number, found 0.',
+    );
+    expect(() => assembleForms({ ...base, target: [{ theta: 0, information: Number.NaN }] })).toThrow(
       "The information of the target at theta 0 must be a finite number, found NaN.",
     );
-    expect(() => assembleForm({ pool, length: 5, target: [{ theta: Infinity, information: 1 }] })).toThrow(DataError);
-    expect(() => assembleForm(JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => assembleForm({ pool, length: 5, content: JSON.parse("{}") })).toThrow(
+    expect(() => assembleForms({ ...base, target: [{ theta: Infinity, information: 1 }] })).toThrow(DataError);
+    expect(() => assembleForms(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => assembleForms({ ...base, content: JSON.parse("{}") })).toThrow(
       "The option content must be an array of content constraints, found an object.",
     );
-    expect(() => assembleForm({ pool, length: 5, target: JSON.parse("[null]") })).toThrow(
+    expect(() => assembleForms({ ...base, target: JSON.parse("[null]") })).toThrow(
       "An information target must be an object { theta, information }, found null.",
     );
+    for (const forms of [0, 1.5, -1, Number.NaN]) {
+      expect(() => assembleForms({ ...base, forms })).toThrow(
+        `The option forms must be a positive integer, found ${forms}.`,
+      );
+    }
+    expect(() => assembleForms({ ...base, forms: JSON.parse("null") })).toThrow(
+      "The option forms must be a positive integer, found null.",
+    );
+    expect(() => assembleForms({ ...base, forms: JSON.parse('"2"') })).toThrow(
+      'The option forms must be a positive integer, found "2".',
+    );
+    for (const overlap of [-1, 0.5, Number.NaN]) {
+      expect(() => assembleForms({ ...base, overlap })).toThrow(
+        `The option overlap must be an integer from 0, found ${overlap}.`,
+      );
+    }
+    expect(() => assembleForms({ ...base, overlap: JSON.parse("null") })).toThrow(
+      "The option overlap must be an integer from 0, found null.",
+    );
+    expect(() => assembleForms({ ...base, enemies: JSON.parse("{}") })).toThrow(
+      "The option enemies must be an array of enemy sets, found an object.",
+    );
+    expect(() => assembleForms({ ...base, enemies: [["q1"]] })).toThrow("Enemy set 1 needs at least two item ids.");
+    expect(() => assembleForms({ ...base, enemies: [["q1", "zz"]] })).toThrow(
+      'Enemy set 1 names "zz", which is not a pool item.',
+    );
+    expect(() => assembleForms({ ...base, enemies: [["q1", "q1"]] })).toThrow("Enemy set 1 names an item twice.");
+    expect(() => assembleForms({ ...base, random: JSON.parse("null") })).toThrow(
+      "A random number generator must be one from createRandom, found null.",
+    );
+    expect(() => assembleForms({ ...base, random: JSON.parse("{}") })).toThrow(
+      "A random number generator must be one from createRandom, found an object.",
+    );
+    const text = [{ ...defined(pool[0]), contentAreas: JSON.parse('"algebra"') }, ...pool.slice(1)];
+    expect(() =>
+      assembleForms({ pool: text, length: 5, content: [{ area: "algebra", minimum: 1, maximum: 2 }] }),
+    ).toThrow('The contentAreas of item "q1" must be an array of distinct non-empty strings, found "algebra".');
   });
 });
 
@@ -4327,6 +4555,58 @@ describe("properties", () => {
         },
       ),
       { numRuns: 200, seed: 20261029 },
+    );
+  });
+
+  it("forms hold at most their length, their enemies apart, their testlets whole and at most the overlap in common", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 8, max: 30 }),
+        fc.integer({ min: 1, max: 8 }),
+        fc.integer({ min: 1, max: 4 }),
+        fc.integer({ min: 0, max: 3 }),
+        fc.integer(),
+        (size, length, forms, overlap, seed) => {
+          const random = createRandom(seed);
+          const sets = ["a", "b", "c", undefined];
+          const pool: PoolItem[] = Array.from({ length: size }, (_, i) => {
+            const testlet = sets[Math.floor(random.uniform() * sets.length)];
+            return {
+              ...item2pl(`q${i}`, 0.5 + random.uniform(), random.normal()),
+              ...(testlet !== undefined && { testlet }),
+            };
+          });
+          const enemies = Array.from({ length: 3 }, () => {
+            const first = Math.floor(random.uniform() * size);
+            return [`q${first}`, `q${(first + 1 + Math.floor(random.uniform() * (size - 1))) % size}`];
+          });
+          const assembled = assembleForms({
+            pool,
+            length: Math.min(length, size),
+            enemies,
+            forms,
+            overlap,
+            target: [{ theta: random.normal(), information: 2 }],
+            random,
+          });
+          const ids = assembled.map((form) => form.items.map((item) => item.id));
+          assembled.forEach((_, f) => {
+            const own = defined(ids[f]);
+            expect(own.length).toBeLessThanOrEqual(Math.min(length, size));
+            expect(new Set(own).size).toBe(own.length);
+            for (const set of enemies) expect(set.filter((id) => own.includes(id)).length).toBeLessThanOrEqual(1);
+            for (const testlet of ["a", "b", "c"]) {
+              const members = pool.filter((item) => item.testlet === testlet).map((item) => item.id);
+              const held = members.filter((id) => own.includes(id)).length;
+              expect([0, members.length]).toContain(held);
+            }
+            ids.slice(f + 1).forEach((other) => {
+              expect(own.filter((id) => other.includes(id)).length).toBeLessThanOrEqual(overlap);
+            });
+          });
+        },
+      ),
+      { numRuns: 100 },
     );
   });
 

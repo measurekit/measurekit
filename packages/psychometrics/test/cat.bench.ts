@@ -3,6 +3,7 @@ import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
   adaptiveTest,
+  assembleForms,
   attributeProfiles,
   calibrateCdm,
   contentBounds,
@@ -25,6 +26,7 @@ import {
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-cat.json" with { type: "json" };
 import boundsFixture from "./fixtures/bench-cat-bounds.json" with { type: "json" };
+import formsFixture from "./fixtures/bench-cat-forms.json" with { type: "json" };
 import cdm from "./fixtures/bench-cdm.json" with { type: "json" };
 import { defined } from "./helpers.js";
 
@@ -145,4 +147,24 @@ test("selects an item under content bounds on a pool of 1,000 3PL items in 12 co
   rule.scores(selection, scores);
   expect(scores.filter((score) => score > Number.NEGATIVE_INFINITY).length).toBeGreaterThan(0);
   await benchmark(context, "cat.contentBoundsStep", () => rule.scores(selection, scores));
+});
+
+test("assembles 4 forms of 40 items from a pool of 1,000 3PL items in 5 content areas, with 30 pairs of enemies", async (context) => {
+  const { pool: parameters, areas, constraints, target, enemies, forms, length } = formsFixture;
+  const pool: PoolItem[] = parameters.a.map((a, i) => ({
+    id: `item${i + 1}`,
+    model: threeParameterLogistic,
+    parameters: { a, b: defined(parameters.b[i]), c: defined(parameters.c[i]), d: 1 },
+    contentAreas: [defined(areas[i])],
+  }));
+  const options = {
+    pool,
+    length,
+    content: constraints,
+    target,
+    forms,
+    enemies: enemies.map((pair) => pair.map((index) => `item${index + 1}`)),
+  };
+  expect(assembleForms(options)).toHaveLength(forms);
+  await benchmark(context, "cat.assembleForms", () => assembleForms(options));
 });

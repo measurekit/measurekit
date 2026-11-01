@@ -41,7 +41,7 @@ export {
 } from "./exposure-calibration.js";
 export {
   type AssembledForm,
-  assembleForm,
+  assembleForms,
   type FormAssemblyOptions,
   type InformationTarget,
 } from "./form-assembly.js";

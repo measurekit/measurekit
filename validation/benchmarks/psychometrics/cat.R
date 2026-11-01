@@ -3,7 +3,8 @@
 # selects by maximum information and estimates by the posterior mean; the diagnostic test selects by the G-DINA
 # discrimination index; the multidimensional one by the determinant of the information, and estimates by the posterior
 # mode. Testlets have no reference. The routing cuts of a multistage panel are derived by uniroot on the information curves
-# of adjacent modules, between their peaks.
+# of adjacent modules, between their peaks. A step of a test under content bounds is timed against mirtCAT's shadow test,
+# and the assembly of parallel forms against highs.
 
 suppressPackageStartupMessages({
   library(catR)
@@ -11,6 +12,7 @@ suppressPackageStartupMessages({
   library(GDINA)
   library(mirt)
   library(mirtCAT)
+  library(highs)
 })
 
 source("validation/benchmarks/simulation.R")
@@ -185,3 +187,91 @@ shadow_step <- function() {
 bench_task("cat.contentBoundsStep", "One item selection under content bounds, by the information at the estimate",
            sprintf("a pool of %d 3PL items in %d content areas, a test of %d items after %d", bounds_pool, length(bounds_names), bounds_length, bounds_given),
            reference("mirtCAT", "findNextItem(objective = computeCriteria(criteria = \"MI\"))` with lpSolve's `lp"), shadow_step)
+
+# --- Form assembly ---------------------------------------------------------------------------------------------------
+# Four forms of 40 items from a pool of 1,000 3PL items in 5 content areas, with 30 pairs of enemies and the information at
+# three thetas as the target, from a hidden feasible form. The reference is highs, which finds the four forms whose largest
+# gap from the target is smallest (minimax) with no item on two forms, within a limit of 10 seconds; measurekit takes the
+# forms by weighted deviations in rotation.
+
+set.seed(20261031)
+forms_pool <- 1000
+forms_count <- 4
+forms_length <- 40
+forms_bank <- cbind(a = round(rlnorm(forms_pool, 0, 0.3), 3), b = round(rnorm(forms_pool), 3), c = round(runif(forms_pool, 0.05, 0.25), 3), d = 1)
+forms_areas <- paste0("area", sample(5, forms_pool, replace = TRUE, prob = c(0.3, 0.25, 0.2, 0.15, 0.1)))
+forms_names <- sort(unique(forms_areas))
+forms_membership <- sapply(forms_names, function(area) as.numeric(forms_areas == area))
+forms_hidden <- sample(forms_pool, forms_length)
+forms_counts <- colSums(forms_membership[forms_hidden, , drop = FALSE])
+forms_minimum <- pmax(0, forms_counts - 1)
+forms_maximum <- forms_counts + 1
+forms_thetas <- c(-1, 0, 1)
+forms_information <- sapply(forms_thetas, function(theta) sum(Ii(theta, forms_bank)$Ii[forms_hidden]))
+forms_enemies <- t(replicate(30, sample(forms_pool, 2)))
+
+bench_fixture("psychometrics", "cat-forms", list(
+  source = "Simulations, set.seed(20261031): a 3PL pool of 1,000 items in 5 content areas, 30 pairs of enemies and the bounds and information of a hidden feasible form of 40.",
+  pool = list(a = I(forms_bank[, "a"]), b = I(forms_bank[, "b"]), c = I(forms_bank[, "c"])),
+  areas = I(forms_areas),
+  constraints = lapply(seq_along(forms_names), function(k) list(area = forms_names[k], minimum = forms_minimum[k], maximum = forms_maximum[k])),
+  target = lapply(seq_along(forms_thetas), function(k) list(theta = forms_thetas[k], information = forms_information[k])),
+  enemies = unname(lapply(seq_len(nrow(forms_enemies)), function(k) I(forms_enemies[k, ] - 1))),
+  forms = forms_count,
+  length = forms_length
+))
+
+forms_model <- local({
+  n <- forms_pool
+  variables <- forms_count * n + 1
+  index <- function(f, i) (f - 1) * n + i
+  rows <- list()
+  lhs <- numeric(0)
+  rhs <- numeric(0)
+  add <- function(row, low, high) {
+    rows[[length(rows) + 1]] <<- row
+    lhs <<- c(lhs, low)
+    rhs <<- c(rhs, high)
+  }
+  for (i in seq_len(n)) {
+    row <- numeric(variables)
+    row[index(seq_len(forms_count), i)] <- 1
+    add(row, -Inf, 1)
+  }
+  info <- sapply(forms_thetas, function(theta) Ii(theta, forms_bank)$Ii)
+  for (f in seq_len(forms_count)) {
+    row <- numeric(variables)
+    row[index(f, seq_len(n))] <- 1
+    add(row, forms_length, forms_length)
+    for (k in seq_along(forms_names)) {
+      row <- numeric(variables)
+      row[index(f, seq_len(n))] <- forms_membership[, k]
+      add(row, forms_minimum[k], forms_maximum[k])
+    }
+    for (pair in seq_len(nrow(forms_enemies))) {
+      row <- numeric(variables)
+      row[index(f, forms_enemies[pair, ])] <- 1
+      add(row, -Inf, 1)
+    }
+    for (k in seq_along(forms_thetas)) {
+      row <- numeric(variables)
+      row[index(f, seq_len(n))] <- info[, k]
+      row[variables] <- -forms_information[k]
+      add(row, -Inf, forms_information[k])
+      row[variables] <- forms_information[k]
+      add(row, forms_information[k], Inf)
+    }
+  }
+  list(A = do.call(rbind, rows), lhs = lhs, rhs = rhs, variables = variables)
+})
+
+solve_forms <- function() {
+  highs_solve(L = c(numeric(forms_model$variables - 1), 1), lower = rep(0, forms_model$variables), upper = rep(1, forms_model$variables),
+              A = forms_model$A, lhs = forms_model$lhs, rhs = forms_model$rhs,
+              types = c(rep("I", forms_model$variables - 1), "C"), control = highs_control(time_limit = 10))
+}
+
+bench_task("cat.assembleForms", "Assembly of parallel forms with enemies, by weighted deviations in rotation",
+           sprintf("%d forms of %d items from a pool of %d 3PL items in %d content areas, with %d pairs of enemies and 3 targets", forms_count, forms_length, forms_pool, length(forms_names), nrow(forms_enemies)),
+           reference("highs", "highs_solve"), solve_forms,
+           note = "highs finds the forms whose largest gap from the target is smallest (minimax), to its limit of 10 seconds.")
