@@ -75,3 +75,15 @@ score_likelihoods <- function(fit, nodes) {
   }
   likelihoods
 }
+
+# The Q-matrix's columns in measurekit's order: attributes by first appearance over the items, so that both libraries
+# order the profiles and each item's latent groups alike.
+psychometrics_order <- function(Q) {
+  first <- unique(unlist(lapply(seq_len(nrow(Q)), function(j) which(Q[j, ] == 1))))
+  Q[, first, drop = FALSE]
+}
+
+# The Q-matrix as measurekit takes it: the attributes of each item, by item id.
+qmatrix <- function(Q, items) {
+  setNames(lapply(seq_len(nrow(Q)), function(j) I(colnames(Q)[Q[j, ] == 1])), items)
+}

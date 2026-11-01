@@ -5,6 +5,7 @@ import {
   type CdmModel,
   calibrateCdm,
   cdmClassificationAccuracy,
+  compareItemModels,
   nonparametricClassification,
   responseMatrix,
   validateQMatrix,
@@ -40,4 +41,18 @@ test("classifies the persons of a calibration, and measures the accuracy of the 
 
 test("classifies 1,000 persons nonparametrically", async (context) => {
   await benchmark(context, "cdm.nonparametric", () => nonparametricClassification(matrix, qMatrix));
+});
+
+test("calibrates the G-DINA model of 1,000 persons, 20 items and 4 attributes with the covariance of its success probabilities", async (context) => {
+  await benchmark(
+    context,
+    "cdm.calibrateGdinaStandardErrors",
+    () => calibrateCdm(matrix, qMatrix, { standardErrors: "incomplete" }),
+    SLOW_OPTIONS,
+  );
+});
+
+test("compares the reduced models of every item of a calibration with two or more attributes", async (context) => {
+  const calibration = calibrateCdm(matrix, qMatrix, { standardErrors: "incomplete" });
+  await benchmark(context, "cdm.compareItemModels", () => compareItemModels(calibration));
 });

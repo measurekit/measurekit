@@ -16,6 +16,7 @@ import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matri
 import { type AdditiveMaximizer, additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
 import { type CdmState, type DichotomousRows, type ExpectedCounts, expectedCounts } from "./expectation.js";
 import { type CdmDesign, cdmDesign, profilesOf } from "./q-matrix.js";
+import { incompleteCovariances } from "./standard-errors.js";
 
 /**
  * A cognitive diagnosis model of an item's success probabilities: `"gdina"`, one per latent group of its attributes;
@@ -25,6 +26,9 @@ import { type CdmDesign, cdmDesign, profilesOf } from "./q-matrix.js";
  * @see {@link https://doi.org/10.1007/s11336-011-9207-7 | de la Torre (2011)}
  */
 export type CdmModel = "gdina" | "dina" | "dino" | "acdm" | "llm" | "rrum";
+
+/** How the standard errors of a cognitive diagnosis calibration are computed. */
+export type CdmStandardErrors = "none" | "incomplete";
 
 /** Options of {@link calibrateCdm}. */
 export interface CdmCalibrationOptions {
@@ -40,6 +44,14 @@ export interface CdmCalibrationOptions {
    * @defaultValue `1e-4`
    */
   readonly tolerance?: number;
+  /**
+   * The standard errors of the success probabilities: `"none"`, or `"incomplete"`, their covariance from the outer
+   * product of the gradient over persons, as GDINA's `SE.type = 2`. `"incomplete"` needs the G-DINA model for every
+   * item, and gives each item its `standardErrors` and `covariance`, which `compareItemModels` uses.
+   *
+   * @defaultValue `"none"`
+   */
+  readonly standardErrors?: CdmStandardErrors;
   /**
    * The most EM iterations.
    *
@@ -72,6 +84,16 @@ export interface CdmItem {
    * have the guessing and the rise from it to 1 - slip.
    */
   readonly coefficients: readonly number[];
+  /**
+   * The standard error of each success probability, in the order of `probabilities`; absent without the option
+   * `standardErrors`.
+   */
+  readonly standardErrors?: readonly number[];
+  /**
+   * The covariance matrix of the success probabilities, by rows, in the order of `probabilities`; absent without the
+   * option `standardErrors`.
+   */
+  readonly covariance?: readonly (readonly number[])[];
 }
 
 /** A profile with its estimated share of the population. */
@@ -106,6 +128,7 @@ export interface CdmCalibration {
 }
 
 const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
+const STANDARD_ERRORS: readonly CdmStandardErrors[] = ["none", "incomplete"];
 /** The link of each additive model (de la Torre, 2011): the identity for the A-CDM, the logit for the LLM, the log for the R-RUM. */
 const LINKS: Readonly<Partial<Record<CdmModel, CdmLink>>> = { acdm: "identity", llm: "logit", rrum: "log" };
 const DEFAULT_TOLERANCE = 1e-4;
@@ -134,8 +157,12 @@ const MIN_PROPORTION = Number.EPSILON;
  * persons, and a proportion stays above the machine epsilon. Missing responses are skipped; persons without responses
  * change nothing.
  *
- * @throws `DataError` when the matrix, the Q-matrix or an option is invalid, a response is neither 0 nor 1, or there is
- * no response.
+ * The incomplete standard errors are computed at the estimates, from each person's posterior over the latent groups of
+ * every item. They take O(n p²) for n persons and p success probabilities, and the inversion of the p by p information
+ * O(p³) per sweep.
+ *
+ * @throws `DataError` when the matrix, the Q-matrix or an option is invalid, a response is neither 0 nor 1, there is
+ * no response, or `standardErrors` is `"incomplete"` and an item is not G-DINA.
  */
 export function calibrateCdm(
   matrix: ResponseMatrix,
@@ -144,10 +171,12 @@ export function calibrateCdm(
 ): CdmCalibration {
   checkResponseMatrix(matrix);
   checkOptions(options);
-  const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
+  const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, standardErrors = "none" } = options;
   checkStopping(tolerance, maxIterations);
+  checkChoice(standardErrors, "The option standardErrors", STANDARD_ERRORS);
   const design = cdmDesign(matrix.itemIds, qMatrix);
   const models = itemModels(options.model, matrix.itemIds.length);
+  if (standardErrors === "incomplete") checkSaturated(models, matrix.itemIds);
   const data = dichotomousRows(matrix);
   if (data.respondents === 0) throw new DataError("Cognitive diagnosis needs at least one response.");
   const state = startingValues(design);
@@ -157,6 +186,7 @@ export function calibrateCdm(
     { tolerance, maxIterations },
   );
   const logLikelihood = expectedCounts(data, design, state).logLikelihood;
+  const covariances = standardErrors === "incomplete" ? incompleteCovariances(data, design, state) : [];
   const parameters =
     design.itemAttributes.reduce((sum, indices, j) => sum + parameterCount(models[j], indices.length), 0) +
     design.profiles.length -
@@ -177,6 +207,7 @@ export function calibrateCdm(
         coefficients: step
           ? Array.from(step.coefficients)
           : identityCoefficients(model, probabilities, design.itemAttributes[j]?.length ?? 0),
+        ...itemErrors(covariances[j], probabilities.length),
       };
     }),
     profiles: design.profiles.map((profile, c) => ({ profile, proportion: state.proportions[c] ?? 0 })),
@@ -186,6 +217,30 @@ export function calibrateCdm(
     converged,
     iterations,
   };
+}
+
+/**
+ * Checks that every item is G-DINA, which the covariance of success probabilities is defined for.
+ *
+ * @throws `DataError` when an item is not.
+ */
+function checkSaturated(models: readonly CdmModel[], itemIds: readonly string[]): void {
+  const index = models.findIndex((model) => model !== "gdina");
+  if (index >= 0) {
+    throw new DataError(
+      `The option standardErrors "incomplete" needs the G-DINA model for every item, found "${models[index]}" for item "${itemIds[index]}".`,
+    );
+  }
+}
+
+/** Returns the standard errors and the covariance rows of an item from its flat covariance matrix, if it has one. */
+function itemErrors(
+  covariance: Float64Array | undefined,
+  size: number,
+): { standardErrors?: number[]; covariance?: number[][] } {
+  if (covariance === undefined) return {};
+  const rows = Array.from({ length: size }, (_, a) => Array.from(covariance.subarray(a * size, (a + 1) * size)));
+  return { standardErrors: rows.map((row, a) => Math.sqrt(Math.max(row[a] ?? 0, 0))), covariance: rows };
 }
 
 /** Returns the number of parameters of an item with `attributeCount` attributes: its success probabilities. */

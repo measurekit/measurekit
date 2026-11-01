@@ -35,6 +35,7 @@ Rscript validation/psychometrics/rater.R             # rater agreement: irr, psy
 Rscript validation/psychometrics/rater-bias.R        # rater bias analysis: base R and TAM's tam.mml.mfr with the interaction of items and raters
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
 Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
+Rscript validation/psychometrics/cdm-item-comparison.R  # item-level model comparison: GDINA's modelcomp with the Wald test, and its covariance of the success probabilities
 Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mirt, GPArotation and base R; case names as arguments run only those cases
 Rscript validation/psychometrics/change.R            # gains, reliability of a difference and reliable change: clinicalsignificance and base R
 Rscript validation/psychometrics/parameterization.R  # mirt's coefficient forms of every item type, multidimensional ones included

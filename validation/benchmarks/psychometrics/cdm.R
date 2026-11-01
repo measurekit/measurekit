@@ -56,3 +56,9 @@ bench_task("cdm.validateQMatrix", "Validation of the Q-matrix by the proportion 
            reference("GDINA", "Qval(method = \"PVAF\")"), function() Qval(gdina_fit, method = "PVAF", eps = 0.95))
 bench_task("cdm.nonparametric", "Nonparametric classification by the Hamming distance", size,
            reference("NPCD", "AlphaNP"), function() AlphaNP(responses, Q, gate = "AND", method = "Hamming"))
+bench_task("cdm.compareItemModels", "Wald tests of the DINA, DINO, A-CDM, LLM and R-RUM against the G-DINA, for each item with two or more attributes",
+           size, reference("GDINA", "modelcomp(method = \"Wald\")"), function() modelcomp(gdina_fit, method = "Wald"),
+           note = "modelcomp computes the covariance of the success probabilities of the fit again for each item; measurekit's comes with its calibration, which cdm.calibrateGdinaStandardErrors times")
+bench_task("cdm.calibrateGdinaStandardErrors", "Calibration of the G-DINA model by EM, with the covariance of its success probabilities",
+           size, reference("GDINA", "GDINA(model = \"GDINA\"), extract(\"catprob.cov\", SE.type = 2)"),
+           function() extract(calibrate("GDINA"), "catprob.cov", SE.type = 2))

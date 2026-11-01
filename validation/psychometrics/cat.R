@@ -229,13 +229,6 @@ CD_PERSONS <- 4 # persons per case, the first rows of the data
 # The prior in multiples of 1 / 4096, so that its sum is exactly 1 as cdcatR's att.prior check requires.
 PRIOR_UNITS <- 4096
 
-# The Q-matrix's columns in the package's order: attributes by first appearance over the items, so that both libraries
-# order the profiles and each item's latent groups alike.
-psychometrics_order <- function(Q) {
-  first <- unique(unlist(lapply(seq_len(nrow(Q)), function(j) which(Q[j, ] == 1))))
-  Q[, first, drop = FALSE]
-}
-
 # The prior of a fit's profile proportions in multiples of 1 / PRIOR_UNITS, each profile `allowed` at least one.
 rounded_prior <- function(proportions, allowed) {
   units <- ifelse(allowed, pmax(round(proportions * PRIOR_UNITS), 1), 0)

@@ -41,3 +41,6 @@ analysis reports the reliability of the total score by the Molenaar-Sijtsma meth
 
 The many-facet Rasch model estimates the bias of each pair of elements of two facets, such as a rater on an item, with its
 standard error and Wald statistic, from the same marginal likelihood as the measures.
+
+Cognitive diagnosis compares each item's G-DINA estimates with the DINA, DINO, A-CDM, LLM and R-RUM by Wald tests, and
+selects a model for each item; the calibration gives the covariance of the success probabilities for them.

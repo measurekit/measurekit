@@ -35,6 +35,8 @@ const BUDGETS = {
   "cdm.calibrateAcdm": 200,
   "cdm.calibrateLlm": 200,
   "cdm.calibrateRrum": 200,
+  "cdm.calibrateGdinaStandardErrors": 700,
+  "cdm.compareItemModels": 2,
   "cdm.attributeProfiles": 3,
   "cdm.accuracy": 4,
   "cdm.validateQMatrix": 20,

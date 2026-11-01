@@ -2,8 +2,9 @@
 
 `@measurekit/psychometrics/cdm` tells which attributes, such as the skills a test measures, each person has
 mastered: the G-DINA, DINA, DINO, A-CDM, LLM and R-RUM models calibrated by marginal maximum likelihood, persons'
-mastery probabilities and profiles, classification accuracy and consistency, Q-matrix validation, and a nonparametric
-classification for small samples. Each is validated against GDINA or NPCD ([validation](validation.md)).
+mastery probabilities and profiles, classification accuracy and consistency, Wald tests that choose a model for each
+item, Q-matrix validation, and a nonparametric classification for small samples. Each is validated against GDINA or
+NPCD ([validation](validation.md)).
 
 ## Q-matrix
 
@@ -61,21 +62,22 @@ it, starting from the previous iteration's. As GDINA, a probability stays within
 than 0.001 expected persons takes 0.0005 more correct responses over 0.001 more persons, and a proportion stays above
 the machine epsilon. Responses are 0 or 1; missing ones are skipped.
 
-| Option          | Default   | Meaning                                                                                                                       |
-| --------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `model`         | `"gdina"` | One model for every item, or an array with one per item, each of `"gdina"`, `"dina"`, `"dino"`, `"acdm"`, `"llm"` or `"rrum"` |
-| `tolerance`     | `1e-4`    | EM stops when no probability or proportion changes by more than this                                                          |
-| `maxIterations` | `2000`    | The most EM iterations                                                                                                        |
+| Option           | Default   | Meaning                                                                                                                                                                   |
+| ---------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`          | `"gdina"` | One model for every item, or an array with one per item, each of `"gdina"`, `"dina"`, `"dino"`, `"acdm"`, `"llm"` or `"rrum"`                                             |
+| `tolerance`      | `1e-4`    | EM stops when no probability or proportion changes by more than this                                                                                                      |
+| `maxIterations`  | `2000`    | The most EM iterations                                                                                                                                                    |
+| `standardErrors` | `"none"`  | `"incomplete"` adds each item's `standardErrors` and `covariance`, from the outer product of the gradient over persons (GDINA's `SE.type = 2`); every item must be G-DINA |
 
-| Result          | Meaning                                                                                                                     |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `attributes`    | The attributes, in order                                                                                                    |
-| `items`         | Per item: `id`, `attributes`, `model`, `probabilities` per latent group, `guessing`, `slip` and `coefficients`              |
-| `profiles`      | Each profile with its `proportion`                                                                                          |
-| `logLikelihood` | The marginal log-likelihood                                                                                                 |
-| `aic`, `bic`    | With 2^K_j parameters per G-DINA item, 2 per DINA or DINO item, K_j + 1 per additive item, and the 2^K - 1 free proportions |
-| `converged`     | Whether EM reached `tolerance`                                                                                              |
-| `iterations`    | EM iterations run                                                                                                           |
+| Result          | Meaning                                                                                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attributes`    | The attributes, in order                                                                                                                                                         |
+| `items`         | Per item: `id`, `attributes`, `model`, `probabilities` per latent group, `guessing`, `slip` and `coefficients`, and with `standardErrors`, its `standardErrors` and `covariance` |
+| `profiles`      | Each profile with its `proportion`                                                                                                                                               |
+| `logLikelihood` | The marginal log-likelihood                                                                                                                                                      |
+| `aic`, `bic`    | With 2^K_j parameters per G-DINA item, 2 per DINA or DINO item, K_j + 1 per additive item, and the 2^K - 1 free proportions                                                      |
+| `converged`     | Whether EM reached `tolerance`                                                                                                                                                   |
+| `iterations`    | EM iterations run                                                                                                                                                                |
 
 `coefficients` are GDINA's `coef(what = "delta")`:
 
@@ -155,6 +157,90 @@ attributes whose PVAF exceeds `eps`, default 0.95, of those the one of largest P
 probabilities do not vary over the profiles, such as an item without responses, has `pvaf` `null` and keeps its
 attributes. A suggestion is evidence for experts to weigh, not a correction: calibrate the G-DINA before validating.
 
+## Item-level model comparison
+
+A G-DINA item can often be described by a model with fewer parameters, which is easier to interpret and estimated more
+precisely. `compareItemModels(calibration, options)` tests, for each item with two or more attributes, whether the
+DINA, DINO, A-CDM, LLM or R-RUM fits as well as the G-DINA, and selects a model for the item (de la Torre and Lee,
+2013; Ma et al., 2016).
+
+```mermaid
+flowchart LR
+  C["calibrateCdm with standardErrors incomplete: G-DINA items"] --> P["Success probabilities"]
+  C --> V["Covariance of each item's success probabilities"]
+  P --> W["Wald test of each reduced model: constraints on the probabilities"]
+  V --> W
+  W --> Q["A p-value per model"]
+  Q --> D{"Largest p-value above 0.05?"}
+  D -->|yes| R["That reduced model"]
+  D -->|no| G["The G-DINA"]
+```
+
+```ts
+import { calibrateCdm, compareItemModels } from "@measurekit/psychometrics/cdm";
+import { createRandom } from "@measurekit/psychometrics";
+import { simulateCdmResponses } from "@measurekit/psychometrics/sim";
+
+// 1,000 persons on two attributes: item3 is a DINA item, item4 an additive one.
+const random = createRandom(7);
+const model = {
+  attributes: ["a", "b"],
+  items: [
+    { id: "item1", attributes: ["a"], probabilities: [0.15, 0.85] },
+    { id: "item2", attributes: ["b"], probabilities: [0.15, 0.85] },
+    { id: "item3", attributes: ["a", "b"], probabilities: [0.15, 0.15, 0.15, 0.85] },
+    { id: "item4", attributes: ["a", "b"], probabilities: [0.1, 0.5, 0.5, 0.9] },
+  ],
+};
+const profiles = Array.from({ length: 1000 }, () => [random.uniform() < 0.5 ? 1 : 0, random.uniform() < 0.5 ? 1 : 0]);
+const matrix = simulateCdmResponses(model, profiles, random);
+const qMatrix = Object.fromEntries(model.items.map(({ id, attributes }) => [id, attributes]));
+
+const calibration = calibrateCdm(matrix, qMatrix, { standardErrors: "incomplete" });
+calibration.items[2]?.standardErrors; // [0.027, 0.055, 0.052, 0.041]: one for each latent group of item3
+const comparisons = compareItemModels(calibration);
+comparisons.map(({ item, selected }) => [item, selected]); // [["item3", "dina"], ["item4", "acdm"]]
+comparisons[0]?.tests[0]; // { model: "dina", statistic: 3.29, degreesOfFreedom: 2, pValue: 0.193 }, rounded
+```
+
+The items with one attribute have no reduced form and are left out. Each test is of constraints on the G-DINA's
+success probabilities P of an item's 2^K latent groups, with the G-DINA's covariance matrix V of them:
+
+| Model    | Constraints                                     | Scale   | Degrees of freedom |
+| -------- | ----------------------------------------------- | ------- | ------------------ |
+| `"dina"` | The groups below the last have one probability  | P       | 2^K - 2            |
+| `"dino"` | The groups above the first have one probability | P       | 2^K - 2            |
+| `"acdm"` | Every interaction of the attributes is 0        | P       | 2^K - K - 1        |
+| `"llm"`  | Every interaction is 0                          | logit P | 2^K - K - 1        |
+| `"rrum"` | Every interaction is 0                          | ln P    | 2^K - K - 1        |
+
+With R the matrix of the constraints, g the scale, and G the diagonal matrix of its derivatives at P, the Wald
+statistic is (R g(P))' (R G V G' R')⁺ (R g(P)), where ⁺ is the Moore-Penrose inverse, and its p-value is the upper tail
+of the chi-square distribution on the degrees of freedom of the table. The selected model is the one with the largest
+p-value, if that is above 0.05, and the G-DINA otherwise; the first of equal p-values wins. The p-values are not adjusted
+for the number of tests.
+
+| Option   | Default                                   | Meaning                                                         |
+| -------- | ----------------------------------------- | --------------------------------------------------------------- |
+| `models` | `["dina", "dino", "acdm", "llm", "rrum"]` | The reduced models to test, in the order of `tests`; none twice |
+
+| Result                     | Meaning                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `item`                     | The item's id                                                                                     |
+| `tests[].model`            | The reduced model                                                                                 |
+| `tests[].statistic`        | The Wald statistic; `null` when it is not finite                                                  |
+| `tests[].degreesOfFreedom` | From the table above                                                                              |
+| `tests[].pValue`           | The probability of a statistic at least as large under the reduced model; `null` with `statistic` |
+| `selected`                 | The reduced model with the largest p-value above 0.05, or `"gdina"`                               |
+
+A calibration that has no covariance, or an item with two or more attributes that is not G-DINA, throws a `DataError`:
+calibrate with `model: "gdina"` and `standardErrors: "incomplete"`. The covariance is singular when a latent group has
+no expected persons, or when the persons are fewer than the parameters; its pseudo-inverse is then used, as GDINA
+does, and a group without persons adds no information to the tests. The Wald test is liberal at the sizes of many
+tests: on the 20 simulated sets of the validation, 600 persons each with items of two or three attributes, it rejects
+the true model of an item at 0.05 in 14% of the items, where 5% is the level, and selects it in 61%. Choose a model for
+an item with this evidence and the content of the item, not with a p-value alone.
+
 ## Small samples
 
 `nonparametricClassification(matrix, qMatrix, { rule })` classifies persons without calibration (Chiu and Douglas,
@@ -181,13 +267,13 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 | GDINA     | An additive M-step is maximized exactly. GDINA's solvers stop near 1e-6, so its estimates and log-likelihood fall slightly short: the two agree within 1e-5, and the log-likelihood here is at least GDINA's.                                                                                                                                                |
 | GDINA     | The small-group correction, which GDINA applies to the G-DINA, DINA and DINO, applies to every model. It changes only groups with fewer than 0.001 expected persons.                                                                                                                                                                                         |
 | GDINA     | GDINA starts from the best of three random starts; `calibrateCdm` is deterministic, starting at P = 0.2 + 0.6 m / K_j for m of K_j attributes mastered, and for an additive item at the least squares fit of that on the link scale. The likelihood of a model with several attributes can have several maxima: compare the log-likelihoods of calibrations. |
-| GDINA     | No monotonicity constraint (`mono.constraint`), no item-level Wald tests (`modelcomp`) and no standard errors.                                                                                                                                                                                                                                               |
+| GDINA     | No monotonicity constraint (`mono.constraint`). The standard errors are those of `SE.type = 2`, and `compareItemModels` is `modelcomp(method = "Wald")` with it, for every model of `models` at once.                                                                                                                                                        |
 | CDM       | The `gdina(rule = "ACDM")` of the CDM package uses another M-step and is not a reference.                                                                                                                                                                                                                                                                    |
 
 ## Not included
 
-- Item-level model comparison (Wald tests), which needs the covariance of the item parameters that `calibrateCdm` does
-  not compute.
+- The likelihood ratio and Lagrange multiplier tests of `modelcomp`, which refit each item under each model, and the
+  item-wise and complete information matrices of `SE.type` 1 and 3.
 - Monotonicity constraints, sequential CDMs and hierarchical attribute structures.
 - The R-RUM's original (π*, r*) parameters, which follow from `coefficients` as above.
 - Adaptive cognitive diagnosis (CD-CAT), higher-order attribute models and polytomous attributes.
@@ -197,8 +283,12 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 - Chiu, C.-Y., & Douglas, J. (2013). A nonparametric approach to cognitive diagnosis by proximity to ideal response
   patterns. Journal of Classification, 30, 225-250.
 - de la Torre, J. (2011). The generalized DINA model framework. Psychometrika, 76, 179-199.
+- de la Torre, J., & Lee, Y.-S. (2013). Evaluating the Wald test for item-level comparison of saturated and reduced
+  models in cognitive diagnosis. Journal of Educational Measurement, 50, 355-373.
 - de la Torre, J., & Chiu, C.-Y. (2016). A general method of empirical Q-matrix validation. Psychometrika, 81, 253-273.
 - Iaconangelo, C. (2017). Uses of classification error probabilities in the three-step approach to estimating
   cognitive diagnosis models. Rutgers University.
+- Ma, W., Iaconangelo, C., & de la Torre, J. (2016). Model similarity, model selection, and attribute classification.
+  Applied Psychological Measurement, 40, 200-217.
 - Wang, W., Song, L., Chen, P., Meng, Y., & Ding, S. (2015). Attribute-level and pattern-level classification
   consistency and accuracy indices for cognitive diagnostic assessment. Journal of Educational Measurement, 52, 457-476.

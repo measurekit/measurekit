@@ -8,6 +8,7 @@ import {
   type CdmModel,
   calibrateCdm,
   cdmClassificationAccuracy,
+  compareItemModels,
   createRandom,
   DataError,
   nonparametricClassification,
@@ -17,6 +18,7 @@ import {
 } from "../src/index.js";
 import fixture from "./fixtures/cdm.json" with { type: "json" };
 import additiveFixture from "./fixtures/cdm-additive.json" with { type: "json" };
+import comparisonFixture from "./fixtures/cdm-item-comparison.json" with { type: "json" };
 import maximumFixture from "./fixtures/cdm-maximum.json" with { type: "json" };
 import { defined, definedEntries, expectClose } from "./helpers.js";
 
@@ -31,6 +33,12 @@ const ADDITIVE_TOLERANCE = 1e-5;
 const MAXIMUM_TOLERANCE = 1e-8;
 /** The person results from the success probabilities and proportions of GDINA's fit. */
 const REFERENCE_PERSON_TOLERANCE = 1e-6;
+/** The covariance of the success probabilities, relative to the largest entry of the item's matrix. */
+const COVARIANCE_TOLERANCE = 1e-5;
+/** Wald statistics, relative to the larger of the statistic and 1. */
+const STATISTIC_TOLERANCE = 1e-4;
+/** The p-values of the Wald statistics. */
+const P_VALUE_TOLERANCE = 1e-5;
 
 const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
 const LINKS: readonly CdmLink[] = ["identity", "logit", "log"];
@@ -457,6 +465,78 @@ describe("calibrateCdm", () => {
     }
   });
 
+  for (const reference of comparisonFixture.cases) {
+    it(`matches GDINA's incomplete covariance of the success probabilities on ${reference.name}`, () => {
+      const result = comparisonCalibration(reference);
+      reference.compared.forEach((id, i) => {
+        const item = defined(result.items.find((candidate) => candidate.id === id));
+        const expected = defined(reference.covariance[i]);
+        const scale = Math.max(...expected.flat().map(Math.abs));
+        expected.forEach((row, a) => {
+          expectClose(
+            defined(item.standardErrors?.[a]),
+            Math.sqrt(defined(row[a])),
+            COVARIANCE_TOLERANCE * Math.sqrt(scale),
+            `${id} SE ${a}`,
+          );
+          row.forEach((value, b) => {
+            expectClose(
+              defined(item.covariance?.[a]?.[b]),
+              value,
+              COVARIANCE_TOLERANCE * scale,
+              `${id} covariance ${a} ${b}`,
+            );
+          });
+        });
+      });
+    });
+  }
+
+  it("leaves out the standard errors and the covariances unless the option asks for them", () => {
+    const [reference] = comparisonFixture.cases;
+    const matrix = responseMatrix(defined(reference).responses, { itemIds: defined(reference).itemIds });
+    const qMatrix = definedEntries(defined(reference).qmatrix);
+    for (const options of [{}, { standardErrors: "none" as const }]) {
+      for (const item of calibrateCdm(matrix, qMatrix, options).items) {
+        expect(item.standardErrors).toBeUndefined();
+        expect(item.covariance).toBeUndefined();
+      }
+    }
+  });
+
+  it("gives the standard errors and covariances of a calibration whose persons are fewer than its parameters", () => {
+    const matrix = responseMatrix([
+      [1, 0, 1],
+      [0, 1, 1],
+      [1, 1, 0],
+    ]);
+    const result = calibrateCdm(
+      matrix,
+      { item1: ["a", "b"], item2: ["a", "b"], item3: ["a", "b"] },
+      { standardErrors: "incomplete" },
+    );
+    for (const item of result.items) {
+      expect(item.covariance).toHaveLength(4);
+      expect(item.standardErrors?.every((error) => Number.isFinite(error) && error >= 0)).toBe(true);
+    }
+  });
+
+  it("rejects incomplete standard errors for items that are not G-DINA, and other values of the option", () => {
+    const matrix = responseMatrix([
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ]);
+    const qMatrix = { item1: ["a"], item2: ["a", "b"] };
+    expect(() => calibrateCdm(matrix, qMatrix, { model: ["gdina", "dina"], standardErrors: "incomplete" })).toThrow(
+      'The option standardErrors "incomplete" needs the G-DINA model for every item, found "dina" for item "item2".',
+    );
+    expect(() => calibrateCdm(matrix, qMatrix, { standardErrors: JSON.parse('"hessian"') })).toThrow(
+      'The option standardErrors must be "none" or "incomplete", found "hessian".',
+    );
+    expect(() => calibrateCdm(matrix, qMatrix, { standardErrors: JSON.parse("null") })).toThrow(DataError);
+  });
+
   it("rejects polytomous responses, a Q-matrix that does not fit the items and unknown models", () => {
     const matrix = responseMatrix([
       [1, 0],
@@ -494,6 +574,189 @@ describe("calibrateCdm", () => {
     );
     expect(() => calibrateCdm(matrix, qMatrix, { model: JSON.parse("5") })).toThrow(
       "The option model must be a cognitive diagnosis model or an array of one per item, found 5.",
+    );
+  });
+});
+
+/** The calibrations of the comparison fixture's cases, by name: each takes up to a second, and several tests use it. */
+const COMPARISON_CALIBRATIONS = new Map<string, CdmCalibration>();
+
+/** A calibration of the fixture's data to the precision of GDINA's fit, with the covariances of the success probabilities. */
+function comparisonCalibration(reference: (typeof comparisonFixture.cases)[number]): CdmCalibration {
+  const known = COMPARISON_CALIBRATIONS.get(reference.name);
+  if (known !== undefined) return known;
+  const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+  const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
+    standardErrors: "incomplete",
+    tolerance: 1e-10,
+    maxIterations: 10_000,
+  });
+  COMPARISON_CALIBRATIONS.set(reference.name, calibration);
+  return calibration;
+}
+
+/** A G-DINA item of two attributes with given probabilities and independent errors of standard error `error`. */
+function twoAttributeCalibration(probabilities: readonly number[], error: number): CdmCalibration {
+  const covariance = probabilities.map((_, a) => probabilities.map((__, b) => (a === b ? error * error : 0)));
+  return {
+    attributes: ["a", "b"],
+    items: [
+      {
+        id: "item1",
+        attributes: ["a", "b"],
+        model: "gdina",
+        probabilities,
+        guessing: defined(probabilities[0]),
+        slip: 1 - defined(probabilities.at(-1)),
+        coefficients: [],
+        standardErrors: probabilities.map(() => error),
+        covariance,
+      },
+    ],
+    profiles: [],
+    logLikelihood: 0,
+    aic: 0,
+    bic: 0,
+    converged: true,
+    iterations: 0,
+  };
+}
+
+describe("compareItemModels", () => {
+  for (const reference of comparisonFixture.cases) {
+    it(`matches GDINA's Wald statistics, degrees of freedom, p-values and selected models on ${reference.name}`, () => {
+      const result = compareItemModels(comparisonCalibration(reference));
+      expect(result.map(({ item }) => item)).toEqual(reference.compared);
+      result.forEach((comparison, i) => {
+        expect(comparison.tests.map(({ model }) => model)).toEqual(comparisonFixture.models);
+        comparison.tests.forEach((test, m) => {
+          const at = `${comparison.item} ${test.model}`;
+          const statistic = defined(reference.statistics[i]?.[m]);
+          expect(test.degreesOfFreedom, at).toBe(reference.degreesOfFreedom[i]?.[m]);
+          expectClose(test.statistic, statistic, STATISTIC_TOLERANCE * Math.max(statistic, 1), `${at} statistic`);
+          expectClose(test.pValue, defined(reference.pValues[i]?.[m]), P_VALUE_TOLERANCE, `${at} p-value`);
+        });
+        expect(comparison.selected, comparison.item).toBe(reference.selected[i]);
+      });
+    });
+  }
+
+  it("rejects the true model of an item and selects it as often as GDINA's Wald test does on 20 simulated sets", () => {
+    let items = 0;
+    let rejected = 0;
+    let selected = 0;
+    for (const reference of comparisonFixture.cases.slice(1)) {
+      compareItemModels(comparisonCalibration(reference)).forEach(({ tests, selected: model }, i) => {
+        const truth = defined(reference.truth?.[i]);
+        items++;
+        if (defined(tests.find(({ model: tested }) => tested === truth)?.pValue) <= comparisonFixture.level) rejected++;
+        if (model === truth) selected++;
+      });
+    }
+    expect(items).toBe(comparisonFixture.recovery.items);
+    expectClose(rejected / items, comparisonFixture.recovery.rejected, 1e-12, "rejected");
+    expectClose(selected / items, comparisonFixture.recovery.selected, 1e-12, "selected");
+  });
+
+  it("derives the statistics of the DINA, DINO and A-CDM from the success probabilities and their errors", () => {
+    // P = (0.2, 0.2, 0.2, 0.8) with independent errors of 0.1: the DINA's two differences are 0; the DINO's are 0 and
+    // -0.6, whose covariance is 0.01 [[2, -1], [-1, 2]], so W = 0.36 * 2 / 0.03 = 24; the A-CDM's interaction is
+    // 0.2 - 0.2 - 0.2 + 0.8 = 0.6, with variance 0.04, so W = 0.36 / 0.04 = 9.
+    const [item] = compareItemModels(twoAttributeCalibration([0.2, 0.2, 0.2, 0.8], 0.1), {
+      models: ["dino", "dina", "acdm"],
+    });
+    expect(item?.tests.map(({ model }) => model)).toEqual(["dino", "dina", "acdm"]);
+    expect(item?.tests.map(({ degreesOfFreedom }) => degreesOfFreedom)).toEqual([2, 2, 1]);
+    expectClose(defined(item?.tests[0]?.statistic), 24, 1e-9, "DINO");
+    expectClose(defined(item?.tests[1]?.statistic), 0, 1e-9, "DINA");
+    expectClose(defined(item?.tests[2]?.statistic), 9, 1e-9, "A-CDM");
+    expectClose(defined(item?.tests[1]?.pValue), 1, 1e-12, "DINA p-value");
+    expectClose(defined(item?.tests[2]?.pValue), 0.0027, 1e-4, "A-CDM p-value");
+    expect(item?.selected).toBe("dina");
+  });
+
+  it("selects the model with the largest p-value above 0.05, and the G-DINA when every model is rejected", () => {
+    // The A-CDM's interaction of 0.6 over its error, against a DINA that the first difference of 0.3 rejects.
+    const additive = compareItemModels(twoAttributeCalibration([0.1, 0.4, 0.4, 0.7], 0.1), {
+      models: ["dina", "acdm"],
+    });
+    expect(additive[0]?.selected).toBe("acdm");
+    expectClose(defined(additive[0]?.tests[1]?.statistic), 0, 1e-9, "A-CDM");
+    const rejected = compareItemModels(twoAttributeCalibration([0.1, 0.4, 0.4, 0.95], 0.01), {
+      models: ["dina", "dino", "acdm"],
+    });
+    expect(rejected[0]?.tests.every(({ pValue }) => defined(pValue) < 0.05)).toBe(true);
+    expect(rejected[0]?.selected).toBe("gdina");
+  });
+
+  it("tests the models of the option in its order, and selects among them only", () => {
+    const [full] = compareItemModels(comparisonCalibration(defined(comparisonFixture.cases[0])));
+    const [only] = compareItemModels(comparisonCalibration(defined(comparisonFixture.cases[0])), {
+      models: ["rrum", "dina"],
+    });
+    expect(only?.tests.map(({ model }) => model)).toEqual(["rrum", "dina"]);
+    expect(only?.tests[0]).toEqual(full?.tests[4]);
+    expect(only?.tests[1]).toEqual(full?.tests[0]);
+    expect(["rrum", "dina", "gdina"]).toContain(only?.selected);
+  });
+
+  it("leaves out items of one attribute, and has nothing to compare when every item has one", () => {
+    const calibration = comparisonCalibration(defined(comparisonFixture.cases[0]));
+    expect(compareItemModels(calibration).map(({ item }) => item)).not.toContain("item1");
+    const matrix = responseMatrix([
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [0, 0],
+    ]);
+    const single = calibrateCdm(matrix, { item1: ["a"], item2: ["b"] }, { standardErrors: "incomplete" });
+    expect(compareItemModels(single)).toEqual([]);
+  });
+
+  it("gives a statistic of 0 and a p-value of 1 to an item that every reduced model fits exactly", () => {
+    const [item] = compareItemModels(twoAttributeCalibration([0.3, 0.3, 0.3, 0.3], 0.05), { models: ["dina", "dino"] });
+    expect(item?.tests.map(({ statistic }) => statistic)).toEqual([0, 0]);
+    expect(item?.tests.map(({ pValue }) => pValue)).toEqual([1, 1]);
+    expect(item?.selected).toBe("dina");
+  });
+
+  it("rejects calibrations that lack G-DINA items with their covariance, and invalid options", () => {
+    const valid = twoAttributeCalibration([0.2, 0.2, 0.2, 0.8], 0.1);
+    const [item] = valid.items;
+    const withItem = (changes: object): CdmCalibration => ({ ...valid, items: [{ ...defined(item), ...changes }] });
+    expect(() => compareItemModels(JSON.parse("null"))).toThrow(
+      "A calibration must be an object from calibrateCdm, found null.",
+    );
+    expect(() => compareItemModels({ ...valid, items: JSON.parse('"items"') })).toThrow(
+      'A calibration needs the array items, found "items".',
+    );
+    expect(() => compareItemModels({ ...valid, items: JSON.parse("[null]") })).toThrow(DataError);
+    expect(() => compareItemModels(withItem({ attributes: JSON.parse('"ab"') }))).toThrow(
+      'Calibrated item 1 needs the array attributes, found "ab".',
+    );
+    expect(() => compareItemModels(withItem({ model: "dina" }))).toThrow(
+      'Item "item1" was calibrated as "dina"; the test needs the G-DINA estimates.',
+    );
+    expect(() => compareItemModels(withItem({ probabilities: [0.2, 0.8] }))).toThrow(
+      'Item "item1" needs 4 probabilities from 0 to 1, one per latent group.',
+    );
+    const message =
+      'Item "item1" needs the 4 by 4 covariance of its success probabilities, from calibrateCdm with the option standardErrors "incomplete".';
+    expect(() => compareItemModels(withItem({ covariance: undefined }))).toThrow(message);
+    expect(() => compareItemModels(withItem({ covariance: [[1]] }))).toThrow(message);
+    expect(() =>
+      compareItemModels(withItem({ covariance: JSON.parse('[[0,0,0,"x"],[0,0,0,0],[0,0,0,0],[0,0,0,0]]') })),
+    ).toThrow(message);
+    expect(() => compareItemModels(valid, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => compareItemModels(valid, { models: JSON.parse('"dina"') })).toThrow(
+      'The option models must be an array of reduced models, such as ["dina", "acdm"], found "dina".',
+    );
+    expect(() => compareItemModels(valid, { models: [] })).toThrow("The option models needs at least one model.");
+    expect(() => compareItemModels(valid, { models: [JSON.parse('"gdina"')] })).toThrow(
+      'Model 1 of the option models must be "dina", "dino", "acdm", "llm" or "rrum", found "gdina".',
+    );
+    expect(() => compareItemModels(valid, { models: ["dina", "dina"] })).toThrow(
+      'The option models lists "dina" twice.',
     );
   });
 });

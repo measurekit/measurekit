@@ -116,8 +116,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/multidimensional/ multidimensional item response theory: models, EM and MH-RM calibration, rotation, scoring, information
   src/sim/              simulation of thetas, item parameters and responses, multidimensional ones included
   src/cat/              adaptive and multistage tests, testlets, their simulation, exposure control, form assembly
-  src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, A-CDM, LLM, R-RUM, Q-matrix validation,
-                        nonparametric classification
+  src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, A-CDM, LLM, R-RUM, Wald tests of reduced models for
+                        each item, Q-matrix validation, nonparametric classification
   src/fit/              item and person fit, local dependence
   src/dif/              differential item functioning
   src/equating/         linking of IRT scales, chains of links, observed-score equating with and without common

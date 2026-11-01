@@ -14,17 +14,6 @@ suppressPackageStartupMessages({
 SEED <- 20261029
 CONTROL <- list(conv.crit = 1e-9, maxitr = 20000)
 
-# The Q-matrix's columns in measurekit's order: attributes by first appearance over the items, so that both
-# libraries order the profiles and each item's latent groups alike.
-psychometrics_order <- function(Q) {
-  first <- unique(unlist(lapply(seq_len(nrow(Q)), function(j) which(Q[j, ] == 1))))
-  Q[, first, drop = FALSE]
-}
-
-qmatrix <- function(Q, items) {
-  setNames(lapply(seq_len(nrow(Q)), function(j) I(colnames(Q)[Q[j, ] == 1])), items)
-}
-
 # The profiles whose ideal responses under the DINA agree: their proportions are not identified apart, only summed.
 dina_classes <- function(Q) {
   ideal <- apply(attributepattern(ncol(Q)), 1, function(a) paste(apply(Q, 1, function(q) all(a[q == 1] == 1)) * 1, collapse = ""))
