@@ -1,4 +1,5 @@
 import {
+  checkBoolean,
   checkOptions,
   checkRecord,
   chiSquareUpperTail,
@@ -15,12 +16,17 @@ import type { IrtItem } from "../irt/model.js";
 
 import { invert } from "../math/linear-algebra.js";
 import { checkGroups, type DifGroup } from "./groups.js";
+import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
+
+/** The fewest anchors that link two scales: the mean-sigma transformation needs two locations to have a spread. */
+const MINIMUM_ANCHORS = 2;
 
 /**
  * Options of {@link lordChiSquare}: the calibration of each group, without fixed items, groups, distributions of theta
- * or the choice of standard errors, which the statistic needs.
+ * or the choice of standard errors, which the statistic needs, and `purify`.
  */
-export type LordOptions = Omit<CalibrationOptions<LogisticItem>, "fixed" | "groups" | "latent" | "standardErrors">;
+export type LordOptions = Omit<CalibrationOptions<LogisticItem>, "fixed" | "groups" | "latent" | "standardErrors"> &
+  PurificationOptions;
 
 /** Lord's chi-square of one item. */
 export interface LordChiSquare {
@@ -35,33 +41,71 @@ export interface LordChiSquare {
 }
 
 /** Lord's chi-square of every item, with the calibrations it compares. */
-export interface LordDif {
-  /** The items, in item order. */
-  readonly items: readonly LordChiSquare[];
+export interface LordDif extends DifAnalysis<LordChiSquare> {
   /** The calibration of the reference group. */
   readonly reference: Calibration<LogisticItem>;
   /** The calibration of the focal group, on its own scale. */
   readonly focal: Calibration<LogisticItem>;
-  /** The mean-sigma transformation of the focal scale to the reference scale, over all items. */
+  /** The mean-sigma transformation of the focal scale to the reference scale, over the anchors of the final round. */
   readonly transformation: ScaleTransformation;
 }
 
 /**
- * Returns Lord's chi-square of every item, as difR's `difLord`.
+ * Returns Lord's chi-square of every item, as difR's `difLord`, purified on request.
  *
  * @remarks
  * Each group is calibrated separately by `calibrate` with `options`; the focal group's estimates move to the reference
- * scale by the mean-sigma transformation over all items, a / A and A b + B, and their covariance matrices with them;
- * and each item's estimated parameters are compared. Missing responses are skipped, as in calibration.
+ * scale by the mean-sigma transformation over the anchors, a / A and A b + B, and their covariance matrices with them;
+ * and each item's estimated parameters are compared. The anchors are all items, or with `purify` the items not flagged
+ * by the round before, as difR's `purify`: each round links the scales again on the same two calibrations, and the
+ * studied item, if it is not an anchor, is compared on the scale of the anchors. Purification stops when two rounds
+ * flag the same items, when fewer than two items are left to link on, or after 10 rounds. Missing responses are
+ * skipped, as in calibration.
  *
  * @throws `DataError` when the matrix or the groups are invalid, a group has no person, a model is not the 2PL, 3PL or
- * 4PL, or a group's calibration throws it.
+ * 4PL, `purify` is not a boolean, the locations of the anchors do not vary in a group, or a group's calibration
+ * throws it.
  * @see {@link https://doi.org/10.4324/9780203056615 | Lord (1980)}
  */
 export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[], options: LordOptions): LordDif {
   checkGroups(matrix, groups);
   checkOptions(options);
-  for (const model of [options.model].flat()) {
+  checkModels(options.model);
+  const { purify = false, ...calibration } = options;
+  checkBoolean(purify, "The option purify");
+  const groupOptions = { ...calibration, standardErrors: "hessian" } as const;
+  const reference = calibrateWithCovariance(groupMatrix(matrix, groups, "reference"), groupOptions);
+  const focal = calibrateWithCovariance(groupMatrix(matrix, groups, "focal"), groupOptions);
+  const referenceBlocks = itemBlocks(reference.covariance);
+  const focalBlocks = itemBlocks(focal.covariance);
+  const link = (anchors: Uint8Array): ScaleTransformation =>
+    meanSigmaLinking(anchored(focal.calibration.items, anchors), anchored(reference.calibration.items, anchors));
+  const statistics = (anchors: Uint8Array): LordChiSquare[] => {
+    const transformation = link(anchors);
+    return matrix.itemIds.map((id, i) => ({
+      id,
+      ...statistic(
+        { item: reference.calibration.items[i], covariance: referenceBlocks.get(id) ?? null },
+        { item: focal.calibration.items[i], covariance: focalBlocks.get(id) ?? null },
+        transformation,
+      ),
+    }));
+  };
+  const analysis = purified(
+    matrix.itemIds,
+    purify,
+    statistics,
+    (item) => significant(item.significance),
+    MINIMUM_ANCHORS,
+  );
+  const kept = new Set(analysis.purification?.anchors ?? matrix.itemIds);
+  const transformation = link(Uint8Array.from(matrix.itemIds, (id) => (kept.has(id) ? 1 : 0)));
+  return { ...analysis, reference: reference.calibration, focal: focal.calibration, transformation };
+}
+
+/** Checks that every model is the 2PL, 3PL or 4PL. */
+function checkModels(models: LordOptions["model"]): void {
+  for (const model of [models].flat()) {
     checkRecord(model, "The option model must be the 2PL, 3PL or 4PL model");
     if (!isLogisticModel(model) || model.parameters(2).some((parameter) => parameter.shared === true)) {
       throw new DataError(
@@ -69,25 +113,11 @@ export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[
       );
     }
   }
-  const groupOptions = { ...options, standardErrors: "hessian" } as const;
-  const reference = calibrateWithCovariance(groupMatrix(matrix, groups, "reference"), groupOptions);
-  const focal = calibrateWithCovariance(groupMatrix(matrix, groups, "focal"), groupOptions);
-  const transformation = meanSigmaLinking(focal.calibration.items, reference.calibration.items);
-  const referenceBlocks = itemBlocks(reference.covariance);
-  const focalBlocks = itemBlocks(focal.covariance);
-  return {
-    items: matrix.itemIds.map((id, i) => ({
-      id,
-      ...statistic(
-        { item: reference.calibration.items[i], covariance: referenceBlocks.get(id) ?? null },
-        { item: focal.calibration.items[i], covariance: focalBlocks.get(id) ?? null },
-        transformation,
-      ),
-    })),
-    reference: reference.calibration,
-    focal: focal.calibration,
-    transformation,
-  };
+}
+
+/** Returns the items marked 1 in `anchors`. */
+function anchored<TItem>(items: readonly TItem[], anchors: Uint8Array): TItem[] {
+  return items.filter((_, i) => anchors[i] === 1);
 }
 
 /** An item's estimates in one group, with their covariance matrix. */

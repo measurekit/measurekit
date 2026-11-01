@@ -61,6 +61,9 @@ bench_task("dif.logisticRegression", "Logistic regression for uniform and nonuni
            reference("difR", "difLogistic"), function() difLogistic(dichotomous, group = group, focal.name = 1, type = "both"))
 bench_task("dif.lordChiSquare", "Lord's chi-square of every item, with both groups calibrated by the 2PL", size,
            reference("difR", "difLord"), function() difLord(dichotomous, group = group, focal.name = 1, model = "2PL"))
+bench_task("dif.lordChiSquarePurified", "Lord's chi-square of every item, purified until two rounds flag the same items", size,
+           reference("difR", "difLord, purify = TRUE"),
+           function() difLord(dichotomous, group = group, focal.name = 1, model = "2PL", purify = TRUE))
 bench_task("dif.ordinalLogistic", "Ordinal logistic regression of every item",
            sprintf("%s persons in two groups, %d items of 4 categories", count(ordinal_persons), ordinal_items),
            reference("rms", "lrm, three models for an item"), ordinal_dif)

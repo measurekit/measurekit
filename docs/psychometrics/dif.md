@@ -3,7 +3,7 @@
 `@measurekit/psychometrics/dif` tests whether an item functions differently for two groups of persons of equal
 ability. For dichotomous items it has the Mantel-Haenszel statistics with the ETS categories, logistic regression and
 Lord's chi-square; for items with any number of categories, the Mantel test and ordinal logistic regression. All but
-Lord's chi-square work on sparse data and purify their matching criterion on request. The dichotomous statistics are
+Lord's chi-square work on sparse data, and all purify their matching criterion or their link on request. The dichotomous statistics are
 validated against difR, the polytomous ones against base R, rms, MASS and lordif, and the sparse-data rule against base R
 ([validation](validation.md)).
 
@@ -64,13 +64,31 @@ them all.
 
 ## Purification
 
+```mermaid
+flowchart LR
+  A["Round 0: every item is an anchor"] --> S["Statistics of every item"]
+  S --> F{"Flagged items<br/>as in the last round?"}
+  F -- yes --> R["Result: converged"]
+  F -- no --> K{"Fewer than the<br/>fewest anchors left,<br/>or 10 rounds run?"}
+  K -- yes --> N["Result: converged is false"]
+  K -- no --> U["Flagged items leave the anchors"]
+  U --> S
+```
+
 With `purify: true` (default `false`), the items flagged at the 0.05 level leave the anchors, and the statistics
-are computed again on the items not flagged, until a round flags the items the previous one did, every item is
-flagged, or 10 rounds have run, as difR's `purify` (Holland and Thayer, 1988). The Mantel-Haenszel test and the
-Mantel test flag by their chi-squares, logistic regression and ordinal logistic regression by their tests of both
-terms, difR's default `type`. The result's `purification`
-holds the `anchors` of the final statistics, the `iterations` after the first statistics and whether they
-`converged`; it is `null` without `purify`.
+are computed again on the items not flagged, until a round flags the items the previous one did, too few anchors are
+left, or 10 rounds have run, as difR's `purify` (Holland and Thayer, 1988). The anchors are the items that define the
+matching score or, for Lord's chi-square, the scale on which the groups are linked.
+
+| Statistic                                               | Flags an item when                                           | Fewest anchors                             |
+| ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
+| `mantelHaenszel`, `mantelTest`                          | The chi-square is significant                                | 1, the studied item's match                |
+| `logisticRegressionDif`, `ordinalLogisticRegressionDif` | The test of both terms is significant, difR's default `type` | 1                                          |
+| `lordChiSquare`                                         | The chi-square is significant                                | 2, as a transformation needs two locations |
+
+The result's `purification` holds the `anchors` of the final statistics, the `iterations` after the first statistics and
+whether they `converged`; it is `null` without `purify`. `converged` is `false` when the rounds ran out or too few anchors
+were left for another.
 
 ## Mantel-Haenszel
 
@@ -130,16 +148,40 @@ its persons answered alike, or answered by one group only, has `null` tests.
 
 `lordChiSquare` compares an item's IRT parameters between the groups (Lord, 1980), as difR's `difLord`:
 
+```mermaid
+flowchart LR
+  C1["Calibrate the reference group"] --> L
+  C2["Calibrate the focal group"] --> L
+  L["Link the focal scale to the reference scale<br/>by mean-sigma over the anchors"] --> X["Chi-square of every item"]
+  X -- "purify" --> P["Flagged items leave the anchors"]
+  P --> L
+```
+
 1. It calibrates each group separately with `calibrate` and `options`: the [calibration options](irt.md#calibration)
    without `fixed`. The model is the 2PL, 3PL or 4PL.
-2. It moves the focal group's estimates to the reference scale by the mean-sigma transformation over all items
-   ([equating](equating.md#linking)): a / A and A b + B, and their covariance matrices with them.
+2. It moves the focal group's estimates to the reference scale by the mean-sigma transformation over the anchors, all
+   items at first ([equating](equating.md#linking)): a / A and A b + B, and their covariance matrices with them.
 3. For each item, with v the estimated parameters and Σ their covariance matrix from the calibration,
    χ² = (v_R - v_F)ᵀ (Σ_R + Σ_F)⁻¹ (v_R - v_F), with as many degrees of freedom as parameters.
 
+The covariance matrices are the observed information: the inverse Hessian of the marginal log-likelihood
+(`standardErrors: "hessian"` in [calibration](irt.md#standard-errors)), which is what ltm's `vcov` gives to difR's
+`itemPar2PL`. Neither the cross-product nor a sandwich estimate is used.
+
+With `purify: true` the two calibrations are kept: each round links the scales again over the items not flagged by the
+round before, and compares every item, flagged ones included, on that link. The calibrations are not repeated, as in
+difR, so purification costs the linking and the statistics only.
+
+| Option   | Default        | Meaning                                                                                                |
+| -------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `purify` | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                                   |
+| Others   | As `calibrate` | The [calibration options](irt.md#calibration) without `fixed`, `groups`, `latent` and `standardErrors` |
+
 The result holds `items`, `{ id, chiSquare, degreesOfFreedom, significance }` each, both calibrations, whose
-`converged` reports their EM, and the `transformation`. difR's ltm uses 21 Gauss-Hermite points:
-`{ quadrature: { method: "gauss-hermite", points: 21 } }` reproduces it.
+`converged` reports their EM, the `transformation` of the final round and the `purification`. difR's ltm uses 21
+Gauss-Hermite points: `{ quadrature: { method: "gauss-hermite", points: 21 } }` reproduces it. lordif's defaults for
+`maxIter`, 10, and difR's for `nrIter` are the 10 rounds; its `minCell`, 5, collapses sparse categories of polytomous
+items, which a dichotomous model has none of.
 
 ## Polytomous items
 
@@ -240,7 +282,6 @@ example above. A matching score that is not a sum of items cannot lose items to 
 
 ## Not included
 
-- Purification of Lord's chi-square, which would need a new linking each round.
 - The exact Mantel-Haenszel test, Wald tests, and matching on a score other than the total for the Mantel-Haenszel
   and logistic regression statistics.
 - Polytomous IRT likelihood-ratio and Lord tests, which need multiple-group IRT; lordif's iterated theta with
@@ -249,13 +290,14 @@ example above. A matching score that is not a sum of items cannot lose items to 
 
 ## Differences from difR
 
-| Topic                 | This package                                                 | difR                                                                                                          |
-| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| Continuity correction | Subtracted when \|Σ (A - E(A))\| ≥ 0.5, as `mantelhaen.test` | Always subtracted: identical groups get (0.5)² / Σ Var(A), not 0                                              |
-| ETS categories        | ETS's rule with its significance tests                       | `print` codes \|MH D-DIF\| alone: below 1 A, below 1.5 B, else C                                              |
-| Lord's calibrations   | EM to `tolerance`                                            | ltm's default control, 40 EM cycles then BFGS, stops short: up to 2% in χ²                                    |
-| Lord's 1PL            | Not supported: `oneParameterLogistic` estimates a common a   | a fixed at 1                                                                                                  |
-| Missing responses     | The scaled matching score of each item's persons             | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect |
+| Topic                 | This package                                                        | difR                                                                                                          |
+| --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Continuity correction | Subtracted when \|Σ (A - E(A))\| ≥ 0.5, as `mantelhaen.test`        | Always subtracted: identical groups get (0.5)² / Σ Var(A), not 0                                              |
+| ETS categories        | ETS's rule with its significance tests                              | `print` codes \|MH D-DIF\| alone: below 1 A, below 1.5 B, else C                                              |
+| Lord's calibrations   | EM to `tolerance`                                                   | ltm's default control, 40 EM cycles then BFGS, stops short: up to 2% in χ²                                    |
+| Lord's 1PL            | Not supported: `oneParameterLogistic` estimates a common a          | a fixed at 1                                                                                                  |
+| Lord's purification   | Stops before fewer than 2 anchors are left, and `converged` says so | Rescales on the items not flagged, whose spread is undefined for fewer than two                               |
+| Missing responses     | The scaled matching score of each item's persons                    | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect |
 
 ## Differences from lordif
 

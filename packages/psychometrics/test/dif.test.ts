@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { purified } from "../src/dif/purification.js";
 import {
   DataError,
   type DifGroup,
@@ -19,8 +20,9 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import fixture from "./fixtures/dif.json" with { type: "json" };
+import lordPurification from "./fixtures/dif-lord-purification.json" with { type: "json" };
 import polytomous from "./fixtures/dif-polytomous.json" with { type: "json" };
-import { expectClose } from "./helpers.js";
+import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Mantel-Haenszel statistics against difR and base R. */
@@ -233,16 +235,20 @@ describe("logisticRegressionDif", () => {
   });
 });
 
+/** The calibration of difR's ltm: 21 Gauss-Hermite points, run to convergence. */
+const LORD_CALIBRATION = {
+  model: twoParameterLogistic,
+  quadrature: { method: "gauss-hermite", points: 21 },
+  tolerance: 1e-10,
+  maxIterations: 10_000,
+} as const;
+
 describe("lordChiSquare", () => {
   for (const dataset of fixture.cases) {
     it(`matches difR's difLord on ${dataset.name} data`, () => {
-      const result = lordChiSquare(responseMatrix(dataset.responses), groups(dataset.focal), {
-        model: twoParameterLogistic,
-        quadrature: { method: "gauss-hermite", points: 21 },
-        tolerance: 1e-10,
-        maxIterations: 10_000,
-      });
+      const result = lordChiSquare(responseMatrix(dataset.responses), groups(dataset.focal), LORD_CALIBRATION);
       const { lord } = dataset;
+      expect(result.purification).toBeNull();
       result.items.forEach((item, i) => {
         const expected = lord.chiSquare[i] ?? 0;
         expectClose(item.chiSquare, expected, LORD_RELATIVE_TOLERANCE * expected, `chi-square ${i + 1}`);
@@ -254,6 +260,23 @@ describe("lordChiSquare", () => {
     });
   }
 
+  for (const expected of lordPurification.cases) {
+    it(`matches difR's purified difLord on ${expected.name} data`, () => {
+      const dataset = defined(fixture.cases.find((reference) => reference.name === expected.name));
+      const result = lordChiSquare(responseMatrix(dataset.responses), groups(dataset.focal), {
+        ...LORD_CALIBRATION,
+        purify: true,
+      });
+      result.items.forEach((item, i) => {
+        const chiSquare = expected.chiSquare[i] ?? 0;
+        expectClose(item.chiSquare, chiSquare, LORD_RELATIVE_TOLERANCE * chiSquare, `chi-square ${i + 1}`);
+      });
+      expectClose(result.transformation.slope, expected.transformation.slope, LORD_TRANSFORMATION_TOLERANCE);
+      expectClose(result.transformation.intercept, expected.transformation.intercept, LORD_TRANSFORMATION_TOLERANCE);
+      expectPurification(result.purification, expected);
+    });
+  }
+
   it("rejects models other than the 2PL, 3PL and 4PL, and a group without persons", () => {
     const matrix = responseMatrix(CONSTANT_ROWS);
     const custom = { ...twoParameterLogistic, name: "custom 2PL" };
@@ -261,6 +284,20 @@ describe("lordChiSquare", () => {
     expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, { model: custom })).toThrow(DataError);
     const references: DifGroup[] = CONSTANT_GROUPS.map(() => "reference");
     expect(() => lordChiSquare(matrix, references, { model: twoParameterLogistic })).toThrow(DataError);
+  });
+});
+
+describe("purified", () => {
+  /** Statistics that flag the first `limit` items whatever the anchors are. */
+  const flaggedBelow = (limit: number) => (anchors: Uint8Array) =>
+    Array.from(anchors, (_, item) => ({ item, flag: item < limit }));
+
+  it("stops before fewer anchors than the statistics accept are left", () => {
+    const ids = ["a", "b", "c", "d"];
+    const run = (minimumAnchors: number) =>
+      purified(ids, true, flaggedBelow(3), (entry) => entry.flag, minimumAnchors).purification;
+    expect(run(1)).toEqual({ anchors: ["d"], iterations: 1, converged: true });
+    expect(run(2)).toEqual({ anchors: ["a", "b", "c", "d"], iterations: 0, converged: false });
   });
 });
 
@@ -661,6 +698,9 @@ describe("options and groups", () => {
     expect(() => logisticRegressionDif(matrix, CONSTANT_GROUPS, { purify: JSON.parse("null") })).toThrow(
       "The option purify must be a boolean, found null.",
     );
+    expect(() =>
+      lordChiSquare(matrix, CONSTANT_GROUPS, { model: twoParameterLogistic, purify: JSON.parse('"yes"') }),
+    ).toThrow('The option purify must be a boolean, found "yes".');
   });
 });
 

@@ -18,3 +18,6 @@ The EM calibrations of the multidimensional models, the many-facet Rasch model a
 accelerate EM with SQUAREM, and the posterior means of a data set tabulate the log probabilities of each item once. At the
 default tolerance the estimates stop closer to the maximum than plain EM would, by up to about 1e-3, and the iterations
 fall, for the exploratory two-dimensional 2PL from 442 to 100.
+
+Lord's chi-square can be purified: with `purify: true` the items it flags leave the anchors of the linking, which is
+repeated on the two calibrations until two rounds flag the same items.

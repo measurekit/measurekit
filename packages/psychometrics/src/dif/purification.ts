@@ -40,14 +40,17 @@ export interface DifAnalysis<TItem> {
 export const SIGNIFICANCE_LEVEL = 0.05;
 /** The most purification rounds, difR's `nrIter`. */
 const MAX_ROUNDS = 10;
+/** The fewest anchors a statistic needs to be computed: one, the studied item's matching item. */
+const DEFAULT_MINIMUM_ANCHORS = 1;
 
 /**
  * Returns the statistics of every item on all items as anchors and, with `purify`, purifies them: each round computes
  * them again with the items flagged before them out of the anchors. Stops when a round flags the items the previous
- * one did, when every item is flagged, which leaves no anchors, or after the most rounds.
+ * one did, when the items not flagged are fewer than `minimumAnchors`, or after the most rounds.
  *
  * @param statistics - Computes every item's statistics with the anchors marked 1.
  * @param flagged - Whether an item's statistics flag it.
+ * @param minimumAnchors - The fewest anchors that `statistics` accepts.
  * @throws `DataError` when `purify` is not a boolean.
  */
 export function purified<TItem>(
@@ -55,6 +58,7 @@ export function purified<TItem>(
   purify: boolean,
   statistics: (anchors: Uint8Array) => TItem[],
   flagged: (item: TItem) => boolean,
+  minimumAnchors = DEFAULT_MINIMUM_ANCHORS,
 ): DifAnalysis<TItem> {
   checkBoolean(purify, "The option purify");
   let anchors = new Uint8Array(itemIds.length).fill(1);
@@ -63,7 +67,7 @@ export function purified<TItem>(
   let flags = items.map(flagged);
   let iterations = 0;
   let converged = !flags.includes(true);
-  while (!converged && iterations < MAX_ROUNDS && flags.includes(false)) {
+  while (!converged && iterations < MAX_ROUNDS && flags.filter((flag) => !flag).length >= minimumAnchors) {
     iterations++;
     anchors = Uint8Array.from(flags, (flag) => (flag ? 0 : 1));
     items = statistics(anchors);

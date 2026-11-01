@@ -16,6 +16,7 @@ Rscript validation/psychometrics/cat.R               # adaptive testing: catR; d
 Rscript validation/psychometrics/multistage-cuts.R   # routing cuts of multistage panels: base R over mirt's iteminfo and expected.item
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
 Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif
+Rscript validation/psychometrics/dif-lord-purification.R # purified Lord's chi-square: difR's difLord(purify = TRUE); run dif.R first
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/explanatory.R       # item parameters regressed on item features: mirt, metafor and base R
 Rscript validation/psychometrics/linear-change.R     # linear logistic change: glm on the persons who changed, base R and eRm's LLRA
@@ -35,7 +36,7 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
 sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm, clinicalsignificance and jsonlite;
-`common.R` holds their shared helpers.
+`common.R` holds their shared helpers, and `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share.
 
 `multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`
 and `information` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and

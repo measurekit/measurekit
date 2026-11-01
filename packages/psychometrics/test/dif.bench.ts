@@ -28,6 +28,12 @@ test("tests 30 items of 2,000 persons in two groups for differential functioning
     () => lordChiSquare(dichotomous, groups, { model: twoParameterLogistic }),
     SLOW_OPTIONS,
   );
+  await benchmark(
+    context,
+    "dif.lordChiSquarePurified",
+    () => lordChiSquare(dichotomous, groups, { model: twoParameterLogistic, purify: true }),
+    SLOW_OPTIONS,
+  );
 });
 
 test("tests 10 items of 4 categories of 1,000 persons in two groups by ordinal logistic regression", async (context) => {

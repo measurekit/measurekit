@@ -50,6 +50,7 @@ const BUDGETS = {
   "dif.mantelHaenszel": 40,
   "dif.logisticRegression": 400,
   "dif.lordChiSquare": 5_000,
+  "dif.lordChiSquarePurified": 4_000,
   "dif.ordinalLogistic": 300,
   "equating.linear": 0.002,
   "equating.equipercentile": 0.02,
