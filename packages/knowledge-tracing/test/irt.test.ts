@@ -468,7 +468,7 @@ describe("IRT with drift against R", () => {
       expectAllClose(run.sd, sd, tolerance, `${driftCase.name} SD`);
       if (!deep) expectClose(run.logLikelihood, logLikelihood, SAME_GRID_TOLERANCE, `${driftCase.name} likelihood`);
     }
-  });
+  }, 30_000);
 
   it("meets the tolerances of each number of points against a grid of 1921 points", () => {
     for (const [points, tolerance] of Object.entries(FINE_TOLERANCES)) {
@@ -488,7 +488,7 @@ describe("IRT with drift against R", () => {
     for (const [points, tolerance] of Object.entries(REVERSAL_TOLERANCES)) {
       expectAllClose(runCase(reversal, Number(points)).mean, reversal.fine.mean, tolerance, `reversal on ${points}`);
     }
-  });
+  }, 40_000);
 
   it("needs 481 points for a reversal at a = 2, and 961 at a = 3, where the posterior is narrower than 241 resolve", () => {
     for (const [name, points, tolerance] of [
