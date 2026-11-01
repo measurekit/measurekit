@@ -27,9 +27,11 @@ flowchart LR
   Q -->|no| O["absent means the old behavior"]
 ```
 
-| Field                           | When it is absent                                                                             |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `exposures` of a logistic state | The learner has no exposures: events without an outcome have not reached a skill of the model |
+| Field                                                                                    | When it is absent                                                                                                                        |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `exposures` of a logistic state                                                          | The learner has no exposures: events without an outcome have not reached a skill of the model                                            |
+| `practice` of a logistic state                                                           | The learner has spent no time on events: no feature reads durations                                                                      |
+| `previous`, `first`, `firstPractice`, `leaky`, `times`, `outcomes` of a logistic history | The skill's features do not read it; a model whose features do reads such a state as missing it, and throws `DataError` naming the field |
 
 A fixture of states and parameters of each model, written by the build before the first release, is read by a test at
 every build, and no build regenerates it.
@@ -142,6 +144,11 @@ the Schur complement of the learners couples, and with the cube of the skills' c
 per learner against 20. A BKT fit of 1M events with 5 starts of 100 iterations thus takes minutes; fitting skill by
 skill bounds its memory by the largest skill. Above a few million events, fit on a window or a sample, or skill by skill
 for BKT.
+
+A logistic state is tens of bytes per skill, and grows only with the features that read more. The `ppe` feature reads the
+time of every attempt, so a skill's history holds all of them, 16 bytes of JSON for each; the window features keep the
+attempts that the largest window reaches, and all of them with a window of `Infinity`. A prediction of `ppe` takes time
+proportional to the attempts at the skill, and a fit of a log, to the square of the attempts of a learner at a skill.
 
 A KST fit takes time proportional to the learners with different answers, the items and the knowledge states, and keeps
 one learner's posterior at a time. Near the default limit, with about 9,000 states over 40 items:

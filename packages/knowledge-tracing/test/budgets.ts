@@ -11,6 +11,7 @@ const BUDGETS = {
   "bkt.replay": 80,
   "elo.replay": 200,
   "logistic.afm": 200,
+  "logistic.features": 300,
   "irt.replay": 2_000,
   "irt.drift": 1_000,
   "kst.blim": 200,

@@ -5,7 +5,7 @@
  *
  * @module @measurekit/knowledge-tracing/logistic
  */
-export type { LogisticFeature } from "./features.js";
+export type { LogisticFeature, PerformancePrediction, PracticeAge } from "./features.js";
 export {
   type AfmOptions,
   afm,
@@ -16,4 +16,4 @@ export {
   pfa,
 } from "./logistic.js";
 export type { LogisticParameters, LogisticSkill, Proficiency } from "./parameters.js";
-export type { DecayedCounts, ExposureHistory, LogisticState, SkillHistory } from "./state.js";
+export type { DecayedCounts, ExposureHistory, LeakyCounts, LogisticState, SkillHistory } from "./state.js";

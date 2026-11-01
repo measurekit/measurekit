@@ -115,7 +115,19 @@ lme4 and LiblineaR:
 | AFM and PFA with a random intercept                                     | The maximum of lme4's Laplace approximation, as `glmer(nAGQ = 1)` defines it, written out in base R                    |
 | Ridge fits                                                              | `LiblineaR(type = 0, cost = 512)`, the L2-regularized logistic regression LKT uses, then Newton steps on its objective |
 
-The features map to LKT's names in [the logistic guide](logistic.md#features). With every event of one skill, glm
+`validation/knowledge-tracing/lkt-features.R` checks the features of LKT's other names, 16 of the 49 in
+[the logistic guide](logistic.md#the-names-of-lkt), against `computefeatures` of LKT 1.7.0, and the time-window counts of
+DAS3H against base R, on LKT's sample with seeded times. The sample has no clock, so each learner's events get the
+practice time before them, as LKT's own, plus seeded gaps away of nothing, a minute, an hour, a day or three days, and
+their durations are those of the sample, 1 second at least:
+
+| Feature                                                    | Reference                                                    | Tolerance | Largest difference |
+| ---------------------------------------------------------- | ------------------------------------------------------------ | --------- | ------------------ |
+| Every feature of LKT's other names, before every event     | `LKT:::computefeatures`: its columns of `prop` to `ppe`      | 1e-10     | 2.2e-16            |
+| `windowOpportunities`, `windowSuccesses`, `windowFailures` | Base R: a count of the learner's earlier events at the skill | 1e-12     | 2.2e-16            |
+
+The seeded times give no age of 0 and no tie, where LKT returns infinity and NaN; the tests check measurekit's values at
+those edges by hand. The features map to LKT's names in [the logistic guide](logistic.md#features). With every event of one skill, glm
 drops a skill's intercept; the script moves the intercepts so that the learners' mean proficiency is 0, as `fit`
 reports it, which changes no prediction.
 
@@ -333,6 +345,7 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `bkt-recovery.json`             | The simulation above                                                                                                                                | Recovery, 20,000 events                                                  |
 | `bkt-opportunities.json`        | 14 cases of P(L), P(T), P(F) and threshold                                                                                                          | Forgetting, P(T) + P(F) ≥ 1, limits below the threshold                  |
 | `logistic-lkt.json`             | LKT's `samplelkt`: 1941 attempts of 17 learners at 143 skills, times from the durations                                                             | Every feature; ridge fits of AFM and PFA                                 |
+| `logistic-lkt-features.json`    | LKT's `samplelkt` with seeded times: 1941 events of 17 learners with their durations; 16 features of LKT and 3 windows                              | Events at the same time not reached, gaps of 0 to 3 days                 |
 | `logistic-glm.json`             | `set.seed(20261029)`: 80 learners, 40 attempts each at 14 items of 5 skills, 4 items of two skills                                                  | Fixed, one-skill fixed, no and random proficiency                        |
 | `irt-abilities.json`            | The learners above                                                                                                                                  | Every item model, extreme patterns, a shifted prior and a coarser grid   |
 | `kst-structures.json`           | 6 surmise relations; pks's `DoignonFalmagne7` and `chess` `dst1`, a space with a gap, a structure that is not a space; a map of 5 items to 4 skills | Equivalent elements, spaces that are not learning spaces                 |

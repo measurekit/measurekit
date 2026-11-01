@@ -19,15 +19,20 @@ import {
   pfa,
   splitByLearner,
 } from "../src/index.js";
-import { checkFeatures, decaysOf, featureValue } from "../src/logistic/features.js";
+import { checkFeatures, featureValue, needsOf } from "../src/logistic/features.js";
 import { nextHistory, type SkillHistory } from "../src/logistic/state.js";
 import exposureFixture from "./fixtures/logistic-exposures.json" with { type: "json" };
 import glm from "./fixtures/logistic-glm.json" with { type: "json" };
 import lkt from "./fixtures/logistic-lkt.json" with { type: "json" };
+import lktFeaturesFixture from "./fixtures/logistic-lkt-features.json" with { type: "json" };
 import { allPredicted, defined, expectClose, expectUnaffectedByLessons, online } from "./helpers.js";
 
 /** Absolute tolerance of features against LKT's. */
 const FEATURE_TOLERANCE = 1e-12;
+/** Absolute tolerance of the features of LKT's other names, which its columns give to 1e-10 of their size. */
+const LKT_FEATURES_TOLERANCE = 1e-10;
+/** Absolute tolerance of the time-window counts against base R. */
+const WINDOW_TOLERANCE = 1e-12;
 /** Absolute tolerance of coefficients, proficiencies and log-likelihoods against glm. */
 const GLM_TOLERANCE = 1e-8;
 /** Absolute tolerance of ridge fits against LiblineaR. */
@@ -86,7 +91,7 @@ describe("logistic features against LKT", () => {
       decayedFailures: { decayedFailures: decays.counts },
     };
     const specs = checkFeatures(Object.values(features));
-    const rates = decaysOf(specs);
+    const needs = needsOf(specs);
     const histories = new Map<string, SkillHistory>();
     // LKT's rows are in learner order, each learner's in time order.
     lkt.events.forEach((event, index) => {
@@ -97,14 +102,289 @@ describe("logistic features against LKT", () => {
         const name = defined(Object.keys(features)[f]) as keyof typeof lkt.features;
         const expected = defined(lkt.features[name][index]);
         expectClose(
-          featureValue(spec, history, undefined, event.time),
+          featureValue(spec, history, undefined, event.time, 0),
           expected,
           FEATURE_TOLERANCE,
           `${name} at ${index + 1}`,
         );
       });
-      histories.set(key, nextHistory(history, event.outcome, event.time, rates));
+      histories.set(key, nextHistory(history, event.outcome, event.time, 0, needs));
     });
+  });
+});
+
+/** A feature of `validation/knowledge-tracing/lkt-features.R`: the model's feature and the reference's value at each event. */
+interface FeatureReference {
+  readonly name: string;
+  readonly feature: LogisticFeature;
+  readonly lkt: string | null;
+  readonly values: readonly number[];
+}
+const featureReferences: readonly FeatureReference[] = JSON.parse(JSON.stringify(lktFeaturesFixture.features));
+const featureEvents: readonly Event[] = JSON.parse(JSON.stringify(lktFeaturesFixture.events));
+
+/** Returns the values of a feature at each event of the fixture, from the state that a model's updates make. */
+function replayedValues(feature: LogisticFeature, events: readonly Event[] = featureEvents): number[] {
+  const model = logistic({ features: [feature] });
+  const [spec] = checkFeatures([feature]);
+  const states = new Map<string, LogisticState>();
+  return events.map((event) => {
+    const state = states.get(event.learner) ?? model.initialState(event.learner);
+    const skill = defined(event.skills[0]);
+    const value = featureValue(defined(spec), state.skills[skill], undefined, event.time, state.practice ?? 0);
+    states.set(event.learner, model.update(state, event));
+    return value;
+  });
+}
+
+describe("logistic features of the other names of LKT, and of DAS3H", () => {
+  it.each(featureReferences)("matches $lkt of LKT, or base R, for $name", (reference) => {
+    const tolerance = reference.lkt === null ? WINDOW_TOLERANCE : LKT_FEATURES_TOLERANCE;
+    const values = replayedValues(reference.feature);
+    reference.values.forEach((expected, index) => {
+      expectClose(defined(values[index]), expected, tolerance, `${reference.name} at event ${index + 1}`);
+    });
+  });
+});
+
+/** An event of learner ana at skill k. */
+const event = (time: number, outcome: number | null, extra: Partial<Event> = {}): Event => ({
+  learner: "ana",
+  item: "q",
+  skills: ["k"],
+  time,
+  outcome,
+  ...extra,
+});
+
+/** The value of a feature before an attempt at `time`, after the events. */
+function valueAfter(feature: LogisticFeature, events: readonly Event[], time: number): number {
+  const model = logistic({ features: [feature] });
+  const state = events.reduce((current, next) => model.update(current, next), model.initialState("ana"));
+  const [spec] = checkFeatures([feature]);
+  return featureValue(defined(spec), state.skills.k, undefined, time, state.practice ?? 0);
+}
+
+describe("logistic history features", () => {
+  it("track in a state only what the features of the model read", () => {
+    const keys = (feature: LogisticFeature | null) => {
+      const model = logistic({ features: feature === null ? [] : [feature] });
+      return Object.keys(
+        defined(model.update(model.initialState("ana"), event(0, 1, { duration: 5 })).skills.k),
+      ).sort();
+    };
+    const plain = ["decayed", "failures", "last", "successes"];
+    const withFields = (...fields: string[]) => [...plain, ...fields].sort();
+    expect(keys(null)).toEqual(plain);
+    expect(keys("proportion")).toEqual(plain);
+    expect(keys({ recencySuccess: 1 })).toEqual(withFields("previous"));
+    expect(keys({ base: 1 })).toEqual(withFields("first"));
+    expect(keys({ basePractice: { decay: 1, scale: 1 } })).toEqual(withFields("first", "firstPractice"));
+    expect(keys({ dash: 10 })).toEqual(withFields("leaky"));
+    expect(keys({ ppe: { power: 1, decay: 1, spacing: 1, weight: 1 } })).toEqual(withFields("outcomes", "times"));
+    expect(keys({ windowOpportunities: 10 })).toEqual(withFields("outcomes", "times"));
+    const model = logistic({ features: [{ basePractice: { decay: 1, scale: 1 } }] });
+    expect(model.update(model.initialState("ana"), event(0, 1, { duration: 5 })).practice).toBe(5);
+    expect(logistic().update(logistic().initialState("ana"), event(0, 1, { duration: 5 })).practice).toBeUndefined();
+  });
+
+  it("gives the proportion 0.5 before any attempt, and the share of successes after", () => {
+    expect(valueAfter("proportion", [], 0)).toBe(0.5);
+    expect(valueAfter("proportion", [event(0, 1), event(1, 0), event(2, 1)], 3)).toBeCloseTo(2 / 3, 15);
+    expect(valueAfter("netSuccesses", [event(0, 1), event(1, 0), event(2, 1)], 3)).toBe(1);
+  });
+
+  it("gives the leaky counts of dash as the closed form: each attempt adds 1, and the count decays in time", () => {
+    const events = [event(0, 1), event(100, 0)];
+    const afterSecond = (Math.exp(-1) + 1) * Math.exp(-0.5);
+    expect(valueAfter({ dash: 100 }, events, 150)).toBeCloseTo(Math.log(1 + afterSecond), 14);
+    expect(valueAfter({ dashSuccess: 100 }, events, 150)).toBeCloseTo(Math.log(1 + Math.exp(-1.5)), 14);
+    expect(valueAfter({ dash: 100 }, [], 150)).toBe(0);
+    expect(valueAfter({ dash: 100 }, [event(7, 1)], 7)).toBeCloseTo(Math.log(2), 15);
+  });
+
+  it("gives base 0 at an age of 0, and ln(1 + n) A^-d after it", () => {
+    expect(valueAfter({ base: 0.5 }, [event(0, 1), event(0, 0)], 0)).toBe(0);
+    expect(valueAfter({ base: 0.5 }, [event(0, 1), event(0, 0)], 100)).toBeCloseTo(Math.log(3) / 10, 14);
+    expect(valueAfter({ baseSuccess: 0.5 }, [event(0, 1), event(5, 0)], 100)).toBeCloseTo(Math.log(2) / 10, 14);
+    expect(valueAfter({ baseFailure: 0.5 }, [event(0, 1), event(5, 0)], 100)).toBeCloseTo(Math.log(2) / 10, 14);
+    expect(valueAfter({ base: 0.5 }, [], 100)).toBe(0);
+  });
+
+  it("gives basePractice the age of the practice time plus the scaled time away, and base at a scale of 1", () => {
+    const events = [event(0, 1, { duration: 10 }), event(1000, 0, { duration: 20 })];
+    const age = (2000 - 30) * 0.5 + 30;
+    expect(valueAfter({ basePractice: { decay: 0.5, scale: 0.5 } }, events, 2000)).toBeCloseTo(
+      Math.log(3) / Math.sqrt(age),
+      14,
+    );
+    expect(valueAfter({ basePractice: { decay: 0.5, scale: 1 } }, events, 2000)).toBeCloseTo(
+      valueAfter({ base: 0.5 }, events, 2000),
+      14,
+    );
+    expect(valueAfter({ basePractice: { decay: 0.5, scale: 0 } }, events, 2000)).toBeCloseTo(
+      Math.log(3) / Math.sqrt(30),
+      14,
+    );
+  });
+
+  it("counts the duration of an event without an outcome in the practice time, and needs one for every event", () => {
+    const model = logistic({ features: [{ basePractice: { decay: 0.5, scale: 0 } }] });
+    const lesson = model.update(model.initialState("ana"), event(0, null, { duration: 50 }));
+    expect(lesson.practice).toBe(50);
+    expect(() => model.update(lesson, event(10, 1))).toThrow(
+      "The event needs a duration, which the features basePractice read for the practice time.",
+    );
+    expect(() => model.fit(eventLog([event(0, 1, { duration: 5 }), event(1, 0)]))).toThrow(
+      "Event 2 needs a duration, which the features basePractice read for the practice time.",
+    );
+    expect(() => logistic().update(logistic().initialState("ana"), event(0, 1))).not.toThrow();
+  });
+
+  it("splits recency by the outcome of the last attempt, the two summing to recency", () => {
+    const events = featureEvents.slice(0, 600);
+    const both = replayedValues({ recency: 0.7 }, events);
+    const success = replayedValues({ recencySuccess: 0.7 }, events);
+    const failure = replayedValues({ recencyFailure: 0.7 }, events);
+    both.forEach((value, index) => {
+      expectClose(defined(success[index]) + defined(failure[index]), value, 1e-12, `event ${index + 1}`);
+    });
+  });
+
+  it("counts the attempts within a window, keeps only those the largest window can reach, and all with Infinity", () => {
+    const events = [event(0, 1), event(5, 0), event(100, 1)];
+    expect(valueAfter({ windowOpportunities: 10 }, events, 105)).toBeCloseTo(Math.log(2), 15);
+    expect(valueAfter({ windowSuccesses: 10 }, events, 105)).toBeCloseTo(Math.log(2), 15);
+    expect(valueAfter({ windowFailures: 10 }, events, 105)).toBe(0);
+    expect(valueAfter({ windowOpportunities: Number.POSITIVE_INFINITY }, events, 105)).toBeCloseTo(Math.log(4), 15);
+    const keep = (feature: LogisticFeature) => {
+      const model = logistic({ features: [feature] });
+      return events.reduce((state, next) => model.update(state, next), model.initialState("ana")).skills.k?.times;
+    };
+    expect(keep({ windowOpportunities: 10 })).toEqual([100]);
+    expect(keep({ windowOpportunities: Number.POSITIVE_INFINITY })).toEqual([0, 5, 100]);
+    expect(keep({ ppe: { power: 1, decay: 1, spacing: 0, weight: 1 } })).toEqual([0, 5, 100]);
+  });
+
+  it("gives ppe n to the power with no earlier attempt, and 1 for the weighted age where an attempt is at the same time", () => {
+    const ppe = { power: 0.5, decay: 0.3, spacing: 0.4, weight: 0.6 };
+    expect(valueAfter({ ppe }, [], 10)).toBe(0);
+    expect(valueAfter({ ppe }, [event(5, 1), event(5, 0)], 5)).toBeCloseTo(Math.sqrt(2), 15);
+    expect(valueAfter({ ppe: { ...ppe, power: 0 } }, [], 10)).toBe(1);
+    // One earlier attempt, 4 before: the weighted age is 4 and there is no gap to space.
+    expect(valueAfter({ ppe }, [event(6, 1)], 10)).toBeCloseTo(4 ** -0.3, 14);
+  });
+
+  it("rejects a state without what a feature reads, and keeps what other models stored", () => {
+    const plain = logistic();
+    const stored = plain.update(plain.initialState("ana"), event(0, 1, { duration: 5 }));
+    const needs: [LogisticFeature, string][] = [
+      [{ recencySuccess: 1 }, "lacks previous"],
+      [{ base: 1 }, "lacks first"],
+      [{ basePractice: { decay: 1, scale: 1 } }, "lacks first"],
+      [{ dash: 10 }, "lacks the leaky counts of scale 10"],
+      [{ windowOpportunities: 10 }, "lacks times"],
+    ];
+    for (const [feature, message] of needs) {
+      expect(() => logistic({ features: [feature] }).update(stored, event(1, 1, { duration: 5 }))).toThrow(message);
+    }
+    const rich = logistic({ features: [{ base: 1 }, { dash: 10 }, { recencySuccess: 1 }] });
+    const state = rich.update(rich.initialState("ana"), event(0, 1));
+    expect(() => plain.update(state, event(1, 1))).not.toThrow();
+  });
+
+  it("continues a state through JSON as if it had not been stored", () => {
+    const features: LogisticFeature[] = [
+      "proportion",
+      { base: 0.5 },
+      { basePractice: { decay: 0.5, scale: 0.2 } },
+      { dash: 50 },
+      { dashSuccess: 20 },
+      { recencyFailure: 0.5 },
+      { windowSuccesses: 30 },
+      { ppe: { power: 0.3, decay: 0.4, spacing: 0.2, weight: 0.5 } },
+    ];
+    const model = logistic({ features });
+    const events = fc.array(
+      fc.record({
+        gap: fc.integer({ min: 1, max: 40 }),
+        outcome: fc.constantFrom(0, 1, null),
+        duration: fc.integer({ min: 1, max: 30 }),
+      }),
+      {
+        minLength: 2,
+        maxLength: 14,
+      },
+    );
+    fc.assert(
+      fc.property(events, (draws) => {
+        const log = draws.map(({ outcome, duration }, index) =>
+          event(
+            draws.slice(0, index + 1).reduce((sum, draw) => sum + draw.gap, 0),
+            outcome,
+            { duration },
+          ),
+        );
+        const split = Math.floor(log.length / 2);
+        const direct = log.reduce((state, next) => model.update(state, next), model.initialState("ana"));
+        const halfway = log
+          .slice(0, split)
+          .reduce((state, next) => model.update(state, next), model.initialState("ana"));
+        const stored: LogisticState = JSON.parse(JSON.stringify(halfway));
+        const resumed = log.slice(split).reduce((state, next) => model.update(state, next), stored);
+        expect(resumed).toEqual(direct);
+        expect(JSON.parse(JSON.stringify(direct))).toEqual(direct);
+      }),
+    );
+  });
+
+  it("fits a model of the new features, with predictions from 0 to 1", () => {
+    const model = logistic({
+      features: ["proportion", { base: 0.5 }, { dash: 86_400 }, { windowOpportunities: 86_400 }],
+      ridge: 1,
+    });
+    const fit = model.fit(eventLog(featureEvents));
+    expect(fit.converged).toBe(true);
+    expect(fit.predictions.every((p) => p !== null && p >= 0 && p <= 1)).toBe(true);
+  });
+
+  it("rejects parameters that are out of range or of another type", () => {
+    const rejected = (feature: unknown) => () => logistic({ features: [JSON.parse(JSON.stringify(feature))] });
+    expect(rejected({ powerOpportunities: 0 })).toThrow(
+      "The parameter of powerOpportunities must be a positive number, found 0.",
+    );
+    expect(rejected({ dash: -5 })).toThrow("The parameter of dash must be a positive number, found -5.");
+    expect(rejected({ base: -1 })).toThrow("The decay of base must be a non-negative number, found -1.");
+    expect(rejected({ recencySuccess: "fast" })).toThrow(
+      'The exponent of recencySuccess must be a non-negative number, found "fast".',
+    );
+    expect(rejected({ windowSuccesses: 0 })).toThrow(
+      "The window of windowSuccesses must be a number above 0, or Infinity, found 0.",
+    );
+    expect(rejected({ decayedProportionFailed: 1.5 })).toThrow(
+      "The decay of decayedProportionFailed must be a number above 0 and at most 1, found 1.5.",
+    );
+    expect(rejected({ basePractice: 2 })).toThrow(
+      "The feature basePractice needs an object with decay, scale, found 2.",
+    );
+    expect(rejected({ basePractice: null })).toThrow(
+      "The feature basePractice needs an object with decay, scale, found null.",
+    );
+    expect(rejected({ basePractice: { decay: 1 } })).toThrow(
+      "The scale of basePractice must be a non-negative number, found undefined.",
+    );
+    expect(rejected({ ppe: { power: 1, decay: 1, spacing: 1, weight: -1 } })).toThrow(
+      "The weight of ppe must be a non-negative number, found -1.",
+    );
+    expect(rejected({ ppe: { power: 1, decay: 1, spacing: 1, weight: 1, extra: 1 } })).toThrow(
+      'The feature ppe has no field "extra"; its fields are power, decay, spacing, weight.',
+    );
+    expect(rejected("netSuccess")).toThrow('Unknown feature "netSuccess"');
+    expect(rejected({ unknown: 1 })).toThrow('Unknown feature {"unknown":1}');
+    expect(() => logistic({ features: [{ dash: 5 }, { dash: 5 }] })).toThrow("The feature dash(5) is listed twice.");
+    expect(
+      () => logistic({ features: [{ ppe: { power: 1, decay: 1, spacing: 1, weight: 1 } }] }).parameters,
+    ).not.toThrow();
   });
 });
 
@@ -301,7 +581,7 @@ describe("logistic edge cases", () => {
     }
     const history = { successes: 0, failures: 1200, last: 0, decayed: { "0.5": { successes: 0, failures: 2 } } };
     const [spec] = checkFeatures([{ decayedLogit: 0.5 }]);
-    expect(featureValue(defined(spec), history, undefined, 1)).toBe(1200 * Math.log(0.5) - Math.log(2));
+    expect(featureValue(defined(spec), history, undefined, 1, 0)).toBe(1200 * Math.log(0.5) - Math.log(2));
   });
 
   it("stop without converging when a feature's square overflows", () => {
@@ -482,7 +762,7 @@ describe("logistic exposure features against R", () => {
       specs.forEach((spec, f) => {
         const expected = defined(columns[f]?.[index]);
         expectClose(
-          featureValue(spec, history, exposure, event.time),
+          featureValue(spec, history, exposure, event.time, 0),
           expected,
           FEATURE_TOLERANCE,
           `${spec.label} at ${index}`,

@@ -6,15 +6,13 @@ import { type GroupIntercepts, logisticRegression } from "../math/logistic-regre
 import type { SparseMatrix } from "../math/sparse-matrix.js";
 import { type FeatureSpec, featureValue } from "./features.js";
 import type { LogisticParameters, Proficiency } from "./parameters.js";
-import { type LogisticState, nextExposure, nextHistory } from "./state.js";
+import { advanceState, type HistoryNeeds, type LogisticState } from "./state.js";
 
 /** What a fit depends on: the checked options of the model. */
 export interface FitSettings {
   readonly specs: readonly FeatureSpec[];
-  /** The decays the features of outcomes need running sums for. */
-  readonly decays: readonly number[];
-  /** The decays the exposure features need running sums for. */
-  readonly exposureDecays: readonly number[];
+  /** What the features need a state to track. */
+  readonly needs: HistoryNeeds;
   readonly proficiency: Proficiency;
   readonly ridge: number;
   readonly tolerance: number;
@@ -48,7 +46,7 @@ interface Design {
  * Builds the design of a log, one row per event: for each of its skills, a column for the intercept and one per
  * feature, from the learner's history with the skill before the event.
  */
-function designOf(log: EventLog, observed: number, { specs, decays, exposureDecays }: FitSettings): Design {
+function designOf(log: EventLog, observed: number, { specs, needs }: FitSettings): Design {
   const width = specs.length + 1;
   const skills = new Map<string, number>();
   const learners = new Map<string, number>();
@@ -61,11 +59,7 @@ function designOf(log: EventLog, observed: number, { specs, decays, exposureDeca
   for (const event of log) {
     const state = histories.get(event.learner) ?? { learner: event.learner, skills: {} };
     if (!isObserved(event)) {
-      const exposures = event.skills.map((skill) => [
-        skill,
-        nextExposure(entry(state.exposures, skill), event.time, exposureDecays),
-      ]);
-      histories.set(event.learner, { ...state, exposures: { ...state.exposures, ...Object.fromEntries(exposures) } });
+      histories.set(event.learner, advanceState(state, event, needs));
       continue;
     }
     const learner = learners.get(event.learner) ?? learners.size;
@@ -79,25 +73,14 @@ function designOf(log: EventLog, observed: number, { specs, decays, exposureDeca
       columns.push(index * width);
       values.push(1);
       specs.forEach((spec, f) => {
-        const value = featureValue(spec, history, exposure, event.time);
+        const value = featureValue(spec, history, exposure, event.time, state.practice ?? 0);
         if (value === 0) return;
         columns.push(index * width + f + 1);
         values.push(value);
       });
     }
     rowStarts.push(columns.length);
-    histories.set(event.learner, {
-      ...state,
-      skills: {
-        ...state.skills,
-        ...Object.fromEntries(
-          event.skills.map((skill) => [
-            skill,
-            nextHistory(entry(state.skills, skill), event.outcome, event.time, decays),
-          ]),
-        ),
-      },
-    });
+    histories.set(event.learner, advanceState(state, event, needs));
   }
   const matrix: SparseMatrix = {
     columnCount: skills.size * width,
