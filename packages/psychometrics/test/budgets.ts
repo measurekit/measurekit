@@ -94,7 +94,7 @@ const BUDGETS = {
   "explanatory.linearChange": 5,
   "explanatory.itemFeatureRegression": 2,
   "sim.simulateResponses": 30,
-  "data.scoreResponses": 6,
+  "data.scoreResponses": 4,
   "scaling.conversionTableEapSum": 2,
   "scaling.conversionTableTrueScore": 6,
   "standardSetting.bookmarkCutScore": 0.2,

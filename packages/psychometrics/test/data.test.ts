@@ -229,6 +229,39 @@ describe("scoreResponses", () => {
     expect(scored.optionLabels).toEqual(["D", "C", "B", "A", "E"]);
   });
 
+  it("accepts more labels than it scans before it asks the set, in the choices and in the given labels", () => {
+    const labels = Array.from("ABCDEFGHIJKL");
+    const shifted = [...labels.slice(6), ...labels.slice(0, 6)];
+    const rows = [labels, [...labels].reverse(), shifted];
+    const key = [...labels].reverse();
+    const scored = scoreResponses(rows, key);
+    expect(scored.responses).toEqual([
+      labels.map((label, item) => (label === key[item] ? 1 : 0)),
+      labels.map(() => 1),
+      shifted.map((label, item) => (label === key[item] ? 1 : 0)),
+    ]);
+    expect(scored.optionLabels).toEqual(labels);
+    expect(scoreResponses(rows, key, { optionLabels: labels }).responses).toEqual(scored.responses);
+    expect(() => scoreResponses([[...labels.slice(0, 11), "M"]], key, { optionLabels: labels })).toThrow(
+      'row 1, item 12, found "M"',
+    );
+  });
+
+  it("checks the ids that are given and the response times against the scores", () => {
+    expect(() => scoreResponses(choices, ["A", "C", "B"], { personIds: ["p", "p"] })).toThrow('"p" appears more than');
+    expect(() => scoreResponses(choices, ["A", "C", "B"], { itemIds: ["q1", "q2"] })).toThrow(
+      "but there are 2 item ids",
+    );
+    expect(() =>
+      scoreResponses(choices, ["A", "C", "B"], {
+        times: [
+          [1, 1, 1],
+          [1, 1, 1],
+        ],
+      }),
+    ).toThrow("needs a response");
+  });
+
   it.each([
     ["a choice outside the labels", choices, ["A", "C", "B"], ["A", "B", "C"], 'row 2, item 3, found "D"'],
     ["a key outside the labels", choices, ["A", "C", "E"], ["A", "B", "C", "D"], 'the key of item 3, found "E"'],

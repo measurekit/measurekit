@@ -53,20 +53,22 @@ export function responseMatrix(
 }
 
 /**
- * Builds a response matrix that holds the rows given, not copies of them: for a function that made the rows and gives
- * them up. Checks what {@link responseMatrix} checks.
+ * Builds a response matrix that holds the rows given, not copies of them: for a function that made the rows and knows
+ * that every response in them is a non-negative integer or `null`. Checks the rest of what {@link responseMatrix}
+ * checks.
  */
 export function responseMatrixOfRows(
   rows: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions = {},
 ): ResponseMatrix {
-  return buildResponseMatrix(rows, options, (owned) => owned);
+  return buildResponseMatrix(rows, options, (owned) => owned, { responses: false });
 }
 
 function buildResponseMatrix(
   rows: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions,
   own: (rows: readonly (readonly (number | null)[])[]) => readonly (readonly (number | null)[])[],
+  checks: Checks = {},
 ): ResponseMatrix {
   checkArray(rows, "The rows of a response matrix must be an array");
   checkOptions(options);
@@ -77,7 +79,12 @@ function buildResponseMatrix(
     responses: rows,
     ...(options.times !== undefined && { times: options.times }),
   };
-  checkResponseMatrix(matrix);
+  // Ids that are made here are unique strings, so they need no check.
+  checkMatrix(matrix, {
+    personIds: options.personIds !== undefined,
+    itemIds: options.itemIds !== undefined,
+    ...checks,
+  });
   return {
     ...matrix,
     responses: own(rows),
@@ -112,6 +119,20 @@ export function responseMatrixFromColumns(
 
 /** Checks that a response matrix is well formed, throwing a `DataError` that names the first problem found. */
 export function checkResponseMatrix(matrix: ResponseMatrix): void {
+  checkMatrix(matrix);
+}
+
+/** The parts of a matrix that take a pass over its ids or its cells: each is checked unless it is `false`. */
+interface Checks {
+  readonly personIds?: boolean;
+  readonly itemIds?: boolean;
+  readonly responses?: boolean;
+}
+
+function checkMatrix(
+  matrix: ResponseMatrix,
+  { personIds: checkPersonIds = true, itemIds: checkItemIds = true, responses: checkCells = true }: Checks = {},
+): void {
   // Matrices built by hand or loaded from JSON may be another value, lack a field or hold another type.
   const { personIds, itemIds, responses } = matrix ?? {};
   if (!(Array.isArray(personIds) && Array.isArray(itemIds) && Array.isArray(responses))) {
@@ -123,8 +144,8 @@ export function checkResponseMatrix(matrix: ResponseMatrix): void {
   if (personIds.length !== responses.length) {
     throw new DataError(`Found ${responses.length} rows of responses and ${personIds.length} person ids.`);
   }
-  indexIds("person", personIds);
-  indexIds("item", itemIds);
+  if (checkPersonIds) indexIds("person", personIds);
+  if (checkItemIds) indexIds("item", itemIds);
   responses.forEach((row, person) => {
     if (!Array.isArray(row)) throw new DataError(`The responses of person "${personIds[person]}" must be an array.`);
     if (row.length !== itemIds.length) {
@@ -132,16 +153,21 @@ export function checkResponseMatrix(matrix: ResponseMatrix): void {
         `Person "${personIds[person]}" has ${row.length} responses, but there are ${itemIds.length} item ids.`,
       );
     }
-    for (let item = 0; item < row.length; item++) {
-      const response = row[item];
-      if (response !== null && !(typeof response === "number" && Number.isSafeInteger(response) && response >= 0)) {
-        throw new DataError(
-          `The response of person "${personIds[person]}" to item "${itemIds[item]}" must be a non-negative integer or null, found ${describe(response)}.`,
-        );
-      }
-    }
+    if (checkCells) checkRow(row, personIds[person], itemIds);
   });
   if (matrix.times !== undefined) checkTimes(matrix);
+}
+
+/** Checks that each response of a person is a non-negative integer or `null`. */
+function checkRow(row: readonly unknown[], personId: string | undefined, itemIds: readonly string[]): void {
+  for (let item = 0; item < row.length; item++) {
+    const response = row[item];
+    if (response !== null && !(typeof response === "number" && Number.isSafeInteger(response) && response >= 0)) {
+      throw new DataError(
+        `The response of person "${personId}" to item "${itemIds[item]}" must be a non-negative integer or null, found ${describe(response)}.`,
+      );
+    }
+  }
 }
 
 /**

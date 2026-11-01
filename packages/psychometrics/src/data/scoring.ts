@@ -61,39 +61,73 @@ export function scoreResponses(
   });
   const { optionLabels } = options;
   if (optionLabels !== undefined) checkArray(optionLabels, "The option labels must be an array");
-  const labels = new Set<string>();
-  for (const label of optionLabels ?? []) if (isOptionLabel(label)) labels.add(label);
+  const accepted = acceptedLabels(optionLabels);
   if (optionLabels !== undefined && new Set(optionLabels).size !== optionLabels.length) {
     throw new DataError("Option labels must be unique.");
   }
-  // Without option labels, the labels of the key and the choices are the option labels.
-  const accepts = (label: unknown): boolean => {
-    if (typeof label === "string" && labels.has(label)) return true;
-    if (optionLabels !== undefined || !isOptionLabel(label)) return false;
-    labels.add(label);
-    return true;
-  };
   for (const [item, label] of key.entries()) {
-    if (!accepts(label)) throw unexpectedLabel(label, `the key of item ${item + 1}`);
+    if (!accepted.accepts(label)) throw unexpectedLabel(label, `the key of item ${item + 1}`);
   }
-  const responses = choices.map((row, person) => {
-    const scored: (number | null)[] = [];
-    for (let item = 0; item < row.length; item++) {
-      const choice = row[item];
-      if (choice === null) scored.push(null);
-      // The labels of the key are accepted, so a choice equal to the key needs no look-up.
-      else if (choice === key[item]) scored.push(1);
-      else if (accepts(choice)) scored.push(0);
-      else throw unexpectedLabel(choice, `row ${person + 1}, item ${item + 1}`);
-    }
-    return scored;
-  });
   return {
-    ...responseMatrixOfRows(responses, options),
+    ...responseMatrixOfRows(scoreRows(choices, key, accepted.accepts), options),
     choices: choices.map((row) => row.slice()),
     key: [...key],
-    optionLabels: optionLabels === undefined ? [...labels].sort() : [...optionLabels],
+    optionLabels: optionLabels === undefined ? [...accepted.labels].sort() : [...optionLabels],
   };
+}
+
+/**
+ * The labels that a scan covers before the set is asked: a few options take nearly every choice, and a scan of them
+ * costs less than a hash look-up.
+ */
+const SCANNED_LABELS = 8;
+
+/**
+ * Returns the option labels that scoring accepts, and a test of a label. Without option labels, the labels of the key and
+ * the choices are the option labels, so the test adds each non-empty string it meets.
+ */
+function acceptedLabels(optionLabels: readonly string[] | undefined): {
+  readonly labels: ReadonlySet<string>;
+  readonly accepts: (label: unknown) => boolean;
+} {
+  const labels = new Set<string>();
+  const scanned: string[] = [];
+  const add = (label: string): void => {
+    labels.add(label);
+    if (scanned.length < SCANNED_LABELS) scanned.push(label);
+  };
+  for (const label of optionLabels ?? []) if (isOptionLabel(label) && !labels.has(label)) add(label);
+  const accepts = (label: unknown): boolean => {
+    for (let i = 0; i < scanned.length; i++) if (scanned[i] === label) return true;
+    if (typeof label === "string" && labels.has(label)) return true;
+    if (optionLabels !== undefined || !isOptionLabel(label)) return false;
+    add(label);
+    return true;
+  };
+  return { labels, accepts };
+}
+
+/** Returns the scores of the choices: 1 for the keyed option, 0 for another option and `null` for no choice. */
+function scoreRows(
+  choices: readonly (readonly (string | null)[])[],
+  key: readonly string[],
+  accepts: (label: unknown) => boolean,
+): (number | null)[][] {
+  const rows = new Array<(number | null)[]>(choices.length);
+  for (let person = 0; person < choices.length; person++) {
+    const row = choices[person] ?? [];
+    const scored = new Array<number | null>(row.length);
+    for (let item = 0; item < row.length; item++) {
+      const choice = row[item];
+      if (choice === null) scored[item] = null;
+      // The labels of the key are accepted, so a choice equal to the key needs no look-up.
+      else if (choice === key[item]) scored[item] = 1;
+      else if (accepts(choice)) scored[item] = 0;
+      else throw unexpectedLabel(choice, `row ${person + 1}, item ${item + 1}`);
+    }
+    rows[person] = scored;
+  }
+  return rows;
 }
 
 function isOptionLabel(label: unknown): label is string {
