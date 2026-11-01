@@ -39,18 +39,24 @@ test("replays 1,941 events with the 16 features of LKT's other names", async (co
   await benchmark(context, "logistic.features", () => online(model, eventLog(lktEvents)));
 });
 
-/** The model of Best-LR: intercepts of skills and items, a proficiency for each learner, and log-counts at each skill and overall. */
-const bestLr = logistic({
-  proficiency: "fixed",
-  intercepts: ["skill", "item"],
-  ridge: 1,
-  features: [
-    "logSuccesses",
-    "logFailures",
-    { feature: "logSuccesses", over: "learner" },
-    { feature: "logFailures", over: "learner" },
-  ],
-});
+/**
+ * The model of Best-LR: intercepts of skills and items, a proficiency for each learner, and log-counts at each skill and
+ * overall. It stops at the gradient that LiblineaR's solution has, which the fixture holds, so that both fit alike.
+ */
+function bestLr(tolerance: number) {
+  return logistic({
+    proficiency: "fixed",
+    intercepts: ["skill", "item"],
+    ridge: 1,
+    tolerance,
+    features: [
+      "logSuccesses",
+      "logFailures",
+      { feature: "logSuccesses", over: "learner" },
+      { feature: "logFailures", over: "learner" },
+    ],
+  });
+}
 
 /** The log of a benchmark fixture whose learners, items and skills are codes, the events in time order. */
 function codedLog(columns: {
@@ -72,12 +78,14 @@ function codedLog(columns: {
 
 test("fits 20,000 events at 1,000 items with intercepts of skills and items, a proficiency for each learner and a ridge", async (context) => {
   const log = codedLog(itemsFixture.small);
-  await benchmark(context, "logistic.fitItems", () => bestLr.fit(log), SLOW_OPTIONS);
+  const model = bestLr(itemsFixture.small.gradient);
+  await benchmark(context, "logistic.fitItems", () => model.fit(log), SLOW_OPTIONS);
 });
 
 test("fits 150,000 events at 49,546 items with intercepts of skills and items, a proficiency for each learner and a ridge", async (context) => {
   const log = codedLog(itemsFixture.large);
-  await benchmark(context, "logistic.fitManyItems", () => bestLr.fit(log), SLOW_OPTIONS);
+  const model = bestLr(itemsFixture.large.gradient);
+  await benchmark(context, "logistic.fitManyItems", () => model.fit(log), SLOW_OPTIONS);
 });
 
 test("searches the decay of a proportion of successes and the exponent of a recency over 3,600 events", async (context) => {

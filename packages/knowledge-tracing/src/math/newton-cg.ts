@@ -27,8 +27,12 @@ export const OBJECTIVE_ROUNDING = 1e-12;
 /** The most conjugate gradient steps of one Newton iteration. */
 const MAX_CG_STEPS = 1_000;
 
-/** The largest share of the gradient's norm that the residual of a Newton step may keep: a step that is at least half exact. */
-const LARGEST_FORCING = 0.5;
+/**
+ * The largest share of the gradient's norm that the residual of a Newton step may keep: a tenth, as in the trust region
+ * Newton method of LIBLINEAR. At a half, the logistic fits of the benchmarks take twice the Newton iterations, each a pass
+ * over the rows, and no fewer Hessian-vector products.
+ */
+const LARGEST_FORCING = 0.1;
 
 /**
  * Minimizes a smooth objective in place from `x` by Newton steps whose linear system is solved approximately by
@@ -37,7 +41,7 @@ const LARGEST_FORCING = 0.5;
  *
  * @remarks
  * Memory and time per iteration grow with the work of one Hessian-vector product, not with the square of the number of
- * variables. The conjugate gradients stop when the residual is under min(0.5, √|g|) of the gradient's norm, the forcing
+ * variables. The conjugate gradients stop when the residual is under min(0.1, √|g|) of the gradient's norm, the forcing
  * sequence that keeps the convergence superlinear.
  *
  * @see {@link https://doi.org/10.1007/978-0-387-40065-5 | Nocedal and Wright (2006), chapter 7}
