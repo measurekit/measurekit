@@ -23,7 +23,7 @@ import assessmentFixture from "./fixtures/kst-assessment.json" with { type: "jso
 import blimFixture from "./fixtures/kst-blim.json" with { type: "json" };
 import iitaFixture from "./fixtures/kst-iita.json" with { type: "json" };
 import structureFixture from "./fixtures/kst-structures.json" with { type: "json" };
-import { defined, expectAllClose, expectClose, online } from "./helpers.js";
+import { defined, expectAllClose, expectClose, expectUnaffectedByLessons, online, withLessons } from "./helpers.js";
 
 /** Absolute tolerance of BLIM parameters fitted by EM against pks, which stops on a change of the parameters. */
 const ML_TOLERANCE = 1e-6;
@@ -281,6 +281,20 @@ describe("KST model", () => {
       "kst",
       "md",
     ]);
+  });
+
+  it("is unaffected by events without an outcome, which are no items, and IITA reads the others", () => {
+    for (const options of [{}, { method: "md" as const }])
+      expectUnaffectedByLessons(kst({ structure, ...options }), log);
+    expect(iita(withLessons(log, 3))).toEqual(iita(log));
+  });
+
+  it("returns the state it was given, as a copy, for an event without an outcome", () => {
+    const fittedModel = model.fit(log).model;
+    const state = fittedModel.update(fittedModel.initialState("ana"), { ...defined(log[0]), learner: "ana" });
+    const next = fittedModel.update(state, { learner: "ana", item: "lesson", skills: [], time: 99, outcome: null });
+    expect(next).toEqual(state);
+    expect(next.probabilities).not.toBe(state.probabilities);
   });
 
   const fitted = model.fit(log).model;

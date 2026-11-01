@@ -38,6 +38,11 @@ export interface LearnerModel<TState = unknown, TParameters = unknown> {
   /**
    * Returns the learner's state after an event. The state given is left unchanged.
    *
+   * @remarks
+   * An event with `outcome: null` is a learning opportunity with nothing observed, so `update` must accept it: a model
+   * applies what a lesson does to a learner, such as learning and forgetting, and leaves the rest. The library never
+   * calls `predict` for such an event.
+   *
    * @throws `DataError` when the state or the event is malformed, or the event belongs to another learner.
    */
   update(state: TState, event: Event): TState;
@@ -68,11 +73,14 @@ export interface ModelFit<TState = unknown, TParameters = unknown> {
   readonly model: LearnerModel<TState, TParameters>;
   /** Each learner's state after their events in the log, by learner id. */
   readonly states: Readonly<Record<string, TState>>;
-  /** The prediction of each event of the log, in log order, made before the event's outcome was known. */
-  readonly predictions: readonly number[];
   /**
-   * The log-likelihood ln L of the log under the fitted model: the sum over events of y ln p + (1 - y) ln(1 - p),
-   * with p the event's prediction and y its outcome, or, for a model whose learners are drawn from a distribution,
+   * The prediction of each event of the log, in log order, made before the event's outcome was known: `null` for an
+   * event without an outcome.
+   */
+  readonly predictions: readonly (number | null)[];
+  /**
+   * The log-likelihood ln L of the log under the fitted model: the sum over events with an outcome of y ln p + (1 - y)
+   * ln(1 - p), with p the event's prediction and y its outcome, or, for a model whose learners are drawn from a distribution,
    * the marginal log-likelihood, each learner's parameters integrated out.
    */
   readonly logLikelihood: number;
@@ -81,7 +89,10 @@ export interface ModelFit<TState = unknown, TParameters = unknown> {
    * one pass, with a penalty, or with parameters estimated elsewhere.
    */
   readonly aic: number | null;
-  /** The Bayesian information criterion, k ln n - 2 ln L with n events, or `null` where `aic` is. */
+  /**
+   * The Bayesian information criterion, k ln n - 2 ln L with n events with an outcome, or `null` where `aic` is. `aic`
+   * and `bic` count the rates that events with an outcome estimate.
+   */
   readonly bic: number | null;
   /** Whether the estimation converged. */
   readonly converged: boolean;

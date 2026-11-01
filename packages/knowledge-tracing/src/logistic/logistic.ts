@@ -6,14 +6,29 @@ import {
   mean,
   logistic as sigmoid,
 } from "@measurekit/core";
-import { type Attempt, checkAttempt, checkEvent, checkHasSkills, type Event } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import {
+  type Attempt,
+  checkAttempt,
+  checkEvent,
+  checkHasSkills,
+  checkObservedHasSkills,
+  type Event,
+  isObserved,
+} from "../data/event.js";
+import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
 import { checkLearner, checkLearnerId } from "../data/learner.js";
 import { entry, parametersOf } from "../data/record.js";
 import { replay, type Steps } from "../data/replay.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { estimate } from "./estimation.js";
-import { checkFeatures, decaysOf, featureValue, type LogisticFeature } from "./features.js";
+import {
+  checkFeatures,
+  decaysOf,
+  exposureDecaysOf,
+  featureValue,
+  type LogisticFeature,
+  usesExposures,
+} from "./features.js";
 import {
   checkParameters,
   type LogisticParameters,
@@ -21,7 +36,7 @@ import {
   PROFICIENCIES,
   type Proficiency,
 } from "./parameters.js";
-import { checkOrder, checkState, type LogisticState, nextHistory } from "./state.js";
+import { checkOrder, checkState, type LogisticState, nextExposure, nextHistory } from "./state.js";
 
 /** Options of {@link logistic}. */
 export interface LogisticOptions {
@@ -136,6 +151,8 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
   const labels = specs.map((spec) => spec.label);
   checkParameters(parameters, labels);
   const decays = decaysOf(specs);
+  const exposureDecays = exposureDecaysOf(specs);
+  const exposed = usesExposures(specs);
   const proficiencies = proficiency === "none" ? undefined : parameters.learners;
   const fitted = Object.values(proficiencies ?? {});
   const absent = proficiency === "fixed" && fitted.length > 0 ? mean(fitted) : 0;
@@ -149,7 +166,7 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
       const history = entry(state.skills, skill);
       terms += intercept;
       for (const spec of specs) {
-        const value = featureValue(spec, history, attempt.time);
+        const value = featureValue(spec, history, entry(state.exposures, skill), attempt.time);
         terms += value * (coefficients[spec.label] ?? 0);
       }
     }
@@ -159,11 +176,19 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
 
   /** Returns the state after an event, the state and event checked, the event not earlier than the state's attempts. */
   const advance = (state: LogisticState, event: Event): LogisticState => {
-    const updates = event.skills.map((skill) => [
-      skill,
-      nextHistory(entry(state.skills, skill), event.outcome, event.time, decays),
-    ]);
-    return { learner: state.learner, skills: { ...state.skills, ...Object.fromEntries(updates) } };
+    if (isObserved(event)) {
+      const updates = event.skills.map((skill) => [
+        skill,
+        nextHistory(entry(state.skills, skill), event.outcome, event.time, decays),
+      ]);
+      return carry(state.learner, { ...state.skills, ...Object.fromEntries(updates) }, state.exposures);
+    }
+    // Without a feature that reads exposures, an event without an outcome leaves the learner as they were.
+    const updates = exposed
+      ? event.skills.map((skill) => [skill, nextExposure(entry(state.exposures, skill), event.time, exposureDecays)])
+      : [];
+    const exposures = updates.length === 0 ? state.exposures : { ...state.exposures, ...Object.fromEntries(updates) };
+    return carry(state.learner, state.skills, exposures);
   };
   const steps: Steps<LogisticState> = {
     initialState: (learner) => ({ learner, skills: {} }),
@@ -175,22 +200,24 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
     parameters,
     fit(log) {
       checkLog(log);
+      checkObservedEvents(log, "a logistic model");
       log.forEach((event, index) => {
-        checkHasSkills(event, `Event ${index + 1}`, "logistic model");
+        checkObservedHasSkills(event, `Event ${index + 1}`, "logistic model");
       });
-      const fitted = estimate(log, { specs, decays, proficiency, ridge, tolerance, maxIterations });
+      const fitted = estimate(log, { specs, decays, exposureDecays, proficiency, ridge, tolerance, maxIterations });
       const built = create({ ...options, parameters: fitted.parameters });
       const replayed = replay(log, built.steps);
       const { states, predictions } = replayed;
       const logLikelihood = fitted.marginal ?? replayed.logLikelihood;
       const k = fitted.parameterCount;
+      const n = log.filter(isObserved).length;
       return {
         model: built.model,
         states,
         predictions,
         logLikelihood,
         aic: ridge > 0 ? null : 2 * k - 2 * logLikelihood,
-        bic: ridge > 0 ? null : k * Math.log(log.length) - 2 * logLikelihood,
+        bic: ridge > 0 ? null : k * Math.log(n) - 2 * logLikelihood,
         converged: fitted.converged,
         iterations: fitted.iterations,
       };
@@ -200,15 +227,15 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
       return steps.initialState(learner);
     },
     update(state, event) {
-      checkState(state, decays);
+      checkState(state, decays, exposureDecays);
       checkEvent(event, "The event");
-      checkHasSkills(event, "The event", "logistic model");
+      checkObservedHasSkills(event, "The event", "logistic model");
       checkLearner(state.learner, event);
       checkOrder(state, event, "The event");
       return advance(state, event);
     },
     predict(state, attempt) {
-      checkState(state, decays);
+      checkState(state, decays, exposureDecays);
       checkAttempt(attempt, "The attempt");
       checkHasSkills(attempt, "The attempt", "logistic model");
       checkLearner(state.learner, attempt);
@@ -217,6 +244,11 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
     },
   };
   return { model, steps };
+}
+
+/** Returns a state with copies of its records, which are present only when they have been given. */
+function carry(learner: string, skills: LogisticState["skills"], exposures: LogisticState["exposures"]): LogisticState {
+  return { learner, skills: { ...skills }, ...(exposures !== undefined && { exposures: { ...exposures } }) };
 }
 
 /**

@@ -94,10 +94,10 @@ xychart-beta horizontal
 %%{init: {"xyChart": {"height": 388, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Knowledge tracing: bkt, elo, evaluate, irt, kst"
-  x-axis ["fit", "replay", "replay", "auc", "replay", "blim", "iita"]
+  x-axis ["fit", "fit, lessons", "replay", "replay", "auc", "replay", "blim", "iita"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.012, 0.034, 0.58, 1.3, 0.19, 0.97, 0.000015]
-  line [1, 1, 1, 1, 1, 1, 1]
+  bar [0.012, 0.013, 0.034, 0.58, 1.3, 0.19, 0.97, 0.000015]
+  line [1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
@@ -230,19 +230,20 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 ### Knowledge tracing
 
-| Task                                                                                      | Size                                            | measurekit (ms) | Reference                               | Reference (ms) |     Ratio |
-| ----------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------: | --------------------------------------- | -------------: | --------: |
-| Fit of the skills of a log by EM from five starts                                         | 20,000 attempts of 200 learners at 5 skills     |             126 | pyBKT 1.4.3 `Model.fit`                 |         10,453 |    0.012× |
-| Replay of the log through the fitted model, a prediction and an update for each attempt   | 20,000 attempts of 200 learners at 5 skills     |            9.71 | pyBKT 1.4.3 `Model.predict`             |            288 |    0.034× |
-| Replay of a log through the learner-item Elo model                                        | 100,000 attempts of 2,000 learners at 400 items |            17.5 | base R, a loop over the attempts        |           30.5 |     0.58× |
-| The area under the ROC curve                                                              | 100,000 predictions                             |            21.6 | pROC 1.19.1 `auc(roc(direction = "<"))` |           16.5 |      1.3× |
-| The AUC, RMSE, log-loss and accuracy of the predictions                                   | 100,000 predictions                             |            25.8 | none                                    |                |           |
-| Replay of the responses of learners, the grid posterior of the ability updated after each | 2,000 learners, 40 responses each               |             331 | mirt 1.48 `fscores(method = "EAP")`     |          1,735 |     0.19× |
-| Fit of the basic local independence model of a chain of 12 items by EM                    | 1,000 persons, 12 items, 13 states              |            24.3 | pks 0.8.0 `blim`                        |           25.0 |     0.97× |
-| Inductive item tree analysis of the responses                                             | 1,000 persons, 12 items                         |            1.10 | DAKS 2.1.3 `iita(v = 1)`                |         74,600 | 0.000015× |
-| Fit of the additive factors model by maximum likelihood                                   | 20,000 attempts of 200 learners at 5 skills     |            16.9 | base R `glm`, binomial family           |            469 |    0.036× |
-| The candidates ranked by their distance to the band of success of a learner               | 500 candidate items, an Elo model               |           0.047 | none                                    |                |           |
-| A log built from and checked for events                                                   | 100,000 events                                  |            13.4 | none                                    |                |           |
+| Task                                                                                          | Size                                            | measurekit (ms) | Reference                               | Reference (ms) |     Ratio |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------: | --------------------------------------- | -------------: | --------: |
+| Fit of the skills of a log by EM from five starts                                             | 20,000 attempts of 200 learners at 5 skills     |             126 | pyBKT 1.4.3 `Model.fit`                 |         10,453 |    0.012× |
+| Fit of the skills of a log by EM from five starts, a fifth of its attempts without an outcome | 20,000 attempts of 200 learners at 5 skills     |             223 | pyBKT 1.4.3 `Model.fit`, correct = -1   |         17,470 |    0.013× |
+| Replay of the log through the fitted model, a prediction and an update for each attempt       | 20,000 attempts of 200 learners at 5 skills     |            9.71 | pyBKT 1.4.3 `Model.predict`             |            288 |    0.034× |
+| Replay of a log through the learner-item Elo model                                            | 100,000 attempts of 2,000 learners at 400 items |            17.5 | base R, a loop over the attempts        |           30.5 |     0.58× |
+| The area under the ROC curve                                                                  | 100,000 predictions                             |            21.6 | pROC 1.19.1 `auc(roc(direction = "<"))` |           16.5 |      1.3× |
+| The AUC, RMSE, log-loss and accuracy of the predictions                                       | 100,000 predictions                             |            25.8 | none                                    |                |           |
+| Replay of the responses of learners, the grid posterior of the ability updated after each     | 2,000 learners, 40 responses each               |             331 | mirt 1.48 `fscores(method = "EAP")`     |          1,735 |     0.19× |
+| Fit of the basic local independence model of a chain of 12 items by EM                        | 1,000 persons, 12 items, 13 states              |            24.3 | pks 0.8.0 `blim`                        |           25.0 |     0.97× |
+| Inductive item tree analysis of the responses                                                 | 1,000 persons, 12 items                         |            1.10 | DAKS 2.1.3 `iita(v = 1)`                |         74,600 | 0.000015× |
+| Fit of the additive factors model by maximum likelihood                                       | 20,000 attempts of 200 learners at 5 skills     |            16.9 | base R `glm`, binomial family           |            469 |    0.036× |
+| The candidates ranked by their distance to the band of success of a learner                   | 500 candidate items, an Elo model               |           0.047 | none                                    |                |           |
+| A log built from and checked for events                                                       | 100,000 events                                  |            13.4 | none                                    |                |           |
 
 - Replay of the responses of learners, the grid posterior of the ability updated after each: mirt scores each of the 40 prefixes of the responses from the first; measurekit updates the posterior by the one response and predicts it. A scoring of the final patterns alone takes a fortieth of the time.
 - Fit of the additive factors model by maximum likelihood: the proficiency of a learner is a fixed effect, as measurekit's default is none.

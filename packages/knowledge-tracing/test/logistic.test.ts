@@ -21,9 +21,10 @@ import {
 } from "../src/index.js";
 import { checkFeatures, decaysOf, featureValue } from "../src/logistic/features.js";
 import { nextHistory, type SkillHistory } from "../src/logistic/state.js";
+import exposureFixture from "./fixtures/logistic-exposures.json" with { type: "json" };
 import glm from "./fixtures/logistic-glm.json" with { type: "json" };
 import lkt from "./fixtures/logistic-lkt.json" with { type: "json" };
-import { defined, expectClose, online } from "./helpers.js";
+import { allPredicted, defined, expectClose, expectUnaffectedByLessons, online } from "./helpers.js";
 
 /** Absolute tolerance of features against LKT's. */
 const FEATURE_TOLERANCE = 1e-12;
@@ -95,7 +96,12 @@ describe("logistic features against LKT", () => {
       specs.forEach((spec, f) => {
         const name = defined(Object.keys(features)[f]) as keyof typeof lkt.features;
         const expected = defined(lkt.features[name][index]);
-        expectClose(featureValue(spec, history, event.time), expected, FEATURE_TOLERANCE, `${name} at ${index + 1}`);
+        expectClose(
+          featureValue(spec, history, undefined, event.time),
+          expected,
+          FEATURE_TOLERANCE,
+          `${name} at ${index + 1}`,
+        );
       });
       histories.set(key, nextHistory(history, event.outcome, event.time, rates));
     });
@@ -274,7 +280,7 @@ describe("logistic edge cases", () => {
     ]) {
       for (const options of [{}, { proficiency: "random" as const }, { ridge: 0.1, proficiency: "fixed" as const }]) {
         const fit = pfa(options).fit(log);
-        expect(fit.predictions.every((p) => p >= 0 && p <= 1)).toBe(true);
+        expect(allPredicted(fit.predictions).every((p) => p >= 0 && p <= 1)).toBe(true);
         expect(Number.isNaN(fit.logLikelihood)).toBe(false);
       }
     }
@@ -291,11 +297,11 @@ describe("logistic edge cases", () => {
       const fit = logistic({ features: [{ decayedLogit: 0.5 }] }).fit(run(outcome));
       expect(fit.converged).toBe(true);
       expect(Number.isFinite(fit.logLikelihood)).toBe(true);
-      expect(fit.predictions.every((p) => p >= 0 && p <= 1)).toBe(true);
+      expect(allPredicted(fit.predictions).every((p) => p >= 0 && p <= 1)).toBe(true);
     }
     const history = { successes: 0, failures: 1200, last: 0, decayed: { "0.5": { successes: 0, failures: 2 } } };
     const [spec] = checkFeatures([{ decayedLogit: 0.5 }]);
-    expect(featureValue(defined(spec), history, 1)).toBe(1200 * Math.log(0.5) - Math.log(2));
+    expect(featureValue(defined(spec), history, undefined, 1)).toBe(1200 * Math.log(0.5) - Math.log(2));
   });
 
   it("stop without converging when a feature's square overflows", () => {
@@ -307,7 +313,7 @@ describe("logistic edge cases", () => {
     ]);
     const fit = logistic({ features: [{ recency: 0.5 }] }).fit(log);
     expect(fit.converged).toBe(false);
-    expect(fit.predictions.every((p) => p >= 0 && p <= 1)).toBe(true);
+    expect(allPredicted(fit.predictions).every((p) => p >= 0 && p <= 1)).toBe(true);
   });
 
   it("keep the coefficient of a feature that is 0 on every event at 0, and converge", () => {
@@ -447,6 +453,153 @@ describe("logistic options from JavaScript", () => {
     );
     expect(() => afm(JSON.parse('{"proficiency": null}'))).toThrow(
       'The option proficiency must be "none", "fixed" or "random", found null.',
+    );
+  });
+});
+
+describe("logistic exposure features against R", () => {
+  const log = eventLog(exposureFixture.events);
+  const features: readonly LogisticFeature[] = [
+    "exposures",
+    { decayedExposures: exposureFixture.decay },
+    { recencyExposure: exposureFixture.exponent },
+  ];
+
+  it("computes each feature from the state as base R does", () => {
+    const specs = checkFeatures(features);
+    const model = logistic({ features });
+    const states = new Map<string, LogisticState>();
+    const columns = [
+      exposureFixture.features.exposures,
+      exposureFixture.features.decayedExposures,
+      exposureFixture.features.recencyExposure,
+    ];
+    log.forEach((event, index) => {
+      const state = states.get(event.learner) ?? model.initialState(event.learner);
+      const skill = defined(event.skills[0]);
+      const history = state.skills[skill];
+      const exposure = state.exposures?.[skill];
+      specs.forEach((spec, f) => {
+        const expected = defined(columns[f]?.[index]);
+        expectClose(
+          featureValue(spec, history, exposure, event.time),
+          expected,
+          FEATURE_TOLERANCE,
+          `${spec.label} at ${index}`,
+        );
+      });
+      states.set(event.learner, model.update(state, event));
+    });
+  });
+
+  it("fits as glm does on the events with an outcome", () => {
+    const fit = logistic({ features, tolerance: 1e-12, maxIterations: 200 }).fit(log);
+    expectParameters(fit.model.parameters, { skills: exposureFixture.skills }, GLM_TOLERANCE);
+    expectClose(fit.logLikelihood, exposureFixture.logLikelihood, GLM_TOLERANCE, "log-likelihood");
+    const observed = log.filter((event) => event.outcome !== null).length;
+    expect(fit.predictions.filter((prediction) => prediction !== null)).toHaveLength(observed);
+    // An intercept and 3 coefficients for each of 2 skills.
+    expectClose(fit.aic, 2 * 8 - 2 * fit.logLikelihood, 1e-9);
+    expectClose(fit.bic, 8 * Math.log(observed) - 2 * fit.logLikelihood, 1e-9);
+  });
+});
+
+describe("logistic with events that have no outcome", () => {
+  const lesson: Event = { learner: "ana", item: "video", skills: ["fractions"], time: 5, outcome: null };
+  const outcomeFeatures: readonly LogisticFeature[] = [
+    "opportunities",
+    "successes",
+    "failures",
+    { decayedLogit: 0.8 },
+    { recency: 0.5 },
+  ];
+
+  it.each([
+    ["without a proficiency", logistic({ features: outcomeFeatures })],
+    ["with a fixed proficiency", afm()],
+    ["with performance factors", pfa({ proficiency: "random" })],
+  ])("is unaffected by them when no feature reads exposures: %s", (_, model) => {
+    expectUnaffectedByLessons(model, simulated);
+  });
+
+  it("keeps the history of outcomes as it was, and records the exposures apart from it", () => {
+    const model = logistic({ features: ["successes", "exposures", { decayedExposures: 0.5 }] });
+    let state = model.initialState("ana");
+    state = model.update(state, { ...lesson, outcome: 1, time: 1 });
+    const history = state.skills.fractions;
+    state = model.update(state, { ...lesson, time: 2 });
+    state = model.update(state, { ...lesson, skills: ["fractions", "decimals"], time: 4 });
+    expect(state.skills.fractions).toEqual(history);
+    expect(state.skills.decimals).toBeUndefined();
+    expect(state.exposures).toEqual({
+      fractions: { count: 2, last: 4, decayed: { "0.5": 1.5 } },
+      decimals: { count: 1, last: 4, decayed: { "0.5": 1 } },
+    });
+  });
+
+  it("leaves a model without exposure features alone, and an event without skills changes nothing", () => {
+    const plain = logistic({ features: ["opportunities"] });
+    const state = plain.update(plain.initialState("ana"), { ...lesson, outcome: 1, time: 1 });
+    expect(plain.update(state, lesson)).toEqual(state);
+    const exposed = logistic({ features: ["exposures"] });
+    expect(exposed.update(exposed.initialState("ana"), { ...lesson, skills: [] })).toEqual(exposed.initialState("ana"));
+    expect(() => exposed.update(exposed.initialState("ana"), { ...lesson, skills: [], outcome: 1 })).toThrow(
+      "The event has no skills; a logistic model needs at least one.",
+    );
+  });
+
+  it("predicts from exposures, reads a state stored without them, and refuses an exposure in the future", () => {
+    const parameters: LogisticParameters = {
+      skills: { fractions: { intercept: -1, coefficients: { exposures: 0.5, "recencyExposure(1)": 2 } } },
+    };
+    const model = logistic({ features: ["exposures", { recencyExposure: 1 }], parameters });
+    const attempt = { learner: "ana", item: "q", skills: ["fractions"], time: 9 };
+    expectClose(model.predict(model.initialState("ana"), attempt), 1 / (1 + Math.exp(1)), 1e-15, "before any exposure");
+    const state = model.update(model.update(model.initialState("ana"), lesson), { ...lesson, time: 6 });
+    // Two exposures, the latest 3 before the attempt: -1 + 0.5 × 2 + 2 / 3.
+    expectClose(model.predict(state, attempt), 1 / (1 + Math.exp(-(-1 + 1 + 2 / 3))), 1e-15, "after two exposures");
+    expect(() => model.predict(state, { ...attempt, time: 5 })).toThrow(
+      'The attempt at time 5 is earlier than the learner\'s last exposure to skill "fractions", at time 6.',
+    );
+  });
+
+  it("rejects a malformed state of exposures", () => {
+    const model = logistic({
+      features: [{ decayedExposures: 0.5 }],
+      parameters: { skills: { fractions: { intercept: 0, coefficients: { "decayedExposures(0.5)": 1 } } } },
+    });
+    const attempt = { learner: "ana", item: "q", skills: ["fractions"], time: 9 };
+    const state = (exposures: unknown): LogisticState =>
+      JSON.parse(JSON.stringify({ learner: "ana", skills: {}, exposures }));
+    expect(() => model.predict(state([]), attempt)).toThrow(
+      'The logistic state of learner "ana" needs exposures, an object of exposures by skill id, found an array.',
+    );
+    expect(() => model.predict(state({ fractions: { count: -1, last: 1, decayed: { "0.5": 1 } } }), attempt)).toThrow(
+      "needs count, a non-negative number, found -1.",
+    );
+    expect(() => model.predict(state({ fractions: { count: 1, last: "1", decayed: { "0.5": 1 } } }), attempt)).toThrow(
+      'needs last, the time of the last exposure, found "1".',
+    );
+    expect(() => model.predict(state({ fractions: { count: 1, last: 1, decayed: {} } }), attempt)).toThrow(
+      "lacks the decayed count of decay 0.5, which the model's features need.",
+    );
+  });
+
+  it("estimates no coefficients for a skill that only lessons practice", () => {
+    const events = eventLog([
+      { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 1 },
+      { learner: "b", item: "q", skills: ["s"], time: 1, outcome: 0 },
+      { learner: "a", item: "video", skills: ["s", "taught"], time: 2, outcome: null },
+    ]);
+    const fit = logistic({ features: ["exposures"], ridge: 0.1 }).fit(events);
+    expect(Object.keys(fit.model.parameters.skills)).toEqual(["s"]);
+    expect(fit.predictions).toEqual([expect.any(Number), expect.any(Number), null]);
+    expect(Object.keys(defined(fit.states.a?.exposures))).toEqual(["s", "taught"]);
+  });
+
+  it("refuses to fit a log without an event with an outcome", () => {
+    expect(() => logistic().fit(eventLog([lesson]))).toThrow(
+      "The log has no event with an outcome; a logistic model needs at least one to fit.",
     );
   });
 });

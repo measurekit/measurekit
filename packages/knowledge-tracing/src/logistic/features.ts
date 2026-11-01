@@ -1,11 +1,13 @@
 import { checkArray, checkNonNegative, DataError, describe, isRecord } from "@measurekit/core";
 import { entry } from "../data/record.js";
-import type { SkillHistory } from "./state.js";
+import type { ExposureHistory, SkillHistory } from "./state.js";
 
 /**
  * A feature of a learner's history with a skill before an attempt, as the logistic knowledge tracing framework (LKT)
- * defines it. Counts and log counts take no parameter; the decayed features take a decay d from 0 to 1, by which each
- * earlier attempt weighs d times the next; recency takes an exponent.
+ * defines it, and the exposure features of instructional factors analysis. Counts and log counts take no parameter;
+ * the decayed features take a decay d from 0 to 1, by which each earlier attempt weighs d times the next; recency takes
+ * an exponent. The exposure features read the events without an outcome at the skill, and the others the events with
+ * one.
  */
 export type LogisticFeature =
   | "opportunities"
@@ -14,6 +16,7 @@ export type LogisticFeature =
   | "logOpportunities"
   | "logSuccesses"
   | "logFailures"
+  | "exposures"
   | {
       /** Opportunities decayed by d: Σ dᵃ over the attempts, a the number of later attempts. */
       readonly decayedOpportunities: number;
@@ -37,18 +40,36 @@ export type LogisticFeature =
   | {
       /** Δt⁻ᵉ with exponent e, Δt the time since the last attempt; 0 at the first attempt. */
       readonly recency: number;
+    }
+  | {
+      /** Exposures decayed by d: Σ dᵃ over the exposures, a the number of later exposures. */
+      readonly decayedExposures: number;
+    }
+  | {
+      /** Δt⁻ᵉ with exponent e, Δt the time since the latest exposure; 0 before any exposure. */
+      readonly recencyExposure: number;
     };
 
-const COUNTS = ["opportunities", "successes", "failures", "logOpportunities", "logSuccesses", "logFailures"] as const;
+const COUNTS = [
+  "opportunities",
+  "successes",
+  "failures",
+  "logOpportunities",
+  "logSuccesses",
+  "logFailures",
+  "exposures",
+] as const;
 const DECAYED = [
   "decayedOpportunities",
   "decayedSuccesses",
   "decayedFailures",
   "decayedProportion",
   "decayedLogit",
+  "decayedExposures",
 ] as const;
+const RECENCIES = ["recency", "recencyExposure"] as const;
 
-type Kind = (typeof COUNTS)[number] | (typeof DECAYED)[number] | "recency";
+type Kind = (typeof COUNTS)[number] | (typeof DECAYED)[number] | (typeof RECENCIES)[number];
 
 /** A checked feature: its kind, its parameter, and its label, the key of its coefficients. */
 export interface FeatureSpec {
@@ -79,9 +100,9 @@ function toSpec(feature: LogisticFeature): FeatureSpec {
   const entries = isRecord(feature) ? Object.entries(feature) : [];
   const [kind, rate] = entries[0] ?? [];
   if (entries.length !== 1 || kind === undefined) throw unknown(feature);
-  if (kind === "recency") {
-    checkNonNegative(rate, "The exponent of recency");
-    return { kind, rate, label: `recency(${rate})` };
+  if (isRecency(kind)) {
+    checkNonNegative(rate, `The exponent of ${kind}`);
+    return { kind, rate, label: `${kind}(${rate})` };
   }
   if (!isDecayed(kind)) throw unknown(feature);
   if (!(typeof rate === "number" && rate > 0 && rate <= 1)) {
@@ -94,6 +115,10 @@ function isDecayed(kind: string): kind is (typeof DECAYED)[number] {
   return (DECAYED as readonly string[]).includes(kind);
 }
 
+function isRecency(kind: string): kind is (typeof RECENCIES)[number] {
+  return (RECENCIES as readonly string[]).includes(kind);
+}
+
 function isCount(kind: string): kind is (typeof COUNTS)[number] {
   return (COUNTS as readonly string[]).includes(kind);
 }
@@ -102,20 +127,42 @@ function unknown(feature: unknown): DataError {
   return new DataError(`Unknown feature ${JSON.stringify(feature)}; see LogisticFeature for the features.`);
 }
 
-/** Returns the decays the features need running sums for, distinct, in order. */
+/** Returns whether any feature reads the exposures, which a state tracks only then. */
+export function usesExposures(specs: readonly FeatureSpec[]): boolean {
+  return specs.some(
+    (spec) => spec.kind === "exposures" || spec.kind === "decayedExposures" || spec.kind === "recencyExposure",
+  );
+}
+
+/** Returns the decays the features of outcomes need running sums for, distinct, in order. */
 export function decaysOf(specs: readonly FeatureSpec[]): number[] {
-  return [...new Set(specs.filter((spec) => spec.kind !== "recency" && spec.rate > 0).map((spec) => spec.rate))];
+  return decaysOfKinds(specs, (kind) => kind !== "decayedExposures");
+}
+
+/** Returns the decays the exposure features need running sums for, distinct, in order. */
+export function exposureDecaysOf(specs: readonly FeatureSpec[]): number[] {
+  return decaysOfKinds(specs, (kind) => kind === "decayedExposures");
+}
+
+function decaysOfKinds(specs: readonly FeatureSpec[], include: (kind: Kind) => boolean): number[] {
+  const decayed = specs.filter((spec) => !isRecency(spec.kind) && spec.rate > 0 && include(spec.kind));
+  return [...new Set(decayed.map((spec) => spec.rate))];
 }
 
 /** The decayed counts before any attempt. */
 const NO_COUNTS = { successes: 0, failures: 0 };
 
 /**
- * Returns a feature's value for an attempt at `time`, from the learner's history with the skill before it; with no
- * history, that of a skill not practiced. The history holds the running sums of the model's decays, as its state check
- * and its fit ensure.
+ * Returns a feature's value for an attempt at `time`, from the learner's history and exposures with the skill before
+ * it; with none, that of a skill not practiced. They hold the running sums of the model's decays, as its state check and
+ * its fit ensure.
  */
-export function featureValue(spec: FeatureSpec, history: SkillHistory | undefined, time: number): number {
+export function featureValue(
+  spec: FeatureSpec,
+  history: SkillHistory | undefined,
+  exposure: ExposureHistory | undefined,
+  time: number,
+): number {
   const successes = history?.successes ?? 0;
   const failures = history?.failures ?? 0;
   const attempts = successes + failures;
@@ -132,16 +179,25 @@ export function featureValue(spec: FeatureSpec, history: SkillHistory | undefine
       return Math.log(1 + successes);
     case "logFailures":
       return Math.log(1 + failures);
-    case "recency": {
-      // LKT gives 0 at the first attempt and at an attempt at the same time as the last.
-      const elapsed = history === undefined ? 0 : time - history.last;
-      return elapsed === 0 ? 0 : elapsed ** -spec.rate;
-    }
+    case "exposures":
+      return exposure?.count ?? 0;
+    case "decayedExposures":
+      return (exposure === undefined ? undefined : entry(exposure.decayed, String(spec.rate))) ?? 0;
+    case "recency":
+      return recency(history?.last, time, spec.rate);
+    case "recencyExposure":
+      return recency(exposure?.last, time, spec.rate);
     default: {
       const sums = (history === undefined ? undefined : entry(history.decayed, String(spec.rate))) ?? NO_COUNTS;
       return decayed(spec.kind, spec.rate, attempts, sums.successes, sums.failures);
     }
   }
+}
+
+/** Returns Δt⁻ᵉ since `last`. LKT gives 0 before any attempt and at an attempt at the same time as the last. */
+function recency(last: number | undefined, time: number, exponent: number): number {
+  const elapsed = last === undefined ? 0 : time - last;
+  return elapsed === 0 ? 0 : elapsed ** -exponent;
 }
 
 /**

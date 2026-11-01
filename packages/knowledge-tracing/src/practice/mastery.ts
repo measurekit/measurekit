@@ -6,7 +6,7 @@ import {
   DataError,
   describe,
 } from "@measurekit/core";
-import type { Event } from "../data/event.js";
+import { type Event, isObserved } from "../data/event.js";
 import { checkLog, type EventLog } from "../data/event-log.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
@@ -55,7 +55,8 @@ export interface OpportunitiesToStreakOptions extends StreakOptions {
 
 /**
  * Returns the opportunity at which each learner first answered `length` attempts at each skill correctly in a row. Only
- * an outcome of 1 is correct; any other ends the run.
+ * an outcome of 1 is correct; any other outcome ends the run. An event without an outcome is no opportunity and leaves
+ * the run as it is.
  *
  * @throws `DataError` when the log is malformed or the length is not a positive integer.
  */
@@ -75,7 +76,9 @@ export function streakMastery(log: EventLog, options: StreakOptions = {}): Maste
 
 /**
  * Returns the opportunity at which each learner's probability of mastery by the model first reached the threshold
- * after an attempt at each skill, updating each learner's state from `initialState` through the log.
+ * after an attempt at each skill, updating each learner's state from `initialState` through the log. An event without
+ * an outcome updates the state but is no opportunity, and the criterion is tested only after events with an outcome, so
+ * a lesson alone never records mastery.
  *
  * @throws `DataError` when the model is not a learner model that defines mastery, the log is malformed, the threshold
  * is not from 0 to 1, or the model rejects an event.
@@ -124,18 +127,17 @@ export function opportunitiesToStreak(probability: number, options: Opportunitie
 
 /**
  * Goes through the log: `observe` takes each event and returns whether the criterion is met for each of its
- * skills after it. Records, per learner and skill, the opportunity of the first event after which it is.
+ * skills after it. Records, per learner and skill, the opportunity of the first event with an outcome after which it
+ * is; an event without one is observed, so that a model updates, and counts for nothing else.
  */
 function firstOpportunities(log: EventLog, observe: (event: Event) => (skill: string) => boolean): MasteryTable {
   const table = new Map<string, Map<string, number | null>>();
   const counts = new Map<string, number>();
   for (const event of log) {
-    let skills = table.get(event.learner);
-    if (skills === undefined) {
-      skills = new Map();
-      table.set(event.learner, skills);
-    }
     const met = observe(event);
+    if (!isObserved(event)) continue;
+    const skills = table.get(event.learner) ?? new Map<string, number | null>();
+    table.set(event.learner, skills);
     for (const skill of event.skills) {
       const key = `${event.learner}\u0000${skill}`;
       const count = (counts.get(key) ?? 0) + 1;

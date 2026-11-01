@@ -1,6 +1,7 @@
 import { DataError } from "@measurekit/core";
+import { isObserved } from "../data/event.js";
 import { checkLog, type EventLog } from "../data/event-log.js";
-import { checkPredictions } from "./predictions.js";
+import { observedPairs } from "./observed-pairs.js";
 
 /** The error rate at one opportunity of a learning curve. */
 export interface LearningCurvePoint {
@@ -29,23 +30,28 @@ export interface LearningCurve {
  * @remarks
  * Error rates that fall with practice indicate that the skills model what learners learn. With predictions, such as a
  * fit's, each point also has the predicted error rate. Opportunities count the events of the log given, so pass whole
- * learner histories: a full log, or the test log of a split by learner. Events without skills are left out.
+ * learner histories: a full log, or the test log of a split by learner. Events without skills are left out, and so are
+ * events without an outcome: they are no opportunity and have no error rate.
  *
- * @param predictions - The prediction of each event, in log order.
- * @throws `DataError` when the log is malformed, no event has skills, or the predictions are malformed or not one per
- * event.
+ * @param predictions - The prediction of each event, in log order, such as a fit's: a probability for each event with
+ * an outcome, and `null` for each event without one.
+ * @throws `DataError` when the log is malformed, no event with an outcome has skills, or the predictions are malformed,
+ * not one per event, or lacking for an event with an outcome.
  */
-export function learningCurve(log: EventLog, predictions?: readonly number[]): LearningCurve {
+export function learningCurve(log: EventLog, predictions?: readonly (number | null)[]): LearningCurve {
   checkLog(log);
-  const outcomes = log.map((event) => event.outcome);
-  if (predictions !== undefined) checkPredictions(predictions, outcomes);
-  if (log.every((event) => event.skills.length === 0)) {
+  const observed = log.filter(isObserved);
+  if (predictions !== undefined && observedPairs(log, predictions).outcomes.length < observed.length) {
+    throw new DataError("A learning curve needs a prediction for every event with an outcome.");
+  }
+  if (observed.every((event) => event.skills.length === 0)) {
     throw new DataError("A learning curve needs events with skills; no event of the log has any.");
   }
   const overall = emptyTotals();
   const bySkill = new Map<string, Totals>();
   const practiced = new Map<string, Map<string, number>>();
   log.forEach((event, index) => {
+    if (!isObserved(event)) return;
     const counts = practiced.get(event.learner) ?? new Map<string, number>();
     practiced.set(event.learner, counts);
     for (const skill of event.skills) {

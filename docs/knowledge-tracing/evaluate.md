@@ -4,6 +4,13 @@
 predictions, cross-validation and comparison of any [`LearnerModel`](architecture.md#the-learner-model-interface), and
 learning curves. The metrics are validated against pROC and base R ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  F[Fit or fold] --> P["predictions: one per event, null for an event without an outcome"]
+  P --> O["observedPairs: the events with an outcome and a prediction"]
+  O --> M["metrics, calibration, learning curves"]
+```
+
 ## Metrics
 
 Each function takes predictions, probabilities of a correct outcome, and the outcomes, from 0 to 1, as two arrays of
@@ -52,7 +59,8 @@ hand; a single fold is a train-test split. For each fold:
 1. the model is fitted to the training log;
 2. every learner of the test log starts from `initialState` and goes through their events of both logs in time order,
    training events first at equal times;
-3. each test event is predicted, then updates the learner's state; training events only update it.
+3. each test event is predicted, then updates the learner's state; training events only update it. A test event without
+   an outcome, such as a lesson, updates the state and has a `null` prediction.
 
 A learner's earlier events thus inform the predictions of their later ones, as they would online, and the fitted
 parameters, such as Elo's item ratings, stay fixed. A test event the fitted model cannot predict throws its `DataError`,
@@ -80,11 +88,29 @@ result.metrics; // the metrics of every fold's predictions together
 result.folds[0]; // { predictions, metrics }: the predictions of the fold's test events, in log order
 ```
 
+The metrics are those of the test events with an outcome. A fold whose test log has none has `metrics: null`, and
+`crossValidate` throws `DataError` when no fold has one.
+
 | Split            | Measures predictions of                                                  |
 | ---------------- | ------------------------------------------------------------------------ |
 | `splitByLearner` | New learners, from their first event on: the usual choice                |
 | `splitByItem`    | Items the model has not been fitted to                                   |
 | `splitByTime`    | Later events from earlier ones, as a model deployed at a date would make |
+
+## Predictions with nulls
+
+A fit's `predictions` and a fold's have one entry per event, `null` where the event has no outcome. The metric functions
+take numbers only: `observedPairs(log, predictions)` returns `{ predictions, outcomes }` of the events with both an
+outcome and a prediction, in log order, for them.
+
+```ts
+import { elo } from "@measurekit/knowledge-tracing/elo";
+import { metrics, observedPairs } from "@measurekit/knowledge-tracing/evaluate";
+
+// log: a log with lessons, events with outcome: null
+const { predictions, outcomes } = observedPairs(log, elo().fit(log).predictions);
+metrics(predictions, outcomes);
+```
 
 ## Model comparison
 
@@ -132,5 +158,6 @@ curve.skills.fractions; // the curve of one skill
 
 `overall` pools every skill; `skills` has one curve per skill, in the order the skills first appear. Opportunities
 count the events of the log given, so pass whole learner histories: a full log, or the test log of a split by learner.
-Events without skills are left out; a log without skills throws `DataError`. `predictions` (default: none) has one
-prediction per event in log order, such as a fit's.
+Events without skills are left out; a log without skills throws `DataError`. Events without an outcome are no
+opportunity and have no error rate, so they are left out too. `predictions` (default: none) has one prediction per event
+in log order, such as a fit's: a probability for each event with an outcome, and `null` for each without one.

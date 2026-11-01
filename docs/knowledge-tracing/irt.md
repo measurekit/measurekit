@@ -43,6 +43,12 @@ The prior's grid needs distinct, finite points, with finite squares of their spa
 mean so large that it has not throws `DataError`. The default grid is that of `@measurekit/psychometrics` for EAP,
 and mirt's `fscores` with `quadpts = 61` and `theta_lim = c(-6, 6)` for the standard prior.
 
+## Events without an outcome
+
+An event with `outcome: null`, such as a lesson, does not move the posterior of θ and has no item lookup, as a lesson is
+no item and has no parameters. `update` returns the state as it was, and a fit gives the event a `null` prediction and
+adds no likelihood term. Removing these events from a log changes no state or prediction.
+
 ## Online
 
 ```ts

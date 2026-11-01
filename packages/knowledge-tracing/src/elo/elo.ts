@@ -7,10 +7,11 @@ import {
   DataError,
   logistic,
 } from "@measurekit/core";
-import { type Attempt, checkAttempt, checkEvent, type Event } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import { type Attempt, checkAttempt, checkEvent, type Event, isObserved, type ObservedEvent } from "../data/event.js";
+import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
 import { checkLearner, checkLearnerId } from "../data/learner.js";
 import { entry } from "../data/record.js";
+import { onePass } from "../data/replay.js";
 import { outcomeLogLikelihood } from "../math/logistic.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { checkParameters, type EloItem, type EloParameters } from "./parameters.js";
@@ -59,15 +60,18 @@ export interface EloOptions {
 export interface EloModel extends LearnerModel<EloState, EloParameters> {
   /**
    * Replays a log in time order, updating learners and items after each event as online use would, from this model's
-   * item ratings and every learner's initial state.
+   * item ratings and every learner's initial state. An event without an outcome changes no rating and has no
+   * prediction.
    *
-   * @throws `DataError` when the log is malformed.
+   * @throws `DataError` when the log is malformed or has no event with an outcome.
    */
   fit(log: EventLog): EloFit;
   /**
    * Returns the rating of the event's item after the event, given the learner's state before it; the model is
    * unchanged. With {@link LearnerModel.update} on the same state and event, it makes one step of a replay. An app
-   * stores the rating as the item's row and builds the next model from the rows it needs.
+   * stores the rating as the item's row and builds the next model from the rows it needs. An event without an outcome
+   * leaves the item's rating as it is: its rating, or `{ difficulty: 0, count: 0 }` for an item the model does not
+   * know.
    *
    * @throws `DataError` when the state or the event is malformed, or the event belongs to another learner.
    */
@@ -150,32 +154,18 @@ export function elo(options: EloOptions = {}): EloModel {
     parameters,
     fit(log) {
       checkLog(log);
+      checkObservedEvents(log, "an Elo model");
       const ratings = new Map(items);
-      const states = new Map<string, EloState>();
-      const predictions: number[] = [];
-      let logLikelihood = 0;
-      for (const event of log) {
-        const result = step(
-          settings,
-          states.get(event.learner) ?? initial(event.learner),
-          ratings.get(event.item) ?? UNRATED,
-          event,
-        );
-        states.set(event.learner, result.state);
+      const pass = onePass(log, initial, (state, event) => {
+        const result = step(settings, state, ratings.get(event.item) ?? UNRATED, event);
         ratings.set(event.item, result.item);
-        predictions.push(result.prediction);
-        logLikelihood += outcomeLogLikelihood(result.prediction, event.outcome);
-      }
-      return {
-        model: elo({ ...options, parameters: { items: Object.fromEntries(ratings) } }),
-        states: Object.fromEntries(states),
-        predictions,
-        logLikelihood,
-        aic: null,
-        bic: null,
-        converged: true,
-        iterations: 1,
-      };
+        return {
+          state: result.state,
+          prediction: result.prediction,
+          logLikelihood: outcomeLogLikelihood(result.prediction, event.outcome),
+        };
+      });
+      return { model: elo({ ...options, parameters: { items: Object.fromEntries(ratings) } }), ...pass };
     },
     initialState(learner) {
       checkLearnerId(learner);
@@ -183,6 +173,7 @@ export function elo(options: EloOptions = {}): EloModel {
     },
     update(state, event) {
       checkStep(state, event);
+      if (!isObserved(event)) return copyOf(state);
       return step(settings, state, items.get(event.item) ?? UNRATED, event).state;
     },
     predict(state, attempt) {
@@ -193,7 +184,8 @@ export function elo(options: EloOptions = {}): EloModel {
     },
     updateItem(state, event) {
       checkStep(state, event);
-      return step(settings, state, items.get(event.item) ?? UNRATED, event).item;
+      const item = items.get(event.item) ?? UNRATED;
+      return isObserved(event) ? step(settings, state, item, event).item : { ...item };
     },
   };
 }
@@ -202,7 +194,12 @@ function initial(learner: string): EloState {
   return { learner, ability: 0, count: 0, skills: {} };
 }
 
-function step(settings: Settings, state: EloState, item: EloItem, event: Event): Step {
+/** Returns a copy of a state, for an event that changes nothing: a result never aliases its input. */
+function copyOf(state: EloState): EloState {
+  return { ...state, skills: { ...state.skills } };
+}
+
+function step(settings: Settings, state: EloState, item: EloItem, event: ObservedEvent): Step {
   const prediction = logistic(logit(settings, state, item, event));
   const error = event.outcome - prediction;
   const { a, b } = settings.uncertainty;

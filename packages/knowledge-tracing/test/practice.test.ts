@@ -169,3 +169,40 @@ describe("practice options from JavaScript", () => {
     );
   });
 });
+
+describe("mastery criteria with events that have no outcome", () => {
+  const answer = (learner: string, time: number, outcome: number | null, skills = ["s"]) => ({
+    learner,
+    item: outcome === null ? "video" : "q",
+    skills,
+    time,
+    outcome,
+  });
+
+  it("leaves a streak as it is for an event without an outcome, and records no mastery from lessons alone", () => {
+    const log = eventLog([
+      answer("ana", 1, 1),
+      answer("ana", 2, null),
+      answer("ana", 3, 1),
+      answer("ana", 4, 1),
+      answer("budi", 1, null),
+      answer("budi", 2, null, ["t"]),
+    ]);
+    expect(streakMastery(log)).toEqual({ ana: { s: 3 } });
+  });
+
+  it("updates the model with lessons, and tests the threshold only after events with an outcome", () => {
+    const model = bkt({ parameters: { skills: { s: { prior: 0.1, learn: 0.6, forget: 0, guess: 0.2, slip: 0.1 } } } });
+    const log = eventLog([
+      answer("ana", 1, null),
+      answer("ana", 2, null),
+      answer("ana", 3, null),
+      answer("ana", 4, 1),
+      answer("budi", 1, 0),
+      answer("budi", 2, 0),
+    ]);
+    // Three lessons take P(L) from 0.1 past 0.95 at ana's first attempt: opportunity 1, as the lessons are no opportunity.
+    expect(thresholdMastery(model, log)).toEqual({ ana: { s: 1 }, budi: { s: null } });
+    expect(thresholdMastery(model, eventLog([answer("ana", 1, null)]))).toEqual({});
+  });
+});

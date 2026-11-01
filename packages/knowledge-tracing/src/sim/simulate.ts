@@ -1,7 +1,17 @@
-import { checkRandom, checkUnitInterval, type Random } from "@measurekit/core";
+import { checkBoolean, checkRandom, checkUnitInterval, type Random } from "@measurekit/core";
 import { type Attempt, checkAttempts } from "../data/event.js";
-import { type EventLog, eventLog } from "../data/event-log.js";
+import { type EventInput, type EventLog, eventLog } from "../data/event-log.js";
 import { checkModel, type LearnerModel } from "../model.js";
+
+/** An attempt to simulate: with `observe: false` it is a learning opportunity, whose outcome is not drawn. */
+export interface SimulatedAttempt extends Attempt {
+  /**
+   * Whether an outcome is drawn; `false` gives an event with `outcome: null`.
+   *
+   * @defaultValue `true`
+   */
+  readonly observe?: boolean;
+}
 
 /** A simulated log, with each learner's state after it. */
 export interface Simulation<TState> {
@@ -20,24 +30,34 @@ export interface Simulation<TState> {
  * the learner's earlier outcomes, as BKT, logistic models, IRT and KST, this draws from the model itself: each
  * learner's latent knowledge is drawn along with the outcomes. Outcomes are 0 or 1.
  *
+ * An attempt with `observe: false`, such as a lesson, draws nothing: it is predicted by no one, and the model updates
+ * with an event without an outcome.
+ *
  * @throws `DataError` when the model is not a learner model, the attempts are not a non-empty array of attempts, the
  * model rejects one, or a prediction is not from 0 to 1.
  */
 export function simulate<TState>(
   model: LearnerModel<TState>,
-  attempts: readonly Attempt[],
+  attempts: readonly SimulatedAttempt[],
   random: Random,
 ): Simulation<TState> {
   checkModel(model, "A simulation needs a learner model, such as bkt()");
   checkAttempts(attempts, "Attempt");
+  attempts.forEach(({ observe }, index) => {
+    if (observe !== undefined) checkBoolean(observe, `The observe of attempt ${index + 1}`);
+  });
   checkRandom(random);
   const ordered = [...attempts].sort((x, y) => x.time - y.time);
   const states = new Map<string, TState>();
-  const events = ordered.map((attempt) => {
+  const events = ordered.map(({ observe = true, ...attempt }): EventInput => {
     const state = states.get(attempt.learner) ?? model.initialState(attempt.learner);
-    const p = model.predict(state, attempt);
-    checkUnitInterval(p, `The model's prediction for "${attempt.learner}" at "${attempt.item}"`);
-    const event = { ...attempt, outcome: random.uniform() < p ? 1 : 0 };
+    let outcome: number | null = null;
+    if (observe) {
+      const p = model.predict(state, attempt);
+      checkUnitInterval(p, `The model's prediction for "${attempt.learner}" at "${attempt.item}"`);
+      outcome = random.uniform() < p ? 1 : 0;
+    }
+    const event = { ...attempt, outcome };
     states.set(attempt.learner, model.update(state, event));
     return event;
   });

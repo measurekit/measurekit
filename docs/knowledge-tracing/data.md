@@ -1,23 +1,41 @@
 # Data
 
-Functions in `@measurekit/knowledge-tracing/data` build the logs that every model and evaluation takes, and split
-them into folds. Logs are plain arrays of plain objects, so they can be built by hand or loaded from JSON;
-every function that takes a log checks it.
+Functions in `@measurekit/knowledge-tracing/data` build the logs that every model and evaluation takes, keep the first
+attempts of a log, and split it into folds. Logs are plain arrays of plain objects, so they can be built by hand or
+loaded from JSON; every function that takes a log checks it.
+
+```mermaid
+flowchart LR
+  A[Attempt: learner, item, skills, time] --> E[Event: the attempt and its outcome]
+  E --> Q{outcome is null?}
+  Q -->|no| P[predicted, then the state is updated]
+  P --> S[counts in likelihoods, AIC, BIC, opportunities and metrics]
+  Q -->|yes| U[the state is updated only]
+  U --> N[prediction null, no likelihood term, no opportunity]
+```
 
 ## Events
 
-An event is one attempt of a learner at an item, with its outcome.
+An event is one attempt of a learner at an item, with its outcome, or with `outcome: null` when the attempt is a learning
+opportunity with nothing observed: a lesson, a video, or a success with hints that counts as no evidence. One log holds
+everything a learner did, in time order.
 
-| Field     | Meaning                                                                                                     |
-| --------- | ----------------------------------------------------------------------------------------------------------- |
-| `learner` | The learner's id: a non-empty string.                                                                       |
-| `item`    | The item's id: a non-empty string.                                                                          |
-| `skills`  | The ids of the skills (knowledge components) the item practices: distinct non-empty strings, possibly none. |
-| `time`    | A finite number that orders the attempts, such as epoch milliseconds or a sequence number.                  |
-| `outcome` | From 0 to 1: 1 correct, 0 incorrect, and between them partial credit, where a model supports it.            |
+| Field           | Meaning                                                                                                     | Default       |
+| --------------- | ----------------------------------------------------------------------------------------------------------- | ------------- |
+| `learner`       | The learner's id: a non-empty string.                                                                       | required      |
+| `item`          | The item's id: a non-empty string.                                                                          | required      |
+| `skills`        | The ids of the skills (knowledge components) the item practices: distinct non-empty strings, possibly none. | required      |
+| `time`          | A finite number that orders the attempts, such as epoch milliseconds or a sequence number.                  | required      |
+| `outcome`       | From 0 to 1: 1 correct, 0 incorrect, and between them partial credit, where a model supports it; or `null`. | required      |
+| `resource`      | The key of the learn and forget rates of the attempt: a lesson, a video or an item.                         | the item      |
+| `covariates`    | Finite numbers by name, known before the outcome, which a model written outside the package can read.       | none          |
+| `hints`         | The hints taken before the outcome: an integer from 0.                                                      | none recorded |
+| `duration`      | The time spent on the attempt, above 0, in the units of `time`.                                             | none recorded |
+| `attemptNumber` | Which try at the item this is: an integer from 1.                                                           | none recorded |
 
-An attempt is an event without its outcome: what a model predicts from. Models take the attempt's skills and time, so
-time-aware and skill-based models need nothing else.
+An attempt is an event without its outcome and the metadata that follows it: what a model predicts from. Models take the
+attempt's skills, time and resource, so time-aware and skill-based models need nothing else. A missing `outcome` is an
+error: only an explicit `null` means that nothing was observed.
 
 ## Logs
 
@@ -41,17 +59,26 @@ const log = eventLog(
 log.map((event) => event.skills); // [["fractions"], ["fractions", "decimals"], ["decimals"]]
 ```
 
-| Rule   | Detail                                                                                                       |
-| ------ | ------------------------------------------------------------------------------------------------------------ |
-| Size   | At least one event.                                                                                          |
-| Skills | An event's own `skills`; without them, its item's row of the Q-matrix; without a Q-matrix, none.             |
-| Order  | By `time`, stable. Functions that take a log reject one out of time order, which a log built by hand may be. |
-| Copies | The events are copied, with only the fields above, so later changes to the input do not change the log.      |
-| Parts  | Any subsequence of a log, such as `log.filter(...)`, is a log.                                               |
+| Rule   | Detail                                                                                                                                       |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Size   | At least one event.                                                                                                                          |
+| Skills | An event's own `skills`; without them, its item's row of the Q-matrix; without a Q-matrix, none.                                             |
+| Order  | By `time`, stable. Functions that take a log reject one out of time order, which a log built by hand may be.                                 |
+| Copies | The events are copied, with only the fields above, so later changes to the input do not change the log. A field that is absent stays absent. |
+| Parts  | Any subsequence of a log, such as `log.filter(...)`, is a log.                                                                               |
 
 A malformed event throws `DataError` naming the first problem and the event's position in the input, e.g.
-`Event 3 needs an outcome from 0 to 1, found 2.` `NaN`, infinite times, repeated skills, empty ids and values of
+`Event 3 needs an outcome from 0 to 1 or null, found 2.` `NaN`, infinite times, repeated skills, empty ids and values of
 other types are rejected.
+
+## First attempts
+
+`firstAttempts(log, options)` keeps the first try of each learner at each item: the events with `attemptNumber` 1 or,
+without one, the learner's first event with an outcome at the item. Events without an outcome stay.
+
+| Option   | Default       | Values                                                                                                       |
+| -------- | ------------- | ------------------------------------------------------------------------------------------------------------ |
+| `hinted` | `"incorrect"` | What a first attempt with `hints` above 0 counts as: `"incorrect"`, as DataShop does; `"null"`; or `"keep"`. |
 
 ## Q-matrices
 
@@ -73,6 +100,15 @@ Splits return folds `{ train, test }` of one log, for cross-validation without l
 | `splitByItem(log, folds, random)`    | Each item's events are in one fold's test log: predictions of items the model has not seen. |
 | `splitByTime(log, folds)`            | `folds + 1` consecutive blocks; fold k trains on blocks 1 to k and tests on block k + 1.    |
 
+Events without an outcome have nothing to predict, so the splits count the events with an outcome and the items they
+have.
+
+| Split      | An event without an outcome                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| By learner | Goes with its learner.                                                                                 |
+| By item    | Is in the training log of every fold; a lesson is no item, so it is not counted among the items dealt. |
+| By time    | Is in the block that holds its time; blocks have about equal numbers of events with an outcome.        |
+
 ```ts
 import { createRandom } from "@measurekit/knowledge-tracing";
 import { splitByLearner, splitByTime } from "@measurekit/knowledge-tracing/data";
@@ -83,7 +119,7 @@ const byTime = splitByTime(log, 1); // [{ train: the earlier events, test: the l
 
 - **By learner and by item.** Learners or items are dealt to folds in an order drawn from `random`, so folds differ in
   size by at most one learner or item, and the same seed gives the same folds. `folds` is at least 2 and at most the
-  number of learners or items.
+  number of learners, or of items with an outcome.
 - **By time.** Blocks have about equal numbers of events. A boundary falls after the last event of its time, so a
   model never trains on an event at or after the time of one it predicts. `folds` is at least 1; one fold is a single
   split at the middle of the log. Too few distinct times for the blocks throw `DataError`.

@@ -23,6 +23,11 @@ export function nextMastery(
   return Math.min(1, (unknown / total) * learn + (known / total) * (1 - forget));
 }
 
+/** Returns P(L) after an attempt that shows nothing of it: P(L) moved by the learn and forget rates alone. */
+export function learnedMastery(mastery: number, { learn, forget }: BktLearning): number {
+  return Math.min(1, mastery * (1 - forget) + (1 - mastery) * learn);
+}
+
 /**
  * Returns the number of further attempts after which P(L), as expected before their outcomes, reaches `threshold`.
  *

@@ -16,4 +16,4 @@ export {
   pfa,
 } from "./logistic.js";
 export type { LogisticParameters, LogisticSkill, Proficiency } from "./parameters.js";
-export type { DecayedCounts, LogisticState, SkillHistory } from "./state.js";
+export type { DecayedCounts, ExposureHistory, LogisticState, SkillHistory } from "./state.js";

@@ -54,9 +54,11 @@ Use these words with these meanings in code, comments and docs.
 | learner             | One person who practices; a model keeps one state per learner.                                                                  |
 | item                | One question or task a learner attempts.                                                                                        |
 | skill               | A knowledge component that an item practices; psychometrics calls it attribute. An item practices zero or more skills.          |
-| attempt             | A learner's try at an item: learner, item, skills and time. Models predict attempts.                                            |
-| event               | An attempt with its outcome: one entry of a log.                                                                                |
-| outcome             | From 0 to 1: 1 correct, 0 incorrect, and between them partial credit.                                                           |
+| attempt             | A learner's try at an item: learner, item, skills, time, and its resource and covariates. Models predict attempts.              |
+| event               | An attempt with its outcome and its attempt metadata (hints, duration, attempt number): one entry of a log.                     |
+| outcome             | From 0 to 1: 1 correct, 0 incorrect, and between them partial credit; `null` for a learning opportunity with nothing observed.  |
+| resource            | What the learn and forget rates of an attempt belong to: a lesson, a video or an item, which is the default.                    |
+| exposure            | An event without an outcome at a skill, which logistic models count apart from the events with one.                             |
 | log                 | Events in time order.                                                                                                           |
 | Q-matrix            | The skills of each item, by item id: the `QMatrix` of core, which psychometrics shares, so one moves between the packages.      |
 | opportunity         | The number of times a learner has practiced a skill, the current event included.                                                |
@@ -127,7 +129,7 @@ packages/knowledge-tracing/   the published package @measurekit/knowledge-tracin
   src/index.ts          re-exports every module, the model interface, and DataError, MeasurekitError and
                         createRandom of core
   src/model.ts          LearnerModel and ModelFit, the interface every model implements, and checkModel
-  src/data/             events, logs, Q-matrices, learner checks, splits, the replay of a log through a model
+  src/data/             events, logs, Q-matrices, learner checks, first attempts, splits, the replay of a log through a model
   src/math/             numerics
   src/evaluate/         metrics, calibration, cross-validation, model comparison, learning curves
   src/elo/              learner-item and concept-specific Elo
@@ -269,6 +271,12 @@ Knowledge tracing: the model families never import each other, nor does anything
   return `NaN`. Iterative methods report `converged` and `iterations` instead of throwing.
 - Knowledge tracing models are immutable: `update` returns a new state and `fit` a new model. States and parameters are
   plain data that JSON serializes; model methods check them, as they may come from storage.
+- A state or parameters stored by a 1.x release stay readable by every later 1.x release. A new field is optional, and
+  its absence means the old behavior. A change that cannot be optional is a major version. `test/model.test.ts` reads
+  `test/fixtures/stored-state.json`, which no build regenerates.
+- An event with `outcome: null` is a learning opportunity: `update` accepts it, `predict` is never called for it, a fit
+  gives it a `null` prediction and no likelihood term, and `n` of the information criteria counts the events with an
+  outcome. Only an explicit `null` means that nothing was observed: a missing outcome throws `DataError`.
 - Never use `Math.random`; take a `Random`. The GritQL plugin `biome/no-math-random.grit` makes `pnpm lint` fail on
   `Math.random` anywhere in `packages/*/src`.
 - Numerics work on `Float64Array` and do not allocate in inner loops.

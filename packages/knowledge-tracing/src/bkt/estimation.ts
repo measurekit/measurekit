@@ -1,4 +1,5 @@
 import { createRandom, DataError, type Random, type Stopping } from "@measurekit/core";
+import { resourceOf } from "../data/event.js";
 import type { EventLog } from "../data/event-log.js";
 import { entry } from "../data/record.js";
 import { expectationMaximization } from "../math/expectation-maximization.js";
@@ -10,7 +11,8 @@ export interface Sequence {
   readonly learner: string;
   /** The learner's prior group, if they have one. */
   readonly group: string | undefined;
-  readonly steps: { readonly item: string; readonly outcome: number }[];
+  /** The attempts: the item, the resource and the outcome, `null` for an attempt with nothing observed. */
+  readonly steps: { readonly item: string; readonly resource: string; readonly outcome: number | null }[];
 }
 
 /** Which rates of a skill have values by group or item, and how many rates the skill's events estimate. */
@@ -18,9 +20,9 @@ export interface Structure {
   readonly forgetting: boolean;
   /** The groups with a prior of their own: those of the skill's learners, with prior groups. */
   readonly groups: readonly string[];
-  /** The items with learn and forget rates of their own: those followed by an attempt, with item learning. */
-  readonly learningItems: readonly string[];
-  /** The items with guess and slip rates of their own: all of the skill's, with item guess and slip. */
+  /** The resources with learn and forget rates of their own: those followed by an outcome, with resource learning. */
+  readonly learningResources: readonly string[];
+  /** The items with guess and slip rates of their own: those with an outcome, with item guess and slip. */
   readonly guessSlipItems: readonly string[];
   /** The number of rates the events estimate: k of the information criteria. */
   readonly parameterCount: number;
@@ -29,7 +31,7 @@ export interface Structure {
 /** What the structure of a skill depends on. */
 export interface StructureOptions {
   readonly forgetting: boolean;
-  readonly itemLearning: boolean;
+  readonly resourceLearning: boolean;
   readonly itemGuessSlip: boolean;
   readonly priorGroups: boolean;
 }
@@ -42,47 +44,65 @@ export interface SkillEstimate {
   readonly converged: boolean;
 }
 
-/** Returns the sequences of each skill, by skill id in the order the skills first appear in the log. */
+/**
+ * Returns the sequences of each skill, by skill id in the order the skills first appear in the log. A sequence without
+ * an observed outcome has nothing to estimate from, so a skill met only through such sequences is left out.
+ */
 export function sequencesBySkill(
   log: EventLog,
   priorGroups: Readonly<Record<string, string>> | undefined,
 ): Map<string, Sequence[]> {
   const bySkill = new Map<string, Map<string, Sequence>>();
-  for (const { learner, item, skills, outcome } of log) {
+  for (const event of log) {
+    const { learner, item, skills, outcome } = event;
     for (const skill of skills) {
       const learners = bySkill.get(skill) ?? new Map<string, Sequence>();
       bySkill.set(skill, learners);
       const sequence = learners.get(learner) ?? { learner, group: entry(priorGroups, learner), steps: [] };
       learners.set(learner, sequence);
-      sequence.steps.push({ item, outcome });
+      sequence.steps.push({ item, resource: resourceOf(event), outcome });
     }
   }
-  return new Map([...bySkill].map(([skill, learners]) => [skill, [...learners.values()]]));
+  const informative = [...bySkill].map(([skill, learners]): [string, Sequence[]] => [
+    skill,
+    [...learners.values()].filter(({ steps }) => steps.some(({ outcome }) => outcome !== null)),
+  ]);
+  return new Map(informative.filter(([, sequences]) => sequences.length > 0));
 }
 
 /** Returns the structure of a skill's sequences. */
 export function structureOf(sequences: readonly Sequence[], options: StructureOptions): Structure {
   const groups = options.priorGroups ? distinct(sequences.flatMap((sequence) => sequence.group ?? [])) : [];
-  const followed = sequences.flatMap((sequence) => sequence.steps.slice(0, -1).map((step) => step.item));
-  const learningItems = options.itemLearning ? distinct(followed) : [];
-  const answered = sequences.flatMap((sequence) => sequence.steps.map((step) => step.item));
+  // A transition teaches something when an outcome follows it, so steps after the last outcome count for nothing.
+  const followed = sequences.flatMap(({ steps }) =>
+    steps
+      .slice(
+        0,
+        steps.findLastIndex(({ outcome }) => outcome !== null),
+      )
+      .map((step) => step.resource),
+  );
+  const learningResources = options.resourceLearning ? distinct(followed) : [];
+  const answered = sequences.flatMap(({ steps }) =>
+    steps.filter(({ outcome }) => outcome !== null).map(({ item }) => item),
+  );
   const guessSlipItems = options.itemGuessSlip ? distinct(answered) : [];
   // The skill's own rate counts when an event uses it: a learner without a group, or any event without the option.
   const priors = groups.length + (sequences.some((sequence) => sequence.group === undefined) ? 1 : 0);
-  const learning = options.itemLearning ? learningItems.length : Math.min(followed.length, 1);
+  const learning = options.resourceLearning ? learningResources.length : Math.min(followed.length, 1);
   const guessSlip = options.itemGuessSlip ? guessSlipItems.length : 1;
   return {
     forgetting: options.forgetting,
     groups,
-    learningItems,
+    learningResources,
     guessSlipItems,
     parameterCount: priors + learning * (options.forgetting ? 2 : 1) + 2 * guessSlip,
   };
 }
 
 /**
- * Returns a start from given parameters, with the structure's groups and items starting at their own values or, without
- * them, at the skill's, and the forget rate at 0 without forgetting.
+ * Returns a start from given parameters, with the structure's groups, resources and items starting at their own values
+ * or, without them, at the skill's, and the forget rate at 0 without forgetting.
  */
 export function startFrom(skill: BktSkill, structure: Structure): BktSkill {
   const forget = (rate: number): number => (structure.forgetting ? rate : 0);
@@ -90,8 +110,8 @@ export function startFrom(skill: BktSkill, structure: Structure): BktSkill {
     { prior: skill.prior, learn: skill.learn, forget: forget(skill.forget), guess: skill.guess, slip: skill.slip },
     structure,
     (group) => priorOf(skill, group),
-    (item) => {
-      const { learn, forget: rate } = learningOf(skill, item);
+    (resource) => {
+      const { learn, forget: rate } = learningOf(skill, resource);
       return { learn, forget: forget(rate) };
     },
     (item) => guessSlipOf(skill, item),
@@ -114,7 +134,7 @@ export function randomStarts(structure: Structure, count: number, seed: number):
  */
 const START_BOUNDS = { prior: 1, learn: 0.4, forget: 0.2, guess: 0.4, slip: 0.3 };
 
-/** Returns a random start, drawn for the skill, then for each group and item in sorted order. */
+/** Returns a random start, drawn for the skill, then for each group, resource and item in sorted order. */
 function randomStart(structure: Structure, random: Random): BktSkill {
   const draw = (upper: number): number => upper * random.uniform();
   const learning = (): BktLearning => ({
@@ -135,15 +155,15 @@ function withRecords(
   skill: BktSkill,
   structure: Structure,
   prior: (group: string) => number,
-  learning: (item: string) => BktLearning,
+  learning: (resource: string) => BktLearning,
   guessSlip: (item: string) => BktGuessSlip,
 ): BktSkill {
-  const { groups, learningItems, guessSlipItems } = structure;
+  const { groups, learningResources, guessSlipItems } = structure;
   return {
     ...skill,
     ...(groups.length > 0 && { groupPriors: Object.fromEntries(groups.map((group) => [group, prior(group)])) }),
-    ...(learningItems.length > 0 && {
-      itemLearning: Object.fromEntries(learningItems.map((item) => [item, learning(item)])),
+    ...(learningResources.length > 0 && {
+      resourceLearning: Object.fromEntries(learningResources.map((resource) => [resource, learning(resource)])),
     }),
     ...(guessSlipItems.length > 0 && {
       itemGuessSlip: Object.fromEntries(guessSlipItems.map((item) => [item, guessSlip(item)])),
@@ -178,7 +198,7 @@ export function estimate(
   return fits.reduce((best, fit) => (fit.logLikelihood > best.logLikelihood ? fit : best));
 }
 
-/** Expected counts by class: a group or item, or `null` for the skill's own rate. */
+/** Expected counts by class: a group, resource or item, or `null` for the skill's own rate. */
 type Counts = Map<string | null, Float64Array>;
 
 /** The expected counts of an E-step. */
@@ -198,7 +218,7 @@ function expectation(skill: BktSkill, sequences: readonly Sequence[]): { logLike
   const counts: Expectation = { prior: new Map(), learning: new Map(), guessSlip: new Map() };
   const rates = {
     prior: classes((group) => entry(skill.groupPriors, group), skill.prior, counts.prior),
-    learning: classes((item) => entry(skill.itemLearning, item), skill, counts.learning),
+    learning: classes((resource) => entry(skill.resourceLearning, resource), skill, counts.learning),
     guessSlip: classes((item) => entry(skill.itemGuessSlip, item), skill, counts.guessSlip),
   };
   let logLikelihood = 0;
@@ -213,7 +233,8 @@ interface RateClass<T> {
 }
 
 /**
- * Returns a lookup of the class of a group or item: its own when the skill has a value for it, the skill's otherwise.
+ * Returns a lookup of the class of a group, resource or item: its own when the skill has a value for it, the skill's
+ * otherwise.
  * Classes are made once per E-step, so the steps of the sequences only look them up.
  */
 function classes<T>(
@@ -239,7 +260,7 @@ function classes<T>(
 /** The lookups of an E-step. */
 interface Rates {
   readonly prior: (group: string | undefined) => RateClass<number>;
-  readonly learning: (item: string) => RateClass<BktLearning>;
+  readonly learning: (resource: string) => RateClass<BktLearning>;
   readonly guessSlip: (item: string) => RateClass<BktGuessSlip>;
 }
 
@@ -248,12 +269,18 @@ function addSequence({ learner, group, steps }: Sequence, rates: Rates): number 
   const last = steps.length - 1;
   const transitions = new Float64Array(4 * last);
   const emissions = new Float64Array(2 * steps.length);
-  steps.forEach(({ item, outcome }, t) => {
-    const { guess, slip } = rates.guessSlip(item).rates;
-    emissions[2 * t] = outcome === 1 ? guess : 1 - guess;
-    emissions[2 * t + 1] = outcome === 1 ? 1 - slip : slip;
+  steps.forEach(({ item, resource, outcome }, t) => {
+    if (outcome === null) {
+      // An attempt with nothing observed has probability 1 in both states.
+      emissions[2 * t] = 1;
+      emissions[2 * t + 1] = 1;
+    } else {
+      const { guess, slip } = rates.guessSlip(item).rates;
+      emissions[2 * t] = outcome === 1 ? guess : 1 - guess;
+      emissions[2 * t + 1] = outcome === 1 ? 1 - slip : slip;
+    }
     if (t === last) return;
-    const { learn, forget } = rates.learning(item).rates;
+    const { learn, forget } = rates.learning(resource).rates;
     transitions[4 * t] = 1 - learn;
     transitions[4 * t + 1] = learn;
     transitions[4 * t + 2] = forget;
@@ -273,16 +300,16 @@ function addSequence({ learner, group, steps }: Sequence, rates: Rates): number 
     );
   }
   add(prior.sums, posteriors[1] ?? 0, 1);
-  steps.forEach(({ item, outcome }, t) => {
+  steps.forEach(({ item, resource, outcome }, t) => {
     const unknown = posteriors[2 * t] ?? 0;
     const known = posteriors[2 * t + 1] ?? 0;
-    add(rates.guessSlip(item).sums, unknown, unknown * outcome, known, known * (1 - outcome));
+    if (outcome !== null) add(rates.guessSlip(item).sums, unknown, unknown * outcome, known, known * (1 - outcome));
     if (t === last) return;
     const stay = transitionPosteriors[4 * t] ?? 0;
     const learned = transitionPosteriors[4 * t + 1] ?? 0;
     const forgot = transitionPosteriors[4 * t + 2] ?? 0;
     const kept = transitionPosteriors[4 * t + 3] ?? 0;
-    add(rates.learning(item).sums, stay + learned, learned, forgot + kept, forgot);
+    add(rates.learning(resource).sums, stay + learned, learned, forgot + kept, forgot);
   });
   return logLikelihood;
 }
@@ -305,8 +332,8 @@ const MIN_GUESS_SLIP = Number.EPSILON;
 /**
  * The M-step: each rate is its expected count over its expected opportunities, P(G) and P(S) bounded by
  * {@link MIN_GUESS_SLIP}, which for a single rate maximizes the expected log-likelihood within the bounds. A rate
- * of the skill used by no event, when every group or item has its own, is the ratio over all of them, the value
- * for groups and items not fitted. A rate without expected opportunities keeps its value.
+ * of the skill used by no event, when every group, resource or item has its own, is the ratio over all of them, the
+ * value for groups, resources and items not fitted. A rate without expected opportunities keeps its value.
  */
 function maximization(skill: BktSkill, counts: Expectation, forgetting: boolean): BktSkill {
   const ratio = (sums: Float64Array | undefined, numerator: number, denominator: number, current: number): number => {
@@ -327,9 +354,9 @@ function maximization(skill: BktSkill, counts: Expectation, forgetting: boolean)
     ...(skill.groupPriors !== undefined && {
       groupPriors: mapRecord(skill.groupPriors, (group, prior) => ratio(counts.prior.get(group), 0, 1, prior)),
     }),
-    ...(skill.itemLearning !== undefined && {
-      itemLearning: mapRecord(skill.itemLearning, (item, rates) => {
-        const sums = counts.learning.get(item);
+    ...(skill.resourceLearning !== undefined && {
+      resourceLearning: mapRecord(skill.resourceLearning, (resource, rates) => {
+        const sums = counts.learning.get(resource);
         return { learn: ratio(sums, 1, 0, rates.learn), forget: forget(ratio(sums, 3, 2, rates.forget)) };
       }),
     }),

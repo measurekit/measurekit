@@ -10,8 +10,16 @@ import {
   isNonEmptyString,
   isRecord,
 } from "@measurekit/core";
-import { checkAttempt, checkEvent, checkHasSkills, type Event } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import {
+  checkAttempt,
+  checkEvent,
+  checkHasSkills,
+  checkObservedHasSkills,
+  type Event,
+  isObserved,
+  resourceOf,
+} from "../data/event.js";
+import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
 import { checkLearner, checkLearnerId } from "../data/learner.js";
 import { entry, parametersOf } from "../data/record.js";
 import { replay, type Steps } from "../data/replay.js";
@@ -25,7 +33,7 @@ import {
   startFrom,
   structureOf,
 } from "./estimation.js";
-import { correctness, nextMastery, opportunitiesToMastery } from "./inference.js";
+import { correctness, learnedMastery, nextMastery, opportunitiesToMastery } from "./inference.js";
 import { type BktParameters, type BktSkill, checkParameters, guessSlipOf, learningOf, priorOf } from "./parameters.js";
 import { type BktState, checkState } from "./state.js";
 
@@ -44,11 +52,12 @@ export interface BktOptions {
    */
   readonly itemGuessSlip?: boolean;
   /**
-   * Whether each item has learn and forget rates of its own, applied after an attempt at it.
+   * Whether each resource has learn and forget rates of its own, applied after an attempt with it. A resource is an
+   * attempt's `resource`, or its item without one.
    *
    * @defaultValue `false`
    */
-  readonly itemLearning?: boolean;
+  readonly resourceLearning?: boolean;
   /**
    * The group of each learner, by learner id: the learners of a group share a prior for each skill (individualized
    * priors). Learners without a group have the skill's prior.
@@ -104,10 +113,16 @@ export interface BktModel extends LearnerModel<BktState, BktParameters> {
   /**
    * Fits each skill of a log by expectation maximization, independently of the others: from the model's parameters for
    * a skill that has them, otherwise from `restarts` random starts. The fit's `iterations` are the most of any skill's
-   * chosen start, and it has `converged` when all of them have; `aic` and `bic` count the rates the events estimate.
+   * chosen start, and it has `converged` when all of them have; `aic` and `bic` count the rates the events with an
+   * outcome estimate, and n of `bic` is their number.
    *
-   * @throws `DataError` when the log is malformed, an event has no skills or an outcome other than 0 or 1, or an
-   * outcome has probability 0 under the model's parameters.
+   * @remarks
+   * An event without an outcome applies its resource's learn and forget rates alone and adds no guess or slip, so a
+   * lesson's rates are estimated from the outcomes that follow it. A skill met only through events without an outcome
+   * gets no parameters.
+   *
+   * @throws `DataError` when the log is malformed or has no event with an outcome, an event with an outcome has no
+   * skills or an outcome other than 0 or 1, or an outcome has probability 0 under the model's parameters.
    */
   fit(log: EventLog): BktFit;
   /**
@@ -159,11 +174,14 @@ interface Settings extends StructureOptions {
  * @remarks
  * For each skill, a learner either knows it or not, starts knowing it with probability P(L0), answers correctly with
  * probability 1 - P(S) when knowing it and P(G) when not, and after each attempt learns it with probability P(T) and,
- * with `forgetting`, forgets it with probability P(F). The options add pyBKT's extensions: item guess and slip, item
- * learning and prior groups.
+ * with `forgetting`, forgets it with probability P(F). The options add pyBKT's extensions: item guess and slip,
+ * resource learning and prior groups.
  *
  * An event with several skills is an event of each: each skill's P(L) is updated as for that skill alone, the
  * prediction is the mean of the skills' predictions, and fitting counts the event in every skill's sequences.
+ *
+ * An event with `outcome: null`, such as a lesson, moves each of its skills' P(L) to P(L) (1 - P(F)) + (1 - P(L))
+ * P(T), with the rates of its resource, and a skill without parameters stays as it is.
  *
  * @throws `DataError` when an option is out of range or the parameters are malformed.
  * @see {@link https://doi.org/10.1007/BF01099821 | Corbett and Anderson (1994)}
@@ -190,21 +208,30 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
       return sum / attempt.skills.length;
     },
     update(state, event) {
-      const updates = event.skills.map((skill): [string, number] => {
-        const parameters = skillOf(skill);
+      const updates: [string, number][] = [];
+      for (const skill of event.skills) {
+        if (!isObserved(event)) {
+          // Without parameters a skill has no prior to move, so a lesson leaves it alone.
+          const known = entry(parameters.skills, skill);
+          if (known !== undefined) {
+            updates.push([skill, learnedMastery(masteryOf(state, skill), learningOf(known, resourceOf(event)))]);
+          }
+          continue;
+        }
+        const rates = skillOf(skill);
         const next = nextMastery(
           masteryOf(state, skill),
           event.outcome,
-          guessSlipOf(parameters, event.item),
-          learningOf(parameters, event.item),
+          guessSlipOf(rates, event.item),
+          learningOf(rates, resourceOf(event)),
         );
         if (next === null) {
           throw new DataError(
             `The event's outcome has probability 0 for skill "${skill}" under the learner's P(L) and the item's guess and slip.`,
           );
         }
-        return [skill, next];
-      });
+        updates.push([skill, next]);
+      }
       return { learner: state.learner, skills: { ...state.skills, ...Object.fromEntries(updates) } };
     },
   };
@@ -213,6 +240,7 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
     parameters,
     fit(log) {
       checkLog(log);
+      checkObservedEvents(log, "a BKT model");
       log.forEach((event, index) => {
         checkTraceable(event, `Event ${index + 1}`);
       });
@@ -242,7 +270,7 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
         predictions,
         logLikelihood,
         aic: 2 * parameterCount - 2 * logLikelihood,
-        bic: parameterCount * Math.log(log.length) - 2 * logLikelihood,
+        bic: parameterCount * Math.log(log.filter(isObserved).length) - 2 * logLikelihood,
         converged: fits.every((fit) => fit.converged),
         iterations: fits.reduce((most, fit) => Math.max(most, fit.iterations), 0),
       };
@@ -280,10 +308,13 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
   return { model, steps };
 }
 
-/** Checks that BKT can trace a well-formed event: at least one skill, and an outcome of 0 or 1. */
+/**
+ * Checks that BKT can trace a well-formed event: with an outcome, at least one skill and an outcome of 0 or 1; without
+ * one, anything.
+ */
 function checkTraceable(event: Event, label: string): void {
-  checkHasSkills(event, label, "BKT model");
-  if (event.outcome !== 0 && event.outcome !== 1) {
+  checkObservedHasSkills(event, label, "BKT model");
+  if (event.outcome !== null && event.outcome !== 0 && event.outcome !== 1) {
     throw new DataError(`${label} has the outcome ${event.outcome}; BKT needs outcomes of 0 or 1.`);
   }
 }
@@ -293,21 +324,21 @@ function settingsOf(options: BktOptions): Settings {
   const {
     forgetting = false,
     itemGuessSlip = false,
-    itemLearning = false,
+    resourceLearning = false,
     priorGroups,
     restarts = DEFAULT_RESTARTS,
     seed = DEFAULT_SEED,
     tolerance = DEFAULT_TOLERANCE,
     maxIterations = DEFAULT_MAX_ITERATIONS,
   } = options;
-  for (const [name, value] of Object.entries({ forgetting, itemGuessSlip, itemLearning })) {
+  for (const [name, value] of Object.entries({ forgetting, itemGuessSlip, resourceLearning })) {
     checkBoolean(value, `The option ${name}`);
   }
   if (priorGroups !== undefined) checkPriorGroups(priorGroups);
   checkPositiveInteger(restarts, "The option restarts");
   checkSeed(seed);
   checkStopping(tolerance, maxIterations);
-  const structure = { forgetting, itemGuessSlip, itemLearning, priorGroups: priorGroups !== undefined };
+  const structure = { forgetting, itemGuessSlip, resourceLearning, priorGroups: priorGroups !== undefined };
   return { ...structure, groups: priorGroups, restarts, seed, tolerance, maxIterations };
 }
 

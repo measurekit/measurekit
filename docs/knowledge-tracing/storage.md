@@ -9,10 +9,30 @@ writes, how it refits models, and how much memory a fit takes.
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
 | Learner states   | One JSON value per learner and model: tens of bytes per skill; for IRT about 3.5 KB, whatever the number of answers; for KST about 22 bytes per knowledge state                               | At every answer                  |
 | Model parameters | JSON: Elo's item ratings and IRT's items one row per item; BKT's and logistic models' one row per skill, and a logistic model's θ one per learner; KST's structure and π, with a row per item | At every refit; Elo items online |
-| Events           | An append-only log: learner, item, skills, time, outcome                                                                                                                                      | At every answer                  |
+| Events           | An append-only log: learner, item, skills, time, outcome (`null` for a learning opportunity), resource, hints, duration, attempt number                                                       | At every answer                  |
 
 States and parameters are plain data, which model methods check when they read them, so they need no schema beyond
 JSON. The event log is the record of what happened; models are fitted from it and can always be rebuilt from it.
+
+## Stored states across versions
+
+A state or parameters stored by a 1.x release stay readable by every later 1.x release. A new field is optional, and its
+absence means the old behavior. A change that cannot be optional is a major version.
+
+```mermaid
+flowchart LR
+  S["State or parameters of release 1.x"] --> R["Model of a later release 1.y"]
+  R --> Q{new field present?}
+  Q -->|yes| N["used"]
+  Q -->|no| O["absent means the old behavior"]
+```
+
+| Field                           | When it is absent                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------------- |
+| `exposures` of a logistic state | The learner has no exposures: events without an outcome have not reached a skill of the model |
+
+A fixture of states and parameters of each model, written by the build before the first release, is read by a test at
+every build, and no build regenerates it.
 
 ## At answer time
 

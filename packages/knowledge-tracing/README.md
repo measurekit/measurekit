@@ -20,7 +20,7 @@ npm install @measurekit/knowledge-tracing
 import { eventLog } from "@measurekit/knowledge-tracing/data";
 import { elo } from "@measurekit/knowledge-tracing/elo";
 
-// One event per attempt: who answered which item, when, and how it went (1 correct, 0 incorrect).
+// One event per attempt: who answered which item, when, and how it went (1 correct, 0 incorrect, or null for a lesson).
 const log = eventLog(
   [
     { learner: "ana", item: "q1", time: 1, outcome: 1 },
@@ -84,25 +84,28 @@ learningCurve(log).skills.fractions; // [{ opportunity: 1, count: 2, errorRate: 
 
 | Import                                   | Contents                                                                                                                                   |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@measurekit/knowledge-tracing/data`     | `eventLog` with Q-matrices; `splitByLearner`, `splitByItem`, `splitByTime`                                                                 |
-| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `metrics`, `calibration`; `crossValidate`, `compareModels`; `learningCurve`                          |
+| `@measurekit/knowledge-tracing/data`     | `eventLog` with Q-matrices, and events without an outcome; `firstAttempts`; `splitByLearner`, `splitByItem`, `splitByTime`                 |
+| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `metrics`, `calibration`, `observedPairs`; `crossValidate`, `compareModels`; `learningCurve`         |
 | `@measurekit/knowledge-tracing/elo`      | `elo`: learner-item Elo with Pelánek's uncertainty function, and concept-specific Elo with skill abilities                                 |
-| `@measurekit/knowledge-tracing/bkt`      | `bkt`: Bayesian knowledge tracing with forgetting, item guess and slip, item learning and prior groups; mastery                            |
+| `@measurekit/knowledge-tracing/bkt`      | `bkt`: Bayesian knowledge tracing with forgetting, item guess and slip, resource learning and prior groups; mastery                        |
 | `@measurekit/knowledge-tracing/logistic` | `afm`, `pfa`, `logistic`: AFM, PFA and LKT features, with no, fixed or random proficiency and a ridge                                      |
 | `@measurekit/knowledge-tracing/irt`      | `irt`: online EAP and MAP ability and the posterior of θ from calibrated 1PL to 4PL, graded response and generalized partial credit items  |
 | `@measurekit/knowledge-tracing/kst`      | `kst`: BLIM by ML or MD and adaptive assessment; `surmiseStructure`, `isKnowledgeSpace`, `isLearningSpace`, `fringes`, `delineate`; `iita` |
 | `@measurekit/knowledge-tracing/practice` | `recommend`; `streakMastery`, `thresholdMastery`; `opportunitiesToStreak`                                                                  |
-| `@measurekit/knowledge-tracing/sim`      | `simulate`: outcomes drawn from any learner model, seeded                                                                                  |
+| `@measurekit/knowledge-tracing/sim`      | `simulate`: outcomes drawn from any learner model, seeded, with lessons that draw none                                                     |
 | `@measurekit/knowledge-tracing`          | All of the above, the `LearnerModel` interface, `createRandom` (a seeded random number generator), `DataError` and `MeasurekitError`       |
 
 Invalid input throws `DataError`. A statistic that is undefined for the data, such as the AUC of outcomes that are all
 correct, is `null` in a table of metrics and a `DataError` from a function that returns only that statistic. Results
 never contain `NaN`.
 
+A state or parameters stored by a 1.x release stay readable by every later 1.x release. A new field is optional, and its
+absence means the old behavior.
+
 ## Documentation
 
-- [Data](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/data.md): events, logs,
-  Q-matrices, splits by learner, item and time.
+- [Data](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/data.md): events, with and without an
+  outcome, logs, Q-matrices, first attempts, splits by learner, item and time.
 - [Evaluation](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/evaluate.md):
   metrics, calibration, cross-validation, model comparison, learning curves.
 - [Elo](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/elo.md): the models, the

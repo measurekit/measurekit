@@ -7,6 +7,10 @@ before collecting data, to plan how many learners a fit needs, or to test an app
 time order, each attempt is correct with the probability the model predicts from the learner's state, and the state
 is updated with the drawn outcome. Outcomes are 0 or 1.
 
+An attempt with `observe: false` (default `true`), such as a lesson, draws nothing: the event has `outcome: null`, and
+the model is updated with it, so a lesson can teach the simulated learner. Attempts may carry a `resource` for the
+learn and forget rates of a lesson.
+
 ```ts
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
 import { createRandom } from "@measurekit/knowledge-tracing";

@@ -1,6 +1,14 @@
 import { checkChoice, checkOptions, checkStopping, DataError, describe } from "@measurekit/core";
-import { type Attempt, checkAttempt, checkAttempts, checkEvent, checkHasSkills } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import {
+  type Attempt,
+  checkAttempt,
+  checkAttempts,
+  checkEvent,
+  checkHasSkills,
+  isObserved,
+  type ObservedEvent,
+} from "../data/event.js";
+import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
 import { checkLearner, checkLearnerId } from "../data/learner.js";
 import { entry, parametersOf } from "../data/record.js";
 import { replay, type Steps } from "../data/replay.js";
@@ -71,10 +79,11 @@ export interface KstModel extends LearnerModel<KstState, KstParameters> {
   /**
    * Fits the BLIM to the log from this model's parameters: each learner's events, given a knowledge state, are
    * independent. The log-likelihood is the marginal one, the states summed over; the fit's states and predictions are
-   * those of online inference with the fitted parameters.
+   * those of online inference with the fitted parameters. Events without an outcome are left out of the fit, and
+   * `aic` and `bic` count the events with one.
    *
-   * @throws `DataError` when the log is malformed, an event's item or skills are outside the structure, or the
-   * outcomes have probability 0 under the parameters.
+   * @throws `DataError` when the log is malformed or has no event with an outcome, an event's item or skills are
+   * outside the structure, or the outcomes have probability 0 under the parameters.
    */
   fit(log: EventLog): KstFit;
   /**
@@ -153,6 +162,8 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
       return mastered * (1 - slip) + (1 - mastered) * guess;
     },
     update(state, event) {
+      // A lesson is not an item: it has no guess or slip, and it does not move the probabilities of the states.
+      if (!isObserved(event)) return { learner: state.learner, probabilities: [...state.probabilities] };
       const { guess, slip } = itemOf(event.item);
       const mask = maskOf(event);
       const y = event.outcome;
@@ -180,8 +191,10 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
     parameters,
     fit(log) {
       checkLog(log);
-      const items = [...new Set(log.map((event) => event.item))];
-      const design = groupsOf(log, items, maskOf);
+      checkObservedEvents(log, "a KST model");
+      const observed = log.filter(isObserved);
+      const items = [...new Set(observed.map((event) => event.item))];
+      const design = groupsOf(observed, items, maskOf);
       const start: Blim = {
         probabilities: Float64Array.from(parameters.probabilities),
         guess: Float64Array.from(items, (id) => entry(parameters.items, id)?.guess ?? START_RATE),
@@ -213,7 +226,7 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
         predictions,
         logLikelihood: result.logLikelihood,
         aic: ml ? 2 * k - 2 * result.logLikelihood : null,
-        bic: ml ? k * Math.log(log.length) - 2 * result.logLikelihood : null,
+        bic: ml ? k * Math.log(observed.length) - 2 * result.logLikelihood : null,
         converged: result.converged,
         iterations: result.iterations,
       };
@@ -298,7 +311,11 @@ function attemptMasks(compiled: CompiledStructure, over: "skills" | "items"): (a
  * Returns the learners' answers as groups: each learner's events summed per item and mask, and learners with equal
  * sums merged.
  */
-function groupsOf(log: EventLog, items: readonly string[], maskOf: (attempt: Attempt) => Uint8Array): Group[] {
+function groupsOf(
+  log: readonly ObservedEvent[],
+  items: readonly string[],
+  maskOf: (attempt: Attempt) => Uint8Array,
+): Group[] {
   const index = new Map(items.map((id, i) => [id, i]));
   const masks = new Map<Uint8Array, number>();
   const learners = new Map<string, Map<string, Row>>();

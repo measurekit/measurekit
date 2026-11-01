@@ -1,4 +1,5 @@
 import { checkChoice, checkOptions, DataError } from "@measurekit/core";
+import { isObserved } from "../data/event.js";
 import { checkLog, type EventLog } from "../data/event-log.js";
 
 /**
@@ -46,10 +47,10 @@ export interface IitaResult extends IitaCandidate {
  * It generates quasi-orders that admit more and more counterexamples, b_ij learners who fail i but solve j, and returns
  * the one whose counterexamples best match those expected with one error rate. Each learner's first outcome at each
  * item is used; every learner must have answered every item of the log, with outcomes 0 or 1. Items are in the order of
- * their first event. Pass the prerequisites to `surmiseStructure` for the knowledge space.
+ * their first event with an outcome, and events without one are left out. Pass the prerequisites to `surmiseStructure` for the knowledge space.
  *
  * @throws `DataError` when the log is malformed, a learner has not answered every item, an outcome is not 0 or 1, there
- * are fewer than 2 items, or an item is solved by no learner.
+ * are fewer than 2 items with an outcome, or an item is solved by no learner.
  */
 export function iita(log: EventLog, options: IitaOptions = {}): IitaResult {
   checkOptions(options);
@@ -96,11 +97,13 @@ function counterexamples(patterns: readonly (readonly number[])[], m: number): F
 /** Returns the items in order of their first event and each learner's first outcome at each, checking completeness. */
 function responsePatterns(log: EventLog): { items: string[]; patterns: number[][] } {
   checkLog(log);
-  const items = [...new Set(log.map((event) => event.item))];
+  // A lesson has no response pattern, and an item met only through events without an outcome is not one either.
+  const observed = log.filter(isObserved);
+  const items = [...new Set(observed.map((event) => event.item))];
   if (items.length < 2) throw new DataError("IITA needs at least 2 items.");
   const itemIndex = new Map(items.map((item, i) => [item, i]));
   const patterns = new Map<string, number[]>();
-  for (const event of log) {
+  for (const event of observed) {
     const pattern = patterns.get(event.learner) ?? new Array<number>(items.length).fill(-1);
     patterns.set(event.learner, pattern);
     const i = itemIndex.get(event.item) ?? 0;

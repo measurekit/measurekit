@@ -3,4 +3,4 @@
  *
  * @module @measurekit/knowledge-tracing/sim
  */
-export { type Simulation, simulate } from "./simulate.js";
+export { type SimulatedAttempt, type Simulation, simulate } from "./simulate.js";

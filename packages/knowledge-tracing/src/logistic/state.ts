@@ -9,8 +9,20 @@ import { entry } from "../data/record.js";
 export interface LogisticState {
   /** The learner's id. */
   readonly learner: string;
-  /** The learner's history with each skill practiced, by skill id. */
+  /** The learner's history with each skill practiced, by skill id: the events with an outcome. */
   readonly skills: Readonly<Record<string, SkillHistory>>;
+  /** The learner's exposures to each skill, by skill id: the events without an outcome; absent until the first. */
+  readonly exposures?: Readonly<Record<string, ExposureHistory>>;
+}
+
+/** What the exposure features need of a learner's events without an outcome at a skill. */
+export interface ExposureHistory {
+  /** The number of exposures. */
+  readonly count: number;
+  /** The time of the latest exposure. */
+  readonly last: number;
+  /** For each decay d of the model's features, by `String(d)`: Σ dᵃ over the exposures, a the number of later ones. */
+  readonly decayed: Readonly<Record<string, number>>;
 }
 
 /** What the features need of a learner's history with a skill. */
@@ -57,8 +69,29 @@ export function nextHistory(
   };
 }
 
-/** Checks a state, which may come from storage, throwing a `DataError` that names the first problem found. */
-export function checkState(state: LogisticState, decays: readonly number[]): void {
+/** Returns the exposures after an event without an outcome at `time`. */
+export function nextExposure(
+  exposure: ExposureHistory | undefined,
+  time: number,
+  decays: readonly number[],
+): ExposureHistory {
+  return {
+    count: (exposure?.count ?? 0) + 1,
+    last: time,
+    decayed: Object.fromEntries(
+      decays.map((decay) => {
+        const sum = exposure === undefined ? undefined : entry(exposure.decayed, String(decay));
+        return [String(decay), decay * (sum ?? 0) + 1];
+      }),
+    ),
+  };
+}
+
+/**
+ * Checks a state, which may come from storage, throwing a `DataError` that names the first problem found. `decays` are
+ * the decays of the model's outcome features, and `exposureDecays` those of its exposure features.
+ */
+export function checkState(state: LogisticState, decays: readonly number[], exposureDecays: readonly number[]): void {
   const learner = checkLearnerState(state, "logistic");
   const label = `The logistic state of learner "${learner}"`;
   checkRecord(state.skills, `${label} needs skills, an object of histories by skill id`);
@@ -82,6 +115,30 @@ export function checkState(state: LogisticState, decays: readonly number[]): voi
       checkCount(sums.failures, `${prefix} needs decayed failures for decay ${decay}`);
     }
   }
+  checkExposures(state, label, exposureDecays);
+}
+
+/** Checks a state's exposures, which are optional: a state stored before there were any has none. */
+function checkExposures(state: LogisticState, label: string, exposureDecays: readonly number[]): void {
+  if (state.exposures === undefined) return;
+  checkRecord(state.exposures, `${label} needs exposures, an object of exposures by skill id`);
+  for (const [skill, exposure] of Object.entries(state.exposures)) {
+    const prefix = `${label}, exposures to skill "${skill}",`;
+    checkRecord(exposure, `${prefix} must be an object`);
+    checkCount(exposure.count, `${prefix} needs count`);
+    if (!Number.isFinite(exposure.last)) {
+      throw new DataError(`${prefix} needs last, the time of the last exposure, found ${describe(exposure.last)}.`);
+    }
+    checkRecord(exposure.decayed, `${prefix} needs decayed, an object of decayed counts by decay`);
+    for (const decay of exposureDecays) {
+      if (entry(exposure.decayed, String(decay)) === undefined) {
+        throw new DataError(`${prefix} lacks the decayed count of decay ${decay}, which the model's features need.`);
+      }
+    }
+    for (const [decay, sum] of Object.entries(exposure.decayed)) {
+      checkCount(sum, `${prefix} needs a decayed count for decay ${decay}`);
+    }
+  }
 }
 
 function checkCount(value: number, message: string): void {
@@ -91,8 +148,8 @@ function checkCount(value: number, message: string): void {
 }
 
 /**
- * Checks that an attempt is not earlier than the learner's last attempt at any of its skills, as features count the
- * time since it.
+ * Checks that an attempt is not earlier than the learner's last attempt or exposure at any of its skills, as features
+ * count the time since it.
  *
  * @param label - Names the attempt in the error message, such as `The event`.
  */
@@ -102,6 +159,12 @@ export function checkOrder(state: LogisticState, attempt: Attempt, label: string
     if (history !== undefined && attempt.time < history.last) {
       throw new DataError(
         `${label} at time ${attempt.time} is earlier than the learner's last attempt at skill "${skill}", at time ${history.last}.`,
+      );
+    }
+    const exposure = entry(state.exposures, skill);
+    if (exposure !== undefined && attempt.time < exposure.last) {
+      throw new DataError(
+        `${label} at time ${attempt.time} is earlier than the learner's last exposure to skill "${skill}", at time ${exposure.last}.`,
       );
     }
   }

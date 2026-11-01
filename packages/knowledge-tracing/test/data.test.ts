@@ -7,13 +7,16 @@ import {
   type EventInput,
   type EventLog,
   eventLog,
+  type FirstAttemptsOptions,
   type Fold,
+  firstAttempts,
   MeasurekitError,
   type Random,
   splitByItem,
   splitByLearner,
   splitByTime,
 } from "../src/index.js";
+import firstAttemptFixture from "./fixtures/data-first-attempts.json" with { type: "json" };
 import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
 import { defined } from "./helpers.js";
 
@@ -53,6 +56,42 @@ describe("eventLog", () => {
     skills.push("fractions");
     expect(log).toEqual([{ learner: "ana", item: "q1", skills: ["decimals"], time: 0, outcome: 1 }]);
     expect(eventLog([{ learner: "ana", item: "q1", time: 0, outcome: 1 }])[0]?.skills).toEqual([]);
+  });
+
+  it("keeps an event without an outcome, as null, with its resource, covariates and attempt metadata", () => {
+    const covariates = { load: 2 };
+    const input = [
+      {
+        learner: "ana",
+        item: "video",
+        time: 0,
+        outcome: null,
+        resource: "lesson",
+        covariates,
+        hints: 1,
+        duration: 30,
+        attemptNumber: 1,
+      },
+      { learner: "ana", item: "q1", time: 1, outcome: 1, extra: true },
+    ];
+    const log = eventLog(input);
+    covariates.load = 9;
+    expect(log).toEqual([
+      {
+        learner: "ana",
+        item: "video",
+        skills: [],
+        time: 0,
+        outcome: null,
+        resource: "lesson",
+        covariates: { load: 2 },
+        hints: 1,
+        duration: 30,
+        attemptNumber: 1,
+      },
+      { learner: "ana", item: "q1", skills: [], time: 1, outcome: 1 },
+    ]);
+    expect(Object.keys(log[1] ?? {})).toEqual(["learner", "item", "skills", "time", "outcome"]);
   });
 
   it("returns a permutation of the events in time order", () => {
@@ -112,12 +151,52 @@ describe("eventLog", () => {
     [
       "an outcome above 1",
       [{ learner: "a", item: "q", time: 0, outcome: 1.5 }],
-      "Event 1 needs an outcome from 0 to 1, found 1.5.",
+      "Event 1 needs an outcome from 0 to 1 or null, found 1.5.",
     ],
     [
       "an outcome that is a string",
       [{ learner: "a", item: "q", time: 0, outcome: "1" }],
-      'Event 1 needs an outcome from 0 to 1, found "1".',
+      'Event 1 needs an outcome from 0 to 1 or null, found "1".',
+    ],
+    [
+      "a missing outcome",
+      [{ learner: "a", item: "q", time: 0 }],
+      "Event 1 needs an outcome from 0 to 1 or null, found undefined.",
+    ],
+    [
+      "fractional hints",
+      [{ learner: "a", item: "q", time: 0, outcome: 1, hints: 1.5 }],
+      "The hints of Event 1 must be an integer from 0, found 1.5.",
+    ],
+    [
+      "negative hints",
+      [{ learner: "a", item: "q", time: 0, outcome: 1, hints: -1 }],
+      "The hints of Event 1 must be an integer from 0, found -1.",
+    ],
+    [
+      "a duration of 0",
+      [{ learner: "a", item: "q", time: 0, outcome: 1, duration: 0 }],
+      "The duration of Event 1 must be a positive number, found 0.",
+    ],
+    [
+      "attempt number 0",
+      [{ learner: "a", item: "q", time: 0, outcome: 1, attemptNumber: 0 }],
+      "The attempt number of Event 1 must be an integer from 1, found 0.",
+    ],
+    [
+      "an empty resource",
+      [{ learner: "a", item: "q", time: 0, outcome: 1, resource: "" }],
+      'Event 1 needs a resource id, a non-empty string, found "".',
+    ],
+    [
+      "covariates that are an array",
+      [{ learner: "a", item: "q", time: 0, outcome: 1, covariates: [1] }],
+      "Event 1 needs covariates, an object of numbers by name, found an array.",
+    ],
+    [
+      "a covariate that is not finite",
+      [{ learner: "a", item: "q", time: 0, outcome: 1, covariates: { load: Number.NaN } }],
+      'The covariate "load" of Event 1 must be a finite number, found NaN.',
     ],
   ] satisfies [string, unknown[], string][])("rejects %s", (_, input, message) => {
     // Malformed events enter as untyped data, as from JSON.
@@ -139,6 +218,69 @@ describe("eventLog", () => {
     expect(() => eventLog(events, { qMatrix: JSON.parse('[["s"]]') })).toThrow(
       "A Q-matrix must be an object of skill lists by item id, found an array.",
     );
+  });
+});
+
+describe("firstAttempts", () => {
+  const numbered = eventLog(firstAttemptFixture.numbered);
+  const unnumbered = eventLog(firstAttemptFixture.unnumbered);
+  // eventLog orders by time, and the fixture's events are in time order.
+  const reference = (
+    log: EventLog,
+    numberedLog: boolean,
+    hinted: NonNullable<FirstAttemptsOptions["hinted"]>,
+  ): EventLog => {
+    const expected = firstAttemptFixture.expected[numberedLog ? "numbered" : "unnumbered"][hinted];
+    return expected.positions.map((position, index) => ({
+      ...defined(log[position]),
+      outcome: expected.outcomes[index] ?? null,
+    }));
+  };
+
+  it.each(["incorrect", "null", "keep"] as const)(
+    "keeps the first attempts as base R does, with hinted %s",
+    (hinted) => {
+      expect(firstAttempts(numbered, { hinted })).toEqual(reference(numbered, true, hinted));
+      expect(firstAttempts(unnumbered, { hinted })).toEqual(reference(unnumbered, false, hinted));
+    },
+  );
+
+  it("counts a first attempt with hints as incorrect, as DataShop does, unless told otherwise", () => {
+    const log = eventLog([
+      { learner: "a", item: "q", time: 0, outcome: 1, hints: 2 },
+      { learner: "a", item: "q", time: 1, outcome: 1 },
+    ]);
+    expect(firstAttempts(log).map((event) => event.outcome)).toEqual([0]);
+    expect(firstAttempts(log, { hinted: "null" }).map((event) => event.outcome)).toEqual([null]);
+    expect(firstAttempts(log, { hinted: "keep" }).map((event) => event.outcome)).toEqual([1]);
+  });
+
+  it("keeps events without an outcome, and takes the first observed event when attempts are not numbered", () => {
+    const log = eventLog([
+      { learner: "a", item: "q", time: 0, outcome: null },
+      { learner: "a", item: "q", time: 1, outcome: 0 },
+      { learner: "a", item: "q", time: 2, outcome: 1 },
+    ]);
+    expect(firstAttempts(log).map((event) => event.time)).toEqual([0, 1]);
+  });
+
+  it("reads the attempt number the host records, and leaves the log it was given alone", () => {
+    const log = eventLog([
+      { learner: "a", item: "q", time: 0, outcome: 0, attemptNumber: 2 },
+      { learner: "a", item: "q", time: 1, outcome: 1, attemptNumber: 1, hints: 1 },
+    ]);
+    const frozen = JSON.stringify(log);
+    expect(firstAttempts(log).map((event) => [event.time, event.outcome])).toEqual([[1, 0]]);
+    expect(JSON.stringify(log)).toBe(frozen);
+  });
+
+  it("rejects an option that is not a choice and a malformed log", () => {
+    const log = eventLog([{ learner: "a", item: "q", time: 0, outcome: 1 }]);
+    expect(() => firstAttempts(log, { hinted: "ignore" as "keep" })).toThrow(
+      'The option hinted must be "incorrect", "null" or "keep", found "ignore".',
+    );
+    expect(() => firstAttempts([])).toThrow("A log needs at least one event.");
+    expect(() => firstAttempts(log, JSON.parse("null"))).toThrow("The options must be an object");
   });
 });
 
@@ -205,6 +347,76 @@ describe("splits", () => {
       { train: log.slice(start, first), test: log.slice(first, second) },
       { train: log.slice(start, second), test: log.slice(second, end) },
     ]);
+  });
+
+  describe("with events that have no outcome", () => {
+    const withLessons = eventLog([
+      ...["a", "b", "c", "d"].flatMap((learner, index) => [
+        { learner, item: "video", time: index * 10, outcome: null },
+        { learner, item: "q1", time: index * 10 + 1, outcome: 1 },
+        { learner, item: "q2", time: index * 10 + 2, outcome: 0 },
+        { learner, item: "q3", time: index * 10 + 3, outcome: 1 },
+      ]),
+      { learner: "e", item: "reading", time: 100, outcome: null },
+    ]);
+    const observed = (events: EventLog): number => events.filter((event) => event.outcome !== null).length;
+
+    it("deals out the items that have an outcome, and puts every event without one in every training log", () => {
+      const folds = splitByItem(withLessons, 3, createRandom(5));
+      expect(folds.flatMap((fold) => fold.test)).toHaveLength(observed(withLessons));
+      for (const fold of folds) {
+        expect(fold.test.every((event) => event.outcome !== null)).toBe(true);
+        expect(fold.train.filter((event) => event.outcome === null)).toHaveLength(
+          withLessons.length - observed(withLessons),
+        );
+        const tested = new Set(fold.test.map((event) => event.item));
+        expect(fold.train.filter((event) => event.outcome !== null && tested.has(event.item))).toEqual([]);
+      }
+    });
+
+    it("counts the items with an outcome against the folds: a lesson is no item", () => {
+      expect(() => splitByItem(withLessons, 4, createRandom(5))).toThrow(
+        "Splitting by item into 4 folds needs at least 4 items, found 3.",
+      );
+    });
+
+    it("keeps the events without an outcome of a learner with that learner", () => {
+      const folds = splitByLearner(withLessons, 2, createRandom(5));
+      expect(folds.flatMap((fold) => fold.test)).toHaveLength(withLessons.length);
+      for (const fold of folds) {
+        const testLearners = new Set(fold.test.map((event) => event.learner));
+        expect(fold.train.some((event) => testLearners.has(event.learner))).toBe(false);
+      }
+    });
+
+    it("divides the events with an outcome into blocks, and puts a lesson into the block that holds its time", () => {
+      const log = eventLog([
+        { learner: "a", item: "q", time: 1, outcome: 1 },
+        { learner: "a", item: "q", time: 2, outcome: 0 },
+        { learner: "a", item: "video", time: 3, outcome: null },
+        { learner: "a", item: "q", time: 4, outcome: 1 },
+        { learner: "b", item: "video", time: 4, outcome: null },
+        { learner: "b", item: "q", time: 4, outcome: 0 },
+        { learner: "b", item: "q", time: 5, outcome: 1 },
+        { learner: "b", item: "video", time: 6, outcome: null },
+      ]);
+      const folds = splitByTime(log, 2);
+      expect(folds.map((fold) => fold.test.map((event) => event.time))).toEqual([
+        [2, 3, 4, 4, 4],
+        [5, 6],
+      ]);
+      expect(folds.map((fold) => observed(fold.test))).toEqual([3, 1]);
+      expect(folds.map((fold) => fold.train.length)).toEqual([1, 6]);
+    });
+
+    it("rejects times of events with an outcome that do not divide into blocks, however many events there are", () => {
+      const log = eventLog([
+        { learner: "a", item: "video", time: 1, outcome: null },
+        { learner: "a", item: "video", time: 2, outcome: null },
+        { learner: "a", item: "q", time: 3, outcome: 1 },
+      ]);
+      expect(() => splitByTime(log, 1)).toThrow("The log's times do not divide into 2 blocks for 1 folds");
+    });
   });
 
   it("never trains on events later than those it tests", () => {

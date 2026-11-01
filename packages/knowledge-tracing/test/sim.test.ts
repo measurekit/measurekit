@@ -13,6 +13,7 @@ import {
   type LearnerModel,
   logistic,
   type Random,
+  type SimulatedAttempt,
   simulate,
   surmiseStructure,
 } from "../src/index.js";
@@ -43,6 +44,50 @@ function draw(probabilities: readonly number[], random: Random): number {
   }
   return probabilities.length - 1;
 }
+
+describe("simulate with attempts that are not observed", () => {
+  const model = elo();
+  const attempts: SimulatedAttempt[] = Array.from({ length: 12 }, (_, time) => ({
+    learner: "ana",
+    item: `q${time % 3}`,
+    skills: [],
+    time,
+  }));
+
+  it("gives an attempt with observe false no outcome, draws nothing for it, and updates the model with it", () => {
+    const lessons = attempts.map((attempt) => (attempt.time % 4 === 0 ? { ...attempt, observe: false } : attempt));
+    const { log, states } = simulate(model, lessons, createRandom(9));
+    expect(log.map((event) => event.outcome === null)).toEqual(lessons.map((attempt) => attempt.observe === false));
+    expect(log.every((event) => !("observe" in event))).toBe(true);
+    // Elo ignores events without an outcome, so the others draw as they would without the lessons.
+    const without = simulate(
+      model,
+      lessons.filter((attempt) => attempt.observe !== false),
+      createRandom(9),
+    );
+    expect(log.filter((event) => event.outcome !== null).map((event) => event.outcome)).toEqual(
+      without.log.map((event) => event.outcome),
+    );
+    expect(states).toEqual(without.states);
+  });
+
+  it("teaches the model with an unobserved attempt: BKT learns from a lesson before the first draw", () => {
+    const learner = bkt({ parameters: { skills: { s: { prior: 0, learn: 1, forget: 0, guess: 0, slip: 0 } } } });
+    const lesson = { learner: "ana", item: "video", skills: ["s"], time: 1, observe: false };
+    const question = { learner: "ana", item: "q", skills: ["s"], time: 2 };
+    expect(simulate(learner, [lesson, question], createRandom(1)).log.map((event) => event.outcome)).toEqual([null, 1]);
+    expect(
+      simulate(learner, [{ ...lesson, observe: true }, question], createRandom(1)).log.map((e) => e.outcome),
+    ).toEqual([0, 1]);
+  });
+
+  it("rejects an observe that is not a boolean", () => {
+    const attempt = JSON.parse('{"learner":"a","item":"q","skills":[],"time":1,"observe":"no"}');
+    expect(() => simulate(model, [attempt], createRandom(1))).toThrow(
+      'The observe of attempt 1 must be a boolean, found "no".',
+    );
+  });
+});
 
 describe("simulate", () => {
   it("reproduces with the seed and continues each learner's state", () => {

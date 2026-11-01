@@ -8,10 +8,11 @@ import {
   DataError,
   type ThetaDistribution,
 } from "@measurekit/core";
-import { checkAttempt, checkEvent, type Event } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import { checkAttempt, checkEvent, isObserved, type ObservedEvent } from "../data/event.js";
+import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
 import { checkLearner, checkLearnerId } from "../data/learner.js";
 import { parametersOf } from "../data/record.js";
+import { onePass } from "../data/replay.js";
 import { indexOfMax } from "../math/extremes.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { type Ability, average, posteriorMean, posteriorMode } from "./ability.js";
@@ -60,9 +61,11 @@ export interface AbilityOptions {
 export interface IrtModel extends LearnerModel<IrtState, IrtParameters> {
   /**
    * Runs the log through the model and returns it unchanged, with the learners' states: item parameters are given, not
-   * estimated. The log-likelihood is the marginal log-likelihood of the outcomes on the grid.
+   * estimated. The log-likelihood is the marginal log-likelihood of the outcomes on the grid. An event without an outcome
+   * changes no state and has no prediction.
    *
-   * @throws `DataError` when the log is malformed, an item has no parameters, or an outcome is not a category.
+   * @throws `DataError` when the log is malformed or has no event with an outcome, an item has no parameters, or an
+   * outcome is not a category.
    */
   fit(log: EventLog): IrtFit;
   /**
@@ -155,28 +158,16 @@ export function irt(options: IrtOptions): IrtModel {
     parameters,
     fit(log) {
       checkLog(log);
-      const states = new Map<string, IrtState>();
+      checkObservedEvents(log, "an IRT model");
       const likelihood = new Float64Array(points);
-      let logLikelihood = 0;
-      const predictions = log.map((event) => {
-        const state = states.get(event.learner) ?? initial(event.learner);
+      const pass = onePass(log, initial, (state, event) => {
         const item = itemOf(event.item);
         const weights = weightsOfState(state);
         const prediction = expectation(weights, item, grid, terms);
-        states.set(event.learner, advance(state, item, categoryOf(item, event), likelihood));
-        logLikelihood += Math.log(average(weights, (q) => likelihood[q] ?? 0));
-        return prediction;
+        const next = advance(state, item, categoryOf(item, event), likelihood);
+        return { state: next, prediction, logLikelihood: Math.log(average(weights, (q) => likelihood[q] ?? 0)) };
       });
-      return {
-        model,
-        states: Object.fromEntries(states),
-        predictions,
-        logLikelihood,
-        aic: null,
-        bic: null,
-        converged: true,
-        iterations: 1,
-      };
+      return { model, ...pass };
     },
     initialState(learner) {
       checkLearnerId(learner);
@@ -186,6 +177,15 @@ export function irt(options: IrtOptions): IrtModel {
       checkState(state, points);
       checkEvent(event, "The event");
       checkLearner(state.learner, event);
+      // A lesson is not an item: it has no parameters, and it does not move the posterior of θ.
+      if (!isObserved(event)) {
+        return {
+          learner: state.learner,
+          logDensity: [...state.logDensity],
+          slope: [...state.slope],
+          curvature: [...state.curvature],
+        };
+      }
       const item = itemOf(event.item);
       return advance(state, item, categoryOf(item, event));
     },
@@ -228,7 +228,7 @@ function checkGrid(grid: readonly number[], prior: IrtPrior): void {
 }
 
 /** Returns the category of an event's outcome: k for the outcome k / (K - 1). */
-function categoryOf(item: IrtItem, event: Event): number {
+function categoryOf(item: IrtItem, event: ObservedEvent): number {
   const last = categoryCount(item) - 1;
   const k = Math.round(event.outcome * last);
   if (Math.abs(event.outcome * last - k) > CATEGORY_TOLERANCE) {

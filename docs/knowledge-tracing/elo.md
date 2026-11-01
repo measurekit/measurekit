@@ -66,6 +66,13 @@ fit.predictions; // each event's prediction before its outcome, as online use wo
 The fit's `logLikelihood` sums the log-likelihoods of these predictions; `aic` and `bic` are `null`, as Elo estimates
 no fixed number of parameters; `converged` is `true` and `iterations` 1, a single pass.
 
+## Events without an outcome
+
+An event with `outcome: null`, such as a lesson, changes no rating: `update` returns the learner's state as it was, and
+`updateItem` the item's rating as it is, or `{ difficulty: 0, count: 0 }` for an item the model does not know. A lesson
+is no item, so a fit writes no rating for it, gives it a `null` prediction and adds no likelihood term. Removing these
+events from a log changes no state, rating or prediction. A host skips the write of an item row for them.
+
 ## Online
 
 An app keeps each learner's state and each item's rating as a row, and an answer needs only the two rows it touches:

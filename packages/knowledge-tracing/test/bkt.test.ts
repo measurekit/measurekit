@@ -15,12 +15,14 @@ import {
   elo,
   eventLog,
   learningCurve,
+  simulate,
   splitByLearner,
 } from "../src/index.js";
+import lessons from "./fixtures/bkt-lessons.json" with { type: "json" };
 import opportunities from "./fixtures/bkt-opportunities.json" with { type: "json" };
 import practice from "./fixtures/bkt-practice.json" with { type: "json" };
 import recovery from "./fixtures/bkt-recovery.json" with { type: "json" };
-import { defined, expectClose, online } from "./helpers.js";
+import { allPredicted, defined, expectClose, online } from "./helpers.js";
 
 /** Absolute tolerance of P(correct) and P(L) against pyBKT at fixed parameters. */
 const INFERENCE_TOLERANCE = 1e-13;
@@ -30,7 +32,7 @@ const FIT_TOLERANCE = 1e-8;
 /** A configuration of `validation/knowledge-tracing/bkt.py`: the options it sets and pyBKT's results. */
 interface Configuration {
   readonly name: string;
-  readonly options: Pick<BktOptions, "forgetting" | "itemGuessSlip" | "itemLearning"> & {
+  readonly options: Pick<BktOptions, "forgetting" | "itemGuessSlip" | "resourceLearning"> & {
     readonly priorGroups?: boolean;
   };
 }
@@ -116,6 +118,182 @@ describe("bkt against pyBKT", () => {
   });
 });
 
+// The lessons' log has events with `outcome: null`, which pyBKT records as correct = -1.
+const lessonInference: readonly (Configuration & {
+  readonly parameters: BktParameters;
+  readonly predictions: readonly (number | null)[];
+  readonly mastery: readonly number[];
+})[] = JSON.parse(JSON.stringify(lessons.inference));
+const lessonFits: readonly Fit[] = JSON.parse(JSON.stringify(lessons.fits));
+const lessonLog = eventLog(lessons.events);
+
+describe("bkt against pyBKT with events that have no outcome", () => {
+  it.each(lessonInference)("tracks and predicts as pyBKT does with correct = -1: $name", (reference) => {
+    const model = bkt({ ...optionsOf(reference), parameters: reference.parameters });
+    const states = new Map<string, BktState>();
+    lessonLog.forEach((event, index) => {
+      const state = states.get(event.learner) ?? model.initialState(event.learner);
+      expectClose(model.mastery(state, "s"), defined(reference.mastery[index]), INFERENCE_TOLERANCE, `P(L) ${index}`);
+      if (event.outcome !== null) {
+        expectClose(model.predict(state, event), reference.predictions[index] ?? null, INFERENCE_TOLERANCE, `${index}`);
+      }
+      states.set(event.learner, model.update(state, event));
+    });
+  });
+
+  it.each(lessonFits)("fits from pyBKT's start to pyBKT's estimates with correct = -1: $name", (reference) => {
+    const fit = bkt({
+      ...optionsOf(reference),
+      parameters: reference.start,
+      tolerance: lessons.tolerance,
+      maxIterations: lessons.maxIterations,
+    }).fit(lessonLog);
+    expectSkill(fit.model.parameters.skills.s, defined(reference.parameters.skills.s), FIT_TOLERANCE, "s");
+    expectClose(fit.logLikelihood, reference.logLikelihood, FIT_TOLERANCE, "log-likelihood");
+    expect(fit.iterations).toBe(reference.iterations);
+    expect(fit.converged).toBe(true);
+  });
+});
+
+describe("bkt with events that have no outcome", () => {
+  const rates: BktSkill = { prior: 0.3, learn: 0.2, forget: 0.1, guess: 0.2, slip: 0.1 };
+  const lesson = { learner: "ana", item: "video", skills: ["s"], time: 1, outcome: null };
+
+  it("moves P(L) by the learn and forget rates alone: P(L) (1 - P(F)) + (1 - P(L)) P(T)", () => {
+    const model = bkt({ parameters: { skills: { s: rates } } });
+    const first = model.update(model.initialState("ana"), lesson);
+    expectClose(defined(first.skills.s), 0.3 * 0.9 + 0.7 * 0.2, 1e-15);
+    expectClose(
+      defined(model.update(first, lesson).skills.s),
+      defined(first.skills.s) * 0.9 + (1 - defined(first.skills.s)) * 0.2,
+      1e-15,
+    );
+  });
+
+  it("applies the rates of the event's resource, which is its item without one", () => {
+    const skill: BktSkill = {
+      ...rates,
+      resourceLearning: { video: { learn: 0.5, forget: 0 }, reading: { learn: 0.05, forget: 0 } },
+    };
+    const model = bkt({ resourceLearning: true, parameters: { skills: { s: skill } } });
+    const initial = model.initialState("ana");
+    expectClose(defined(model.update(initial, lesson).skills.s), 0.3 + 0.7 * 0.5, 1e-15);
+    expectClose(defined(model.update(initial, { ...lesson, resource: "reading" }).skills.s), 0.3 + 0.7 * 0.05, 1e-15);
+    expectClose(defined(model.update(initial, { ...lesson, item: "other", resource: "video" }).skills.s), 0.65, 1e-15);
+  });
+
+  it("leaves a skill without parameters as it is, and moves the others of the event", () => {
+    const model = bkt({ parameters: { skills: { s: rates } } });
+    const state = model.update(model.initialState("ana"), { ...lesson, skills: ["s", "unknown"] });
+    expect(Object.keys(state.skills)).toEqual(["s"]);
+    expect(model.update(model.initialState("ana"), { ...lesson, skills: ["unknown"] })).toEqual(
+      model.initialState("ana"),
+    );
+  });
+
+  it("accepts an event without skills, which changes nothing, and still rejects an outcome with none", () => {
+    const model = bkt({ parameters: { skills: { s: rates } } });
+    expect(model.update(model.initialState("ana"), { ...lesson, skills: [] })).toEqual(model.initialState("ana"));
+    expect(() => model.update(model.initialState("ana"), { ...lesson, skills: [], outcome: 1 })).toThrow(
+      "The event has no skills; a BKT model needs at least one.",
+    );
+  });
+
+  it("leaves the state it was given unchanged, and a state continues after a JSON round trip", () => {
+    const model = bkt({ parameters: { skills: { s: rates } } });
+    const state = model.initialState("ana");
+    const frozen: BktState = JSON.parse(JSON.stringify(state));
+    const next = model.update(state, lesson);
+    expect(state).toEqual(frozen);
+    expect(model.update(JSON.parse(JSON.stringify(next)), lesson)).toEqual(model.update(next, lesson));
+  });
+
+  it("gives each event without an outcome a null prediction and no likelihood term", () => {
+    const fit = bkt({ resourceLearning: true, itemGuessSlip: true }).fit(lessonLog);
+    expect(fit.predictions.map((p) => p === null)).toEqual(lessonLog.map((event) => event.outcome === null));
+    const observed = lessonLog.filter((event) => event.outcome !== null);
+    const run = online(fit.model, observed);
+    expect(Object.keys(fit.states)).toHaveLength(new Set(lessonLog.map((event) => event.learner)).size);
+    expect(Number.isFinite(fit.logLikelihood)).toBe(true);
+    expect(fit.logLikelihood).toBeGreaterThan(-Number.MAX_VALUE);
+    expect(run.predictions).toHaveLength(observed.length);
+  });
+
+  it("counts the events with an outcome and the rates they estimate in AIC and BIC", () => {
+    const fit = bkt({ resourceLearning: true, itemGuessSlip: true }).fit(lessonLog);
+    const n = lessonLog.filter((event) => event.outcome !== null).length;
+    // P(L0), a learn rate for each of 2 resources, and a guess and a slip for each of 3 items: a lesson has no item rates.
+    expectClose(fit.aic, 2 * 9 - 2 * fit.logLikelihood, 1e-9);
+    expectClose(fit.bic, 9 * Math.log(n) - 2 * fit.logLikelihood, 1e-9);
+    expect(Object.keys(defined(fit.model.parameters.skills.s?.itemGuessSlip)).toSorted()).toEqual(["p1", "p2", "p3"]);
+  });
+
+  it("estimates no rate for a resource that no outcome follows, and none for a skill without an outcome", () => {
+    const events = [
+      { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 1 },
+      { learner: "a", item: "q", skills: ["s"], time: 2, outcome: 0 },
+      { learner: "a", item: "outro", skills: ["s", "taught"], time: 3, outcome: null },
+      { learner: "b", item: "q", skills: ["s"], time: 1, outcome: 0 },
+      { learner: "b", item: "q", skills: ["s"], time: 2, outcome: 1 },
+      { learner: "b", item: "outro", skills: ["s", "taught"], time: 3, outcome: null },
+    ];
+    const fit = bkt({ resourceLearning: true }).fit(eventLog(events));
+    expect(Object.keys(fit.model.parameters.skills)).toEqual(["s"]);
+    expect(Object.keys(defined(fit.model.parameters.skills.s?.resourceLearning))).toEqual(["q"]);
+    expect(fit.predictions.map((prediction) => prediction === null)).toEqual([false, false, false, false, true, true]);
+    // The taught skill has no parameters, so its events leave learners' states with s alone.
+    expect(Object.keys(defined(fit.states.a?.skills))).toEqual(["s"]);
+  });
+
+  it("refuses to fit a log without an event with an outcome", () => {
+    expect(() => bkt().fit(eventLog([lesson]))).toThrow(
+      "The log has no event with an outcome; a BKT model needs at least one to fit.",
+    );
+  });
+
+  it("recovers the rates of a lesson and of practice from a seeded simulation", () => {
+    const truth: BktParameters = {
+      skills: {
+        s: {
+          prior: 0.2,
+          learn: 0.1,
+          forget: 0,
+          guess: 0.2,
+          slip: 0.1,
+          resourceLearning: { lesson: { learn: 0.35, forget: 0 }, practice: { learn: 0.1, forget: 0 } },
+        },
+      },
+    };
+    const random = createRandom(11);
+    const attempts = Array.from({ length: 1500 }, (_, learner) =>
+      Array.from({ length: 10 }, (__, step) => {
+        const isLesson = random.uniform() < 0.3;
+        return {
+          learner: `l${learner}`,
+          item: isLesson ? "lesson" : "practice",
+          skills: ["s"],
+          time: step * 10_000 + learner,
+          observe: !isLesson,
+        };
+      }),
+    ).flat();
+    const { log: simulated } = simulate(bkt({ resourceLearning: true, parameters: truth }), attempts, random);
+    expect(simulated.filter((event) => event.outcome === null)).toHaveLength(attempts.filter((a) => !a.observe).length);
+    const fit = bkt({ resourceLearning: true }).fit(simulated);
+    const estimates = defined(fit.model.parameters.skills.s);
+    expect(fit.converged).toBe(true);
+    expect(Math.abs(estimates.prior - 0.2)).toBeLessThanOrEqual(0.1);
+    for (const [resource, rate] of [
+      ["lesson", 0.35],
+      ["practice", 0.1],
+    ] as const) {
+      expect(Math.abs(defined(estimates.resourceLearning?.[resource]).learn - rate), resource).toBeLessThanOrEqual(
+        0.05,
+      );
+    }
+  });
+});
+
 /** The events of one skill, with that skill only: what an app queries to fit the skill alone. */
 function oneSkill(events: EventLog, skill: string): EventLog {
   return events.filter((event) => event.skills.includes(skill)).map((event) => ({ ...event, skills: [skill] }));
@@ -152,7 +330,7 @@ describe("bkt fitting", () => {
   it("fits skill by skill to the parameters of the whole log, merged by spreading", () => {
     const configurations: BktOptions[] = [
       {},
-      { forgetting: true, itemGuessSlip: true, itemLearning: true },
+      { forgetting: true, itemGuessSlip: true, resourceLearning: true },
       { priorGroups: practice.priorGroups },
     ];
     for (const options of configurations) {
@@ -188,7 +366,7 @@ describe("bkt fitting", () => {
     const extended = bkt({
       forgetting: true,
       itemGuessSlip: true,
-      itemLearning: true,
+      resourceLearning: true,
       priorGroups: practice.priorGroups,
     });
     const result = extended.fit(log);
@@ -343,7 +521,7 @@ describe("bkt edge cases", () => {
         expect(rate >= Number.EPSILON && rate <= 1 - Number.EPSILON).toBe(true);
       }
       expect(Number.isFinite(fit.logLikelihood)).toBe(true);
-      expect(fit.predictions.every((p) => p >= 0 && p <= 1)).toBe(true);
+      expect(allPredicted(fit.predictions).every((p) => p >= 0 && p <= 1)).toBe(true);
       for (const outcome of [0, 1]) {
         const state = fit.model.update(fit.model.initialState("new"), {
           learner: "new",

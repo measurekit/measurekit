@@ -16,13 +16,16 @@ import {
   learningCurve,
   logLoss,
   metrics,
+  observedPairs,
   rmse,
+  splitByItem,
   splitByLearner,
+  splitByTime,
 } from "../src/index.js";
 import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
 import curves from "./fixtures/evaluate-learning-curve.json" with { type: "json" };
 import fixture from "./fixtures/evaluate-metrics.json" with { type: "json" };
-import { defined, expectAllClose, expectClose } from "./helpers.js";
+import { allPredicted, defined, expectAllClose, expectClose } from "./helpers.js";
 
 /** Absolute tolerance of metrics, calibration bins and learning curves against R. */
 const METRIC_TOLERANCE = 1e-12;
@@ -34,7 +37,7 @@ function baseRate(rate = 0.5): LearnerModel<string, { rate: number }> {
   return {
     parameters: { rate },
     fit(log) {
-      const model = baseRate(log.reduce((sum, event) => sum + event.outcome, 0) / log.length);
+      const model = baseRate(log.reduce((sum, event) => sum + defined(event.outcome), 0) / log.length);
       const predictions = log.map(() => model.parameters.rate);
       const logLikelihood = log.reduce(
         (sum, event) => sum + Math.log(event.outcome === 1 ? model.parameters.rate : 1 - model.parameters.rate),
@@ -180,7 +183,12 @@ describe("crossValidate", () => {
       ["skills", elo({ skills: true })],
     ] as const) {
       const evaluation = crossValidate(model, folds);
-      expectAllClose(defined(evaluation.folds[0]).predictions, reference.predictions[name], PREDICTION_TOLERANCE, name);
+      expectAllClose(
+        allPredicted(defined(evaluation.folds[0]).predictions),
+        reference.predictions[name],
+        PREDICTION_TOLERANCE,
+        name,
+      );
     }
   });
 
@@ -190,8 +198,8 @@ describe("crossValidate", () => {
     expect(evaluation.folds).toHaveLength(3);
     expect(evaluation.metrics).toEqual(
       metrics(
-        evaluation.folds.flatMap((fold) => fold.predictions),
-        folds.flatMap((fold) => fold.test.map((event) => event.outcome)),
+        evaluation.folds.flatMap((fold) => allPredicted(fold.predictions)),
+        folds.flatMap((fold) => fold.test.map((event) => defined(event.outcome))),
       ),
     );
     evaluation.folds.forEach((fold, index) => {
@@ -201,7 +209,7 @@ describe("crossValidate", () => {
 
   it("evaluates a model written outside the package", () => {
     const evaluation = crossValidate(baseRate(0.5), [{ train: at([0, 1, 2, 3]), test: at([4, 5]) }]);
-    const rate = at([0, 1, 2, 3]).reduce((sum, event) => sum + event.outcome, 0) / 4;
+    const rate = at([0, 1, 2, 3]).reduce((sum, event) => sum + defined(event.outcome), 0) / 4;
     expect(defined(evaluation.folds[0]).predictions).toEqual([rate, rate]);
   });
 
@@ -266,7 +274,7 @@ describe("learningCurve", () => {
     expect(() => learningCurve(plain)).toThrow(
       "A learning curve needs events with skills; no event of the log has any.",
     );
-    expect(() => learningCurve(log, [0.5])).toThrow(`Found 1 predictions and ${log.length} outcomes.`);
+    expect(() => learningCurve(log, [0.5])).toThrow(`Found 1 predictions for ${log.length} events.`);
     expect(() => learningCurve([])).toThrow("A log needs at least one event.");
   });
 });
@@ -295,6 +303,114 @@ describe("evaluate options from JavaScript", () => {
     );
     expect(() => compareModels({ elo: JSON.parse('{"fit": 1}') }, [])).toThrow(
       "Cross-validation needs a learner model, such as bkt(), found an object.",
+    );
+  });
+});
+
+describe("evaluation with events that have no outcome", () => {
+  const base = eventLog(holdout.events);
+  // A lesson after every third event, at the learner and time of the event, which Elo ignores.
+  const lessons = base.flatMap(
+    (event, index): EventLog =>
+      index % 3 === 0
+        ? [
+            event,
+            { learner: event.learner, item: `lesson${index}`, skills: event.skills, time: event.time, outcome: null },
+          ]
+        : [event],
+  );
+
+  it("aligns the events with an outcome and a prediction, and leaves the others to the metrics", () => {
+    const log = eventLog([
+      { learner: "a", item: "q", time: 1, outcome: 1 },
+      { learner: "a", item: "video", time: 2, outcome: null },
+      { learner: "a", item: "q", time: 3, outcome: 0 },
+      { learner: "a", item: "q", time: 4, outcome: 1 },
+    ]);
+    expect(observedPairs(log, [0.9, null, 0.2, null])).toEqual({ predictions: [0.9, 0.2], outcomes: [1, 0] });
+    expect(observedPairs(log, [0.9, 0.5, 0.2, 0.7])).toEqual({ predictions: [0.9, 0.2, 0.7], outcomes: [1, 0, 1] });
+    const fit = elo().fit(log);
+    const pairs = observedPairs(log, fit.predictions);
+    expect(pairs.outcomes).toEqual([1, 0, 1]);
+    expect(metrics(pairs.predictions, pairs.outcomes).count).toBe(3);
+  });
+
+  it("rejects predictions that are not one per event, or are neither probabilities nor null", () => {
+    const log = eventLog([{ learner: "a", item: "q", time: 1, outcome: 1 }]);
+    expect(() => observedPairs(log, [])).toThrow("Found 0 predictions for 1 events.");
+    expect(() => observedPairs(log, [1.5])).toThrow(
+      "Prediction 1 must be a probability from 0 to 1 or null, found 1.5.",
+    );
+    expect(() => observedPairs(log, JSON.parse('"0.5"'))).toThrow(
+      "The predictions must be an array with a prediction or null for each event, found",
+    );
+    expect(() => observedPairs([], [])).toThrow("A log needs at least one event.");
+  });
+
+  it.each([
+    ["learner", (log: EventLog) => splitByLearner(log, 3, createRandom(3))],
+    ["item", (log: EventLog) => splitByItem(log, 3, createRandom(3))],
+    ["time", (log: EventLog) => splitByTime(log, 3)],
+  ])("evaluates on folds by %s as it does without the events, which have null predictions", (_, split) => {
+    const folds = split(lessons);
+    const withNulls = crossValidate(elo(), folds);
+    const without = crossValidate(elo(), split(base));
+    expect(withNulls.metrics).toEqual(without.metrics);
+    expect(withNulls.folds.map((fold) => fold.metrics)).toEqual(without.folds.map((fold) => fold.metrics));
+    folds.forEach((fold, index) => {
+      const nulls = defined(withNulls.folds[index]).predictions.filter((prediction) => prediction === null);
+      expect(nulls).toHaveLength(fold.test.filter((event) => event.outcome === null).length);
+    });
+  });
+
+  it("keeps the predictions of a test log aligned with it, a null for each event without an outcome", () => {
+    const folds = splitByLearner(lessons, 3, createRandom(3));
+    const evaluation = crossValidate(elo(), folds);
+    folds.forEach((fold, index) => {
+      expect(defined(evaluation.folds[index]).predictions.map((p) => p === null)).toEqual(
+        fold.test.map((event) => event.outcome === null),
+      );
+    });
+    expect(folds.flatMap((fold) => fold.test).some((event) => event.outcome === null)).toBe(true);
+  });
+
+  it("gives a fold with no event with an outcome no metrics, and refuses when no fold has one", () => {
+    const lesson = (learner: string, time: number) => ({ learner, item: "video", skills: [], time, outcome: null });
+    const answer = (learner: string, time: number) => ({ learner, item: "q", skills: [], time, outcome: 1 });
+    const train = eventLog([answer("a", 1), answer("b", 2)]);
+    const folds: Fold[] = [
+      { train, test: eventLog([lesson("c", 3)]) },
+      { train, test: eventLog([answer("c", 4)]) },
+    ];
+    const evaluation = crossValidate(elo(), folds);
+    expect(evaluation.folds.map((fold) => fold.metrics?.count ?? null)).toEqual([null, 1]);
+    expect(evaluation.metrics.count).toBe(1);
+    expect(() => crossValidate(elo(), [{ train, test: eventLog([lesson("c", 3)]) }])).toThrow(
+      "Cross-validation needs an event with an outcome in a test log; no test log has one.",
+    );
+  });
+
+  it("counts opportunities and errors over the events with an outcome in learning curves", () => {
+    const fit = elo({ skills: true }).fit(lessons);
+    const curve = learningCurve(lessons, fit.predictions);
+    const plain = learningCurve(base, elo({ skills: true }).fit(base).predictions);
+    expect(curve).toEqual(plain);
+    expect(learningCurve(lessons).overall.map((point) => point.count)).toEqual(
+      learningCurve(base).overall.map((point) => point.count),
+    );
+  });
+
+  it("refuses a learning curve whose predictions lack an event with an outcome", () => {
+    const log = eventLog([
+      { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 1 },
+      { learner: "a", item: "video", skills: ["s"], time: 2, outcome: null },
+    ]);
+    expect(learningCurve(log, [0.5, null]).overall[0]?.count).toBe(1);
+    expect(() => learningCurve(log, [null, null])).toThrow(
+      "A learning curve needs a prediction for every event with an outcome.",
+    );
+    expect(() => learningCurve(eventLog([{ ...defined(log[1]) }]))).toThrow(
+      "A learning curve needs events with skills; no event of the log has any.",
     );
   });
 });

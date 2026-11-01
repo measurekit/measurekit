@@ -48,6 +48,10 @@ The threshold criterion needs a model that defines mastery, as [BKT](bkt.md#mast
 is Corbett and Anderson's (1994). Three correct in a row is the rule of ASSISTments' skill builders. Only an outcome of
 1 extends a run.
 
+An event without an outcome, such as a lesson, is no opportunity. A streak is left as it is by it, and a threshold
+criterion tests the model's mastery only after events with an outcome, though the model is updated by the lesson, so a
+lesson alone never records mastery.
+
 Over a log, both return, for each learner and each skill they practiced, the opportunity after which the criterion was
 first met, 1 being the first attempt at the skill, or `null` if the log ends before:
 

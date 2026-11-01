@@ -37,14 +37,14 @@ COLUMNS = {
     "skill_name": "skill",
     "correct": "correct",
     "multigs": "item",
-    "multilearn": "item",
+    "multilearn": "resource",
     "multiprior": "group",
 }
 
 
 def pybkt_data(rows, skill, options, gs_names=None, resource_names=None):
     """pyBKT's data of one skill: model_type is (multilearn, multiprior, multipair, multigs)."""
-    model_type = (options.get("itemLearning", False), options.get("priorGroups", False), False,
+    model_type = (options.get("resourceLearning", False), options.get("priorGroups", False), False,
                   options.get("itemGuessSlip", False))
     return data_helper.convert_data(
         pd.DataFrame(rows), skill, defaults=dict(COLUMNS), model_type=model_type,
@@ -60,8 +60,8 @@ def pybkt_model(parameters, data, options):
     for name, _ in resources:
         if options.get("priorGroups") and name != "Default":
             learning.append((parameters["groupPriors"][name], 0.0))
-        elif options.get("itemLearning"):
-            rates = parameters["itemLearning"][name]
+        elif options.get("resourceLearning"):
+            rates = parameters["resourceLearning"][name]
             learning.append((rates["learn"], rates["forget"]))
         else:
             learning.append((parameters["learn"], parameters["forget"]))
@@ -129,8 +129,8 @@ def knowledge_tracing_parameters(model, data, options, counts):
         skill["learn"], skill["forget"] = float(model["learns"][default]), float(model["forgets"][default])
     else:
         skill["prior"] = float(model["prior"])
-        if options.get("itemLearning"):
-            skill["itemLearning"] = {name: {"learn": float(model["learns"][index - 1]),
+        if options.get("resourceLearning"):
+            skill["resourceLearning"] = {name: {"learn": float(model["learns"][index - 1]),
                                             "forget": float(model["forgets"][index - 1])}
                                      for name, index in names.items()}
             skill["learn"] = pooled(transitions[:, 1, 0], transitions[:, :, 0])
@@ -160,7 +160,7 @@ SKILLS = ["a", "b", "c"]
 rng = np.random.default_rng(SEED)
 TRUE = {skill: {
     "groupPriors": {"high": 0.6, "low": 0.2},
-    "itemLearning": {item: {"learn": float(rng.uniform(0.05, 0.3)), "forget": float(rng.uniform(0, 0.05))}
+    "resourceLearning": {item: {"learn": float(rng.uniform(0.05, 0.3)), "forget": float(rng.uniform(0, 0.05))}
                      for item, skills in ITEM_SKILLS.items() if skill in skills},
     "itemGuessSlip": {item: {"guess": float(rng.uniform(0.1, 0.3)), "slip": float(rng.uniform(0.05, 0.15))}
                       for item, skills in ITEM_SKILLS.items() if skill in skills},
@@ -178,11 +178,12 @@ for index, learner in enumerate(LEARNERS):
         events.append({"learner": learner, "item": item, "skills": skills, "time": attempt * 100 + index,
                        "outcome": int(rng.random() < chance)})
         for skill in skills:
-            learning = TRUE[skill]["itemLearning"][item]
+            learning = TRUE[skill]["resourceLearning"][item]
             known[skill] = rng.random() >= learning["forget"] if known[skill] else rng.random() < learning["learn"]
 events.sort(key=lambda event: event["time"])
 rows = [{"order": order, "learner": event["learner"], "skill": skill, "correct": event["outcome"],
-         "item": event["item"], "group": GROUPS[event["learner"]], "event": order, "position": position}
+         "item": event["item"], "resource": event["item"], "group": GROUPS[event["learner"]], "event": order,
+         "position": position}
         for order, event in enumerate(events) for position, skill in enumerate(event["skills"])]
 
 # pyBKT drops the emission counts of a learner's only event of a skill, and rates every item without a following
@@ -209,9 +210,9 @@ def parameters_for(options, values):
                  "guess": v["guess"], "slip": v["slip"]}
         if options.get("priorGroups"):
             entry["groupPriors"] = v["groupPriors"]
-        if options.get("itemLearning"):
-            entry["itemLearning"] = {item: {"learn": r["learn"], "forget": r["forget"] if options.get("forgetting")
-                                            else 0.0} for item, r in v["itemLearning"].items()}
+        if options.get("resourceLearning"):
+            entry["resourceLearning"] = {item: {"learn": r["learn"], "forget": r["forget"] if options.get("forgetting")
+                                            else 0.0} for item, r in v["resourceLearning"].items()}
         if options.get("itemGuessSlip"):
             entry["itemGuessSlip"] = v["itemGuessSlip"]
         skills[skill] = entry
@@ -224,7 +225,7 @@ def rates(skill, prior, learn, forget, guess, slip, shift):
     return {
         "prior": prior, "learn": learn, "forget": forget, "guess": guess, "slip": slip,
         "groupPriors": {"high": min(prior + 0.3, 0.9), "low": prior},
-        "itemLearning": {item: {"learn": learn + shift * k, "forget": forget + shift * k / 4}
+        "resourceLearning": {item: {"learn": learn + shift * k, "forget": forget + shift * k / 4}
                          for k, item in enumerate(items)},
         "itemGuessSlip": {item: {"guess": guess + shift * k, "slip": slip + shift * k / 2}
                           for k, item in enumerate(items)},
@@ -237,10 +238,10 @@ CONFIGURATIONS = [
     ("standard", {}),
     ("forgetting", {"forgetting": True}),
     ("item guess and slip", {"itemGuessSlip": True}),
-    ("item learning with forgetting", {"itemLearning": True, "forgetting": True}),
+    ("resource learning with forgetting", {"resourceLearning": True, "forgetting": True}),
     ("prior groups", {"priorGroups": True}),
-    ("item guess, slip and learning with forgetting", {"itemGuessSlip": True, "itemLearning": True, "forgetting": True}),
-    ("prior groups with item rates", {"priorGroups": True, "itemGuessSlip": True, "itemLearning": True,
+    ("item guess, slip and learning with forgetting", {"itemGuessSlip": True, "resourceLearning": True, "forgetting": True}),
+    ("prior groups with item rates", {"priorGroups": True, "itemGuessSlip": True, "resourceLearning": True,
                                       "forgetting": True}),
 ]
 
@@ -253,7 +254,7 @@ def predictions_of(options, parameters):
     for skill in SKILLS:
         skill_rows = [row for row in rows if row["skill"] == skill]
         skill_parameters = parameters["skills"][skill]
-        if options.get("priorGroups") and (options.get("itemGuessSlip") or options.get("itemLearning")):
+        if options.get("priorGroups") and (options.get("itemGuessSlip") or options.get("resourceLearning")):
             whole = pybkt_data(skill_rows, skill, {**options, "priorGroups": False})
             for group, prior in skill_parameters["groupPriors"].items():
                 part = [row for row in skill_rows if row["group"] == group]
@@ -340,7 +341,7 @@ for learner in range(1000):
         for attempt in range(10):
             correct = int(rng.random() < (1 - truth["slip"] if known else truth["guess"]))
             recovery_rows.append({"order": (attempt * 2 + k) * 1000 + learner, "learner": f"r{learner}",
-                                  "skill": skill, "correct": correct, "item": skill, "group": ""})
+                                  "skill": skill, "correct": correct, "item": skill, "resource": skill, "group": ""})
             if not known:
                 known = rng.random() < truth["learn"]
 recovery_rows.sort(key=lambda row: row["order"])
@@ -380,4 +381,117 @@ write_fixture("bkt-opportunities", {
     "source": "Python: the recurrence P(L) <- P(L) (1 - P(F)) + (1 - P(L)) P(T) iterated; null when it never reaches.",
     "cases": [{"mastery": m, "learn": l, "forget": f, "threshold": t, "opportunities": opportunities(m, l, f, t)}
               for m, l, f, t in CASES],
+})
+
+
+# Events without an outcome: 150 learners take 14 steps at one skill, each a lesson, which pyBKT records as correct = -1,
+# or an attempt at one of 3 items. Lessons and practice have learn rates of their own; items have guess and slip.
+LESSON_RATES = {"prior": 0.3, "resources": {"lesson": (0.35, 0.02), "practice": (0.1, 0.02)},
+                "items": {"p1": (0.25, 0.1), "p2": (0.15, 0.2), "p3": (0.2, 0.15)}}
+LESSON_ITEM = "lesson"
+lesson_rng = np.random.default_rng(SEED + 1)
+lesson_events = []
+for index in range(150):
+    known = lesson_rng.random() < LESSON_RATES["prior"]
+    for step in range(14):
+        is_lesson = lesson_rng.random() < 0.3
+        item = LESSON_ITEM if is_lesson else str(lesson_rng.choice(sorted(LESSON_RATES["items"])))
+        resource = "lesson" if is_lesson else "practice"
+        outcome = None
+        if not is_lesson:
+            guess, slip = LESSON_RATES["items"][item]
+            outcome = int(lesson_rng.random() < (1 - slip if known else guess))
+        lesson_events.append({"learner": f"M{index:02d}", "item": item, "resource": resource, "skills": ["s"],
+                              "time": step * 100 + index, "outcome": outcome})
+        learn, forget = LESSON_RATES["resources"][resource]
+        known = lesson_rng.random() >= forget if known else lesson_rng.random() < learn
+lesson_events.sort(key=lambda event: event["time"])
+lesson_rows = [{"order": order, "learner": event["learner"], "skill": "s",
+                "correct": -1 if event["outcome"] is None else event["outcome"], "item": event["item"],
+                "resource": event["resource"], "group": ""} for order, event in enumerate(lesson_events)]
+# pyBKT rates every resource without a following attempt as learned for sure, so each resource must be followed by an
+# outcome somewhere, and every learner needs at least 2 steps.
+followed = {row["resource"] for row in lesson_rows if any(
+    later["learner"] == row["learner"] and later["order"] > row["order"] and later["correct"] != -1
+    for later in lesson_rows)}
+assert followed == {"lesson", "practice"}, followed
+
+LESSON_CONFIGURATIONS = [
+    ("lessons and practice", {"resourceLearning": True, "itemGuessSlip": True}),
+    ("lessons and practice with forgetting", {"resourceLearning": True, "itemGuessSlip": True, "forgetting": True}),
+    ("one learn rate", {}),
+]
+
+
+def lesson_parameters(options, prior, learn, forget, guess, slip, shift, with_lesson_item=True):
+    """measurekit's parameters of the skill: the rates, those of the resources and of the items around them."""
+    skill = {"prior": prior, "learn": learn, "forget": forget if options.get("forgetting") else 0.0,
+             "guess": guess, "slip": slip}
+    if options.get("resourceLearning"):
+        skill["resourceLearning"] = {name: {"learn": learn + shift * k, "forget": skill["forget"]}
+                                     for k, name in enumerate(["lesson", "practice"])}
+    if options.get("itemGuessSlip"):
+        names = sorted(LESSON_RATES["items"]) + ([LESSON_ITEM] if with_lesson_item else [])
+        skill["itemGuessSlip"] = {name: {"guess": guess + shift * k, "slip": slip + shift * k / 2}
+                                  for k, name in enumerate(names)}
+    return skill
+
+
+def lesson_model(options, skill):
+    """pyBKT's model and data of the lesson log for measurekit's parameters of the skill."""
+    data = pybkt_data(lesson_rows, "s", options)
+    return pybkt_model(skill, data, options), data
+
+
+lesson_inference, lesson_fits = [], []
+for name, options in LESSON_CONFIGURATIONS:
+    fixed = lesson_parameters(options, 0.3, 0.2, 0.03, 0.2, 0.1, 0.05)
+    model, data = lesson_model(options, fixed)
+    by_row = pybkt_predictions(model, data)
+    inference_skill = {key: value for key, value in fixed.items()}
+    if options.get("itemGuessSlip"):
+        inference_skill["itemGuessSlip"] = {item: rates for item, rates in fixed["itemGuessSlip"].items()
+                                            if item != LESSON_ITEM}
+    lesson_inference.append({
+        "name": name, "options": options, "parameters": {"skills": {"s": inference_skill}},
+        "predictions": [None if row["correct"] == -1 else float(by_row[order][0])
+                        for order, row in enumerate(lesson_rows)],
+        "mastery": [float(by_row[order][1]) for order in range(len(lesson_rows))],
+    })
+
+    start = lesson_parameters(options, 0.5, 0.3, 0.08, 0.3, 0.2, 0.03)
+    model, data = lesson_model(options, start)
+    reference, _ = EM_fit.EM_fit({key: np.copy(value) for key, value in model.items()}, data, tol=TOLERANCE,
+                                 maxiter=MAX_ITERATIONS, parallel=False)
+    model, lls, counts = expectation_maximization(model, data)
+    for key in ["learns", "forgets", "guesses", "slips"]:
+        assert np.array_equal(model[key], reference[key]), (name, key)
+    fitted = knowledge_tracing_parameters(model, data, options, counts)
+    if options.get("itemGuessSlip"):
+        fitted["itemGuessSlip"] = {item: rates for item, rates in fitted["itemGuessSlip"].items()
+                                   if item != LESSON_ITEM}
+        start["itemGuessSlip"] = {item: rates for item, rates in start["itemGuessSlip"].items()
+                                  if item != LESSON_ITEM}
+    fitted_model = pybkt_model({**fitted, **({"itemGuessSlip": {**fitted["itemGuessSlip"],
+                                                                 LESSON_ITEM: {"guess": 0.5, "slip": 0.5}}}
+                                             if options.get("itemGuessSlip") else {})}, data, options)
+    by_row = pybkt_predictions(fitted_model, data)
+    lesson_fits.append({
+        "name": name, "options": options, "start": {"skills": {"s": start}},
+        "parameters": {"skills": {"s": fitted}}, "iterations": len(lls),
+        "logLikelihood": sum(outcome_log_likelihood(by_row[order][0], row["correct"])
+                             for order, row in enumerate(lesson_rows) if row["correct"] != -1),
+    })
+
+write_fixture("bkt-lessons", {
+    "source": "pyBKT 1.4.3: correct = -1 for a lesson, multilearn as resource, multigs as item; predict_onestep at "
+              "fixed parameters and EM_fit from matched starts.",
+    "tolerance": TOLERANCE,
+    "maxIterations": MAX_ITERATIONS,
+    "truth": {"skills": {"s": {"prior": LESSON_RATES["prior"],
+                               "resourceLearning": {name: {"learn": learn, "forget": forget}
+                                                    for name, (learn, forget) in LESSON_RATES["resources"].items()}}}},
+    "events": lesson_events,
+    "inference": lesson_inference,
+    "fits": lesson_fits,
 })

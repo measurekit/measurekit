@@ -14,7 +14,14 @@ import {
 } from "../src/index.js";
 import recovery from "./fixtures/elo-recovery.json" with { type: "json" };
 import worked from "./fixtures/elo-worked.json" with { type: "json" };
-import { correlation, defined, expectAllClose, expectClose } from "./helpers.js";
+import {
+  allPredicted,
+  correlation,
+  defined,
+  expectAllClose,
+  expectClose,
+  expectUnaffectedByLessons,
+} from "./helpers.js";
 
 /** Absolute tolerance of Elo estimates and predictions against the R replay. */
 const ELO_TOLERANCE = 1e-12;
@@ -116,7 +123,7 @@ const arbitraryOptions: fc.Arbitrary<EloOptions> = fc.oneof(
 describe("elo against R", () => {
   it.each(cases)("replays the worked log: $name", (reference) => {
     const fit = elo({ ...reference.options, parameters: reference.parameters }).fit(eventLog(reference.events));
-    expectAllClose(fit.predictions, reference.predictions, ELO_TOLERANCE, "predictions");
+    expectAllClose(allPredicted(fit.predictions), reference.predictions, ELO_TOLERANCE, "predictions");
     expect(Object.keys(fit.states)).toEqual(Object.keys(reference.states));
     for (const [learner, state] of Object.entries(reference.states)) expectState(fit.states[learner], state, learner);
     const { items } = fit.model.parameters;
@@ -297,7 +304,7 @@ describe("elo input checks", () => {
     const model = elo();
     const state = model.initialState("ana");
     expect(() => model.update(state, { ...event, outcome: 2 })).toThrow(
-      "The event needs an outcome from 0 to 1, found 2.",
+      "The event needs an outcome from 0 to 1 or null, found 2.",
     );
     expect(() => model.predict(state, { ...event, skills: ["x", "x"] })).toThrow(
       'The attempt lists the skill "x" twice.',
@@ -312,5 +319,37 @@ describe("elo options from JavaScript", () => {
 
   it("rejects parameters of null, which do not stand for the default", () => {
     expect(() => elo(JSON.parse('{"parameters": null}'))).toThrow("Elo parameters must be an object, found null.");
+  });
+});
+
+describe("elo with events that have no outcome", () => {
+  const lesson = { learner: "ana", item: "video", skills: ["fractions"], time: 9, outcome: null };
+
+  it.each(cases)("is unaffected by them: $name", (reference) => {
+    expectUnaffectedByLessons(elo(reference.options), eventLog(reference.events));
+  });
+
+  it("changes no rating: the state stays, and the item's rating is its own, or 0 for an item it does not know", () => {
+    const model = elo({ skills: true, parameters: { items: { q1: { difficulty: 0.4, count: 3 } } } });
+    const state = model.update(model.initialState("ana"), { ...lesson, item: "q1", outcome: 1 });
+    expect(model.update(state, lesson)).toEqual(state);
+    expect(model.update(state, lesson)).not.toBe(state);
+    expect(model.updateItem(state, { ...lesson, item: "q1" })).toEqual({ difficulty: 0.4, count: 3 });
+    expect(model.updateItem(state, lesson)).toEqual({ difficulty: 0, count: 0 });
+  });
+
+  it("writes no rating for them in a fit, and gives them no prediction", () => {
+    const log = eventLog([
+      { learner: "ana", item: "video", time: 1, outcome: null },
+      { learner: "ana", item: "q1", time: 2, outcome: 1 },
+    ]);
+    const fit = elo().fit(log);
+    expect(Object.keys(fit.model.parameters.items)).toEqual(["q1"]);
+    expect(fit.predictions).toEqual([null, 0.5]);
+    expect(defined(fit.states.ana).count).toBe(1);
+  });
+
+  it("refuses to fit a log without an event with an outcome", () => {
+    expect(() => elo().fit(eventLog([{ learner: "ana", item: "video", time: 1, outcome: null }]))).toThrow(DataError);
   });
 });

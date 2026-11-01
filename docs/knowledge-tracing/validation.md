@@ -42,7 +42,7 @@ equal `EM_fit.EM_fit`'s. The options map to pyBKT as follows:
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `forgetting: true`                               | `forgets = True`                                                                                                                                 |
 | `itemGuessSlip: true`                            | `multigs`, on the item column                                                                                                                    |
-| `itemLearning: true`                             | `multilearn`, on the item column                                                                                                                 |
+| `resourceLearning: true`                         | `multilearn`, on the resource column                                                                                                             |
 | `priorGroups`                                    | `multiprior`, on a group column: pyBKT's prior is 0, and a group's prior is the learn rate of a phantom step before each learner's first attempt |
 | `restarts`, `seed`, `tolerance`, `maxIterations` | `num_fits`, `seed`, `tol`, `maxiter`                                                                                                             |
 
@@ -63,6 +63,21 @@ group's; their fit has no reference beyond its parts.
 From the same start, the EM of `bkt` takes the same number of iterations as pyBKT's and reaches its estimates
 within 6e-16. From random starts, both reach the same optimum for every skill of the practice log as the given starts,
 within 1.4e-6 in log-likelihood, where EM stops at a change of 1e-6. No start reached another local optimum.
+
+**Events without an outcome.** `bkt.py` also runs pyBKT on a log in which an event of a lesson is `correct = -1`, pyBKT's
+no response, with `multilearn` on the resource column and `multigs` on the item column. A learner's P(L) before every
+event at fixed parameters, P(correct) before every event with an outcome, and EM from a given start are compared, in
+three configurations: lessons and practice with rates of their own, the same with forgetting, and one learn rate. EM
+takes the same number of iterations as pyBKT's.
+
+| Quantity                                                                 | Reference                                                            |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| P(L) and P(correct) at fixed parameters with `correct = -1`              | `predict_onestep.run`                                                |
+| Parameters, log-likelihood and iterations of EM with `correct = -1`      | `EM_fit` from the same start, to a change of the log-likelihood 1e-9 |
+| The rates of a lesson and of practice recovered from a seeded simulation | The true rates, to 0.05, and P(L0) to 0.1                            |
+
+pyBKT gives a lesson a guess and slip class of its own, which no count reaches; `bkt` gives a lesson none. A resource that
+no outcome follows in a sequence has no rate in `bkt`, where pyBKT keeps its start; the log avoids it.
 
 Several results of pyBKT are not references, and the fixtures avoid them:
 
@@ -104,6 +119,17 @@ exact approximation, to a gradient below 1e-6; `fit` reaches it within 7e-9.
 formula leaves out the first learner's column, 302 columns against 303 in `afm`, and the ridge is not invariant to that
 choice: LiblineaR on LKT's columns, run to the same tight tolerance, still differs by 0.0071 and gives -691.0554. The
 rest is LKT's stopping tolerance, `epsilon = 1e-4`.
+
+**Exposure features.** `validation/knowledge-tracing/exposures.R` simulates a log in which lessons raise the probability of
+a correct answer, writes the exposure features of every event from their definitions in base R, and fits them with
+`glm(family = binomial)`, `epsilon = 1e-14`, the score checked below 1e-9. The test computes the features from the learner's
+state, and fits the model to the log with its lessons.
+
+## Attempt metadata
+
+`validation/knowledge-tracing/data.R` simulates a log with events without an outcome, hints and attempt numbers, and
+computes the first attempts in base R by DataShop's convention, with and without the attempt number and for each value
+of `hinted`. The test compares the events kept and their outcomes exactly.
 
 ## Item response theory
 
@@ -212,6 +238,8 @@ Properties that hold for any input are tested with fast-check:
 - the expected attempts to a streak satisfy their recurrence, E_r = 1 + p E_(r+1) + (1 - p) E_0;
 - IRT states stay finite, and predictions from 0 to 1, for items of discrimination up to 60 and difficulty from -6 to
   6, and every outcome, after a JSON round trip at every step;
+- removing the events without an outcome from a log changes no parameter, state, log-likelihood or prediction at the
+  events with an outcome, for Elo, IRT, KST and logistic models without exposure features;
 - the forward-backward posteriors of 800 correct and 400 incorrect answers, where P(unknown) underflows to 0, equal
   those computed in log space within 1e-10.
 
@@ -247,28 +275,32 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 
 ## Tolerances
 
-| Quantity                                                            | Tolerance                      | Largest difference found       |
-| ------------------------------------------------------------------- | ------------------------------ | ------------------------------ |
-| Normal quantile and logistic function                               | 1e-14 relative                 | 3e-16                          |
-| Forward-backward quantities                                         | 1e-12 absolute                 | 9e-16                          |
-| Logistic regression coefficients and log-likelihood                 | 1e-10 absolute                 | 2e-13                          |
-| Metrics, calibration bins, learning curves                          | 1e-12 absolute                 | 3e-16                          |
-| Elo predictions, estimates and log-likelihood                       | 1e-12 absolute                 | 2e-15                          |
-| Held-out Elo predictions                                            | 1e-12 absolute                 | 1e-16                          |
-| BKT P(correct) and P(L) at fixed parameters                         | 1e-13 absolute                 | 2.3e-14                        |
-| BKT parameters and log-likelihood fitted from a given start         | 1e-8 absolute                  | 6.8e-13                        |
-| Logistic features against LKT                                       | 1e-12 absolute                 | 9e-16                          |
-| Logistic coefficients, proficiencies and log-likelihood against glm | 1e-8 absolute                  | 5.4e-10                        |
-| Ridge coefficients and proficiencies                                | 1e-6 absolute                  | 3.4e-9                         |
-| Random-intercept coefficients, σ and modes                          | 1e-5 absolute                  | 7.3e-9                         |
-| Random-intercept log-likelihood                                     | 1e-6 absolute                  | 4.3e-12                        |
-| IRT EAP, its standard error, predictions and log-likelihood         | 1e-10 absolute                 | 2.2e-15                        |
-| IRT MAP, at the default grid spacing 0.2, × (spacing / 0.2)⁵        | 1e-5 absolute                  | 3.1e-7; 2.1e-5 at spacing 0.45 |
-| IRT MAP standard error, × (spacing / 0.2)⁴                          | 1e-4 absolute                  | 2.5e-6; 1.3e-4 at spacing 0.45 |
-| BLIM parameters by ML against pks                                   | 1e-6 absolute                  | 1.3e-7                         |
-| BLIM log-likelihood by ML                                           | 1e-8 absolute                  | 2.8e-11                        |
-| BLIM by MD, the assessment's posteriors                             | 1e-12 absolute                 | 4.5e-13                        |
-| IITA `diff` and error rate                                          | 1e-10 relative, 1e-12 absolute | 1.7e-15, 6.9e-17               |
+| Quantity                                                             | Tolerance                      | Largest difference found       |
+| -------------------------------------------------------------------- | ------------------------------ | ------------------------------ |
+| Normal quantile and logistic function                                | 1e-14 relative                 | 3e-16                          |
+| Forward-backward quantities                                          | 1e-12 absolute                 | 9e-16                          |
+| Logistic regression coefficients and log-likelihood                  | 1e-10 absolute                 | 2e-13                          |
+| Metrics, calibration bins, learning curves                           | 1e-12 absolute                 | 3e-16                          |
+| Elo predictions, estimates and log-likelihood                        | 1e-12 absolute                 | 2e-15                          |
+| Held-out Elo predictions                                             | 1e-12 absolute                 | 1e-16                          |
+| BKT P(correct) and P(L) at fixed parameters                          | 1e-13 absolute                 | 2.3e-14                        |
+| BKT parameters and log-likelihood fitted from a given start          | 1e-8 absolute                  | 6.8e-13                        |
+| BKT P(L) and P(correct) at fixed parameters, with `correct = -1`     | 1e-13 absolute                 | 9.3e-15                        |
+| BKT parameters and log-likelihood from a given start, `correct = -1` | 1e-8 absolute                  | 9.1e-13                        |
+| Logistic features against LKT                                        | 1e-12 absolute                 | 9e-16                          |
+| Exposure features against base R                                     | 1e-12 absolute                 | 0                              |
+| Exposure coefficients and log-likelihood against glm                 | 1e-8 absolute                  | 1.8e-14                        |
+| Logistic coefficients, proficiencies and log-likelihood against glm  | 1e-8 absolute                  | 5.4e-10                        |
+| Ridge coefficients and proficiencies                                 | 1e-6 absolute                  | 3.4e-9                         |
+| Random-intercept coefficients, σ and modes                           | 1e-5 absolute                  | 7.3e-9                         |
+| Random-intercept log-likelihood                                      | 1e-6 absolute                  | 4.3e-12                        |
+| IRT EAP, its standard error, predictions and log-likelihood          | 1e-10 absolute                 | 2.2e-15                        |
+| IRT MAP, at the default grid spacing 0.2, × (spacing / 0.2)⁵         | 1e-5 absolute                  | 3.1e-7; 2.1e-5 at spacing 0.45 |
+| IRT MAP standard error, × (spacing / 0.2)⁴                           | 1e-4 absolute                  | 2.5e-6; 1.3e-4 at spacing 0.45 |
+| BLIM parameters by ML against pks                                    | 1e-6 absolute                  | 1.3e-7                         |
+| BLIM log-likelihood by ML                                            | 1e-8 absolute                  | 2.8e-11                        |
+| BLIM by MD, the assessment's posteriors                              | 1e-12 absolute                 | 4.5e-13                        |
+| IITA `diff` and error rate                                           | 1e-10 relative, 1e-12 absolute | 1.7e-15, 6.9e-17               |
 
 glm stops when the deviance changes by less than 1e-14 relative, the Newton steps of the logistic models when
 no gradient component exceeds 1e-10. The logistic fits' tolerances allow for the references' stopping rules, with
@@ -283,4 +315,6 @@ which sums in extended precision. Fixtures store 17 significant digits, so they 
 
 [validation/README.md](../../validation/README.md) lists the scripts, the R packages and the Python environment they
 need. Update the versions above when they change. A new statistic needs a reference in an R or Python script, a
-fixture, a test that loads it, and a row in the tables above.
+fixture, a test that loads it, and a row in the tables above. `stored-state.json` is the one fixture no script writes:
+it holds the states and parameters of each model that the build before the first release wrote, and a test checks that
+every build reads them as before. It is never regenerated ([storage](storage.md#stored-states-across-versions)).

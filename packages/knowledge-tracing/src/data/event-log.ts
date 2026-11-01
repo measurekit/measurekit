@@ -1,5 +1,5 @@
 import { checkArray, checkOptions, checkRecord, DataError, type QMatrix } from "@measurekit/core";
-import { checkEvent, type Event } from "./event.js";
+import { checkEvent, type Event, isObserved } from "./event.js";
 import { checkItemSkills, skillsOf } from "./q-matrix.js";
 
 /**
@@ -31,7 +31,8 @@ export interface EventLogOptions {
 
 /**
  * Builds a log from events in any order: it checks and copies them, takes the skills of events without skills from the
- * Q-matrix, and orders them by time, keeping the given order of events with equal times.
+ * Q-matrix, and orders them by time, keeping the given order of events with equal times. It copies the fields of
+ * {@link Event} and drops any others; an event without an outcome has `outcome: null`.
  *
  * @throws `DataError` when there are no events, an event is malformed, the Q-matrix is malformed, or an event without
  * skills has an item the Q-matrix lacks.
@@ -58,11 +59,22 @@ export function eventLog(events: readonly EventInput[], options: EventLogOptions
   const log = events.map((input, index): Event => {
     const label = `Event ${index + 1}`;
     checkRecord(input, `${label} must be an object`);
-    const { learner, item, time, outcome } = input;
+    const { learner, item, time, outcome, resource, covariates, hints, duration, attemptNumber } = input;
     const skills = skillsOfInput(input, qMatrix, label);
-    const event = { learner, item, skills, time, outcome };
+    const event: Event = {
+      learner,
+      item,
+      skills,
+      time,
+      outcome,
+      ...(resource !== undefined && { resource }),
+      ...(covariates !== undefined && { covariates }),
+      ...(hints !== undefined && { hints }),
+      ...(duration !== undefined && { duration }),
+      ...(attemptNumber !== undefined && { attemptNumber }),
+    };
     checkEvent(event, label);
-    return { ...event, skills: [...skills] };
+    return { ...event, skills: [...skills], ...(covariates !== undefined && { covariates: { ...covariates } }) };
   });
   return log.sort((a, b) => a.time - b.time);
 }
@@ -72,6 +84,17 @@ function skillsOfInput(input: EventInput, qMatrix: QMatrix | undefined, label: s
   if (input.skills !== undefined) return input.skills;
   if (qMatrix === undefined || typeof input.item !== "string") return [];
   return skillsOf(qMatrix, input.item, label);
+}
+
+/**
+ * Checks that a log has an event with an outcome, as a model needs to fit.
+ *
+ * @param model - Names the model in the error message, such as `a BKT model`.
+ */
+export function checkObservedEvents(log: EventLog, model: string): void {
+  if (!log.some(isObserved)) {
+    throw new DataError(`The log has no event with an outcome; ${model} needs at least one to fit.`);
+  }
 }
 
 /**

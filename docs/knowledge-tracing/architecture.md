@@ -62,25 +62,25 @@ them, the absence of Node modules and platform globals in `src/`, and that code 
 A learner model has parameters, estimated from a log in batch, and a state per learner, updated one event at a time
 online. `LearnerModel<TState, TParameters>`:
 
-| Member                    | Contract                                                                                                                                                                                     |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parameters`              | The model's parameters: plain data, from which the family's factory rebuilds the model, as `elo({ parameters })`.                                                                            |
-| `fit(log)`                | Estimates the parameters from a log, starting from the model's own, and returns a `ModelFit` with a new model.                                                                               |
-| `initialState(learner)`   | The learner's state before any event. Learner-specific parameters, such as an individual prior or a learner intercept, enter here; an unknown learner gets the population's.                 |
-| `update(state, event)`    | The state after an event: a new object; the state given is unchanged.                                                                                                                        |
-| `predict(state, attempt)` | P(correct) for an attempt, an event without its outcome: the expected outcome, a score from 0 to 1 for an item of several categories. A log's events are predicted, then passed to `update`. |
-| `mastery?(state, skill)`  | P(skill mastered), only for models that define mastery.                                                                                                                                      |
+| Member                    | Contract                                                                                                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `parameters`              | The model's parameters: plain data, from which the family's factory rebuilds the model, as `elo({ parameters })`.                                                                                                                                      |
+| `fit(log)`                | Estimates the parameters from a log, starting from the model's own, and returns a `ModelFit` with a new model.                                                                                                                                         |
+| `initialState(learner)`   | The learner's state before any event. Learner-specific parameters, such as an individual prior or a learner intercept, enter here; an unknown learner gets the population's.                                                                           |
+| `update(state, event)`    | The state after an event: a new object; the state given is unchanged. It accepts `outcome: null`, a learning opportunity with nothing observed, and applies what such an event does to a learner.                                                      |
+| `predict(state, attempt)` | P(correct) for an attempt, an event without its outcome: the expected outcome, a score from 0 to 1 for an item of several categories. A log's events are predicted, then passed to `update`; the library never predicts an event with `outcome: null`. |
+| `mastery?(state, skill)`  | P(skill mastered), only for models that define mastery.                                                                                                                                                                                                |
 
 `ModelFit` reports the same quantities for every model:
 
-| Field                     | Meaning                                                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`                   | The model with the estimated parameters                                                                                                                 |
-| `states`                  | Each learner's state after their events, by learner id                                                                                                  |
-| `predictions`             | Each event's prediction, made before its outcome, in log order                                                                                          |
-| `logLikelihood`           | Σ y ln p + (1 - y) ln(1 - p) over the events, from `predictions`; for learners drawn from a distribution, the marginal log-likelihood, θ integrated out |
-| `aic`, `bic`              | 2k - 2 ln L and k ln n - 2 ln L with k estimated parameters and n events; `null` for a model without k: fitted in one pass, with a penalty or elsewhere |
-| `converged`, `iterations` | Whether the estimation converged, and its iterations or passes over the log                                                                             |
+| Field                     | Meaning                                                                                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                   | The model with the estimated parameters                                                                                                                                 |
+| `states`                  | Each learner's state after their events, by learner id                                                                                                                  |
+| `predictions`             | Each event's prediction, made before its outcome, in log order; `null` for an event without an outcome                                                                  |
+| `logLikelihood`           | Σ y ln p + (1 - y) ln(1 - p) over the events with an outcome, from `predictions`; for learners drawn from a distribution, the marginal log-likelihood, θ integrated out |
+| `aic`, `bic`              | 2k - 2 ln L and k ln n - 2 ln L with k estimated parameters and n events with an outcome; `null` for a model without k: fitted in one pass, with a penalty or elsewhere |
+| `converged`, `iterations` | Whether the estimation converged, and its iterations or passes over the log                                                                                             |
 
 A family's factory takes options, which fix the model's structure and its estimation, and `parameters`, which restore a
 fitted model. `fit` takes only the log, so cross-validation fits any model the same way, and is a function of the model
@@ -91,13 +91,13 @@ itself from `fit`.
 
 The interface covers the classical families of learner models:
 
-| Family        | Parameters                                                                          | State                                                     | `update`                                  | `mastery`                    | `fit`                                                                   |
-| ------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
-| Elo           | Item difficulties                                                                   | Global and skill abilities                                | One Elo step                              | none                         | One replay of the log                                                   |
-| BKT           | Per skill: prior, learn, forget, guess, slip; per group or item with the extensions | P(L) per skill                                            | Condition on the outcome, then transition | P(L)                         | EM from the model's parameters                                          |
-| AFM, PFA, LKT | Per skill: an intercept and a coefficient per feature; per learner: θ               | Per skill: successes, failures, last time, decayed counts | Count the event in each of its skills     | none                         | Newton, by the Schur complement of the learners; Laplace for a random θ |
-| IRT           | Given item parameters: 1PL to 4PL, graded, partial credit                           | The log-posterior of θ and its derivatives on a grid      | Add the outcome's log-probability         | none                         | None: the parameters are given; the states after the log                |
-| KST           | π of each knowledge state; per item: guess, slip                                    | The probability of each knowledge state                   | Bayes' rule                               | P(the state holds the skill) | EM, or minimum discrepancy in one pass                                  |
+| Family        | Parameters                                                                                    | State                                                     | `update`                                  | `mastery`                    | `fit`                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| Elo           | Item difficulties                                                                             | Global and skill abilities                                | One Elo step                              | none                         | One replay of the log                                                   |
+| BKT           | Per skill: prior, learn, forget, guess, slip; per group, resource or item with the extensions | P(L) per skill                                            | Condition on the outcome, then transition | P(L)                         | EM from the model's parameters                                          |
+| AFM, PFA, LKT | Per skill: an intercept and a coefficient per feature; per learner: θ                         | Per skill: successes, failures, last time, decayed counts | Count the event in each of its skills     | none                         | Newton, by the Schur complement of the learners; Laplace for a random θ |
+| IRT           | Given item parameters: 1PL to 4PL, graded, partial credit                                     | The log-posterior of θ and its derivatives on a grid      | Add the outcome's log-probability         | none                         | None: the parameters are given; the states after the log                |
+| KST           | π of each knowledge state; per item: guess, slip                                              | The probability of each knowledge state                   | Bayes' rule                               | P(the state holds the skill) | EM, or minimum discrepancy in one pass                                  |
 
 `predict` takes the attempt's time, so time-aware features such as recency decay need no other member, and
 `initialState` takes the learner id for learner-level parameters.
@@ -149,15 +149,17 @@ function baseRate(rate = 0.5): LearnerModel<string, { rate: number }> {
   return {
     parameters: { rate },
     fit(log) {
-      const p = log.reduce((sum, event) => sum + event.outcome, 0) / log.length;
-      const logLikelihood = log.reduce((sum, event) => sum + Math.log(event.outcome === 1 ? p : 1 - p), 0);
+      // An event without an outcome has no prediction and no term of the likelihood.
+      const outcomes = log.flatMap((event) => (event.outcome === null ? [] : [event.outcome]));
+      const p = outcomes.reduce((sum, outcome) => sum + outcome, 0) / outcomes.length;
+      const logLikelihood = outcomes.reduce((sum, outcome) => sum + Math.log(outcome === 1 ? p : 1 - p), 0);
       return {
         model: baseRate(p),
         states: Object.fromEntries(log.map((event) => [event.learner, event.learner])),
-        predictions: log.map(() => p),
+        predictions: log.map((event) => (event.outcome === null ? null : p)),
         logLikelihood,
         aic: 2 - 2 * logLikelihood,
-        bic: Math.log(log.length) - 2 * logLikelihood,
+        bic: Math.log(outcomes.length) - 2 * logLikelihood,
         converged: true,
         iterations: 1,
       };
@@ -179,7 +181,8 @@ Evaluation, practice and simulation check that a model passed in is an object wi
 - Functions in `math/` assume valid input; public functions validate before calling them.
 - A fit's predictions and states come from replaying the log with the model's steps, `data/replay.ts`: the arithmetic of
   online updates without their checks, as the log was checked as a whole, so they equal the same events applied online,
-  to the last bit. Elo's fit replays its own step, which also moves item ratings.
+  to the last bit. Elo's and IRT's fits make one pass over the log with their own step, `onePass` of the same file, which
+  also moves Elo's item ratings; an event without an outcome leaves the learner's state as it was.
 - Newton's line search takes a step that raises the objective by no more than its rounding error, 1e-12 relative: near
   the optimum a Newton step lowers it by less, and the gradient decides convergence.
 - Logistic regressions with an intercept per learner have an arrow-shaped Hessian; Newton steps solve it by the Schur

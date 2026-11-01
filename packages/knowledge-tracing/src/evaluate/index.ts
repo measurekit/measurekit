@@ -9,3 +9,4 @@ export { type CrossValidation, crossValidate, type FoldEvaluation } from "./cros
 export { type LearningCurve, type LearningCurvePoint, learningCurve } from "./learning-curve.js";
 export { accuracy, auc, logLoss, type Metrics, metrics, rmse } from "./metrics.js";
 export { compareModels, type ModelEvaluation } from "./model-comparison.js";
+export { type ObservedPairs, observedPairs } from "./observed-pairs.js";

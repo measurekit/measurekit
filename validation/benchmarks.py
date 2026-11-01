@@ -1,4 +1,5 @@
-"""Times pyBKT, the reference of the Bayesian knowledge tracing benchmarks of measurekit, on the log of bench-bkt.json.
+"""Times pyBKT, the reference of the Bayesian knowledge tracing benchmarks of measurekit, on the log of bench-bkt.json, and
+on the same log with a fifth of its attempts as lessons.
 
     validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py
 
@@ -49,6 +50,11 @@ data = pd.DataFrame(
     }
 )
 
+# The same log with every fifth attempt, from the first, a lesson: correct = -1, pyBKT's no response.
+LESSON_EVERY = 5
+lessons = data.assign(correct=[-1 if index % LESSON_EVERY == 0 else outcome
+                               for index, outcome in enumerate(fixture["outcome"])])
+
 model = Model(seed=1, parallel=False)
 
 
@@ -56,8 +62,16 @@ def fit():
     Model(seed=1, parallel=False).fit(data=data)
 
 
+def fit_lessons():
+    Model(seed=1, parallel=False).fit(data=lessons)
+
+
 model.fit(data=data)
-results = {"bkt.fit": time_calls(fit), "bkt.replay": time_calls(lambda: model.predict(data=data))}
+results = {
+    "bkt.fit": time_calls(fit),
+    "bkt.fitLessons": time_calls(fit_lessons),
+    "bkt.replay": time_calls(lambda: model.predict(data=data)),
+}
 for key, result in results.items():
     print(f"{key:20} median {result['median']:10.3f} ms   fastest {result['min']:10.3f} ms")
 

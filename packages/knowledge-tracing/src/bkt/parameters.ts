@@ -11,8 +11,9 @@ export interface BktParameters {
 }
 
 /**
- * The parameters of one skill. An item uses its own rates when the skill has them and the skill's otherwise; a learner
- * uses their group's prior when the skill has one and the skill's otherwise.
+ * The parameters of one skill. An item uses its own guess and slip, and a resource its own learn and forget rates, when
+ * the skill has them and the skill's otherwise; a learner uses their group's prior when the skill has one and the
+ * skill's otherwise.
  */
 export interface BktSkill {
   /** P(L0), the probability that a learner knows the skill before practicing it. */
@@ -27,13 +28,13 @@ export interface BktSkill {
   readonly slip: number;
   /** The prior of each group of learners, by group; absent without prior groups. */
   readonly groupPriors?: Readonly<Record<string, number>>;
-  /** The learn and forget rates of items, by item id; absent without item learning. */
-  readonly itemLearning?: Readonly<Record<string, BktLearning>>;
+  /** The learn and forget rates of resources, by resource id; absent without resource learning. */
+  readonly resourceLearning?: Readonly<Record<string, BktLearning>>;
   /** The guess and slip rates of items, by item id; absent without item guess and slip. */
   readonly itemGuessSlip?: Readonly<Record<string, BktGuessSlip>>;
 }
 
-/** The learn and forget rates that follow an attempt at an item. */
+/** The learn and forget rates that follow an attempt with a resource. */
 export interface BktLearning {
   /** P(T), the probability of learning the skill from the attempt. */
   readonly learn: number;
@@ -54,9 +55,9 @@ export function priorOf(skill: BktSkill, group: string | undefined): number {
   return (group === undefined ? undefined : entry(skill.groupPriors, group)) ?? skill.prior;
 }
 
-/** Returns the learn and forget rates that follow an attempt at an item. */
-export function learningOf(skill: BktSkill, item: string): BktLearning {
-  return entry(skill.itemLearning, item) ?? skill;
+/** Returns the learn and forget rates that follow an attempt with a resource. */
+export function learningOf(skill: BktSkill, resource: string): BktLearning {
+  return entry(skill.resourceLearning, resource) ?? skill;
 }
 
 /** Returns the guess and slip rates of an item. */
@@ -71,14 +72,17 @@ export function checkParameters(parameters: BktParameters): void {
   for (const [id, skill] of Object.entries(parameters.skills)) {
     const label = `The BKT parameters of skill "${id}"`;
     checkRecord(skill, `${label} must be an object`);
-    const { prior, learn, forget, guess, slip, groupPriors, itemLearning, itemGuessSlip } = skill;
+    const { prior, learn, forget, guess, slip, groupPriors, resourceLearning, itemGuessSlip } = skill;
     checkRates(label, { prior, learn, forget, guess, slip });
     for (const [group, groupPrior] of records(groupPriors, `${label} need groupPriors, an object of priors by group`)) {
       checkRates(`${label}, group "${group}",`, { prior: groupPrior });
     }
-    for (const [item, rates] of records(itemLearning, `${label} need itemLearning, an object of rates by item id`)) {
-      checkRecord(rates, `${label}, item "${item}", must be an object`);
-      checkRates(`${label}, item "${item}",`, { learn: rates.learn, forget: rates.forget });
+    for (const [resource, rates] of records(
+      resourceLearning,
+      `${label} need resourceLearning, an object of rates by resource id`,
+    )) {
+      checkRecord(rates, `${label}, resource "${resource}", must be an object`);
+      checkRates(`${label}, resource "${resource}",`, { learn: rates.learn, forget: rates.forget });
     }
     for (const [item, rates] of records(itemGuessSlip, `${label} need itemGuessSlip, an object of rates by item id`)) {
       checkRecord(rates, `${label}, item "${item}", must be an object`);

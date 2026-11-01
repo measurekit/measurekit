@@ -15,7 +15,7 @@ import {
   type ThetaDistribution,
 } from "../src/index.js";
 import reference from "./fixtures/irt-abilities.json" with { type: "json" };
-import { expectAllClose, expectClose } from "./helpers.js";
+import { allPredicted, defined, expectAllClose, expectClose, expectUnaffectedByLessons } from "./helpers.js";
 
 /** Absolute tolerance of EAP estimates, predictions and log-probabilities against the written-out grid posterior. */
 const GRID_TOLERANCE = 1e-10;
@@ -55,7 +55,7 @@ describe("IRT ability estimates against R", () => {
         moments.push(...momentsOf(model.posterior(state)));
         map.push(model.ability(state, { estimator: "map" }).theta);
       }
-      expectAllClose(fit.predictions, trace.prediction, GRID_TOLERANCE, "prediction");
+      expectAllClose(allPredicted(fit.predictions), trace.prediction, GRID_TOLERANCE, "prediction");
       expectAllClose(
         eap,
         trace.eap.flatMap((theta, i) => [theta, trace.eapStandardError[i] ?? 0]),
@@ -347,5 +347,20 @@ describe("IRT options from JavaScript", () => {
     expect(() => model.ability(model.initialState("ana"), missing)).toThrow(
       "The options must be an object, found null.",
     );
+  });
+});
+
+describe("IRT with events that have no outcome", () => {
+  const model = irt({ parameters: { items } });
+
+  it("is unaffected by them: a lesson is no item, and it does not move the posterior", () => {
+    expectUnaffectedByLessons(model, log);
+  });
+
+  it("returns the state as it was, as a copy, for an event without an outcome", () => {
+    const state = model.update(model.initialState("ana"), { ...defined(log[0]), learner: "ana" });
+    const next = model.update(state, { learner: "ana", item: "lesson", skills: [], time: 99, outcome: null });
+    expect(next).toEqual(state);
+    expect(next.logDensity).not.toBe(state.logDensity);
   });
 });

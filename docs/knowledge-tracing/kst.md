@@ -80,6 +80,13 @@ with the same answers are computed once. An EM iteration takes time proportional
 answers, the items and the states: on 2,000 learners and 40 items, about 0.07 s with 385 states and 1 s with 5,896.
 The fit's states and predictions are those of online inference with the fitted parameters.
 
+## Events without an outcome
+
+An event with `outcome: null`, such as a lesson, leaves the probabilities of the states as they were and needs no
+parameters for its item. A fit, `iita` and the item count k of `aic` and `bic` read the events with an outcome only: a
+lesson is never an item, and an item met only through events without an outcome has no response pattern. `bic` takes n as
+the number of events with an outcome. A fit throws `DataError` for a log with none.
+
 ## Online and adaptive assessment
 
 A learner's state is `{ learner, probabilities }`, a probability per knowledge state, in the structure's order:

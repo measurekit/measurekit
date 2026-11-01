@@ -1,23 +1,24 @@
 import { checkRecord, DataError } from "@measurekit/core";
-import type { Event } from "../data/event.js";
+import { type Event, isObserved } from "../data/event.js";
 import { checkLog } from "../data/event-log.js";
 import type { Fold } from "../data/split.js";
 import { checkModel, type LearnerModel } from "../model.js";
 import { type Metrics, metrics } from "./metrics.js";
+import { observedPairs } from "./observed-pairs.js";
 
 /** A model's predictions of one fold's test log, and their metrics. */
 export interface FoldEvaluation {
-  /** The prediction of each test event, in the order of the test log. */
-  readonly predictions: readonly number[];
-  /** The metrics of the predictions. */
-  readonly metrics: Metrics;
+  /** The prediction of each test event, in the order of the test log: `null` for an event without an outcome. */
+  readonly predictions: readonly (number | null)[];
+  /** The metrics of the events with an outcome, or `null` when the test log has none. */
+  readonly metrics: Metrics | null;
 }
 
 /** A model's evaluation on folds. */
 export interface CrossValidation {
   /** The evaluation of each fold, in order. */
   readonly folds: readonly FoldEvaluation[];
-  /** The metrics of the predictions of all folds together. */
+  /** The metrics of the predictions of all folds together, over the events with an outcome. */
   readonly metrics: Metrics;
 }
 
@@ -29,10 +30,11 @@ export interface CrossValidation {
  * For each fold, the model is fitted to the training log; then every learner of the test log starts from `initialState`
  * and goes through their events of both logs in time order, training events first at equal times. Each test event is
  * predicted before the state is updated with it; training events only update the state. A learner's earlier events thus
- * inform the predictions of their later ones, as they would online.
+ * inform the predictions of their later ones, as they would online. An event without an outcome updates the state and
+ * has a `null` prediction, and the metrics use the events with an outcome.
  *
- * @throws `DataError` when the model is not a learner model, there are no folds, a log is malformed, or the model
- * rejects the data.
+ * @throws `DataError` when the model is not a learner model, there are no folds, a log is malformed, the model
+ * rejects the data, or no test log has an event with an outcome.
  */
 export function crossValidate<TState>(model: LearnerModel<TState>, folds: readonly Fold[]): CrossValidation {
   checkModel(model, "Cross-validation needs a learner model, such as bkt()");
@@ -41,19 +43,25 @@ export function crossValidate<TState>(model: LearnerModel<TState>, folds: readon
     checkRecord(fold, `Fold ${index + 1} must be an object { train, test } of two logs`);
     checkLog(fold.test);
     const predictions = predictFold(model.fit(fold.train).model, fold);
-    return { predictions, metrics: metrics(predictions, outcomesOf(fold.test)) };
+    const pairs = observedPairs(fold.test, predictions);
+    return { predictions, metrics: pairs.outcomes.length === 0 ? null : metrics(pairs.predictions, pairs.outcomes) };
   });
+  const pooled = folds.map((fold, index) => observedPairs(fold.test, evaluations[index]?.predictions ?? []));
+  const outcomes = pooled.flatMap((pairs) => pairs.outcomes);
+  if (outcomes.length === 0) {
+    throw new DataError("Cross-validation needs an event with an outcome in a test log; no test log has one.");
+  }
   return {
     folds: evaluations,
     metrics: metrics(
-      evaluations.flatMap((evaluation) => evaluation.predictions),
-      folds.flatMap((fold) => outcomesOf(fold.test)),
+      pooled.flatMap((pairs) => pairs.predictions),
+      outcomes,
     ),
   };
 }
 
 /** Returns the fitted model's predictions of a fold's test events, as {@link crossValidate} describes. */
-function predictFold<TState>(fitted: LearnerModel<TState>, fold: Fold): number[] {
+function predictFold<TState>(fitted: LearnerModel<TState>, fold: Fold): (number | null)[] {
   const testLearners = new Set(fold.test.map((event) => event.learner));
   const training = new Map<string, Event[]>();
   for (const event of fold.train) {
@@ -74,12 +82,8 @@ function predictFold<TState>(fitted: LearnerModel<TState>, fold: Fold): number[]
       next++;
     }
     trained.set(learner, next);
-    const prediction = fitted.predict(state, event);
+    const prediction = isObserved(event) ? fitted.predict(state, event) : null;
     states.set(learner, fitted.update(state, event));
     return prediction;
   });
-}
-
-function outcomesOf(log: readonly Event[]): number[] {
-  return log.map((event) => event.outcome);
 }

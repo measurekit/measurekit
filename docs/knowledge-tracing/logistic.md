@@ -1,10 +1,21 @@
 # Logistic models
 
 `@measurekit/knowledge-tracing/logistic` fits logistic learner models: the additive factors model (AFM),
-performance factors analysis (PFA) and models of the features of logistic knowledge tracing (LKT). Learner
-proficiency is absent, a fixed effect per learner, or a random intercept. Fits are validated against
-`glm`, `lme4::glmer` and LiblineaR, and the features against the LKT
+performance factors analysis (PFA) and models of the features of logistic knowledge tracing (LKT), with the exposure
+features of instructional factors analysis. Learner proficiency is absent, a fixed effect per learner, or a random
+intercept. Fits are validated against `glm`, `lme4::glmer` and LiblineaR, and the features against the LKT
 package ([validation](validation.md#logistic-models)).
+
+```mermaid
+flowchart LR
+  E[Event] --> Q{outcome is null?}
+  Q -->|no| H["history of the skill: successes, failures, last time, decayed sums"]
+  Q -->|yes| X["exposures to the skill: count, last time, decayed sums"]
+  H --> F[outcome features]
+  X --> G[exposure features]
+  F --> P["P(correct)"]
+  G --> P
+```
 
 ## The models
 
@@ -39,10 +50,35 @@ counts fully; their prior is one success and one failure, decayed over every att
 | `{ decayedLogit: d }`             | ln((dⁿ + S) / (dⁿ + F)): 0 before any attempt                                   | `logitdec`            |
 | `{ recency: e }`                  | Δt⁻ᵉ, Δt the time since the last attempt; 0 at the first attempt and for Δt = 0 | `recency`             |
 
+The exposure features read the events without an outcome at the skill, such as lessons, which instructional factors
+analysis (Chi et al., 2011) counts apart from practice. They are 0 before any exposure.
+
+| Feature                   | Value                                                                    |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `"exposures"`             | m, the number of events without an outcome at the skill                  |
+| `{ decayedExposures: d }` | Σ dᵃ over the exposures, a the number of later exposures                 |
+| `{ recencyExposure: e }`  | Δt⁻ᵉ, Δt the time since the latest exposure; 0 before one and for Δt = 0 |
+
+LKT's `recencytest` and `recencystudy` switch on the previous row and are not reproduced.
+
 A decay d is above 0 and at most 1; an exponent e is at least 0. Decays and exponents are given, not estimated: compare
 candidates by [cross-validation](evaluate.md#model-comparison). The time unit only rescales a recency coefficient.
 LKT's `logitdec` looks at a learner's last 61 attempts at a skill; `decayedLogit` at all of them, the earlier
 ones weighing d⁶¹ times less.
+
+## Events without an outcome
+
+- **History.** The history of outcomes, the state's `skills`, is as it would be without these events: removing them
+  leaves every outcome feature as it was, so a skill first met through a lesson has no outcome history and its
+  `recency` is 0.
+- **Exposures.** A model with an exposure feature records each such event in the state's `exposures`, by skill, with the
+  count, the time of the latest and the decayed sums of its features; the field is absent until the first. A model
+  without an exposure feature leaves its states as they were.
+- **Fitting.** The rows of the design are the events with an outcome, and `aic` and `bic` count them. A skill met only
+  through events without an outcome has no coefficients, and `predict` for it throws `DataError`.
+- **Order.** An attempt earlier than the learner's latest exposure to one of its skills throws `DataError`, as for an
+  attempt at the skill.
+- **Skills.** An event without an outcome and without skills changes nothing.
 
 ## Options
 
@@ -146,6 +182,9 @@ skill; outcomes from 0 to 1 count as partial credit.
 
 - Cen, H., Koedinger, K., & Junker, B. (2006). Learning factors analysis: A general method for cognitive model
   evaluation and improvement. In Intelligent Tutoring Systems (ITS 2006).
+- Chi, M., Koedinger, K. R., Gordon, G. J., Jordan, P., & VanLehn, K. (2011). Instructional factors analysis: A
+  cognitive model for multiple instructional interventions. In Proceedings of the 4th International Conference on
+  Educational Data Mining.
 - Pavlik, P. I., Cen, H., & Koedinger, K. R. (2009). Performance factors analysis: A new alternative to knowledge
   tracing. In Artificial Intelligence in Education (AIED 2009).
 - Pavlik, P. I., Eglington, L. G., & Harrell-Williams, L. M. (2021). Logistic knowledge tracing: A constrained

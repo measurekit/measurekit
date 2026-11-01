@@ -1,9 +1,19 @@
 # Bayesian knowledge tracing
 
 `@measurekit/knowledge-tracing/bkt` traces each skill with Bayesian knowledge tracing (Corbett and Anderson, 1994)
-and the extensions of pyBKT (Badrinath, Wang and Pardos, 2021): forgetting, item guess and slip, item learning and
-prior groups. Inference at fixed parameters and EM fitting are validated against pyBKT
-([validation](validation.md#bayesian-knowledge-tracing)).
+and the extensions of pyBKT (Badrinath, Wang and Pardos, 2021): forgetting, item guess and slip, resource learning and
+prior groups. Inference at fixed parameters and EM fitting, with and without events that have no outcome, are validated
+against pyBKT ([validation](validation.md#bayesian-knowledge-tracing)).
+
+```mermaid
+flowchart LR
+  L["P(L)"] --> Q{outcome is null?}
+  Q -->|no| P["predict P(correct)"]
+  P --> C["condition P(L) on the outcome"]
+  Q -->|yes| M["move P(L) by the learn and forget rates of the resource"]
+  C --> M
+  M --> N["P(L) at the next attempt"]
+```
 
 ## The model
 
@@ -21,10 +31,13 @@ With P(L), the probability that the learner knows the skill at their next attemp
 
 P(correct) = P(L) (1 - P(S)) + (1 - P(L)) P(G).
 
-After the outcome, P(L) is conditioned on it by Bayes' rule, then moved by the rates of the item just practiced:
+After the outcome, P(L) is conditioned on it by Bayes' rule, then moved by the rates of the resource just practiced:
 P(L) ← P(L | outcome) (1 - P(F)) + (1 - P(L | outcome)) P(T).
 
-- **Outcomes** are 0 or 1, and every event needs at least one skill; other events throw `DataError`.
+- **Outcomes** are 0 or 1, and every event with an outcome needs at least one skill; other events throw `DataError`.
+- **Events without an outcome.** An event with `outcome: null`, such as a lesson, shows nothing about P(L), so only the
+  learn and forget rates apply: P(L) ← P(L) (1 - P(F)) + (1 - P(L)) P(T). It has no prediction, adds no guess or slip,
+  and a skill without parameters stays as it is, online too. Its skills may be none.
 - **Several skills.** An event with several skills is an event of each: each skill's P(L) updates as for that skill
   alone, the prediction is the mean of the skills' predictions, and fitting counts the event in every skill's
   sequences, as Elo does ([architecture](architecture.md#events-with-several-skills)).
@@ -32,29 +45,31 @@ P(L) ← P(L | outcome) (1 - P(F)) + (1 - P(L | outcome)) P(T).
 
 ## Options
 
-| Option          | Default | Meaning                                                                                     | pyBKT        |
-| --------------- | ------- | ------------------------------------------------------------------------------------------- | ------------ |
-| `forgetting`    | `false` | Estimate P(F); without it P(F) is 0                                                         | `forgets`    |
-| `itemGuessSlip` | `false` | Each item has its own P(G) and P(S)                                                         | `multigs`    |
-| `itemLearning`  | `false` | Each item has its own P(T), and P(F) with forgetting, applied after an attempt at it        | `multilearn` |
-| `priorGroups`   | none    | The group of each learner, by learner id; each group has its own P(L0) per skill            | `multiprior` |
-| `restarts`      | `5`     | Random starts of EM for a skill without parameters; the highest log-likelihood is kept      | `num_fits`   |
-| `seed`          | `0`     | The seed of the random starts; every skill draws its starts from a generator with this seed | `seed`       |
-| `tolerance`     | `1e-6`  | EM has converged when a skill's log-likelihood changes by at most this                      | `tol`        |
-| `maxIterations` | `500`   | The most EM iterations of a start                                                           | `maxiter`    |
-| `parameters`    | none    | The parameters to predict with and to start EM from                                         | `coef_`      |
+| Option             | Default | Meaning                                                                                     | pyBKT        |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------- | ------------ |
+| `forgetting`       | `false` | Estimate P(F); without it P(F) is 0                                                         | `forgets`    |
+| `itemGuessSlip`    | `false` | Each item has its own P(G) and P(S)                                                         | `multigs`    |
+| `resourceLearning` | `false` | Each resource has its own P(T), and P(F) with forgetting, applied after an attempt with it  | `multilearn` |
+| `priorGroups`      | none    | The group of each learner, by learner id; each group has its own P(L0) per skill            | `multiprior` |
+| `restarts`         | `5`     | Random starts of EM for a skill without parameters; the highest log-likelihood is kept      | `num_fits`   |
+| `seed`             | `0`     | The seed of the random starts; every skill draws its starts from a generator with this seed | `seed`       |
+| `tolerance`        | `1e-6`  | EM has converged when a skill's log-likelihood changes by at most this                      | `tol`        |
+| `maxIterations`    | `500`   | The most EM iterations of a start                                                           | `maxiter`    |
+| `parameters`       | none    | The parameters to predict with and to start EM from                                         | `coef_`      |
 
-The options combine freely. Item rates use the event's `item`: to share rates among items, such as those of one
-template, give their events the template's id as `item`.
+The options combine freely. Guess and slip use the event's `item`: to share them among items, such as those of one
+template, give their events the template's id as `item`. Learn and forget rates use the event's `resource`, which is its
+item when it has none: a lesson, a video and an exercise can each have rates of their own.
 
 ## Parameters
 
 `model.parameters` is plain data, `{ skills: { [skill]: BktSkill } }`. A skill has the five rates above and, with the
-extensions, `groupPriors` by group, `itemLearning` `{ learn, forget }` by item and `itemGuessSlip` `{ guess, slip }`
-by item. An item uses its own rates when the skill has them and the skill's otherwise; a learner uses their group's
-prior when the skill has one and the skill's otherwise. So items and learners that a fit did not see, such as new
-items, use the skill's rates. Where every item or group has its own, the skill's rate is their pooled estimate: the
-expected count over the expected opportunities of all of them.
+extensions, `groupPriors` by group, `resourceLearning` `{ learn, forget }` by resource and `itemGuessSlip`
+`{ guess, slip }` by item. An item uses its own guess and slip, and a resource its own learn and forget rates, when the
+skill has them and the skill's otherwise; a learner uses their group's prior when the skill has one and the skill's
+otherwise. So items, resources and learners that a fit did not see, such as new items, use the skill's rates. Where
+every item, resource or group has its own, the skill's rate is their pooled estimate: the expected count over the
+expected opportunities of all of them.
 
 ## Fitting
 
@@ -86,12 +101,18 @@ fit.model.parameters.skills.fractions; // { prior, learn, forget, guess, slip, i
 fit.states.l0; // { learner: "l0", skills: { fractions, decimals } }: the learner's P(L) after the log
 ```
 
-| Fit field                 | Meaning                                                                                                                                 |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `predictions`             | Each event's prediction by online inference with the fitted parameters                                                                  |
-| `logLikelihood`           | The log-likelihood of those predictions: for events of one skill, the HMM log-likelihood                                                |
-| `aic`, `bic`              | With k the rates the events estimate: of each skill, its priors, learn rates, forget rates with forgetting, guess and slip rates in use |
-| `converged`, `iterations` | Whether every skill's chosen start converged, and the most iterations of any                                                            |
+| Fit field                 | Meaning                                                                                                                                                                           |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `predictions`             | Each event's prediction by online inference with the fitted parameters; `null` for an event without an outcome                                                                    |
+| `logLikelihood`           | The log-likelihood of those predictions: for events of one skill, the HMM log-likelihood                                                                                          |
+| `aic`, `bic`              | With k the rates the events estimate: of each skill, its priors, learn rates, forget rates with forgetting, guess and slip rates in use; n of `bic` is the events with an outcome |
+| `converged`, `iterations` | Whether every skill's chosen start converged, and the most iterations of any                                                                                                      |
+
+In EM, an event without an outcome has probability 1 in both states and adds no guess or slip count, while the learning
+step after it counts for its resource: a lesson's P(T) is estimated from the outcomes that follow it. A transition with
+no outcome after it in the sequence, such as a lesson at its end, teaches nothing and is not counted in `aic` and `bic`;
+a skill met only through events without an outcome gets no parameters, and a lesson gets no guess or slip. `fit` throws
+`DataError` for a log with no event with an outcome.
 
 A rate without expected opportunities in the data, such as P(T) of a skill whose learners each attempted it once, keeps
 its starting value. Skills of the model absent from the log keep their parameters. A log too large for memory can be
