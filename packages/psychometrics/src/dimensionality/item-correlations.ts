@@ -1,7 +1,7 @@
 import { DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
+import { pearsonMatrix } from "../math/pearson.js";
 import { type CodedItem, codeItems } from "./coded-items.js";
-import { pearsonMatrix } from "./pearson.js";
 import { polychoricMatrix } from "./polychoric.js";
 import { smooth } from "./smoothing.js";
 

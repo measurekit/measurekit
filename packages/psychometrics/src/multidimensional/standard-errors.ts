@@ -1,12 +1,12 @@
-import { unboundedDerivative } from "../irt/bounds.js";
+import { covarianceFromInformation } from "../irt/hessian-covariance.js";
 import type { CompressedResponses } from "../irt/responses.js";
-import { invert, invertPositiveDefinite } from "../math/linear-algebra.js";
+import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { symmetrized } from "../math/matrix.js";
-import { type ItemState, UNBOUNDED } from "./calibration-setup.js";
+import type { ItemState } from "./calibration-setup.js";
 import type { Latent } from "./correlation.js";
 import type { ExpectationStep } from "./expectation.js";
 import type { Grid } from "./grid.js";
-import type { ItemMaximization } from "./m-step.js";
+import { type ItemMaximization, itemScales } from "./m-step.js";
 import { parameterCount, posteriorScoreMoments } from "./posterior-scores.js";
 
 export { parameterCount };
@@ -25,7 +25,7 @@ export interface Fit<TParameters> {
 }
 
 /** The relative step of the central differences of the complete-data gradient, about the cube root of epsilon. */
-const STEP = 1e-5;
+export const STEP = 1e-5;
 
 /**
  * Returns the covariance matrix of the estimated parameters on their own scale, by rows, in the order of the items'
@@ -78,13 +78,15 @@ export function crossProductCovariance<TParameters>(fit: Fit<TParameters>): Floa
 }
 
 /**
- * Returns the expected complete-data information of the estimated parameters on the unbounded scale: the Hessian of
- * the negative expected complete-data log-posterior of each item, and of each group's distribution, at the last
- * E-step's counts. It is block diagonal, as the items and the groups share no parameters.
+ * Writes the Hessian of the negative expected complete-data log-posterior of each item into its block of `information`,
+ * by central differences of the exact gradient at the last E-step's counts, and returns the slot after the last item.
  */
-function completeInformation<TParameters>(fit: Fit<TParameters>, size: number): Float64Array {
-  const { items, latents, maximization, eStep } = fit;
-  const information = new Float64Array(size * size);
+export function itemInformation<TParameters>(
+  items: readonly ItemState<TParameters>[],
+  maximization: ItemMaximization<TParameters>,
+  information: Float64Array,
+  size: number,
+): number {
   let slot = 0;
   for (const item of items) {
     const eta = maximization.coordinates(item);
@@ -105,6 +107,18 @@ function completeInformation<TParameters>(fit: Fit<TParameters>, size: number): 
     maximization.assign(item, eta);
     slot += length;
   }
+  return slot;
+}
+
+/**
+ * Returns the expected complete-data information of the estimated parameters on the unbounded scale: the Hessian of
+ * the negative expected complete-data log-posterior of each item, and of each group's distribution, at the last
+ * E-step's counts. It is block diagonal, as the items and the groups share no parameters.
+ */
+function completeInformation<TParameters>(fit: Fit<TParameters>, size: number): Float64Array {
+  const { items, latents, maximization, eStep } = fit;
+  const information = new Float64Array(size * size);
+  let slot = itemInformation(items, maximization, information, size);
   latents.forEach((latent, g) => {
     latentInformation(latent, eStep.groupCounts[g] ?? eStep.nodeCounts, information, size, slot);
     slot += latent.size;
@@ -154,21 +168,11 @@ export function covarianceOfInformation<TParameters>(
   items: readonly ItemState<TParameters>[],
   size: number,
 ): Float64Array | null {
-  const inverse = invert(information, size);
-  if (inverse === null) return null;
   const scales = new Float64Array(size).fill(1);
   let slot = 0;
   for (const item of items) {
-    item.free.forEach((j, l) => {
-      const { lower, upper } = item.entries[l] ?? UNBOUNDED;
-      scales[slot + l] = unboundedDerivative(item.vector[j] ?? 0, lower, upper);
-    });
+    scales.set(itemScales(item), slot);
     slot += item.free.length;
   }
-  for (let a = 0; a < size; a++) {
-    if (!((inverse[a * size + a] ?? 0) > 0)) return null;
-    for (let b = 0; b < size; b++)
-      inverse[a * size + b] = (inverse[a * size + b] ?? 0) * (scales[a] ?? 1) * (scales[b] ?? 1);
-  }
-  return inverse;
+  return covarianceFromInformation(information, size, scales);
 }

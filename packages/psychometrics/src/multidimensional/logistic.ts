@@ -114,13 +114,18 @@ function logisticModel(name: string, guessing: boolean): MultidimensionalModel<M
       // P (1 - P), which is 0 only where the probabilities underflow and the information vanishes.
       const variance = (1 - d + (d - c) * lower) * (c + (d - c) * upper);
       const factor = variance > 0 ? (slope * slope) / variance : 0;
-      a.forEach((ai, i) => {
-        a.forEach((aj, j) => {
-          out[i * a.length + j] = factor * (ai * aj);
-        });
-      });
+      writeInformation(a, factor, out);
     },
   };
+}
+
+/** Writes the information of an item, `factor` times the outer product of the slopes `a`, by rows, into `out`. */
+export function writeInformation(a: readonly number[], factor: number, out: Float64Array): void {
+  a.forEach((ai, i) => {
+    a.forEach((aj, j) => {
+      out[i * a.length + j] = factor * (ai * aj);
+    });
+  });
 }
 
 /** Returns a · θ. */

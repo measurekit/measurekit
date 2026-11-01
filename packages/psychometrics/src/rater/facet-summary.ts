@@ -1,4 +1,4 @@
-import { chiSquareUpperTail } from "@measurekit/core";
+import { chiSquareUpperTail, mean } from "@measurekit/core";
 
 /** One element of a facet: a rater, an item, a task. */
 export interface FacetElement {
@@ -71,9 +71,9 @@ export function summarizeFacet(facet: string, elements: readonly FacetElement[])
   if (!defined) return { facet, elements, separation: null, reliability: null, homogeneity: null };
   const measures = elements.map(({ measure }) => measure);
   const variances = errors.map((error) => (error ?? 0) ** 2);
-  const mean = measures.reduce((sum, measure) => sum + measure, 0) / measures.length;
-  const observed = measures.reduce((sum, measure) => sum + (measure - mean) ** 2, 0) / measures.length;
-  const meanSquareError = variances.reduce((sum, variance) => sum + variance, 0) / variances.length;
+  const center = mean(measures);
+  const observed = measures.reduce((sum, measure) => sum + (measure - center) ** 2, 0) / measures.length;
+  const meanSquareError = mean(variances);
   const trueVariance = Math.max(observed - meanSquareError, 0);
   return {
     facet,

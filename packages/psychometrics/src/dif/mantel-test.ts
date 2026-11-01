@@ -2,6 +2,7 @@ import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { standardDeviation } from "../math/statistics.js";
 import { type DifGroup, type ItemCases, itemCases, polytomousData } from "./groups.js";
 import {
   type DifAnalysis,
@@ -149,7 +150,7 @@ function statistics(cases: ItemCases, categories: number): Omit<MantelTest, "id"
   const chiSquare = variance > 0 ? (excess * excess) / variance : null;
   const significance = chiSquare === null ? null : chiSquareUpperTail(chiSquare, 1);
   const standardizedMeanDifference = meanDifference(groups);
-  const spread = standardDeviation(cases.responses);
+  const spread = responseSpread(cases.responses);
   const effectSize =
     standardizedMeanDifference === null || spread === null || spread === 0 ? null : standardizedMeanDifference / spread;
   return {
@@ -196,11 +197,8 @@ function meanDifference({ scoreCount: groupCount, sizes, totals }: ScoreGroups):
 }
 
 /** Returns the sample standard deviation of the responses, or `null` for fewer than two. */
-function standardDeviation(responses: Int32Array): number | null {
-  if (responses.length < 2) return null;
-  const mean = responses.reduce((sum, response) => sum + response, 0) / responses.length;
-  const squares = responses.reduce((sum, response) => sum + (response - mean) ** 2, 0);
-  return Math.sqrt(squares / (responses.length - 1));
+function responseSpread(responses: Int32Array): number | null {
+  return responses.length < 2 ? null : standardDeviation(Float64Array.from(responses));
 }
 
 /** Returns the persons in score group s and group g (1 for focal) who responded k. */

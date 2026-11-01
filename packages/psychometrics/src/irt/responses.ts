@@ -1,4 +1,4 @@
-import { DataError } from "@measurekit/core";
+import { DataError, describe } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
 import { checkResponseRecords, type ResponseRecords } from "../data/response-records.js";
 import type { IrtModel } from "./model.js";
@@ -121,4 +121,66 @@ export function checkCategories(
     );
   }
   return counts.length;
+}
+
+/** The groups of persons in a calibration. */
+export interface PersonGroups {
+  /** The distinct labels in order of first appearance; `null` without the option `groups`. */
+  readonly labels: readonly string[] | null;
+  /** The index in `labels` of each person's group; 0 for every person without groups. */
+  readonly groupOf: Int32Array;
+}
+
+/**
+ * Checks the labels that the option `groups` gives to `personCount` persons and returns their groups.
+ *
+ * @throws `DataError` when `groups` is given and does not hold one string for each person.
+ */
+export function personGroups(groups: readonly string[] | undefined, personCount: number): PersonGroups {
+  if (groups === undefined) return { labels: null, groupOf: new Int32Array(personCount) };
+  if (!Array.isArray(groups) || groups.length !== personCount) {
+    throw new DataError(`Found ${Array.isArray(groups) ? groups.length : "no"} groups for ${personCount} persons.`);
+  }
+  groups.forEach((label, person) => {
+    if (typeof label !== "string") {
+      throw new DataError(`The group of person ${person + 1} must be a string, found ${describe(label)}.`);
+    }
+  });
+  const labels = [...new Set(groups)];
+  return { labels, groupOf: Int32Array.from(groups, (label) => labels.indexOf(label)) };
+}
+
+/**
+ * Returns whether each person has a response, and how many persons do.
+ *
+ * @throws `DataError` when no person has a response.
+ */
+export function respondentsOf({ offsets }: Pick<CompressedResponses, "offsets">): {
+  readonly answered: boolean[];
+  readonly respondents: number;
+} {
+  const answered = Array.from(
+    { length: offsets.length - 1 },
+    (_, person) => (offsets[person + 1] ?? 0) > (offsets[person] ?? 0),
+  );
+  const respondents = answered.filter(Boolean).length;
+  if (respondents === 0) throw new DataError("Calibration needs at least one response.");
+  return { answered, respondents };
+}
+
+/**
+ * Calls `visit` with each person who has a response, the bounds of the person's responses and the person's group.
+ *
+ * @param groupOf - The index of each person's group; without it every person is in group 0.
+ */
+export function forEachRespondent(
+  { offsets }: Pick<CompressedResponses, "offsets">,
+  groupOf: ArrayLike<number> | undefined,
+  visit: (person: number, start: number, end: number, group: number) => void,
+): void {
+  for (let person = 0; person < offsets.length - 1; person++) {
+    const start = offsets[person] ?? 0;
+    const end = offsets[person + 1] ?? 0;
+    if (end > start) visit(person, start, end, groupOf?.[person] ?? 0);
+  }
 }

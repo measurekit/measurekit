@@ -1,6 +1,6 @@
-import { backtrack, cholesky, DataError } from "@measurekit/core";
+import { backtrack, cholesky, DataError, multiplyVector } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
-import { multiply, multiplyVector, traceOfProduct } from "../math/matrix.js";
+import { multiply, trace, traceOfProduct } from "../math/matrix.js";
 import { designCrossProducts } from "./cross-products.js";
 
 /** The estimates of a regression with a random residual and known sampling variances. */
@@ -220,12 +220,6 @@ function product(a: Float64Array, b: Float64Array, size: number): Float64Array {
   const result = new Float64Array(size * size);
   multiply(a, b, size, size, size, result);
   return result;
-}
-
-function trace(a: Float64Array, size: number): number {
-  let sum = 0;
-  for (let i = 0; i < size; i++) sum += a[i * size + i] ?? 0;
-  return sum;
 }
 
 /** Returns ln |A| of a symmetric positive definite matrix, from its Cholesky factor. */

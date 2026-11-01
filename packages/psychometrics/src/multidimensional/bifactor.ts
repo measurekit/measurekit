@@ -1,9 +1,9 @@
-import { checkChoice, checkIntegerFrom, checkOptions, checkStopping, DataError } from "@measurekit/core";
+import { checkChoice, checkIntegerFrom, checkOptions, checkStopping } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
 import type { StandardErrorMethod } from "../irt/calibration-options.js";
 import type { ParameterPrior } from "../irt/prior.js";
-import { compressResponses } from "../irt/responses.js";
+import { compressResponses, respondentsOf } from "../irt/responses.js";
 import { bifactorFit, solveBifactor } from "./bifactor-fit.js";
 import { structureOf } from "./bifactor-structure.js";
 import { assemble, type MultidimensionalCalibration } from "./calibration.js";
@@ -120,10 +120,7 @@ export function calibrateBifactor(
   const responses = compressResponses(data);
   const { standardErrors = "none", model = multidimensionalTwoParameterLogistic, priors } = options;
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
-  const respondents = Array.from(responses.personIds, (_, person) => {
-    return (responses.offsets[person + 1] ?? 0) > (responses.offsets[person] ?? 0);
-  }).filter(Boolean).length;
-  if (respondents === 0) throw new DataError("Calibration needs at least one response.");
+  const { respondents } = respondentsOf(responses);
   const structure = structureOf(options, responses.itemIds);
   const { points = DEFAULT_POINTS[structure.primaryCount - 1] ?? 21 } = options;
   checkIntegerFrom(points, "The option points", 2);

@@ -2,6 +2,7 @@ import { checkArray, checkChoice, checkRecord, DataError, describe, isRecord } f
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { newton } from "../math/optimize.js";
 import type { Quadrature } from "../math/quadrature.js";
+import { personGroups } from "./responses.js";
 
 /**
  * The distribution of theta in a group of persons during calibration: `"standard-normal"`, N(0, 1); `"normal"`, a
@@ -116,9 +117,8 @@ export function population(
   if (options.covariates !== undefined) {
     return regressionPopulation(options, answered, rule, rectangular, scaleFixed, addFree);
   }
-  const labels = groupLabels(options.groups, answered.length);
-  const names: (string | null)[] = labels === null ? [null] : [...new Set(labels)];
-  const groupOf = Int32Array.from(answered, (_, person) => (labels === null ? 0 : names.indexOf(labels[person] ?? "")));
+  const { labels, groupOf } = personGroups(options.groups, answered.length);
+  const names: readonly (string | null)[] = labels ?? [null];
   const distributions = names.map((name) => distributionOf(options.latent, name, labels !== null));
   checkLatentNames(options.latent, labels);
   names.forEach((name, g) => {
@@ -149,19 +149,6 @@ export function population(
     };
   });
   return { groups, groupOf };
-}
-
-function groupLabels(groups: readonly string[] | undefined, personCount: number): readonly string[] | null {
-  if (groups === undefined) return null;
-  if (!Array.isArray(groups) || groups.length !== personCount) {
-    throw new DataError(`Found ${Array.isArray(groups) ? groups.length : "no"} groups for ${personCount} persons.`);
-  }
-  groups.forEach((label, person) => {
-    if (typeof label !== "string") {
-      throw new DataError(`The group of person ${person + 1} must be a string, found ${describe(label)}.`);
-    }
-  });
-  return groups;
 }
 
 function distributionOf(

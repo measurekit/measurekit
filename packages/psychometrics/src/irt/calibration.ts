@@ -8,7 +8,6 @@ import {
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
-import { toUnbounded } from "./bounds.js";
 import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
 import { type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
@@ -23,10 +22,10 @@ import {
   maximizeDistributions,
   regressionEstimate,
 } from "./latent.js";
-import { type Maximization, maximization } from "./m-step.js";
+import { type Maximization, maximization, unboundedCoordinates } from "./m-step.js";
 import type { TestItem } from "./model.js";
 import { quadratureRule } from "./quadrature.js";
-import { type CompressedResponses, compressResponses } from "./responses.js";
+import { type CompressedResponses, compressResponses, respondentsOf } from "./responses.js";
 import { squarem } from "./squarem.js";
 import { maximizeTestlets, type TestletEstimate, testletEstimates } from "./testlets.js";
 
@@ -190,11 +189,7 @@ export function calibrateWithCovariance<TParameters>(
   checkStopping(tolerance, maxIterations);
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
   checkRegressionOptions(options, standardErrors);
-  const answered = Array.from(responses.personIds, (_, person) => {
-    return (responses.offsets[person + 1] ?? 0) > (responses.offsets[person] ?? 0);
-  });
-  const respondents = answered.filter(Boolean).length;
-  if (respondents === 0) throw new DataError("Calibration needs at least one response.");
+  const { answered, respondents } = respondentsOf(responses);
   const rule = quadratureRule(options.quadrature);
   const { nodes } = rule;
   const setup = setUp(responses, options, answered, rule);
@@ -264,7 +259,7 @@ function iterate<TParameters>(
   return squarem(
     {
       step,
-      get: () => Float64Array.from(values, (x, j) => toUnbounded(x, free[j]?.lower ?? 0, free[j]?.upper ?? 0)),
+      get: () => unboundedCoordinates(values, free),
       set: (state) => mStep.assign(mStep.all, state),
     },
     stopping,

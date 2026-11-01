@@ -22,9 +22,9 @@ export interface LogisticRegressionDif {
  * this. It converges quadratically, so the deviance is then exact to working precision; a line search would stall
  * near the optimum, where the deviance changes less than its rounding error.
  */
-const STEP_TOLERANCE = 1e-10;
+export const STEP_TOLERANCE = 1e-10;
 /** Bounds Newton's method where an estimate diverges (separation), by when the deviance has reached its infimum. */
-const MAX_ITERATIONS = 100;
+export const MAX_ITERATIONS = 100;
 
 /**
  * Returns the logistic regression DIF tests of every dichotomous item, as difR's `difLogistic` with likelihood-ratio

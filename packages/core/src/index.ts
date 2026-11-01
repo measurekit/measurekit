@@ -8,6 +8,7 @@ export * from "./bfgs.js";
 export * from "./checks.js";
 export * from "./chi-square.js";
 export * from "./cholesky.js";
+export * from "./descent.js";
 export * from "./errors.js";
 export * from "./item-probabilities.js";
 export * from "./iteration.js";

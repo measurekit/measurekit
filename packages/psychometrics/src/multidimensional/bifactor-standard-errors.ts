@@ -2,10 +2,7 @@ import { symmetrized } from "../math/matrix.js";
 import type { BifactorFit } from "./bifactor-fit.js";
 import { addPersonMeans, addSubPattern, finishProducts, type GroupScores, groupScores } from "./bifactor-scores.js";
 import type { Latent } from "./correlation.js";
-import { covarianceOfInformation } from "./standard-errors.js";
-
-/** The relative step of the central differences of the complete-data gradient, about the cube root of epsilon. */
-const STEP = 1e-5;
+import { covarianceOfInformation, itemInformation, STEP } from "./standard-errors.js";
 
 /**
  * Returns the covariance matrix of the estimated parameters on their own scale, by rows, in the order of the items'
@@ -233,26 +230,7 @@ function placeCrossing(
 function completeInformation<TParameters>(fit: BifactorFit<TParameters>, size: number): Float64Array {
   const { items, latent, correlated, maximization, expectation } = fit;
   const information = new Float64Array(size * size);
-  let slot = 0;
-  for (const item of items) {
-    const eta = maximization.coordinates(item);
-    const length = item.free.length;
-    const up = new Float64Array(length);
-    const down = new Float64Array(length);
-    const moved = Float64Array.from(eta);
-    for (let l = 0; l < length; l++) {
-      const step = STEP * Math.max(1, Math.abs(eta[l] ?? 0));
-      moved[l] = (eta[l] ?? 0) + step;
-      maximization.objective(item, moved, up);
-      moved[l] = (eta[l] ?? 0) - step;
-      maximization.objective(item, moved, down);
-      moved[l] = eta[l] ?? 0;
-      for (let m = 0; m < length; m++)
-        information[(slot + m) * size + slot + l] = ((up[m] ?? 0) - (down[m] ?? 0)) / (2 * step);
-    }
-    maximization.assign(item, eta);
-    slot += length;
-  }
+  const slot = itemInformation(items, maximization, information, size);
   if (correlated) correlationInformation(latent, expectation.nodeCounts, information, size, slot);
   return information;
 }

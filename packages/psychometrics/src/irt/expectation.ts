@@ -2,7 +2,7 @@ import { normalizeLogs } from "@measurekit/core";
 import type { Population } from "./latent.js";
 import type { IrtModel } from "./model.js";
 import { logProbability } from "./probability.js";
-import type { CompressedResponses } from "./responses.js";
+import { type CompressedResponses, forEachRespondent } from "./responses.js";
 import type { TestletDesign } from "./testlets.js";
 
 /** An item as the E-step sees it: its model, its current parameters and the expected counts the E-step writes. */
@@ -60,9 +60,8 @@ export function expectationStep(
   logTerms: Float64Array | null = null,
 ): ExpectationStep {
   const nodeCount = nodes.length;
-  const { offsets, codes } = data;
+  const { codes } = data;
   const responseItems = data.items;
-  const personCount = offsets.length - 1;
   const categories = Int32Array.from(items, (item) => item.categoryCount);
   const tableStarts = new Int32Array(items.length + 1);
   items.forEach((item, i) => {
@@ -136,15 +135,6 @@ export function expectationStep(
     countPattern(person);
   };
 
-  /** Calls `visit` with each person who answered an item, the bounds of the person's responses and the group. */
-  const forEachRespondent = (visit: (person: number, start: number, end: number, groupIndex: number) => void): void => {
-    for (let person = 0; person < personCount; person++) {
-      const start = offsets[person] ?? 0;
-      const end = offsets[person + 1] ?? 0;
-      if (end > start) visit(person, start, end, groupOf[person] ?? 0);
-    }
-  };
-
   const reduction =
     design === null
       ? null
@@ -159,7 +149,7 @@ export function expectationStep(
       for (const testlet of design?.testlets ?? []) testlet.counts.fill(0);
       reduction?.prepare();
       let logLikelihood = 0;
-      forEachRespondent((person, start, end, g) => {
+      forEachRespondent(data, groupOf, (person, start, end, g) => {
         const group = groups[g];
         if (group === undefined) return;
         joint(person, start, end, group.logWeights);
@@ -172,7 +162,7 @@ export function expectationStep(
       return logLikelihood;
     },
     forEachPosterior(visit) {
-      forEachRespondent((person, start, end, g) => {
+      forEachRespondent(data, groupOf, (person, start, end, g) => {
         const group = groups[g];
         if (group === undefined) return;
         joint(person, start, end, group.logWeights);

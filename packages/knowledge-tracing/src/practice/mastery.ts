@@ -153,6 +153,16 @@ export function windowMastery(log: EventLog, options: WindowOptions): MasteryTab
   });
 }
 
+/** Returns a function that updates the state of an event's learner with the event and returns the new state. */
+function tracking<TState>(model: LearnerModel<TState>): (event: Event) => TState {
+  const states = new Map<string, TState>();
+  return (event) => {
+    const state = model.update(states.get(event.learner) ?? model.initialState(event.learner), event);
+    states.set(event.learner, state);
+    return state;
+  };
+}
+
 /**
  * Returns the opportunity at which each learner's probability of mastery by the model first reached the threshold
  * after an attempt at each skill, updating each learner's state from `initialState` through the log. An event without
@@ -174,10 +184,9 @@ export function thresholdMastery<TState>(
   const { threshold = DEFAULT_THRESHOLD } = options;
   checkUnitInterval(threshold, "The threshold");
   checkLog(log);
-  const states = new Map<string, TState>();
+  const advance = tracking(model);
   return firstOpportunities(log, (event) => {
-    const state = model.update(states.get(event.learner) ?? model.initialState(event.learner), event);
-    states.set(event.learner, state);
+    const state = advance(event);
     return (skill) => model.mastery(state, skill) >= threshold;
   });
 }
@@ -204,10 +213,9 @@ export function predictedMastery<TState>(
   log.forEach((event, index) => {
     checkObservedHasSkills(event, `Event ${index + 1}`, "mastery table");
   });
-  const states = new Map<string, TState>();
+  const advance = tracking(model);
   return firstOpportunities(log, (event) => {
-    const state = model.update(states.get(event.learner) ?? model.initialState(event.learner), event);
-    states.set(event.learner, state);
+    const state = advance(event);
     const reached = isObserved(event) && model.predict(state, event) >= threshold;
     return () => reached;
   });

@@ -1,8 +1,5 @@
-import { backtrack } from "./line-search.js";
-import { dot, maxAbs } from "./vectors.js";
-
-/** A function to minimize: it returns its value at `x` and writes its gradient into `gradient`. */
-export type GradientFunction = (x: Float64Array, gradient: Float64Array) => number;
+import { type DescentPoint, type GradientFunction, stepAlong } from "./descent.js";
+import { dot, maxAbs, multiplyVector } from "./vectors.js";
 
 /** Stopping rules of a minimization. */
 export interface OptimizerOptions {
@@ -35,13 +32,6 @@ export interface OptimizationResult {
   readonly converged: boolean;
 }
 
-/** A point of a descent, with the function's gradient and value there. */
-interface Point {
-  readonly x: Float64Array;
-  readonly gradient: Float64Array;
-  value: number;
-}
-
 const DEFAULT_TOLERANCE = 1e-8;
 const DEFAULT_MAX_ITERATIONS = 100;
 
@@ -68,9 +58,9 @@ export function bfgs(
   const size = start.length;
   const approximation = inverseHessianOf(size);
   const direction = new Float64Array(size);
-  let point: Point = { x: Float64Array.from(start), gradient: new Float64Array(size), value: 0 };
+  let point: DescentPoint = { x: Float64Array.from(start), gradient: new Float64Array(size), value: 0 };
   point.value = f(point.x, point.gradient);
-  let trial: Point = { x: new Float64Array(size), gradient: new Float64Array(size), value: 0 };
+  let trial: DescentPoint = { x: new Float64Array(size), gradient: new Float64Array(size), value: 0 };
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     if (maxAbs(point.gradient) <= tolerance) {
       return { x: point.x, value: point.value, iterations: iteration, converged: true };
@@ -78,7 +68,7 @@ export function bfgs(
     approximation.direction(point.gradient, direction);
     // Near a minimum, rounding of the value hides the decrease a gradient above the tolerance promises, and the Armijo
     // condition accepts steps that change nothing.
-    if (!(lineSearch(f, point, direction, trial) && progressed(point, trial))) {
+    if (!(stepAlong(f, point, direction, trial) && progressed(point, trial))) {
       if (approximation.fresh()) return { x: point.x, value: point.value, iterations: iteration, converged: true };
       approximation.reset();
       continue;
@@ -99,7 +89,7 @@ interface InverseHessian {
   /** Writes the quasi-Newton direction for `gradient`, or its negative where that is not a descent direction. */
   direction(gradient: Float64Array, out: Float64Array): void;
   /** Learns from an accepted step, if it has positive curvature. */
-  update(from: Point, to: Point): void;
+  update(from: DescentPoint, to: DescentPoint): void;
   /** Returns the approximation to the identity. */
   reset(): void;
   /** Whether it is the identity, as at the start and after a reset. */
@@ -120,7 +110,7 @@ function inverseHessianOf(size: number): InverseHessian {
   reset();
   return {
     direction(gradient, out) {
-      multiply(matrix, gradient, out);
+      multiplyVector(matrix, gradient, out);
       for (let i = 0; i < size; i++) out[i] = -(out[i] ?? 0);
       if (dot(gradient, out) >= 0) {
         reset();
@@ -146,36 +136,9 @@ function inverseHessianOf(size: number): InverseHessian {
   };
 }
 
-/**
- * Halves the step along `search` from `point` until the value decreases enough (the Armijo condition), leaving the
- * accepted point in `trial`. Returns whether a step was accepted.
- */
-function lineSearch(f: GradientFunction, point: Point, search: Float64Array, trial: Point): boolean {
-  const accepted = backtrack(
-    (length) => {
-      for (let i = 0; i < search.length; i++) trial.x[i] = (point.x[i] ?? 0) + length * (search[i] ?? 0);
-      trial.value = f(trial.x, trial.gradient);
-      return trial.value;
-    },
-    point.value,
-    dot(point.gradient, search),
-  );
-  return accepted !== null;
-}
-
 /** Returns whether a step lowered the value or the largest gradient component. */
-function progressed(point: Point, trial: Point): boolean {
+function progressed(point: DescentPoint, trial: DescentPoint): boolean {
   return trial.value < point.value || maxAbs(trial.gradient) < maxAbs(point.gradient);
-}
-
-/** Writes the product of the square matrix `matrix`, by rows, and `vector` into `out`. */
-function multiply(matrix: Float64Array, vector: Float64Array, out: Float64Array): void {
-  const size = vector.length;
-  for (let i = 0; i < size; i++) {
-    let sum = 0;
-    for (let j = 0; j < size; j++) sum += (matrix[i * size + j] ?? 0) * (vector[j] ?? 0);
-    out[i] = sum;
-  }
 }
 
 /** Applies the BFGS update to an inverse Hessian approximation, given a step with positive `curvature`. */
@@ -187,7 +150,7 @@ function updateInverseHessian(
   product: Float64Array,
 ): void {
   const size = step.length;
-  multiply(inverseHessian, gradientChange, product);
+  multiplyVector(inverseHessian, gradientChange, product);
   const rho = 1 / curvature;
   const factor = rho + rho * rho * dot(gradientChange, product);
   for (let i = 0; i < size; i++) {

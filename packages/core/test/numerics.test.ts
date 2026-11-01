@@ -4,6 +4,7 @@ import {
   ARMIJO,
   backtrack,
   cholesky,
+  type DescentPoint,
   dot,
   iterateToConvergence,
   largestChange,
@@ -11,8 +12,10 @@ import {
   logLogistic,
   maxAbs,
   mean,
+  multiplyVector,
   normalizeLogs,
   normalQuantile,
+  stepAlong,
 } from "../src/index.js";
 
 /** Relative tolerance of the sums that the normalization of logs rounds. */
@@ -145,6 +148,12 @@ describe("vectors", () => {
   it("averages arrays and typed arrays alike in mean", () => {
     expect(mean([1, 2, 6])).toBe(3);
     expect(mean(Float64Array.of(0.5))).toBe(0.5);
+  });
+
+  it("multiplies a square matrix, by rows, and a vector in multiplyVector", () => {
+    const out = new Float64Array(2);
+    multiplyVector(Float64Array.of(1, 2, 3, 4), Float64Array.of(5, -1), out);
+    expect(Array.from(out)).toEqual([3, 11]);
   });
 
   it("takes the largest absolute change in largestChange, 0 for no values", () => {
@@ -283,5 +292,34 @@ describe("backtrack", () => {
         },
       ),
     );
+  });
+});
+
+describe("stepAlong", () => {
+  /** The function (x - 2)² of one coordinate, with its gradient. */
+  const square = (x: Float64Array, gradient: Float64Array): number => {
+    gradient[0] = 2 * ((x[0] ?? 0) - 2);
+    return ((x[0] ?? 0) - 2) ** 2;
+  };
+  const pointAt = (x: number): DescentPoint => {
+    const point = { x: Float64Array.of(x), gradient: new Float64Array(1), value: 0 };
+    point.value = square(point.x, point.gradient);
+    return point;
+  };
+
+  it("leaves the accepted point in the trial after halving the step until the value falls enough", () => {
+    const point = pointAt(0);
+    const trial = { x: new Float64Array(1), gradient: new Float64Array(1), value: 0 };
+    // A step of 10 along +1 overshoots to 10 and 5, and the length 1/4 lands at 2.5: (0.5)² = 0.25 <= 4 - 1e-4 · 4 · 10 / 4.
+    expect(stepAlong(square, point, Float64Array.of(10), trial)).toBe(true);
+    expect(Array.from(trial.x)).toEqual([2.5]);
+    expect(trial.value).toBe(0.25);
+    expect(Array.from(trial.gradient)).toEqual([1]);
+  });
+
+  it("refuses a direction that does not descend", () => {
+    const point = pointAt(0);
+    const trial = { x: new Float64Array(1), gradient: new Float64Array(1), value: 0 };
+    expect(stepAlong(square, point, Float64Array.of(-1), trial)).toBe(false);
   });
 });

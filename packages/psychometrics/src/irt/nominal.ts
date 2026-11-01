@@ -1,4 +1,4 @@
-import { DataError, isRecord, softmax } from "@measurekit/core";
+import { DataError, isRecord, mean, softmax } from "@measurekit/core";
 import { divideByTotalThetaDerivatives } from "./divide-by-total.js";
 import type { IrtModel } from "./model.js";
 import { formatList } from "./thresholds.js";
@@ -116,8 +116,8 @@ export const nominalResponse: IrtModel<NominalParameters> = {
 
 /** Returns the values minus their mean. */
 export function centered(values: readonly number[]): number[] {
-  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-  return values.map((value) => value - mean);
+  const center = mean(values);
+  return values.map((value) => value - center);
 }
 
 /** Returns the values followed by minus their sum. */

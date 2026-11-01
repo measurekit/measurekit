@@ -99,4 +99,5 @@ export {
   standardErrorThreshold,
   testLength,
 } from "./stopping.js";
+export type { TestControlOptions } from "./test-controls.js";
 export type { WithinTestlet } from "./testlets.js";

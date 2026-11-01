@@ -1,7 +1,7 @@
-import { unboundedDerivative } from "../irt/bounds.js";
 import { MIN_PROBABILITY } from "../irt/probability.js";
 import type { GroupNodes } from "./bifactor-expectation.js";
-import { type ItemState, UNBOUNDED } from "./calibration-setup.js";
+import type { ItemState } from "./calibration-setup.js";
+import { itemScales } from "./m-step.js";
 
 /** An item's scores at the nodes of its group, and where its entries sit among the group's. */
 interface ItemScores {
@@ -84,10 +84,7 @@ function itemScoreTable<TParameters>(item: ItemState<TParameters>, group: GroupN
   const { dimensions, count, nodes } = group.grid;
   const size = item.free.length;
   const length = item.vector.length;
-  const scales = Float64Array.from(item.free, (j, l) => {
-    const { lower, upper } = item.entries[l] ?? UNBOUNDED;
-    return unboundedDerivative(item.vector[j] ?? 0, lower, upper);
-  });
+  const scales = itemScales(item);
   const table = new Float64Array(item.categoryCount * count * size);
   const theta = new Float64Array(dimensions);
   const probabilities = new Float64Array(item.categoryCount);

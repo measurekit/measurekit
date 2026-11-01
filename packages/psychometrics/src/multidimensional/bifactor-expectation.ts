@@ -1,6 +1,7 @@
 import type { GroupPatterns, PatternTable } from "./bifactor-patterns.js";
 import { createWalk, type Walk } from "./bifactor-walk.js";
 import type { ItemState } from "./calibration-setup.js";
+import { addRun } from "./expectation.js";
 import type { Grid } from "./grid.js";
 
 /** The nodes of one group of items and its items, as the E-step and M-step see them. */
@@ -293,9 +294,4 @@ function referenceCounts<TParameters>(
       item.counts[reference + m] = Math.max((total[m] ?? 0) - others, 0);
     }
   });
-}
-
-/** Adds `source[from + q]` to `out[start + q]` for each q below `length`. */
-function addRun(out: Float64Array, start: number, source: Float64Array, from: number, length: number): void {
-  for (let q = 0; q < length; q++) out[start + q] = (out[start + q] ?? 0) + (source[from + q] ?? 0);
 }

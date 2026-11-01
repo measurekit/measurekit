@@ -1,4 +1,4 @@
-import { symmetrized } from "../math/matrix.js";
+import { mirror, symmetrized } from "../math/matrix.js";
 import { type PersonResponses, responsesByPerson } from "./mhrm-chain.js";
 import { latentObservedInformation, personLatentScores, secondMoments } from "./mhrm-latent.js";
 import { observedItemInformation, priorMoments, responseScores } from "./mhrm-moments.js";
@@ -210,13 +210,6 @@ function addLatentBlock(
       target[index] =
         (target[index] ?? 0) + weight * (latent[person * pairs + q] ?? 0) * (latent[person * pairs + r] ?? 0);
     }
-  }
-}
-
-/** Copies the upper triangle of a symmetric matrix onto its lower triangle where the lower entry was not written. */
-function mirror(matrix: Float64Array, size: number): void {
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j < i; j++) if ((matrix[i * size + j] ?? 0) === 0) matrix[i * size + j] = matrix[j * size + i] ?? 0;
   }
 }
 

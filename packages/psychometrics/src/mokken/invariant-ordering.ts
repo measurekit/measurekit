@@ -1,10 +1,11 @@
-import { DataError, studentLowerTail } from "@measurekit/core";
+import { DataError, mean, studentLowerTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { normalCdf } from "../math/normal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
 import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
 import { itemScalability, scaleCoefficient, usableItems } from "./scalability.js";
 import { columnOf, covariances, type MokkenData, mokkenData, scoreOf } from "./scores.js";
+import { addViolation, emptyViolations, type Violations } from "./violations.js";
 
 /** The default smallest difference of means that counts as a violation for each step of the highest score. */
 const MINIMUM_VIOLATION_PER_STEP = 0.03;
@@ -112,27 +113,14 @@ interface PairViolations {
   readonly significant: Int32Array;
 }
 
-interface Totals {
-  activeComparisons: number;
-  violations: number;
-  maximumViolation: number;
-  violationSum: number;
-  maximumZ: number;
-  significantViolations: number;
+/** The violations of an item's order with the others, and whether any had a test statistic. */
+interface Totals extends Violations {
   /** Whether any violation had a test statistic. */
   tested: boolean;
 }
 
 function emptyTotals(): Totals {
-  return {
-    activeComparisons: 0,
-    violations: 0,
-    maximumViolation: 0,
-    violationSum: 0,
-    maximumZ: 0,
-    significantViolations: 0,
-    tested: false,
-  };
+  return { ...emptyViolations(), tested: false };
 }
 
 interface PairSettings {
@@ -195,9 +183,7 @@ function pairResult(
     const second = persons.map((person) => scoreOf(data, person, harder));
     const difference = mean(second) - mean(first);
     if (!(difference > settings.minimumViolation)) continue;
-    result.violations += 1;
-    result.violationSum += difference;
-    result.maximumViolation = Math.max(result.maximumViolation, difference);
+    addViolation(result, difference);
     const test = data.categories > 2 ? pairedTest(first, second) : discordantTest(first, second);
     if (test.pValue < settings.alpha) result.significantViolations += 1;
     if (test.statistic !== null) {
@@ -206,10 +192,6 @@ function pairResult(
     }
   }
   return result;
-}
-
-function mean(values: readonly number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 /** A one-sided test of a harder item with the higher mean: the statistic, if it exists, and its p value. */
@@ -315,7 +297,7 @@ function personCoefficient(data: MokkenData, items: readonly number[]): number |
   let own = 0;
   for (let person = 0; person < data.persons; person++) {
     const scores = Float64Array.from(items, (item) => scoreOf(data, person, item));
-    const center = scores.reduce((sum, score) => sum + score, 0) / items.length;
+    const center = mean(scores);
     scores.forEach((score, k) => {
       byItem[k] = (byItem[k] ?? 0) + (score - center);
       own += (score - center) ** 2;

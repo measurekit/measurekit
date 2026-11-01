@@ -210,3 +210,50 @@ export function largestCategoryCount(items: readonly CategorizedItem[]): number 
   for (const item of items) largest = Math.max(largest, item.model.categoryCount(item.parameters));
   return largest;
 }
+
+/**
+ * Returns the model of each item from one model for all or a list with one per item, checking each with `check`.
+ *
+ * @param check - Checks one model; its message names the model the option needs.
+ * @throws `DataError` when a list does not have one model per item, or a model is invalid.
+ */
+export function modelsOf<TModel>(
+  model: TModel | readonly TModel[],
+  itemCount: number,
+  check: (model: TModel) => void,
+): readonly TModel[] {
+  const models = isList(model) ? model : Array.from({ length: itemCount }, () => model);
+  if (models.length !== itemCount) throw new DataError(`Found ${models.length} models for ${itemCount} items.`);
+  for (const each of models) check(each);
+  return models;
+}
+
+// Array.isArray does not narrow a union with a readonly array type.
+function isList<T>(value: T | readonly T[]): value is readonly T[] {
+  return Array.isArray(value);
+}
+
+/**
+ * Checks that each id with fixed parameters is the id of an item.
+ *
+ * @throws `DataError` when an id is not an item id.
+ */
+export function checkFixedIds(ids: Iterable<string>, itemIds: readonly string[]): void {
+  for (const id of ids) {
+    if (!itemIds.includes(id)) throw new DataError(`Fixed parameters are given for "${id}", which is not an item id.`);
+  }
+}
+
+/**
+ * Checks that the fixed parameters of an item have a category for each response to it.
+ *
+ * @param responseCategories - The number of categories up to the item's highest response.
+ * @throws `DataError` when the item has a response beyond its fixed parameters' categories.
+ */
+export function checkFixedCategories(id: string, responseCategories: number, categoryCount: number): void {
+  if (responseCategories > categoryCount) {
+    throw new DataError(
+      `Item "${id}" has a response of ${responseCategories - 1}, but its fixed parameters have ${categoryCount} categories.`,
+    );
+  }
+}

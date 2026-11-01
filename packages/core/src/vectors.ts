@@ -5,6 +5,16 @@ export function dot(a: Float64Array, b: Float64Array): number {
   return sum;
 }
 
+/** Writes the product of the square matrix `matrix`, by rows, and a vector of as many entries into `out`. */
+export function multiplyVector(matrix: Float64Array, vector: Float64Array, out: Float64Array): void {
+  const size = vector.length;
+  for (let i = 0; i < size; i++) {
+    let sum = 0;
+    for (let j = 0; j < size; j++) sum += (matrix[i * size + j] ?? 0) * (vector[j] ?? 0);
+    out[i] = sum;
+  }
+}
+
 /** Returns the largest absolute value, 0 for no values. */
 export function maxAbs(values: Float64Array): number {
   let largest = 0;

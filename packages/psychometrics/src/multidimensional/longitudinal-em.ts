@@ -1,7 +1,6 @@
 import { largestChange } from "@measurekit/core";
-import { toUnbounded } from "../irt/bounds.js";
 import type { Setup } from "../irt/calibration-setup.js";
-import { type Maximization, UNBOUNDED } from "../irt/m-step.js";
+import { type Maximization, unboundedCoordinates } from "../irt/m-step.js";
 import type { CompressedResponses } from "../irt/responses.js";
 import { type Iteration, squarem } from "../irt/squarem.js";
 import type { Latent } from "./correlation.js";
@@ -62,9 +61,7 @@ function emIteration<TParameters>({ setup, maximization, latent, eStep }: Longit
     },
     get() {
       const state = new Float64Array(values.length + latent.size);
-      state.set(
-        Float64Array.from(values, (x, j) => toUnbounded(x, (free[j] ?? UNBOUNDED).lower, (free[j] ?? UNBOUNDED).upper)),
-      );
+      state.set(unboundedCoordinates(values, free));
       state.set(latent.parameters(), values.length);
       return state;
     },

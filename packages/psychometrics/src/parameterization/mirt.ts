@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe, type LogisticItem, type ThresholdItem } from "@measurekit/core";
+import { checkRecord, DataError, describe, type LogisticItem, mean, type ThresholdItem } from "@measurekit/core";
 import { gradedResponse } from "../irt/graded.js";
 import { checkItem, checkModel } from "../irt/items.js";
 import {
@@ -214,7 +214,7 @@ const RATING_SCALE_FORM: MirtForm = {
     const a1 = nonzeroSlope(read);
     const shift = read.value("c") / a1;
     const thresholds = read.series("b", 1).map((step) => step - shift);
-    const b = thresholds.reduce((sum, threshold) => sum + threshold, 0) / thresholds.length;
+    const b = mean(thresholds);
     return { a: a1, b, steps: thresholds.map((threshold) => threshold - b) };
   },
 };

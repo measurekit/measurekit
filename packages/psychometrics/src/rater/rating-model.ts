@@ -4,6 +4,7 @@ import {
   DataError,
   describe,
   isNonEmptyString,
+  mean,
   partialCreditProbabilities,
   type ThresholdItem,
 } from "@measurekit/core";
@@ -256,7 +257,7 @@ export function expectedRatingAt(
     partialCreditProbabilities(1, location, thresholds, theta, probabilities);
     return probabilities.reduce((sum, probability, k) => sum + k * probability, 0);
   });
-  return totals.reduce((sum, value) => sum + value, 0) / totals.length;
+  return mean(totals);
 }
 
 /**

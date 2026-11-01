@@ -1,13 +1,14 @@
 import {
-  backtrack,
+  type DescentPoint,
   dot,
   type GradientFunction,
   maxAbs,
+  multiplyVector,
   type OptimizationResult,
   type OptimizerOptions,
+  stepAlong,
 } from "@measurekit/core";
 import { invert } from "./linear-algebra.js";
-import { multiplyVector } from "./matrix.js";
 
 /**
  * A function to minimize by Newton's method: it returns its value at `x` and writes its gradient and its Hessian, by
@@ -30,13 +31,6 @@ export interface NewtonOptions extends OptimizerOptions {
   readonly stepTolerance?: number;
 }
 
-/** A point of a descent, with the function's gradient and value there. */
-interface Point {
-  readonly x: Float64Array;
-  readonly gradient: Float64Array;
-  value: number;
-}
-
 const DEFAULT_TOLERANCE = 1e-8;
 const DEFAULT_MAX_ITERATIONS = 100;
 
@@ -49,9 +43,9 @@ export function newton(f: HessianFunction, start: ArrayLike<number>, options: Ne
   const size = start.length;
   const hessian = new Float64Array(size * size);
   const objective: GradientFunction = (x, gradient) => f(x, gradient, hessian);
-  let point: Point = { x: Float64Array.from(start), gradient: new Float64Array(size), value: 0 };
+  let point: DescentPoint = { x: Float64Array.from(start), gradient: new Float64Array(size), value: 0 };
   point.value = objective(point.x, point.gradient);
-  let trial: Point = { x: new Float64Array(size), gradient: new Float64Array(size), value: 0 };
+  let trial: DescentPoint = { x: new Float64Array(size), gradient: new Float64Array(size), value: 0 };
   const search = new Float64Array(size);
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     if (maxAbs(point.gradient) <= tolerance) {
@@ -61,7 +55,7 @@ export function newton(f: HessianFunction, start: ArrayLike<number>, options: Ne
     if (stepTolerance !== undefined && maxAbs(search) <= stepTolerance) {
       return fullStep(objective, point, search, iteration);
     }
-    if (!lineSearch(objective, point, search, trial)) {
+    if (!stepAlong(objective, point, search, trial)) {
       return { x: point.x, value: point.value, iterations: iteration, converged: false };
     }
     [point, trial] = [trial, point];
@@ -87,24 +81,12 @@ function direction(hessian: Float64Array, gradient: Float64Array, out: Float64Ar
 }
 
 /** Takes the step along `search` from `point` in full and returns the converged result there. */
-function fullStep(f: GradientFunction, point: Point, search: Float64Array, iteration: number): OptimizationResult {
+function fullStep(
+  f: GradientFunction,
+  point: DescentPoint,
+  search: Float64Array,
+  iteration: number,
+): OptimizationResult {
   const x = point.x.map((value, i) => value + (search[i] ?? 0));
   return { x, value: f(x, new Float64Array(x.length)), iterations: iteration + 1, converged: true };
-}
-
-/**
- * Halves the step along `search` from `point` until the value decreases enough (the Armijo condition), leaving the
- * accepted point in `trial`. Returns whether a step was accepted.
- */
-function lineSearch(f: GradientFunction, point: Point, search: Float64Array, trial: Point): boolean {
-  const accepted = backtrack(
-    (length) => {
-      for (let i = 0; i < search.length; i++) trial.x[i] = (point.x[i] ?? 0) + length * (search[i] ?? 0);
-      trial.value = f(trial.x, trial.gradient);
-      return trial.value;
-    },
-    point.value,
-    dot(point.gradient, search),
-  );
-  return accepted !== null;
 }

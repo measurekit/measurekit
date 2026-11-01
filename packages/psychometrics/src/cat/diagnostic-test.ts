@@ -9,10 +9,10 @@ import { profilePosterior } from "./profile-posterior.js";
 import { profileSpace } from "./profile-space.js";
 import type { ItemSelectionRule } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
-import type { WithinTestlet } from "./testlets.js";
+import type { TestControlOptions } from "./test-controls.js";
 
 /** Options of {@link diagnosticAdaptiveTest}. */
-export interface DiagnosticAdaptiveTestOptions {
+export interface DiagnosticAdaptiveTestOptions extends TestControlOptions {
   /** The item pool: calibrated items `{ id, attributes, probabilities }`, with `contentAreas` and `exposure` optional. */
   readonly pool: readonly DiagnosticPoolItem[];
   /** The attributes, from 1 to 20, in the order of the profiles. Every attribute of an item is among them. */
@@ -33,28 +33,6 @@ export interface DiagnosticAdaptiveTestOptions {
    * @defaultValue `gdinaDiscriminationIndex`
    */
   readonly selection?: ItemSelectionRule<DiagnosticTestItem, ProfileEstimate>;
-  /**
-   * Target proportions of the content areas, by area, for Kingsbury-Zara content balancing; they need not sum to 1.
-   * Every pool item then needs exactly one of these areas among its `contentAreas`.
-   *
-   * @defaultValue none: no content balancing
-   */
-  readonly contentTargets?: Readonly<Record<string, number>>;
-  /**
-   * Enemy sets: ids of items that must not be administered in the same test. Once an item of a set is administered,
-   * the others are not eligible.
-   *
-   * @defaultValue none
-   */
-  readonly enemies?: readonly (readonly string[])[];
-  /**
-   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order; `"adaptive"`,
-   * each next item the one the selection rule scores highest among the testlet's remaining items. It applies to pool
-   * items that have a `testlet`.
-   *
-   * @defaultValue `"in-order"`
-   */
-  readonly withinTestlet?: WithinTestlet;
 }
 
 /** The state of a diagnostic adaptive test: plain data, which JSON serializes, so that a test can resume from it. */

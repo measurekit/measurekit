@@ -1,8 +1,7 @@
-import { unboundedDerivative } from "../irt/bounds.js";
 import { MIN_PROBABILITY } from "../irt/probability.js";
 import { symmetrized } from "../math/matrix.js";
-import { type ItemState, UNBOUNDED } from "./calibration-setup.js";
-import { assignCoordinates, itemCoordinates } from "./m-step.js";
+import type { ItemState } from "./calibration-setup.js";
+import { assignCoordinates, itemCoordinates, itemScales } from "./m-step.js";
 import type { ItemResponses } from "./mhrm-chain.js";
 
 /** The relative step of the central differences of the complete-data score, about the cube root of epsilon. */
@@ -13,6 +12,8 @@ export interface Scratch {
   readonly point: Float64Array;
   readonly probabilities: Float64Array;
   readonly derivatives: Float64Array;
+  /** One response's score for each estimated entry of an item. */
+  readonly score: Float64Array;
 }
 
 /** Returns scratch space for items of the most categories and parameters, and for `dimensions` dimensions. */
@@ -23,6 +24,7 @@ export function createScratch<TParameters>(items: readonly ItemState<TParameters
     point: new Float64Array(dimensions),
     probabilities: new Float64Array(categories),
     derivatives: new Float64Array(categories * entries),
+    score: new Float64Array(entries),
   };
 }
 
@@ -33,12 +35,27 @@ export interface Draws {
   readonly dimensions: number;
 }
 
-/** Returns dx/dη at each estimated entry of the item. */
-function scalesOf<TParameters>(item: ItemState<TParameters>): Float64Array {
-  return Float64Array.from(item.free, (j, l) => {
-    const { lower, upper } = item.entries[l] ?? UNBOUNDED;
-    return unboundedDerivative(item.vector[j] ?? 0, lower, upper);
-  });
+/**
+ * Writes the complete-data score of response `r` of an item on the unbounded scale into `scratch.score`, ∂ ln P(x | θ) /
+ * ∂η at the draw of the response's person for each estimated entry. `scales` is {@link itemScales} of the item.
+ */
+function scoreOfResponse<TParameters>(
+  item: ItemState<TParameters>,
+  scales: Float64Array,
+  r: number,
+  { theta, responses, dimensions }: Draws,
+  { point, probabilities, derivatives, score }: Scratch,
+): void {
+  const length = item.vector.length;
+  const person = responses.respondents[r] ?? 0;
+  for (let d = 0; d < dimensions; d++) point[d] = theta[person * dimensions + d] ?? 0;
+  item.model.probabilities(item.parameters, point, probabilities);
+  item.model.parameterDerivatives(item.parameters, point, derivatives);
+  const code = responses.codes[r] ?? 0;
+  const observed = Math.max(probabilities[code] ?? 0, MIN_PROBABILITY);
+  for (let l = 0; l < item.free.length; l++) {
+    score[l] = ((derivatives[code * length + (item.free[l] ?? 0)] ?? 0) / observed) * (scales[l] ?? 1);
+  }
 }
 
 /**
@@ -48,26 +65,17 @@ function scalesOf<TParameters>(item: ItemState<TParameters>): Float64Array {
 export function itemMoments<TParameters>(
   item: ItemState<TParameters>,
   index: number,
-  { theta, responses, dimensions }: Draws,
+  draws: Draws,
   scratch: Scratch,
   gradient: Float64Array,
 ): void {
   const size = item.free.length;
-  const length = item.vector.length;
-  const scales = scalesOf(item);
-  const { point, probabilities, derivatives } = scratch;
+  const scales = itemScales(item);
+  const { responses } = draws;
   gradient.fill(0, 0, size);
   for (let r = responses.starts[index] ?? 0; r < (responses.starts[index + 1] ?? 0); r++) {
-    const person = responses.respondents[r] ?? 0;
-    for (let d = 0; d < dimensions; d++) point[d] = theta[person * dimensions + d] ?? 0;
-    item.model.probabilities(item.parameters, point, probabilities);
-    item.model.parameterDerivatives(item.parameters, point, derivatives);
-    const code = responses.codes[r] ?? 0;
-    const observed = Math.max(probabilities[code] ?? 0, MIN_PROBABILITY);
-    for (let l = 0; l < size; l++) {
-      gradient[l] =
-        (gradient[l] ?? 0) + ((derivatives[code * length + (item.free[l] ?? 0)] ?? 0) / observed) * (scales[l] ?? 1);
-    }
+    scoreOfResponse(item, scales, r, draws, scratch);
+    for (let l = 0; l < size; l++) gradient[l] = (gradient[l] ?? 0) + (scratch.score[l] ?? 0);
   }
 }
 
@@ -79,26 +87,17 @@ export function itemMoments<TParameters>(
 export function responseScores<TParameters>(
   item: ItemState<TParameters>,
   index: number,
-  { theta, responses, dimensions }: Draws,
+  draws: Draws,
   scratch: Scratch,
   scores: Float64Array,
   offsets: Int32Array,
 ): void {
   const size = item.free.length;
-  const length = item.vector.length;
-  const rates = scalesOf(item);
-  const { point, probabilities, derivatives } = scratch;
+  const scales = itemScales(item);
+  const { responses } = draws;
   for (let r = responses.starts[index] ?? 0; r < (responses.starts[index + 1] ?? 0); r++) {
-    const person = responses.respondents[r] ?? 0;
-    for (let d = 0; d < dimensions; d++) point[d] = theta[person * dimensions + d] ?? 0;
-    item.model.probabilities(item.parameters, point, probabilities);
-    item.model.parameterDerivatives(item.parameters, point, derivatives);
-    const code = responses.codes[r] ?? 0;
-    const observed = Math.max(probabilities[code] ?? 0, MIN_PROBABILITY);
-    for (let l = 0; l < size; l++) {
-      scores[(offsets[r] ?? 0) + l] =
-        ((derivatives[code * length + (item.free[l] ?? 0)] ?? 0) / observed) * (rates[l] ?? 1);
-    }
+    scoreOfResponse(item, scales, r, draws, scratch);
+    for (let l = 0; l < size; l++) scores[(offsets[r] ?? 0) + l] = scratch.score[l] ?? 0;
   }
 }
 
@@ -112,7 +111,7 @@ export function priorMoments<TParameters>(
   information?: Float64Array,
 ): void {
   const size = item.free.length;
-  const scales = scalesOf(item);
+  const scales = itemScales(item);
   item.free.forEach((j, l) => {
     const prior = item.entries[l]?.prior;
     if (prior === undefined) return;

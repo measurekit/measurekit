@@ -1,5 +1,6 @@
-import { DataError, describe, isRecord, logisticPair } from "@measurekit/core";
-import { linearPredictor } from "./logistic.js";
+import { DataError, isRecord, logisticPair } from "@measurekit/core";
+import { formatList, sharesAbove } from "../irt/thresholds.js";
+import { linearPredictor, writeInformation } from "./logistic.js";
 import type { MultidimensionalModel } from "./model.js";
 
 /**
@@ -29,13 +30,10 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
   ],
   startingValues(proportions, slopes) {
     // At theta 0, P(X ≥ k) is the share of persons in categories k and above.
-    const intercepts: number[] = [];
-    let above = 1;
-    for (let k = 1; k < proportions.length; k++) {
-      above -= proportions[k - 1] ?? 0;
-      intercepts.push(Math.log(above / (1 - above)));
-    }
-    return { a: Array.from(slopes), intercepts };
+    return {
+      a: Array.from(slopes),
+      intercepts: sharesAbove(proportions).map((above) => Math.log(above / (1 - above))),
+    };
   },
   toVector(parameters) {
     const { a, intercepts }: Partial<MultidimensionalGradedParameters> = isRecord(parameters) ? parameters : {};
@@ -48,12 +46,12 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
       intercepts.every(Number.isFinite);
     if (!valid) {
       throw new DataError(
-        `An MGRM item needs finite slopes a, at least one, and at least one finite intercept, found a = ${list(a)}, intercepts = ${list(intercepts)}.`,
+        `An MGRM item needs finite slopes a, at least one, and at least one finite intercept, found a = ${formatList(a)}, intercepts = ${formatList(intercepts)}.`,
       );
     }
     for (let k = 1; k < intercepts.length; k++) {
       if (!((intercepts[k - 1] ?? 0) > (intercepts[k] ?? 0))) {
-        throw new DataError(`An MGRM item needs strictly decreasing intercepts, found ${list(intercepts)}.`);
+        throw new DataError(`An MGRM item needs strictly decreasing intercepts, found ${formatList(intercepts)}.`);
       }
     }
     return Float64Array.of(...a, ...intercepts);
@@ -124,15 +122,6 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
       slope = next;
     }
     const factor = above > 0 ? sum + (slope * slope) / above : sum;
-    a.forEach((ai, i) => {
-      a.forEach((aj, j) => {
-        out[i * a.length + j] = factor * (ai * aj);
-      });
-    });
+    writeInformation(a, factor, out);
   },
 };
-
-/** Formats a list of numbers for a message, or describes any other value. */
-function list(values: unknown): string {
-  return Array.isArray(values) ? `[${values.map(describe).join(", ")}]` : describe(values);
-}

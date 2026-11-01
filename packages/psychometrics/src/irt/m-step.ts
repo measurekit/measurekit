@@ -223,11 +223,27 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
 }
 
 /** A free parameter without bounds or prior. */
-export const UNBOUNDED: FreeParameter = {
+const UNBOUNDED: FreeParameter = {
   lower: Number.NEGATIVE_INFINITY,
   upper: Number.POSITIVE_INFINITY,
   prior: undefined,
 };
+
+/** Returns the unbounded coordinates of the parameters `values`, whose bounds are in `free`. */
+export function unboundedCoordinates(values: ArrayLike<number>, free: readonly FreeParameter[]): Float64Array {
+  return Float64Array.from(values, (x, j) => {
+    const { lower, upper } = free[j] ?? UNBOUNDED;
+    return toUnbounded(x, lower, upper);
+  });
+}
+
+/** Returns dx/dη at each of the parameters `values`, whose bounds are in `free`. */
+export function unboundedScales(values: ArrayLike<number>, free: readonly FreeParameter[]): Float64Array {
+  return Float64Array.from(values, (x, j) => {
+    const { lower, upper } = free[j] ?? UNBOUNDED;
+    return unboundedDerivative(x, lower, upper);
+  });
+}
 
 /**
  * Splits the estimated items into blocks the M-step can maximize separately: the items of a model with a shared

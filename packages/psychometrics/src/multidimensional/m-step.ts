@@ -108,6 +108,14 @@ export function itemCoordinates<TParameters>(item: ItemState<TParameters>): Floa
   });
 }
 
+/** Returns dx/dη at each estimated entry of the item. */
+export function itemScales<TParameters>(item: ItemState<TParameters>): Float64Array {
+  return Float64Array.from(item.free, (j, l) => {
+    const { lower, upper } = item.entries[l] ?? UNBOUNDED;
+    return unboundedDerivative(item.vector[j] ?? 0, lower, upper);
+  });
+}
+
 /**
  * Returns -Σ count log P over an item's nodes and categories and, when `gradient` is given, adds its gradient at the
  * item's estimated entries and, when `hessian` is given, the expected information Σ n P'P'ᵀ / P of the item's counts,
@@ -209,10 +217,7 @@ function toUnboundedScale<TParameters>(
   hessian: Float64Array | undefined,
 ): void {
   const size = item.free.length;
-  const scales = Float64Array.from(item.free, (j, l) => {
-    const { lower, upper } = item.entries[l] ?? UNBOUNDED;
-    return unboundedDerivative(item.vector[j] ?? 0, lower, upper);
-  });
+  const scales = itemScales(item);
   for (let l = 0; l < size; l++) gradient[l] = (gradient[l] ?? 0) * (scales[l] ?? 0);
   if (hessian === undefined) return;
   for (let l = 0; l < size; l++) {

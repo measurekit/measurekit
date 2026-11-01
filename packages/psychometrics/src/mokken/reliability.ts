@@ -1,4 +1,4 @@
-import { DataError } from "@measurekit/core";
+import { DataError, mean } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { variance } from "../math/statistics.js";
 import { type MokkenData, mokkenData, scoreOf } from "./scores.js";
@@ -214,7 +214,7 @@ function estimatedJoint(steps: StepMatrix, a: number, b: number): number {
     ...neighborValues(steps, acrossRow, (step) => groupMean(steps, rows, membersOf(steps, step)), pb, pa),
     ...neighborValues(steps, downColumn, (step) => groupMean(steps, membersOf(steps, step), columns), pa, pb),
   ];
-  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+  return values.length === 0 ? 0 : mean(values);
 }
 
 /**

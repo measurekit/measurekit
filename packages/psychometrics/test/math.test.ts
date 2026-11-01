@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { symmetricEigen } from "../src/math/eigen.js";
 import { numericalHessian } from "../src/math/hessian.js";
 import { invert, invertPositiveDefinite } from "../src/math/linear-algebra.js";
-import { identity, multiply, multiplyVector, symmetrized, traceOfProduct, transpose } from "../src/math/matrix.js";
+import { identity, mirror, multiply, symmetrized, trace, traceOfProduct, transpose } from "../src/math/matrix.js";
 import { normalCdf, normalDensity } from "../src/math/normal.js";
 import { newton } from "../src/math/optimize.js";
 import { pseudoInverse } from "../src/math/pseudo-inverse.js";
@@ -326,21 +326,14 @@ describe("matrix helpers", () => {
     expect(Array.from(out)).toEqual(Array.from(a));
   });
 
-  it("multiplies a square matrix and a vector as a matrix with one column", () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.double({ min: -10, max: 10, noNaN: true }), { minLength: 12, maxLength: 12 }),
-        (values) => {
-          const matrix = Float64Array.from(values.slice(0, 9));
-          const vector = Float64Array.from(values.slice(9));
-          const direct = new Float64Array(3);
-          const asColumn = new Float64Array(3);
-          multiplyVector(matrix, vector, direct);
-          multiply(matrix, vector, 3, 3, 1, asColumn);
-          expect(Array.from(direct)).toEqual(Array.from(asColumn));
-        },
-      ),
-    );
+  it("sums the diagonal in trace", () => {
+    expect(trace(Float64Array.of(1, 2, 3, 4, 5, 6, 7, 8, 9), 3)).toBe(15);
+  });
+
+  it("copies the upper triangle onto the lower entries that were not written, and no other", () => {
+    const matrix = Float64Array.of(1, 2, 3, 0, 4, 5, 9, 0, 6);
+    mirror(matrix, 3);
+    expect(Array.from(matrix)).toEqual([1, 2, 3, 2, 4, 5, 9, 5, 6]);
   });
 
   it("takes tr(a b) as the trace of the product", () => {

@@ -3,6 +3,7 @@ import type { ResponseMatrix } from "../data/response-matrix.js";
 import { invert } from "../math/linear-algebra.js";
 import { type DifData, type DifGroup, itemCases, polytomousData } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
+import { type LogisticRegressionDif, MAX_ITERATIONS, STEP_TOLERANCE } from "./logistic-regression.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 
 /** Options of {@link ordinalLogisticRegressionDif}. */
@@ -17,23 +18,11 @@ export interface MatchingOptions extends PurificationOptions {
 }
 
 /** Ordinal logistic regression DIF tests of one polytomous item. */
-export interface OrdinalLogisticDif {
-  /** The item id. */
-  readonly id: string;
-  /** Uniform DIF: the group term, model 1 against model 0. */
-  readonly uniform: LikelihoodRatioTest;
-  /** Nonuniform DIF: the interaction of score and group, model 2 against model 1. */
-  readonly nonuniform: LikelihoodRatioTest;
-  /** Both: the group and interaction terms, model 2 against model 0. */
-  readonly both: LikelihoodRatioTest;
+export interface OrdinalLogisticDif extends LogisticRegressionDif {
   /** The relative change of the score coefficient when the group joins the model: |β1(1) - β1(0)| / |β1(0)|. */
   readonly slopeChange: number | null;
 }
 
-/** Newton's method stops when no parameter changes by more than this, as in the dichotomous regressions. */
-const STEP_TOLERANCE = 1e-10;
-/** Bounds Newton's method where an estimate diverges (separation), by when the deviance has reached its infimum. */
-const MAX_ITERATIONS = 100;
 /** The most times a step that leaves the thresholds unordered or raises the deviance is halved. */
 const MAX_HALVES = 30;
 /** The relative increase of the deviance a step may show: the rounding error of a sum over all persons. */

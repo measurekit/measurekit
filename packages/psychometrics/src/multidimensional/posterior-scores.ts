@@ -1,10 +1,11 @@
-import { unboundedDerivative } from "../irt/bounds.js";
 import { MIN_PROBABILITY } from "../irt/probability.js";
 import type { CompressedResponses } from "../irt/responses.js";
-import { type ItemState, UNBOUNDED } from "./calibration-setup.js";
+import { mirror } from "../math/matrix.js";
+import type { ItemState } from "./calibration-setup.js";
 import type { Latent } from "./correlation.js";
 import type { ExpectationStep } from "./expectation.js";
 import type { Grid } from "./grid.js";
+import { itemScales } from "./m-step.js";
 import { type DimensionSet, restriction, subgridCount, subgridNodes } from "./subgrid.js";
 
 /**
@@ -205,16 +206,13 @@ function itemUnit<TParameters>(
   axis: Float64Array,
   scaled: boolean,
 ): ScoreUnit {
-  const { dimensions, free, vector } = item;
+  const { dimensions, free } = item;
   let set: DimensionSet = 0;
   for (const j of free) if (j < dimensions) set |= 1 << j;
   const nodes = subgridCount(set, axis.length);
   const coordinates = new Float64Array(nodes * dimensions);
   subgridNodes(set, axis, dimensions, coordinates);
-  const scales = Float64Array.from(free, (j, l) => {
-    const { lower, upper } = item.entries[l] ?? UNBOUNDED;
-    return scaled ? unboundedDerivative(vector[j] ?? 0, lower, upper) : 1;
-  });
+  const scales = scaled ? itemScales(item) : new Float64Array(free.length).fill(1);
   return { offset, size: free.length, set, nodes, table: itemScores(item, coordinates, scales) };
 }
 
@@ -406,15 +404,6 @@ function addSecondMoment(matrix: Float64Array, size: number, pair: UnitPair): vo
       for (let m = 0; m < second.size; m++) {
         matrix[row + m] = (matrix[row + m] ?? 0) + left * (second.table[secondStart + m] ?? 0);
       }
-    }
-  }
-}
-
-/** Copies the upper triangle of a symmetric matrix onto its lower triangle where the lower entry was not written. */
-function mirror(matrix: Float64Array, size: number): void {
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j < i; j++) {
-      if ((matrix[i * size + j] ?? 0) === 0) matrix[i * size + j] = matrix[j * size + i] ?? 0;
     }
   }
 }

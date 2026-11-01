@@ -19,6 +19,7 @@ import type { IrtModel } from "../irt/model.js";
 import type { ParameterPrior } from "../irt/prior.js";
 import { logProbability } from "../irt/probability.js";
 import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
+import { respondentsOf } from "../irt/responses.js";
 import { calibrateResponseTimes } from "./lognormal.js";
 import { expectation, iterate, jointModel } from "./speed-accuracy-em.js";
 import { jointCovariance } from "./speed-accuracy-errors.js";
@@ -171,12 +172,7 @@ export function calibrateSpeedAccuracy<TParameters>(
   checkStopping(tolerance, maxIterations);
   const timed = timedResponses(data, "Speed-accuracy calibration");
   const start = calibrateResponseTimes(data);
-  const answered = Array.from(
-    timed.personIds,
-    (_, person) => (timed.offsets[person + 1] ?? 0) > (timed.offsets[person] ?? 0),
-  );
-  const respondents = answered.filter(Boolean).length;
-  if (respondents === 0) throw new DataError("Calibration needs at least one response.");
+  const { answered, respondents } = respondentsOf(timed);
   const rule = quadratureRule(quadrature);
   const irtOptions: CalibrationOptions<TParameters> = {
     model,

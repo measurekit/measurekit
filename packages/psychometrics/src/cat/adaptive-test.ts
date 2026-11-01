@@ -6,10 +6,10 @@ import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
 import { checkResponse, type PoolItem } from "./items.js";
 import { type ItemSelectionRule, maximumInformation } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
-import type { WithinTestlet } from "./testlets.js";
+import type { TestControlOptions } from "./test-controls.js";
 
 /** Options of {@link adaptiveTest}. */
-export interface AdaptiveTestOptions {
+export interface AdaptiveTestOptions extends TestControlOptions {
   /** The item pool. */
   readonly pool: readonly PoolItem[];
   /** The rule that ends the test. The test also ends when no item is left or the selection rule scores every eligible item `-Infinity`. */
@@ -26,28 +26,6 @@ export interface AdaptiveTestOptions {
    * @defaultValue `posteriorMeanEstimate`
    */
   readonly estimator?: AbilityEstimator;
-  /**
-   * Target proportions of the content areas, by area, for Kingsbury-Zara content balancing; they need not sum to 1.
-   * Every pool item then needs exactly one of these areas among its `contentAreas`.
-   *
-   * @defaultValue none: no content balancing
-   */
-  readonly contentTargets?: Readonly<Record<string, number>>;
-  /**
-   * Enemy sets: ids of items that must not be administered in the same test, such as items that give away each other's
-   * answers. Once an item of a set is administered, the others are not eligible.
-   *
-   * @defaultValue none
-   */
-  readonly enemies?: readonly (readonly string[])[];
-  /**
-   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order; `"adaptive"`,
-   * each next item the one the selection rule scores highest among the testlet's remaining items. It applies to pool
-   * items that have a `testlet`.
-   *
-   * @defaultValue `"in-order"`
-   */
-  readonly withinTestlet?: WithinTestlet;
 }
 
 /** The state of an adaptive test: plain data, which JSON serializes, so that a test can resume from a stored state. */

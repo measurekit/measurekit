@@ -110,14 +110,7 @@ function newtonDirection(
       reduced[a * count + b] = hessian[i * size + j] ?? 0;
     });
   });
-  const inverse = invertPositiveDefinite(reduced, count);
-  const step = new Float64Array(count);
-  if (inverse !== null) {
-    for (let a = 0; a < count; a++) step[a] = -dot(inverse.subarray(a * count, (a + 1) * count), slope);
-  }
-  if (inverse === null || dot(step, slope) >= 0) {
-    for (let a = 0; a < count; a++) step[a] = -(slope[a] ?? 0);
-  }
+  const step = descent(reduced, slope);
   free.forEach((i, a) => {
     direction[i] = step[a] ?? 0;
   });

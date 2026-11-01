@@ -1,4 +1,5 @@
 import { checkRecord, DataError } from "@measurekit/core";
+import { checkFixedCategories, checkFixedIds, modelsOf } from "../irt/items.js";
 import { checkPrior, type ParameterPrior } from "../irt/prior.js";
 import { type CompressedResponses, categoryCounts, checkCategories } from "../irt/responses.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
@@ -65,15 +66,18 @@ export function setUp<TParameters>(
   const { itemIds } = responses;
   const dimensions = design.dimensionNames.length;
   const counts = categoryCounts(responses);
-  const models = itemModels(options.model, itemIds.length);
+  const models = modelsOf(options.model, itemIds.length, (each) =>
+    checkMultidimensionalModel(
+      each,
+      "The option model must be a multidimensional model such as multidimensionalTwoParameterLogistic",
+    ),
+  );
   const { priors = {}, fixed = {} } = options;
   checkRecord(priors, "The option priors must be an object of priors by parameter name");
   // A map, so that an id such as "constructor" finds only its own parameters.
   checkRecord(fixed, "The option fixed must be an object of item parameters by item id");
   const anchors = new Map(Object.entries(fixed));
-  for (const id of anchors.keys()) {
-    if (!itemIds.includes(id)) throw new DataError(`Fixed parameters are given for "${id}", which is not an item id.`);
-  }
+  checkFixedIds(anchors.keys(), itemIds);
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);
   const slopes = startingSlopes(design, responses);
   const items = models.map((model, column): ItemState<TParameters> => {
@@ -139,11 +143,7 @@ function fixedItem<TParameters>(
       `Fixed item "${id}" has ${model.dimensionCount(parameters)} dimensions, but the calibration has ${dimensions}.`,
     );
   }
-  if (responseCategories > categoryCount) {
-    throw new DataError(
-      `Item "${id}" has a response of ${responseCategories - 1}, but its fixed parameters have ${categoryCount} categories.`,
-    );
-  }
+  checkFixedCategories(id, responseCategories, categoryCount);
   return {
     id,
     model,
@@ -157,24 +157,4 @@ function fixedItem<TParameters>(
     free: new Int32Array(0),
     entries: [],
   };
-}
-
-function itemModels<TParameters>(
-  model: MultidimensionalModel<TParameters> | readonly MultidimensionalModel<TParameters>[],
-  itemCount: number,
-): readonly MultidimensionalModel<TParameters>[] {
-  const models = isList(model) ? model : Array.from({ length: itemCount }, () => model);
-  if (models.length !== itemCount) throw new DataError(`Found ${models.length} models for ${itemCount} items.`);
-  for (const each of models) {
-    checkMultidimensionalModel(
-      each,
-      "The option model must be a multidimensional model such as multidimensionalTwoParameterLogistic",
-    );
-  }
-  return models;
-}
-
-// Array.isArray does not narrow a union with a readonly array type.
-function isList<T>(value: T | readonly T[]): value is readonly T[] {
-  return Array.isArray(value);
 }

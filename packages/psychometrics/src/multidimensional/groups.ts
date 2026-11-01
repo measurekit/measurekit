@@ -1,5 +1,5 @@
-import { DataError, describe } from "@measurekit/core";
-import type { CompressedResponses } from "../irt/responses.js";
+import { DataError } from "@measurekit/core";
+import { type CompressedResponses, personGroups } from "../irt/responses.js";
 import type { ItemState } from "./calibration-setup.js";
 import { type Latent, latentDistribution } from "./correlation.js";
 import type { Design } from "./design.js";
@@ -40,12 +40,8 @@ export function population<TParameters>(
   grid: Grid,
 ): Population {
   const persons = responses.offsets.length - 1;
-  const labels = groupLabels(options.groups, persons);
-  const distinct = labels === null ? null : [...new Set(labels)];
-  const names: readonly (string | null)[] = distinct ?? [null];
-  const groupOf = Int32Array.from({ length: persons }, (_, person) =>
-    labels === null ? 0 : names.indexOf(labels[person] ?? ""),
-  );
+  const { labels, groupOf } = personGroups(options.groups, persons);
+  const names: readonly (string | null)[] = labels ?? [null];
   const answered = answeredItems(responses, groupOf, names.length);
   names.forEach((name, g) => {
     if (!answered[g]?.some(Boolean)) throw new DataError(`Group "${name}" has no person with a response.`);
@@ -56,20 +52,7 @@ export function population<TParameters>(
     const estimated = anchored || g > 0;
     return latentDistribution(grid, { correlations: design.correlated, variances: estimated, means: estimated });
   });
-  return { labels: distinct, groupOf, latents };
-}
-
-function groupLabels(groups: readonly string[] | undefined, personCount: number): readonly string[] | null {
-  if (groups === undefined) return null;
-  if (!Array.isArray(groups) || groups.length !== personCount) {
-    throw new DataError(`Found ${Array.isArray(groups) ? groups.length : "no"} groups for ${personCount} persons.`);
-  }
-  groups.forEach((label, person) => {
-    if (typeof label !== "string") {
-      throw new DataError(`The group of person ${person + 1} must be a string, found ${describe(label)}.`);
-    }
-  });
-  return groups;
+  return { labels, groupOf, latents };
 }
 
 /** Returns, for each group, whether some person of it answered each item. */

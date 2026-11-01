@@ -28,6 +28,17 @@ export function thresholdsFromVector(vector: Float64Array): ThresholdItem {
   return { a: vector[0] ?? 0, b: Array.from(vector.subarray(1)) };
 }
 
+/** Returns the share of persons in categories k and above, for k = 1 to K - 1, from the share in each category. */
+export function sharesAbove(proportions: ArrayLike<number>): number[] {
+  const shares: number[] = [];
+  let above = 1;
+  for (let k = 1; k < proportions.length; k++) {
+    above -= proportions[k - 1] ?? 0;
+    shares.push(above);
+  }
+  return shares;
+}
+
 /** Formats a list of numbers for a message, or describes any other value. */
 export function formatList(values: unknown): string {
   return Array.isArray(values) ? `[${values.map(describe).join(", ")}]` : describe(values);

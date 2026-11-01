@@ -1,7 +1,6 @@
-import { toUnbounded, unboundedDerivative } from "../irt/bounds.js";
-import { UNBOUNDED } from "../irt/m-step.js";
+import { covarianceFromInformation } from "../irt/hessian-covariance.js";
+import { unboundedCoordinates, unboundedScales } from "../irt/m-step.js";
 import { numericalHessian } from "../math/hessian.js";
-import { invert } from "../math/linear-algebra.js";
 import { expectation, type JointModel } from "./speed-accuracy-em.js";
 import { timeGradient } from "./speed-accuracy-time.js";
 
@@ -22,10 +21,7 @@ export function jointCovariance<TParameters>(joint: JointModel<TParameters>): Fl
   const { free, values } = setup;
   const itemSize = values.length;
   const size = itemSize + parameters.length;
-  const eta = Float64Array.from(values, (x, j) => {
-    const { lower, upper } = free[j] ?? UNBOUNDED;
-    return toUnbounded(x, lower, upper);
-  });
+  const eta = unboundedCoordinates(values, free);
   const itemGradient = new Float64Array(itemSize);
   const timeScores = new Float64Array(parameters.length);
   const point = new Float64Array(size);
@@ -44,17 +40,7 @@ export function jointCovariance<TParameters>(joint: JointModel<TParameters>): Fl
   mStep.assign(mStep.all, eta);
   parameters.set(point.subarray(itemSize));
   expectation(joint);
-  const inverse = invert(information, size);
-  if (inverse === null) return null;
-  const scales = Float64Array.from({ length: size }, (_, j) => {
-    if (j >= itemSize) return 1;
-    const { lower, upper } = free[j] ?? UNBOUNDED;
-    return unboundedDerivative(values[j] ?? 0, lower, upper);
-  });
-  for (let j = 0; j < size; j++) {
-    if (!((inverse[j * size + j] ?? 0) > 0)) return null;
-    for (let k = 0; k < size; k++)
-      inverse[j * size + k] = (inverse[j * size + k] ?? 0) * (scales[j] ?? 1) * (scales[k] ?? 1);
-  }
-  return inverse;
+  const scales = new Float64Array(size).fill(1);
+  scales.set(unboundedScales(values, free));
+  return covarianceFromInformation(information, size, scales);
 }

@@ -2,7 +2,7 @@ import { checkRecord, DataError } from "@measurekit/core";
 import type { Quadrature } from "../math/quadrature.js";
 import type { CalibrationOptions } from "./calibration-options.js";
 import type { ExpectationItem } from "./expectation.js";
-import { checkItem, checkModel } from "./items.js";
+import { checkFixedCategories, checkFixedIds, checkItem, checkModel, modelsOf } from "./items.js";
 import { type Population, population } from "./latent.js";
 import type { IrtModel, ModelParameter } from "./model.js";
 import { checkPrior, type ParameterPrior } from "./prior.js";
@@ -61,14 +61,14 @@ export function setUp<TParameters>(
 ): Setup<TParameters> {
   const { itemIds } = responses;
   const itemCounts = categoryCounts(responses);
-  const models = itemModels(options.model, itemIds.length);
+  const models = modelsOf(options.model, itemIds.length, (each) =>
+    checkModel(each, "The option model must be an IRT model such as twoParameterLogistic"),
+  );
   const { fixed = {}, priors = {}, itemPriors = {} } = options;
   checkRecord(fixed, "The option fixed must be an object of item parameters by item id");
   checkRecord(priors, "The option priors must be an object of priors by parameter name");
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);
-  for (const id of Object.keys(fixed)) {
-    if (!itemIds.includes(id)) throw new DataError(`Fixed parameters are given for "${id}", which is not an item id.`);
-  }
+  checkFixedIds(Object.keys(fixed), itemIds);
   const priorsOfItem = itemPriorMap(itemPriors, itemIds, fixed);
   const free: FreeParameter[] = [];
   const values: number[] = [];
@@ -216,21 +216,6 @@ function sharedSlots<TParameters>(
   return first.slots;
 }
 
-function itemModels<TParameters>(
-  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
-  itemCount: number,
-): readonly IrtModel<TParameters>[] {
-  const models = isList(model) ? model : Array.from({ length: itemCount }, () => model);
-  if (models.length !== itemCount) throw new DataError(`Found ${models.length} models for ${itemCount} items.`);
-  for (const each of models) checkModel(each, "The option model must be an IRT model such as twoParameterLogistic");
-  return models;
-}
-
-// Array.isArray does not narrow a union with a readonly array type.
-function isList<T>(value: T | readonly T[]): value is readonly T[] {
-  return Array.isArray(value);
-}
-
 /**
  * Checks that testlets come with standard errors the testlet model supports. The groups and their distributions of
  * theta need no check: the testlets' integrals do not depend on the group, and `population` checks the scale.
@@ -252,11 +237,7 @@ function fixedItem<TParameters>(
 ): ItemState<TParameters> {
   checkItem({ model, parameters }, `Fixed item "${id}"`);
   const categoryCount = model.categoryCount(parameters);
-  if (responseCategories > categoryCount) {
-    throw new DataError(
-      `Item "${id}" has a response of ${responseCategories - 1}, but its fixed parameters have ${categoryCount} categories.`,
-    );
-  }
+  checkFixedCategories(id, responseCategories, categoryCount);
   return {
     id,
     model,

@@ -1,7 +1,6 @@
-import { toUnbounded, unboundedDerivative } from "../irt/bounds.js";
 import type { StandardErrorMethod } from "../irt/calibration-options.js";
 import { derivativeRatios } from "../irt/cross-product.js";
-import { UNBOUNDED } from "../irt/m-step.js";
+import { unboundedCoordinates, unboundedScales } from "../irt/m-step.js";
 import type { CompressedResponses } from "../irt/responses.js";
 import { numericalHessian } from "../math/hessian.js";
 import { invert, invertPositiveDefinite } from "../math/linear-algebra.js";
@@ -39,12 +38,7 @@ export function standardErrorsOf<TParameters>(
 function reportScales<TParameters>({ setup, latent }: LongitudinalFit<TParameters>, unbounded: boolean): Float64Array {
   const { values, free } = setup;
   const scales = new Float64Array(values.length + latent.size).fill(1);
-  if (unbounded) {
-    values.forEach((x, j) => {
-      const { lower, upper } = free[j] ?? UNBOUNDED;
-      scales[j] = unboundedDerivative(x, lower, upper);
-    });
-  }
+  if (unbounded) scales.set(unboundedScales(values, free));
   if (latent.free.variances) {
     const first = values.length + (latent.free.correlations ? latent.pairs.length : 0);
     latent.standardDeviations.forEach((deviation, d) => {
@@ -73,9 +67,7 @@ function hessianCovariance<TParameters>(fit: LongitudinalFit<TParameters>): Floa
   const { values, free } = setup;
   const n = values.length;
   const start = new Float64Array(n + latent.size);
-  start.set(
-    Float64Array.from(values, (x, j) => toUnbounded(x, (free[j] ?? UNBOUNDED).lower, (free[j] ?? UNBOUNDED).upper)),
-  );
+  start.set(unboundedCoordinates(values, free));
   start.set(latent.entries(), n);
   const hessian = numericalHessian((point, gradient) => {
     const eta = point.subarray(0, n);

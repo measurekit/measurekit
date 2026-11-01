@@ -1,6 +1,6 @@
 import { normalizeLogs } from "@measurekit/core";
 import { logProbability } from "../irt/probability.js";
-import type { CompressedResponses } from "../irt/responses.js";
+import { type CompressedResponses, forEachRespondent } from "../irt/responses.js";
 import type { Grid } from "./grid.js";
 import type { MultidimensionalModel } from "./model.js";
 
@@ -62,9 +62,8 @@ export function expectationStep(
 ): ExpectationStep {
   const groupWeights = logWeights instanceof Float64Array ? [logWeights] : logWeights;
   const nodeCount = grid.count;
-  const { offsets, codes } = data;
+  const { codes } = data;
   const responseItems = data.items;
-  const personCount = offsets.length - 1;
   const tableStarts = new Int32Array(items.length + 1);
   items.forEach((item, i) => {
     tableStarts[i + 1] = (tableStarts[i] ?? 0) + nodeCount * item.categoryCount;
@@ -85,15 +84,6 @@ export function expectationStep(
       const code = codes[r] ?? 0;
       if (code === (references?.[item] ?? -1)) continue;
       addRun(posterior, 0, logTable, (tableStarts[item] ?? 0) + code * nodeCount, nodeCount);
-    }
-  };
-
-  /** Calls `visit` with each person who answered an item, the bounds of the person's responses and the group. */
-  const forEachRespondent = (visit: (person: number, start: number, end: number, group: number) => void): void => {
-    for (let person = 0; person < personCount; person++) {
-      const start = offsets[person] ?? 0;
-      const end = offsets[person + 1] ?? 0;
-      if (end > start) visit(person, start, end, groupOf?.[person] ?? 0);
     }
   };
 
@@ -124,7 +114,7 @@ export function expectationStep(
       for (const item of items) item.counts.fill(0);
       for (const counts of groupCounts) counts.fill(0);
       let logLikelihood = 0;
-      forEachRespondent((_, start, end, group) => {
+      forEachRespondent(data, groupOf, (_, start, end, group) => {
         joint(start, end, group);
         logLikelihood += normalizeLogs(posterior);
         count(start, end, group);
@@ -137,7 +127,7 @@ export function expectationStep(
       return logLikelihood;
     },
     forEachPosterior(visit) {
-      forEachRespondent((person, start, end, group) => {
+      forEachRespondent(data, groupOf, (person, start, end, group) => {
         joint(start, end, group);
         normalizeLogs(posterior);
         visit(person, posterior);
@@ -232,7 +222,7 @@ function tabulate(
 }
 
 /** Adds `source[from + q]` to `out[start + q]` for each q below `length`. */
-function addRun(out: Float64Array, start: number, source: Float64Array, from: number, length: number): void {
+export function addRun(out: Float64Array, start: number, source: Float64Array, from: number, length: number): void {
   for (let q = 0; q < length; q++) out[start + q] = (out[start + q] ?? 0) + (source[from + q] ?? 0);
 }
 

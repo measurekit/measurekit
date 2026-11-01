@@ -52,9 +52,7 @@ export function tuckerEquating(
   to: BivariateDistribution,
   options: SyntheticOptions = {},
 ): number[] {
-  checkOptions(options);
-  const [source, target] = neatTables(from, to);
-  const weight = syntheticWeight(options, source, target);
+  const { source, target, weight } = syntheticGroups(from, to, options);
   const sourceMoments = groupMoments(source, "from");
   const targetMoments = groupMoments(target, "to");
   return syntheticLinear(
@@ -87,9 +85,7 @@ export function levineEquating(
   to: BivariateDistribution,
   options: LevineOptions = {},
 ): number[] {
-  checkOptions(options);
-  const [source, target] = neatTables(from, to);
-  const weight = syntheticWeight(options, source, target);
+  const { source, target, weight } = syntheticGroups(from, to, options);
   const { trueScore = false, anchor = "internal" } = options;
   checkBoolean(trueScore, "The option trueScore");
   checkChoice(anchor, "The option anchor", ["internal", "external"]);
@@ -129,15 +125,22 @@ export function chainedLinearEquating(from: BivariateDistribution, to: Bivariate
 }
 
 /**
- * Returns the weight of the `from` group in a synthetic population: `options.weight`, checked, or the group's share of
- * the persons.
+ * Checks the options and returns the tables of the two groups and the weight of the `from` group in their synthetic
+ * population: `options.weight`, or the group's share of the persons.
  *
- * @throws `DataError` when the weight is not a number from 0 to 1.
+ * @throws `DataError` when a distribution is invalid, the two have different numbers of anchor scores, or the weight is
+ * not a number from 0 to 1.
  */
-export function syntheticWeight(options: SyntheticOptions, source: BivariateTable, target: BivariateTable): number {
+export function syntheticGroups(
+  from: BivariateDistribution,
+  to: BivariateDistribution,
+  options: SyntheticOptions,
+): { readonly source: BivariateTable; readonly target: BivariateTable; readonly weight: number } {
+  checkOptions(options);
+  const [source, target] = neatTables(from, to);
   const { weight = source.persons / (source.persons + target.persons) } = options;
   checkUnitInterval(weight, "The option weight");
-  return weight;
+  return { source, target, weight };
 }
 
 /** The moments of one group's total and anchor scores, with denominator n - 1. */

@@ -1,4 +1,4 @@
-import { checkRandom, type Random } from "@measurekit/core";
+import { checkRandom, mean, type Random } from "@measurekit/core";
 import { simulateMultidimensionalResponses } from "../sim/multidimensional-responses.js";
 import type { MultidimensionalAdaptiveTest, MultidimensionalAdaptiveTestState } from "./multidimensional-test.js";
 import { administer, checkTest, type ExposureRate, responseLookup, summarizeAdministrations } from "./simulation.js";
@@ -56,7 +56,7 @@ export function simulateMultidimensionalAdaptiveTest(
   const perDimension = Array.from({ length: dimensions }, (_, d) => errors(d));
   return {
     persons,
-    bias: perDimension.map((list) => list.reduce((sum, error) => sum + error, 0) / list.length),
+    bias: perDimension.map((list) => mean(list)),
     rootMeanSquareError: perDimension.map((list) =>
       Math.sqrt(list.reduce((sum, error) => sum + error * error, 0) / list.length),
     ),

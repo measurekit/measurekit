@@ -6,6 +6,7 @@ import type { AdaptiveTestContext, ItemSelectionRule, SelectionContext } from ".
 import { checkDistinct, checkState, type TestState } from "./state.js";
 import type { StoppingRule } from "./stopping.js";
 import { checkExposure, selectItem } from "./sympson-hetter.js";
+import type { TestControlOptions } from "./test-controls.js";
 import {
   checkTestletAreas,
   checkWithinTestlet,
@@ -13,7 +14,6 @@ import {
   poolTestlets,
   remainingInTestlet,
   unitSelection,
-  type WithinTestlet,
 } from "./testlets.js";
 
 /**
@@ -30,7 +30,7 @@ export interface AdaptiveState<TEstimate> extends TestState<TEstimate> {
 }
 
 /** What {@link adaptiveEngine} needs of a test: validated items, rules and the functions of the test's estimate. */
-export interface AdaptiveEngineOptions<TItem extends PoolControls, TEstimate> {
+export interface AdaptiveEngineOptions<TItem extends PoolControls, TEstimate> extends TestControlOptions {
   /** The pool, whose items the test has checked, and ids are unique. */
   readonly pool: readonly TItem[];
   /** The index of each pool item by id. */
@@ -39,20 +39,6 @@ export interface AdaptiveEngineOptions<TItem extends PoolControls, TEstimate> {
   readonly stopping: StoppingRule<TItem, TEstimate>;
   /** The rule that selects the next item. */
   readonly selection: ItemSelectionRule<TItem, TEstimate>;
-  /** The target proportions of the content areas, by area. */
-  readonly contentTargets?: Readonly<Record<string, number>>;
-  /**
-   * The enemy sets.
-   *
-   * @defaultValue none
-   */
-  readonly enemies?: readonly (readonly string[])[];
-  /**
-   * How the items of a testlet are ordered. It applies to pool items that have a `testlet`.
-   *
-   * @defaultValue `"in-order"`
-   */
-  readonly withinTestlet?: WithinTestlet;
   /** Returns the estimate from the administered items and their responses, also without any. */
   readonly estimate: (administered: readonly TItem[], responses: readonly number[]) => TEstimate;
   /** Checks that a response is one the item can have. */

@@ -4,22 +4,13 @@ import { defaultGroupSize, restScoreGroups } from "./groups.js";
 import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
 import { itemScalability, usableItems } from "./scalability.js";
 import { covariances, type MokkenData, mokkenData, scoreOf } from "./scores.js";
+import { addViolation, emptyViolations, type Violations } from "./violations.js";
 
 /** The default smallest decrease of a proportion that counts as a violation, mokken's `minvi`. */
 const DEFAULT_MINIMUM_VIOLATION = 0.03;
 /** The proportions at or below which a group has none of the persons above a step, and at or above which all. */
 const NONE = 1e-10;
 const ALL = 0.999999999999;
-
-/** The violations of one item's response function over its steps. */
-interface Violations {
-  activeComparisons: number;
-  violations: number;
-  maximumViolation: number;
-  violationSum: number;
-  maximumZ: number;
-  significantViolations: number;
-}
 
 /**
  * Checks monotonicity: that the probability of scoring at least each step of an item does not decrease with the rest
@@ -97,14 +88,7 @@ function itemViolations(
     counts[at] = (counts[at] ?? 0) + 1;
     sizes[group] = (sizes[group] ?? 0) + 1;
   }
-  const total: Violations = {
-    activeComparisons: 0,
-    violations: 0,
-    maximumViolation: 0,
-    violationSum: 0,
-    maximumZ: 0,
-    significantViolations: 0,
-  };
+  const total = emptyViolations();
   for (let step = 1; step < categories; step++) {
     const above = Float64Array.from({ length: groups.count }, (_, group) => {
       let reached = 0;
@@ -132,9 +116,7 @@ function addStep(
       // A violation is a group with a higher rest score in which fewer persons reach the step.
       const decrease = proportion(lower) - proportion(higher);
       if (!(decrease > minimumViolation)) continue;
-      total.violations += 1;
-      total.violationSum += decrease;
-      total.maximumViolation = Math.max(total.maximumViolation, decrease);
+      addViolation(total, decrease);
       const z = violationZ(above, sizes, lower, higher);
       total.maximumZ = Math.max(total.maximumZ, z);
       if (z > critical) total.significantViolations += 1;

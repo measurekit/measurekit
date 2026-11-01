@@ -2,7 +2,7 @@ import { checkChoice, checkOptions, checkSeed, checkStopping, DataError } from "
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
 import type { StandardErrorMethod } from "../irt/calibration-options.js";
-import { type CompressedResponses, compressResponses } from "../irt/responses.js";
+import { type CompressedResponses, compressResponses, respondentsOf } from "../irt/responses.js";
 import type { CalibrationMethod, MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { type ItemState, setUp } from "./calibration-setup.js";
 import { pairsOf } from "./correlation.js";
@@ -136,10 +136,7 @@ export function calibrateMultidimensional<TParameters>(
   const { standardErrors = "none", seed = 0 } = options;
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
   checkSeed(seed);
-  const respondents = Array.from(responses.personIds, (_, person) => {
-    return (responses.offsets[person + 1] ?? 0) > (responses.offsets[person] ?? 0);
-  }).filter(Boolean).length;
-  if (respondents === 0) throw new DataError("Calibration needs at least one response.");
+  const { respondents } = respondentsOf(responses);
   const design = designOf(options, responses.itemIds);
   const { method = defaultMethod(design.dimensionNames.length) } = options;
   checkChoice(method, "The option method", METHODS);

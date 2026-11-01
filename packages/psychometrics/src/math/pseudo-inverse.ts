@@ -1,5 +1,6 @@
 import { symmetricEigen } from "./eigen.js";
 import { invertPositiveDefinite } from "./linear-algebra.js";
+import { trace } from "./matrix.js";
 
 /** The relative size below which an eigenvalue counts as 0: the square root of the machine epsilon, as R's `MASS::ginv`. */
 const RANK_TOLERANCE = Math.sqrt(Number.EPSILON);
@@ -35,10 +36,4 @@ function truncatedInverse(a: Float64Array, size: number): Float64Array {
     }
   });
   return inverse;
-}
-
-function trace(a: Float64Array, size: number): number {
-  let sum = 0;
-  for (let i = 0; i < size; i++) sum += a[i * size + i] ?? 0;
-  return sum;
 }

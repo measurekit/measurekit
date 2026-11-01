@@ -12,10 +12,10 @@ import { maximumDeterminant } from "./maximum-determinant.js";
 import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
 import type { ItemSelectionRule } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
-import type { WithinTestlet } from "./testlets.js";
+import type { TestControlOptions } from "./test-controls.js";
 
 /** Options of {@link multidimensionalAdaptiveTest}. */
-export interface MultidimensionalAdaptiveTestOptions {
+export interface MultidimensionalAdaptiveTestOptions extends TestControlOptions {
   /** The item pool: multidimensional items with ids, all on the same number of dimensions, such as a calibration's. */
   readonly pool: readonly MultidimensionalPoolItem[];
   /** The rule that ends the test. The test also ends when no item is left or the selection rule scores every eligible item `-Infinity`. */
@@ -33,28 +33,6 @@ export interface MultidimensionalAdaptiveTestOptions {
    * @defaultValue `multidimensionalPosteriorModeEstimate`, under a prior of N(0, I) of the pool's dimensions
    */
   readonly estimator?: MultidimensionalEstimator;
-  /**
-   * Target proportions of the content areas, by area, for Kingsbury-Zara content balancing; they need not sum to 1.
-   * Every pool item then needs exactly one of these areas among its `contentAreas`.
-   *
-   * @defaultValue none: no content balancing
-   */
-  readonly contentTargets?: Readonly<Record<string, number>>;
-  /**
-   * Enemy sets: ids of items that must not be administered in the same test. Once an item of a set is administered,
-   * the others are not eligible.
-   *
-   * @defaultValue none
-   */
-  readonly enemies?: readonly (readonly string[])[];
-  /**
-   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order; `"adaptive"`,
-   * each next item the one the selection rule scores highest among the testlet's remaining items. It applies to pool
-   * items that have a `testlet`.
-   *
-   * @defaultValue `"in-order"`
-   */
-  readonly withinTestlet?: WithinTestlet;
 }
 
 /** The state of a multidimensional adaptive test: plain data, which JSON serializes, so that a test can resume from it. */

@@ -1,5 +1,6 @@
 import type { CompressedResponses } from "../irt/responses.js";
 import { symmetricEigen } from "../math/eigen.js";
+import { pearsonMatrix } from "../math/pearson.js";
 import type { Design } from "./design.js";
 import { NORMAL_OGIVE_SCALE } from "./loadings.js";
 
@@ -41,44 +42,13 @@ function principalSlopes(responses: CompressedResponses, dimensions: number): nu
 
 /** Returns the Pearson correlations of the items over the persons who answered both, 0 where undefined. */
 function correlations({ itemIds, offsets, items, codes }: CompressedResponses): Float64Array {
-  const size = itemIds.length;
   const personCount = offsets.length - 1;
-  const answers = new Float64Array(personCount * size).fill(Number.NaN);
+  const columns = itemIds.map(() => new Float64Array(personCount).fill(Number.NaN));
   for (let person = 0; person < personCount; person++) {
     for (let r = offsets[person] ?? 0; r < (offsets[person + 1] ?? 0); r++) {
-      answers[person * size + (items[r] ?? 0)] = codes[r] ?? 0;
+      const column = columns[items[r] ?? 0];
+      if (column !== undefined) column[person] = codes[r] ?? 0;
     }
   }
-  const result = new Float64Array(size * size);
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j <= i; j++) {
-      const value = i === j ? 1 : pairCorrelation(answers, size, personCount, i, j);
-      result[i * size + j] = value;
-      result[j * size + i] = value;
-    }
-  }
-  return result;
-}
-
-function pairCorrelation(answers: Float64Array, size: number, personCount: number, i: number, j: number): number {
-  let n = 0;
-  let sumX = 0;
-  let sumY = 0;
-  let sumXx = 0;
-  let sumYy = 0;
-  let sumXy = 0;
-  for (let person = 0; person < personCount; person++) {
-    const x = answers[person * size + i] ?? Number.NaN;
-    const y = answers[person * size + j] ?? Number.NaN;
-    if (Number.isNaN(x) || Number.isNaN(y)) continue;
-    n++;
-    sumX += x;
-    sumY += y;
-    sumXx += x * x;
-    sumYy += y * y;
-    sumXy += x * y;
-  }
-  const varianceX = n * sumXx - sumX * sumX;
-  const varianceY = n * sumYy - sumY * sumY;
-  return varianceX > 0 && varianceY > 0 ? (n * sumXy - sumX * sumY) / Math.sqrt(varianceX * varianceY) : 0;
+  return pearsonMatrix(columns).map((value) => (Number.isNaN(value) ? 0 : value));
 }

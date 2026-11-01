@@ -23,14 +23,11 @@ export function multiply(
   }
 }
 
-/** Writes the product of the `size` by `size` matrix `matrix`, by rows, and a vector of `size` entries into `out`. */
-export function multiplyVector(matrix: Float64Array, vector: Float64Array, out: Float64Array): void {
-  const size = vector.length;
-  for (let i = 0; i < size; i++) {
-    let sum = 0;
-    for (let j = 0; j < size; j++) sum += (matrix[i * size + j] ?? 0) * (vector[j] ?? 0);
-    out[i] = sum;
-  }
+/** Returns the trace of the `size` by `size` matrix `a`. */
+export function trace(a: Float64Array, size: number): number {
+  let sum = 0;
+  for (let i = 0; i < size; i++) sum += a[i * size + i] ?? 0;
+  return sum;
 }
 
 /** Returns tr(a b) of two `size` by `size` matrices. */
@@ -38,6 +35,13 @@ export function traceOfProduct(a: Float64Array, b: Float64Array, size: number): 
   let sum = 0;
   for (let i = 0; i < size; i++) for (let k = 0; k < size; k++) sum += (a[i * size + k] ?? 0) * (b[k * size + i] ?? 0);
   return sum;
+}
+
+/** Copies the upper triangle of a symmetric matrix onto its lower triangle where the lower entry was not written. */
+export function mirror(matrix: Float64Array, size: number): void {
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < i; j++) if ((matrix[i * size + j] ?? 0) === 0) matrix[i * size + j] = matrix[j * size + i] ?? 0;
+  }
 }
 
 /** Returns the square matrix of `size` rows averaged with its transpose. */
