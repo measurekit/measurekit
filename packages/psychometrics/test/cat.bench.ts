@@ -9,6 +9,7 @@ import {
   maximumInformation,
   multidimensionalAdaptiveTest,
   multidimensionalTwoParameterLogistic,
+  multistageCuts,
   posteriorMeanEstimate,
   responseMatrix,
   simulateAdaptiveTest,
@@ -66,6 +67,22 @@ test("simulates adaptive tests of 30 items that select testlets, for 200 persons
     () => simulateAdaptiveTest(test, fixture.thetas, createRandom(SEED)),
     SLOW_OPTIONS,
   );
+});
+
+test("derives the routing cuts of a panel of 1-3-3-3 modules of 20 items from a pool of 500 3PL items", async (context) => {
+  const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
+    id: `item${i + 1}`,
+    model: threeParameterLogistic,
+    parameters: { a, b: defined(fixture.pool.b[i]), c: defined(fixture.pool.c[i]), d: 1 },
+  }));
+  const stages = fixture.multistage.stages.map((modules, stage) =>
+    modules.map((items, module) => ({
+      id: `stage${stage + 1}module${module + 1}`,
+      items: items.map((index) => defined(pool[index])),
+    })),
+  );
+  expect(multistageCuts(stages)).toHaveLength(7);
+  await benchmark(context, "cat.multistageCuts", () => multistageCuts(stages));
 });
 
 test("simulates diagnostic adaptive tests of 10 items for 200 persons on a pool of 20 items", async (context) => {

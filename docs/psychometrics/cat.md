@@ -3,10 +3,11 @@
 `@measurekit/psychometrics/cat` runs computerized adaptive tests (CAT) and multistage tests (MST) on items of any [IRT
 model](irt.md), adaptive tests that classify a person's attribute profile with the items of a [cognitive diagnosis
 model](cdm.md), and adaptive tests that estimate a vector of thetas with [multidimensional](multidimensional.md) items,
-simulates them, calibrates their exposure control and assembles fixed forms. Item selection, ability estimates, content
-balancing and stopping decisions are validated against catR step by step; diagnostic tests against a replay of every
-rule written out in base R and against cdcatR; multidimensional tests against a replay in base R and against mirtCAT;
-testlets against a replay in base R and mirtCAT's ordered groups ([validation](validation.md)).
+derives the routing cuts of multistage panels, simulates them, calibrates their exposure control and assembles fixed
+forms. Item selection, ability estimates, content balancing and stopping decisions are validated against catR step by
+step; diagnostic tests against a replay of every rule written out in base R and against cdcatR; multidimensional tests
+against a replay in base R and against mirtCAT; testlets against a replay in base R and mirtCAT's ordered groups;
+routing cuts against root finders in base R ([validation](validation.md)).
 
 ## Adaptive tests
 
@@ -688,6 +689,84 @@ Modules are `{ id, items, cuts }`. Module and item ids are unique in the panel.
 ids of the administered modules, with `items`, `responses`, `estimate` and `next` as in an adaptive test, and is plain
 data in the same way; `answer` also checks that it takes one module per stage, in order, with their items.
 
+### Routing cuts
+
+`multistageCuts(stages, options)` derives the `cuts` of a panel's modules, which `multistageTest` takes and does not
+derive.
+
+```mermaid
+flowchart LR
+  S["Stages of modules"] --> M{"method"}
+  M -->|maximum-information| I["Where the information of two adjacent modules of a stage is equal, between their peaks"]
+  M -->|routing-shares| Q["Where the population reaches each cumulative share"]
+  I --> T["Cuts into each stage, in theta"]
+  Q --> T
+  T --> C{"scale"}
+  C -->|theta| R["The cuts as they are, for every module of the stage before"]
+  C -->|number-correct| N["The test characteristic curve of the items taken so far at each cut, rounded up to a whole score"]
+  R --> O["One list of cuts for each module of the stages but the last"]
+  N --> O
+  O --> P["The cuts of the modules in multistageTest"]
+```
+
+```ts
+import { multistageCuts, multistageTest } from "@measurekit/psychometrics/cat";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+
+const module = (id: string, difficulties: number[]) => ({
+  id,
+  items: difficulties.map((b, j) => ({
+    id: `${id}${j + 1}`,
+    model: twoParameterLogistic,
+    parameters: { a: 1, b, c: 0, d: 1 },
+  })),
+});
+const stages = [
+  [module("routing", [-1, -0.3, 0.3, 1])],
+  [module("easy", [-1.5, -1, -0.5]), module("medium", [-0.5, 0, 0.5]), module("hard", [0.5, 1, 1.5])],
+];
+multistageCuts(stages); // [[-0.5, 0.5]]: the routing module's cuts in theta, where the modules' information is equal
+const [cuts] = multistageCuts(stages, { scale: "number-correct" }); // [2, 3]
+const test = multistageTest({
+  stages: [[{ ...module("routing", [-1, -0.3, 0.3, 1]), cuts }], stages[1]],
+  routing: "number-correct",
+});
+```
+
+| Option       | Default                 | Meaning                                                                                     |
+| ------------ | ----------------------- | ------------------------------------------------------------------------------------------- |
+| `method`     | `"maximum-information"` | `"maximum-information"` or `"routing-shares"`                                               |
+| `scale`      | `"theta"`               | `"theta"`, or `"number-correct"`: whole scores, as `multistageTest` routes by them          |
+| `range`      | `[-6, 6]`               | `maximum-information` only: the interval in which the peaks and crossings are searched      |
+| `population` | the standard normal     | `routing-shares` only: a `{ nodes, weights }` distribution, nodes ascending                 |
+| `shares`     | equal shares in a stage | `routing-shares` only: one list for each stage after the first, a positive share per module |
+
+An option of the other method is an error. The result has one list for each module of the stages but the last, in the
+order of the panel; a module's list has one cut fewer than the modules of the next stage, ascending. The `cuts` that the
+modules carry are ignored, and the stages and items are checked as `multistageTest` checks them.
+
+| Method                | A cut is                                                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `maximum-information` | The first theta above the easier module's peak where the harder module is as informative; the peaks are searched in steps of 0.01 |
+| `routing-shares`      | The quantile of the population at the cumulative share of the modules below; the standard normal is exact                         |
+
+- **Stage by stage.** The cuts into a stage are the same for every module of the stage before, as a person of a given
+  theta belongs in the same module of a stage whichever module they come from. The routes through two adjacent modules
+  share what comes before, so the cut compares the modules' information alone. The modules of a stage must go from the
+  easiest to the hardest.
+- **Crossings.** Information curves may cross again in a tail, where the flatter curve decays more slowly; the cut is
+  the crossing between the peaks. It must exist: each module must be the more informative at its own peak, or the
+  panel is refused.
+- **Populations of nodes.** The weight of a node spreads evenly over the cell between the midpoints to its neighbors,
+  the first and the last cell as wide as the one beside it, so that a quantile varies smoothly with its share; a
+  population of one node puts every cut at it.
+- **Shares.** Each list is divided by its sum, which may be off 1 by up to 1e-6.
+- **Number-correct.** A cut is the smallest whole score at or above the test characteristic curve at the cut in theta,
+  so that a person with at least that score goes up. The curve is that of the routing module and of the module of each
+  earlier stage that routing by theta takes at the cut, so the cuts of a module of the third stage or later count
+  the items of the route a person at the cut would take. A score within 1e-9 of a whole score counts as it. Cuts whose
+  expected scores fall as theta rises, which modules of unequal length can cause, are refused: use the scale `"theta"`.
+
 ## Simulation
 
 [`simulateDiagnosticTest`](#simulation-of-diagnostic-tests) simulates diagnostic tests. `simulateAdaptiveTest(test,
@@ -786,6 +865,9 @@ form.contentCounts; // the number of items of each constrained area, within its 
 - Testlets from which only some items are administered, such as a passage with more questions than a test takes, and
   testlets whose items are in several content areas under content balancing.
 - A testlet-level exposure parameter: the `exposure` of the first item to be administered acts for its testlet.
+- Routing cuts by other rules than equal information and shares of a population, such as optimizing the accuracy of
+  classification, and cuts that differ with the route that led to a module, except through the items on the scale
+  `"number-correct"`.
 
 ## Differences from catR
 

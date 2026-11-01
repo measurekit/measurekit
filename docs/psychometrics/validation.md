@@ -87,6 +87,7 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | Content balancing                                            | `nextItem` with `cbControl`                                                                             |
 | Stopping decisions                                           | `checkStopRule` with `length`, `precision` and `minInfo` on the remaining items, alone and together     |
 | Randomesque, Sympson-Hetter, multistage routing, simulation  | Properties over seeded simulations and hand-derived routes (below)                                      |
+| Routing cuts by information and by shares                    | Base R over mirt's `iteminfo` and `expected.item` (below)                                               |
 | Enemy sets, exposure calibration, form assembly              | Properties (below); catR has no enemy sets or form assembly                                             |
 | Testlet selection, administration, withholding and stopping  | Base R replay of the documented rules, with catR's `Ii`; mirtCAT's `ordered` groups (below)             |
 
@@ -307,7 +308,19 @@ test accepts any area catR could pick, and checks that the item is the most info
 cover the stochastic parts: randomesque selects only among the top items and reaches each of them; an item every
 test selects first is administered at the rate of its exposure parameter, within four binomial standard errors
 over 4,000 seeded persons; the last eligible item is never withheld; seeded simulations reproduce exactly.
-Multistage routing is checked against routes derived by hand, at and beside the cut points. Enemy sets: over random
+Multistage routing is checked against routes derived by hand, at and beside the cut points.
+`validation/psychometrics/multistage-cuts.R` derives routing cuts in base R, as no reference package does: mstR is not
+among the references. Panels of 2PL, 3PL, graded and generalized partial credit items are set in mirt, whose `iteminfo`
+gives the information curves and `expected.item` the test characteristic curves. A cut by maximum information is the root
+of the difference of two modules' information between their peaks, by `uniroot` at a tolerance of 1e-13, and the script
+checks that the difference changes sign once there; a pair of modules whose curves also cross in a tail checks that the
+cut is not that crossing. A cut by shares is `qnorm` at the cumulative share, or the root of the piecewise linear
+distribution function of a population of nodes through the edges of its cells; a population of 501 nodes is also
+compared with the quantiles of the mixture density it discretizes, which differ by 6e-6. A cut on the scale
+number-correct is the ceiling of the expected score, less 1e-9, through the route that routing by theta takes, and the
+script checks that no score lies within 1e-7 of a whole one. Theta cuts agree within 1e-6, and the whole scores
+exactly; the largest difference over the fixture is 2e-14. Properties cover the rest: modules that translate each other
+cross at the midpoints of their centers, and cuts by shares ascend and are whole scores on the scale number-correct. Enemy sets: over random
 sets and responses, no test administers two items of a set. Exposure calibration: every rate of the last simulation
 is within its tolerance of r, the result reproduces with its seed, and a test too long for r does not converge.
 Form assembly is a heuristic without a reference solution: an assembled form of 30 from 300 items meets every

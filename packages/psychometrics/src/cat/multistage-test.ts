@@ -65,7 +65,8 @@ export interface MultistageTest {
   answer(state: MultistageTestState, responses: readonly number[]): MultistageTestState;
 }
 
-const ROUTINGS: readonly MultistageRouting[] = ["number-correct", "theta"];
+/** The routings, for the checks of the option that names one. */
+export const ROUTINGS: readonly MultistageRouting[] = ["number-correct", "theta"];
 
 /**
  * Returns a multistage test of a panel. Every person takes the module of the first stage, then one module of each
@@ -143,6 +144,21 @@ interface LocatedModule {
  * next stage.
  */
 export function locateModules(stages: readonly (readonly MultistageModule[])[]): Map<string, LocatedModule> {
+  const located = locateStages(stages);
+  stages.forEach((modules, stage) => {
+    const following = stages[stage + 1]?.length ?? 1;
+    for (const module of modules) checkCuts(module, following);
+  });
+  return located;
+}
+
+/**
+ * Checks the structure of a panel, its cut points aside, and returns its modules by id.
+ *
+ * @throws `DataError` when the panel has no stages, a stage has no modules, the first stage has more than one, a module
+ * is not an object with a string id and at least one item, or module ids repeat.
+ */
+export function locateStages(stages: readonly (readonly MultistageModule[])[]): Map<string, LocatedModule> {
   checkArray(stages, "The option stages must be an array of stages");
   const valid = stages.length > 0 && stages.every((modules) => Array.isArray(modules) && modules.length > 0);
   if (!valid) {
@@ -153,7 +169,6 @@ export function locateModules(stages: readonly (readonly MultistageModule[])[]):
   }
   const located = new Map<string, LocatedModule>();
   stages.forEach((modules, stage) => {
-    const following = stages[stage + 1]?.length ?? 1;
     for (const module of modules) {
       checkRecord(module, `The modules of stage ${stage + 1} must be objects { id, items, cuts }`);
       if (typeof module.id !== "string") {
@@ -163,7 +178,6 @@ export function locateModules(stages: readonly (readonly MultistageModule[])[]):
       if (!(Array.isArray(module.items) && module.items.length > 0)) {
         throw new DataError(`Module "${module.id}" needs an array of at least one item.`);
       }
-      checkCuts(module, following);
       located.set(module.id, { module, stage });
     }
   });

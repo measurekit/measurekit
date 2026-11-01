@@ -42,6 +42,7 @@ const BUDGETS = {
   "cat.simulateTestlets": 3_000,
   "cat.simulateDiagnostic": 70,
   "cat.simulateMultidimensional": 700,
+  "cat.multistageCuts": 10,
   "fit.itemFit": 30,
   "fit.personFit": 40,
   "fit.summedScoreFit": 30,

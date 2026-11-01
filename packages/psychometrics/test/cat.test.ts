@@ -35,7 +35,9 @@ import {
   type MultidimensionalAdaptiveTestState,
   type MultidimensionalEstimate,
   type MultidimensionalPoolItem,
+  type MultistageCutsOptions,
   type MultistageModule,
+  type MultistageRouting,
   type MultistageTest,
   type MultivariateNormalPrior,
   masteryThreshold,
@@ -49,6 +51,7 @@ import {
   multidimensionalPosteriorModeEstimate,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
+  multistageCuts,
   multistageTest,
   type PoolItem,
   type ProfileEstimate,
@@ -68,6 +71,7 @@ import {
   simulateMultidimensionalAdaptiveTest,
   simulateMultistageTest,
   standardErrorThreshold,
+  type TestItem,
   testInformation,
   testLength,
   threeParameterLogistic,
@@ -82,8 +86,9 @@ import catCdm from "./fixtures/cat-cdm.json" with { type: "json" };
 import catContent from "./fixtures/cat-content.json" with { type: "json" };
 import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
 import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
+import cutsFixture from "./fixtures/cat-multistage-cuts.json" with { type: "json" };
 import catTestlets from "./fixtures/cat-testlets.json" with { type: "json" };
-import { arbitraryItem, defined, expectClose, item2pl, mean } from "./helpers.js";
+import { arbitraryItem, defined, expectClose, item2pl, MODELS, mean } from "./helpers.js";
 
 // Tolerances against catR, explained in docs/validation.md.
 /** ML, MAP and WLE theta and standard error: catR finds roots with uniroot's default tolerance, about 1.2e-4. */
@@ -99,6 +104,13 @@ const SCORE_TOLERANCE = 1e-12;
 const REPLAY_TOLERANCE = 1e-12;
 /** The theta of an item's largest information against catR's closed form in thOpt. */
 const PEAK_TOLERANCE = 1e-10;
+/** Routing cuts against the roots of base R's uniroot at a tolerance of 1e-13. */
+const CUTS_TOLERANCE = 1e-6;
+/**
+ * The cuts of a population of nodes 0.02 apart against the quantiles of its density: a linear distribution function in
+ * each cell errs by an amount that falls with the square of the spacing, 6e-6 here.
+ */
+const DISCRETIZATION_TOLERANCE = 1e-5;
 
 /** catR's estimate: its method, `null` before the first response, when theta is the prior mean 0. */
 interface CatEstimate {
@@ -1210,12 +1222,14 @@ describe("kullbackLeibler", () => {
   }
 });
 
+/** A module of 2PL items with slope 1 and these difficulties, with the cut points when given. */
+const module = (id: string, difficulties: readonly number[], cuts?: readonly number[]): MultistageModule => ({
+  id,
+  items: difficulties.map((b, j) => item2pl(`${id}-${j + 1}`, 1, b)),
+  ...(cuts && { cuts }),
+});
+
 describe("multistageTest", () => {
-  const module = (id: string, difficulties: readonly number[], cuts?: readonly number[]): MultistageModule => ({
-    id,
-    items: difficulties.map((b, j) => item2pl(`${id}-${j + 1}`, 1, b)),
-    ...(cuts && { cuts }),
-  });
   const stages = [
     [module("routing", [-1, -0.3, 0.3, 1], [2, 3])],
     [
@@ -1402,6 +1416,334 @@ describe("multistageTest", () => {
     expect(() => test.answer(JSON.parse("{}"), [1, 1, 1, 1])).toThrow(
       "A test state needs the arrays items and responses.",
     );
+  });
+});
+
+describe("multistageCuts", () => {
+  const items = new Map<string, TestItem>(
+    cutsFixture.items.map(({ id, model, parameters }) => [id, { id, model: defined(MODELS[model]), parameters }]),
+  );
+  const fixtureStages = (panel: (typeof cutsFixture.panels)[number]): MultistageModule[][] =>
+    panel.stages.map((modules) =>
+      modules.map(({ id, items: names }) => ({ id, items: names.map((name) => defined(items.get(name))) })),
+    );
+  // Cuts are thetas or whole scores, so the tolerance holds both.
+  const expectCuts = (actual: readonly (readonly number[])[], expected: readonly (readonly number[])[]): void => {
+    expect(actual).toHaveLength(expected.length);
+    expected.forEach((cuts, m) => {
+      const found = defined(actual[m]);
+      expect(found, `module ${m}`).toHaveLength(cuts.length);
+      cuts.forEach((cut, j) => {
+        expectClose(found[j] ?? null, cut, CUTS_TOLERANCE, `module ${m}, cut ${j}`);
+      });
+    });
+  };
+  // Modules that translate each other by 1: their information curves are symmetric and cross at the midpoints of the
+  // centers, -0.5 and 0.5.
+  const translates = [
+    [module("routing", [-1, -0.3, 0.3, 1])],
+    [module("easy", [-1.5, -1, -0.5]), module("medium", [-0.5, 0, 0.5]), module("hard", [0.5, 1, 1.5])],
+    [module("last", [0])],
+  ];
+  const shared = (shares: readonly number[], options: MultistageCutsOptions = {}) =>
+    multistageCuts([[module("routing", [0])], shares.map((_, j) => module(`next${j}`, [j]))], {
+      method: "routing-shares",
+      shares: [shares],
+      ...options,
+    });
+
+  for (const panel of cutsFixture.panels) {
+    for (const reference of panel.cases) {
+      it(`matches the cuts of base R: ${reference.description}, panel ${panel.name}`, () => {
+        const options: MultistageCutsOptions = JSON.parse(JSON.stringify(reference.options));
+        expectCuts(multistageCuts(fixtureStages(panel), options), reference.cuts);
+      });
+    }
+  }
+
+  it("takes the crossing between the peaks of two modules whose curves also cross in a tail", () => {
+    const [tail, between] = cutsFixture.tailCrossings;
+    const tails = defined(cutsFixture.panels.find(({ name }) => name === "tails"));
+    expect(cutsFixture.tailCrossings).toHaveLength(2);
+    const routing = defined(multistageCuts(fixtureStages(tails))[0]);
+    expectClose(routing[0] ?? null, defined(between), CUTS_TOLERANCE);
+    expect(Math.abs((routing[0] ?? 0) - defined(tail))).toBeGreaterThan(1);
+  });
+
+  it("places the cuts of a fine population at the quantiles of the density it discretizes", () => {
+    const { population, shares, density } = cutsFixture.discretized;
+    const cuts = defined(shared(shares, { population })[0]);
+    density.forEach((quantile, j) => {
+      expectClose(cuts[j] ?? null, quantile, DISCRETIZATION_TOLERANCE, `cut ${j}`);
+    });
+  });
+
+  describe("by maximum information", () => {
+    it("puts the cuts of modules that translate each other at the midpoints of their centers", () => {
+      expectCuts(multistageCuts(translates), [[-0.5, 0.5], [], [], []]);
+    });
+
+    it("puts the cut between two single items of opposite difficulty at 0", () => {
+      const stages = [[module("routing", [0])], [module("easy", [-1]), module("hard", [1])]];
+      expectCuts(multistageCuts(stages), [[0]]);
+    });
+
+    it("searches the crossing within the range", () => {
+      expectCuts(multistageCuts(translates, { range: [-2, 2] }), [[-0.5, 0.5], [], [], []]);
+      const far = [[module("routing", [0])], [module("easy", [7]), module("hard", [9])]];
+      expectCuts(multistageCuts(far, { range: [0, 12] }), [[8]]);
+      expect(() => multistageCuts(far)).toThrow('The information of modules "easy" and "hard" of stage 2');
+    });
+
+    it("has no cuts into a stage of one module, and none for a panel of one stage", () => {
+      const single = [[module("routing", [0])], [module("only", [0])]];
+      expect(multistageCuts(single)).toEqual([[]]);
+      expect(multistageCuts([[module("only", [0])]])).toEqual([]);
+    });
+
+    it("ignores the cuts that the modules carry", () => {
+      const carrying = [
+        [{ ...module("routing", [0]), cuts: JSON.parse('"cuts"') }],
+        [module("easy", [-1]), module("hard", [1])],
+      ];
+      expectCuts(multistageCuts(carrying), [[0]]);
+    });
+
+    it("refuses modules of a stage that are not from the easiest to the hardest", () => {
+      const reversed = [[module("routing", [0])], [module("hard", [1]), module("easy", [-1])]];
+      expect(() => multistageCuts(reversed)).toThrow(
+        'The information of modules "hard" and "easy" of stage 2 peaks at theta 1 and -1; a stage needs its modules from the easiest to the hardest',
+      );
+      const same = [[module("routing", [0])], [module("a", [0]), module("b", [0])]];
+      expect(() => multistageCuts(same)).toThrow(DataError);
+    });
+
+    it("refuses modules whose information does not cross between their peaks", () => {
+      const dominated = [[module("routing", [0])], [module("easy", [-1.5]), module("hard", [0, 0, 0, 0, 0])]];
+      expect(() => multistageCuts(dominated)).toThrow(
+        'The information of modules "easy" and "hard" of stage 2 does not cross between their peaks at theta -1.5 and 0',
+      );
+    });
+  });
+
+  describe("by routing shares", () => {
+    it("sends equal shares of the standard normal population to the modules by default", () => {
+      const equal = multistageCuts(translates, { method: "routing-shares" });
+      expect(equal[0]?.map((cut) => cut.toFixed(10))).toEqual(["-0.4307272993", "0.4307272993"]);
+      expect(equal[1]).toEqual([]);
+    });
+
+    it("divides shares by their sum, which may be off 1 by a rounding", () => {
+      // The share below the cut is 0.5 / 1.0000004, a little under a half: the cut is a little below 0.
+      const [cut] = defined(shared([0.5, 0.5000004])[0]);
+      expect(cut).toBeLessThan(0);
+      expect(Math.abs(cut ?? 0)).toBeLessThan(1e-6);
+    });
+
+    it("puts a cut at the edge between two cells when the shares are the weights of the nodes", () => {
+      const population = { nodes: [0, 1, 2], weights: [0.25, 0.5, 0.25] };
+      expectCuts(shared([0.25, 0.5, 0.25], { population }), [[0.5, 1.5]]);
+      expectCuts(shared([0.5, 0.5], { population }), [[1]]);
+      expectCuts(shared([0.125, 0.875], { population }), [[0]]);
+    });
+
+    it("puts every cut of a population of one node at it", () => {
+      expectCuts(shared([0.2, 0.3, 0.5], { population: { nodes: [0.5], weights: [1] } }), [[0.5, 0.5]]);
+    });
+
+    it("sends a population of nodes to the modules in the shares", () => {
+      const population = { nodes: [-1, 0, 2, 3], weights: [0.1, 0.4, 0.3, 0.2] };
+      const [cuts] = shared([0.3, 0.4, 0.3], { population });
+      // Cells: [-1.5, -0.5], [-0.5, 1], [1, 2.5], [2.5, 3.5]; 0.3 is 0.2 into the second cell, 0.7 is 0.2 into the third.
+      expectCuts([defined(cuts)], [[-0.5 + (0.2 / 0.4) * 1.5, 1 + (0.2 / 0.3) * 1.5]]);
+    });
+  });
+
+  describe("on the scale number-correct", () => {
+    it("lifts a cut at a whole expected score to that score, not the next", () => {
+      // The expected score of the routing module at theta 0 is 2: p(-1) + p(1) and p(-0.3) + p(0.3) are 1 each.
+      const stages = [[module("routing", [-1, -0.3, 0.3, 1])], [module("low", [-1]), module("high", [1])]];
+      expect(multistageCuts(stages, { method: "routing-shares", scale: "number-correct" })).toEqual([[2]]);
+    });
+
+    it("counts the items of the modules that routing by theta takes before the routing module", () => {
+      const stages = [
+        [module("routing", [0])],
+        [module("low", [-1, -1]), module("high", [1, 1])],
+        [module("one", [0]), module("two", [0])],
+        [module("a", [0]), module("b", [0])],
+      ];
+      // Every cut into a stage is theta 0, which routing sends to "high". The routing module scores 1 / 2 there, "low"
+      // 2 p(1) = 1.462 and "high" 2 p(-1) = 0.538, with p(x) the logistic function, and "one" and "two" 1 / 2.
+      // "routing": 0.5 rounds up to 1. "low": 1.962 and "high": 1.038 round up to 2. "one" and "two" are reached through
+      // "high": 0.5 + 0.538 + 0.5 = 1.538 rounds up to 2; through "low" it would be 2.462, and 3.
+      expect(multistageCuts(stages, { method: "routing-shares", scale: "number-correct" })).toEqual([
+        [1],
+        [2],
+        [2],
+        [2],
+        [2],
+      ]);
+    });
+
+    it("refuses cuts whose expected scores fall as theta rises", () => {
+      const stages = [
+        [module("routing", [0, 0])],
+        [module("long", [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]), module("short", [1])],
+        [module("x", [0]), module("y", [0])],
+        [module("a", [0]), module("b", [0]), module("c", [0]), module("d", [0])],
+      ];
+      const options = {
+        method: "routing-shares",
+        scale: "number-correct",
+        shares: [
+          [0.5, 0.5],
+          [0.5, 0.5],
+          [0.25, 0.25, 0.25, 0.25],
+        ],
+      } as const;
+      expect(() => multistageCuts(stages, options)).toThrow(
+        'The cuts of module "x" on the scale number-correct would be',
+      );
+      expect(multistageCuts(stages, { ...options, scale: "theta" })).toHaveLength(5);
+    });
+  });
+
+  describe("results", () => {
+    it("are the cuts of a panel that multistageTest takes, one list for each module of the stages but the last", () => {
+      for (const scale of ["theta", "number-correct"] as const) {
+        const cuts = multistageCuts(translates, { scale });
+        expect(cuts).toHaveLength(4);
+        let next = 0;
+        const withCuts = translates.map((modules, stage) =>
+          modules.map((module) => (stage === translates.length - 1 ? module : { ...module, cuts: cuts[next++] })),
+        );
+        const test = multistageTest({ stages: withCuts, routing: scale });
+        const lowest = [[0, 0, 0, 0], [0, 0, 0], [0]].reduce(
+          (state, answers) => test.answer(state, answers),
+          test.start(),
+        );
+        expect(lowest.modules).toEqual(["routing", "easy", "last"]);
+        const highest = [[1, 1, 1, 1], [1, 1, 1], [1]].reduce(
+          (state, answers) => test.answer(state, answers),
+          test.start(),
+        );
+        expect(highest.modules).toEqual(["routing", "hard", "last"]);
+      }
+    });
+
+    it("leave the stages as they were, and give each module a list of its own", () => {
+      const panel = [
+        [module("routing", [0])],
+        [module("a", [-1]), module("b", [1])],
+        [module("c", [-1]), module("d", [1])],
+      ];
+      const before = JSON.stringify(panel);
+      const cuts = multistageCuts(panel);
+      expect(JSON.stringify(panel)).toBe(before);
+      expect(cuts[1]).toEqual(cuts[2]);
+      expect(cuts[1]).not.toBe(cuts[2]);
+    });
+  });
+
+  describe("input", () => {
+    const stages = translates;
+    const shares = [[0.3, 0.3, 0.4], [1]];
+
+    it("refuses options of the other method", () => {
+      expect(() => multistageCuts(stages, { shares })).toThrow(
+        'The option shares belongs to the method "routing-shares", not to "maximum-information".',
+      );
+      expect(() => multistageCuts(stages, { population: { nodes: [0], weights: [1] } })).toThrow(
+        'The option population belongs to the method "routing-shares"',
+      );
+      expect(() => multistageCuts(stages, { method: "routing-shares", range: [-1, 1] })).toThrow(
+        'The option range belongs to the method "maximum-information", not to "routing-shares".',
+      );
+    });
+
+    it("refuses an unknown method or scale, and options that are not an object", () => {
+      expect(() => multistageCuts(stages, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      expect(() => multistageCuts(stages, { method: JSON.parse('"quantile"') })).toThrow(
+        'The option method must be "maximum-information" or "routing-shares", found "quantile".',
+      );
+      expect(() => multistageCuts(stages, { scale: JSON.parse('"score"') })).toThrow(
+        'The option scale must be "number-correct" or "theta", found "score".',
+      );
+      expect(() => multistageCuts(stages, { method: JSON.parse("null") })).toThrow(DataError);
+      expect(() => multistageCuts(stages, { scale: JSON.parse("null") })).toThrow(DataError);
+    });
+
+    it("refuses a range that is not an interval", () => {
+      expect(() => multistageCuts(stages, { range: [1, -1] })).toThrow(
+        "The range needs the lower bound below the upper",
+      );
+      expect(() => multistageCuts(stages, { range: JSON.parse('"wide"') })).toThrow(
+        "The option range must be an array [lower, upper], found",
+      );
+      expect(() => multistageCuts(stages, { range: JSON.parse("null") })).toThrow(DataError);
+    });
+
+    it("refuses shares that are not a positive share for each module of each stage after the first, summing to 1", () => {
+      const routing = (value: unknown) =>
+        multistageCuts(stages, { method: "routing-shares", shares: JSON.parse(JSON.stringify(value)) });
+      expect(() => routing([[0.5, 0.5]])).toThrow(
+        "The option shares needs a list for each of the 2 stages after the first, found 1.",
+      );
+      expect(() => routing([[0.5, 0.5], [1]])).toThrow("Stage 2 has 3 modules, found 2 shares.");
+      expect(() => routing([[0.5, 0.5, 0], [1]])).toThrow(
+        "A share of a module of stage 2 must be a positive number, found 0.",
+      );
+      expect(() => routing([[0.5, 0.5, 0.5], [1]])).toThrow(
+        "The shares of the modules of stage 2 must sum to 1, found 1.5.",
+      );
+      expect(() => routing([[0.3, 0.3, 0.4], [0.9]])).toThrow(
+        "The shares of the modules of stage 3 must sum to 1, found 0.9.",
+      );
+      expect(() => routing([[0.3, 0.3, 0.4], null])).toThrow(
+        "The shares of the modules of stage 3 must be an array, found null.",
+      );
+      expect(() => routing("shares")).toThrow(
+        "The option shares must be an array of the shares of the modules of each stage after the first, found",
+      );
+      expect(() => routing(null)).toThrow(DataError);
+      expect(() => routing([[0.3, 0.3, "0.4"], [1]])).toThrow(DataError);
+    });
+
+    it("refuses a population that is not a distribution of nodes in ascending order", () => {
+      const population = (value: unknown) =>
+        multistageCuts(stages, { method: "routing-shares", population: JSON.parse(JSON.stringify(value)) });
+      expect(() => population({ nodes: [1, 0], weights: [0.5, 0.5] })).toThrow(
+        "The nodes of the population must be in ascending order, found 1 before 0.",
+      );
+      expect(() => population({ nodes: [0, 1], weights: [0.5, 0.6] })).toThrow(
+        "The weights of the population must sum to 1, found 1.1.",
+      );
+      expect(() => population({ nodes: [], weights: [] })).toThrow(DataError);
+      expect(() => population("normal")).toThrow("The population must be an object { nodes, weights }");
+      expect(() => population(null)).toThrow(DataError);
+    });
+
+    it("refuses stages and items that multistageTest would refuse", () => {
+      expect(() => multistageCuts(JSON.parse("null"))).toThrow(
+        "The option stages must be an array of stages, found null.",
+      );
+      expect(() => multistageCuts([])).toThrow(DataError);
+      expect(() => multistageCuts([[module("a", [0])], []])).toThrow(DataError);
+      expect(() => multistageCuts([[module("a", [0]), module("b", [0])]])).toThrow(
+        "The first stage of a multistage test has one module, found 2.",
+      );
+      expect(() => multistageCuts([[module("a", [0])], [module("a", [1])]])).toThrow(
+        'Module ids must be unique; "a" appears twice.',
+      );
+      expect(() => multistageCuts([[module("a", [])]])).toThrow('Module "a" needs an array of at least one item.');
+      expect(() => multistageCuts([[JSON.parse("null")]])).toThrow(DataError);
+      const invalid = { id: "q", model: twoParameterLogistic, parameters: JSON.parse('{"a":"1","b":0,"c":0,"d":1}') };
+      expect(() => multistageCuts([[{ id: "a", items: [invalid] }]])).toThrow('Item "q"');
+      expect(() =>
+        multistageCuts([[{ id: "a", items: [item2pl("q", 1, 0)] }], [{ id: "b", items: [item2pl("q", 1, 0)] }]]),
+      ).toThrow('Item ids must be unique; "q" appears twice.');
+    });
   });
 });
 
@@ -3414,6 +3756,76 @@ describe("properties", () => {
         }
       }),
       { numRuns: 100 },
+    );
+  });
+
+  it("routing cuts between modules that translate each other by any shift are the midpoints of their centers", () => {
+    const slope = fc.double({ min: 0.8, max: 1.5, noNaN: true });
+    const first = fc.double({ min: -3, max: 0, noNaN: true });
+    const gap = fc.double({ min: 0.8, max: 2.5, noNaN: true });
+    fc.assert(
+      fc.property(slope, first, gap, gap, (a, center, gap1, gap2) => {
+        const centers = [center, center + gap1, center + gap1 + gap2];
+        const stages = [
+          [module("routing", [0])],
+          centers.map((c, j) => ({
+            id: `m${j}`,
+            items: [-0.3, 0, 0.3].map((offset, k) => item2pl(`m${j}-${k}`, a, c + offset)),
+          })),
+        ];
+        const [cuts] = multistageCuts(stages);
+        expectClose(defined(cuts)[0] ?? null, center + gap1 / 2, 1e-8);
+        expectClose(defined(cuts)[1] ?? null, center + gap1 + gap2 / 2, 1e-8);
+      }),
+      { numRuns: 40 },
+    );
+  });
+
+  it("routing cuts by shares ascend, are the same for the modules of a stage, and are whole scores on the scale of scores", () => {
+    const shares = (count: number) =>
+      fc
+        .array(fc.double({ min: 0.05, max: 1, noNaN: true }), { minLength: count, maxLength: count })
+        .map((values) => values.map((value) => value / values.reduce((sum, other) => sum + other, 0)));
+    const widths = fc.array(fc.integer({ min: 1, max: 4 }), { minLength: 1, maxLength: 2 });
+    const populations = fc.option(
+      fc
+        .uniqueArray(fc.double({ min: -4, max: 4, noNaN: true }), { minLength: 1, maxLength: 8 })
+        .chain((nodes) => shares(nodes.length).map((weights) => ({ nodes: nodes.toSorted((x, y) => x - y), weights }))),
+      { nil: undefined },
+    );
+    fc.assert(
+      fc.property(
+        widths.chain((counts) => fc.tuple(fc.constant(counts), fc.tuple(...counts.map(shares)), populations)),
+        fc.constantFrom<MultistageRouting>("theta", "number-correct"),
+        ([counts, perStage, population], scale) => {
+          const stages = [
+            [module("start", [0, 0.5])],
+            ...counts.map((count, k) =>
+              Array.from({ length: count }, (_, j) => module(`s${k}m${j}`, [j * 0.7 - 1, j * 0.7 - 0.5])),
+            ),
+          ];
+          const cuts = multistageCuts(stages, { method: "routing-shares", scale, shares: perStage, population });
+          expect(cuts).toHaveLength(stages.slice(0, -1).flat().length);
+          let next = 0;
+          stages.slice(0, -1).forEach((modules, stage) => {
+            const following = defined(stages[stage + 1]).length;
+            const lists = modules.map(() => defined(cuts[next++]));
+            if (scale === "theta") for (const list of lists) expect(list).toEqual(lists[0]);
+            for (const list of lists) {
+              expect(list).toHaveLength(following - 1);
+              list.forEach((cut, j) => {
+                expect(Number.isFinite(cut)).toBe(true);
+                expect(cut).toBeGreaterThanOrEqual(list[j - 1] ?? Number.NEGATIVE_INFINITY);
+                if (scale === "number-correct") {
+                  expect(Number.isInteger(cut)).toBe(true);
+                  expect(cut).toBeGreaterThanOrEqual(0);
+                }
+              });
+            }
+          });
+        },
+      ),
+      { numRuns: 60 },
     );
   });
 });

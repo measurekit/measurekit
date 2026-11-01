@@ -1,7 +1,7 @@
 /**
  * Adaptive and multistage testing: adaptive test sessions with item selection rules, content balancing, enemy sets,
  * testlets, Sympson-Hetter exposure control and its calibration, and stopping rules; adaptive tests of cognitive diagnosis and of
- * multidimensional items; multistage panels with routing; simulation of all of them; and the assembly of fixed forms.
+ * multidimensional items; multistage panels with routing and the derivation of their cuts; simulation of all of them; and the assembly of fixed forms.
  *
  * @module @measurekit/psychometrics/cat
  */
@@ -59,6 +59,11 @@ export {
   type MultidimensionalAdaptiveTestState,
   multidimensionalAdaptiveTest,
 } from "./multidimensional-test.js";
+export {
+  type MultistageCutsMethod,
+  type MultistageCutsOptions,
+  multistageCuts,
+} from "./multistage-cuts.js";
 export {
   type MultistageModule,
   type MultistageRouting,
