@@ -133,6 +133,19 @@ their durations are those of the sample, 1 second at least:
 | Every feature of LKT's other names, before every event     | `LKT:::computefeatures`: its columns of `prop` to `ppe`      | 1e-10     | 2.2e-16            |
 | `windowOpportunities`, `windowSuccesses`, `windowFailures` | Base R: a count of the learner's earlier events at the skill | 1e-12     | 2.2e-16            |
 
+`validation/knowledge-tracing/logistic-terms.R` checks terms beyond the skill and the standard errors, on a seeded log of
+60 learners at 24 items of 6 skills with a covariate. Fixed proficiency with every event having the same number of
+intercepts (item intercepts alone, or one skill per event) is fitted with sum contrasts for the learners, whose mean is
+0 as `fit` reports them:
+
+| Quantity                                                                           | Reference                                                                                                                        | Tolerance     | Largest difference |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------ |
+| Item intercepts, shared coefficients, terms over items and the learner, covariates | `glm(family = binomial)`, `epsilon = 1e-14`; the score checked below 1e-9                                                        | 1e-8 absolute | 1.3e-9             |
+| Best-LR and a coefficient for each item, with a ridge                              | `LiblineaR(type = 0)` at the cost 1 / ridge, then Newton steps on its objective; the gap to LiblineaR's own stop is recorded     | 1e-6 absolute | 3.2e-10            |
+| Item intercepts and a covariate with a random intercept                            | The maximum of lme4's Laplace approximation, written out in base R, as above                                                     | 1e-5 absolute | 1.3e-8             |
+| Standard errors, no or fixed proficiency                                           | `summary(glm)`, the error of the last sum-contrast learner from the others'                                                      | 1e-6 relative | 2.8e-7             |
+| Standard errors, random intercept                                                  | The inverse Schur complement written out in base R, equal to `vcov(glmer, use.hessian = FALSE)` at glmer's estimates within 1e-4 | 1e-6 relative | 1.5e-9             |
+
 The seeded times give no age of 0 and no tie, where LKT returns infinity and NaN; the tests check measurekit's values at
 those edges by hand. The features map to LKT's names in [the logistic guide](logistic.md#features). With every event of one skill, glm
 drops a skill's intercept; the script moves the intercepts so that the learners' mean proficiency is 0, as `fit`
@@ -416,6 +429,7 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `practice-mastery.json`         | `set.seed(20261029)`: 1500 events of 15 learners at 4 skills, items of 1 or 2 skills, 8% lessons, 10% outcomes of 0.5; the tables of 12 criteria    | Skills never mastered, lessons, partial credit, events of two skills                        |
 | `logistic-lkt-features.json`    | LKT's `samplelkt` with seeded times: 1941 events of 17 learners with their durations; 16 features of LKT and 3 windows                              | Events at the same time not reached, gaps of 0 to 3 days                                    |
 | `logistic-glm.json`             | `set.seed(20261029)`: 80 learners, 40 attempts each at 14 items of 5 skills, 4 items of two skills                                                  | Fixed, one-skill fixed, no and random proficiency                                           |
+| `logistic-terms.json`           | `set.seed(20261101)`: 60 learners, 36 events each at 24 items of 6 skills, 6 items of two skills, a covariate                                       | Item intercepts, shared coefficients, terms over items and the learner, standard errors     |
 | `irt-abilities.json`            | The learners above                                                                                                                                  | Every item model, extreme patterns, a shifted prior and a coarser grid                      |
 | `kst-structures.json`           | 6 surmise relations; pks's `DoignonFalmagne7` and `chess` `dst1`, a space with a gap, a structure that is not a space; a map of 5 items to 4 skills | Equivalent elements, spaces that are not learning spaces                                    |
 | `kst-structure-tools.json`      | The 6 structures above and 8 random families of states; 8 families of generators of a closure                                                       | Spaces with a gap, structures that are not spaces, no path                                  |
@@ -458,6 +472,8 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | Ridge coefficients and proficiencies                                 | 1e-6 absolute                  | 3.4e-9                         |
 | Random-intercept coefficients, σ and modes                           | 1e-5 absolute                  | 7.3e-9                         |
 | Random-intercept log-likelihood                                      | 1e-6 absolute                  | 4.3e-12                        |
+| Terms beyond the skill against glm, lme4 and LiblineaR               | 1e-8, 1e-5, 1e-6 absolute      | 1.3e-9, 1.3e-8, 3.2e-10        |
+| Logistic standard errors against `summary(glm)` and lme4             | 1e-6 relative                  | 2.8e-7                         |
 | IRT EAP, its standard error, predictions and log-likelihood          | 1e-10 absolute                 | 2.2e-15                        |
 | IRT MAP, at the default grid spacing 0.2, × (spacing / 0.2)⁵         | 1e-5 absolute                  | 3.1e-7; 2.1e-5 at spacing 0.45 |
 | IRT MAP standard error, × (spacing / 0.2)⁴                           | 1e-4 absolute                  | 2.5e-6; 1.3e-4 at spacing 0.45 |

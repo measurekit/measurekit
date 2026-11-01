@@ -2,11 +2,13 @@ import { logistic, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { createRandom } from "../src/index.js";
+import { createProblem, penalizedNewton } from "../src/math/arrow-system.js";
 import { expectationMaximization } from "../src/math/expectation-maximization.js";
 import { forwardBackward } from "../src/math/hidden-markov.js";
 import { choleskySolve } from "../src/math/linear-algebra.js";
 import { outcomeLogLikelihood } from "../src/math/logistic.js";
 import { logisticRegression } from "../src/math/logistic-regression.js";
+import { newtonCg } from "../src/math/newton-cg.js";
 import { permutation } from "../src/math/permutation.js";
 import { quinticDerivative, quinticHermite, quinticMaximum } from "../src/math/quintic.js";
 import { rank } from "../src/math/rank.js";
@@ -111,6 +113,182 @@ describe("logisticRegression", () => {
     }
   });
 });
+
+describe("newtonCg", () => {
+  // f(x) = x'Ax / 2 - b'x, whose minimum solves A x = b: x = (2/9, 1/9, 13/9) for the A and b below.
+  const matrix = [
+    [4, 1, 0],
+    [1, 3, 1],
+    [0, 1, 2],
+  ];
+  const product = (v: Float64Array): number[] =>
+    matrix.map((row) => row.reduce((sum, a, j) => sum + a * (v[j] ?? 0), 0));
+  const b = [1, 2, 3];
+  const quadratic = {
+    value: (x: Float64Array) =>
+      product(x).reduce((sum, ax, i) => sum + (ax * (x[i] ?? 0)) / 2 - (b[i] ?? 0) * (x[i] ?? 0), 0),
+    linearize(x: Float64Array, gradient: Float64Array, diagonal: Float64Array) {
+      product(x).forEach((ax, i) => {
+        gradient[i] = ax - (b[i] ?? 0);
+        diagonal[i] = defined(matrix[i]?.[i]);
+      });
+    },
+    hessianVector(v: Float64Array, out: Float64Array) {
+      product(v).forEach((value, i) => {
+        out[i] = value;
+      });
+    },
+  };
+
+  it("minimizes a quadratic to its exact minimum", () => {
+    const x = new Float64Array(3);
+    const result = newtonCg(quadratic, x, { tolerance: 1e-12, maxIterations: 10 });
+    expect(result.converged).toBe(true);
+    expectAllClose(x, [2 / 9, 1 / 9, 13 / 9], 1e-12);
+  });
+
+  it("reports a start at the minimum as converged without iterating, and the iterations it was allowed as not converged", () => {
+    expect(
+      newtonCg(quadratic, Float64Array.from([2 / 9, 1 / 9, 13 / 9]), { tolerance: 1e-9, maxIterations: 5 }),
+    ).toEqual({ iterations: 0, converged: true });
+    const x = new Float64Array(3);
+    expect(newtonCg(quadratic, x, { tolerance: 1e-30, maxIterations: 1 })).toEqual({ iterations: 1, converged: false });
+  });
+});
+
+describe("logisticRegression with a ridge", () => {
+  const regression = defined(regressions.regressions[0]);
+  const design = sparse(regression.design);
+  const outcomes = Float64Array.from(regression.outcomes);
+
+  it("reaches the minimum that Newton's method with dense matrices does, with and without fixed intercepts", () => {
+    const ridge = 2;
+    const groups = Int32Array.from({ length: outcomes.length }, (_, row) => row % 7);
+    const dense = createProblem(design, outcomes, undefined, 0);
+    const beta = new Float64Array(design.columnCount);
+    penalizedNewton(dense, beta, new Float64Array(0), {
+      ridge,
+      groupPenalty: 0,
+      flats: [],
+      tolerance: 1e-12,
+      maxIterations: 100,
+    });
+    const plain = logisticRegression(design, outcomes, { ridge, tolerance: 1e-10, maxIterations: 100 });
+    expect(plain.converged).toBe(true);
+    expectAllClose(plain.coefficients, beta, 1e-8, "no groups");
+    const grouped = createProblem(design, outcomes, groups, 7);
+    const betaGrouped = new Float64Array(design.columnCount);
+    const intercepts = new Float64Array(7);
+    penalizedNewton(grouped, betaGrouped, intercepts, {
+      ridge,
+      groupPenalty: ridge,
+      flats: [],
+      tolerance: 1e-12,
+      maxIterations: 100,
+    });
+    const withGroups = logisticRegression(design, outcomes, {
+      groups: { indices: groups, count: 7, kind: "fixed" },
+      ridge,
+      tolerance: 1e-10,
+      maxIterations: 100,
+    });
+    expectAllClose(withGroups.coefficients, betaGrouped, 1e-8, "groups");
+    expectAllClose(withGroups.groupIntercepts, intercepts, 1e-8, "intercepts");
+  });
+
+  it("shrinks every coefficient toward 0 as the ridge grows", () => {
+    const norms = [0.1, 1, 10].map((ridge) => {
+      const fit = logisticRegression(design, outcomes, { ridge, tolerance: 1e-10, maxIterations: 100 });
+      return Math.hypot(...fit.coefficients);
+    });
+    expect(norms[0]).toBeGreaterThan(defined(norms[1]));
+    expect(norms[1]).toBeGreaterThan(defined(norms[2]));
+  });
+
+  it("gives no standard errors with a ridge", () => {
+    const fit = logisticRegression(design, outcomes, {
+      ridge: 1,
+      standardErrors: true,
+      tolerance: 1e-10,
+      maxIterations: 100,
+    });
+    expect(fit.standardErrors).toBeNull();
+  });
+});
+
+describe("logisticRegression standard errors", () => {
+  const regression = defined(regressions.regressions[0]);
+  const design = sparse(regression.design);
+  const outcomes = Float64Array.from(regression.outcomes);
+
+  it("are the square roots of the diagonal of the inverse of X'WX, with the binomial weight p (1 - p)", () => {
+    const fit = logisticRegression(design, outcomes, { standardErrors: true, tolerance: 1e-12, maxIterations: 100 });
+    const p = design.columnCount;
+    const information = Array.from({ length: p }, () => new Array<number>(p).fill(0));
+    for (let row = 0; row < outcomes.length; row++) {
+      const entries = Array.from(
+        { length: (design.rowStarts[row + 1] ?? 0) - (design.rowStarts[row] ?? 0) },
+        (_, k) => (design.rowStarts[row] ?? 0) + k,
+      );
+      const eta = entries.reduce(
+        (sum, e) => sum + defined(design.values[e]) * defined(fit.coefficients[defined(design.columns[e])]),
+        0,
+      );
+      const weight = logistic(eta) * (1 - logistic(eta));
+      for (const a of entries) {
+        for (const c of entries) {
+          const cell = defined(information[defined(design.columns[a])]);
+          cell[defined(design.columns[c])] =
+            defined(cell[defined(design.columns[c])]) + weight * defined(design.values[a]) * defined(design.values[c]);
+        }
+      }
+    }
+    const inverse = invert(information);
+    expectAllClose(
+      defined(fit.standardErrors).coefficients,
+      inverse.map((row, j) => Math.sqrt(defined(row[j]))),
+      1e-9,
+    );
+  });
+
+  it("are null for a coefficient that no row uses", () => {
+    const columns = Int32Array.from([0, 1, 0, 1]);
+    const matrix: SparseMatrix = {
+      columnCount: 3,
+      rowStarts: Int32Array.from([0, 2, 4]),
+      columns,
+      values: Float64Array.from([1, 1, 1, 2]),
+    };
+    const fit = logisticRegression(matrix, Float64Array.from([0, 1]), {
+      standardErrors: true,
+      tolerance: 1e-9,
+      maxIterations: 50,
+    });
+    expect(fit.standardErrors).toBeNull();
+  });
+});
+
+/** Returns the inverse of a small square matrix by Gauss-Jordan elimination with partial pivoting. */
+function invert(matrix: readonly (readonly number[])[]): number[][] {
+  const n = matrix.length;
+  const work = matrix.map((row, i) => [...row, ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  for (let column = 0; column < n; column++) {
+    const pivot = work.reduce(
+      (best, row, i) =>
+        i >= column && Math.abs(defined(row[column])) > Math.abs(defined(defined(work[best])[column])) ? i : best,
+      column,
+    );
+    [work[column], work[pivot]] = [defined(work[pivot]), defined(work[column])];
+    const scale = defined(defined(work[column])[column]);
+    work[column] = defined(work[column]).map((value) => value / scale);
+    for (let i = 0; i < n; i++) {
+      if (i === column) continue;
+      const factor = defined(defined(work[i])[column]);
+      work[i] = defined(work[i]).map((value, j) => value - factor * defined(defined(work[column])[j]));
+    }
+  }
+  return work.map((row) => row.slice(n));
+}
 
 describe("forwardBackward", () => {
   it("matches the posteriors, predictions and log-likelihood of enumerating every path", () => {

@@ -15,6 +15,10 @@ export interface LogisticState {
   readonly exposures?: Readonly<Record<string, ExposureHistory>>;
   /** The time the learner has spent on events so far, the sum of their durations; present with the practice features. */
   readonly practice?: number;
+  /** The learner's history with each item practiced, by item id: the events with an outcome; present with terms over items. */
+  readonly items?: Readonly<Record<string, SkillHistory>>;
+  /** The learner's history over all the events with an outcome; present with terms over the learner. */
+  readonly overall?: SkillHistory;
 }
 
 /** What the exposure features need of a learner's events without an outcome at a skill. */
@@ -62,7 +66,7 @@ export interface LeakyCounts {
   readonly successes: number;
 }
 
-/** What the model's features need a state to track, which it tracks only then. */
+/** What the features that read one kind of history need it to track, which it tracks only then. */
 export interface HistoryNeeds {
   /** The decays the features of outcomes need running sums for. */
   readonly decays: readonly number[];
@@ -82,6 +86,16 @@ export interface HistoryNeeds {
   readonly times: boolean;
   /** How far back the times are kept: the largest window, or infinity. */
   readonly horizon: number;
+}
+
+/** What the model's terms need a state to track, by the history their features read. */
+export interface StateNeeds {
+  /** The histories with skills, which a state always keeps. */
+  readonly skills: HistoryNeeds;
+  /** The histories with items; `null` without a term over items, and then a state keeps none. */
+  readonly items: HistoryNeeds | null;
+  /** The history over all events; `null` without a term over the learner. */
+  readonly overall: HistoryNeeds | null;
 }
 
 /** Counts in which each attempt weighs d times the next. */
@@ -168,26 +182,43 @@ function nextExposure(exposure: ExposureHistory | undefined, time: number, decay
   };
 }
 
+/** Returns whether any history tracks the practice time, which every event's `duration` adds to. */
+function tracksPractice(needs: StateNeeds): boolean {
+  return needs.skills.practice || (needs.items?.practice ?? false) || (needs.overall?.practice ?? false);
+}
+
 /**
  * Returns the state after an event, the state and event checked and the event not earlier than the state's attempts:
  * the histories of an event with an outcome, the exposures of one without when a feature reads them, and the practice
  * time of every event when a feature reads it.
  */
-export function advanceState(state: LogisticState, event: Event, needs: HistoryNeeds): LogisticState {
+export function advanceState(state: LogisticState, event: Event, needs: StateNeeds): LogisticState {
   const practice = state.practice ?? 0;
-  const spent = needs.practice ? { practice: practice + (event.duration ?? 0) } : {};
+  const spent = tracksPractice(needs) ? { practice: practice + (event.duration ?? 0) } : {};
   if (isObserved(event)) {
-    const updates = event.skills.map((skill) => [
-      skill,
-      nextHistory(entry(state.skills, skill), event.outcome, event.time, practice, needs),
-    ]);
-    return carry(state, { skills: { ...state.skills, ...Object.fromEntries(updates) } }, spent);
+    const next = (history: SkillHistory | undefined, kind: HistoryNeeds): SkillHistory =>
+      nextHistory(history, event.outcome, event.time, practice, kind);
+    const updates = event.skills.map((skill) => [skill, next(entry(state.skills, skill), needs.skills)]);
+    return carry(
+      state,
+      {
+        skills: { ...state.skills, ...Object.fromEntries(updates) },
+        ...(needs.items !== null && {
+          items: {
+            ...state.items,
+            ...Object.fromEntries([[event.item, next(entry(state.items, event.item), needs.items)]]),
+          },
+        }),
+        ...(needs.overall !== null && { overall: next(state.overall, needs.overall) }),
+      },
+      spent,
+    );
   }
   // Without a feature that reads exposures, an event without an outcome leaves the learner as they were.
-  const updates = needs.exposures
+  const updates = needs.skills.exposures
     ? event.skills.map((skill) => [
         skill,
-        nextExposure(entry(state.exposures, skill), event.time, needs.exposureDecays),
+        nextExposure(entry(state.exposures, skill), event.time, needs.skills.exposureDecays),
       ])
     : [];
   return carry(
@@ -197,22 +228,33 @@ export function advanceState(state: LogisticState, event: Event, needs: HistoryN
   );
 }
 
-/** Returns a state with copies of its records, those of `changed` replaced, which are present only once given. */
+/**
+ * Returns a state whose records are those of `changed`, which are new, and copies of the others; records are present
+ * only once given.
+ */
 function carry(
   state: LogisticState,
-  changed: Partial<Pick<LogisticState, "skills" | "exposures">>,
+  changed: Partial<Pick<LogisticState, "skills" | "exposures" | "items" | "overall">>,
   spent: { readonly practice?: number },
 ): LogisticState {
-  const skills = changed.skills ?? state.skills;
-  const exposures = changed.exposures ?? state.exposures;
+  const exposures = changed.exposures ?? copy(state.exposures);
+  const items = changed.items ?? copy(state.items);
+  const overall = changed.overall ?? state.overall;
   return {
     learner: state.learner,
-    skills: { ...skills },
-    ...(exposures !== undefined && { exposures: { ...exposures } }),
+    skills: changed.skills ?? { ...state.skills },
+    ...(exposures !== undefined && { exposures }),
+    ...(items !== undefined && { items }),
+    ...(overall !== undefined && { overall }),
     ...(spent.practice !== undefined
       ? { practice: spent.practice }
       : state.practice !== undefined && { practice: state.practice }),
   };
+}
+
+/** Returns a copy of a record of histories, or `undefined` for none. */
+function copy<T>(record: Readonly<Record<string, T>> | undefined): Record<string, T> | undefined {
+  return record === undefined ? undefined : { ...record };
 }
 
 /**
@@ -221,28 +263,53 @@ function carry(
  * @param label - Names the event in the error message, such as `Event 3`.
  * @throws `DataError` when a feature reads durations and the event has none.
  */
-export function checkDuration(event: Event, label: string, needs: HistoryNeeds): void {
-  if (needs.practice && event.duration === undefined) {
+export function checkDuration(event: Event, label: string, needs: StateNeeds): void {
+  if (tracksPractice(needs) && event.duration === undefined) {
     throw new DataError(`${label} needs a duration, which the features basePractice read for the practice time.`);
   }
 }
 
+/** What a history that no term reads needs: nothing, but that it is well formed. */
+const NO_NEEDS: HistoryNeeds = {
+  decays: [],
+  exposureDecays: [],
+  exposures: false,
+  previous: false,
+  first: false,
+  practice: false,
+  leaks: [],
+  times: false,
+  horizon: 0,
+};
+
 /**
  * Checks a state, which may come from storage, throwing a `DataError` that names the first problem found. `needs` are
- * what the model's features need a state to track.
+ * what the model's terms need a state to track.
  */
-export function checkState(state: LogisticState, needs: HistoryNeeds): void {
+export function checkState(state: LogisticState, needs: StateNeeds): void {
   const learner = checkLearnerState(state, "logistic");
   const label = `The logistic state of learner "${learner}"`;
   checkRecord(state.skills, `${label} needs skills, an object of histories by skill id`);
-  for (const [skill, history] of Object.entries(state.skills)) {
-    const prefix = `${label}, skill "${skill}",`;
-    checkRecord(history, `${prefix} must be an object`);
-    checkCounts(history, prefix, needs.decays);
-    checkTracked(history, prefix, needs);
+  checkHistories(state.skills, `${label}, skill`, needs.skills);
+  checkExposures(state, label, needs.skills.exposureDecays);
+  if (state.items !== undefined) {
+    checkRecord(state.items, `${label} needs items, an object of histories by item id`);
+    checkHistories(state.items, `${label}, item`, needs.items ?? NO_NEEDS);
   }
-  checkExposures(state, label, needs.exposureDecays);
+  if (state.overall !== undefined) checkHistory(state.overall, `${label}, overall history,`, needs.overall ?? NO_NEEDS);
   if (state.practice !== undefined) checkCount(state.practice, `${label} needs practice, the time spent`);
+}
+
+/** Checks the histories of a record, by the id of what they count over, which `kind` names. */
+function checkHistories(histories: Readonly<Record<string, SkillHistory>>, kind: string, needs: HistoryNeeds): void {
+  for (const [id, history] of Object.entries(histories)) checkHistory(history, `${kind} "${id}",`, needs);
+}
+
+/** Checks one history against what its features read. */
+function checkHistory(history: SkillHistory, prefix: string, needs: HistoryNeeds): void {
+  checkRecord(history, `${prefix} must be an object`);
+  checkCounts(history, prefix, needs.decays);
+  checkTracked(history, prefix, needs);
 }
 
 /** Checks the counts of a history: its successes, failures, last time and decayed counts. */
@@ -349,12 +416,12 @@ function checkCount(value: number, message: string): void {
 }
 
 /**
- * Checks that an attempt is not earlier than the learner's last attempt or exposure at any of its skills, as features
- * count the time since it.
+ * Checks that an attempt is not earlier than the learner's last attempt or exposure at any of its skills, nor, when a
+ * term reads them, their last attempt at the item or at any item, as features count the time since it.
  *
  * @param label - Names the attempt in the error message, such as `The event`.
  */
-export function checkOrder(state: LogisticState, attempt: Attempt, label: string): void {
+export function checkOrder(state: LogisticState, attempt: Attempt, label: string, needs: StateNeeds): void {
   for (const skill of attempt.skills) {
     const history = entry(state.skills, skill);
     if (history !== undefined && attempt.time < history.last) {
@@ -368,5 +435,16 @@ export function checkOrder(state: LogisticState, attempt: Attempt, label: string
         `${label} at time ${attempt.time} is earlier than the learner's last exposure to skill "${skill}", at time ${exposure.last}.`,
       );
     }
+  }
+  const item = needs.items === null ? undefined : entry(state.items, attempt.item);
+  if (item !== undefined && attempt.time < item.last) {
+    throw new DataError(
+      `${label} at time ${attempt.time} is earlier than the learner's last attempt at item "${attempt.item}", at time ${item.last}.`,
+    );
+  }
+  if (needs.overall !== null && state.overall !== undefined && attempt.time < state.overall.last) {
+    throw new DataError(
+      `${label} at time ${attempt.time} is earlier than the learner's last attempt, at time ${state.overall.last}.`,
+    );
   }
 }

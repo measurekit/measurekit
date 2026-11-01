@@ -2,9 +2,10 @@
 
 `@measurekit/knowledge-tracing/logistic` fits logistic learner models: the additive factors model (AFM),
 performance factors analysis (PFA) and models of the features of logistic knowledge tracing (LKT), with the exposure
-features of instructional factors analysis. Learner proficiency is absent, a fixed effect per learner, or a random
-intercept. Fits are validated against `glm`, `lme4::glmer` and LiblineaR, and the features against the LKT
-package ([validation](validation.md#logistic-models)).
+features of instructional factors analysis. Intercepts and features count over skills, items or the learner, with a
+coefficient for each skill or item or one for all, and covariates enter with one coefficient each, as Best-LR of Gervet
+et al. (2020) has them. Learner proficiency is absent, a fixed effect per learner, or a random intercept. `fit` returns
+standard errors. Fits are validated against `glm`, `lme4::glmer` and LiblineaR, and the features against the LKT package ([validation](validation.md#logistic-models)).
 
 ```mermaid
 flowchart LR
@@ -19,17 +20,110 @@ flowchart LR
 
 ## The models
 
-logit P(correct) = θ + Σ over the attempt's skills k of (β_k + Σ_f w_kf x_kf),
+logit P(correct) = θ + β_item + Σ over the attempt's skills k of (β_k + Σ_f w_kf x_kf) + Σ_g w_g x_g + Σ_c w_c z_c,
 
-with θ the learner's proficiency, β_k the skill's intercept, and x_kf the features of the learner's history with skill
-k before the attempt, each with a coefficient w_kf per skill. The skills' terms add up, as AFM, PFA and LKT define them:
-an item of two skills gets both skills' intercepts and features.
+with θ the learner's proficiency, β_k and β_item the intercepts of the skill and of the item, x the features of the
+learner's history before the attempt, and z the covariates of the attempt. A feature x_kf has a coefficient w_kf for
+each skill; x_g has one coefficient w_g for all skills, items or learners. The skills' terms add up, as AFM, PFA and LKT
+define them: an item of two skills gets both skills' intercepts and features.
 
 | Factory             | Model                                                          | Features                | Default proficiency |
 | ------------------- | -------------------------------------------------------------- | ----------------------- | ------------------- |
 | `afm(options)`      | AFM (Cen, Koedinger and Junker, 2006): β_k + γ_k T_k           | `opportunities`         | `"fixed"`           |
 | `pfa(options)`      | PFA (Pavlik, Cen and Koedinger, 2009): β_k + γ_k s_k + ρ_k f_k | `successes`, `failures` | `"none"`            |
-| `logistic(options)` | Any of the features below                                      | `features`              | `"none"`            |
+| `logistic(options)` | Any of the features and terms below                            | `features`              | `"none"`            |
+
+### Options
+
+| Option           | Meaning                                                                                                                | Default     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `features`       | Features and terms: a feature on its own is a term over skills with a coefficient for each skill                       | `[]`        |
+| `intercepts`     | `"skill"` and `"item"`: an intercept for each skill, and for each item; both need a ridge above 0                      | `["skill"]` |
+| `covariates`     | Names of the numbers in each attempt's `covariates`, each with one coefficient; every attempt needs them               | `[]`        |
+| `proficiency`    | `"none"`, `"fixed"` (a free θ per learner) or `"random"` (θ from N(0, σ²), the Laplace approximation of `lme4::glmer`) | `"none"`    |
+| `ridge`          | λ of the penalty λ / 2 Σ b² over the coefficients and fixed proficiencies                                              | `0`         |
+| `standardErrors` | Whether `fit` returns standard errors; a fit with a ridge has none                                                     | `false`     |
+| `tolerance`      | The largest absolute gradient component at which a fit has converged                                                   | `1e-8`      |
+| `maxIterations`  | The most iterations of a fit                                                                                           | `100`       |
+| `parameters`     | The parameters to predict with                                                                                         | none        |
+
+### Terms
+
+A term is `{ feature, over, coefficient }`. The history that a feature reads counts the learner's earlier attempts at
+the skills of the attempt (`over: "skill"`), at its item (`"item"`), or at any item (`"learner"`).
+
+```mermaid
+flowchart LR
+  A[Attempt] --> S["over skill: each of its skills"]
+  A --> I["over item: its item"]
+  A --> L["over learner: all the learner's attempts"]
+  S --> E["each: a coefficient per skill"]
+  S --> H["shared: one coefficient, summed over the skills"]
+  I --> E2["each: a coefficient per item"]
+  I --> H
+  L --> H
+```
+
+| `over`      | `coefficient: "each"` (default for skill and item)         | `coefficient: "shared"` (default for learner)                                |
+| ----------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `"skill"`   | `skills[k].coefficients[label]`, as AFM, PFA and LKT's `$` | `shared["skill:label"]`: LKT's component without `$`, summed over the skills |
+| `"item"`    | `items[i].coefficients[label]`                             | `shared["item:label"]`                                                       |
+| `"learner"` | Not allowed: a slope for each learner is a random slope    | `shared["learner:label"]`                                                    |
+
+The exposure features read the exposures to a skill, so they can only be over skills. Covariates are `shared["covariate:name"]`.
+
+```ts
+import { logistic } from "@measurekit/knowledge-tracing/logistic";
+
+// Best-LR, as Gervet et al. (2020) print it
+const bestLr = logistic({
+  proficiency: "fixed",
+  intercepts: ["skill", "item"],
+  ridge: 1,
+  features: [
+    "logSuccesses",
+    "logFailures",
+    { feature: "logSuccesses", over: "learner" },
+    { feature: "logFailures", over: "learner" },
+  ],
+});
+```
+
+| Rule                               | Behavior                                                                                                                                                                      |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Skill and item intercepts together | Need a ridge above 0: items nest in skills, so without one the pair adds nothing to predictions                                                                               |
+| An item the fit did not see        | Intercept 0 and coefficients 0. A skill the fit did not see throws, when the model has a term for skills                                                                      |
+| Fixed proficiency without a ridge  | θ is fixed by a mean of 0 in each set of learners and skills (or items, with item intercepts alone) that share none, where all events of the set have the same number of them |
+| Parameters                         | `skills[k].intercept` is 0 for a model without skill intercepts; `items` and `shared` are present only when the model has them                                                |
+| State                              | `items` and `overall` histories are kept only when a term reads them, with only the fields that its features read                                                             |
+
+### Solvers
+
+```mermaid
+flowchart TD
+  F[fit] --> R{"proficiency random?"}
+  R -->|yes| D["dense: Laplace approximation, quasi-Newton on the Schur complement"]
+  R -->|no| Q{"ridge above 0?"}
+  Q -->|yes| N["Newton-CG: conjugate gradients on Hessian-vector products, diagonal preconditioner"]
+  Q -->|no| A["dense: Newton on the arrow Hessian, Schur complement of the learners"]
+```
+
+| Path                  | Cost of a step                                    | Limit                                                                                      |
+| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Ridge, fixed or no θ  | Passes over the events, however many coefficients | None                                                                                       |
+| No ridge, or random θ | The cube of the coefficients                      | `MAX_DENSE_COEFFICIENTS` = 5,000 coefficients; above it, a `DataError` says to add a ridge |
+
+Best-LR on assist12 has 53,086 items: a dense matrix of that many coefficients takes 22 GB, so the ridge path never forms it.
+
+### Standard errors
+
+With `standardErrors: true`, `fit` returns the square roots of the diagonal of the inverse Hessian at the estimates, in the
+shape of the parameters: skills, items, shared coefficients, and with fixed proficiency the learners. The variance of an
+outcome is the binomial p (1 - p), also for outcomes between 0 and 1, as `glm` has it. Fixed proficiencies are centered by
+a mean of 0 in each set, and their errors and the coefficients' are those of the centered estimates, as sum contrasts give.
+A random intercept has the errors of the coefficients only, the inverse Schur complement that `vcov(glmer, use.hessian =
+FALSE)` is; `learnerSd` has none. `standardErrors` is `null` unless asked, with a ridge, and where the information is
+singular: features that are linear combinations of each other, or a coefficient that no event uses.
 
 ## Features
 
@@ -101,14 +195,16 @@ Every name of `computefeatures` in LKT 1.7.0, 49 in all, and what measurekit doe
 | `base`, `basesuc`, `basefail`                                                                                                                           | `base`, `baseSuccess`, `baseFailure`                                                                          |
 | `base2`, `base2suc`, `base2fail`                                                                                                                        | `basePractice`, `basePracticeSuccess`, `basePracticeFailure`                                                  |
 | `dashafm`, `dashsuc`, `ppe`                                                                                                                             | `dash`, `dashSuccess`, `ppe`                                                                                  |
-| `intercept`                                                                                                                                             | The intercept β_k of each skill, which every model has                                                        |
-| `numer`                                                                                                                                                 | Not included: no feature reads the `covariates` of an event                                                   |
+| `intercept`                                                                                                                                             | The intercept of each skill or item: the option `intercepts`                                                  |
+| `numer`                                                                                                                                                 | A covariate: the option `covariates`, one coefficient for each name                                           |
 | `recencytest`, `recencystudy`                                                                                                                           | Not included: they read `previousstudy`, whose line is commented out in LKT 1.7.0                             |
 | `base4`, `base5suc`, `base5fail`                                                                                                                        | Not included: their scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing effect              |
 | `diffrelcor1`, `diffrelcor2`, `diffcor1`, `diffcor2`, `diffcorComp`, `diffincorComp`, `diffallComp`, `diffincor1`, `diffincor2`, `diffall1`, `diffall2` | Not included: they read other learners, so a state is not a function of a learner's own events                |
 | `errordec`, `logitdecevol`, `baseratepropdec`                                                                                                           | Not included: they read an earlier model, or a parameter free for each item                                   |
 
-Of the 49 names, 12 were covered before, 16 are added, 1 is the skill's intercept, and 20 are not included. The exposure features and the DAS3H windows are not LKT's.
+Of the 49 names, 28 are features, `intercept` and `numer` are the intercepts and covariates, and 19 are not included. The
+exposure features and the DAS3H windows are not LKT's. LKT's components map to the terms: a feature over `"skill"` or
+`"item"` with a coefficient for each is a component with `$`, one with a shared coefficient is a component without it.
 
 ## Online
 
@@ -130,11 +226,32 @@ model.predict(ana, { ...attempt, item: "q2", time: 104 }); // 0.68: θ 0.6, -0.4
 
 The state holds each skill's history: `successes`, `failures`, `last`, the time of the last attempt, and `decayed`, the
 decayed successes and failures of each decay the features use, and the fields that the model's other features read
-(`previous`, `first`, `firstPractice`, `leaky`, `times` and `outcomes`), with the learner's `practice` time. It is plain
-data; the model checks it, and that it has what the model's features need. An attempt or event earlier than the learner's last attempt at one of its
+(`previous`, `first`, `firstPractice`, `leaky`, `times` and `outcomes`), with the learner's `practice` time, and for terms
+over items and the learner, the same histories in `items`, by item id, and `overall`. It is plain data; the model checks it,
+and that it has what the model's features need. An attempt or event earlier than the learner's last attempt at one of its
 skills throws `DataError`, as the time since it would be negative. Coefficients are keyed by the feature's label: its
 name, with its parameter in parentheses. A skill without coefficients throws `DataError`. Every event needs at least one
 skill; outcomes from 0 to 1 count as partial credit.
+
+## Differences from the references
+
+| Quantity             | Reference                              | Here                                                                                                                     |
+| -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Ridge fits           | LiblineaR stops at a relative gradient | Newton-CG stops at a gradient of `tolerance` in every component, 1e-8 by default, so the minimum is reached more exactly |
+| Singular information | `glm` gives `NA` to an aliased column  | `standardErrors` is `null`, as one number for a coefficient would not tell which is aliased                              |
+| Fixed proficiency    | `glm` drops an aliased column          | θ has a mean of 0 in each set, and the errors are those of the centered estimates, as sum contrasts give                 |
+
+## Errors
+
+| `DataError` when                                                                                     | What to do                                                                                     |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `intercepts` has both kinds and `ridge` is 0                                                         | Add a ridge, or keep one kind                                                                  |
+| A term over the learner has `coefficient: "each"`                                                    | Use `"shared"`: a slope for each learner is a random-slope model, which this module leaves out |
+| An exposure feature is over items or the learner                                                     | Count exposures over skills                                                                    |
+| A fit has more than 5,000 coefficients without a ridge, or with random θ                             | Add a ridge and use `"none"` or `"fixed"` proficiency; a ridge has no standard errors          |
+| An event with an outcome, or an attempt to predict, lacks a covariate                                | Give every attempt each name of `covariates`                                                   |
+| A model with shared coefficients has no `shared` parameters when it predicts                         | Fit it, or pass `parameters` with `shared`                                                     |
+| An attempt is earlier than the learner's last attempt at a skill, item or any item that a term reads | Give the attempts in time order                                                                |
 
 ## References
 
@@ -143,6 +260,8 @@ skill; outcomes from 0 to 1 count as partial credit.
 - Chi, M., Koedinger, K. R., Gordon, G. J., Jordan, P., & VanLehn, K. (2011). Instructional factors analysis: A
   cognitive model for multiple instructional interventions. In Proceedings of the 4th International Conference on
   Educational Data Mining.
+- Gervet, T., Koedinger, K., Schneider, J., & Mitchell, T. (2020). When is deep learning the best approach to knowledge
+  tracing? Journal of Educational Data Mining, 12(3), 31-54.
 - Pavlik, P. I., Cen, H., & Koedinger, K. R. (2009). Performance factors analysis: A new alternative to knowledge
   tracing. In Artificial Intelligence in Education (AIED 2009).
 - Pavlik, P. I., Eglington, L. G., & Harrell-Williams, L. M. (2021). Logistic knowledge tracing: A constrained

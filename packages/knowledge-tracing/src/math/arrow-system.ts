@@ -1,5 +1,6 @@
 import { backtrack, dot, logistic, logLogistic, maxAbs } from "@measurekit/core";
 import { choleskySolve } from "./linear-algebra.js";
+import { OBJECTIVE_ROUNDING } from "./newton-cg.js";
 import type { SparseMatrix } from "./sparse-matrix.js";
 
 /**
@@ -285,7 +286,7 @@ function solveDamped(schur: Float64Array, p: number, rhs: Float64Array, out: Flo
 }
 
 /** Adds scale f fᵀ to a square matrix stored by rows, over the nonzero entries of f. */
-function addOuter(matrix: Float64Array, f: Float64Array, scale: number): void {
+export function addOuter(matrix: Float64Array, f: Float64Array, scale: number): void {
   const p = f.length;
   const nonzero: number[] = [];
   f.forEach((value, i) => {
@@ -358,12 +359,6 @@ export function penalizedNewton(
 }
 
 /**
- * The rounding error of a sum of row losses, relative to it: near the optimum a Newton step lowers the objective by
- * less than that, so a step within it is taken, and the gradient decides convergence.
- */
-const ROUNDING = 1e-12;
-
-/**
  * Halves the step from (β, u) until the objective decreases enough (the Armijo condition), or rises by no more than
  * its rounding error, moving β and u there in place; returns the objective there, or `null` when no step does.
  */
@@ -389,7 +384,7 @@ function searchLine(
     },
     value,
     slope,
-    { slack: ROUNDING * (1 + Math.abs(value)) },
+    { slack: OBJECTIVE_ROUNDING * (1 + Math.abs(value)) },
   );
   if (length === null) return null;
   beta.set(trialBeta);

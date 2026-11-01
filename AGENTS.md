@@ -70,7 +70,7 @@ Use these words with these meanings in code, comments and docs.
 | mastery             | P(the learner has mastered a skill), for models that define it: P(L) in BKT.                                                    |
 | prior group         | Learners who share a BKT prior for each skill.                                                                                  |
 | proficiency         | θ, a learner's general ability in a logistic model: none, a fixed effect or a random intercept.                                 |
-| feature             | A logistic model's function of a learner's history with a skill before an attempt.                                              |
+| feature             | A logistic model's function of a learner's history with a skill, an item or all items before an attempt.                        |
 | band                | The range of predicted success that practice aims at when ranking items.                                                        |
 | knowledge state     | In KST, the set of skills or items a learner masters; a structure lists the possible ones.                                      |
 | fringe              | The elements a knowledge state can lose (inner) or gain (outer) while staying a state.                                          |
@@ -147,7 +147,8 @@ packages/knowledge-tracing/   the published package @measurekit/knowledge-tracin
                         metrics by opportunity
   src/elo/              learner-item and concept-specific Elo
   src/bkt/              Bayesian knowledge tracing with pyBKT's extensions
-  src/logistic/         AFM, PFA and LKT features, with fixed or random proficiency
+  src/logistic/         AFM, PFA and LKT features over skills, items or the learner, intercepts, covariates, standard errors, fixed or random
+                        proficiency
   src/irt/              online IRT: the posterior of ability on a grid, from calibrated item parameters
   src/kst/              knowledge structures and their tools, the basic local independence model, IITA, adaptive assessment
   src/practice/         the next item by predicted success, mastery criteria, attempts to a streak

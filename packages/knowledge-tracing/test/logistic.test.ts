@@ -19,12 +19,14 @@ import {
   pfa,
   splitByLearner,
 } from "../src/index.js";
-import { checkFeatures, featureValue, needsOf } from "../src/logistic/features.js";
+import { type FeatureSpec, featureValue, needsOf } from "../src/logistic/features.js";
 import { nextHistory, type SkillHistory } from "../src/logistic/state.js";
+import { checkTerms } from "../src/logistic/terms.js";
 import exposureFixture from "./fixtures/logistic-exposures.json" with { type: "json" };
 import glm from "./fixtures/logistic-glm.json" with { type: "json" };
 import lkt from "./fixtures/logistic-lkt.json" with { type: "json" };
 import lktFeaturesFixture from "./fixtures/logistic-lkt-features.json" with { type: "json" };
+import termsFixture from "./fixtures/logistic-terms.json" with { type: "json" };
 import { allPredicted, defined, expectClose, expectUnaffectedByLessons, online } from "./helpers.js";
 
 /** Absolute tolerance of features against LKT's. */
@@ -41,6 +43,11 @@ const RIDGE_TOLERANCE = 1e-6;
 const RANDOM_TOLERANCE = 1e-5;
 /** Absolute tolerance of the random-intercept log-likelihood. */
 const RANDOM_LOG_LIKELIHOOD_TOLERANCE = 1e-6;
+
+/** Returns the checked features of the plain list. */
+function specsOf(features: readonly LogisticFeature[]): FeatureSpec[] {
+  return checkTerms(features).map(({ feature }) => feature);
+}
 
 /** A fit of `validation/knowledge-tracing/logistic.R`: the model's options and the reference's estimates. */
 interface Reference {
@@ -71,6 +78,18 @@ function expectParameters(actual: LogisticParameters, expected: LogisticParamete
   for (const [learner, theta] of Object.entries(expected.learners ?? {})) {
     expectClose(actual.learners?.[learner] ?? null, theta, tolerance, learner);
   }
+  expect(Object.keys(actual.items ?? {}).toSorted()).toEqual(Object.keys(expected.items ?? {}).toSorted());
+  for (const [item, coefficients] of Object.entries(expected.items ?? {})) {
+    const found = defined(actual.items?.[item]);
+    expectClose(found.intercept, coefficients.intercept, tolerance, `${item} intercept`);
+    for (const [label, value] of Object.entries(coefficients.coefficients)) {
+      expectClose(found.coefficients[label] ?? null, value, tolerance, `${item} ${label}`);
+    }
+  }
+  expect(Object.keys(actual.shared ?? {}).toSorted()).toEqual(Object.keys(expected.shared ?? {}).toSorted());
+  for (const [label, value] of Object.entries(expected.shared ?? {})) {
+    expectClose(actual.shared?.[label] ?? null, value, tolerance, label);
+  }
 }
 
 describe("logistic features against LKT", () => {
@@ -90,7 +109,7 @@ describe("logistic features against LKT", () => {
       decayedSuccesses: { decayedSuccesses: decays.counts },
       decayedFailures: { decayedFailures: decays.counts },
     };
-    const specs = checkFeatures(Object.values(features));
+    const specs = specsOf(Object.values(features));
     const needs = needsOf(specs);
     const histories = new Map<string, SkillHistory>();
     // LKT's rows are in learner order, each learner's in time order.
@@ -126,7 +145,7 @@ const featureEvents: readonly Event[] = JSON.parse(JSON.stringify(lktFeaturesFix
 /** Returns the values of a feature at each event of the fixture, from the state that a model's updates make. */
 function replayedValues(feature: LogisticFeature, events: readonly Event[] = featureEvents): number[] {
   const model = logistic({ features: [feature] });
-  const [spec] = checkFeatures([feature]);
+  const [spec] = specsOf([feature]);
   const states = new Map<string, LogisticState>();
   return events.map((event) => {
     const state = states.get(event.learner) ?? model.initialState(event.learner);
@@ -161,7 +180,7 @@ const event = (time: number, outcome: number | null, extra: Partial<Event> = {})
 function valueAfter(feature: LogisticFeature, events: readonly Event[], time: number): number {
   const model = logistic({ features: [feature] });
   const state = events.reduce((current, next) => model.update(current, next), model.initialState("ana"));
-  const [spec] = checkFeatures([feature]);
+  const [spec] = specsOf([feature]);
   return featureValue(defined(spec), state.skills.k, undefined, time, state.practice ?? 0);
 }
 
@@ -582,7 +601,7 @@ describe("logistic edge cases", () => {
       expect(allPredicted(fit.predictions).every((p) => p >= 0 && p <= 1)).toBe(true);
     }
     const history = { successes: 0, failures: 1200, last: 0, decayed: { "0.5": { successes: 0, failures: 2 } } };
-    const [spec] = checkFeatures([{ decayedLogit: 0.5 }]);
+    const [spec] = specsOf([{ decayedLogit: 0.5 }]);
     expect(featureValue(defined(spec), history, undefined, 1, 0)).toBe(1200 * Math.log(0.5) - Math.log(2));
   });
 
@@ -748,7 +767,7 @@ describe("logistic exposure features against R", () => {
   ];
 
   it("computes each feature from the state as base R does", () => {
-    const specs = checkFeatures(features);
+    const specs = specsOf(features);
     const model = logistic({ features });
     const states = new Map<string, LogisticState>();
     const columns = [
@@ -883,5 +902,457 @@ describe("logistic with events that have no outcome", () => {
     expect(() => logistic().fit(eventLog([lesson]))).toThrow(
       "The log has no event with an outcome; a logistic model needs at least one to fit.",
     );
+  });
+});
+
+/** Relative tolerance of standard errors against summary(glm) and the inverse Schur complement of lme4. */
+const STANDARD_ERROR_TOLERANCE = 1e-6;
+
+/** A fit of `validation/knowledge-tracing/logistic-terms.R`: the model's options, the reference's estimates and errors. */
+interface TermsReference {
+  readonly name: string;
+  readonly options: LogisticOptions;
+  /** The positions of the events the fit uses, 0-based; all of them without. */
+  readonly subset?: readonly number[];
+  readonly expected: LogisticParameters & { readonly logLikelihood: number };
+  readonly standardErrors?: LogisticParameters;
+}
+
+const termsReferences: readonly TermsReference[] = JSON.parse(JSON.stringify(termsFixture.fits));
+const termsLog = eventLog(JSON.parse(JSON.stringify(termsFixture.events)));
+
+/** Returns every number of parameters by its path, such as `/items/i01/intercept`. */
+function numbersOf(parameters: unknown, path = ""): Map<string, number> {
+  if (typeof parameters === "number") return new Map([[path, parameters]]);
+  if (typeof parameters !== "object" || parameters === null) return new Map();
+  return new Map(Object.entries(parameters).flatMap(([key, value]) => [...numbersOf(value, `${path}/${key}`)]));
+}
+
+describe("logistic terms against R", () => {
+  it.each(termsReferences)("fits as glm, lme4 or LiblineaR do: $name", (reference) => {
+    const ridge = reference.options.ridge !== undefined;
+    const random = reference.options.proficiency === "random";
+    const log = reference.subset === undefined ? termsLog : reference.subset.map((index) => defined(termsLog[index]));
+    const fit = logistic({ ...reference.options, standardErrors: !ridge }).fit(log);
+    expect(fit.converged).toBe(true);
+    expectParameters(
+      fit.model.parameters,
+      reference.expected,
+      ridge ? RIDGE_TOLERANCE : random ? RANDOM_TOLERANCE : GLM_TOLERANCE,
+    );
+    const tolerance = random ? RANDOM_LOG_LIKELIHOOD_TOLERANCE : ridge ? RIDGE_TOLERANCE : GLM_TOLERANCE;
+    expectClose(fit.logLikelihood, reference.expected.logLikelihood, tolerance, "log-likelihood");
+    if (random) {
+      expectClose(
+        fit.model.parameters.learnerSd ?? null,
+        defined(reference.expected.learnerSd),
+        RANDOM_TOLERANCE,
+        "sd",
+      );
+    }
+    if (reference.standardErrors === undefined) {
+      expect(fit.standardErrors).toBeNull();
+      return;
+    }
+    const actual = numbersOf(fit.standardErrors);
+    const expected = numbersOf(reference.standardErrors);
+    expect([...actual.keys()].toSorted()).toEqual([...expected.keys()].toSorted());
+    for (const [path, value] of expected) {
+      // A standard error of 0 stands for a coefficient the model does not have.
+      const error = value === 0 ? Math.abs(defined(actual.get(path))) : Math.abs(defined(actual.get(path)) / value - 1);
+      expect(error, `${reference.name} ${path}`).toBeLessThanOrEqual(STANDARD_ERROR_TOLERANCE);
+    }
+  });
+
+  it("counts the coefficients of both kinds of intercept and the flat direction in the information criteria", () => {
+    // 24 items without skill intercepts; 60 learners less the mean fixed at 0.
+    const fit = logistic({ intercepts: ["item"], proficiency: "fixed" }).fit(termsLog);
+    const k = 24 + 60 - 1;
+    expectClose(fit.aic, 2 * k - 2 * fit.logLikelihood, 1e-9);
+    expectClose(fit.bic, k * Math.log(termsLog.length) - 2 * fit.logLikelihood, 1e-9);
+  });
+});
+
+describe("logistic terms", () => {
+  const first: Event = { learner: "ana", item: "q1", skills: ["a"], time: 1, outcome: 1 };
+  const events: Event[] = [
+    first,
+    { ...first, time: 2 },
+    { learner: "ana", item: "q2", skills: ["b"], time: 3, outcome: 0 },
+  ];
+  const plain = { intercept: 0, coefficients: {} };
+
+  it("adds shared coefficients over the attempt's skills, the item's intercept and the covariates to the linear predictor", () => {
+    const model = logistic({
+      features: [{ feature: "successes", coefficient: "shared" }],
+      intercepts: ["skill", "item"],
+      covariates: ["x"],
+      ridge: 1,
+      parameters: {
+        skills: { a: { intercept: 0.5, coefficients: {} }, b: { intercept: -0.25, coefficients: {} } },
+        items: { q3: { intercept: 0.1, coefficients: {} } },
+        shared: { "skill:successes": 0.3, "covariate:x": 2 },
+      },
+    });
+    const state = events.reduce((current, next) => model.update(current, next), model.initialState("ana"));
+    const attempt = { learner: "ana", item: "q3", skills: ["a", "b"], time: 4, covariates: { x: 0.5 } };
+    // The successes before the attempt are 2 at a and 0 at b.
+    const logit = 0.5 - 0.25 + 0.1 + 0.3 * (2 + 0) + 2 * 0.5;
+    expectClose(model.predict(state, attempt), 1 / (1 + Math.exp(-logit)), 1e-14);
+  });
+
+  it("gives a coefficient to each item for a term over items, and to all of them for a term over the learner", () => {
+    const model = logistic({
+      features: [
+        { feature: "opportunities", over: "item" },
+        { feature: "opportunities", over: "learner" },
+      ],
+      parameters: {
+        skills: { a: plain, b: plain },
+        items: {
+          q1: { intercept: 0, coefficients: { opportunities: 0.5 } },
+          q2: { intercept: 0, coefficients: { opportunities: -1 } },
+        },
+        shared: { "learner:opportunities": 0.1 },
+      },
+    });
+    const state = events.reduce((current, next) => model.update(current, next), model.initialState("ana"));
+    const at = (item: string) => model.predict(state, { learner: "ana", item, skills: ["a"], time: 4 });
+    // Three earlier attempts: two at q1, one at q2, and none at an item the fit did not see.
+    expectClose(at("q1"), 1 / (1 + Math.exp(-(0.5 * 2 + 0.1 * 3))), 1e-14);
+    expectClose(at("q2"), 1 / (1 + Math.exp(-(-1 * 1 + 0.1 * 3))), 1e-14);
+    expectClose(at("q9"), 1 / (1 + Math.exp(-0.1 * 3)), 1e-14);
+  });
+
+  it("gives an item the fit did not see the intercept and coefficients 0, and still refuses a skill it did not see", () => {
+    const fit = logistic({
+      intercepts: ["skill", "item"],
+      features: [{ feature: "opportunities", over: "item" }],
+      ridge: 1,
+    }).fit(termsLog);
+    const state = fit.model.initialState("ana");
+    const seen = defined(fit.model.parameters.skills.s1).intercept;
+    const unseen = { learner: "ana", item: "new", skills: ["s1"], time: 0 };
+    expectClose(fit.model.predict(state, unseen), 1 / (1 + Math.exp(-seen)), 1e-14);
+    expect(() => fit.model.predict(state, { ...unseen, skills: ["new"] })).toThrow(
+      'The model has no parameters for skill "new".',
+    );
+  });
+
+  it("reads no skill parameters when no term uses a skill", () => {
+    const fit = logistic({ intercepts: ["item"] }).fit(termsLog);
+    const attempt = { learner: "ana", item: "i01", skills: ["unknown"], time: 0 };
+    expect(fit.model.predict(fit.model.initialState("ana"), attempt)).toBeGreaterThan(0);
+    expect(Object.values(fit.model.parameters.skills).every((skill) => skill.intercept === 0)).toBe(true);
+  });
+
+  it("keeps the histories of items and of the learner in a state only when a term reads them", () => {
+    const state = (features: LogisticOptions["features"]) =>
+      events.reduce((current, next) => {
+        const model = logistic({ features });
+        return model.update(current, next);
+      }, logistic().initialState("ana"));
+    expect(Object.keys(state([]))).toEqual(["learner", "skills"]);
+    expect(Object.keys(state([{ feature: "successes", over: "item" }]))).toEqual(["learner", "skills", "items"]);
+    expect(Object.keys(state([{ feature: "successes", over: "learner" }]))).toEqual(["learner", "skills", "overall"]);
+    const both = state([
+      { feature: "successes", over: "item" },
+      { feature: "failures", over: "learner" },
+    ]);
+    expect(Object.keys(both.items ?? {})).toEqual(["q1", "q2"]);
+    expect(both.items?.q1?.successes).toBe(2);
+    expect(both.overall).toMatchObject({ successes: 2, failures: 1 });
+  });
+
+  it("tracks in an item's history only what the features over items read", () => {
+    const model = logistic({
+      features: [
+        { decayedSuccesses: 0.5 },
+        { feature: { recency: 1 }, over: "item" },
+        { feature: "successes", over: "learner" },
+      ],
+    });
+    const state = events.reduce((current, next) => model.update(current, next), model.initialState("ana"));
+    expect(Object.keys(state.skills.a?.decayed ?? {})).toEqual(["0.5"]);
+    expect(state.items?.q1?.decayed).toEqual({});
+    expect(state.overall?.decayed).toEqual({});
+  });
+
+  it("refuses an attempt earlier than the learner's last attempt at the item or at any item, when a term reads them", () => {
+    const skills = { a: plain, b: plain };
+    const itemModel = logistic({ features: [{ feature: "successes", over: "item" }], parameters: { skills } });
+    const learnerModel = logistic({
+      features: [{ feature: "successes", over: "learner" }],
+      parameters: { skills, shared: { "learner:successes": 0.1 } },
+    });
+    const plainModel = logistic({ parameters: { skills } });
+    const after = (model: typeof itemModel) =>
+      events.reduce((current, next) => model.update(current, next), model.initialState("ana"));
+    const earlier = { learner: "ana", item: "q2", skills: ["a"], time: 2 };
+    expect(() => itemModel.predict(after(itemModel), earlier)).toThrow(
+      'The attempt at time 2 is earlier than the learner\'s last attempt at item "q2", at time 3.',
+    );
+    expect(() => learnerModel.predict(after(learnerModel), { ...earlier, item: "q9" })).toThrow(
+      "The attempt at time 2 is earlier than the learner's last attempt, at time 3.",
+    );
+    expect(plainModel.predict(after(plainModel), { ...earlier, item: "q9" })).toBeGreaterThan(0);
+  });
+
+  it("continues identically from a state stored as JSON, whatever the terms", () => {
+    const model = logistic({
+      features: [
+        "opportunities",
+        { feature: "logSuccesses", over: "item" },
+        { feature: "logFailures", over: "learner" },
+        { feature: "opportunities", over: "item", coefficient: "shared" },
+      ],
+      intercepts: ["skill", "item"],
+      covariates: ["x"],
+      ridge: 1,
+      parameters: {
+        skills: {
+          s1: { intercept: 0.2, coefficients: { opportunities: 0.1 } },
+          s2: { intercept: -0.2, coefficients: { opportunities: -0.1 } },
+        },
+        items: {
+          i1: { intercept: 0.3, coefficients: { logSuccesses: 0.2 } },
+          i2: { intercept: -0.3, coefficients: { logSuccesses: -0.2 } },
+        },
+        shared: { "item:opportunities": 0.1, "learner:logFailures": -0.2, "covariate:x": 0.5 },
+      },
+    });
+    const arbitraryEvents = fc
+      .array(
+        fc.record({
+          item: fc.constantFrom("i1", "i2", "i3"),
+          skill: fc.constantFrom("s1", "s2"),
+          outcome: fc.constantFrom(0, 1, null),
+          x: fc.double({ min: -2, max: 2, noNaN: true }),
+        }),
+        { minLength: 1, maxLength: 12 },
+      )
+      .map((list) =>
+        list.map(
+          ({ item, skill, outcome, x }, time): Event => ({
+            learner: "ana",
+            item,
+            skills: [skill],
+            time,
+            outcome,
+            covariates: { x },
+          }),
+        ),
+      );
+    fc.assert(
+      fc.property(arbitraryEvents, fc.nat(), (list, cut) => {
+        const split = cut % (list.length + 1);
+        let direct = model.initialState("ana");
+        let first = model.initialState("ana");
+        for (const [index, event] of list.entries()) {
+          if (event.outcome !== null) {
+            const prediction = model.predict(direct, event);
+            expect(prediction >= 0 && prediction <= 1).toBe(true);
+          }
+          const copy = JSON.stringify(direct);
+          const next = model.update(Object.freeze(direct), event);
+          expect(JSON.stringify(direct)).toBe(copy);
+          direct = next;
+          if (index < split) first = model.update(first, event);
+        }
+        let stored: LogisticState = JSON.parse(JSON.stringify(first));
+        for (const event of list.slice(split)) stored = model.update(stored, event);
+        expect(stored).toEqual(direct);
+      }),
+    );
+  });
+
+  it("needs each covariate on every event with an outcome and every prediction, but not on an update or a lesson", () => {
+    const model = logistic({ covariates: ["x"] });
+    const withX: Event = { ...first, covariates: { x: 1 } };
+    const lesson: Event = { ...first, outcome: null };
+    expect(() => model.fit(eventLog([withX, { ...first, time: 2 }]))).toThrow(
+      'Event 2 needs the covariate "x", which the model reads.',
+    );
+    expect(model.fit(eventLog([withX, { ...lesson, time: 2 }])).converged).toBe(true);
+    const fitted = model.fit(eventLog([withX, { ...withX, time: 2, outcome: 0 }])).model;
+    expect(() => fitted.predict(fitted.initialState("ana"), first)).toThrow(
+      'The attempt needs the covariate "x", which the model reads.',
+    );
+    expect(fitted.update(fitted.initialState("ana"), first).skills.a?.successes).toBe(1);
+  });
+
+  it("fits more than 5,000 coefficients with a ridge, and refuses to without one or with random proficiency", () => {
+    const many = eventLog(
+      Array.from({ length: 5_001 }, (_, i) => ({
+        learner: `l${i % 50}`,
+        item: `i${i}`,
+        skills: [`s${i % 3}`],
+        time: i,
+        outcome: (i * 7) % 5 < 3 ? 1 : 0,
+      })),
+    );
+    const ridge = logistic({ intercepts: ["item"], ridge: 1 }).fit(many);
+    expect(ridge.converged).toBe(true);
+    expect(Object.keys(ridge.model.parameters.items ?? {})).toHaveLength(5_001);
+    expect(ridge.standardErrors).toBeNull();
+    expect(() => logistic({ intercepts: ["item"] }).fit(many)).toThrow(
+      "The fit has 5001 coefficients, more than the 5000 that a fit without a ridge solves. Add a ridge",
+    );
+    expect(() => logistic({ intercepts: ["item"], ridge: 1, proficiency: "random" }).fit(many)).toThrow(
+      "more than the 5000 that a fit with random proficiency solves",
+    );
+  });
+});
+
+describe("logistic standard errors", () => {
+  it("are null unless asked, and with a ridge", () => {
+    expect(logistic().fit(termsLog).standardErrors).toBeNull();
+    expect(logistic({ ridge: 1, standardErrors: true }).fit(termsLog).standardErrors).toBeNull();
+    expect(logistic({ standardErrors: true }).fit(termsLog).standardErrors).not.toBeNull();
+  });
+
+  it("have a value for each coefficient and, with fixed proficiency, each learner, and none for a random intercept", () => {
+    const errors = defined(logistic({ standardErrors: true, proficiency: "fixed" }).fit(termsLog).standardErrors);
+    expect(Object.keys(errors.learners ?? {})).toHaveLength(60);
+    expect(Object.values(errors.skills).every(({ intercept }) => intercept > 0)).toBe(true);
+    const random = defined(logistic({ standardErrors: true, proficiency: "random" }).fit(termsLog).standardErrors);
+    expect(random.learners).toBeUndefined();
+    expect(random.learnerSd).toBeUndefined();
+  });
+
+  it("use the binomial variance of an intercept alone for outcomes between 0 and 1", () => {
+    const outcomes = [0.2, 0.8, 0.5, 1, 0.3, 0.7];
+    const log = eventLog(
+      outcomes.map((outcome, time) => ({ learner: "ana", item: "q", skills: ["s"], time, outcome })),
+    );
+    const errors = defined(logistic({ standardErrors: true }).fit(log).standardErrors);
+    const p = outcomes.reduce((sum, outcome) => sum + outcome, 0) / outcomes.length;
+    expectClose(defined(errors.skills.s).intercept, 1 / Math.sqrt(outcomes.length * p * (1 - p)), 1e-9);
+  });
+
+  it("are null where the information is singular, with parameters still estimated", () => {
+    // Opportunities are successes plus failures: the three features are linearly dependent.
+    const collinear = logistic({ standardErrors: true, features: ["opportunities", "successes", "failures"] }).fit(
+      termsLog,
+    );
+    expect(collinear.converged).toBe(true);
+    expect(collinear.standardErrors).toBeNull();
+    // Each learner attempts each skill once, so the recency of every attempt is 0 and its coefficient has no information.
+    const once = eventLog(
+      ["a", "b", "c", "d"].flatMap((learner, l) =>
+        ["x", "y"].map((skill, k) => ({
+          learner,
+          item: `${skill}${l}`,
+          skills: [skill],
+          time: k,
+          outcome: (l + k) % 2,
+        })),
+      ),
+    );
+    const dead = logistic({ standardErrors: true, features: [{ recency: 1 }] }).fit(once);
+    expect(dead.standardErrors).toBeNull();
+  });
+
+  it("shrink as events are added", () => {
+    const small = defined(logistic({ standardErrors: true }).fit(termsLog.slice(0, 700)).standardErrors);
+    const large = defined(logistic({ standardErrors: true }).fit(termsLog).standardErrors);
+    expect(defined(large.skills.s1).intercept).toBeLessThan(defined(small.skills.s1).intercept);
+  });
+});
+
+describe("logistic options of terms from JavaScript", () => {
+  it.each([
+    [
+      '{"features": [{"feature": "successes", "over": "planet"}]}',
+      'The field over of a term must be "skill", "item" or "learner", found "planet".',
+    ],
+    [
+      '{"features": [{"feature": "successes", "coefficient": null}]}',
+      'The field coefficient of a term must be "each" or "shared", found null.',
+    ],
+    [
+      '{"features": [{"feature": "successes", "weight": 1}]}',
+      'A term has no field "weight"; its fields are feature, over and coefficient.',
+    ],
+    [
+      '{"features": [{"feature": "successes", "over": "learner", "coefficient": "each"}]}',
+      "The term successes over the learner needs one shared coefficient: a coefficient for each learner is a random slope",
+    ],
+    [
+      '{"features": [{"feature": "exposures", "over": "item"}]}',
+      "The feature exposures counts the exposures to a skill, so its term can only be over skills.",
+    ],
+    [
+      '{"features": [{"feature": "successes", "over": "item"}, {"feature": "successes", "over": "item"}]}',
+      "The term successes over item with a each coefficient is listed twice.",
+    ],
+    ['{"features": [{"feature": "nothing"}]}', 'Unknown feature "nothing"'],
+    ['{"intercepts": null}', "The option intercepts must be an array, found null."],
+    ['{"intercepts": ["planet"]}', 'An intercept of the option intercepts must be "skill" or "item", found "planet".'],
+    ['{"intercepts": ["item", "item"]}', 'The option intercepts lists "item" twice.'],
+    [
+      '{"intercepts": ["skill", "item"]}',
+      'The option intercepts has both "skill" and "item", which needs a ridge above 0: items nest in skills, so without one the pair adds nothing to predictions.',
+    ],
+    ['{"covariates": null}', "The option covariates must be an array, found null."],
+    ['{"covariates": [""]}', 'The option covariates needs names, non-empty strings, found "".'],
+    ['{"covariates": ["x", "x"]}', 'The option covariates lists "x" twice.'],
+    ['{"standardErrors": "yes"}', 'The option standardErrors must be a boolean, found "yes".'],
+    [
+      '{"features": [{"feature": "successes", "coefficient": "shared"}], "parameters": {"skills": {}, "shared": {}}}',
+      "The shared coefficient skill:successes of the logistic parameters must be a finite number, found undefined.",
+    ],
+    [
+      '{"intercepts": ["item"], "parameters": {"skills": {}, "items": {"q": {"intercept": 0}}}}',
+      'The logistic parameters of item "q" need coefficients, an object of coefficients by feature, found undefined.',
+    ],
+    [
+      '{"parameters": {"skills": {}, "shared": null}}',
+      "Logistic parameters need shared, an object of coefficients by label, found null.",
+    ],
+  ])("reject the options %s", (json, message) => {
+    const options: LogisticOptions = JSON.parse(json);
+    expect(() => logistic(options)).toThrow(DataError);
+    expect(() => logistic(options)).toThrow(message);
+  });
+
+  it("refuses to predict with shared coefficients that the model lacks", () => {
+    const model = logistic({ covariates: ["x"] });
+    const attempt = { learner: "ana", item: "q", skills: ["s"], time: 0, covariates: { x: 1 } };
+    const state = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
+    expect(() =>
+      logistic({ covariates: ["x"], parameters: { skills: { s: { intercept: 0, coefficients: {} } } } }).predict(
+        state,
+        attempt,
+      ),
+    ).toThrow("The model has no parameters for its shared coefficients covariate:x.");
+  });
+
+  it("rejects a state with malformed histories of items and of the learner", () => {
+    const model = logistic({
+      features: [
+        { feature: "successes", over: "item" },
+        { feature: "successes", over: "learner" },
+      ],
+      parameters: { skills: { s: { intercept: 0, coefficients: {} } }, shared: { "learner:successes": 0.1 } },
+    });
+    const attempt = { learner: "ana", item: "q", skills: ["s"], time: 0 };
+    const parse = (json: string): LogisticState => JSON.parse(json);
+    const history = '{"successes": 1, "failures": 0, "last": 0, "decayed": {}}';
+    const base = '"learner": "ana", "skills": {}';
+    expect(() => model.predict(parse(`{${base}, "items": null}`), attempt)).toThrow(
+      'The logistic state of learner "ana" needs items, an object of histories by item id, found null.',
+    );
+    expect(() =>
+      model.predict(
+        parse(`{${base}, "items": {"q": {"successes": -1, "failures": 0, "last": 0, "decayed": {}}}}`),
+        attempt,
+      ),
+    ).toThrow('The logistic state of learner "ana", item "q", needs successes, a non-negative number, found -1.');
+    expect(() => model.predict(parse(`{${base}, "overall": {"successes": 1}}`), attempt)).toThrow(
+      'The logistic state of learner "ana", overall history, needs failures, a non-negative number, found undefined.',
+    );
+    const stored = parse(`{${base}, "items": {"q": ${history}}, "overall": ${history}}`);
+    expect(model.predict(stored, { ...attempt, time: 5 })).toBeGreaterThan(0);
   });
 });

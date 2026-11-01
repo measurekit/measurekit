@@ -1,4 +1,4 @@
-import { checkArray, checkNonNegative, checkPositive, DataError, describe, isRecord } from "@measurekit/core";
+import { checkNonNegative, checkPositive, DataError, describe, isRecord } from "@measurekit/core";
 import { entry } from "../data/record.js";
 import { type ExposureHistory, type HistoryNeeds, leakyAt, type SkillHistory } from "./state.js";
 
@@ -198,19 +198,13 @@ export interface FeatureSpec {
   readonly label: string;
 }
 
-/** Returns the checked features, rejecting unknown ones, parameters out of range and repeated features. */
-export function checkFeatures(features: readonly LogisticFeature[]): FeatureSpec[] {
-  checkArray(features, "The option features must be an array");
-  const specs = features.map(toSpec);
-  const labels = new Set<string>();
-  for (const { label } of specs) {
-    if (labels.has(label)) throw new DataError(`The feature ${label} is listed twice.`);
-    labels.add(label);
-  }
-  return specs;
+/** The features that read the events without an outcome at a skill, which only skill terms can have. */
+export function readsExposures(spec: FeatureSpec): boolean {
+  return EXPOSURE_KINDS.includes(spec.kind);
 }
 
-function toSpec(feature: LogisticFeature): FeatureSpec {
+/** Returns the checked feature, rejecting an unknown one and parameters out of range. */
+export function checkFeature(feature: LogisticFeature): FeatureSpec {
   if (typeof feature === "string") {
     if (!isIn(COUNTS, feature)) throw unknown(feature);
     return { kind: feature, values: [], label: feature };

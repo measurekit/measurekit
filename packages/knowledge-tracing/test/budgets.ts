@@ -12,6 +12,8 @@ const BUDGETS = {
   "elo.replay": 200,
   "logistic.afm": 200,
   "logistic.features": 300,
+  "logistic.fitItems": 700,
+  "logistic.fitManyItems": 6_000,
   "irt.replay": 2_000,
   "irt.drift": 1_000,
   "kst.blim": 200,

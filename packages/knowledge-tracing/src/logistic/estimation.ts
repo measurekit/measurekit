@@ -1,20 +1,20 @@
+import { DataError } from "@measurekit/core";
 import { isObserved, type ObservedEvent } from "../data/event.js";
 import type { EventLog } from "../data/event-log.js";
-import { entry } from "../data/record.js";
 import type { FlatDirection } from "../math/arrow-system.js";
-import { type GroupIntercepts, logisticRegression } from "../math/logistic-regression.js";
+import { type GroupIntercepts, logisticRegression, MAX_DENSE_COEFFICIENTS } from "../math/logistic-regression.js";
 import type { SparseMatrix } from "../math/sparse-matrix.js";
-import { type FeatureSpec, featureValue } from "./features.js";
-import type { LogisticParameters, Proficiency } from "./parameters.js";
-import { advanceState, type HistoryNeeds, type LogisticState } from "./state.js";
+import type { LogisticParameters, LogisticSkill, Proficiency } from "./parameters.js";
+import { advanceState, type LogisticState } from "./state.js";
+import { blockWidth, type InterceptKind, type TermSpec, type Terms, visitRow } from "./terms.js";
 
 /** What a fit depends on: the checked options of the model. */
 export interface FitSettings {
-  readonly specs: readonly FeatureSpec[];
-  /** What the features need a state to track. */
-  readonly needs: HistoryNeeds;
+  readonly terms: Terms;
   readonly proficiency: Proficiency;
   readonly ridge: number;
+  /** Whether to return the standard errors, which a fit without a ridge has. */
+  readonly standardErrors: boolean;
   readonly tolerance: number;
   readonly maxIterations: number;
 }
@@ -22,6 +22,8 @@ export interface FitSettings {
 /** The estimates of a fit, with what the fit reports of them. */
 export interface Estimates {
   readonly parameters: LogisticParameters;
+  /** The standard errors in the shape of the parameters; `null` unless asked, with a ridge and where singular. */
+  readonly standardErrors: LogisticParameters | null;
   readonly parameterCount: number;
   /** The Laplace approximation of the marginal log-likelihood, with a random intercept. */
   readonly marginal: number | null;
@@ -30,76 +32,91 @@ export interface Estimates {
 }
 
 /**
- * The design of a log: a sparse matrix with a row per event with an outcome, and the indices of the skills and learners
- * of those events.
+ * The design of a log: a sparse matrix with a row per event with an outcome, and the indices of the skills, items and
+ * learners of those events.
  */
 interface Design {
   readonly matrix: SparseMatrix;
-  /** The block of columns of each skill, in order of first appearance: the intercept, then one per feature. */
+  /** The first column of the block of each skill and of each item, in order of first appearance. */
   readonly skills: ReadonlyMap<string, number>;
+  readonly items: ReadonlyMap<string, number>;
   readonly learners: ReadonlyMap<string, number>;
   /** The learner of each row. */
   readonly rowLearners: Int32Array;
 }
 
 /**
- * Builds the design of a log, one row per event: for each of its skills, a column for the intercept and one per
- * feature, from the learner's history with the skill before the event.
+ * Builds the design of a log, one row per event. The columns are the shared coefficients' and the covariates', then the
+ * block of each skill and each item as it first appears: the intercept, if the model has one, and a column per term with
+ * a coefficient for each, from the learner's history before the event.
  */
-function designOf(log: EventLog, observed: number, { specs, needs }: FitSettings): Design {
-  const width = specs.length + 1;
+function designOf(log: EventLog, observed: number, terms: Terms): Design {
+  const widths = { skill: blockWidth(terms, "skill"), item: blockWidth(terms, "item") };
+  const sharedCount = terms.labels.shared.length;
   const skills = new Map<string, number>();
+  const items = new Map<string, number>();
   const learners = new Map<string, number>();
   const histories = new Map<string, LogisticState>();
   const rowStarts = [0];
   const columns: number[] = [];
   const values: number[] = [];
   const rowLearners = new Int32Array(observed);
+  let columnCount = sharedCount;
   let row = 0;
+  /** Returns the first column of a block, adding it at the first appearance. */
+  const blockOf = (blocks: Map<string, number>, id: string, size: number): number => {
+    let base = blocks.get(id);
+    if (base === undefined) {
+      base = columnCount;
+      columnCount += size;
+      blocks.set(id, base);
+    }
+    return base;
+  };
+  const push = (first: number, block: Float64Array): void => {
+    block.forEach((value, j) => {
+      if (value === 0) return;
+      columns.push(first + j);
+      values.push(value);
+    });
+  };
   for (const event of log) {
     const state = histories.get(event.learner) ?? { learner: event.learner, skills: {} };
-    if (!isObserved(event)) {
-      histories.set(event.learner, advanceState(state, event, needs));
-      continue;
-    }
-    const learner = learners.get(event.learner) ?? learners.size;
-    learners.set(event.learner, learner);
-    rowLearners[row++] = learner;
-    for (const skill of event.skills) {
-      const index = skills.get(skill) ?? skills.size;
-      skills.set(skill, index);
-      const history = entry(state.skills, skill);
-      const exposure = entry(state.exposures, skill);
-      columns.push(index * width);
-      values.push(1);
-      specs.forEach((spec, f) => {
-        const value = featureValue(spec, history, exposure, event.time, state.practice ?? 0);
-        if (value === 0) return;
-        columns.push(index * width + f + 1);
-        values.push(value);
+    if (isObserved(event)) {
+      const learner = learners.get(event.learner) ?? learners.size;
+      learners.set(event.learner, learner);
+      rowLearners[row++] = learner;
+      visitRow(terms, state, event, {
+        skill: (skill, block) => push(blockOf(skills, skill, widths.skill), block),
+        item: (item, block) => push(blockOf(items, item, widths.item), block),
+        shared: (block) => push(0, block),
       });
+      rowStarts.push(columns.length);
     }
-    rowStarts.push(columns.length);
-    histories.set(event.learner, advanceState(state, event, needs));
+    histories.set(event.learner, advanceState(state, event, terms.needs));
   }
   const matrix: SparseMatrix = {
-    columnCount: skills.size * width,
+    columnCount,
     rowStarts: Int32Array.from(rowStarts),
     columns: Int32Array.from(columns),
     values: Float64Array.from(values),
   };
-  return { matrix, skills, learners, rowLearners };
+  return { matrix, skills, items, learners, rowLearners };
 }
 
 /**
- * Returns the flat directions of fixed proficiencies. Events connect learners and skills into sets that share none: in
- * each set whose events all have m skills, raising its learners' θ by c and its skills' intercepts by -c/m changes no
- * prediction. Each set thus has its own direction, and its θ are comparable only among themselves.
+ * Returns the flat directions of fixed proficiencies. Events connect learners and the skills, or the items, whose
+ * intercepts the model has into sets that share none: in each set whose events all have m of them, raising its
+ * learners' θ by c and their intercepts by -c/m changes no prediction. Each set thus has its own direction, and its θ are
+ * comparable only among themselves.
  */
-function flatDirections(log: readonly ObservedEvent[], design: Design, width: number): FlatDirection[] {
-  const { matrix, skills, learners, rowLearners } = design;
-  // Union-find over the learners, then the skills, with path halving so that long chains of sets stay fast.
-  const parent = Int32Array.from({ length: learners.size + skills.size }, (_, i) => i);
+function flatDirections(log: readonly ObservedEvent[], design: Design, kind: InterceptKind): FlatDirection[] {
+  const { matrix, learners, rowLearners } = design;
+  const units = kind === "skill" ? design.skills : design.items;
+  const ordinals = new Map([...units.keys()].map((id, i) => [id, i]));
+  const unitsOf = (event: ObservedEvent): readonly string[] => (kind === "skill" ? event.skills : [event.item]);
+  // Union-find over the learners, then the units, with path halving so that long chains of sets stay fast.
+  const parent = Int32Array.from({ length: learners.size + units.size }, (_, i) => i);
   const find = (x: number): number => {
     let root = x;
     while (parent[root] !== root) {
@@ -109,29 +126,29 @@ function flatDirections(log: readonly ObservedEvent[], design: Design, width: nu
     return root;
   };
   log.forEach((event, row) => {
-    for (const skill of event.skills) {
-      parent[find(learners.size + (skills.get(skill) ?? 0))] = find(rowLearners[row] ?? 0);
-    }
+    for (const id of unitsOf(event))
+      parent[find(learners.size + (ordinals.get(id) ?? 0))] = find(rowLearners[row] ?? 0);
   });
-  // The number of skills of each set's events, or null when they differ.
-  const skillCounts = new Map<number, number | null>();
+  // The number of units of each set's events, or null when they differ.
+  const unitCounts = new Map<number, number | null>();
   log.forEach((event, row) => {
     const root = find(rowLearners[row] ?? 0);
-    const seen = skillCounts.has(root) ? skillCounts.get(root) : event.skills.length;
-    skillCounts.set(root, seen === event.skills.length ? seen : null);
+    const count = unitsOf(event).length;
+    const seen = unitCounts.has(root) ? unitCounts.get(root) : count;
+    unitCounts.set(root, seen === count ? seen : null);
   });
   const directions = new Map<number, { coefficients: Float64Array; groups: number[] }>();
   for (let learner = 0; learner < learners.size; learner++) {
     const root = find(learner);
-    if (skillCounts.get(root) === null) continue;
+    if (unitCounts.get(root) === null) continue;
     const direction = directions.get(root) ?? { coefficients: new Float64Array(matrix.columnCount), groups: [] };
     directions.set(root, direction);
     direction.groups.push(learner);
   }
-  for (const index of skills.values()) {
-    const root = find(learners.size + index);
+  for (const [id, column] of units) {
+    const root = find(learners.size + (ordinals.get(id) ?? 0));
     const direction = directions.get(root);
-    if (direction !== undefined) direction.coefficients[index * width] = -1 / (skillCounts.get(root) ?? 1);
+    if (direction !== undefined) direction.coefficients[column] = -1 / (unitCounts.get(root) ?? 1);
   }
   return [...directions.values()].map(({ coefficients, groups }) => ({
     coefficients,
@@ -139,42 +156,92 @@ function flatDirections(log: readonly ObservedEvent[], design: Design, width: nu
   }));
 }
 
+/** Returns the kind of intercept that fixed proficiencies are not identified apart from, or `null` for none. */
+function interceptOf({ intercepts }: Terms): InterceptKind | null {
+  if (intercepts.skill) return "skill";
+  return intercepts.item ? "item" : null;
+}
+
+/**
+ * Throws when a fit that solves with dense matrices has more coefficients than {@link MAX_DENSE_COEFFICIENTS}: those
+ * without a ridge, and with random proficiency.
+ */
+function checkDense(coefficients: number, proficiency: Proficiency, ridge: number): void {
+  if (coefficients <= MAX_DENSE_COEFFICIENTS) return;
+  if (proficiency === "random") {
+    throw new DataError(
+      `The fit has ${coefficients} coefficients, more than the ${MAX_DENSE_COEFFICIENTS} that a fit with random proficiency solves. Use the proficiency "fixed" or "none" with a ridge.`,
+    );
+  }
+  if (ridge === 0) {
+    throw new DataError(
+      `The fit has ${coefficients} coefficients, more than the ${MAX_DENSE_COEFFICIENTS} that a fit without a ridge solves. Add a ridge, which a fit of any size solves without the matrix of the coefficients, but which has no standard errors.`,
+    );
+  }
+}
+
+/** Returns the values of a vector over the design's columns in the shape of the parameters, without the learners. */
+function shapeOf(
+  design: Design,
+  terms: Terms,
+  values: ArrayLike<number>,
+): Pick<LogisticParameters, "skills" | "items" | "shared"> {
+  const block = (base: number, intercept: boolean, eachTerms: readonly TermSpec[]): LogisticSkill => ({
+    intercept: intercept ? (values[base] ?? 0) : 0,
+    coefficients: Object.fromEntries(
+      eachTerms.map((term, j) => [term.label, values[base + (intercept ? 1 : 0) + j] ?? 0]),
+    ),
+  });
+  const blocks = (
+    map: ReadonlyMap<string, number>,
+    kind: InterceptKind,
+    eachTerms: readonly TermSpec[],
+  ): Record<string, LogisticSkill> =>
+    Object.fromEntries([...map].map(([id, base]) => [id, block(base, terms.intercepts[kind], eachTerms)]));
+  const hasItems = terms.intercepts.item || terms.items.length > 0;
+  return {
+    skills: blocks(design.skills, "skill", terms.skills),
+    ...(hasItems && { items: blocks(design.items, "item", terms.items) }),
+    ...(terms.labels.shared.length > 0 && {
+      shared: Object.fromEntries(terms.labels.shared.map((label, j) => [label, values[j] ?? 0])),
+    }),
+  };
+}
+
 /** Fits the model's coefficients and learners' proficiencies to the events with an outcome of a log. */
 export function estimate(log: EventLog, settings: FitSettings): Estimates {
-  const { specs, proficiency, ridge, tolerance, maxIterations } = settings;
+  const { terms, proficiency, ridge, standardErrors: asked, tolerance, maxIterations } = settings;
   const observed = log.filter(isObserved);
-  const { matrix, skills, learners, rowLearners } = designOf(log, observed.length, settings);
-  const width = specs.length + 1;
-  const flats =
-    proficiency === "fixed" && ridge === 0
-      ? flatDirections(observed, { matrix, skills, learners, rowLearners }, width)
-      : [];
+  const design = designOf(log, observed.length, terms);
+  const { matrix, learners, rowLearners } = design;
+  checkDense(matrix.columnCount, proficiency, ridge);
+  const kind = interceptOf(terms);
+  const flats = proficiency === "fixed" && ridge === 0 && kind !== null ? flatDirections(observed, design, kind) : [];
   const grouping: GroupIntercepts | undefined =
     proficiency === "none" ? undefined : { indices: rowLearners, count: learners.size, kind: proficiency, flats };
   const fit = logisticRegression(
     matrix,
     Float64Array.from(observed, (event) => event.outcome),
-    { ...(grouping && { groups: grouping }), ridge, tolerance, maxIterations },
+    { ...(grouping && { groups: grouping }), ridge, standardErrors: asked, tolerance, maxIterations },
   );
-  const coefficient = (index: number, f: number): number => fit.coefficients[index * width + f] ?? 0;
+  const learnerValues = (values: ArrayLike<number>): Record<string, number> =>
+    Object.fromEntries([...learners].map(([learner, index]) => [learner, values[index] ?? 0]));
   const parameters: LogisticParameters = {
-    skills: Object.fromEntries(
-      [...skills].map(([skill, index]) => [
-        skill,
-        {
-          intercept: coefficient(index, 0),
-          coefficients: Object.fromEntries(specs.map((spec, f) => [spec.label, coefficient(index, f + 1)])),
-        },
-      ]),
-    ),
-    ...(proficiency !== "none" && {
-      learners: Object.fromEntries([...learners].map(([learner, index]) => [learner, fit.groupIntercepts[index] ?? 0])),
-    }),
+    ...shapeOf(design, terms, fit.coefficients),
+    ...(proficiency !== "none" && { learners: learnerValues(fit.groupIntercepts) }),
     ...(fit.sd !== null && { learnerSd: fit.sd }),
   };
+  const errors = fit.standardErrors;
   const learnerCount = { none: 0, fixed: learners.size - flats.length, random: 1 }[proficiency];
   return {
     parameters,
+    standardErrors:
+      errors === null
+        ? null
+        : {
+            ...shapeOf(design, terms, errors.coefficients),
+            ...(proficiency === "fixed" && { learners: learnerValues(errors.groups) }),
+          },
     parameterCount: matrix.columnCount + learnerCount,
     marginal: proficiency === "random" ? fit.logLikelihood : null,
     converged: fit.converged,
