@@ -11,7 +11,7 @@ runs only the TypeScript tests; R and Python run when fixtures change.
 
 ## References
 
-Fixtures were generated with R 4.6.1, pROC 1.19.1, lme4 2.1.0, LiblineaR 2.10-26, LKT 1.7.0, mirt 1.48, kst 0.5.6, pks
+Fixtures were generated with R 4.6.1, pROC 1.19.1, irr 0.85, lme4 2.1.0, LiblineaR 2.10-26, LKT 1.7.0, mirt 1.48, kst 0.5.6, pks
 0.8.0, DAKS 2.1.3, sets 1.0-25 and jsonlite 2.0.0, and Python 3.12.14 with pyBKT 1.4.3, NumPy 1.26.4, pandas 2.3.3 and
 scikit-learn 1.7.2.
 
@@ -27,6 +27,13 @@ scikit-learn 1.7.2.
 | Elo predictions, abilities, skill abilities, difficulties and log-likelihood   | Base R: the update equations written out and replayed event by event                        |
 | Held-out predictions of cross-validation                                       | Base R: a replay of the training events, then the test learners' events in time order       |
 | Time splits                                                                    | Base R: the block boundaries written out                                                    |
+| R² of predictions                                                              | Base R: 1 - Σ(y - p)² / Σ(y - ȳ)²                                                           |
+| Kappa of the predictions above 0.5                                             | `irr::kappa2` on the predictions above 0.5 and the outcomes                                 |
+| Test between models                                                            | `t.test(paired = TRUE)` of the two models' mean losses per learner                          |
+| Cross-validation with skills new to a test block                               | Base R: a replay of a model written out, leaving out the events of unseen skills            |
+| Metrics by opportunity                                                         | `pROC::auc` and base R by opportunity and skill                                             |
+| Power law of a learning curve                                                  | `lm(log(errorRate) ~ log(opportunity), weights = count)`                                    |
+| Categories of a learning curve                                                 | DataShop's rules, written out from its help page, version 11.4.0                            |
 
 The Elo script also checks its first update against the values derived by hand: from 0 and 0, P = 0.5 and U(0) = 1,
 so a correct answer raises the learner's ability to 0.5 and lowers the item's difficulty to -0.5, exactly.
@@ -325,6 +332,8 @@ Properties that hold for any input are tested with fast-check:
 
 - predictions and P(L) are probabilities from 0 to 1, and metrics are finite;
 - AUC is unchanged by increasing transformations of the predictions;
+- kappa is within -1 and 1, and R² is at most 1;
+- the power law recovers the scale and exponent of an exact power law, whatever the counts;
 - `update` and `updateItem` never change the state, the event or the model they are given;
 - learner states and item ratings stored as JSON continue exactly as the originals;
 - running `update` and `updateItem` after every event equals a replay by `fit`;
@@ -348,30 +357,35 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 
 ## Datasets
 
-| Fixture                         | Data                                                                                                                                                | Covers                                                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `math-functions.json`           | 18 probabilities from 1e-300 to 1 - 1e-10, 13 points from -30 to 30                                                                                 | Tails of the normal quantile and the logistic function                   |
-| `math-forward-backward.json`    | `set.seed(20261029)`: a knowledge tracing sequence of 7 steps, a 3-state sequence of 6, a single step                                               | Transitions that change by step, forgetting, one step                    |
-| `math-logistic-regression.json` | `set.seed(20261029)`: 800 rows, skill indicators, attempts and skill slopes                                                                         | 0/1 outcomes and outcomes in [0, 1]                                      |
-| `evaluate-metrics.json`         | A textbook case of 4; 400 predictions rounded to 0.01; 150 partial credit outcomes                                                                  | Ties, predictions of 0.5 and on bin bounds, partial credit               |
-| `evaluate-learning-curve.json`  | 30 learners, 15 events each on 12 items and 4 skills, some items with two skills                                                                    | Multiple skills per event, predicted error rates                         |
-| `elo-worked.json`               | 8 events of 2 learners: learner-item Elo with the default and a constant K; concept-specific Elo                                                    | Multiple skills, partial credit, events without skills, starting ratings |
-| `elo-holdout.json`              | 36 events of 6 learners on 4 items, times with ties; folds by learner, item and time                                                                | Training events before, between and after test events                    |
-| `elo-recovery.json`             | The simulation above                                                                                                                                | Recovery, a replay of 24,000 events                                      |
-| `bkt-practice.json`             | `default_rng(20261029)`: 40 learners in two prior groups, 20 attempts each at 9 items of 3 skills, one item with two skills                         | Every extension at fixed parameters and in EM; random starts             |
-| `bkt-recovery.json`             | The simulation above                                                                                                                                | Recovery, 20,000 events                                                  |
-| `bkt-opportunities.json`        | 14 cases of P(L), P(T), P(F) and threshold                                                                                                          | Forgetting, P(T) + P(F) ≥ 1, limits below the threshold                  |
-| `logistic-lkt.json`             | LKT's `samplelkt`: 1941 attempts of 17 learners at 143 skills, times from the durations                                                             | Every feature; ridge fits of AFM and PFA                                 |
-| `practice-mastery.json`         | `set.seed(20261029)`: 1500 events of 15 learners at 4 skills, items of 1 or 2 skills, 8% lessons, 10% outcomes of 0.5; the tables of 12 criteria    | Skills never mastered, lessons, partial credit, events of two skills     |
-| `logistic-lkt-features.json`    | LKT's `samplelkt` with seeded times: 1941 events of 17 learners with their durations; 16 features of LKT and 3 windows                              | Events at the same time not reached, gaps of 0 to 3 days                 |
-| `logistic-glm.json`             | `set.seed(20261029)`: 80 learners, 40 attempts each at 14 items of 5 skills, 4 items of two skills                                                  | Fixed, one-skill fixed, no and random proficiency                        |
-| `irt-abilities.json`            | The learners above                                                                                                                                  | Every item model, extreme patterns, a shifted prior and a coarser grid   |
-| `kst-structures.json`           | 6 surmise relations; pks's `DoignonFalmagne7` and `chess` `dst1`, a space with a gap, a structure that is not a space; a map of 5 items to 4 skills | Equivalent elements, spaces that are not learning spaces                 |
-| `kst-structure-tools.json`      | The 6 structures above and 8 random families of states; 8 families of generators of a closure                                                       | Spaces with a gap, structures that are not spaces, no path               |
-| `kst-structure-clauses.json`    | 15 clause systems of 2 to 7 elements, with the spaces that enumeration gives                                                                        | Cycles, an element that is its own clause, empty clauses                 |
-| `kst-blim.json`                 | `DoignonFalmagne7`: 1000 learners, 5 items, 9 states; `chess`: 92 learners, 16 items, 57 states                                                     | Rates at the bound, states of probability 0                              |
-| `kst-iita.json`                 | DAKS's `pisa`: 340 learners, 5 items; 3 sets of 300 learners and 7 items from `simu`                                                                | Every version, selection sets with conflicting pairs                     |
-| `kst-assessment.json`           | Every state of `DoignonFalmagne7` as the true one, answers drawn with pks's ML estimates                                                            | Stopping at 0.8, questions asked again                                   |
+| Fixture                         | Data                                                                                                                                                | Covers                                                                                      |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `math-functions.json`           | 18 probabilities from 1e-300 to 1 - 1e-10, 13 points from -30 to 30                                                                                 | Tails of the normal quantile and the logistic function                                      |
+| `math-forward-backward.json`    | `set.seed(20261029)`: a knowledge tracing sequence of 7 steps, a 3-state sequence of 6, a single step                                               | Transitions that change by step, forgetting, one step                                       |
+| `math-logistic-regression.json` | `set.seed(20261029)`: 800 rows, skill indicators, attempts and skill slopes                                                                         | 0/1 outcomes and outcomes in [0, 1]                                                         |
+| `evaluate-metrics.json`         | A textbook case of 4; 400 predictions rounded to 0.01; 150 partial credit outcomes                                                                  | Ties, predictions of 0.5 and on bin bounds, partial credit                                  |
+| `evaluate-learning-curve.json`  | 30 learners, 15 events each on 12 items and 4 skills, some items with two skills                                                                    | Multiple skills per event, predicted error rates                                            |
+| `evaluate-agreement.json`       | The cases above, a mean-outcome and a worse-than-mean prediction, outcomes all equal, one class predicted                                           | R² below 0, kappa -1, 0 and undefined                                                       |
+| `evaluate-comparison.json`      | `set.seed(20261029)`: 40 learners of 8 to 12 events, 7% lessons; folds by learner and two of three folds by item                                    | A learner in several test folds, events of a learner left untested                          |
+| `evaluate-unseen.json`          | `set.seed(20261029)`: 24 learners meet 4 skills in turn, 5 to 8 events each, with review items; 4 folds by time                                     | Test blocks with skills the training log lacks, a skipped event leaving its learner's state |
+| `evaluate-opportunity.json`     | `set.seed(20261029)`: 40 learners of 8 to 14 events on 12 items of 4 skills, 6% lessons, 5% of the rest without a prediction                        | Opportunities with one class, learner and skill pairs below the minimum                     |
+| `evaluate-curves.json`          | The curves above and 9 built to the cases; 8 sets of DataShop's thresholds                                                                          | Zero error rates, two points, a flat and a rising curve, every category                     |
+| `elo-worked.json`               | 8 events of 2 learners: learner-item Elo with the default and a constant K; concept-specific Elo                                                    | Multiple skills, partial credit, events without skills, starting ratings                    |
+| `elo-holdout.json`              | 36 events of 6 learners on 4 items, times with ties; folds by learner, item and time                                                                | Training events before, between and after test events                                       |
+| `elo-recovery.json`             | The simulation above                                                                                                                                | Recovery, a replay of 24,000 events                                                         |
+| `bkt-practice.json`             | `default_rng(20261029)`: 40 learners in two prior groups, 20 attempts each at 9 items of 3 skills, one item with two skills                         | Every extension at fixed parameters and in EM; random starts                                |
+| `bkt-recovery.json`             | The simulation above                                                                                                                                | Recovery, 20,000 events                                                                     |
+| `bkt-opportunities.json`        | 14 cases of P(L), P(T), P(F) and threshold                                                                                                          | Forgetting, P(T) + P(F) ≥ 1, limits below the threshold                                     |
+| `logistic-lkt.json`             | LKT's `samplelkt`: 1941 attempts of 17 learners at 143 skills, times from the durations                                                             | Every feature; ridge fits of AFM and PFA                                                    |
+| `practice-mastery.json`         | `set.seed(20261029)`: 1500 events of 15 learners at 4 skills, items of 1 or 2 skills, 8% lessons, 10% outcomes of 0.5; the tables of 12 criteria    | Skills never mastered, lessons, partial credit, events of two skills                        |
+| `logistic-lkt-features.json`    | LKT's `samplelkt` with seeded times: 1941 events of 17 learners with their durations; 16 features of LKT and 3 windows                              | Events at the same time not reached, gaps of 0 to 3 days                                    |
+| `logistic-glm.json`             | `set.seed(20261029)`: 80 learners, 40 attempts each at 14 items of 5 skills, 4 items of two skills                                                  | Fixed, one-skill fixed, no and random proficiency                                           |
+| `irt-abilities.json`            | The learners above                                                                                                                                  | Every item model, extreme patterns, a shifted prior and a coarser grid                      |
+| `kst-structures.json`           | 6 surmise relations; pks's `DoignonFalmagne7` and `chess` `dst1`, a space with a gap, a structure that is not a space; a map of 5 items to 4 skills | Equivalent elements, spaces that are not learning spaces                                    |
+| `kst-structure-tools.json`      | The 6 structures above and 8 random families of states; 8 families of generators of a closure                                                       | Spaces with a gap, structures that are not spaces, no path                                  |
+| `kst-structure-clauses.json`    | 15 clause systems of 2 to 7 elements, with the spaces that enumeration gives                                                                        | Cycles, an element that is its own clause, empty clauses                                    |
+| `kst-blim.json`                 | `DoignonFalmagne7`: 1000 learners, 5 items, 9 states; `chess`: 92 learners, 16 items, 57 states                                                     | Rates at the bound, states of probability 0                                                 |
+| `kst-iita.json`                 | DAKS's `pisa`: 340 learners, 5 items; 3 sets of 300 learners and 7 items from `simu`                                                                | Every version, selection sets with conflicting pairs                                        |
+| `kst-assessment.json`           | Every state of `DoignonFalmagne7` as the true one, answers drawn with pks's ML estimates                                                            | Stopping at 0.8, questions asked again                                                      |
 
 ## Tolerances
 
@@ -381,6 +395,11 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | Forward-backward quantities                                          | 1e-12 absolute                 | 9e-16                          |
 | Logistic regression coefficients and log-likelihood                  | 1e-10 absolute                 | 2e-13                          |
 | Metrics, calibration bins, learning curves                           | 1e-12 absolute                 | 3e-16                          |
+| R² and kappa                                                         | 1e-12 absolute                 | 2e-15                          |
+| Test between models                                                  | 1e-9 absolute                  | 3e-15                          |
+| Cross-validation with skills new to a test block                     | 1e-12 absolute                 | 4e-16                          |
+| Metrics by opportunity                                               | 1e-12 absolute                 | 3e-16                          |
+| Power laws of learning curves                                        | 1e-10 absolute                 | 4e-16                          |
 | Elo predictions, estimates and log-likelihood                        | 1e-12 absolute                 | 2e-15                          |
 | Held-out Elo predictions                                             | 1e-12 absolute                 | 1e-16                          |
 | BKT P(correct) and P(L) at fixed parameters                          | 1e-13 absolute                 | 2.3e-14                        |

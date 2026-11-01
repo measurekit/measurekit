@@ -32,3 +32,10 @@ skill's history gains a field only when a feature reads it, and `basePractice` r
 Mastery criteria over a log are the probability of mastery (`thresholdMastery`), a streak (`streakMastery`), a moving
 average (`movingAverageMastery`), a window of outcomes (`windowMastery`) and a predicted success (`predictedMastery`),
 which serves logistic models and Elo.
+
+Evaluation reports R² and Cohen's kappa beside AUC, RMSE, log-loss and accuracy. `crossValidate` and `compareModels`
+take `unseenSkills: "skip"`, which leaves out the test events of skills that the training log has no outcome of, as a
+split by time of a curriculum gives, so that BKT and logistic models can be evaluated on it. `compareByLearner` tests
+whether two models predict differently well, with a paired t test of their losses averaged per learner.
+`metricsByOpportunity` gives the metrics by opportunity, `learningCurve` takes `predictions` and `minOpportunities` in
+an options object, and `powerLawFit` and `categorizeCurve` fit a curve's power law and give DataShop's category of it.

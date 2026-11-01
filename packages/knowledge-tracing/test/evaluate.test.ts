@@ -2,8 +2,12 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   accuracy,
+  afm,
   auc,
+  bkt,
   calibration,
+  categorizeCurve,
+  compareByLearner,
   compareModels,
   createRandom,
   crossValidate,
@@ -12,25 +16,105 @@ import {
   elo,
   eventLog,
   type Fold,
+  kappa,
   type LearnerModel,
+  type LearningCurvePoint,
   learningCurve,
   logLoss,
+  type Metrics,
   metrics,
+  metricsByOpportunity,
   observedPairs,
+  powerLawFit,
   rmse,
+  rSquared,
   splitByItem,
   splitByLearner,
   splitByTime,
 } from "../src/index.js";
 import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
+import agreement from "./fixtures/evaluate-agreement.json" with { type: "json" };
+import comparison from "./fixtures/evaluate-comparison.json" with { type: "json" };
+import powerLaws from "./fixtures/evaluate-curves.json" with { type: "json" };
 import curves from "./fixtures/evaluate-learning-curve.json" with { type: "json" };
 import fixture from "./fixtures/evaluate-metrics.json" with { type: "json" };
+import opportunities from "./fixtures/evaluate-opportunity.json" with { type: "json" };
+import unseen from "./fixtures/evaluate-unseen.json" with { type: "json" };
 import { allPredicted, defined, expectAllClose, expectClose } from "./helpers.js";
 
 /** Absolute tolerance of metrics, calibration bins and learning curves against R. */
 const METRIC_TOLERANCE = 1e-12;
 /** Absolute tolerance of held-out Elo predictions against R. */
 const PREDICTION_TOLERANCE = 1e-12;
+/** Absolute tolerance of the test between models against `t.test`. */
+const TEST_TOLERANCE = 1e-9;
+/** Absolute tolerance of power laws against `lm`. */
+const CURVE_TOLERANCE = 1e-10;
+
+/** A model written outside the package from its steps; there is nothing for its fit to estimate. */
+function fromSteps<TState>(
+  steps: Pick<LearnerModel<TState>, "initialState" | "update" | "predict">,
+): LearnerModel<TState> {
+  const model: LearnerModel<TState> = {
+    ...steps,
+    parameters: null,
+    fit(log) {
+      const states = new Map<string, TState>();
+      const predictions = log.map((event) => {
+        const state = states.get(event.learner) ?? steps.initialState(event.learner);
+        states.set(event.learner, steps.update(state, event));
+        return event.outcome === null ? null : steps.predict(state, event);
+      });
+      return {
+        model,
+        states: Object.fromEntries(states),
+        predictions,
+        logLikelihood: 0,
+        aic: null,
+        bic: null,
+        converged: true,
+        iterations: 1,
+      };
+    },
+  };
+  return model;
+}
+
+/** The answers and correct answers of a learner so far. */
+interface Tally {
+  readonly answered: number;
+  readonly correct: number;
+}
+
+/** P(correct) = (1 + correct) / (2 + answered) over the learner's own events with an outcome, whatever the skill. */
+function laplace(): LearnerModel<Tally> {
+  return fromSteps<Tally>({
+    initialState: () => ({ answered: 0, correct: 0 }),
+    update: (state, event) =>
+      event.outcome === null ? state : { answered: state.answered + 1, correct: state.correct + event.outcome },
+    predict: (state) => (1 + state.correct) / (2 + state.answered),
+  });
+}
+
+/** A model that predicts what a table gives for the time of the attempt, whoever the learner is. */
+function scripted(table: readonly (number | null)[]): LearnerModel<null> {
+  return fromSteps<null>({
+    initialState: () => null,
+    update: () => null,
+    predict: (_, attempt) => defined(table[attempt.time - 1]),
+  });
+}
+
+/** Returns the folds a fixture lists, as indices into its log. */
+function foldsOf(
+  log: EventLog,
+  indices: readonly { readonly train: readonly number[]; readonly test: readonly number[] }[],
+): Fold[] {
+  return indices.map((fold) => ({
+    train: fold.train.map((index) => defined(log[index])),
+    test: fold.test.map((index) => defined(log[index])),
+  }));
+}
 
 /** A model written outside the package: every learner answers correctly at the rate of the training log. */
 function baseRate(rate = 0.5): LearnerModel<string, { rate: number }> {
@@ -58,6 +142,38 @@ function baseRate(rate = 0.5): LearnerModel<string, { rate: number }> {
     update: (state) => state,
     predict: () => rate,
   };
+}
+
+/** The metrics of a reference. */
+interface ReferenceMetrics {
+  readonly count: number;
+  readonly auc: number | null;
+  readonly rmse: number;
+  readonly logLoss: number;
+  readonly accuracy: number | null;
+  readonly rSquared: number | null;
+  readonly kappa: number | null;
+}
+
+/** A point of a reference learning curve. */
+interface ReferencePoint {
+  readonly opportunity: number;
+  readonly count: number;
+  readonly errorRate: number;
+  readonly predictedErrorRate: number | null;
+}
+
+/** Expects metrics to be the reference's, or both to be `null`. */
+function expectMetrics(actual: Metrics | null, expected: ReferenceMetrics | null, label: string): void {
+  if (expected === null) {
+    expect(actual, label).toBeNull();
+    return;
+  }
+  const table = defined(actual);
+  expect(table.count, label).toBe(expected.count);
+  for (const key of ["auc", "rmse", "logLoss", "accuracy", "rSquared", "kappa"] as const) {
+    expectClose(table[key], expected[key], METRIC_TOLERANCE, `${label} ${key}`);
+  }
 }
 
 describe("metrics against R", () => {
@@ -88,6 +204,58 @@ describe("metrics against R", () => {
         expectClose(bin.meanOutcome, target.meanOutcome, METRIC_TOLERANCE, `bin ${index}`);
       });
     }
+  });
+});
+
+describe("R² and kappa against R", () => {
+  it.each(agreement.cases)("match base R and irr: $name", (reference) => {
+    const { predictions, outcomes } = reference;
+    expectMetrics(metrics(predictions, outcomes), reference, "metrics");
+    if (reference.rSquared === null) expect(() => rSquared(predictions, outcomes)).toThrow(DataError);
+    else expectClose(rSquared(predictions, outcomes), reference.rSquared, METRIC_TOLERANCE, "rSquared()");
+    if (reference.kappa === null) expect(() => kappa(predictions, outcomes)).toThrow(DataError);
+    else expectClose(kappa(predictions, outcomes), reference.kappa, METRIC_TOLERANCE, "kappa()");
+  });
+
+  it("explain nothing with the mean outcome, and less than nothing with worse predictions", () => {
+    expect(rSquared([0.5, 0.5, 0.5, 0.5], [1, 0, 0.5, 0.5])).toBe(0);
+    expect(rSquared([0.5, 0.5], [0, 1])).toBe(0);
+    expect(rSquared([1, 0], [1, 0])).toBe(1);
+    expect(rSquared([0, 1], [1, 0])).toBe(-3);
+  });
+
+  it("give a kappa of 1 for predictions that agree with the outcomes, and -1 for the opposite", () => {
+    expect(kappa([0.9, 0.1, 0.8, 0.2], [1, 0, 1, 0])).toBe(1);
+    expect(kappa([0.1, 0.9, 0.2, 0.8], [1, 0, 1, 0])).toBe(-1);
+  });
+
+  it("leave R² and kappa undefined where they have no meaning: a DataError, or null in the table", () => {
+    expect(() => rSquared([0.2, 0.9], [1, 1])).toThrow("R² needs outcomes that are not all equal; all 2 are 1.");
+    expect(() => kappa([0.5], [0.5])).toThrow("Kappa needs outcomes of 0 or 1, not partial credit.");
+    expect(() => kappa([0.9, 0.8], [1, 1])).toThrow(
+      "Kappa is undefined when every prediction and every outcome is correct.",
+    );
+    expect(() => kappa([0.1, 0.2], [0, 0])).toThrow(
+      "Kappa is undefined when every prediction and every outcome is incorrect.",
+    );
+    expect(metrics([0.5, 0.2], [0.5, 0.5])).toMatchObject({ rSquared: null, kappa: null });
+  });
+
+  it("keep kappa within -1 and 1, and R² at most 1", () => {
+    const rows = fc.array(fc.record({ p: fc.double({ min: 0, max: 1, noNaN: true }), y: fc.constantFrom(0, 1) }), {
+      minLength: 1,
+      maxLength: 60,
+    });
+    fc.assert(
+      fc.property(rows, (data) => {
+        const table = metrics(
+          data.map((row) => row.p),
+          data.map((row) => row.y),
+        );
+        if (table.kappa !== null) expect(Math.abs(table.kappa)).toBeLessThanOrEqual(1 + 1e-12);
+        if (table.rSquared !== null) expect(table.rSquared).toBeLessThanOrEqual(1 + 1e-12);
+      }),
+    );
   });
 });
 
@@ -137,6 +305,8 @@ describe("metrics", () => {
       rmse: rmse([0.2, 0.9], [1, 1]),
       logLoss: logLoss([0.2, 0.9], [1, 1]),
       accuracy: 0.5,
+      rSquared: null,
+      kappa: 0,
     });
   });
 
@@ -222,6 +392,111 @@ describe("crossValidate", () => {
   });
 });
 
+describe("crossValidate with skills the training log has no outcome of", () => {
+  const log = eventLog(unseen.events);
+  const folds = foldsOf(log, unseen.folds);
+
+  it("splits the curriculum by time at the blocks that R forms", () => {
+    expect(splitByTime(log, 4)).toEqual(folds);
+  });
+
+  it.each(["throw", "skip"] as const)("predicts as R does with unseenSkills %s", (mode) => {
+    const reference = unseen[mode];
+    const evaluation = crossValidate(laplace(), folds, { unseenSkills: mode });
+    expect(evaluation.folds).toHaveLength(reference.folds.length);
+    evaluation.folds.forEach((fold, index) => {
+      const expected = defined(reference.folds[index]);
+      expect(fold.skipped, `skipped ${index}`).toBe(expected.skipped);
+      expect(fold.predictions.map((p) => p === null)).toEqual(expected.predictions.map((p) => p === null));
+      expectAllClose(
+        fold.predictions.map((p) => p ?? 0),
+        expected.predictions.map((p) => p ?? 0),
+        PREDICTION_TOLERANCE,
+        `fold ${index}`,
+      );
+      expectMetrics(fold.metrics, expected.metrics, `fold ${index}`);
+    });
+    expectMetrics(evaluation.metrics, reference.metrics, "pooled");
+  });
+
+  it("skips a different share of the test events from the folds, only under skip", () => {
+    const skipped = (mode: "throw" | "skip") =>
+      crossValidate(laplace(), folds, { unseenSkills: mode }).folds.map((fold) => fold.skipped);
+    expect(skipped("throw")).toEqual([0, 0, 0, 0]);
+    expect(skipped("skip").every((count, index) => count === defined(unseen.skip.folds[index]).skipped)).toBe(true);
+    expect(skipped("skip").reduce((sum, count) => sum + count, 0)).toBeGreaterThan(0);
+    expect(crossValidate(laplace(), folds)).toEqual(crossValidate(laplace(), folds, { unseenSkills: "throw" }));
+  });
+
+  it("lets BKT and AFM, which have parameters for the seen skills only, be evaluated by skipping the others", () => {
+    const evaluateBySkipping = <TState>(model: LearnerModel<TState>): void => {
+      expect(() => crossValidate(model, folds)).toThrow(DataError);
+      const evaluation = crossValidate(model, folds, { unseenSkills: "skip" });
+      expect(evaluation.folds.map((fold) => fold.skipped)).toEqual(unseen.skip.folds.map((fold) => fold.skipped));
+      expect(evaluation.metrics.count).toBe(unseen.skip.metrics.count);
+    };
+    evaluateBySkipping(bkt());
+    evaluateBySkipping(afm());
+  });
+
+  it("predicts a skill new to a test block with Elo, which starts it from its initial ability", () => {
+    const evaluation = crossValidate(elo({ skills: true }), folds);
+    expect(evaluation.metrics.count).toBe(unseen.throw.metrics.count);
+  });
+
+  it("counts a skill met only through a lesson as unseen, and an event without skills as seen", () => {
+    const small = eventLog([
+      { learner: "a", item: "video", skills: ["s"], time: 1, outcome: null },
+      { learner: "a", item: "q1", skills: ["t"], time: 2, outcome: 1 },
+      { learner: "a", item: "q2", skills: ["s"], time: 3, outcome: 1 },
+      { learner: "a", item: "q3", skills: [], time: 4, outcome: 0 },
+    ]);
+    const fold = { train: small.slice(0, 2), test: small.slice(2) };
+    const evaluation = crossValidate(laplace(), [fold], { unseenSkills: "skip" });
+    // The skipped event leaves the learner's state: 1 correct of 1 answered, not 2 of 2.
+    expect(defined(evaluation.folds[0])).toEqual({
+      predictions: [null, 2 / 3],
+      metrics: metrics([2 / 3], [0]),
+      skipped: 1,
+    });
+  });
+
+  it("refuses a run whose test events with an outcome are all skipped", () => {
+    const small = eventLog([
+      { learner: "a", item: "q1", skills: ["t"], time: 1, outcome: 1 },
+      { learner: "a", item: "q2", skills: ["s"], time: 2, outcome: 1 },
+      { learner: "a", item: "q3", skills: ["s"], time: 3, outcome: null },
+    ]);
+    expect(() =>
+      crossValidate(laplace(), [{ train: small.slice(0, 1), test: small.slice(1) }], { unseenSkills: "skip" }),
+    ).toThrow(
+      "Cross-validation needs a test event with a prediction; unseenSkills skipped all 1 test events with an outcome.",
+    );
+  });
+
+  it("gives every model of a comparison the same skipped events", () => {
+    const rows = compareModels({ laplace: laplace(), elo: elo({ skills: true }) }, folds, { unseenSkills: "skip" });
+    for (const row of rows)
+      expect(row.folds.map((fold) => fold.skipped)).toEqual(unseen.skip.folds.map((f) => f.skipped));
+    const [first, second] = rows;
+    first?.folds.forEach((fold, index) => {
+      expect(fold.predictions.map((p) => p === null)).toEqual(
+        defined(second?.folds[index]).predictions.map((p) => p === null),
+      );
+    });
+  });
+
+  it("rejects an option that is not one of the choices", () => {
+    expect(() => crossValidate(laplace(), folds, { unseenSkills: JSON.parse('"drop"') })).toThrow(
+      'The option unseenSkills must be "throw" or "skip", found "drop".',
+    );
+    expect(() => crossValidate(laplace(), folds, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => crossValidate(laplace(), folds, { unseenSkills: JSON.parse("null") })).toThrow(DataError);
+  });
+});
+
 describe("compareModels", () => {
   it("evaluates every model on the same folds, in the order given", () => {
     const folds = splitByLearner(eventLog(holdout.events), 2, createRandom(3));
@@ -241,11 +516,189 @@ describe("compareModels", () => {
   });
 });
 
+describe("compareByLearner", () => {
+  const log = eventLog(comparison.events);
+  const first = scripted(comparison.predictions.first);
+  const second = scripted(comparison.predictions.second);
+
+  it.each(comparison.cases)("matches t.test over the learners' mean losses: $name", (reference) => {
+    const folds = foldsOf(log, reference.folds);
+    const one = crossValidate(first, folds);
+    const two = crossValidate(second, folds);
+    for (const expected of reference.tests) {
+      const result = compareByLearner(one, two, folds, { loss: expected.loss === "squared" ? "squared" : "log" });
+      const label = expected.loss;
+      expect(result.learners, label).toBe(expected.learners);
+      expect(result.degreesOfFreedom, label).toBe(expected.degreesOfFreedom);
+      expectClose(result.meanDifference, expected.meanDifference, TEST_TOLERANCE, `${label} difference`);
+      expectClose(result.standardError, expected.standardError, TEST_TOLERANCE, `${label} standard error`);
+      expectClose(result.statistic, expected.statistic, TEST_TOLERANCE, `${label} statistic`);
+      expectClose(result.pValue, expected.pValue, TEST_TOLERANCE, `${label} p-value`);
+    }
+  });
+
+  it("compares by log loss unless asked for the squared one", () => {
+    const folds = foldsOf(log, defined(comparison.cases[0]).folds);
+    const one = crossValidate(first, folds);
+    const two = crossValidate(second, folds);
+    expect(compareByLearner(one, two, folds)).toEqual(compareByLearner(one, two, folds, { loss: "log" }));
+    expect(compareByLearner(one, two, folds)).not.toEqual(compareByLearner(one, two, folds, { loss: "squared" }));
+  });
+
+  it("negates the difference and the statistic, and keeps the p-value, when the models swap", () => {
+    const folds = foldsOf(log, defined(comparison.cases[1]).folds);
+    const one = crossValidate(first, folds);
+    const two = crossValidate(second, folds);
+    const forward = compareByLearner(one, two, folds);
+    const backward = compareByLearner(two, one, folds);
+    expectClose(backward.meanDifference, -defined(forward.meanDifference), 1e-14);
+    expectClose(backward.statistic, -defined(forward.statistic), 1e-12);
+    expectClose(backward.standardError, forward.standardError, 1e-14);
+    expectClose(backward.pValue, forward.pValue, 1e-14);
+  });
+
+  it("leaves a model's test against itself without a statistic, with a difference and error of 0", () => {
+    const folds = foldsOf(log, defined(comparison.cases[0]).folds);
+    const one = crossValidate(first, folds);
+    expect(compareByLearner(one, one, folds)).toEqual({
+      learners: 40,
+      meanDifference: 0,
+      standardError: 0,
+      statistic: null,
+      degreesOfFreedom: 39,
+      pValue: null,
+    });
+  });
+
+  describe("on three events", () => {
+    const small = eventLog([
+      { learner: "a", item: "q", skills: [], time: 1, outcome: 1 },
+      { learner: "b", item: "q", skills: [], time: 2, outcome: 1 },
+      { learner: "c", item: "q", skills: [], time: 3, outcome: 0 },
+    ]);
+    const fold = { train: small, test: small };
+    const evaluate = (table: readonly number[]) => crossValidate(scripted(table), [fold]);
+
+    it("tests squared losses by hand: differences of 0.75, 0 and 0 have a mean of 0.25 and an error of 0.25", () => {
+      const result = compareByLearner(evaluate([0, 0.5, 0.5]), evaluate([0.5, 0.5, 0.5]), [fold], { loss: "squared" });
+      expect(result.learners).toBe(3);
+      expectClose(result.meanDifference, 0.25, 1e-15);
+      expectClose(result.standardError, 0.25, 1e-15);
+      expectClose(result.statistic, 1, 1e-14);
+      // P(|T| > 1) with 2 degrees of freedom is 1 - 1 / √3.
+      expectClose(result.pValue, 1 - 1 / Math.sqrt(3), 1e-12);
+    });
+
+    it("has no test where a certain prediction is wrong, as its log loss is infinite", () => {
+      const result = compareByLearner(evaluate([0, 0.5, 0.5]), evaluate([0.5, 0.5, 0.5]), [fold]);
+      expect(result).toEqual({
+        learners: 3,
+        meanDifference: null,
+        standardError: null,
+        statistic: null,
+        degreesOfFreedom: 2,
+        pValue: null,
+      });
+    });
+
+    it("has a difference but no variance for one learner", () => {
+      const alone = { train: small.slice(0, 1), test: small.slice(0, 1) };
+      const result = compareByLearner(
+        crossValidate(scripted([0.9]), [alone]),
+        crossValidate(scripted([0.6]), [alone]),
+        [alone],
+        { loss: "squared" },
+      );
+      expect(result).toEqual({
+        learners: 1,
+        meanDifference: expect.closeTo(0.01 - 0.16, 14),
+        standardError: null,
+        statistic: null,
+        degreesOfFreedom: 0,
+        pValue: null,
+      });
+    });
+
+    it("uses the events that both models predicted, and refuses when there are none", () => {
+      const evaluation = (predictions: readonly (number | null)[]) => ({
+        folds: [{ predictions, metrics: null, skipped: predictions.filter((p) => p === null).length }],
+        metrics: metrics([0.5], [1]),
+      });
+      const result = compareByLearner(evaluation([0.9, null, 0.2]), evaluation([0.5, 0.5, null]), [fold], {
+        loss: "squared",
+      });
+      expect(result.learners).toBe(1);
+      expectClose(result.meanDifference, 0.01 - 0.25, 1e-14);
+      expect(() => compareByLearner(evaluation([null, null, null]), evaluation([0.5, 0.5, 0.5]), [fold])).toThrow(
+        "A comparison needs a test event with an outcome that both models predicted; found none.",
+      );
+    });
+  });
+
+  it("rejects evaluations that do not belong to the folds, and options that are not valid", () => {
+    const folds = foldsOf(log, defined(comparison.cases[1]).folds);
+    const one = crossValidate(first, folds);
+    const two = crossValidate(second, folds);
+    expect(() => compareByLearner(one, two, folds.slice(0, 1))).toThrow(
+      "The first evaluation has 2 folds, but 1 were given.",
+    );
+    expect(() =>
+      compareByLearner(
+        one,
+        two,
+        folds.map((fold) => ({ ...fold, test: fold.test.slice(1) })),
+      ),
+    ).toThrow(
+      `Found ${defined(one.folds[0]).predictions.length} predictions for ${defined(folds[0]).test.length - 1} events.`,
+    );
+    expect(() => compareByLearner(one, two, folds, { loss: JSON.parse('"hinge"') })).toThrow(
+      'The option loss must be "log" or "squared", found "hinge".',
+    );
+    expect(() => compareByLearner(one, two, folds, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => compareByLearner(JSON.parse("null"), two, folds)).toThrow(
+      "The first evaluation must be an object returned by crossValidate, found null.",
+    );
+    expect(() => compareByLearner(one, JSON.parse('{"folds": 1}'), folds)).toThrow(
+      "The second evaluation must have an array of folds, found 1.",
+    );
+    expect(() => compareByLearner(one, two, JSON.parse('"folds"'))).toThrow(
+      "The folds must be an array of folds, found",
+    );
+  });
+});
+
+describe("comparing Q-matrices", () => {
+  const items = ["q1", "q2", "q3", "q4"];
+  const events = ["ana", "budi", "citra", "dewi", "eka", "fiona"].flatMap((learner, i) =>
+    items.map((item, j) => ({ learner, item, time: 10 * i + j, outcome: (i * 3 + j * 5) % 7 < 4 ? 1 : 0 })),
+  );
+  // The same items with two readings of their skills.
+  const coarse = { q1: ["math"], q2: ["math"], q3: ["math"], q4: ["math"] };
+  const fine = { q1: ["add"], q2: ["add"], q3: ["multiply"], q4: ["multiply"] };
+
+  it("compares two logs of the same events by the learners, with one seed for the folds", () => {
+    const [coarseLog, fineLog] = [coarse, fine].map((qMatrix) => eventLog(events, { qMatrix }));
+    const coarseFolds = splitByLearner(defined(coarseLog), 3, createRandom(7));
+    const fineFolds = splitByLearner(defined(fineLog), 3, createRandom(7));
+    expect(coarseFolds.map((fold) => fold.test.map((event) => event.learner))).toEqual(
+      fineFolds.map((fold) => fold.test.map((event) => event.learner)),
+    );
+    const model = { elo: elo({ skills: true }) };
+    const [coarseRow] = compareModels(model, coarseFolds);
+    const [fineRow] = compareModels(model, fineFolds);
+    const result = compareByLearner(defined(coarseRow), defined(fineRow), coarseFolds);
+    expect(result.learners).toBe(6);
+    expect(result.degreesOfFreedom).toBe(5);
+  });
+});
+
 describe("learningCurve", () => {
   const log = eventLog(curves.events);
 
   it("matches base R's error rates by opportunity, over all skills and per skill", () => {
-    const curve = learningCurve(log, curves.predictions);
+    const curve = learningCurve(log, { predictions: curves.predictions });
     const expectPoints = (actual: typeof curve.overall, expected: typeof curves.overall, label: string): void => {
       expect(
         actual.map((point) => [point.opportunity, point.count]),
@@ -269,13 +722,245 @@ describe("learningCurve", () => {
     expect(curve.overall.every((point) => point.predictedErrorRate === null)).toBe(true);
   });
 
+  it.each(opportunities.curves)(
+    "matches base R's curves of learner and skill pairs with at least $minOpportunities opportunities",
+    ({ minOpportunities, curve: reference }) => {
+      const events = eventLog(opportunities.events);
+      const curve = learningCurve(events, { predictions: opportunities.predictions, minOpportunities });
+      const expectPoints = (actual: typeof curve.overall, expected: readonly ReferencePoint[], label: string): void => {
+        expect(
+          actual.map((point) => [point.opportunity, point.count]),
+          label,
+        ).toEqual(expected.map((point) => [point.opportunity, point.count]));
+        actual.forEach((point, index) => {
+          const target = defined(expected[index]);
+          expectClose(point.errorRate, target.errorRate, METRIC_TOLERANCE, `${label} ${index}`);
+          expectClose(point.predictedErrorRate, target.predictedErrorRate, METRIC_TOLERANCE, `${label} ${index}`);
+        });
+      };
+      expectPoints(curve.overall, reference.overall, "overall");
+      expect(Object.keys(curve.skills).toSorted()).toEqual(Object.keys(reference.skills).toSorted());
+      for (const [skill, points] of Object.entries(reference.skills)) {
+        expectPoints(defined(curve.skills[skill]), points, skill);
+      }
+    },
+  );
+
+  it("keeps only learner and skill pairs with enough practice, at every opportunity", () => {
+    const small = eventLog([
+      { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 0 },
+      { learner: "a", item: "q", skills: ["s"], time: 2, outcome: 1 },
+      { learner: "b", item: "q", skills: ["s"], time: 3, outcome: 1 },
+    ]);
+    expect(learningCurve(small).overall).toEqual([
+      { opportunity: 1, count: 2, errorRate: 0.5, predictedErrorRate: null },
+      { opportunity: 2, count: 1, errorRate: 0, predictedErrorRate: null },
+    ]);
+    expect(learningCurve(small, { minOpportunities: 2 }).overall).toEqual([
+      { opportunity: 1, count: 1, errorRate: 1, predictedErrorRate: null },
+      { opportunity: 2, count: 1, errorRate: 0, predictedErrorRate: null },
+    ]);
+  });
+
+  it("rejects a minimum that is not a positive integer, or that no learner and skill reaches", () => {
+    expect(() => learningCurve(log, { minOpportunities: 0 })).toThrow(
+      "The option minOpportunities must be a positive integer, found 0.",
+    );
+    expect(() => learningCurve(log, { minOpportunities: 1000 })).toThrow(
+      "A learning curve needs a learner and skill with at least 1000 opportunities; none has.",
+    );
+    expect(() => learningCurve(log, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+  });
+
   it("rejects a log without skills and predictions that are not one per event", () => {
     const plain = eventLog([{ learner: "ana", item: "q1", time: 0, outcome: 1 }]);
     expect(() => learningCurve(plain)).toThrow(
       "A learning curve needs events with skills; no event of the log has any.",
     );
-    expect(() => learningCurve(log, [0.5])).toThrow(`Found 1 predictions for ${log.length} events.`);
+    expect(() => learningCurve(log, { predictions: [0.5] })).toThrow(`Found 1 predictions for ${log.length} events.`);
     expect(() => learningCurve([])).toThrow("A log needs at least one event.");
+  });
+});
+
+describe("metricsByOpportunity", () => {
+  const log = eventLog(opportunities.events);
+  const reference = defined(opportunities.curves[0]).curve;
+
+  it("matches pROC and base R by opportunity, over all skills and for each skill", () => {
+    const table = metricsByOpportunity(log, opportunities.predictions);
+    const expectPoints = (
+      actual: typeof table.overall,
+      expected: readonly { readonly opportunity: number; readonly metrics: ReferenceMetrics | null }[],
+      label: string,
+    ): void => {
+      expect(actual.map((point) => point.opportunity)).toEqual(expected.map((point) => point.opportunity));
+      actual.forEach((point, index) => {
+        expectMetrics(point.metrics, defined(expected[index]).metrics, `${label} ${index}`);
+      });
+    };
+    expectPoints(table.overall, reference.overall, "overall");
+    expect(Object.keys(table.skills).toSorted()).toEqual(Object.keys(reference.skills).toSorted());
+    for (const [skill, points] of Object.entries(reference.skills)) {
+      expectPoints(defined(table.skills[skill]), points, skill);
+    }
+  });
+
+  it("has the opportunities of the learning curve, and metrics null where no event has a prediction", () => {
+    const table = metricsByOpportunity(log, opportunities.predictions);
+    const curve = learningCurve(log, { predictions: opportunities.predictions });
+    expect(table.overall.map((point) => point.opportunity)).toEqual(curve.overall.map((point) => point.opportunity));
+    expect(Object.keys(table.skills)).toEqual(Object.keys(curve.skills));
+    expect(table.overall.some((point) => point.metrics === null)).toBe(false);
+    const none = metricsByOpportunity(
+      log,
+      opportunities.predictions.map(() => null),
+    );
+    expect(none.overall.every((point) => point.metrics === null)).toBe(true);
+    expect(none.overall).toHaveLength(curve.overall.length);
+  });
+
+  it("counts an event of two skills at an opportunity of each, and leaves out lessons and events without skills", () => {
+    const small = eventLog([
+      { learner: "a", item: "q1", skills: ["s", "t"], time: 1, outcome: 1 },
+      { learner: "a", item: "video", skills: ["s"], time: 2, outcome: null },
+      { learner: "a", item: "q2", skills: [], time: 3, outcome: 0 },
+      { learner: "a", item: "q3", skills: ["s"], time: 4, outcome: 0 },
+    ]);
+    const table = metricsByOpportunity(small, [0.8, null, 0.5, 0.3]);
+    expect(table.overall.map((point) => point.metrics?.count)).toEqual([2, 1]);
+    expect(table.skills.s?.map((point) => point.metrics?.count)).toEqual([1, 1]);
+    expect(table.skills.t?.map((point) => point.metrics?.count)).toEqual([1]);
+    expect(table.overall[0]?.metrics).toEqual(metrics([0.8, 0.8], [1, 1]));
+  });
+
+  it("rejects a log without skills and predictions that are not one per event", () => {
+    const plain = eventLog([{ learner: "ana", item: "q1", time: 0, outcome: 1 }]);
+    expect(() => metricsByOpportunity(plain, [0.5])).toThrow(
+      "Metrics by opportunity need events with skills; no event of the log has any.",
+    );
+    expect(() => metricsByOpportunity(log, [0.5])).toThrow(`Found 1 predictions for ${log.length} events.`);
+    expect(() => metricsByOpportunity(log, JSON.parse("null"))).toThrow(
+      "The predictions must be an array with a prediction or null for each event, found null.",
+    );
+    expect(() => metricsByOpportunity(JSON.parse("null"), [])).toThrow("A log must be an array of events, found null.");
+  });
+});
+
+describe("the analysis of learning curves", () => {
+  it.each(powerLaws.cases)("fits the power law as lm does: $name", (reference) => {
+    const fit = powerLawFit(reference.points);
+    if (reference.powerLaw === null) {
+      expect(fit).toBeNull();
+      return;
+    }
+    expectClose(defined(fit).scale, reference.powerLaw.scale, CURVE_TOLERANCE, "scale");
+    expectClose(defined(fit).exponent, reference.powerLaw.exponent, CURVE_TOLERANCE, "exponent");
+    expectClose(defined(fit).rSquared, reference.powerLaw.rSquared, CURVE_TOLERANCE, "R²");
+  });
+
+  it.each(powerLaws.cases)("categorizes as DataShop's rules do: $name", (reference) => {
+    reference.categories.forEach(({ options, category }, index) => {
+      expect(categorizeCurve(reference.points, options), `options ${index}`).toBe(category);
+    });
+  });
+
+  it("recovers the scale and exponent of an exact power law, whatever the counts", () => {
+    const laws = fc.record({
+      scale: fc.double({ min: 0.2, max: 0.95, noNaN: true }),
+      exponent: fc.double({ min: -0.2, max: 1.5, noNaN: true }),
+      counts: fc.array(fc.integer({ min: 1, max: 500 }), { minLength: 2, maxLength: 12 }),
+    });
+    fc.assert(
+      fc.property(laws, ({ scale, exponent, counts }) => {
+        const points = counts.map((count, index) => ({
+          opportunity: index + 1,
+          count,
+          errorRate: Math.min(scale * (index + 1) ** -exponent, 1),
+          predictedErrorRate: null,
+        }));
+        fc.pre(points.every((point) => point.errorRate < 1));
+        const fit = defined(powerLawFit(points));
+        expect(Math.abs(fit.exponent - exponent)).toBeLessThan(1e-9);
+        expect(Math.abs(fit.scale - scale)).toBeLessThan(1e-9);
+      }),
+    );
+  });
+
+  describe("categorizeCurve at its thresholds", () => {
+    const curve = (counts: readonly number[], errors: readonly number[]): LearningCurvePoint[] =>
+      counts.map((count, index) => ({
+        opportunity: index + 1,
+        count,
+        errorRate: defined(errors[index]),
+        predictedErrorRate: null,
+      }));
+    const options = { minLearners: 10, minPoints: 3, slope: 0.1, minSlope: 0.1 };
+
+    it("calls a curve good at exactly the thresholds: only a value beyond one is bad", () => {
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.4]), options)).toBe("good");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.5, 0.2]), options)).toBe("good");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.41]), options)).toBe("still high");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.19]), options)).toBe("low and flat");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.4]), { ...options, slope: 0.09 })).toBe("no learning");
+    });
+
+    it("discards points of fewer learners before it counts the points and reads the last", () => {
+      expect(categorizeCurve(curve([9, 10, 10], [0.9, 0.6, 0.4]), options)).toBe("too little data");
+      expect(categorizeCurve(curve([9, 10, 10], [0.9, 0.6, 0.4]), { ...options, minPoints: 2 })).toBe("good");
+      expect(categorizeCurve(curve([10, 2, 10], [0.9, 0.05, 0.3]), { ...options, minLearners: 5, minPoints: 2 })).toBe(
+        "good",
+      );
+      expect(categorizeCurve(curve([10, 10, 2], [0.9, 0.35, 0.95]), { ...options, minLearners: 5, minPoints: 2 })).toBe(
+        "good",
+      );
+      expect(categorizeCurve(curve([2, 2], [0.9, 0.5]), options)).toBe("too little data");
+    });
+
+    it("tests the categories in order: too little data, low and flat, still high, no learning", () => {
+      expect(categorizeCurve(curve([10, 10], [0.1, 0.9]), { ...options, minPoints: 3, slope: 0 })).toBe(
+        "too little data",
+      );
+      expect(categorizeCurve(curve([10, 10, 10], [0.1, 0.5, 0.9]), { ...options, slope: 0 })).toBe("low and flat");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.5, 0.9]), { ...options, slope: 0 })).toBe("still high");
+    });
+
+    it("takes the thresholds of DataShop unless they are given", () => {
+      const points = curve([10, 10, 10], [0.9, 0.5, 0.3]);
+      expect(categorizeCurve(points, options)).toBe("good");
+      expect(categorizeCurve(points, { ...options, lowError: 0.35 })).toBe("low and flat");
+      expect(categorizeCurve(points, { ...options, highError: 0.25 })).toBe("still high");
+    });
+  });
+
+  it("rejects points and options that are not valid", () => {
+    const point = { opportunity: 1, count: 5, errorRate: 0.5, predictedErrorRate: null };
+    const options = { minLearners: 1, minPoints: 1, slope: 0, minSlope: 0 };
+    expect(() => powerLawFit([{ ...point, opportunity: 0 }])).toThrow(
+      "Point 1 needs an opportunity that is an integer from 1, found 0.",
+    );
+    expect(() => powerLawFit([point, point])).toThrow("Point 2 repeats opportunity 1.");
+    expect(() => powerLawFit([{ ...point, count: 0 }])).toThrow(
+      "Point 1 needs a count that is an integer from 1, found 0.",
+    );
+    expect(() => powerLawFit([{ ...point, errorRate: 1.5 }])).toThrow(
+      "Point 1 needs an error rate from 0 to 1, found 1.5.",
+    );
+    expect(() => powerLawFit(JSON.parse("null"))).toThrow(
+      "The points must be an array of learning curve points, found null.",
+    );
+    expect(() => powerLawFit(JSON.parse("[null]"))).toThrow(
+      "Point 1 must be an object { opportunity, count, errorRate }, found null.",
+    );
+    expect(() => categorizeCurve([point], { ...options, minLearners: 0 })).toThrow(
+      "The option minLearners must be a positive integer, found 0.",
+    );
+    expect(() => categorizeCurve([point], { ...options, slope: JSON.parse('"1"') })).toThrow(
+      'The option slope must be a finite number, found "1".',
+    );
+    expect(() => categorizeCurve([point], { ...options, highError: 2 })).toThrow(DataError);
+    expect(() => categorizeCurve([point], JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => categorizeCurve([point], JSON.parse("{}"))).toThrow(DataError);
+    expect(powerLawFit([])).toBeNull();
   });
 });
 
@@ -392,23 +1077,31 @@ describe("evaluation with events that have no outcome", () => {
 
   it("counts opportunities and errors over the events with an outcome in learning curves", () => {
     const fit = elo({ skills: true }).fit(lessons);
-    const curve = learningCurve(lessons, fit.predictions);
-    const plain = learningCurve(base, elo({ skills: true }).fit(base).predictions);
+    const curve = learningCurve(lessons, { predictions: fit.predictions });
+    const plain = learningCurve(base, { predictions: elo({ skills: true }).fit(base).predictions });
     expect(curve).toEqual(plain);
     expect(learningCurve(lessons).overall.map((point) => point.count)).toEqual(
       learningCurve(base).overall.map((point) => point.count),
     );
   });
 
-  it("refuses a learning curve whose predictions lack an event with an outcome", () => {
+  it("counts an event with an outcome and no prediction in the error rate, and leaves the predicted one", () => {
     const log = eventLog([
       { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 1 },
       { learner: "a", item: "video", skills: ["s"], time: 2, outcome: null },
+      { learner: "a", item: "q", skills: ["s"], time: 3, outcome: 0 },
+      { learner: "b", item: "q", skills: ["s"], time: 4, outcome: 1 },
     ]);
-    expect(learningCurve(log, [0.5, null]).overall[0]?.count).toBe(1);
-    expect(() => learningCurve(log, [null, null])).toThrow(
-      "A learning curve needs a prediction for every event with an outcome.",
-    );
+    expect(learningCurve(log, { predictions: [0.5, null, null, 0.75] }).overall).toEqual([
+      { opportunity: 1, count: 2, errorRate: 0, predictedErrorRate: 0.375 },
+      { opportunity: 2, count: 1, errorRate: 1, predictedErrorRate: null },
+    ]);
+    expect(learningCurve(log, { predictions: [null, null, null, null] }).overall[0]).toEqual({
+      opportunity: 1,
+      count: 2,
+      errorRate: 0,
+      predictedErrorRate: null,
+    });
     expect(() => learningCurve(eventLog([{ ...defined(log[1]) }]))).toThrow(
       "A learning curve needs events with skills; no event of the log has any.",
     );

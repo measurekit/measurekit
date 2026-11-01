@@ -1,7 +1,7 @@
-import { DataError } from "@measurekit/core";
-import { isObserved } from "../data/event.js";
+import { checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
 import { checkLog, type EventLog } from "../data/event-log.js";
-import { observedPairs } from "./observed-pairs.js";
+import { checkPredictionList } from "./observed-pairs.js";
+import { checkHasSkills, collectByOpportunity } from "./opportunities.js";
 
 /** The error rate at one opportunity of a learning curve. */
 export interface LearningCurvePoint {
@@ -11,7 +11,10 @@ export interface LearningCurvePoint {
   readonly count: number;
   /** The observed error rate, 1 - mean outcome, at this opportunity. */
   readonly errorRate: number;
-  /** The predicted error rate, 1 - mean prediction, or `null` when no predictions were given. */
+  /**
+   * The predicted error rate, 1 - mean prediction over the events with a prediction, or `null` when no predictions
+   * were given or none is at this opportunity.
+   */
   readonly predictedErrorRate: number | null;
 }
 
@@ -23,6 +26,25 @@ export interface LearningCurve {
   readonly skills: Readonly<Record<string, readonly LearningCurvePoint[]>>;
 }
 
+const DEFAULT_MIN_OPPORTUNITIES = 1;
+
+/** Options of {@link learningCurve}. */
+export interface LearningCurveOptions {
+  /**
+   * The prediction of each event, in log order, such as a fit's: a probability, or `null` for an event without one.
+   *
+   * @defaultValue none
+   */
+  readonly predictions?: readonly (number | null)[];
+  /**
+   * The fewest opportunities that a learner and skill pair has in the log to take part, so that a curve is not shaped
+   * by who left: the pairs of learners who stopped early are kept out of every opportunity, not only the late ones.
+   *
+   * @defaultValue `1`
+   */
+  readonly minOpportunities?: number;
+}
+
 /**
  * Returns learning curves: the error rate of events by opportunity, the number of times the learner has practiced the
  * skill, counting the event itself.
@@ -31,70 +53,58 @@ export interface LearningCurve {
  * Error rates that fall with practice indicate that the skills model what learners learn. With predictions, such as a
  * fit's, each point also has the predicted error rate. Opportunities count the events of the log given, so pass whole
  * learner histories: a full log, or the test log of a split by learner. Events without skills are left out, and so are
- * events without an outcome: they are no opportunity and have no error rate.
+ * events without an outcome: they are no opportunity and have no error rate. An event with an outcome and a `null`
+ * prediction, such as one that `unseenSkills` of `crossValidate` skipped, counts in the observed error rate and leaves
+ * the predicted one.
  *
- * @param predictions - The prediction of each event, in log order, such as a fit's: a probability for each event with
- * an outcome, and `null` for each event without one.
- * @throws `DataError` when the log is malformed, no event with an outcome has skills, or the predictions are malformed,
- * not one per event, or lacking for an event with an outcome.
+ * @throws `DataError` when the log is malformed, no event with an outcome has skills, an option is invalid, the
+ * predictions are malformed or not one per event, or no learner and skill pair has `minOpportunities` opportunities.
  */
-export function learningCurve(log: EventLog, predictions?: readonly (number | null)[]): LearningCurve {
+export function learningCurve(log: EventLog, options: LearningCurveOptions = {}): LearningCurve {
+  checkOptions(options);
+  const { predictions, minOpportunities = DEFAULT_MIN_OPPORTUNITIES } = options;
+  checkPositiveInteger(minOpportunities, "The option minOpportunities");
   checkLog(log);
-  const observed = log.filter(isObserved);
-  if (predictions !== undefined && observedPairs(log, predictions).outcomes.length < observed.length) {
-    throw new DataError("A learning curve needs a prediction for every event with an outcome.");
-  }
-  if (observed.every((event) => event.skills.length === 0)) {
-    throw new DataError("A learning curve needs events with skills; no event of the log has any.");
-  }
-  const overall = emptyTotals();
-  const bySkill = new Map<string, Totals>();
-  const practiced = new Map<string, Map<string, number>>();
-  log.forEach((event, index) => {
-    if (!isObserved(event)) return;
-    const counts = practiced.get(event.learner) ?? new Map<string, number>();
-    practiced.set(event.learner, counts);
-    for (const skill of event.skills) {
-      const opportunity = (counts.get(skill) ?? 0) + 1;
-      counts.set(skill, opportunity);
-      const totals = bySkill.get(skill) ?? emptyTotals();
-      bySkill.set(skill, totals);
-      const prediction = predictions?.[index] ?? 0;
-      add(overall, opportunity, event.outcome, prediction);
-      add(totals, opportunity, event.outcome, prediction);
+  if (predictions !== undefined) checkPredictionList(log, predictions);
+  checkHasSkills(log, "A learning curve needs");
+  const { overall, skills } = collectByOpportunity(log, minOpportunities, emptyTotals, (totals, index) => {
+    const prediction = predictions?.[index];
+    totals.count++;
+    totals.outcomes += log[index]?.outcome ?? 0;
+    if (prediction !== null && prediction !== undefined) {
+      totals.predictions += prediction;
+      totals.predicted++;
     }
   });
-  const hasPredictions = predictions !== undefined;
+  if (overall.length === 0) {
+    throw new DataError(
+      `A learning curve needs a learner and skill with at least ${minOpportunities} opportunities; none has.`,
+    );
+  }
   return {
-    overall: points(overall, hasPredictions),
-    skills: Object.fromEntries([...bySkill].map(([skill, totals]) => [skill, points(totals, hasPredictions)])),
+    overall: points(overall),
+    skills: Object.fromEntries([...skills].map(([skill, totals]) => [skill, points(totals)])),
   };
 }
 
-/** Sums of outcomes and predictions by opportunity, from opportunity 1 at index 0. */
+/** Sums of outcomes and predictions at one opportunity. */
 interface Totals {
-  readonly counts: number[];
-  readonly outcomes: number[];
-  readonly predictions: number[];
+  count: number;
+  outcomes: number;
+  predictions: number;
+  /** The events with a prediction. */
+  predicted: number;
 }
 
 function emptyTotals(): Totals {
-  return { counts: [], outcomes: [], predictions: [] };
+  return { count: 0, outcomes: 0, predictions: 0, predicted: 0 };
 }
 
-function add(totals: Totals, opportunity: number, outcome: number, prediction: number): void {
-  const index = opportunity - 1;
-  totals.counts[index] = (totals.counts[index] ?? 0) + 1;
-  totals.outcomes[index] = (totals.outcomes[index] ?? 0) + outcome;
-  totals.predictions[index] = (totals.predictions[index] ?? 0) + prediction;
-}
-
-function points(totals: Totals, hasPredictions: boolean): LearningCurvePoint[] {
-  // A learner reaches opportunity k of a skill only after k - 1, so the counts have no gaps.
-  return totals.counts.map((count, index) => ({
+function points(totals: readonly Totals[]): LearningCurvePoint[] {
+  return totals.map(({ count, outcomes, predictions, predicted }, index) => ({
     opportunity: index + 1,
     count,
-    errorRate: 1 - (totals.outcomes[index] ?? 0) / count,
-    predictedErrorRate: hasPredictions ? 1 - (totals.predictions[index] ?? 0) / count : null,
+    errorRate: 1 - outcomes / count,
+    predictedErrorRate: predicted === 0 ? null : 1 - predictions / predicted,
   }));
 }

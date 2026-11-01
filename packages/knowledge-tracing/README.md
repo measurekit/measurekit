@@ -6,8 +6,9 @@ logistic knowledge tracing, with fixed or random learner proficiency) and Elo ar
 learner's state online, one event at a time; IRT updates ability online from calibrated item parameters, and knowledge
 space theory tracks the set of skills a learner masters, with prerequisites, adaptive assessment and the basic local
 independence model. States and parameters are plain JSON, stored and resumed exactly. Practice ranks the next items by
-predicted success and applies mastery criteria. Evaluation covers AUC, RMSE, log-loss, accuracy, calibration,
-cross-validation by learner, item or time, model comparison and learning curves. Every statistic is validated against
+predicted success and applies mastery criteria. Evaluation covers AUC, RMSE, log-loss, accuracy, R², kappa,
+calibration, cross-validation by learner, item or time, a paired test between models, and learning curves with their
+power laws and categories. Every statistic is validated against
 pyBKT or R. Its only dependency is `@measurekit/core`, which has none; it runs in any JavaScript runtime.
 
 ```bash
@@ -85,7 +86,7 @@ learningCurve(log).skills.fractions; // [{ opportunity: 1, count: 2, errorRate: 
 | Import                                   | Contents                                                                                                                                                                                                                                                                                        |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@measurekit/knowledge-tracing/data`     | `eventLog` with Q-matrices, and events without an outcome; `firstAttempts`; `splitByLearner`, `splitByItem`, `splitByTime`                                                                                                                                                                      |
-| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `metrics`, `calibration`, `observedPairs`; `crossValidate`, `compareModels`; `learningCurve`                                                                                                                                                              |
+| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `rSquared`, `kappa`, `metrics`, `calibration`, `observedPairs`; `crossValidate`, `compareModels`, `compareByLearner`; `learningCurve`, `metricsByOpportunity`, `powerLawFit`, `categorizeCurve`                                                           |
 | `@measurekit/knowledge-tracing/elo`      | `elo`: learner-item Elo with Pelánek's uncertainty function, and concept-specific Elo with skill abilities                                                                                                                                                                                      |
 | `@measurekit/knowledge-tracing/bkt`      | `bkt`: Bayesian knowledge tracing with forgetting, item guess and slip, resource and pair learning, prior groups, fixed rates and bounds; mastery                                                                                                                                               |
 | `@measurekit/knowledge-tracing/logistic` | `afm`, `pfa`, `logistic`: AFM, PFA, LKT and DAS3H features, with no, fixed or random proficiency and a ridge                                                                                                                                                                                    |
@@ -107,7 +108,7 @@ absence means the old behavior.
 - [Data](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/data.md): events, with and without an
   outcome, logs, Q-matrices, first attempts, splits by learner, item and time.
 - [Evaluation](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/evaluate.md):
-  metrics, calibration, cross-validation, model comparison, learning curves.
+  metrics, calibration, cross-validation, model comparison, learning curves and their analysis.
 - [Elo](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/elo.md): the models, the
   uncertainty function, online and batch use, learner state.
 - [Bayesian knowledge tracing](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/bkt.md):

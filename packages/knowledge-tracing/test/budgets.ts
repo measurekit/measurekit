@@ -21,6 +21,7 @@ const BUDGETS = {
   "kst.clauseStructure": 2,
   "evaluate.auc": 200,
   "evaluate.metrics": 200,
+  "evaluate.metricsByOpportunity": 200,
   "practice.recommend": 0.6,
   "data.eventLog": 90,
 } as const;

@@ -481,7 +481,9 @@ describe("logistic models", () => {
       folds,
     );
     expect(comparison.map((row) => row.name)).toEqual(["afm", "pfa", "lkt"]);
-    expect(learningCurve(simulated, pfa().fit(simulated).predictions).overall[0]?.predictedErrorRate).not.toBeNull();
+    expect(
+      learningCurve(simulated, { predictions: pfa().fit(simulated).predictions }).overall[0]?.predictedErrorRate,
+    ).not.toBeNull();
   });
 
   const parameters: LogisticParameters = {

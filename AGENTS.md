@@ -140,7 +140,8 @@ packages/knowledge-tracing/   the published package @measurekit/knowledge-tracin
   src/model.ts          LearnerModel and ModelFit, the interface every model implements, and checkModel
   src/data/             events, logs, Q-matrices, learner checks, first attempts, splits, the replay of a log through a model
   src/math/             numerics
-  src/evaluate/         metrics, calibration, cross-validation, model comparison, learning curves
+  src/evaluate/         metrics, calibration, cross-validation, model comparison, the test between models, learning curves,
+                        metrics by opportunity
   src/elo/              learner-item and concept-specific Elo
   src/bkt/              Bayesian knowledge tracing with pyBKT's extensions
   src/logistic/         AFM, PFA and LKT features, with fixed or random proficiency

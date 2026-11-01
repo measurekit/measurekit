@@ -1,4 +1,4 @@
-import { DataError, mean } from "@measurekit/core";
+import { DataError, kappaOfPairs, mean } from "@measurekit/core";
 import { outcomeLogLikelihood } from "../math/logistic.js";
 import { checkPredictions, isBinary } from "./predictions.js";
 
@@ -17,6 +17,16 @@ export interface Metrics {
    * 1.
    */
   readonly accuracy: number | null;
+  /**
+   * The coefficient of determination 1 - Σ(y - p)² / Σ(y - ȳ)²: 1 for exact predictions, 0 for the mean outcome, below
+   * 0 for predictions worse than it. `null` when all outcomes are equal.
+   */
+  readonly rSquared: number | null;
+  /**
+   * Cohen's kappa of the predictions above 0.5 and the outcomes: agreement beyond chance, from the margins. `null` for
+   * partial credit, or when chance agreement is 1.
+   */
+  readonly kappa: number | null;
 }
 
 /**
@@ -71,8 +81,46 @@ export function accuracy(predictions: readonly number[], outcomes: readonly numb
 }
 
 /**
+ * Returns the coefficient of determination of predictions against outcomes, 1 - Σ(y - p)² / Σ(y - ȳ)², the share of
+ * the variance of the outcomes that the predictions explain. It is below 0 for predictions worse than the mean outcome.
+ *
+ * @see {@link https://jedm.educationaldatamining.org/index.php/JEDM/article/view/JEDM087 | Pelánek (2015)}
+ * @throws `DataError` when the predictions and outcomes are malformed or all outcomes are equal.
+ */
+export function rSquared(predictions: readonly number[], outcomes: readonly number[]): number {
+  checkPredictions(predictions, outcomes);
+  const value = coefficientOfDetermination(predictions, outcomes);
+  if (value === null) {
+    throw new DataError(`R² needs outcomes that are not all equal; all ${outcomes.length} are ${outcomes[0]}.`);
+  }
+  return value;
+}
+
+/**
+ * Returns Cohen's kappa of the predictions and the outcomes: a prediction above 0.5 predicts a correct outcome, and
+ * kappa is the agreement of these predicted outcomes with the observed ones beyond what their shares of correct
+ * outcomes give by chance, (p_o - p_e) / (1 - p_e).
+ *
+ * @see {@link https://jedm.educationaldatamining.org/index.php/JEDM/article/view/JEDM087 | Pelánek (2015)}
+ * @throws `DataError` when the predictions and outcomes are malformed, an outcome is not 0 or 1, or chance agreement is
+ * 1, as when every prediction and every outcome is correct.
+ */
+export function kappa(predictions: readonly number[], outcomes: readonly number[]): number {
+  checkPredictions(predictions, outcomes);
+  if (!isBinary(outcomes)) throw new DataError("Kappa needs outcomes of 0 or 1, not partial credit.");
+  const value = agreementBeyondChance(predictions, outcomes);
+  if (value === null) {
+    throw new DataError(
+      `Kappa is undefined when every prediction and every outcome is ${outcomes[0] === 1 ? "correct" : "incorrect"}.`,
+    );
+  }
+  return value;
+}
+
+/**
  * Returns every metric of predictions against outcomes. AUC and accuracy are `null` where they are undefined: AUC for
- * outcomes all equal, both for partial credit.
+ * outcomes all equal, both for partial credit; R² for outcomes all equal; kappa for partial credit and where chance
+ * agreement is 1.
  *
  * @throws `DataError` when the predictions and outcomes are malformed.
  */
@@ -85,6 +133,8 @@ export function metrics(predictions: readonly number[], outcomes: readonly numbe
     rmse: rootMeanSquareError(predictions, outcomes),
     logLoss: meanLogLoss(predictions, outcomes),
     accuracy: binary ? shareRight(predictions, outcomes) : null,
+    rSquared: coefficientOfDetermination(predictions, outcomes),
+    kappa: binary ? agreementBeyondChance(predictions, outcomes) : null,
   };
 }
 
@@ -122,4 +172,25 @@ function meanLogLoss(predictions: readonly number[], outcomes: readonly number[]
 
 function shareRight(predictions: readonly number[], outcomes: readonly number[]): number {
   return mean(predictions.map((prediction, index) => (prediction > 0.5 === (outcomes[index] === 1) ? 1 : 0)));
+}
+
+function coefficientOfDetermination(predictions: readonly number[], outcomes: readonly number[]): number | null {
+  // Compared as numbers, not through the mean, which rounds: equal outcomes have no variance to explain.
+  if (outcomes.every((outcome) => outcome === outcomes[0])) return null;
+  const center = mean(outcomes);
+  let residual = 0;
+  let total = 0;
+  predictions.forEach((prediction, index) => {
+    const outcome = outcomes[index] ?? 0;
+    residual += (outcome - prediction) ** 2;
+    total += (outcome - center) ** 2;
+  });
+  return 1 - residual / total;
+}
+
+function agreementBeyondChance(predictions: readonly number[], outcomes: readonly number[]): number | null {
+  return kappaOfPairs(
+    predictions.map((prediction) => (prediction > 0.5 ? 1 : 0)),
+    outcomes,
+  );
 }

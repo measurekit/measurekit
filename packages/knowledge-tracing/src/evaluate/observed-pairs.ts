@@ -14,7 +14,8 @@ export interface ObservedPairs {
  *
  * @remarks
  * A fit's predictions have one entry per event of its log, `null` for an event without an outcome, which the metrics
- * take no part of; this pairs them up.
+ * take no part of; this pairs them up. An event with an outcome and a `null` prediction, which `unseenSkills` of
+ * `crossValidate` gives to a skipped event, is left out too.
  *
  * @param predictions - One entry per event of the log: a probability or `null`.
  * @throws `DataError` when the log is malformed, the predictions are not one per event, or one is neither a probability
@@ -22,22 +23,29 @@ export interface ObservedPairs {
  */
 export function observedPairs(log: EventLog, predictions: readonly (number | null)[]): ObservedPairs {
   checkLog(log);
-  checkArray(predictions, "The predictions must be an array with a prediction or null for each event");
-  if (predictions.length !== log.length) {
-    throw new DataError(`Found ${predictions.length} predictions for ${log.length} events.`);
-  }
+  checkPredictionList(log, predictions);
   const pairedPredictions: number[] = [];
   const outcomes: number[] = [];
   log.forEach(({ outcome }, index) => {
     const prediction = predictions[index];
+    if (prediction === null || prediction === undefined || outcome === null) return;
+    pairedPredictions.push(prediction);
+    outcomes.push(outcome);
+  });
+  return { predictions: pairedPredictions, outcomes };
+}
+
+/** Checks that there is one prediction per event of a log, each a probability or `null`. */
+export function checkPredictionList(log: EventLog, predictions: readonly (number | null)[]): void {
+  checkArray(predictions, "The predictions must be an array with a prediction or null for each event");
+  if (predictions.length !== log.length) {
+    throw new DataError(`Found ${predictions.length} predictions for ${log.length} events.`);
+  }
+  predictions.forEach((prediction, index) => {
     if (prediction !== null && !isUnitInterval(prediction)) {
       throw new DataError(
         `Prediction ${index + 1} must be a probability from 0 to 1 or null, found ${describe(prediction)}.`,
       );
     }
-    if (prediction === null || outcome === null) return;
-    pairedPredictions.push(prediction);
-    outcomes.push(outcome);
   });
-  return { predictions: pairedPredictions, outcomes };
 }

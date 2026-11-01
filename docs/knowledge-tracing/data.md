@@ -87,8 +87,10 @@ A `QMatrix` gives the skills of each item, `{ [item]: skills }`, for events that
 where its cognitive diagnosis needs at least one attribute per item.
 
 An event without skills whose item the Q-matrix lacks throws `DataError`:
-`Event 7 has no skills, and the Q-matrix lacks its item "q9".` A skill no model has seen is not an error: models start
-it from its initial value.
+`Event 7 has no skills, and the Q-matrix lacks its item "q9".` A skill a model has no parameters for, such as a skill new
+to a test block, is no error of the log: Elo and IRT models start it from its initial value, while BKT and logistic
+models throw `DataError` when they predict it. [`crossValidate`](evaluate.md#skills-new-to-a-test-block) has the option
+`unseenSkills` for it.
 
 ## Splits
 

@@ -629,7 +629,7 @@ describe("bkt fitting", () => {
     expect(evaluation.metrics.count).toBe(log.length);
     const comparison = compareModels({ bkt: bkt(), elo: elo({ skills: true }) }, folds);
     expect(comparison.map((row) => row.name)).toEqual(["bkt", "elo"]);
-    const curve = learningCurve(log, bkt().fit(log).predictions);
+    const curve = learningCurve(log, { predictions: bkt().fit(log).predictions });
     expect(curve.overall[0]?.predictedErrorRate).not.toBeNull();
   });
 });

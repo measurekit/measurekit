@@ -55,6 +55,7 @@ Rscript validation/knowledge-tracing/math.R      # normal quantile, logistic fun
 Rscript validation/knowledge-tracing/bkt-bounds.R # BKT within bounds: the forward likelihood maximized by L-BFGS-B in base R
 Rscript validation/knowledge-tracing/data.R      # first attempts by DataShop's convention, in base R
 Rscript validation/knowledge-tracing/evaluate.R  # AUC by pROC; RMSE, log-loss, accuracy, calibration and learning curves in base R
+Rscript validation/knowledge-tracing/evaluate-models.R  # R² and kappa (irr), the paired test of two models, time splits with unseen skills, metrics by opportunity, power laws and DataShop's categories of curves
 Rscript validation/knowledge-tracing/elo.R       # Elo updates written out, held-out predictions, the recovery simulation
 Rscript validation/knowledge-tracing/exposures.R # the exposure features, written out in base R, and their fit by glm
 Rscript validation/knowledge-tracing/logistic.R  # LKT's features; AFM, PFA and LKT fits by glm, lme4's Laplace approximation, LiblineaR
@@ -66,7 +67,7 @@ Rscript validation/knowledge-tracing/kst-structure.R  # base, atoms, neighbourho
 validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/bkt.py  # BKT by pyBKT: inference, EM from given and random starts, recovery; lessons as correct = -1, fixed rates, multipair
 ```
 
-The R scripts need R with the packages pROC, lme4, LiblineaR, LKT, mirt, kst, pks, DAKS, sets and jsonlite; `common.R`
+The R scripts need R with the packages pROC, irr, lme4, LiblineaR, LKT, mirt, kst, pks, DAKS, sets and jsonlite; `common.R`
 holds their shared helpers. `irt.R` takes about two minutes, most of them on the grid of 1,921 points; `irt.R abilities`
 or `irt.R drift` runs one part. `bkt.py` needs the Python environment below, and takes under a minute.
 
