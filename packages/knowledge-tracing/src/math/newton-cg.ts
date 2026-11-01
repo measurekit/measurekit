@@ -41,8 +41,8 @@ const LARGEST_FORCING = 0.1;
  *
  * @remarks
  * Memory and time per iteration grow with the work of one Hessian-vector product, not with the square of the number of
- * variables. The conjugate gradients stop when the residual is under min(0.1, √|g|) of the gradient's norm, the forcing
- * sequence that keeps the convergence superlinear.
+ * variables. The conjugate gradients stop when the norm of the residual is under min(0.1, √|g|) of the gradient's, both
+ * in the metric of the preconditioner, the forcing sequence that keeps the convergence superlinear.
  *
  * @see {@link https://doi.org/10.1007/978-0-387-40065-5 | Nocedal and Wright (2006), chapter 7}
  */
@@ -113,13 +113,21 @@ function conjugateGradients(
     const norm = Math.sqrt(dot(gradient, gradient));
     divide(work.scaled, work.residual, diagonal);
     work.direction.set(work.scaled);
-    descend(objective, work, diagonal, step, { target: Math.min(LARGEST_FORCING, Math.sqrt(norm)) * norm, limit });
+    // The gradient's norm in the metric of the preconditioner, √(g' M⁻¹ g), which the residual is measured in.
+    const preconditioned = Math.sqrt(dot(work.residual, work.scaled));
+    descend(objective, work, diagonal, step, {
+      target: Math.min(LARGEST_FORCING, Math.sqrt(norm)) * preconditioned,
+      limit,
+    });
     // The first direction is the preconditioned negative gradient, so a break before any step still leaves a descent.
     if (maxAbs(step) === 0) step.set(work.scaled);
   };
 }
 
-/** Runs conjugate gradients steps until the residual is within the target or the limit of steps is reached. */
+/**
+ * Runs conjugate gradients steps until the norm of the residual in the metric of the preconditioner, √(r' M⁻¹ r), is
+ * within the target or the limit of steps is reached.
+ */
 function descend(
   objective: NewtonObjective,
   work: CgWork,
@@ -137,9 +145,9 @@ function descend(
     const length = weight / curvature;
     addScaled(step, length, direction);
     addScaled(residual, -length, product);
-    if (Math.sqrt(dot(residual, residual)) <= stop.target) return;
     divide(scaled, residual, diagonal);
     const next = dot(residual, scaled);
+    if (Math.sqrt(next) <= stop.target) return;
     for (let j = 0; j < step.length; j++) direction[j] = (scaled[j] ?? 0) + (next / weight) * (direction[j] ?? 0);
     weight = next;
   }

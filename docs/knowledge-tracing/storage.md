@@ -145,7 +145,7 @@ Without a ridge, a logistic fit grows linearly with events and with learners, wi
 practices, which the Schur complement of the learners couples, and with the cube of the coefficients, up to 5,000 of them:
 the 5M log has 50 attempts per learner against 20. With a ridge, the fit solves by conjugate gradients on passes over the
 events, so its memory is that of the design: 50,000 items with a proficiency for each of 3,000 learners and 150,000
-events fit in under 2 seconds. A BKT fit of 1M events with 5 starts of 100 iterations thus takes minutes; fitting skill by
+events fit in under a second. A BKT fit of 1M events with 5 starts of 100 iterations thus takes minutes; fitting skill by
 skill bounds its memory by the largest skill. Above a few million events, fit on a window or a sample, or skill by skill
 for BKT.
 

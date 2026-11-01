@@ -7,6 +7,7 @@ import {
   crossValidate,
   DataError,
   type Event,
+  type EventInput,
   type EventLog,
   eventLog,
   type LogisticFeature,
@@ -1204,6 +1205,72 @@ describe("logistic terms", () => {
     expect(() => logistic({ intercepts: ["item"], ridge: 1, proficiency: "random" }).fit(many)).toThrow(
       "more than the 5000 that a fit with random proficiency solves",
     );
+  });
+});
+
+describe("logistic fits replayed", () => {
+  // Ids that are names of Object.prototype, which a record of histories must hold as entries of its own.
+  const learners = ["__proto__", "constructor", "ana"];
+  const skills = ["__proto__", "toString", "fractions"];
+  const replayLog = eventLog(
+    Array.from({ length: 90 }, (_, i): EventInput => {
+      const base = { learner: defined(learners[i % 3]), item: i % 9 === 0 ? "__proto__" : `q${i % 7}`, time: i + 1 };
+      const covariates = { x: ((i * 7) % 5) / 4 };
+      const multiple = i % 4 === 0 ? [defined(skills[(i + 1) % 3])] : [];
+      return {
+        ...base,
+        skills: [defined(skills[i % 3]), ...multiple],
+        outcome: i % 6 === 5 ? null : (i * i + i) % 5 < 3 ? 1 : 0,
+        duration: 1 + (i % 4),
+        covariates,
+      };
+    }),
+  );
+  const cases: [string, LogisticOptions][] = [
+    [
+      "terms over skills, items and the learner, exposures, practice and covariates",
+      {
+        features: [
+          "successes",
+          "exposures",
+          { basePractice: { decay: 0.5, scale: 1 } },
+          { feature: "failures", over: "item" },
+          { feature: "logSuccesses", over: "learner" },
+          { feature: "opportunities", coefficient: "shared" },
+        ],
+        intercepts: ["skill", "item"],
+        covariates: ["x"],
+        proficiency: "fixed",
+        ridge: 0.5,
+      },
+    ],
+    [
+      "decayed features and no proficiency",
+      { features: [{ decayedLogit: 0.8 }, { dash: 10 }], proficiency: "none", ridge: 0.1 },
+    ],
+    ["random proficiency", { features: ["opportunities"], proficiency: "random" }],
+    [
+      "item intercepts without a ridge penalty on skills",
+      {
+        features: ["successes", { feature: "opportunities", over: "item" }],
+        intercepts: ["item"],
+        proficiency: "fixed",
+      },
+    ],
+  ];
+
+  it.each(cases)("gives the predictions and states of an online replay through the fitted model: %s", (_, option) => {
+    const fit = logistic(option).fit(replayLog);
+    const run = online(fit.model, replayLog);
+    expect(fit.predictions.filter((prediction) => prediction !== null)).toHaveLength(
+      replayLog.filter((event) => event.outcome !== null).length,
+    );
+    fit.predictions.forEach((prediction, i) => {
+      if (prediction !== null) expectClose(prediction, defined(run.predictions[i]), 1e-14);
+    });
+    expect(Object.keys(fit.states)).toEqual([...run.states.keys()]);
+    // The states are those of the replay in every field and in the order of the fields, which a stored state keeps.
+    expect(JSON.stringify(fit.states)).toBe(JSON.stringify(Object.fromEntries(run.states)));
   });
 });
 

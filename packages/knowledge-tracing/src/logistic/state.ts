@@ -1,7 +1,7 @@
 import { checkArray, checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
 import { type Attempt, type Event, isObserved } from "../data/event.js";
 import { checkLearnerState } from "../data/learner.js";
-import { entry } from "../data/record.js";
+import { entry, put } from "../data/record.js";
 
 /**
  * A learner's state in a logistic model: their history with each skill practiced. Plain data, which JSON serializes.
@@ -187,68 +187,115 @@ function tracksPractice(needs: StateNeeds): boolean {
   return needs.skills.practice || (needs.items?.practice ?? false) || (needs.overall?.practice ?? false);
 }
 
+/** What an event changes in a state: the histories it replaces, and the practice time after it. */
+interface Changes {
+  /** The histories at the event's skills after an attempt. */
+  readonly skills: readonly (readonly [string, SkillHistory])[];
+  /** The exposures to the event's skills after an event without an outcome that a feature reads. */
+  readonly exposures: readonly (readonly [string, ExposureHistory])[];
+  /** The history at the event's item after an attempt, when a term reads items. */
+  readonly item?: readonly [string, SkillHistory];
+  /** The history over all attempts after an attempt, when a term reads the learner's. */
+  readonly overall?: SkillHistory;
+  /** The time the learner has spent, when a feature reads it. */
+  readonly practice?: number;
+}
+
 /**
- * Returns the state after an event, the state and event checked and the event not earlier than the state's attempts:
- * the histories of an event with an outcome, the exposures of one without when a feature reads them, and the practice
- * time of every event when a feature reads it.
+ * Returns what an event changes in the state, the state and event checked and the event not earlier than the state's
+ * attempts: the histories of an event with an outcome, the exposures of one without when a feature reads them, and the
+ * practice time of every event when a feature reads it. Without a feature that reads exposures, an event without an
+ * outcome leaves the learner as they were.
  */
-export function advanceState(state: LogisticState, event: Event, needs: StateNeeds): LogisticState {
+function changesOf(state: LogisticState, event: Event, needs: StateNeeds): Changes {
   const practice = state.practice ?? 0;
   const spent = tracksPractice(needs) ? { practice: practice + (event.duration ?? 0) } : {};
   if (isObserved(event)) {
     const next = (history: SkillHistory | undefined, kind: HistoryNeeds): SkillHistory =>
       nextHistory(history, event.outcome, event.time, practice, kind);
-    const updates = event.skills.map((skill) => [skill, next(entry(state.skills, skill), needs.skills)]);
-    return carry(
-      state,
-      {
-        skills: { ...state.skills, ...Object.fromEntries(updates) },
-        ...(needs.items !== null && {
-          items: {
-            ...state.items,
-            ...Object.fromEntries([[event.item, next(entry(state.items, event.item), needs.items)]]),
-          },
-        }),
-        ...(needs.overall !== null && { overall: next(state.overall, needs.overall) }),
-      },
-      spent,
-    );
+    return {
+      skills: event.skills.map((skill) => [skill, next(entry(state.skills, skill), needs.skills)]),
+      exposures: [],
+      ...(needs.items !== null && { item: [event.item, next(entry(state.items, event.item), needs.items)] }),
+      ...(needs.overall !== null && { overall: next(state.overall, needs.overall) }),
+      ...spent,
+    };
   }
-  // Without a feature that reads exposures, an event without an outcome leaves the learner as they were.
-  const updates = needs.skills.exposures
-    ? event.skills.map((skill) => [
-        skill,
-        nextExposure(entry(state.exposures, skill), event.time, needs.skills.exposureDecays),
-      ])
-    : [];
-  return carry(
-    state,
-    updates.length === 0 ? {} : { exposures: { ...state.exposures, ...Object.fromEntries(updates) } },
-    spent,
-  );
+  return {
+    skills: [],
+    exposures: needs.skills.exposures
+      ? event.skills.map((skill) => [
+          skill,
+          nextExposure(entry(state.exposures, skill), event.time, needs.skills.exposureDecays),
+        ])
+      : [],
+    ...spent,
+  };
 }
 
 /**
- * Returns a state whose records are those of `changed`, which are new, and copies of the others; records are present
- * only once given.
+ * Returns the state after an event, the state and event checked and the event not earlier than the state's attempts.
+ * The state is not changed: the new state has copies of its records.
  */
-function carry(
-  state: LogisticState,
-  changed: Partial<Pick<LogisticState, "skills" | "exposures" | "items" | "overall">>,
-  spent: { readonly practice?: number },
-): LogisticState {
-  const exposures = changed.exposures ?? copy(state.exposures);
-  const items = changed.items ?? copy(state.items);
-  const overall = changed.overall ?? state.overall;
-  return {
+export function advanceState(state: LogisticState, event: Event, needs: StateNeeds): LogisticState {
+  const changes = changesOf(state, event, needs);
+  return finishState({
     learner: state.learner,
-    skills: changed.skills ?? { ...state.skills },
+    skills: { ...state.skills, ...Object.fromEntries(changes.skills) },
+    exposures:
+      changes.exposures.length > 0
+        ? { ...state.exposures, ...Object.fromEntries(changes.exposures) }
+        : copy(state.exposures),
+    items: changes.item === undefined ? copy(state.items) : { ...state.items, ...Object.fromEntries([changes.item]) },
+    overall: changes.overall ?? state.overall,
+    practice: changes.practice ?? state.practice,
+  });
+}
+
+/**
+ * A state that a pass over a log advances in place, which the pass owns: no other state shares its records. It avoids
+ * the copies of the records that {@link advanceState} makes for each event, which grow with the learner's history.
+ */
+export interface WorkingState {
+  readonly learner: string;
+  skills: Record<string, SkillHistory>;
+  exposures?: Record<string, ExposureHistory>;
+  items?: Record<string, SkillHistory>;
+  overall?: SkillHistory;
+  practice?: number;
+}
+
+/** Returns a learner's working state before any event. */
+export function startState(learner: string): WorkingState {
+  return { learner, skills: {} };
+}
+
+/** Advances a working state in place to the state {@link advanceState} returns for the event. */
+export function advanceInPlace(state: WorkingState, event: Event, needs: StateNeeds): void {
+  const changes = changesOf(state, event, needs);
+  for (const [skill, history] of changes.skills) put(state.skills, skill, history);
+  if (changes.exposures.length > 0) {
+    state.exposures ??= {};
+    for (const [skill, exposure] of changes.exposures) put(state.exposures, skill, exposure);
+  }
+  if (changes.item !== undefined) {
+    state.items ??= {};
+    put(state.items, changes.item[0], changes.item[1]);
+  }
+  if (changes.overall !== undefined) state.overall = changes.overall;
+  if (changes.practice !== undefined) state.practice = changes.practice;
+}
+
+/** Returns the state a working state has reached, with its fields in the order of every state; the records are shared. */
+export function finishState(state: WorkingState | LogisticState): LogisticState {
+  const { learner, skills, exposures, items, overall, practice } = state;
+  return {
+    learner,
+    skills,
     ...(exposures !== undefined && { exposures }),
     ...(items !== undefined && { items }),
     ...(overall !== undefined && { overall }),
-    ...(spent.practice !== undefined
-      ? { practice: spent.practice }
-      : state.practice !== undefined && { practice: state.practice }),
+    ...(practice !== undefined && { practice }),
   };
 }
 

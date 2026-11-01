@@ -19,7 +19,7 @@ import {
 import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
 import { checkLearner, checkLearnerId } from "../data/learner.js";
 import { entry, parametersOf } from "../data/record.js";
-import { replay, type Steps } from "../data/replay.js";
+import type { Steps } from "../data/replay.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { estimate } from "./estimation.js";
 import type { LogisticFeature } from "./features.js";
@@ -161,7 +161,7 @@ export interface LogisticFit extends ModelFit<LogisticState, LogisticParameters>
  * for without a ridge, or the parameters are malformed or lack a coefficient the model has.
  */
 export function logistic(options: LogisticOptions = {}): LogisticModel {
-  return create(options).model;
+  return create(options);
 }
 
 const DEFAULT_PROFICIENCY: Proficiency = "none";
@@ -176,8 +176,8 @@ const DEFAULT_RIDGE = 0;
 const DEFAULT_TOLERANCE = 1e-8;
 const DEFAULT_MAX_ITERATIONS = 100;
 
-/** Builds a logistic model with its steps, which `fit` replays the log with. */
-function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<LogisticState> } {
+/** Builds a logistic model. */
+function create(options: LogisticOptions): LogisticModel {
   checkOptions(options);
   const {
     features = [],
@@ -272,14 +272,12 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
         if (isObserved(event)) checkCovariates(event, label, terms.covariates);
       });
       const fitted = estimate(log, { terms, proficiency, ridge, standardErrors, tolerance, maxIterations });
-      const built = create({ ...options, parameters: fitted.parameters });
-      const replayed = replay(log, built.steps);
-      const { states, predictions } = replayed;
-      const logLikelihood = fitted.marginal ?? replayed.logLikelihood;
+      const { states, predictions } = fitted;
+      const logLikelihood = fitted.marginal ?? fitted.logLikelihood;
       const k = fitted.parameterCount;
       const n = log.filter(isObserved).length;
       return {
-        model: built.model,
+        model: create({ ...options, parameters: fitted.parameters }),
         states,
         predictions,
         logLikelihood,
@@ -313,7 +311,7 @@ function create(options: LogisticOptions): { model: LogisticModel; steps: Steps<
       return probability(state, attempt);
     },
   };
-  return { model, steps };
+  return model;
 }
 
 /**

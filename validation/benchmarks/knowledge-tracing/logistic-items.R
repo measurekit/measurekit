@@ -5,13 +5,12 @@
 #
 # LiblineaR stops at epsilon 1e-4, LKT's default, at a gradient of the objective (its largest component) that the script
 # measures; measurekit stops at that gradient, which the fixture holds, so that both end at the same distance from the
-# minimum. At it measurekit takes 3.0 and 2.1 times as long (the medians of six runs of each), and the time goes to:
-#   - the replay of the log for the predictions and the states of the learners, which LiblineaR does not give: 24% and 31%;
-#   - the features, which run through states that copy their records: 1.1 and 1.3 times the time of LiblineaR's features
-#     and design;
-#   - the solver, which takes 2.3 times as long at 1,000 items and as long at 50,000. It needs 5 Newton iterations and 102
-#     and 60 Hessian-vector products against LiblineaR's 5 and 14 and 84 and 90, which `LiblineaR(verbose = TRUE)` prints.
-# At measurekit's default gradient of 1e-8 the fit takes 1.4 and 1.3 times as long as at LiblineaR's.
+# minimum. At it measurekit takes 1.7 times as long at 1,000 items and 0.8 times at 50,000 (the medians of four runs of
+# each, at a load of 5 on 10 cores). What remains at 1,000 items is the solver, 63% of the fit and JavaScript: it takes 75
+# Hessian-vector products to LiblineaR's 84, and each takes 300 us where the same loop in C takes 85 us (`cc -O2`, on the
+# design of the fit). The features and the design take 12 ms to LiblineaR's 17 ms at 1,000 items, and 120 ms to 281 ms at
+# 50,000, where the solver takes 40 products to 90. LiblineaR(verbose = TRUE) prints its products.
+# At measurekit's default gradient of 1e-8 the fit takes 1.7 times as long as at LiblineaR's.
 
 suppressPackageStartupMessages({
   library(LiblineaR)
@@ -86,13 +85,12 @@ bench_fixture("knowledge-tracing", "logistic-items", list(
   large = c(lapply(large[c("learner", "item", "skill", "outcome")], I), list(gradient = unname(gradients[["large"]])))
 ))
 
-# Both tasks have one task text, so the note of the first covers both. The ratios and shares are those of the header.
+# Both tasks have one task text, so the note of the first covers both. The ratios are those of the header.
 note <- sprintf(paste("the time of the reference includes the features and the design from the events, as measurekit's does;",
                       "both stop at the gradient that LiblineaR reaches at epsilon %g (%.2g at 1,000 items, %.2g at 50,000),",
-                      "where measurekit takes 3.0 and 2.1 times as long: it also replays the log for the predictions and states,",
-                      "which the reference does not give (24%% and 31%% of its time), its features take 1.1 and 1.3 times as long as",
-                      "the reference's, and its solver 2.3 times as long at 1,000 items and as long at 50,000; at its default",
-                      "gradient of 1e-8 it takes 1.4 and 1.3 times as long as at these"),
+                      "where measurekit takes 1.7 and 0.8 times as long: its solver is JavaScript, each Hessian-vector product",
+                      "taking 3.5 times as long as the same loop in C, and its features and design take 0.7 and 0.4 times as long",
+                      "as the reference's; at its default gradient of 1e-8 it takes 1.7 times as long as at these"),
                 EPSILON, gradients[["small"]], gradients[["large"]])
 bench_task("logistic.fitItems", "Fit with an intercept for each skill and item, a proficiency for each learner and a ridge of 1",
            sprintf("%s events of %d learners at %s items", count(length(small$outcome)), small$learners, count(small$items)),

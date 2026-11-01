@@ -1,11 +1,18 @@
-import { DataError } from "@measurekit/core";
+import { DataError, logistic } from "@measurekit/core";
 import { isObserved, type ObservedEvent } from "../data/event.js";
 import type { EventLog } from "../data/event-log.js";
 import type { FlatDirection } from "../math/arrow-system.js";
-import { type GroupIntercepts, logisticRegression, MAX_DENSE_COEFFICIENTS } from "../math/logistic-regression.js";
+import { linear } from "../math/arrow-system.js";
+import { outcomeLogLikelihood } from "../math/logistic.js";
+import {
+  type GroupIntercepts,
+  type LogisticRegression,
+  logisticRegression,
+  MAX_DENSE_COEFFICIENTS,
+} from "../math/logistic-regression.js";
 import type { SparseMatrix } from "../math/sparse-matrix.js";
 import type { LogisticParameters, LogisticSkill, Proficiency } from "./parameters.js";
-import { advanceState, type LogisticState } from "./state.js";
+import { advanceInPlace, finishState, type LogisticState, startState, type WorkingState } from "./state.js";
 import { blockWidth, type InterceptKind, type TermSpec, type Terms, visitRow } from "./terms.js";
 
 /** What a fit depends on: the checked options of the model. */
@@ -25,6 +32,12 @@ export interface Estimates {
   /** The standard errors in the shape of the parameters; `null` unless asked, with a ridge and where singular. */
   readonly standardErrors: LogisticParameters | null;
   readonly parameterCount: number;
+  /** Each learner's state after the log, by learner id. */
+  readonly states: Record<string, LogisticState>;
+  /** Each event's prediction at the estimates, made before the event; `null` for an event without an outcome. */
+  readonly predictions: (number | null)[];
+  /** The sum over events with an outcome of y ln p + (1 - y) ln(1 - p), with p the event's prediction. */
+  readonly logLikelihood: number;
   /** The Laplace approximation of the marginal log-likelihood, with a random intercept. */
   readonly marginal: number | null;
   readonly converged: boolean;
@@ -33,10 +46,12 @@ export interface Estimates {
 
 /**
  * The design of a log: a sparse matrix with a row per event with an outcome, and the indices of the skills, items and
- * learners of those events.
+ * learners of those events, with each learner's state after the log.
  */
 interface Design {
   readonly matrix: SparseMatrix;
+  /** Each learner's state after the log, in order of first appearance. */
+  readonly states: ReadonlyMap<string, WorkingState>;
   /** The first column of the block of each skill and of each item, in order of first appearance. */
   readonly skills: ReadonlyMap<string, number>;
   readonly items: ReadonlyMap<string, number>;
@@ -48,7 +63,8 @@ interface Design {
 /**
  * Builds the design of a log, one row per event. The columns are the shared coefficients' and the covariates', then the
  * block of each skill and each item as it first appears: the intercept, if the model has one, and a column per term with
- * a coefficient for each, from the learner's history before the event.
+ * a coefficient for each, from the learner's history before the event. Each learner's state advances in place, so the
+ * pass copies no records.
  */
 function designOf(log: EventLog, observed: number, terms: Terms): Design {
   const widths = { skill: blockWidth(terms, "skill"), item: blockWidth(terms, "item") };
@@ -56,7 +72,7 @@ function designOf(log: EventLog, observed: number, terms: Terms): Design {
   const skills = new Map<string, number>();
   const items = new Map<string, number>();
   const learners = new Map<string, number>();
-  const histories = new Map<string, LogisticState>();
+  const states = new Map<string, WorkingState>();
   const rowStarts = [0];
   const columns: number[] = [];
   const values: number[] = [];
@@ -81,7 +97,11 @@ function designOf(log: EventLog, observed: number, terms: Terms): Design {
     });
   };
   for (const event of log) {
-    const state = histories.get(event.learner) ?? { learner: event.learner, skills: {} };
+    let state = states.get(event.learner);
+    if (state === undefined) {
+      state = startState(event.learner);
+      states.set(event.learner, state);
+    }
     if (isObserved(event)) {
       const learner = learners.get(event.learner) ?? learners.size;
       learners.set(event.learner, learner);
@@ -93,7 +113,7 @@ function designOf(log: EventLog, observed: number, terms: Terms): Design {
       });
       rowStarts.push(columns.length);
     }
-    histories.set(event.learner, advanceState(state, event, terms.needs));
+    advanceInPlace(state, event, terms.needs);
   }
   const matrix: SparseMatrix = {
     columnCount,
@@ -101,7 +121,7 @@ function designOf(log: EventLog, observed: number, terms: Terms): Design {
     columns: Int32Array.from(columns),
     values: Float64Array.from(values),
   };
-  return { matrix, skills, items, learners, rowLearners };
+  return { matrix, states, skills, items, learners, rowLearners };
 }
 
 /**
@@ -208,6 +228,29 @@ function shapeOf(
   };
 }
 
+/**
+ * Returns each event's prediction at a fit, the probability of a correct outcome from its row of the design and its
+ * learner's intercept, made before the event as a replay of the log through the fitted model makes it, and the
+ * log-likelihood of the outcomes.
+ */
+function predictionsOf(
+  log: EventLog,
+  design: Design,
+  fit: Pick<LogisticRegression, "coefficients" | "groupIntercepts">,
+  proficiency: Proficiency,
+): { predictions: (number | null)[]; logLikelihood: number } {
+  let row = 0;
+  let logLikelihood = 0;
+  const predictions = log.map((event) => {
+    if (!isObserved(event)) return null;
+    const theta = proficiency === "none" ? 0 : (fit.groupIntercepts[design.rowLearners[row] ?? 0] ?? 0);
+    const prediction = logistic(theta + linear(design.matrix, row++, fit.coefficients));
+    logLikelihood += outcomeLogLikelihood(prediction, event.outcome);
+    return prediction;
+  });
+  return { predictions, logLikelihood };
+}
+
 /** Fits the model's coefficients and learners' proficiencies to the events with an outcome of a log. */
 export function estimate(log: EventLog, settings: FitSettings): Estimates {
   const { terms, proficiency, ridge, standardErrors: asked, tolerance, maxIterations } = settings;
@@ -232,6 +275,7 @@ export function estimate(log: EventLog, settings: FitSettings): Estimates {
     ...(fit.sd !== null && { learnerSd: fit.sd }),
   };
   const errors = fit.standardErrors;
+  const replayed = predictionsOf(log, design, fit, proficiency);
   const learnerCount = { none: 0, fixed: learners.size - flats.length, random: 1 }[proficiency];
   return {
     parameters,
@@ -243,6 +287,8 @@ export function estimate(log: EventLog, settings: FitSettings): Estimates {
             ...(proficiency === "fixed" && { learners: learnerValues(errors.groups) }),
           },
     parameterCount: matrix.columnCount + learnerCount,
+    states: Object.fromEntries([...design.states].map(([learner, state]) => [learner, finishState(state)])),
+    ...replayed,
     marginal: proficiency === "random" ? fit.logLikelihood : null,
     converged: fit.converged,
     iterations: fit.iterations,

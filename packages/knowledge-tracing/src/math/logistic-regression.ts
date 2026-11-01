@@ -1,5 +1,5 @@
 import { logistic } from "@measurekit/core";
-import { createProblem, type FlatDirection, linear, logLikelihood, penalizedNewton, rowLoss } from "./arrow-system.js";
+import { createProblem, type FlatDirection, logLikelihood, penalizedNewton, rowLoss } from "./arrow-system.js";
 import { randomIntercepts } from "./laplace.js";
 import { type NewtonObjective, newtonCg } from "./newton-cg.js";
 import type { SparseMatrix } from "./sparse-matrix.js";
@@ -147,6 +147,10 @@ function ridgeFit(
 /**
  * The objective of a ridge fit over x = (β, u): the negative log-likelihood + λ / 2 (|β|² + |u|²), with Hessian-vector
  * products, and the negative log-likelihood alone.
+ *
+ * @remarks
+ * Each pass over the rows is a loop over the entries of all rows, in a function of its own: a call per row costs a sixth
+ * of the time of a fit.
  */
 function ridgeObjective(
   design: SparseMatrix,
@@ -155,14 +159,16 @@ function ridgeObjective(
   ridge: number,
 ): NewtonObjective & { loss(x: Float64Array): number } {
   const p = design.columnCount;
-  const weights = new Float64Array(outcomes.length);
+  const rows = outcomes.length;
   const indices = groups?.indices;
-  /** Returns η = x β + u_g of a row for the vector `x` of coefficients followed by the group intercepts. */
-  const predictor = (row: number, x: Float64Array): number =>
-    linear(design, row, x) + (indices === undefined ? 0 : (x[p + (indices[row] ?? 0)] ?? 0));
+  const weights = new Float64Array(rows);
+  const residuals = new Float64Array(rows);
+  /** η of each row at the last {@link predictors}. */
+  const predictions = new Float64Array(rows);
   const loss = (x: Float64Array): number => {
+    predictors(design, indices, x, predictions);
     let sum = 0;
-    for (let row = 0; row < outcomes.length; row++) sum += rowLoss(predictor(row, x), outcomes[row] ?? 0);
+    for (let row = 0; row < rows; row++) sum += rowLoss(predictions[row] ?? 0, outcomes[row] ?? 0);
     return sum;
   };
   return {
@@ -175,18 +181,17 @@ function ridgeObjective(
     linearize(x, gradient, diagonal) {
       gradient.fill(0);
       diagonal.fill(0);
-      for (let row = 0; row < outcomes.length; row++) {
-        const p1 = logistic(predictor(row, x));
-        const weight = p1 * (1 - p1);
-        const residual = p1 - (outcomes[row] ?? 0);
-        weights[row] = weight;
-        scatter(design, row, residual, gradient);
-        scatter(design, row, weight, diagonal, true);
-        if (indices !== undefined) {
-          const g = p + (indices[row] ?? 0);
-          gradient[g] = (gradient[g] ?? 0) + residual;
-          diagonal[g] = (diagonal[g] ?? 0) + weight;
-        }
+      predictors(design, indices, x, predictions);
+      for (let row = 0; row < rows; row++) {
+        const p1 = logistic(predictions[row] ?? 0);
+        weights[row] = p1 * (1 - p1);
+        residuals[row] = p1 - (outcomes[row] ?? 0);
+      }
+      scatterRows(design, residuals, gradient, false);
+      scatterRows(design, weights, diagonal, true);
+      if (indices !== undefined) {
+        scatterGroups(indices, p, residuals, gradient);
+        scatterGroups(indices, p, weights, diagonal);
       }
       for (let j = 0; j < x.length; j++) {
         gradient[j] = (gradient[j] ?? 0) + ridge * (x[j] ?? 0);
@@ -195,24 +200,44 @@ function ridgeObjective(
     },
     hessianVector(v, out) {
       out.fill(0);
-      for (let row = 0; row < outcomes.length; row++) {
-        const scaled = (weights[row] ?? 0) * predictor(row, v);
-        scatter(design, row, scaled, out);
-        if (indices !== undefined) {
-          const g = p + (indices[row] ?? 0);
-          out[g] = (out[g] ?? 0) + scaled;
-        }
-      }
+      predictors(design, indices, v, predictions);
+      for (let row = 0; row < rows; row++) predictions[row] = (weights[row] ?? 0) * (predictions[row] ?? 0);
+      scatterRows(design, predictions, out, false);
+      if (indices !== undefined) scatterGroups(indices, p, predictions, out);
       for (let j = 0; j < v.length; j++) out[j] = (out[j] ?? 0) + ridge * (v[j] ?? 0);
     },
   };
 }
 
-/** Adds scale times a row's entries to `out`, or scale times their squares. */
-function scatter(design: SparseMatrix, row: number, scale: number, out: Float64Array, squared = false): void {
-  for (let e = design.rowStarts[row] ?? 0; e < (design.rowStarts[row + 1] ?? 0); e++) {
-    const column = design.columns[e] ?? 0;
-    const value = design.values[e] ?? 0;
-    out[column] = (out[column] ?? 0) + scale * (squared ? value * value : value);
+/** Writes η = x β + u_g of each row into `out`, for the vector `x` of coefficients followed by the group intercepts. */
+function predictors(design: SparseMatrix, indices: Int32Array | undefined, x: Float64Array, out: Float64Array): void {
+  const { rowStarts, columns, values, columnCount } = design;
+  for (let row = 0; row < out.length; row++) {
+    let eta = 0;
+    for (let e = rowStarts[row] ?? 0; e < (rowStarts[row + 1] ?? 0); e++) {
+      eta += (values[e] ?? 0) * (x[columns[e] ?? 0] ?? 0);
+    }
+    out[row] = indices === undefined ? eta : eta + (x[columnCount + (indices[row] ?? 0)] ?? 0);
+  }
+}
+
+/** Adds each row's scale times its entries to `out`, or times their squares. */
+function scatterRows(design: SparseMatrix, scales: Float64Array, out: Float64Array, squared: boolean): void {
+  const { rowStarts, columns, values } = design;
+  for (let row = 0; row < scales.length; row++) {
+    const scale = scales[row] ?? 0;
+    for (let e = rowStarts[row] ?? 0; e < (rowStarts[row + 1] ?? 0); e++) {
+      const column = columns[e] ?? 0;
+      const value = values[e] ?? 0;
+      out[column] = (out[column] ?? 0) + scale * (squared ? value * value : value);
+    }
+  }
+}
+
+/** Adds each row's scale to the entry of its group, which follows the `offset` entries of the coefficients. */
+function scatterGroups(indices: Int32Array, offset: number, scales: Float64Array, out: Float64Array): void {
+  for (let row = 0; row < scales.length; row++) {
+    const group = offset + (indices[row] ?? 0);
+    out[group] = (out[group] ?? 0) + (scales[row] ?? 0);
   }
 }

@@ -8,6 +8,16 @@ export function entry<T>(record: Readonly<Record<string, T>> | undefined, key: s
   return record !== undefined && Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
+/**
+ * Sets a record's own entry for a key. Ids are user data, and an assignment to `__proto__` would set the record's
+ * prototype instead of an entry.
+ */
+export function put<T>(record: Record<string, T>, key: string, value: T): void {
+  if (key === "__proto__")
+    Object.defineProperty(record, key, { value, enumerable: true, writable: true, configurable: true });
+  else record[key] = value;
+}
+
 /** Returns a record with `map` applied to each value, given the value and its key. */
 export function mapRecord<TValue, TResult>(
   record: Readonly<Record<string, TValue>>,
