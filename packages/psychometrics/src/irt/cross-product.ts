@@ -136,7 +136,7 @@ function sparseScore(size: number): SparseScore {
  * Returns dP_k/dξ_l / P_k of an item at each node, category and vector entry, by node, then category, then entry: the
  * derivatives of ln P_k.
  */
-function derivativeRatios(
+export function derivativeRatios(
   item: {
     readonly model: IrtModel;
     readonly parameters: unknown;

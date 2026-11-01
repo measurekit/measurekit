@@ -56,3 +56,8 @@ items at a time, as mirt's `bfactor` does, and runs 8 to 17 times as fast on 2,0
 correlations, with varimax or oblimin rotation, as `psych::fa(fm = "minres")` does. `minimumAveragePartial` is Velicer's
 test for the number of factors, and `smoothCorrelations` makes a correlation matrix that is not positive definite so, as
 `psych::cor.smooth` does.
+
+`calibrateLongitudinal` calibrates the same persons answering the same items on two or three occasions. The trait of each
+occasion is a dimension of a normal distribution whose means, standard deviations and correlations are estimated, with
+the first occasion N(0, 1); items have one set of parameters across the occasions, and the result reports the moments of
+each occasion and of the change between consecutive ones, as `mirt` with constrained items does.

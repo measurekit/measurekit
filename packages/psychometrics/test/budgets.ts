@@ -27,6 +27,7 @@ const BUDGETS = {
   "multidimensional.calibrateGroups": 3_000,
   "multidimensional.calibrateBifactor12": 500,
   "multidimensional.calibrateBifactor40": 3_000,
+  "multidimensional.calibrateLongitudinal": 20_000,
   "multidimensional.calibrateMhrm": 60_000,
   "multidimensional.estimateMode": 200,
   "multidimensional.estimateMean": 200,

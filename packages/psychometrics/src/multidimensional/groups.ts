@@ -126,7 +126,7 @@ function checkScale<TParameters>(
 }
 
 /** Returns, for each group, the index of the lowest group it is linked to through items that groups answer in common. */
-function linkedGroups(answered: readonly (readonly boolean[])[]): number[] {
+export function linkedGroups(answered: readonly (readonly boolean[])[]): number[] {
   const component = answered.map((_, g) => g);
   const root = (g: number): number => {
     let at = g;

@@ -77,8 +77,10 @@ export interface MultidimensionalCalibration<TParameters> {
   readonly iterations: number;
 }
 
-const EM_TOLERANCE = 1e-4;
-const EM_MAX_ITERATIONS = 500;
+/** The default `tolerance` of EM. */
+export const EM_TOLERANCE = 1e-4;
+/** The default `maxIterations` of EM. */
+export const EM_MAX_ITERATIONS = 500;
 /** The defaults of MH-RM: mirt's `TOL` and `NCYCLES`. */
 const MHRM_TOLERANCE = 1e-3;
 const MHRM_MAX_ITERATIONS = 2000;

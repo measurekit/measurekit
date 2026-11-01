@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
+  calibrateLongitudinal,
   calibrateMultidimensional,
   multidimensionalEstimates,
   multidimensionalGradedResponse,
@@ -11,6 +12,7 @@ import {
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-multidimensional.json" with { type: "json" };
+import longitudinal from "./fixtures/bench-multidimensional-longitudinal.json" with { type: "json" };
 
 const { points } = fixture;
 const confirmatory = responseMatrix(fixture.confirmatory.responses, { itemIds: fixture.confirmatory.itemIds });
@@ -63,6 +65,20 @@ test("calibrates a confirmatory two-dimensional 2PL of 1,000 persons in two grou
     context,
     "multidimensional.calibrateGroups",
     () => calibrateMultidimensional(confirmatory, options),
+    SLOW_OPTIONS,
+  );
+});
+
+test("calibrates a trait over three occasions of 1,000 persons and 10 items", async (context) => {
+  const occasions = longitudinal.occasions.map(({ personIds, itemIds, responses }) =>
+    responseMatrix(responses, { personIds, itemIds }),
+  );
+  const options = { points: longitudinal.points };
+  expect(calibrateLongitudinal(occasions, options).converged).toBe(true);
+  await benchmark(
+    context,
+    "multidimensional.calibrateLongitudinal",
+    () => calibrateLongitudinal(occasions, options),
     SLOW_OPTIONS,
   );
 });

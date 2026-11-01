@@ -1,12 +1,15 @@
-import { cholesky } from "@measurekit/core";
+import { cholesky, logistic } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   calibrate,
+  calibrateLongitudinal,
   calibrateMultidimensional,
   createRandom,
   DataError,
+  generalizedPartialCredit,
   type LoadingPattern,
+  type LongitudinalCalibration,
   logNormalPrior,
   type MultidimensionalCalibration,
   type MultidimensionalCalibrationOptions,
@@ -23,14 +26,17 @@ import {
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
   normalPrior,
+  oneParameterLogistic,
   type ParameterPrior,
   posteriorMeanEstimate,
   posteriorModeEstimate,
+  type ResponseMatrix,
   type RotationOptions,
   responseMatrix,
   responseRecords,
   rotateLoadings,
   simulateMultidimensionalResponses,
+  threeParameterLogistic,
   twoParameterLogistic,
 } from "../src/index.js";
 import { compressResponses } from "../src/irt/responses.js";
@@ -49,6 +55,8 @@ import {
   secondMoments,
 } from "../src/multidimensional/mhrm-latent.js";
 import { createScratch, itemMoments, observedItemInformation } from "../src/multidimensional/mhrm-moments.js";
+import longitudinal from "./fixtures/longitudinal.json" with { type: "json" };
+import longitudinalRecovery from "./fixtures/longitudinal-recovery.json" with { type: "json" };
 import exploratory from "./fixtures/multidimensional-exploratory.json" with { type: "json" };
 import graded from "./fixtures/multidimensional-graded.json" with { type: "json" };
 import graded3 from "./fixtures/multidimensional-graded3.json" with { type: "json" };
@@ -59,7 +67,7 @@ import m3pl from "./fixtures/multidimensional-m3pl.json" with { type: "json" };
 import mhrm from "./fixtures/multidimensional-mhrm.json" with { type: "json" };
 import missing from "./fixtures/multidimensional-missing.json" with { type: "json" };
 import rotation from "./fixtures/multidimensional-rotation.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
+import { defined, expectClose, expectParameters, MODELS as FIXTURE_MODELS, mean } from "./helpers.js";
 
 /** The built-in models by the names that fixtures give them. */
 const MODELS = {
@@ -1818,6 +1826,25 @@ describe("latent distribution of a group", () => {
     expect(Array.from(fixed.matrix)).toEqual([1, 0, 0, 1]);
   });
 
+  it("keeps the mean and standard deviation of a pinned dimension and estimates the others", () => {
+    const grid = productGrid(3, 11);
+    const pinned = latentDistribution(grid, { ...free, pinned: [0] });
+    // Three correlations, two standard deviations and two means.
+    expect(pinned.size).toBe(7);
+    const covariance = Float64Array.of(1, 0.54, 0.27, 0.54, 1.44, 0.54, 0.27, 0.54, 0.81);
+    pinned.maximize(counts(grid, covariance, [0, 0.4, -0.3]));
+    covariance.forEach((value, k) => {
+      expectClose(pinned.matrix[k] ?? Number.NaN, value, 1e-6, `covariance entry ${k}`);
+    });
+    expectClose(pinned.mean[1] ?? Number.NaN, 0.4, 1e-6, "mean 2");
+    expectClose(pinned.mean[2] ?? Number.NaN, -0.3, 1e-6, "mean 3");
+    // Counts of a first dimension with another mean and spread leave the pinned entries where they were set.
+    pinned.maximize(counts(grid, Float64Array.of(1.5, 0.5, 0.2, 0.5, 1, 0.1, 0.2, 0.1, 1), [0.3, 0, 0]));
+    expect(pinned.mean[0]).toBe(0);
+    expect(pinned.standardDeviations[0]).toBe(1);
+    expect(pinned.entries().length).toBe(7);
+  });
+
   it("round-trips its entries and its parameters", () => {
     const grid = productGrid(3, 7);
     const latent = latentDistribution(grid, free);
@@ -2045,6 +2072,573 @@ describe("multiple groups errors", () => {
         fixed: { [defined(itemIds[0])]: { a: [1, 0], intercept: 0, c: 0, d: 1 } },
       }),
     ).toThrow('The option fixed is for EM, which the method "mhrm" does not use.');
+  });
+});
+
+/** The moments that abilities over several occasions are drawn with. */
+interface TraitMoments {
+  readonly means: readonly number[];
+  readonly sds: readonly number[];
+  readonly rho: number;
+}
+
+/**
+ * Draws the abilities of persons on several occasions, normal with the means and standard deviations and an
+ * autoregressive correlation, and their responses to the same 2PL items on every occasion, with slopes from 0.8 to 1.8
+ * and difficulties of standard deviation 0.8.
+ */
+function simulateTrait(
+  seed: number,
+  persons: number,
+  itemCount: number,
+  { means, sds, rho }: TraitMoments,
+): { readonly occasions: ResponseMatrix[]; readonly thetas: number[][] } {
+  const random = createRandom(seed);
+  const slopes = Array.from({ length: itemCount }, () => 0.8 + random.uniform());
+  const difficulties = Array.from({ length: itemCount }, () => 0.8 * random.normal());
+  const ids = Array.from({ length: itemCount }, (_, i) => `q${i + 1}`);
+  const thetas = Array.from({ length: persons }, () => {
+    let state = random.normal();
+    return means.map((mean, t) => {
+      if (t > 0) state = rho * state + Math.sqrt(1 - rho * rho) * random.normal();
+      return mean + (sds[t] ?? 1) * state;
+    });
+  });
+  const occasions = means.map((_, t) =>
+    responseMatrix(
+      thetas.map((theta) =>
+        ids.map((__, i) =>
+          random.uniform() < logistic(defined(slopes[i]) * ((theta[t] ?? 0) - defined(difficulties[i]))) ? 1 : 0,
+        ),
+      ),
+      { itemIds: ids },
+    ),
+  );
+  return { occasions, thetas };
+}
+
+/** Draws the responses of {@link simulateTrait}, without the abilities. */
+function simulateOccasions(seed: number, persons: number, itemCount: number, moments: TraitMoments): ResponseMatrix[] {
+  return simulateTrait(seed, persons, itemCount, moments).occasions;
+}
+
+/** Persons, items and moments small enough for many calibrations: 2 occasions, 300 persons, 6 items. */
+const SMALL = { means: [0, 0.4], sds: [1, 1.2], rho: 0.8 } as const;
+
+/** Expects two calibrations to agree on the log-likelihood, the items and the moments. */
+function expectSameFit(
+  actual: LongitudinalCalibration,
+  expected: LongitudinalCalibration,
+  ids: readonly string[] = expected.items.map(({ id }) => id),
+): void {
+  expectClose(actual.logLikelihood, expected.logLikelihood, 1e-6, "log-likelihood");
+  for (const id of ids) {
+    const found = defined(actual.items.find((item) => item.id === id)).parameters;
+    expectParameters(found, defined(expected.items.find((item) => item.id === id)).parameters, 1e-5, `item ${id}`);
+  }
+  expected.occasions.forEach(({ mean: expectedMean, sd }, t) => {
+    expectClose(defined(actual.occasions[t]).mean, expectedMean, 1e-5, `mean ${t}`);
+    expectClose(defined(actual.occasions[t]).sd, sd, 1e-5, `sd ${t}`);
+  });
+}
+
+/** A case of the longitudinal fixture: the occasions' responses and the estimates of mirt. */
+interface LongitudinalCase {
+  readonly model: string;
+  readonly points: number;
+  readonly occasions: readonly {
+    readonly personIds: readonly string[];
+    readonly itemIds: readonly string[];
+    readonly responses: readonly (readonly (number | null)[])[];
+  }[];
+  readonly items: readonly { readonly id: string; readonly parameters: object }[];
+  readonly means: readonly number[];
+  readonly sds: readonly number[];
+  readonly correlations: readonly (readonly number[])[];
+  readonly changes: readonly {
+    readonly from: number;
+    readonly to: number;
+    readonly mean: number;
+    readonly sd: number;
+    readonly correlationWithStart: number;
+  }[];
+  readonly logLikelihood: number;
+}
+
+describe("longitudinal calibration", () => {
+  /** How far each case may be from mirt: mirt's own EM stops where its estimates have not settled. */
+  const Tolerances = { two: 1e-4, anchored: 1e-4, graded: 1e-4, three: 1e-3, rasch: 5e-4 } as const;
+  type CaseName = keyof typeof Tolerances;
+  const cases: Readonly<Record<CaseName, LongitudinalCase>> = {
+    two: longitudinal.two,
+    three: longitudinal.three,
+    anchored: longitudinal.anchored,
+    graded: longitudinal.graded,
+    rasch: longitudinal.rasch,
+  };
+  const names = Object.keys(Tolerances) as CaseName[];
+  const matricesOf = (source: LongitudinalCase): ResponseMatrix[] =>
+    source.occasions.map(({ personIds, itemIds, responses }) =>
+      responseMatrix(responses, { personIds: [...personIds], itemIds: [...itemIds] }),
+    );
+  const fits = new Map<CaseName, LongitudinalCalibration>();
+  /** Calibrates a case at a tolerance tight enough for its estimates to settle, once for all tests. */
+  function fitOf(name: CaseName): LongitudinalCalibration {
+    const source = cases[name];
+    const found =
+      fits.get(name) ??
+      calibrateLongitudinal(matricesOf(source), {
+        model: defined(FIXTURE_MODELS[source.model]),
+        points: source.points,
+        tolerance: 1e-6,
+        maxIterations: 5000,
+      });
+    fits.set(name, found);
+    return found;
+  }
+
+  it.each(names)(
+    "matches mirt on the %s case: items, moments, changes and log-likelihood",
+    (name) => {
+      const fit = fitOf(name);
+      const source = cases[name];
+      const tolerance = Tolerances[name];
+      expect(fit.converged).toBe(true);
+      expect(fit.items.map(({ id }) => id)).toEqual(source.items.map(({ id }) => id));
+      fit.items.forEach(({ id, parameters }, i) => {
+        expectParameters(parameters, source.items[i]?.parameters, tolerance, `item ${id}`);
+      });
+      source.means.forEach((mean, t) => {
+        expectClose(defined(fit.occasions[t]).mean, mean, tolerance, `mean ${t}`);
+        expectClose(defined(fit.occasions[t]).sd, defined(source.sds[t]), tolerance, `sd ${t}`);
+      });
+      source.correlations.forEach((row, i) => {
+        row.forEach((value, j) => {
+          expectClose(defined(fit.correlations[i]?.[j]), value, tolerance, `correlation ${i},${j}`);
+        });
+      });
+      source.changes.forEach((change, k) => {
+        const found = defined(fit.changes[k]);
+        expect([found.from, found.to]).toEqual([change.from, change.to]);
+        expectClose(found.mean, change.mean, 2 * tolerance, `mean of change ${k}`);
+        expectClose(found.sd, change.sd, 2 * tolerance, `sd of change ${k}`);
+        expectClose(
+          found.correlationWithStart,
+          change.correlationWithStart,
+          2 * tolerance,
+          `correlation with start ${k}`,
+        );
+      });
+      expectClose(fit.logLikelihood, source.logLikelihood, 1e-2, "log-likelihood");
+      // Where mirt's EM stops short of the maximum its log-likelihood is lower; it is never higher.
+      expect(fit.logLikelihood).toBeGreaterThanOrEqual(source.logLikelihood - 1e-6);
+    },
+    120_000,
+  );
+
+  it("matches TAM's Rasch model, whose scale is that of the first occasion's standard deviation", () => {
+    const { tam } = longitudinal.rasch;
+    const fit = fitOf("rasch");
+    fit.items.forEach(({ id, parameters }, i) => {
+      expectParameters(parameters, { a: tam.slope, b: tam.difficulties[i], c: 0, d: 1 }, 5e-3, `item ${id}`);
+    });
+    tam.means.forEach((mean, t) => {
+      expectClose(defined(fit.occasions[t]).mean, mean, 5e-3, `mean ${t}`);
+      expectClose(defined(fit.occasions[t]).sd, defined(tam.sds[t]), 5e-3, `sd ${t}`);
+    });
+    tam.correlations.forEach((row, i) => {
+      row.forEach((value, j) => {
+        expectClose(defined(fit.correlations[i]?.[j]), value, 5e-3, `correlation ${i},${j}`);
+      });
+    });
+    expectClose(fit.logLikelihood, tam.logLikelihood, 1e-2, "log-likelihood");
+  }, 120_000);
+
+  describe("standard errors", () => {
+    const { two } = longitudinal;
+    const run = (standardErrors: "hessian" | "cross-product") =>
+      calibrateLongitudinal(matricesOf(two), {
+        points: two.points,
+        tolerance: 1e-8,
+        maxIterations: 5000,
+        standardErrors,
+      });
+
+    it("matches mirt's Oakes errors by the observed information, which the Hessian of the gradient gives", () => {
+      const errors = defined(run("hessian").standardErrors);
+      // Ten items' slopes and difficulties, then the correlation, the standard deviation and the mean of the second occasion.
+      expect(errors).toHaveLength(23);
+      two.standardErrors.forEach((se, k) => {
+        expectClose(defined(errors[k]), se, 1e-5, `standard error ${k}`);
+      });
+    }, 120_000);
+
+    it("matches mirt's cross-product errors by the persons' scores", () => {
+      const errors = defined(run("cross-product").standardErrors);
+      two.crossProductStandardErrors.forEach((se, k) => {
+        expectClose(defined(errors[k]), se, 1e-5, `standard error ${k}`);
+      });
+    }, 120_000);
+  });
+
+  describe("grid", () => {
+    const small = simulateOccasions(5, 200, 6, SMALL);
+    const three = simulateOccasions(6, 150, 6, { means: [0, 0.3, 0.6], sds: [1, 1.1, 1.2], rho: 0.8 });
+
+    it("has 31 nodes per occasion for two occasions and 21 for three by default", () => {
+      expectSameFit(calibrateLongitudinal(small), calibrateLongitudinal(small, { points: 31 }));
+      expectSameFit(calibrateLongitudinal(three), calibrateLongitudinal(three, { points: 21 }));
+    }, 120_000);
+
+    it("changes the estimates a little with the number of nodes on short tests", () => {
+      const coarse = calibrateLongitudinal(small, { points: 21 });
+      const fine = calibrateLongitudinal(small, { points: 41 });
+      expectClose(coarse.logLikelihood, fine.logLikelihood, 0.5);
+      expectClose(defined(coarse.occasions[1]).mean, defined(fine.occasions[1]).mean, 0.02);
+    });
+  });
+});
+
+describe("longitudinal recovery", () => {
+  const moments = { means: [0, 0.3, 0.6], sds: [1, 1.15, 1.3], rho: 0.85 } as const;
+  /** The thresholds are rounded up to a multiple of this. */
+  const Step = 0.005;
+  /**
+   * The largest errors of the means, standard deviations and correlations that the recovery of 5,000 persons may have:
+   * 1.5 times the worst of the three seeds of mirt on the same design, from the fixture, rounded up to a multiple of
+   * 0.005. With more items per occasion the errors are smaller, so the same thresholds hold for 40 items.
+   */
+  function thresholds(occasionCount: number) {
+    const { worst } = defined(longitudinalRecovery.recovery.find((row) => row.occasions === occasionCount));
+    const limit = (error: number): number => Math.ceil((1.5 * error) / Step - 1e-9) * Step;
+    return { mean: limit(worst.mean), sd: limit(worst.sd), correlation: limit(worst.correlation) };
+  }
+  const column = (thetas: readonly (readonly number[])[], t: number): number[] =>
+    thetas.map((theta) => defined(theta[t]));
+  const spread = (values: readonly number[]): number => {
+    const center = mean(values);
+    return Math.sqrt(values.reduce((sum, value) => sum + (value - center) ** 2, 0) / (values.length - 1));
+  };
+  const correlate = (x: readonly number[], y: readonly number[]): number => {
+    const [cx, cy] = [mean(x), mean(y)];
+    const cross = x.reduce((sum, value, i) => sum + (value - cx) * (defined(y[i]) - cy), 0);
+    return cross / Math.sqrt(x.reduce((s, v) => s + (v - cx) ** 2, 0) * y.reduce((s, v) => s + (v - cy) ** 2, 0));
+  };
+
+  /**
+   * Returns the largest distance of the estimates from the moments of the abilities that the persons were given, so
+   * that the sampling of the persons is no part of it: the means and standard deviations of the occasions after the
+   * first, in units of the first occasion's sample standard deviation and from its sample mean, and the correlations.
+   */
+  function errorsOf(fit: LongitudinalCalibration, thetas: readonly (readonly number[])[]) {
+    const first = column(thetas, 0);
+    const errors = { mean: 0, sd: 0, correlation: 0 };
+    fit.occasions.forEach(({ mean: estimated, sd }, t) => {
+      const values = column(thetas, t);
+      if (t > 0) {
+        errors.mean = Math.max(errors.mean, Math.abs(estimated - (mean(values) - mean(first)) / spread(first)));
+        errors.sd = Math.max(errors.sd, Math.abs(sd - spread(values) / spread(first)));
+      }
+      for (let u = 0; u < t; u++) {
+        errors.correlation = Math.max(
+          errors.correlation,
+          Math.abs(defined(fit.correlations[t]?.[u]) - correlate(values, column(thetas, u))),
+        );
+      }
+    });
+    return errors;
+  }
+
+  /** Calibrates the persons of a seed at the default nodes, or at `points`. */
+  function recover(seed: number, occasionCount: number, itemCount: number, points?: number) {
+    const { occasions, thetas } = simulateTrait(seed, 5000, itemCount, {
+      ...moments,
+      means: moments.means.slice(0, occasionCount),
+      sds: moments.sds.slice(0, occasionCount),
+    });
+    const fit = calibrateLongitudinal(occasions, { ...(points === undefined ? {} : { points }), maxIterations: 1000 });
+    return { fit, errors: errorsOf(fit, thetas) };
+  }
+
+  it.each([
+    [2, 10],
+    [2, 40],
+    [3, 10],
+    [3, 40],
+  ] as const)(
+    "recovers the moments of %i occasions from 5,000 persons and %i items on each",
+    (occasionCount, itemCount) => {
+      for (const seed of [1, 2, 3]) {
+        const { fit, errors } = recover(seed, occasionCount, itemCount);
+        expect(fit.converged).toBe(true);
+        const limits = thresholds(occasionCount);
+        expect(errors.mean, `mean, seed ${seed}`).toBeLessThanOrEqual(limits.mean);
+        expect(errors.sd, `sd, seed ${seed}`).toBeLessThanOrEqual(limits.sd);
+        expect(errors.correlation, `correlation, seed ${seed}`).toBeLessThanOrEqual(limits.correlation);
+      }
+    },
+    600_000,
+  );
+
+  it("misses the thresholds at 40 items on three occasions with 15 nodes, which is why 21 is the default", () => {
+    const { errors } = recover(1, 3, 40, 15);
+    expect(errors.mean).toBeGreaterThan(thresholds(3).mean);
+    expect(errors.sd).toBeGreaterThan(thresholds(3).sd);
+  }, 600_000);
+
+  /** Returns the largest difference between the means, standard deviations and correlations of two calibrations. */
+  function momentDistance(a: LongitudinalCalibration, b: LongitudinalCalibration): number {
+    const differences = a.occasions.flatMap(({ mean: m, sd }, t) => [
+      Math.abs(m - defined(b.occasions[t]).mean),
+      Math.abs(sd - defined(b.occasions[t]).sd),
+    ]);
+    for (const [i, row] of a.correlations.entries()) {
+      for (const [j, value] of row.entries()) differences.push(Math.abs(value - defined(b.correlations[i]?.[j])));
+    }
+    return Math.max(...differences);
+  }
+
+  it("settles by 21 nodes per occasion at 40 items and 3 occasions, where 15 are far from 31", () => {
+    for (const seed of [101, 102]) {
+      const { occasions } = simulateTrait(seed, 2000, 40, moments);
+      const [coarse, usual, fine] = [15, 21, 31].map((points) =>
+        calibrateLongitudinal(occasions, { points, maxIterations: 1000 }),
+      );
+      expect(defined(fine).converged).toBe(true);
+      expect(momentDistance(defined(usual), defined(fine)), `21 against 31, seed ${seed}`).toBeLessThan(0.03);
+      expect(momentDistance(defined(coarse), defined(fine)), `15 against 31, seed ${seed}`).toBeGreaterThan(0.05);
+    }
+  }, 900_000);
+});
+
+describe("longitudinal calibration data", () => {
+  const occasions = simulateOccasions(1, 300, 6, SMALL);
+  const base = { points: 21, tolerance: 1e-8 } as const;
+  const fit = calibrateLongitudinal(occasions, base);
+
+  it("converges and fixes the first occasion at N(0, 1)", () => {
+    expect(fit.converged).toBe(true);
+    expect(fit.occasions[0]).toEqual({ mean: 0, sd: 1 });
+    expect(fit.correlations[0]?.[0]).toBe(1);
+    expect(fit.correlations[0]?.[1]).toBe(fit.correlations[1]?.[0]);
+    expect(fit.items.map(({ id }) => id)).toEqual(["q1", "q2", "q3", "q4", "q5", "q6"]);
+    expect(fit.standardErrors).toBeNull();
+  });
+
+  it("reports the change from the moments of the two occasions", () => {
+    const [first, second] = fit.occasions;
+    const rho = defined(fit.correlations[0]?.[1]);
+    const change = defined(fit.changes[0]);
+    expect([change.from, change.to]).toEqual([0, 1]);
+    expectClose(change.mean, defined(second).mean - defined(first).mean, 1e-12);
+    expectClose(change.sd ** 2, defined(first).sd ** 2 + defined(second).sd ** 2 - 2 * rho * defined(second).sd, 1e-12);
+    expectClose(
+      change.correlationWithStart,
+      (rho * defined(second).sd - defined(first).sd) / change.sd,
+      1e-12,
+      "correlation with the start",
+    );
+  });
+
+  it("matches persons and items by id, whatever their order", () => {
+    const [first, second] = occasions;
+    const rows = defined(second)
+      .personIds.map((_, p) => p)
+      .reverse();
+    const columns = [5, 3, 1, 0, 2, 4];
+    const reordered = responseMatrix(
+      rows.map((p) => columns.map((i) => defined(defined(second).responses[p]?.[i]))),
+      {
+        personIds: rows.map((p) => defined(defined(second).personIds[p])),
+        itemIds: columns.map((i) => defined(defined(second).itemIds[i])),
+      },
+    );
+    expectSameFit(calibrateLongitudinal([defined(first), reordered], base), fit);
+  });
+
+  it("treats a person who did not take part in an occasion as one without responses there", () => {
+    const [first, second] = occasions;
+    const kept = defined(second).personIds.slice(0, 250);
+    const shortened = responseMatrix(defined(second).responses.slice(0, 250), {
+      personIds: kept,
+      itemIds: [...defined(second).itemIds],
+    });
+    const blanked = responseMatrix(
+      defined(second).responses.map((row, p) => (p < 250 ? row : row.map(() => null))),
+      { personIds: [...defined(second).personIds], itemIds: [...defined(second).itemIds] },
+    );
+    const absent = calibrateLongitudinal([defined(first), shortened], base);
+    expectSameFit(calibrateLongitudinal([defined(first), blanked], base), absent);
+    expect(absent.converged).toBe(true);
+  });
+
+  it("changes nothing for a person without a response on any occasion", () => {
+    const withExtra = occasions.map((occasion) =>
+      responseMatrix([...occasion.responses, occasion.itemIds.map(() => null)], {
+        personIds: [...occasion.personIds, "nobody"],
+        itemIds: [...occasion.itemIds],
+      }),
+    );
+    expect(withExtra).toHaveLength(2);
+    expectSameFit(calibrateLongitudinal(withExtra, base), fit);
+  });
+
+  it("estimates items that only one occasion has", () => {
+    const [first, second] = occasions;
+    // The second occasion's q6 becomes q7: q6 is on the first occasion only and q7 on the second only.
+    const renamed = responseMatrix(defined(second).responses, {
+      personIds: [...defined(second).personIds],
+      itemIds: [...defined(second).itemIds.slice(0, 5), "q7"],
+    });
+    const anchored = calibrateLongitudinal([defined(first), renamed], base);
+    expect(anchored.items.map(({ id }) => id)).toEqual(["q1", "q2", "q3", "q4", "q5", "q6", "q7"]);
+    expect(anchored.converged).toBe(true);
+    expectClose(defined(anchored.occasions[1]).mean, 0.4, 0.25);
+  });
+
+  it("links occasions through the others", () => {
+    const three = simulateOccasions(2, 200, 6, { means: [0, 0.3, 0.6], sds: [1, 1.1, 1.2], rho: 0.8 });
+    const keep = (matrix: ResponseMatrix, from: number, to: number): ResponseMatrix =>
+      responseMatrix(
+        matrix.responses.map((row) => row.slice(from, to)),
+        { personIds: [...matrix.personIds], itemIds: matrix.itemIds.slice(from, to) },
+      );
+    const chained = [keep(defined(three[0]), 0, 4), keep(defined(three[1]), 2, 6), keep(defined(three[2]), 3, 6)];
+    // The first and the second share q3 and q4, the second and the third q4 to q6; the first and third share none.
+    const chain = calibrateLongitudinal(chained, { points: 11 });
+    expect(chain.occasions).toHaveLength(3);
+    expect(chain.correlations).toHaveLength(3);
+  });
+
+  it("lists the slope that the 1PL's items share once among the standard errors", () => {
+    const shared = calibrateLongitudinal(occasions, {
+      model: oneParameterLogistic,
+      points: 21,
+      standardErrors: "hessian",
+    });
+    // The slope, six difficulties, one correlation, one standard deviation and one mean.
+    expect(shared.standardErrors).toHaveLength(10);
+    const separate = calibrateLongitudinal(occasions, { points: 21, standardErrors: "hessian" });
+    // Two parameters for each of six items, and the three of the distribution.
+    expect(separate.standardErrors).toHaveLength(15);
+  });
+
+  it("gives Hessian and cross-product standard errors of one size, all positive", () => {
+    const hessian = defined(calibrateLongitudinal(occasions, { points: 21, standardErrors: "hessian" }).standardErrors);
+    const product = defined(
+      calibrateLongitudinal(occasions, { points: 21, standardErrors: "cross-product" }).standardErrors,
+    );
+    expect(product).toHaveLength(hessian.length);
+    hessian.forEach((error, k) => {
+      expect(error).toBeGreaterThan(0);
+      expect(defined(product[k]) / error, `standard error ${k}`).toBeGreaterThan(0.7);
+      expect(defined(product[k]) / error, `standard error ${k}`).toBeLessThan(1.4);
+    });
+  });
+
+  it("stops at maxIterations without claiming convergence", () => {
+    const stopped = calibrateLongitudinal(occasions, { points: 11, maxIterations: 2 });
+    expect(stopped.converged).toBe(false);
+    expect(stopped.iterations).toBe(2);
+  });
+
+  it("does not claim convergence when a distribution is narrower than the spacing of the nodes", () => {
+    expect(calibrateLongitudinal(occasions, { points: 3 }).converged).toBe(false);
+  });
+});
+
+describe("longitudinal calibration errors", () => {
+  const occasions = simulateOccasions(3, 60, 4, SMALL);
+  const first = defined(occasions[0]);
+  const second = defined(occasions[1]);
+  const options = { points: 7 } as const;
+  const only = (matrix: ResponseMatrix, ids: readonly string[]): ResponseMatrix =>
+    responseMatrix(
+      matrix.responses.map((row) => ids.map((id) => defined(row[matrix.itemIds.indexOf(id)]))),
+      { personIds: [...matrix.personIds], itemIds: [...ids] },
+    );
+
+  it("takes two or three occasions", () => {
+    expect(() => calibrateLongitudinal([first], options)).toThrow(
+      "Longitudinal calibration takes 2 or 3 occasions, found 1",
+    );
+    expect(() => calibrateLongitudinal([first, second, first, second], options)).toThrow(
+      "Longitudinal calibration takes 2 or 3 occasions, found 4",
+    );
+    expect(() => calibrateLongitudinal([], options)).toThrow("found 0");
+  });
+
+  it("needs response matrices with responses", () => {
+    const empty = (matrix: ResponseMatrix): ResponseMatrix =>
+      responseMatrix(
+        matrix.responses.map((row) => row.map(() => null)),
+        { personIds: [...matrix.personIds], itemIds: [...matrix.itemIds] },
+      );
+    expect(() => calibrateLongitudinal([empty(first), empty(second)], options)).toThrow(
+      "Calibration needs at least one response.",
+    );
+    expect(() => calibrateLongitudinal(JSON.parse('[{"responses": 1}, null]'), options)).toThrow(DataError);
+  });
+
+  it("needs occasions that share an item, directly or through the others", () => {
+    const apart = only(second, ["q3", "q4"]);
+    const renamed = responseMatrix(apart.responses, { personIds: [...apart.personIds], itemIds: ["x1", "x2"] });
+    expect(() => calibrateLongitudinal([first, renamed], options)).toThrow(
+      "Occasion 2 shares no item with occasion 1, directly or through the other occasions",
+    );
+    const third = only(first, ["q1", "q2"]);
+    expect(() => calibrateLongitudinal([first, third, renamed], options)).toThrow(
+      "Occasion 3 shares no item with occasion 1",
+    );
+  });
+
+  it("needs an item with responses in two categories, and every category up to its highest", () => {
+    const constant = responseMatrix(
+      first.responses.map((row) => row.map((response, i) => (i === 0 ? 0 : response))),
+      { personIds: [...first.personIds], itemIds: [...first.itemIds] },
+    );
+    const alike = responseMatrix(
+      second.responses.map((row) => row.map((response, i) => (i === 0 ? 0 : response))),
+      { personIds: [...second.personIds], itemIds: [...second.itemIds] },
+    );
+    expect(() => calibrateLongitudinal([constant, alike], options)).toThrow(
+      'Item "q1" has responses in fewer than two categories',
+    );
+  });
+
+  it("takes only the models that it validates", () => {
+    expect(() => calibrateLongitudinal([first, second], { model: threeParameterLogistic })).toThrow(
+      "The option model must be oneParameterLogistic, twoParameterLogistic or gradedResponse",
+    );
+    expect(() => calibrateLongitudinal([first, second], { model: generalizedPartialCredit })).toThrow(DataError);
+  });
+
+  it("checks its options", () => {
+    expect(() => calibrateLongitudinal([first, second], { points: 1 })).toThrow(
+      "The option points must be an integer from 2, found 1.",
+    );
+    expect(() => calibrateLongitudinal([first, second], { points: 2.5 })).toThrow(DataError);
+    expect(() => calibrateLongitudinal([first, second], { points: 1001 })).toThrow("has more than 1000000 nodes");
+    expect(() => calibrateLongitudinal([first, second], { ...options, tolerance: -1 })).toThrow(DataError);
+    expect(() => calibrateLongitudinal([first, second], { ...options, maxIterations: 0 })).toThrow(DataError);
+    expect(() => calibrateLongitudinal([first, second], { ...options, standardErrors: JSON.parse('"louis"') })).toThrow(
+      'The option standardErrors must be "none", "hessian" or "cross-product", found "louis".',
+    );
+  });
+
+  it("rejects occasions and options of other types", () => {
+    expect(() => calibrateLongitudinal(JSON.parse("null"))).toThrow(
+      "The occasions must be an array of response matrices",
+    );
+    expect(() => calibrateLongitudinal(JSON.parse('{"length": 2}'))).toThrow(DataError);
+    expect(() => calibrateLongitudinal([first, second], JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => calibrateLongitudinal([first, second], { points: JSON.parse('"7"') })).toThrow(DataError);
+    expect(() => calibrateLongitudinal([first, second], { ...options, tolerance: JSON.parse('"1e-4"') })).toThrow(
+      DataError,
+    );
+    expect(() => calibrateLongitudinal([first, second], { model: JSON.parse('{"name":"2PL"}') })).toThrow(DataError);
   });
 });
 
@@ -2807,6 +3401,30 @@ describe("properties", () => {
         });
         expectClose(defined(other.correlations[0]?.[1]), defined(fit.correlations[0]?.[1]), 1e-6);
       }),
+      { numRuns: 3 },
+    );
+  });
+
+  it("gives longitudinal estimates that do not depend on the order of the persons", () => {
+    const data = simulateOccasions(11, 120, 5, SMALL);
+    const options = { points: 15, tolerance: 1e-9 };
+    const fit = calibrateLongitudinal(data, options);
+    fc.assert(
+      fc.property(
+        fc.shuffledSubarray(
+          Array.from({ length: 120 }, (_, p) => p),
+          { minLength: 120, maxLength: 120 },
+        ),
+        (order) => {
+          const shuffled = data.map((occasion) =>
+            responseMatrix(
+              order.map((p) => defined(occasion.responses[p])),
+              { personIds: order.map((p) => defined(occasion.personIds[p])), itemIds: [...occasion.itemIds] },
+            ),
+          );
+          expectSameFit(calibrateLongitudinal(shuffled, options), fit);
+        },
+      ),
       { numRuns: 3 },
     );
   });

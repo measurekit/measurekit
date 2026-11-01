@@ -172,15 +172,17 @@ function correlationsOf({ matrix, standardDeviations, dimensions }: Latent): Flo
 
 /**
  * Returns whether an estimated distribution has run to a boundary where the likelihood has no maximum: a mean outside
- * the grid, or a standard deviation below the spacing of its nodes or above their range.
+ * the grid, or a standard deviation below the spacing of its nodes or above their range, of a dimension that is not
+ * pinned.
  */
-function runsAway({ free, mean, standardDeviations }: Latent, { nodes, points }: Grid): boolean {
+export function runsAway({ free, mean, standardDeviations }: Latent, { nodes, points }: Grid): boolean {
   const low = nodes[0] ?? 0;
   const high = nodes[nodes.length - 1] ?? 0;
   const spacing = (high - low) / (points - 1);
+  const estimated = (dimension: number): boolean => free.pinned?.includes(dimension) !== true;
   return (
-    (free.means && mean.some((value) => value < low || value > high)) ||
-    (free.variances && standardDeviations.some((value) => value < spacing || value > high - low))
+    (free.means && mean.some((value, d) => estimated(d) && (value < low || value > high))) ||
+    (free.variances && standardDeviations.some((value, d) => estimated(d) && (value < spacing || value > high - low)))
   );
 }
 

@@ -16,6 +16,13 @@ export interface LatentFree {
   readonly variances: boolean;
   /** Whether the means of the dimensions are estimated; otherwise they stay as they are set. */
   readonly means: boolean;
+  /**
+   * The dimensions whose mean and standard deviation stay as they are set while `means` and `variances` estimate those
+   * of the others: the reference occasion of a longitudinal calibration.
+   *
+   * @defaultValue none
+   */
+  readonly pinned?: readonly number[];
 }
 
 /** The entries of a distribution whose dimensions have mean 0 and variance 1, and whose correlations are estimated. */
@@ -27,7 +34,8 @@ const FREE_CORRELATIONS: LatentFree = { correlations: true, variances: false, me
  *
  * @remarks
  * The estimated entries, on their own scale, are the correlations in the order of `pairs`, then the logarithms of the
- * standard deviations, then the means, each group only when it is free. `size` counts them.
+ * standard deviations, then the means, each group only when it is free, and without the pinned dimensions. `size`
+ * counts them.
  */
 export interface Latent {
   /** The covariance matrix by rows: the correlation matrix while the variances are 1. */
@@ -128,6 +136,8 @@ interface State {
   readonly pairs: readonly (readonly [number, number])[];
   /** The number of estimated correlations; the standard deviations and the means follow them in the entries. */
   readonly correlationCount: number;
+  /** The dimensions whose standard deviation and mean are estimated when they are free: those that are not pinned. */
+  readonly moving: readonly number[];
   /** The number of estimated entries. */
   readonly size: number;
   readonly matrix: Float64Array;
@@ -167,12 +177,14 @@ function stateOf(grid: Grid, free: LatentFree): State {
   const size = dimensions * dimensions;
   const pairs = pairsOf(dimensions);
   const correlationCount = free.correlations ? pairs.length : 0;
-  const entryCount = correlationCount + (free.variances ? dimensions : 0) + (free.means ? dimensions : 0);
+  const moving = Array.from({ length: dimensions }, (_, i) => i).filter((i) => free.pinned?.includes(i) !== true);
+  const entryCount = correlationCount + (free.variances ? moving.length : 0) + (free.means ? moving.length : 0);
   return {
     grid,
     free,
     pairs,
     correlationCount,
+    moving,
     size: entryCount,
     matrix: new Float64Array(size),
     correlation: identity(dimensions),
@@ -270,12 +282,10 @@ function evaluate(state: State): void {
 
 /** Writes the derivatives of -Q / 2 at the node whose residual and covector are in the scratch, from `start` on. */
 function entryTerms(state: State, start: number): void {
-  const { dimensions } = state.grid;
   const { covector, residual, terms } = state.scratch;
   let entry = state.free.correlations ? correlationTerms(state, start) : start;
-  if (state.free.variances)
-    for (let i = 0; i < dimensions; i++) terms[entry++] = (covector[i] ?? 0) * (residual[i] ?? 0);
-  if (state.free.means) for (let i = 0; i < dimensions; i++) terms[entry++] = covector[i] ?? 0;
+  if (state.free.variances) for (const i of state.moving) terms[entry++] = (covector[i] ?? 0) * (residual[i] ?? 0);
+  if (state.free.means) for (const i of state.moving) terms[entry++] = covector[i] ?? 0;
 }
 
 /** Writes the derivatives of -Q / 2 with respect to the correlations from `start` on; returns the next index. */
@@ -313,18 +323,16 @@ function nodeScores(state: State, out: Float64Array): void {
 
 /** Reads the entries after the correlations: the standard deviations from their logarithms, then the means. */
 function readTail(state: State, entries: Float64Array, spread: Float64Array, location: Float64Array): void {
-  const { dimensions } = state.grid;
   let slot = state.correlationCount;
-  if (state.free.variances) for (let i = 0; i < dimensions; i++) spread[i] = Math.exp(entries[slot++] ?? 0);
-  if (state.free.means) for (let i = 0; i < dimensions; i++) location[i] = entries[slot++] ?? 0;
+  if (state.free.variances) for (const i of state.moving) spread[i] = Math.exp(entries[slot++] ?? 0);
+  if (state.free.means) for (const i of state.moving) location[i] = entries[slot++] ?? 0;
 }
 
 /** Writes the entries after the correlations: the logarithms of the standard deviations, then the means. */
 function writeTail(state: State, out: Float64Array): void {
-  const { dimensions } = state.grid;
   let slot = state.correlationCount;
-  if (state.free.variances) for (let i = 0; i < dimensions; i++) out[slot++] = Math.log(state.deviations[i] ?? 1);
-  if (state.free.means) for (let i = 0; i < dimensions; i++) out[slot++] = state.mean[i] ?? 0;
+  if (state.free.variances) for (const i of state.moving) out[slot++] = Math.log(state.deviations[i] ?? 1);
+  if (state.free.means) for (const i of state.moving) out[slot++] = state.mean[i] ?? 0;
 }
 
 /** Installs the distribution of the parameters, whose entries that are not free stay as they are. */

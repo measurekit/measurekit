@@ -40,6 +40,8 @@ Rscript validation/psychometrics/cdm-item-comparison.R  # item-level model compa
 Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mirt, GPArotation and base R; case names as arguments run only those cases
 Rscript validation/psychometrics/multidimensional-groups.R # multidimensional IRT in several groups, with fixed items: mirt's multipleGroup
 Rscript validation/psychometrics/bifactor.R           # bifactor and two-tier models: mirt's bfactor; case names as arguments run only those cases
+Rscript validation/psychometrics/longitudinal.R      # the same persons over two or three occasions: mirt with one dimension per occasion and tied items; TAM's tam.mml for the Rasch model
+Rscript validation/psychometrics/longitudinal-recovery.R # how well mirt recovers the moments of the occasions, which bounds the recovery tests and the number of occasions
 Rscript validation/psychometrics/change.R            # gains, reliability of a difference and reliable change: clinicalsignificance and base R
 Rscript validation/psychometrics/parameterization.R  # mirt's coefficient forms of every item type, multidimensional ones included
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
@@ -70,6 +72,11 @@ with their minres solutions in base R and psych, and takes seconds.
 all of them without; it takes about half an hour, as mirt's EM at `TOL = 1e-10` runs to its limit of 5,000 cycles on the 3PL and
 on the data with missing responses, and each fixture records whether mirt stopped before it. `recovery` writes the data and
 the truth only.
+
+`longitudinal.R` writes one fixture of five cases, two occasions with persons missing from the second, three occasions, items
+that only one occasion has, the graded model and the Rasch model, and takes about ten minutes; `longitudinal-mirt.R` holds the
+simulation and the mirt model that it, `longitudinal-recovery.R` and the benchmark share. `longitudinal-recovery.R` fits mirt
+to 5,000 persons on 4 cores, writes each row as it finishes, takes about ten minutes and stops after 60.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in

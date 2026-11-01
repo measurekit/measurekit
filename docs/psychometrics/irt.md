@@ -235,7 +235,10 @@ rectangular rule: its nodes stay at -6 to 6 and their weights move.
 - **Groups.** `groups` gives each person's group label; every item has the same parameters in all groups, and each
   group has its own distribution, `latent: { grade4: "standard-normal", grade5: "normal" }`: mirt's `multipleGroup`
   with `invariance = c(items, "free_means", "free_var")`. Groups not named take the standard normal. Results list the
-  groups in order of first appearance.
+  groups in order of first appearance. Groups are independent samples: stacking the occasions of repeated persons as
+  groups treats each person as two or three persons and ignores the correlation between a person's occasions, so the
+  means and standard errors of the change are wrong. [`calibrateLongitudinal`](multidimensional.md#longitudinal-calibration)
+  estimates the correlations between occasions.
 - **Histograms.** The weights of a histogram creep toward a few spikes, the maximum of the likelihood, without
   reaching it, so a histogram is where EM stops: `tolerance` covers its weights. Its weights have no standard errors;
   the items' standard errors treat them as known, as mirt does.

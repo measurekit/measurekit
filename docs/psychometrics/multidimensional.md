@@ -5,9 +5,10 @@ slope on each dimension: a high theta on one dimension makes up for a low one on
 calibrates items and the correlations between dimensions by marginal maximum likelihood, exploratory and confirmatory,
 with EM for up to three dimensions and with MH-RM for any number, and bifactor and two-tier models by dimension
 reduction; computes standard errors; rotates exploratory solutions; calibrates several groups of persons on one scale,
-with fixed anchor items; estimates thetas by EAP and MAP in any number of dimensions; and computes information matrices.
-Every estimate is validated against mirt, GPArotation and base R ([validation](validation.md)). The dimensions have mean
-0 and variance 1, in the first group of a calibration of several groups.
+with fixed anchor items; calibrates the same persons over two or three occasions; estimates thetas by EAP and MAP in any
+number of dimensions; and computes information matrices. Every estimate is validated against mirt, GPArotation and base
+R ([validation](validation.md)). The dimensions have mean 0 and variance 1, in the first group of a calibration of
+several groups.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -242,6 +243,133 @@ are those of the first group's correlations.
 deviation below the spacing of its nodes or above its range, leaves `converged` `false`: a few persons, or too coarse a
 grid, give such a group no maximum. The default grid of three dimensions has 15 nodes per dimension; set `points: 21`
 above 20 items per dimension, where the coarse grid biases the moments of the groups.
+
+### Longitudinal calibration
+
+```mermaid
+flowchart LR
+  O["Occasions: one response matrix each, persons and items matched by id"] --> L["Likelihood of each person on each occasion's axis of nodes"]
+  L --> G["Grid of occasions: the product of the occasions' likelihoods, weighted by the normal prior"]
+  G --> I["M-step, items: expected counts pooled over the occasions of an item, one set of parameters"]
+  G --> M["M-step, moments: means, standard deviations and correlations of the later occasions"]
+  I --> L
+  M --> G
+  M --> R["Moments of each occasion and of the change between them"]
+```
+
+`calibrateLongitudinal` calibrates the same persons answering the same items on two or three occasions: the trait of each
+occasion is one dimension of a normal distribution whose means, standard deviations and correlations are estimated, and
+an item has one set of parameters on every occasion it is on. It is `mirt` with one dimension per occasion, the items'
+parameters tied by `constrain` and `MEAN` and `COV` freed (Andersen, 1985). The first occasion is N(0, 1) and sets the
+scale: the other means and standard deviations are on it.
+
+| Option           | Default                      | Meaning                                                                                           |
+| ---------------- | ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| `model`          | `twoParameterLogistic`       | `oneParameterLogistic` (one slope for all items), `twoParameterLogistic` or `gradedResponse`      |
+| `points`         | 31 for 2 occasions, 21 for 3 | Nodes on each occasion's axis, from -6 to 6, at least 2; the grid has `points ** occasions` nodes |
+| `standardErrors` | `"none"`                     | `"hessian"` or `"cross-product"`, of the items and the distribution together; see below           |
+| `tolerance`      | `1e-4`                       | EM stops when no estimated parameter changes by more than this                                    |
+| `maxIterations`  | `500`                        | The most EM iterations; the result has `converged: false` if they run out                         |
+
+| The data         | Rule                                                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Occasions        | An array of 2 or 3 response matrices; another length is a `DataError`                                                        |
+| Persons          | Matched by person id: a person who is in some occasions only is allowed, and counts as having no responses on the others     |
+| Items            | Matched by item id, in order of first appearance; an item that only some occasions have is allowed, as in an anchored design |
+| Linked occasions | Every occasion must share an item with the first, directly or through the others, or its mean has no scale: a `DataError`    |
+| Categories       | Pooled over the occasions: an item needs responses in every category up to its highest, as in `calibrate`                    |
+
+| Result           | Meaning                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `items`          | Each item's `id`, `model` and `parameters`, as `calibrate` gives them; they serve `abilityEstimates` and the other functions of items      |
+| `occasions`      | The `mean` and `sd` of each occasion's trait; the first is 0 and 1                                                                         |
+| `correlations`   | The correlations between the occasions, by rows                                                                                            |
+| `changes`        | For each pair of consecutive occasions, `from` and `to` (indexes from 0): the `mean` and `sd` of the change and its `correlationWithStart` |
+| `standardErrors` | `null` without the option. Otherwise the standard errors of the estimates on their own scale: see below                                    |
+| `logLikelihood`  | The marginal log-likelihood at the estimates                                                                                               |
+| `converged`      | Whether EM reached `tolerance` within `maxIterations`, with every later occasion's distribution on the grid; `iterations` counts them      |
+
+`changes` carries the change in the trait that growth models use: the later trait less the earlier, with the mean and
+standard deviation of the difference from the covariance matrix, and its correlation with the earlier trait, which is
+negative where persons who start low gain more. Embretson's (1991) initial ability and modifiability are the earlier
+trait and that change.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { calibrateLongitudinal } from "@measurekit/psychometrics/multidimensional";
+import { simulateItems, simulateResponses } from "@measurekit/psychometrics/sim";
+
+// Twelve items; 1,000 persons answer them twice, the second time 0.4 higher on average and more spread out.
+const random = createRandom(7);
+const items = simulateItems(twoParameterLogistic, 12, random);
+const before = Array.from({ length: 1000 }, () => random.normal());
+const after = before.map((theta) => 0.4 + 1.2 * (0.8 * theta + 0.6 * random.normal()));
+const fit = calibrateLongitudinal([simulateResponses(items, before, random), simulateResponses(items, after, random)], {
+  standardErrors: "hessian",
+});
+fit.occasions; // [{ mean: 0, sd: 1 }, { mean: 0.43, sd: 1.22 }]
+fit.correlations; // [[1, 0.84], [0.84, 1]]
+fit.changes[0]; // { from: 0, to: 1, mean: 0.43, sd: 0.66, correlationWithStart: 0.03 }
+fit.items[0]?.parameters; // { a: 0.81, b: -0.15, c: 0, d: 1 }
+fit.standardErrors?.slice(-3); // [0.024, 0.051, 0.042]: the correlation, SD and mean of the second occasion
+fit.converged; // true
+```
+
+**Convergence.** A later occasion's distribution that runs to the edge of the grid, a mean outside it or a standard
+deviation below the spacing of its nodes or above its range, leaves `converged` `false`, as in
+[groups](#groups-and-fixed-items).
+
+**Standard errors.** `"hessian"` is the observed information, the Hessian of the marginal log-likelihood by central
+differences of its exact gradient, which two E-steps per parameter give; `"cross-product"` is the sum over persons of the
+outer products of their scores, one pass. The array lists the estimated parameters on their own scale: each item's
+parameters in item order and the order of its model's parameters, with a parameter that the items share, the 1PL's slope,
+once at its first item; then the correlations of the pairs (1, 0), (2, 0), (2, 1) of occasions, the standard deviations of
+the occasions after the first and their means. It is `null` where the information cannot be inverted or gives a variance
+that is not positive.
+
+**Time.** CPU time of one calibration at the default `tolerance`, on an Apple M5 with Node.js 26, simulated data:
+
+| Data                                                                     | `"none"` | `"cross-product"` | `"hessian"` |
+| ------------------------------------------------------------------------ | -------- | ----------------- | ----------- |
+| 2 occasions, 2PL, 10 items, 1,500 persons, 31 points                     | 0.4 s    | 0.4 s             | 1.0 s       |
+| 3 occasions, 2PL, 10 items, 1,000 persons, 21 points                     | 2.7 s    | 2.8 s             | 4.1 s       |
+| 3 occasions, graded with 5 categories, 6 items, 1,000 persons, 21 points | 2.0 s    | 2.3 s             | 3.8 s       |
+
+The E-step costs the responses times the points of an axis plus a few operations per node of the grid, which has
+`points ** occasions` nodes; the BFGS of the moments costs more than the items' M-step, which pools the occasions'
+counts. A calibration is synchronous: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
+
+**Why 3 occasions.** The grid has `points ** occasions` nodes, so the nodes per occasion fall as occasions are added, and
+the moments of correlated occasions are biased by the coarse grid with no sign of it: every fit below reports
+`converged`. `mirt` at its defaults, 1,500 persons, 10 items per occasion, autoregressive correlation 0.85, the largest
+error over the seeds (3 seeds up to 3 occasions, 1 at 4 and 5) of an estimate from the mean, standard deviation or
+correlation of the simulated abilities:
+
+| Occasions | Nodes | Mean error | SD error  | Correlation error |
+| --------- | ----- | ---------- | --------- | ----------------- |
+| 2         | 31    | 0.035      | 0.065     | 0.015             |
+| 3         | 15    | 0.047      | 0.053     | 0.021             |
+| 3         | 21    | 0.046      | 0.049     | 0.028             |
+| 4         | 9     | **0.305**  | **0.192** | **0.238**         |
+| 5         | 7     | **0.307**  | **0.291** | **0.228**         |
+
+At 2 and 3 occasions the error is that of the persons and items, which more of them reduce: at 5,000 persons it is
+0.018, 0.014 and 0.013 at 2 occasions and 0.018, 0.022 and 0.013 at 3. At 4 and 5 occasions the grid is the limit by a
+wide margin, so `calibrateLongitudinal` takes 2 or 3 occasions and throws a `DataError` for another number.
+
+**Why 21 nodes at 3 occasions.** With 40 items per occasion the posterior narrows, and 15 nodes, `mirt`'s default for
+three dimensions, miss by many times what 21 do. 2,000 persons, 40 items per occasion, 3 occasions, correlation 0.85,
+two seeds; the distance is the largest difference of a mean, standard deviation or correlation between two grids:
+
+| Seed | 15 against 31 nodes | 21 against 31 nodes | Time at 15, 21 and 31 nodes |
+| ---- | ------------------- | ------------------- | --------------------------- |
+| 1    | 0.109               | 0.021               | 2.8 s, 4.1 s, 21 s          |
+| 2    | 0.104               | 0.008               | 1.7 s, 6.6 s, 22 s          |
+
+So the default is 21 nodes at 3 occasions, and `mirt`'s 31 at 2. The tests recover the moments of 5,000 simulated
+persons at 10 and at 40 items per occasion within 1.5 times the worst error of `mirt` on the same design, rounded up to
+a multiple of 0.005 ([validation](validation.md#simulation)).
 
 ### Standard errors
 
@@ -479,6 +607,10 @@ convert items to and from mirt.
 - QMC-EM.
 - Standard errors of the means and covariances of the groups; the items' standard errors account for them.
 - Items whose parameters differ between groups; the groups share one set of item parameters.
+- More than three occasions: the grid has a dimension for each, and the grids that a product can afford are too coarse
+  for the correlations that longitudinal data have ([why](#longitudinal-calibration)).
+- Structured means and covariances of the occasions, such as a growth curve or an autoregressive covariance: every
+  mean, standard deviation and correlation of the later occasions is free.
 - Multidimensional person fit and DIF.
 
 ## Differences from mirt
@@ -508,6 +640,12 @@ convert items to and from mirt.
   constrain parameters that it does not estimate, so for fixed items it needs the other items named in `invariance`;
   here `fixed` frees the means and covariance of the first group as well. mirt's covariance of a group is free in
   every entry its model frees; here an uncorrelated model has a diagonal covariance in every group, as mirt's.
+- **Longitudinal calibration.** mirt needs the occasions as one wide matrix, a dimension for each, and `constrain`
+  lists of parameter numbers that tie the items; here the occasions are response matrices whose items and persons are
+  matched by id, and a person who missed an occasion has no row in it, where mirt has a row of missing responses. The
+  first occasion is N(0, 1) in both. TAM's Rasch model fixes the slopes at 1 and frees the first occasion's variance: the
+  same model on the scale of that standard deviation, which the 1PL's slope `a` carries here. On three occasions mirt's
+  EM stops before its estimates settle, as for groups, and this library's log-likelihood is never below its own.
 - **MH-RM estimates.** The stages, gains and tolerance are mirt's defaults, and the estimates agree within Monte Carlo
   error, not to the digits that EM does: on 800 persons, 25 graded items and 5 dimensions, mirt's four runs differ from
   their mean by up to 0.08 in a parameter, and a run here from that mean by up to 0.17.
@@ -531,6 +669,10 @@ convert items to and from mirt.
   Supplement, 17. https://doi.org/10.1007/BF03372160
 - Chalmers, R. P. (2012). mirt: A multidimensional item response theory package for the R environment. Journal of
   Statistical Software, 48(6). https://doi.org/10.18637/jss.v048.i06
+- Andersen, E. B. (1985). Estimating latent correlations between repeated testings. Psychometrika, 50, 3-16.
+  https://doi.org/10.1007/BF02294143
+- Embretson, S. E. (1991). A multidimensional latent trait model for measuring learning and change. Psychometrika, 56,
+  495-515. https://doi.org/10.1007/BF02294487
 - Jennrich, R. I. (2001). A simple general procedure for orthogonal rotation. Psychometrika, 66, 289-306.
   https://doi.org/10.1007/BF02294840
 - Jennrich, R. I. (2002). A simple general method for oblique rotation. Psychometrika, 67, 7-19.

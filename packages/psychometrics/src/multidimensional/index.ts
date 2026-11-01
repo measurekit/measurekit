@@ -1,6 +1,7 @@
 /**
  * Multidimensional item response theory: compensatory logistic and graded models, calibration by EM for up to three
- * dimensions, exploratory and confirmatory, standard errors, rotation, scoring and information.
+ * dimensions, exploratory and confirmatory, in several groups and with fixed items, standard errors, rotation, scoring
+ * and information, and the calibration of a trait that changes over two or three occasions.
  *
  * @module @measurekit/psychometrics/multidimensional
  */
@@ -21,6 +22,13 @@ export {
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
 } from "./logistic.js";
+export {
+  calibrateLongitudinal,
+  type LongitudinalCalibration,
+  type LongitudinalOptions,
+  type OccasionChange,
+  type OccasionMoments,
+} from "./longitudinal.js";
 export type {
   LoadingPattern,
   MultidimensionalItem,

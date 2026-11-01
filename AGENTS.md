@@ -42,6 +42,7 @@ Use these words with these meanings in code, comments and docs.
 | profile, Q-matrix  | A profile marks each attribute mastered (1) or not (0); a Q-matrix lists each item's attributes by item id.                |
 | record             | One response in long format, `{ person, item, response }`, for sparse data.                                                |
 | group              | A set of persons with its own distribution of theta in calibration; in DIF, `"reference"` or `"focal"`.                    |
+| occasion           | One administration of the same items to the same persons; a longitudinal calibration gives each its own trait.             |
 | testlet            | Items that share a stimulus, such as a reading passage; the testlet model adds one effect per person and testlet.          |
 | pool, form, panel  | A pool holds the items an adaptive test selects from; a form is a fixed set of items; a panel has stages of modules.       |
 | response time      | Seconds a person spent on an item, aligned with the response: `times` of a matrix, `time` of a record.                     |
@@ -115,7 +116,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/irt/              item response theory: models, calibration with a latent regression, ability estimation,
                         information, reliability
   src/multidimensional/ multidimensional item response theory: models, EM and MH-RM calibration, groups and fixed items by EM,
-                        bifactor and two-tier models, rotation, scoring, information
+                        bifactor and two-tier models, a trait over two or three occasions, rotation, scoring,
+                        information
   src/sim/              simulation of thetas, item parameters and responses, multidimensional ones included
   src/cat/              adaptive and multistage tests, testlets, their simulation, exposure control, form assembly
   src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, A-CDM, LLM, R-RUM, Wald tests of reduced models for
