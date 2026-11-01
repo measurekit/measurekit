@@ -17,10 +17,11 @@ import {
   uniformDistribution,
   yenQ3,
 } from "../src/index.js";
+import { expectClose } from "./assertions.js";
+import { fixtureItems } from "./fixture-items.js";
 import rasch from "./fixtures/fit-rasch.json" with { type: "json" };
 import residuals from "./fixtures/fit-residuals.json" with { type: "json" };
 import summedScore from "./fixtures/fit-summed-score.json" with { type: "json" };
-import { expectClose, fixtureItems } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Every fit statistic against eRm and mirt, from the same items and thetas. */

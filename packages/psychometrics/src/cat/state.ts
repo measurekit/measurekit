@@ -1,5 +1,5 @@
 import { DataError, isRecord } from "@measurekit/core";
-import type { AbilityEstimate } from "../irt/ability.js";
+import type { AbilityEstimate } from "../irt/internal.js";
 import { indexOf, itemById } from "./items.js";
 
 /**

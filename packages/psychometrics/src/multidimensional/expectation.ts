@@ -1,6 +1,5 @@
 import { normalizeLogs } from "@measurekit/core";
-import { logProbability } from "../irt/probability.js";
-import { type CompressedResponses, forEachRespondent } from "../irt/responses.js";
+import { type CompressedResponses, forEachRespondent, logProbability } from "../irt/internal.js";
 import type { Grid } from "./grid.js";
 import type { MultidimensionalModel } from "./model.js";
 

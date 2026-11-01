@@ -1,5 +1,5 @@
 import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { standardDeviation } from "../math/statistics.js";
@@ -78,6 +78,10 @@ const POLYTOMOUS_ETS_THRESHOLDS = { moderate: 0.17, large: 0.25 } as const;
  * significant and |effect size| > 0.25; BB otherwise. Purification flags items whose Mantel chi-square is significant at
  * 0.05.
  *
+ * @param matrix - The responses of the persons.
+ * @param groups - The group of each person, in the order of the matrix.
+ * @param options - Whether to purify the matching score.
+ * @returns The statistics of every item, and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, either group has no person with a response, or
  * `purify` is not a boolean.
  * @see {@link https://doi.org/10.1080/01621459.1963.10500879 | Mantel (1963)}

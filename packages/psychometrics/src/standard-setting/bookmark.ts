@@ -1,7 +1,6 @@
 import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
-import { scoreLimits } from "../equating/models.js";
-import { expectedScore, indexItems, largestCategoryCount } from "../irt/items.js";
-import type { TestItem } from "../irt/model.js";
+import { scoreLimits } from "../equating/internal.js";
+import { expectedScore, indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
 import { findIncreasingRoot } from "../math/root.js";
 
 /** Options of {@link orderedItemBooklet} and {@link bookmarkCutScore}. */
@@ -39,6 +38,9 @@ const DEFAULT_RESPONSE_PROBABILITY = 0.67;
  * at the theta where P(X ≥ k | θ) equals the response probability (RP), in ascending order of location, ties in item
  * order. A dichotomous item has one page, at P(θ) = RP.
  *
+ * @param items - The items of the booklet.
+ * @param options - The response probability that defines mastery.
+ * @returns The pages, from the easiest to the hardest, each with its item, category and location.
  * @throws `DataError` without items, when an id is not a string or repeats, an item is invalid or not one of the
  * built-in models, its expected score does not increase with theta (an NRM item, or a ≤ 0), the response probability
  * is not between 0 and 1, or a logistic item's probability never equals it: c ≥ RP or d ≤ RP.
@@ -79,7 +81,11 @@ export function orderedItemBooklet(items: readonly TestItem[], options: Bookmark
  * person masters pages 1 to `page`, each with a probability of at least the response probability. The theta cut is
  * the location of page `page`, and the raw cut score is the expected total score there.
  *
+ * @param items - The items of the booklet.
  * @param page - The number of the last page mastered, from 1 to the number of pages.
+ * @param options - The response probability that defines mastery.
+ * @returns The theta cut, the location of the last page mastered, and the expected total score there, the raw cut
+ *   score.
  * @throws `DataError` when `page` is not one of the booklet's pages, or in the cases of {@link orderedItemBooklet}.
  */
 export function bookmarkCutScore(

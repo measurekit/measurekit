@@ -15,6 +15,7 @@ export type KappaWeights = "none" | "linear" | "quadratic";
  * @param first - The category each pair has in the first list.
  * @param second - The category each pair has in the second list.
  * @param weights - The weights of partial agreement.
+ * @returns Kappa, at most 1; `null` where chance agreement is complete, so that kappa is undefined.
  * @see {@link https://doi.org/10.1177/001316446002000104 | Cohen (1960)}
  * @see {@link https://doi.org/10.1037/h0026256 | Cohen (1968)}
  */

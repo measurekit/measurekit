@@ -6,7 +6,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@measurekit/knowledge-tracing": "workspace:*"
+    "@measurekit/core": "workspace:*",
+    "@measurekit/knowledge-tracing": "workspace:*",
+    "@measurekit/psychometrics": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

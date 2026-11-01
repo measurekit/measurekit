@@ -1,8 +1,7 @@
 import { checkArray, checkRecord, DataError, describe } from "@measurekit/core";
-import { checkFacetedScores, type FacetedScore } from "../data/faceted-scores.js";
-import { scoreMoments } from "../fit/inputs.js";
-import { addResponse, type MeanSquareFit, meanSquares, SUM_COUNT } from "../fit/mean-squares.js";
-import type { PersonEstimate } from "../irt/joint-maximum-likelihood.js";
+import { checkFacetedScores, type FacetedScore } from "../data/internal.js";
+import { addResponse, type MeanSquareFit, meanSquares, SUM_COUNT, scoreMoments } from "../fit/internal.js";
+import type { PersonEstimate } from "../irt/internal.js";
 import type { ManyFacetRasch } from "./many-facet-rasch.js";
 import { checkManyFacetRasch, ratingStructure, scoredItems } from "./rating-model.js";
 
@@ -24,7 +23,10 @@ export interface FacetFit extends MeanSquareFit {
  * theta, are skipped; persons with extreme scores are not left out, as the estimates are finite under a prior. A
  * statistic is `null` for an element without scores of persons with estimates.
  *
+ * @param scores - The scores in long format, each with the element of every facet in `levels`.
+ * @param model - The many-facet Rasch model.
  * @param persons - Estimates by person id, such as those of `manyFacetEstimates`.
+ * @returns For each element of each facet, the infit and outfit mean squares and their standardized forms.
  * @throws `DataError` when the model, the scores or the estimates are invalid, a score has an element the model does
  * not, or a score is not a category of its item.
  */

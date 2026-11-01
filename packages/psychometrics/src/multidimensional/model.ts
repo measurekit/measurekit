@@ -1,4 +1,4 @@
-import type { ModelParameter } from "../irt/model.js";
+import type { ModelParameter } from "../irt/internal.js";
 
 /**
  * A multidimensional item response model: the probability of each response category of an item as a function of a

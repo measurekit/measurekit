@@ -1,13 +1,13 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import { afm, type Event, eventLog, logistic, searchRates } from "../src/index.js";
-import { checkTerms } from "../src/logistic/terms.js";
+import { checkTerms } from "../src/logistic/internal.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-bkt.json" with { type: "json" };
 import itemsFixture from "./fixtures/bench-logistic-items.json" with { type: "json" };
 import lktFeatures from "./fixtures/logistic-lkt-features.json" with { type: "json" };
 import ratesFixture from "./fixtures/logistic-rates.json" with { type: "json" };
-import { columnsLog, online } from "./helpers.js";
+import { columnsLog, online } from "./logs.js";
 
 /** The log of the BKT benchmark: 20,000 attempts of 200 learners at 5 skills. */
 const log = columnsLog(fixture);

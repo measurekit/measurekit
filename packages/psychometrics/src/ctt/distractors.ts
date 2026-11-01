@@ -1,5 +1,5 @@
 import { checkOptions, checkRecord, DataError } from "@measurekit/core";
-import { type ScoredResponses, scoreResponses } from "../data/scoring.js";
+import { type ScoredResponses, scoreResponses } from "../data/internal.js";
 import { correlation } from "../math/statistics.js";
 import { completeCases } from "./complete-cases.js";
 import { type GroupOptions, groupMean, scoreGroups } from "./groups.js";
@@ -35,6 +35,9 @@ export interface OptionAnalysis {
  * use every person who answered the item; the groups and correlations use the persons who answered every item, by
  * total score. A statistic that is undefined for the data is `null`.
  *
+ * @param scored - The choices of the persons and the key, as `scoreResponses` returns them.
+ * @param options - The share of persons in the upper and lower groups.
+ * @returns The statistics of every option of every item.
  * @throws `DataError` when the choices, key, labels or ids are invalid, or `groupFraction` is out of range.
  */
 export function distractorAnalysis(scored: ScoredResponses, options: GroupOptions = {}): OptionAnalysis[] {

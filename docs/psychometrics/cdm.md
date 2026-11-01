@@ -281,7 +281,7 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 - **Monotonicity constraints.** Outside the sources: an option of GDINA (`mono.constraint`), off by default.
 - **Sequential CDMs.** Outside the sources: an option of GDINA (`sequential`), off by default.
 - **Hierarchical attribute structures.** Outside the sources: an option of GDINA (`att.str`), off by default.
-- _*The R-RUM's original (π*, r_) parameters.** No fit: they follow from `coefficients`, as above.
+- **The R-RUM's original parameters.** No fit: the parameters `π*` and `r*` follow from `coefficients`, as above.
 - **Higher-order attribute models.** Outside the sources: a variant, as GDINA's `att.dist` shows; the saturated
   distribution of the profiles is its default.
 - **Polytomous attributes.** Outside the sources: a variant of the models for attributes mastered or not.

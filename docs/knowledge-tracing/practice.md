@@ -178,6 +178,18 @@ card = scheduler.review({ card, grade, now: new Date() }).card; // card.dueAt: t
 
 Store the card beside the learner's state; a failed review can send the skill back to practice.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                        | What to do                                                                                         |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| The model is not a learner model, or has no `mastery` for `thresholdMastery` | Pass a model such as `bkt()` or `kst()` for `thresholdMastery`; `predictedMastery` takes any model |
+| The band is not within 0 to 1 with lower at most upper                       | Give `band: [lower, upper]` as probabilities                                                       |
+| A threshold, a decay or a length is out of range                             | Give a threshold and a decay from 0 to 1, and a positive integer for a length                      |
+| An event with an outcome has no skills, for the mastery tables               | Give the event skills, or a Q-matrix to `eventLog`                                                 |
+| The model rejects the state or an attempt                                    | Pass a state of this model and attempts with the skills it knows                                   |
+
 ## Not included
 
 - **Bandit and reinforcement-learning sequencing.** No fit: reward design and policy evaluation are a wider domain than

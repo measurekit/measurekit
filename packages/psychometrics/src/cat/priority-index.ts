@@ -53,6 +53,7 @@ function factors(
  * @param rule - The rule that scores the items.
  * @param constraints - The area, the minimum, the maximum and the weight, the bounds as integers from 0.
  * @param length - The most items a test may have, a positive integer.
+ * @returns The selection rule, which scores the items by `rule` times the priority index of their content areas.
  * @throws `DataError` when `rule` is not a selection rule, the constraints are invalid or on one area twice, or
  * `length` is not a positive integer; from the rule, when `rule` scores an eligible item finitely below 0.
  * @see {@link https://doi.org/10.1348/000711008X304376 | Cheng and Chang (2009)}

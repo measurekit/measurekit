@@ -1,9 +1,6 @@
 import { checkChoice, checkIntegerFrom, checkOptions, checkStopping } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
-import type { StandardErrorMethod } from "../irt/calibration-options.js";
-import type { ParameterPrior } from "../irt/prior.js";
-import { compressResponses, respondentsOf } from "../irt/responses.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import { compressResponses, type ParameterPrior, respondentsOf, type StandardErrorMethod } from "../irt/internal.js";
 import { bifactorFit, solveBifactor } from "./bifactor-fit.js";
 import { structureOf } from "./bifactor-structure.js";
 import { assemble, type MultidimensionalCalibration } from "./calibration.js";
@@ -97,6 +94,11 @@ const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian
  * dimensions, so it needs a small `points` with many specific dimensions, and the posterior mode does not. Missing
  * responses are skipped; persons without responses change nothing.
  *
+ * @param data - The responses of the persons, as a matrix or as records.
+ * @param options - The specific and primary dimensions of each item, the priors, the quadrature, the standard errors
+ *   and the stopping rules; each option has its default.
+ * @returns The items with their parameters, the correlations of the primary dimensions, the standardized loadings and
+ *   communalities, the log-likelihood, AIC and BIC, whether the EM converged and the iterations run.
  * @see {@link https://doi.org/10.1177/014662169201600302 | Gibbons and Hedeker (1992)}
  * @see {@link https://doi.org/10.1007/s11336-010-9178-0 | Cai (2010)}
  * @throws `DataError` when the data or an option is invalid, there are no responses, `specific` or `primary` does not

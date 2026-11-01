@@ -1,5 +1,5 @@
 import { checkArray, DataError, describe } from "@measurekit/core";
-import type { IrtItem } from "../irt/model.js";
+import type { IrtItem } from "../irt/internal.js";
 
 /** Returns the highest total score of the items: the sum of their categories less 1. */
 export function highestScore(items: readonly IrtItem[]): number {

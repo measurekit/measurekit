@@ -42,6 +42,8 @@ export interface ScaleGrowth {
  * means and standard deviations come from a calibration with `groups`, or from a separate calibration of each group
  * chained to a base scale.
  *
+ * @param groups - The groups in the order of the scale, the earliest first, each with its mean and standard deviation.
+ * @returns The growth between each group and the next.
  * @throws `DataError` when `groups` is not an array of at least two groups, a group is not an object with a non-empty
  * `group` label, a finite `mean` and a positive `sd`, or two groups have the same label.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1986.tb00252.x | Yen (1986)}

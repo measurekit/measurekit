@@ -1,6 +1,5 @@
 import { DataError, describe, isRecord } from "@measurekit/core";
-import type { Attempt, Event } from "./data/event.js";
-import type { EventLog } from "./data/event-log.js";
+import type { Attempt, Event, EventLog } from "./data/internal.js";
 
 /** The methods of {@link LearnerModel} that every model has. */
 const MODEL_METHODS = ["fit", "initialState", "update", "predict"] as const;

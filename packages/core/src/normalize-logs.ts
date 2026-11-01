@@ -5,6 +5,9 @@
  * @remarks
  * The largest log weight is subtracted before `exp`, so that weights far below the largest do not make every term
  * underflow.
+ *
+ * @param values - The log weights, which the probabilities replace.
+ * @returns The log of the sum of the weights, ln Σ exp(value); `-Infinity` for no weight.
  */
 export function normalizeLogs(values: Float64Array): number {
   let largest = Number.NEGATIVE_INFINITY;

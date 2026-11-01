@@ -1,5 +1,5 @@
 import { DataError, mean, studentLowerTail } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { normalCdf } from "../math/normal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
 import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
@@ -48,6 +48,11 @@ export interface InvariantItemOrdering {
  * their sorted profiles. Persons who answered every item are used. It follows the mokken package's `check.iio` with
  * method MIIO, except that it breaks ties of H by the first item and not by chance.
  *
+ * @param matrix - The responses of the persons, with at least one item that the persons answered.
+ * @param options - How to select the items, the smallest violation and group size that count, and the level of the
+ *   tests.
+ * @returns For each item, its violations; the items removed to reach an ordering; and the scalability coefficient of
+ *   what is left.
  * @throws `DataError` when the matrix is invalid, has fewer than three items, fewer than two persons answered every
  * item, the scores span more than 10 categories, an option is invalid, or fewer persons answered every item than the
  * minimum group size.

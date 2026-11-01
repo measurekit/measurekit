@@ -1,5 +1,5 @@
 import { checkArray, checkFinite, checkPositive, checkRecord, DataError } from "@measurekit/core";
-import type { AbilityEstimate } from "../irt/ability.js";
+import type { AbilityEstimate } from "../irt/internal.js";
 import { normalCdf } from "../math/normal.js";
 
 /** A person's classification by cut scores on theta. */
@@ -31,6 +31,9 @@ export interface ClassificationAccuracy {
  * Each person's theta is taken as normal around the estimate with its standard error, which gives the probability of
  * each category. A person at a cut is in the category above it.
  *
+ * @param estimates - The estimates of theta with their standard errors.
+ * @param cuts - The cut scores on theta, in increasing order.
+ * @returns The accuracy and consistency of the classification, and the classification of each person.
  * @throws `DataError` without estimates or cuts, when an estimate is not finite or a standard error not positive and
  * finite, or when the cuts are not finite and increasing.
  * @see {@link https://doi.org/10.7275/an9m-2035 | Rudner (2001)}

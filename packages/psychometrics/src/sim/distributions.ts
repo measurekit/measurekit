@@ -10,6 +10,9 @@ export type Distribution = (random: Random) => number;
 /**
  * Returns the normal distribution N(mean, sd²).
  *
+ * @param mean - The mean.
+ * @param sd - The standard deviation, above 0.
+ * @returns The distribution.
  * @throws `DataError` when `mean` is not finite or `sd` is not positive and finite.
  */
 export function normalDistribution(mean: number, sd: number): Distribution {
@@ -20,6 +23,9 @@ export function normalDistribution(mean: number, sd: number): Distribution {
 /**
  * Returns the log-normal distribution: ln x ~ N(meanLog, sdLog²), as R's `rlnorm`.
  *
+ * @param meanLog - The mean of the logarithm.
+ * @param sdLog - The standard deviation of the logarithm, above 0.
+ * @returns The distribution.
  * @throws `DataError` when `meanLog` is not finite or `sdLog` is not positive and finite.
  */
 export function logNormalDistribution(meanLog: number, sdLog: number): Distribution {
@@ -30,6 +36,9 @@ export function logNormalDistribution(meanLog: number, sdLog: number): Distribut
 /**
  * Returns the uniform distribution from `lower` to `upper`.
  *
+ * @param lower - The lowest value.
+ * @param upper - The highest value, above `lower`.
+ * @returns The distribution.
  * @throws `DataError` unless `lower` and `upper` are finite and `lower` is below `upper`.
  */
 export function uniformDistribution(lower: number, upper: number): Distribution {

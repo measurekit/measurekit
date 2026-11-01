@@ -27,6 +27,9 @@ const DEFAULT_HINTED = "incorrect";
  * A first attempt that took hints, `hints` above 0, is recoded by the option `hinted`: DataShop counts a step solved
  * with hints as incorrect. The result is a log in the order of the given one.
  *
+ * @param log - The log to take the first attempts of.
+ * @param options - What a first attempt with hints counts as.
+ * @returns The log of the first attempts, and the events without an outcome.
  * @throws `DataError` when the log is malformed or an option is invalid.
  */
 export function firstAttempts(log: EventLog, options: FirstAttemptsOptions = {}): EventLog {

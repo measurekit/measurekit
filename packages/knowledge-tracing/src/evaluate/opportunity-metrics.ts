@@ -1,4 +1,4 @@
-import { checkLog, type EventLog } from "../data/event-log.js";
+import { checkLog, type EventLog } from "../data/internal.js";
 import { type Metrics, metrics } from "./metrics.js";
 import { checkPredictionList } from "./observed-pairs.js";
 import { checkHasSkills, collectByOpportunity } from "./opportunities.js";
@@ -36,8 +36,10 @@ interface Cell {
  * overall metrics count it twice. A point has `metrics: null` when none of its events has a prediction, and its AUC is
  * `null` for outcomes all equal, as in `metrics`.
  *
+ * @param log - The log the predictions were made for.
  * @param predictions - The prediction of each event, in log order, such as a fit's: a probability, or `null` for an
- * event without one.
+ *   event without one.
+ * @returns The metrics over all events and, for each skill, at each opportunity.
  * @throws `DataError` when the log is malformed, no event with an outcome has skills, or the predictions are malformed
  * or not one per event.
  */

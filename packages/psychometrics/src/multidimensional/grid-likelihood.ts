@@ -1,4 +1,4 @@
-import { logProbability } from "../irt/probability.js";
+import { logProbability } from "../irt/internal.js";
 import type { Grid } from "./grid.js";
 import type { MultidimensionalItem } from "./model.js";
 

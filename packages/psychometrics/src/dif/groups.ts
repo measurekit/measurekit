@@ -1,6 +1,5 @@
 import { checkArray, checkChoice, DataError } from "@measurekit/core";
-import { checkDichotomous } from "../data/dichotomous.js";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkDichotomous, checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 
 /** A person's group in a DIF analysis: the reference group, or the focal group whose items are studied. */
 export type DifGroup = "reference" | "focal";

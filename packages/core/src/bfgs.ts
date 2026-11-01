@@ -47,6 +47,7 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * @param f - The function to minimize.
  * @param start - The point to start from.
  * @param options - The stopping rules.
+ * @returns The point reached, the function value there, the iterations run and whether the minimization converged.
  * @see {@link https://doi.org/10.1007/978-0-387-40065-5 | Nocedal and Wright (2006), eq. 6.20}
  */
 export function bfgs(

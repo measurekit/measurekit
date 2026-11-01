@@ -52,6 +52,8 @@ export interface BacktrackOptions {
  * @param evaluate - Moves to the point at a length along the direction and returns the objective there.
  * @param value - The objective at the point the search starts from.
  * @param slope - The derivative of the objective along the direction at the point.
+ * @param options - The first length, the sufficient decrease and the most halvings.
+ * @returns The accepted length, or `null` when none of the lengths tried satisfied the sufficient decrease.
  */
 export function backtrack(
   evaluate: (length: number) => number,

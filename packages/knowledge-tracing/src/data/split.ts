@@ -15,6 +15,10 @@ export interface Fold {
  * Splits a log into `folds` folds by learner: each learner's events are in the test log of one fold and the training
  * logs of the others. Learners are assigned to folds at random, in equal numbers up to one.
  *
+ * @param log - The log to split.
+ * @param folds - The number of folds, at least 2 and at most the number of learners.
+ * @param random - The generator that deals the learners to the folds.
+ * @returns The folds, each with a training log and a test log.
  * @throws `DataError` when the log is malformed, `folds` is not an integer of at least 2, or there are fewer learners
  * than folds.
  */
@@ -30,6 +34,10 @@ export function splitByLearner(log: EventLog, folds: number, random: Random): Fo
  * Items are counted and dealt out by their events with an outcome. An event without an outcome is in the training log
  * of every fold, as it has nothing to predict.
  *
+ * @param log - The log to split.
+ * @param folds - The number of folds, at least 2 and at most the number of items with an outcome.
+ * @param random - The generator that deals the items to the folds.
+ * @returns The folds, each with a training log and a test log.
  * @throws `DataError` when the log is malformed, `folds` is not an integer of at least 2, or there are fewer items with
  * an outcome than folds.
  */
@@ -43,6 +51,9 @@ export function splitByItem(log: EventLog, folds: number, random: Random): Fold[
  * than those it predicts. A block boundary falls after the last event of its time, so events with equal times share a
  * block, and an event without an outcome is in the block that holds its time.
  *
+ * @param log - The log to split.
+ * @param folds - The number of folds, at least 1.
+ * @returns The folds, each trained on the earlier blocks and tested on the next one.
  * @throws `DataError` when the log is malformed, `folds` is not a positive integer, or the times of the events with an
  * outcome do not divide into `folds + 1` non-empty blocks.
  */

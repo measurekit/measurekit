@@ -1,5 +1,5 @@
 import { checkChoice, checkOptions, DataError } from "@measurekit/core";
-import type { EventLog } from "../data/event-log.js";
+import type { EventLog } from "../data/internal.js";
 import { counterexamples, responsePatterns } from "./patterns.js";
 import type { Prerequisites } from "./surmise.js";
 
@@ -50,6 +50,9 @@ export interface IitaResult extends IitaCandidate {
  * item is used; every learner must have answered every item of the log, with outcomes 0 or 1. Items are in the order of
  * their first event with an outcome, and events without one are left out. Pass the prerequisites to `surmiseStructure` for the knowledge space.
  *
+ * @param log - The log whose first attempts give each learner's response pattern.
+ * @param options - The version of the algorithm.
+ * @returns The candidate relations with their fit, the prerequisites of the best, its diff and its error rate.
  * @throws `DataError` when the log is malformed, a learner has not answered every item, an outcome is not 0 or 1, there
  * are fewer than 2 items with an outcome, or an item is solved by no learner.
  */

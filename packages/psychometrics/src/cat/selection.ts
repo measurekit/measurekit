@@ -1,5 +1,5 @@
 import type { Random } from "@measurekit/core";
-import type { AbilityEstimate } from "../irt/ability.js";
+import type { AbilityEstimate } from "../irt/internal.js";
 import type { PoolControls, PoolItem } from "./items.js";
 
 /**

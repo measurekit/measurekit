@@ -18,13 +18,13 @@ import {
   splitByLearner,
   type ThetaDistribution,
 } from "../src/index.js";
-import { differences } from "../src/irt/ability.js";
-import { categoryCount, categoryTerms, expectedOutcome } from "../src/irt/items.js";
+import { categoryCount, categoryTerms, differences, expectedOutcome } from "../src/irt/internal.js";
 import { reflectedWalk } from "../src/math/reflected-walk.js";
+import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
 import reference from "./fixtures/irt-abilities.json" with { type: "json" };
 import drifting from "./fixtures/irt-drift.json" with { type: "json" };
 import stored from "./fixtures/stored-state.json" with { type: "json" };
-import { allPredicted, defined, expectAllClose, expectClose, expectUnaffectedByLessons } from "./helpers.js";
+import { expectUnaffectedByLessons } from "./logs.js";
 
 /** Absolute tolerance of EAP estimates, predictions and log-probabilities against the written-out grid posterior. */
 const GRID_TOLERANCE = 1e-10;

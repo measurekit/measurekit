@@ -1,5 +1,4 @@
-import type { StandardErrorMethod } from "../irt/calibration-options.js";
-import type { ParameterPrior } from "../irt/prior.js";
+import type { ParameterPrior, StandardErrorMethod } from "../irt/internal.js";
 import type { LoadingPattern, MultidimensionalModel } from "./model.js";
 
 /** How a calibration estimates: `"em"`, by quadrature over a grid, or `"mhrm"`, by Metropolis-Hastings Robbins-Monro. */

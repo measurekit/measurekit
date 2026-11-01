@@ -26,9 +26,9 @@ import {
   speedEstimates,
   twoParameterLogistic,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/response-time.json" with { type: "json" };
 import jointFixture from "./fixtures/response-time-speed-accuracy.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** The lognormal calibration against lme's ML fit: EM runs to a change of 1e-13. */

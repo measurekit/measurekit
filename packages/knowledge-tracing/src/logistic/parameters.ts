@@ -1,5 +1,5 @@
 import { checkFinite, checkPositive, checkRecord } from "@measurekit/core";
-import { entry } from "../data/record.js";
+import { entry } from "../data/internal.js";
 
 /** How a logistic model treats learners' proficiency θ: not at all, as a fixed effect, or as a random intercept. */
 export type Proficiency = "none" | "fixed" | "random";

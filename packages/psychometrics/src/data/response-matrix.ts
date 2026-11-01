@@ -41,6 +41,9 @@ export interface ResponseMatrixOptions {
 /**
  * Builds a response matrix from one row of responses per person, with response times if given. The rows are copied.
  *
+ * @param rows - The responses of each person, one entry for each item: an integer from 0, or `null` when missing.
+ * @param options - The ids of the persons and items, and the response times.
+ * @returns The matrix, whose ids are `person1`, `item1` and so on without the options.
  * @throws `DataError` when the rows are not an array, there are no persons or no items, the rows differ in length, a
  * response is not a non-negative integer or `null`, the ids do not match the rows and columns or repeat, or the times
  * do not match the responses or are not positive finite numbers or `null`.
@@ -95,6 +98,9 @@ function buildResponseMatrix(
 /**
  * Builds a response matrix from one column of responses per item.
  *
+ * @param columns - The responses to each item, one entry for each person: an integer from 0, or `null` when missing.
+ * @param options - The ids of the persons and items, and the response times.
+ * @returns The matrix, whose ids are `person1`, `item1` and so on without the options.
  * @throws `DataError` when the columns are not arrays of equal length, or in the cases listed for {@link
  * responseMatrix}.
  */

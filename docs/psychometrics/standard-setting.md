@@ -5,6 +5,17 @@ Bookmark and Hofstee methods, and reports how accurately and consistently cuts o
 package among the references implements them; each is validated against its definition written out in base R,
 with mirt's probabilities and expected test scores for the Bookmark method ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  A["Ratings of borderline persons"] --> AC["angoffCutScore"]
+  B["Items ordered by difficulty"] --> BC["orderedItemBooklet, bookmarkCutScore"]
+  H["Bounds on the cut score and the failure rate"] --> HC["hofsteeCutScore"]
+  AC --> C["Cut score on the total score"]
+  BC --> C
+  HC --> C
+  E["Estimates of theta and cuts on theta"] --> Q["classificationAccuracy"]
+```
+
 Cut scores on the total score scale are not rounded: a person meets the standard with a total score at or above it.
 
 ## Modified Angoff

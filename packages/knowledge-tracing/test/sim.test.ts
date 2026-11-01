@@ -18,7 +18,7 @@ import {
   surmiseStructure,
 } from "../src/index.js";
 import { permutation } from "../src/math/permutation.js";
-import { correlation, defined } from "./helpers.js";
+import { correlation, defined } from "./assertions.js";
 
 // Recovery thresholds, fixed before the simulations were first run.
 const BKT_PRIOR_THRESHOLD = 0.1;

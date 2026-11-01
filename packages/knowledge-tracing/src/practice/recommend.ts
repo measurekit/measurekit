@@ -1,5 +1,5 @@
 import { checkOptions, checkUnitInterval, DataError } from "@measurekit/core";
-import { type Attempt, checkAttempts } from "../data/event.js";
+import { type Attempt, checkAttempts } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
 const DEFAULT_BAND = [0.65, 0.85] as const;
@@ -31,6 +31,12 @@ export interface RecommendOptions {
  * nearest its middle first, then the others, nearest the band first. Ties keep the candidates' order. The first is
  * the next item to practice; filter the candidates first, for instance to the skills not yet mastered.
  *
+ * @param model - The learner model.
+ * @param state - The learner's state.
+ * @param candidates - The attempts to choose from.
+ * @param options - The band of predicted success to aim at.
+ * @returns The candidates with their predictions, ranked: those predicted inside the band first, nearest its middle,
+ *   and the others by distance from the band.
  * @throws `DataError` when the model is not a learner model, the band is not within 0 to 1 with lower ≤ upper, or the
  * model rejects the state or an attempt.
  */

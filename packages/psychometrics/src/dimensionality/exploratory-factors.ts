@@ -6,7 +6,7 @@ import {
   checkStopping,
   DataError,
 } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { minres } from "../math/minres.js";
 import { resolveRotation, rotateLoadingMatrix } from "../math/rotation.js";
 import { ITEM_CORRELATIONS, type ItemCorrelation, positiveDefiniteCorrelations } from "./item-correlations.js";
@@ -84,6 +84,11 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * throws. `calibrateMultidimensional` with `dimensions` estimates the same model from the responses, by full
  * information and far more slowly, and gives the item parameters of the model.
  *
+ * @param data - The responses of the persons.
+ * @param options - The number of factors, the correlation, the rotation, the stopping rules and the correction for
+ *   continuity.
+ * @returns The loadings and communalities of the items, the correlations of the factors, whether the extraction
+ *   converged and the iterations run.
  * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
  * categories, a pair of items has too few persons for a correlation, an option is invalid, or `factors` is more than the
  * items identify.

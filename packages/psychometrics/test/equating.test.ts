@@ -43,6 +43,9 @@ import {
   tuckerEquating,
   twoParameterLogistic,
 } from "../src/index.js";
+import { arbitraryItem, arbitraryLocation, arbitraryLocations } from "./arbitraries.js";
+import { defined, expectClose } from "./assertions.js";
+import { fixtureItems, MODELS } from "./fixture-items.js";
 import bivariatePresmoothing from "./fixtures/equating-bivariate-presmoothing.json" with { type: "json" };
 import bootstrap from "./fixtures/equating-bootstrap.json" with { type: "json" };
 import chain from "./fixtures/equating-chain.json" with { type: "json" };
@@ -54,15 +57,6 @@ import observed from "./fixtures/equating-observed-score.json" with { type: "jso
 import presmoothing from "./fixtures/equating-presmoothing.json" with { type: "json" };
 import robust from "./fixtures/equating-robust-z.json" with { type: "json" };
 import trueScore from "./fixtures/equating-true-score.json" with { type: "json" };
-import {
-  arbitraryItem,
-  arbitraryLocation,
-  arbitraryLocations,
-  defined,
-  expectClose,
-  fixtureItems,
-  MODELS,
-} from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Moment methods: closed forms. */

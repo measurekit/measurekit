@@ -7,10 +7,10 @@ import {
   responseMatrix,
   twoParameterLogistic,
 } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-explanatory.json" with { type: "json" };
 import changeFixture from "./fixtures/bench-explanatory-change.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 const items: CalibratedItem<unknown>[] = fixture.itemIds.map((id, i) => ({
   id,

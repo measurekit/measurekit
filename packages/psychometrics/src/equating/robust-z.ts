@@ -1,5 +1,5 @@
 import { DataError, mean } from "@measurekit/core";
-import type { IrtItem } from "../irt/model.js";
+import type { IrtItem } from "../irt/internal.js";
 import { checkCommonItems } from "./linking.js";
 import { itemMoments } from "./models.js";
 
@@ -30,6 +30,10 @@ const IQR_TO_SD = 0.74;
  * models, put the `from` items on the `to` scale first by a linking method. `from[j]` and `to[j]` are the same item,
  * with the same model and number of categories.
  *
+ * @param from - The common items on the scale to move.
+ * @param to - The same items on the scale to move to.
+ * @returns For each item, the difference of its difficulties between the calibrations, the robust z of the difference
+ *   and whether the item is flagged.
  * @throws `DataError` when the item lists differ in length or are empty, a pair has different models or numbers of
  * categories, an item is invalid, an NRM item or not one of the built-in models, or the interquartile range of the
  * differences is 0, as with one common item.

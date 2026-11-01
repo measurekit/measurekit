@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { EventLog } from "../data/event-log.js";
+import type { EventLog } from "../data/internal.js";
 import { popcount } from "./build.js";
 import { counterexamples, responsePatterns } from "./patterns.js";
 import { type CompiledStructure, compile, holds, type KnowledgeStructure } from "./structure.js";
@@ -47,6 +47,10 @@ export interface StructureValidity {
  * chosen at random. Each learner's first outcome at each item is used; every learner must have answered every item of
  * the structure's domain, with outcomes 0 or 1. The elements of the structure are the items of the log.
  *
+ * @param structure - The knowledge structure over items.
+ * @param log - The log whose first attempts give each learner's response pattern.
+ * @returns The indices of agreement, such as γ and the discrepancy index, and the distances of the patterns to the
+ *   structure.
  * @throws `DataError` when the structure or the log is malformed, a learner has not answered every item, an outcome is
  * not 0 or 1, or the items of the log are not the structure's domain.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}

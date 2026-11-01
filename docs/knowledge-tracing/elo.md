@@ -6,6 +6,14 @@ fitting beyond a pass over the data, updates after every answer, and tracks abil
 are validated against the equations written out in R, and a simulation checks that they recover the abilities
 and difficulties that generated the data ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  A["An answer: a learner and an item"] --> P["predict: logistic of ability minus difficulty"]
+  P --> U["update: ability and difficulty move in proportion to the surprise"]
+  U --> S["New ability and difficulty"]
+  S -.-> A
+```
+
 ## The models
 
 A learner has an ability θ and an item a difficulty d, both 0 at first, and

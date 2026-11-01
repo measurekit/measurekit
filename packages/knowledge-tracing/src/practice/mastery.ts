@@ -7,8 +7,7 @@ import {
   DataError,
   describe,
 } from "@measurekit/core";
-import { checkObservedHasSkills, type Event, isObserved } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import { checkLog, checkObservedHasSkills, type Event, type EventLog, isObserved } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
 /** A learner model that defines mastery, such as BKT. */
@@ -87,6 +86,9 @@ export interface OpportunitiesToStreakOptions extends StreakOptions {
  * an outcome of 1 is correct; any other outcome ends the run. An event without an outcome is no opportunity and leaves
  * the run as it is.
  *
+ * @param log - The log to take the opportunities of.
+ * @param options - The length of the streak.
+ * @returns The opportunity of each learner at each skill; absent where the criterion was never met.
  * @throws `DataError` when the log is malformed or the length is not a positive integer.
  */
 export function streakMastery(log: EventLog, options: StreakOptions = {}): MasteryTable {
@@ -108,6 +110,9 @@ export function streakMastery(log: EventLog, options: StreakOptions = {}): Maste
  * threshold: m moves to d m + (1 - d) y at each attempt from m = 0. Outcomes from 0 to 1 count as partial credit. An
  * event without an outcome is no opportunity and leaves the average as it is.
  *
+ * @param log - The log to take the opportunities of.
+ * @param options - The decay of the average and the threshold it must reach.
+ * @returns The opportunity of each learner at each skill; absent where the criterion was never met.
  * @throws `DataError` when the log is malformed, or the decay or the threshold is not from 0 to 1.
  * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
  */
@@ -131,6 +136,9 @@ export function movingAverageMastery(log: EventLog, options: MovingAverageOption
  * each skill, the attempts so far where there are fewer than `window`. Only an outcome of 1 is correct. An event without
  * an outcome is no opportunity and leaves the window as it is.
  *
+ * @param log - The log to take the opportunities of.
+ * @param options - The number of attempts in the window and of correct outcomes it needs.
+ * @returns The opportunity of each learner at each skill; absent where the criterion was never met.
  * @throws `DataError` when the log is malformed, `window` is not a positive integer, or `correct` is not an integer from
  * 1 to `window`.
  * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
@@ -169,6 +177,10 @@ function tracking<TState>(model: LearnerModel<TState>): (event: Event) => TState
  * an outcome updates the state but is no opportunity, and the criterion is tested only after events with an outcome, so
  * a lesson alone never records mastery.
  *
+ * @param model - A learner model that defines mastery.
+ * @param log - The log to replay.
+ * @param options - The threshold.
+ * @returns The opportunity of each learner at each skill; absent where the criterion was never met.
  * @throws `DataError` when the model is not a learner model that defines mastery, the log is malformed, the threshold
  * is not from 0 to 1, or the model rejects an event.
  */
@@ -197,6 +209,10 @@ export function thresholdMastery<TState>(
  * such as logistic models and Elo. An event without an outcome updates the model, is no opportunity and is never
  * predicted, so a lesson alone never records mastery.
  *
+ * @param model - The learner model.
+ * @param log - The log to replay.
+ * @param options - The threshold.
+ * @returns The opportunity of each learner at each skill; absent where the criterion was never met.
  * @throws `DataError` when the model is not a learner model, the log is malformed, the threshold is not from 0 to 1, an
  * event with an outcome has no skills, as the table is by skill, or the model rejects an event or an attempt.
  */
@@ -225,6 +241,9 @@ export function predictedMastery<TState>(
  * Returns the expected number of further attempts until `length` correct answers in a row, each attempt correct with
  * `probability`: (p⁻ⁿ - p⁻ʳ) / (1 - p) from a run of r, which is n - r at p = 1 and `Infinity` at p = 0.
  *
+ * @param probability - The probability that an attempt is correct, from 0 to 1.
+ * @param options - The length of the streak and the current run.
+ * @returns The expected number of further attempts; `Infinity` at 0.
  * @throws `DataError` when the probability is not from 0 to 1, the length not a positive integer, or the run not an
  * integer from 0 to the length.
  */

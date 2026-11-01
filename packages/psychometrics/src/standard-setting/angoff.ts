@@ -19,6 +19,8 @@ export interface AngoffCutScore {
  * ratings, and the panel's cut score is their mean.
  *
  * @param ratings - Ratings by panelist, then item.
+ * @returns The cut score, the cut score of each panelist, their standard deviation and the standard error of the cut
+ *   score.
  * @throws `DataError` without panelists or items, when the panelists rate different numbers of items, or a rating is
  * not a non-negative number.
  * @see {@link https://openlibrary.org/works/OL3700878W | Angoff (1971)}

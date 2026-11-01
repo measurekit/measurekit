@@ -7,9 +7,8 @@ import {
   DataError,
   type Random,
 } from "@measurekit/core";
-import { type ResponseMatrix, responseMatrix } from "../data/response-matrix.js";
-import { checkItemList, largestCategoryCount } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
+import { type ResponseMatrix, responseMatrix } from "../data/internal.js";
+import { checkItemList, type IrtItem, largestCategoryCount } from "../irt/internal.js";
 
 /** Options of {@link simulateResponses}. */
 export interface ResponseSimulationOptions {
@@ -31,6 +30,11 @@ export interface ResponseSimulationOptions {
  * without missingness, less the missing ones. The matrix has a row per theta and a column per item, with the default
  * ids.
  *
+ * @param items - The items.
+ * @param thetas - The ability of each person.
+ * @param random - The generator of the responses.
+ * @param options - The probability that a response is missing.
+ * @returns The responses, one row for each person.
  * @throws `DataError` without items or thetas, when an item is invalid, a theta is not finite, `random` is not a random
  * number generator, or `missingProbability` is outside [0, 1].
  */

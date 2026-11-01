@@ -8,6 +8,7 @@ import { continuedFraction } from "./continued-fraction.js";
  *
  * @param t - The statistic.
  * @param df - The degrees of freedom, at least 1.
+ * @returns The lower tail probability, from 0 to 1.
  * @see {@link https://numerical.recipes | Press et al. (2007), section 6.4}
  */
 export function studentLowerTail(t: number, df: number): number {

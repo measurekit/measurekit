@@ -5,6 +5,15 @@ its calibration, person speed, aberrant times, the hierarchical model of speed a
 times in one model, and rapid guessing by normative thresholds, response time effort and effort-moderated scoring.
 Each is validated against nlme, LNIRT, mirt or base R ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  T["Responses with times"] --> L["calibrateResponseTimes: lognormal model"]
+  L --> S["speedEstimates, responseTimeFit: speed and aberrant times"]
+  T --> J["calibrateSpeedAccuracy: speed and ability in one model"]
+  J --> E["speedAccuracyEstimates"]
+  T --> N["normativeThresholds"] --> F["responseTimeEffort, effortModeratedEstimates"]
+```
+
 ## Times
 
 Times are in seconds, positive, aligned with the responses: `times` of a [response matrix](data.md), by person, then
@@ -239,6 +248,18 @@ const items = [
 ];
 effortModeratedEstimates(data, items, thresholds); // person2 from item 3 alone
 ```
+
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                               | What to do                                                               |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| The data have no times                                              | Give `times` to the matrix, or `time` to each record                     |
+| An item has fewer than two times, or times that do not differ       | Leave the item out: its variance is 0 and the likelihood is unbounded    |
+| An item of the data has no item with its id among the parameters    | Give the parameters of every item of the data                            |
+| A threshold is not a positive finite number                         | Give each item a threshold in seconds                                    |
+| A response is not a category of its item, in the hierarchical model | Calibrate the item on these data, or give it the categories the data use |
 
 ## Not included
 

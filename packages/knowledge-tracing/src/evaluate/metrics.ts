@@ -34,6 +34,9 @@ export interface Metrics {
  * incorrect one, ties counting one half (Mann-Whitney). It depends only on the order of the predictions, so it is
  * invariant to increasing transformations of them.
  *
+ * @param predictions - The predicted probabilities.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @returns The area, from 0 to 1.
  * @throws `DataError` when the predictions and outcomes are malformed, an outcome is not 0 or 1, or all outcomes are
  * equal.
  */
@@ -50,6 +53,9 @@ export function auc(predictions: readonly number[], outcomes: readonly number[])
 /**
  * Returns the root mean square error of predictions against outcomes: √(mean (p - y)²).
  *
+ * @param predictions - The predicted probabilities.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @returns The root mean square error, from 0 to 1.
  * @throws `DataError` when the predictions and outcomes are malformed.
  */
 export function rmse(predictions: readonly number[], outcomes: readonly number[]): number {
@@ -61,6 +67,9 @@ export function rmse(predictions: readonly number[], outcomes: readonly number[]
  * Returns the mean negative log-likelihood of outcomes under predictions, -mean(y ln p + (1 - y) ln(1 - p)) with the
  * natural logarithm. A prediction of 0 or 1 that is wrong makes it `Infinity`.
  *
+ * @param predictions - The predicted probabilities.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @returns The mean negative log-likelihood, at least 0.
  * @throws `DataError` when the predictions and outcomes are malformed.
  */
 export function logLoss(predictions: readonly number[], outcomes: readonly number[]): number {
@@ -72,6 +81,9 @@ export function logLoss(predictions: readonly number[], outcomes: readonly numbe
  * Returns the share of outcomes predicted right: a prediction above 0.5 predicts a correct outcome, one of 0.5 or below
  * an incorrect one.
  *
+ * @param predictions - The predicted probabilities.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @returns The share predicted right, from 0 to 1.
  * @throws `DataError` when the predictions and outcomes are malformed or an outcome is not 0 or 1.
  */
 export function accuracy(predictions: readonly number[], outcomes: readonly number[]): number {
@@ -84,6 +96,9 @@ export function accuracy(predictions: readonly number[], outcomes: readonly numb
  * Returns the coefficient of determination of predictions against outcomes, 1 - Σ(y - p)² / Σ(y - ȳ)², the share of
  * the variance of the outcomes that the predictions explain. It is below 0 for predictions worse than the mean outcome.
  *
+ * @param predictions - The predicted probabilities.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @returns The coefficient, at most 1.
  * @see {@link https://jedm.educationaldatamining.org/index.php/JEDM/article/view/JEDM087 | Pelánek (2015)}
  * @throws `DataError` when the predictions and outcomes are malformed or all outcomes are equal.
  */
@@ -101,6 +116,9 @@ export function rSquared(predictions: readonly number[], outcomes: readonly numb
  * kappa is the agreement of these predicted outcomes with the observed ones beyond what their shares of correct
  * outcomes give by chance, (p_o - p_e) / (1 - p_e).
  *
+ * @param predictions - The predicted probabilities.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @returns Kappa, at most 1.
  * @see {@link https://jedm.educationaldatamining.org/index.php/JEDM/article/view/JEDM087 | Pelánek (2015)}
  * @throws `DataError` when the predictions and outcomes are malformed, an outcome is not 0 or 1, or chance agreement is
  * 1, as when every prediction and every outcome is correct.
@@ -122,6 +140,9 @@ export function kappa(predictions: readonly number[], outcomes: readonly number[
  * outcomes all equal, both for partial credit; R² for outcomes all equal; kappa for partial credit and where chance
  * agreement is 1.
  *
+ * @param predictions - The predicted probabilities.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @returns Every metric, with `null` for those that are undefined.
  * @throws `DataError` when the predictions and outcomes are malformed.
  */
 export function metrics(predictions: readonly number[], outcomes: readonly number[]): Metrics {

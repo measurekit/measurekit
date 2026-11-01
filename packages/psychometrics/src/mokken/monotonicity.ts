@@ -1,5 +1,5 @@
 import { DataError, normalQuantile } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
 import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
 import { itemScalability, usableItems } from "./scalability.js";
@@ -25,6 +25,9 @@ const ALL = 0.999999999999;
  * counts: below 40, an item's violations are negligible. It follows the mokken package's `check.monotonicity`, over the
  * persons who answered every item.
  *
+ * @param matrix - The responses of the persons.
+ * @param options - The smallest violation and group size that count, and the level of the tests.
+ * @returns For each item, its violations of monotonicity.
  * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every
  * item, the scores span more than 10 categories, an option is invalid, or the minimum group size is more than half of
  * the persons or than all of them.

@@ -13,6 +13,8 @@ import {
  * Returns whether a structure is a knowledge space: closed under union. It compares every pair of states, so takes time
  * quadratic in their number.
  *
+ * @param structure - The knowledge structure.
+ * @returns Whether the structure is closed under union.
  * @throws `DataError` when the structure is malformed.
  */
 export function isKnowledgeSpace(structure: KnowledgeStructure): boolean {
@@ -23,6 +25,8 @@ export function isKnowledgeSpace(structure: KnowledgeStructure): boolean {
  * Returns whether a structure is a learning space: a knowledge space in which every non-empty state has an element
  * whose removal leaves a state, so that every state can be learned one element at a time.
  *
+ * @param structure - The knowledge structure.
+ * @returns Whether the structure is a learning space.
  * @throws `DataError` when the structure is malformed.
  * @see {@link https://doi.org/10.1016/j.jmp.2008.09.005 | Cosyn and Uzun (2009)}
  */
@@ -58,6 +62,9 @@ export interface Fringes {
 /**
  * Returns the inner and outer fringes of a state of the structure, in the domain's order.
  *
+ * @param structure - The knowledge structure.
+ * @param state - The state, a state of the structure.
+ * @returns The inner and the outer fringe.
  * @throws `DataError` when the structure is malformed or the state is not one of its states.
  */
 export function fringes(structure: KnowledgeStructure, state: readonly string[]): Fringes {

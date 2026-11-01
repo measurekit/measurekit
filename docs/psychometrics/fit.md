@@ -4,6 +4,14 @@
 outfit, the S-X² item fit statistic, the lz person fit statistic and Yen's Q3 for local dependence. Each is
 validated against eRm or mirt ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  M["Response matrix"] --> I["Items of any model, one per column"]
+  I --> S["summedScoreFit: S-X²"]
+  I --> R["With one theta per person: itemFit, personFit, yenQ3"]
+  R --> A["Infit and outfit, lz, Q3"]
+```
+
 ## Inputs
 
 Every function takes a [response matrix](data.md) and its items, one per column, of any model, such as a
@@ -109,6 +117,16 @@ lz is about N(0, 1) under fit at the true theta; large negative values flag unex
 `yenQ3` correlates the residuals x - E(x | θ) of each pair of items over persons (Yen, 1984), as mirt's
 `residuals(type = "Q3")`. Under local independence Q3 is near -1 / (k - 1) for k items; pairs well above the average
 Q3 suggest dependence, as items sharing a stimulus.
+
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                               | What to do                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------ |
+| The items or the thetas do not match the matrix     | Give one item for each column and one finite theta for each person       |
+| A response is not a category of its item            | Calibrate the item on these data, or give it the categories the data use |
+| `summedScoreFit` when no person answered every item | Use `itemFit`, which works from the answered items of each person        |
 
 ## Differences from the references
 

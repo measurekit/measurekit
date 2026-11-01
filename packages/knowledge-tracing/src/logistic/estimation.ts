@@ -1,8 +1,6 @@
 import { DataError, logistic } from "@measurekit/core";
-import { isObserved, type ObservedEvent } from "../data/event.js";
-import type { EventLog } from "../data/event-log.js";
-import type { FlatDirection } from "../math/arrow-system.js";
-import { linear } from "../math/arrow-system.js";
+import { type EventLog, isObserved, type ObservedEvent } from "../data/internal.js";
+import { type FlatDirection, linear } from "../math/arrow-system.js";
 import { outcomeLogLikelihood } from "../math/logistic.js";
 import {
   type GroupIntercepts,

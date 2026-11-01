@@ -8,6 +8,14 @@ item difficulty, generalizability theory, Mokken scale analysis, simulation, sta
 times. Every statistic is validated against R. Its only dependency is `@measurekit/core`, which has none; it runs in any
 JavaScript runtime.
 
+```mermaid
+flowchart LR
+  D["Responses: choices, matrices, records, ratings, times"] --> A["Analyze: ctt, irt, multidimensional, cdm, fit, dif, dimensionality, mokken, explanatory"]
+  A --> R["Report and compare: equating, scaling, change, standard-setting"]
+  A --> T["Test: cat, multistage tests, sim"]
+  D --> F["Raters and times: rater, response-time, generalizability"]
+```
+
 ```bash
 npm install @measurekit/psychometrics
 ```

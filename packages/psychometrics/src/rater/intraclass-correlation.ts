@@ -32,6 +32,9 @@ export interface IntraclassCorrelation {
  * MS_E) / (MS_R + (MS_C - MS_E) / n) and (MS_R - MS_E) / MS_R. Ratings are finite numbers. Uses the subjects every
  * rater rated.
  *
+ * @param ratings - The ratings, one row for each subject and one entry for each rater.
+ * @returns The six intraclass correlations: one-way, agreement and consistency, for a single rating and for the mean of
+ *   the raters.
  * @throws `DataError` when there are fewer than two raters, a rating is not a finite number or `null`, or fewer
  * than two subjects were rated by every rater.
  */

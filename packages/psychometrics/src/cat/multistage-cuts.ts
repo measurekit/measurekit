@@ -7,10 +7,14 @@ import {
   normalQuantile,
   type ThetaDistribution,
 } from "@measurekit/core";
-import { checkRange } from "../irt/ability.js";
-import { expectedScore, indexItems, largestCategoryCount } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
-import { checkThetaDistribution } from "../irt/theta-distribution.js";
+import {
+  checkRange,
+  checkThetaDistribution,
+  expectedScore,
+  type IrtItem,
+  indexItems,
+  largestCategoryCount,
+} from "../irt/internal.js";
 import { findRoot } from "../math/root.js";
 import {
   locateStages,

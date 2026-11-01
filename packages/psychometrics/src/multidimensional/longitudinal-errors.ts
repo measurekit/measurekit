@@ -1,7 +1,10 @@
-import type { StandardErrorMethod } from "../irt/calibration-options.js";
-import { derivativeRatios } from "../irt/cross-product.js";
-import { unboundedCoordinates, unboundedScales } from "../irt/m-step.js";
-import type { CompressedResponses } from "../irt/responses.js";
+import {
+  type CompressedResponses,
+  derivativeRatios,
+  type StandardErrorMethod,
+  unboundedCoordinates,
+  unboundedScales,
+} from "../irt/internal.js";
 import { numericalHessian } from "../math/hessian.js";
 import { invert, invertPositiveDefinite } from "../math/linear-algebra.js";
 import type { LongitudinalFit } from "./longitudinal-em.js";

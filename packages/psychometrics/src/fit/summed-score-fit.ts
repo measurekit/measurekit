@@ -1,8 +1,6 @@
 import { chiSquareUpperTail, DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { IrtItem } from "../irt/model.js";
-import { quadratureRule } from "../irt/quadrature.js";
-import { itemTrace, summedScoreLikelihoods } from "../irt/summed-score.js";
+import type { ResponseMatrix } from "../data/internal.js";
+import { type IrtItem, itemTrace, quadratureRule, summedScoreLikelihoods } from "../irt/internal.js";
 
 import { collapseCells } from "./collapse.js";
 import { checkItems } from "./inputs.js";
@@ -30,6 +28,10 @@ export interface SummedScoreFit {
  * mirt collapses them, to expected counts of at least 1. The degrees of freedom count every parameter of the item's
  * model as estimated. Uses the persons who answered every item.
  *
+ * @param matrix - The responses of the persons.
+ * @param items - The calibrated items, in the order of the matrix's items.
+ * @returns For each item, the S-X² statistic with its degrees of freedom and probability; `null` where the statistic is
+ *   undefined.
  * @throws `DataError` when the matrix or the items are invalid, a response is not a category of its item, or no person
  * answered every item.
  * @see {@link https://doi.org/10.1177/01466216000241003 | Orlando and Thissen (2000)}

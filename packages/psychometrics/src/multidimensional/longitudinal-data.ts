@@ -1,6 +1,6 @@
 import { checkArray, DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import { type CompressedResponses, compressResponses } from "../irt/responses.js";
+import type { ResponseMatrix } from "../data/internal.js";
+import { type CompressedResponses, compressResponses } from "../irt/internal.js";
 import { linkedGroups } from "./groups.js";
 
 /** The most occasions a longitudinal calibration takes: its grid has a dimension for each. */

@@ -1,7 +1,5 @@
 import { checkArray, checkPositiveInteger, DataError } from "@measurekit/core";
-import { DEFAULT_THETA_RANGE, modalTheta } from "../irt/ability.js";
-import type { IrtItem } from "../irt/model.js";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { DEFAULT_THETA_RANGE, type IrtItem, MIN_PROBABILITY, modalTheta } from "../irt/internal.js";
 import type { PoolItem } from "./items.js";
 import type { ItemSelectionRule } from "./selection.js";
 
@@ -32,6 +30,7 @@ interface Strata {
  * the pool array, so a pool must not change afterward.
  *
  * @param lengths - The number of items from each stratum, in order of increasing information.
+ * @returns The selection rule.
  * @throws `DataError` when `lengths` is not a non-empty array of positive integers.
  * @see {@link https://doi.org/10.1177/01466219922031338 | Chang and Ying (1999)}
  * @see {@link https://pubmed.ncbi.nlm.nih.gov/17296025/ | Barrada et al. (2006)}

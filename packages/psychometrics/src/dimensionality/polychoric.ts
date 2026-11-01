@@ -1,5 +1,5 @@
 import { checkNonNegative, checkOptions } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { type CodedItem, codeItems, MISSING_RANK } from "./coded-items.js";
 import { createPairEstimator, type PairEstimator } from "./pair-correlation.js";
 
@@ -47,6 +47,9 @@ export const DEFAULT_CORRECTION = 0.5;
  * boundary; the correction of `correction` avoids it for items with two categories. Categories are the observed
  * responses in order, so responses may skip numbers. Responses are integers from 0, which `responseMatrix` checks.
  *
+ * @param matrix - The responses of the persons.
+ * @param options - The correction for continuity.
+ * @returns The correlations of the items and their thresholds.
  * @throws `DataError` when the matrix is invalid or `correction` is not a non-negative number.
  * @see {@link https://doi.org/10.1007/BF02296207 | Olsson (1979)}
  */

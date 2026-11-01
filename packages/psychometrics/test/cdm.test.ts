@@ -1,7 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { additiveMaximizer, type CdmLink, saturatedCoefficients } from "../src/cdm/additive.js";
-import { profilesOf } from "../src/cdm/q-matrix.js";
+import { additiveMaximizer, type CdmLink, profilesOf, saturatedCoefficients } from "../src/cdm/internal.js";
 import {
   attributeProfiles,
   type CdmCalibration,
@@ -16,11 +15,12 @@ import {
   simulateCdmResponses,
   validateQMatrix,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
+import { definedEntries } from "./fixture-items.js";
 import fixture from "./fixtures/cdm.json" with { type: "json" };
 import additiveFixture from "./fixtures/cdm-additive.json" with { type: "json" };
 import comparisonFixture from "./fixtures/cdm-item-comparison.json" with { type: "json" };
 import maximumFixture from "./fixtures/cdm-maximum.json" with { type: "json" };
-import { defined, definedEntries, expectClose } from "./helpers.js";
 
 // Tolerances against GDINA, explained in docs/validation.md.
 /** Success probabilities, proportions and person results: EM stops at a change of 1e-8, within 1e-6 of the maximum. */

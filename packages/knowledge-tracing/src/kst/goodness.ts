@@ -61,8 +61,10 @@ export function goodnessOfFit(
  * It is `null` when either fit has no `goodnessOfFit`, when the general model has no fewer parameters, or when the
  * restricted model fits better, which a nested model cannot do by maximum likelihood.
  *
- * @param restricted - The fit with fewer parameters, such as fixed or equal rates.
- * @param general - The fit it is nested in.
+ * @param restricted - The fit of the restricted model.
+ * @param general - The fit of the more general model.
+ * @returns The difference of G² and of the degrees of freedom with its probability; `null` where either fit lacks a
+ *   goodness of fit.
  * @throws `DataError` when an argument is not a fit with a `goodnessOfFit` of `null` or of numbers.
  */
 export function compareFits(

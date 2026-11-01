@@ -15,6 +15,9 @@ import { cumulativeSums, equipercentileEquating, scoreAtPercentileRank } from ".
  * "equipercentile", method = "chained")`, which rounds the ranks to 10 decimals. Each distribution is the persons at
  * each total score and anchor score.
  *
+ * @param from - The persons at each total score and anchor score of the form to equate.
+ * @param to - The persons at each total score and anchor score of the form to equate to.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a distribution is invalid or the two have different numbers of anchor scores.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
  */
@@ -49,6 +52,10 @@ export function chainedEquipercentileEquating(from: BivariateDistribution, to: B
  * sizes as well as w₁ and w₂, and drops the persons whose anchor score only one group has; it agrees with this
  * function when the groups have the same size.
  *
+ * @param from - The persons at each total score and anchor score of the form to equate.
+ * @param to - The persons at each total score and anchor score of the form to equate to.
+ * @param options - The weight of the first group in the synthetic population.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a distribution is invalid, the two have different numbers of anchor scores, an anchor score
  * has persons in only one group, or `weight` is not a number from 0 to 1.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}

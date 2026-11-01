@@ -8,10 +8,8 @@ import {
   partialCreditProbabilities,
   type ThresholdItem,
 } from "@measurekit/core";
-import type { FacetedScore } from "../data/faceted-scores.js";
-import type { ThetaPrior } from "../irt/ability.js";
-import type { IrtItem } from "../irt/model.js";
-import { partialCredit } from "../irt/partial-credit.js";
+import type { FacetedScore } from "../data/internal.js";
+import { type IrtItem, partialCredit, type ThetaPrior } from "../irt/internal.js";
 
 /** What the functions that use an estimated many-facet model read of it. */
 export interface RatingModelData {

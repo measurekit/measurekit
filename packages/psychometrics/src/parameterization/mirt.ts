@@ -1,24 +1,33 @@
 import { checkRecord, DataError, describe, type LogisticItem, mean, type ThresholdItem } from "@measurekit/core";
-import { gradedResponse } from "../irt/graded.js";
-import { checkItem, checkModel } from "../irt/items.js";
 import {
+  centered,
+  checkItem,
+  checkModel,
   fourParameterLogistic,
+  generalizedPartialCredit,
+  gradedResponse,
+  type IrtItem,
+  type IrtModel,
+  type NominalParameters,
+  nominalResponse,
   oneParameterLogistic,
+  partialCredit,
+  type RatingScaleParameters,
+  ratingScale,
   threeParameterLogistic,
   twoParameterLogistic,
-} from "../irt/logistic.js";
-import type { IrtItem, IrtModel } from "../irt/model.js";
-import { centered, type NominalParameters, nominalResponse } from "../irt/nominal.js";
-import { generalizedPartialCredit, partialCredit } from "../irt/partial-credit.js";
-import { type RatingScaleParameters, ratingScale } from "../irt/rating-scale.js";
-import { type MultidimensionalGradedParameters, multidimensionalGradedResponse } from "../multidimensional/graded.js";
-import { checkMultidimensionalItem, checkMultidimensionalModel } from "../multidimensional/items.js";
+} from "../irt/internal.js";
 import {
+  checkMultidimensionalItem,
+  checkMultidimensionalModel,
+  type MultidimensionalGradedParameters,
+  type MultidimensionalItem,
   type MultidimensionalLogisticParameters,
+  type MultidimensionalModel,
+  multidimensionalGradedResponse,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
-} from "../multidimensional/logistic.js";
-import type { MultidimensionalItem, MultidimensionalModel } from "../multidimensional/model.js";
+} from "../multidimensional/internal.js";
 
 /**
  * One item's coefficients as a row of mirt's `coef(model, simplify = TRUE)$items` gives them, without the columns of
@@ -37,6 +46,8 @@ export interface MirtCoefficients {
  * Returns an item's coefficients in mirt's IRT form, as `coef(model, IRTpars = TRUE, simplify = TRUE)$items` gives
  * them for the item's model.
  *
+ * @param item - The item.
+ * @returns The coefficients by name, in the IRT form.
  * @throws `DataError` when the item's parameters are invalid, or its model is not one of the built-in models.
  */
 export function toMirtIrt(item: IrtItem): MirtCoefficients {
@@ -47,6 +58,8 @@ export function toMirtIrt(item: IrtItem): MirtCoefficients {
  * Returns an item's coefficients in mirt's slope-intercept form, as `coef(model, IRTpars = FALSE, simplify =
  * TRUE)$items` gives them for the item's model.
  *
+ * @param item - The item.
+ * @returns The coefficients by name, in the slope-intercept form.
  * @throws `DataError` when the item's parameters are invalid or have no slope-intercept form, or its model is not one
  * of the built-in models.
  */
@@ -57,6 +70,10 @@ export function toMirtSlopeIntercept(item: IrtItem): MirtCoefficients {
 /**
  * Returns the item of a model with mirt's coefficients in the IRT form.
  *
+ * @param coefficients - The coefficients of one item, as `coef(model, IRTpars = TRUE, simplify = TRUE)$items` gives
+ *   them.
+ * @param model - The model of the item.
+ * @returns The item.
  * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
  * parameters, or the model is not one of the built-in models.
  */
@@ -70,6 +87,10 @@ export function fromMirtIrt<TParameters>(
 /**
  * Returns the item of a model with mirt's coefficients in the slope-intercept form.
  *
+ * @param coefficients - The coefficients of one item, as `coef(model, IRTpars = FALSE, simplify = TRUE)$items` gives
+ *   them.
+ * @param model - The model of the item.
+ * @returns The item.
  * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
  * parameters, or the model is not one of the built-in models.
  */
@@ -85,6 +106,8 @@ export function fromMirtSlopeIntercept<TParameters>(
  * TRUE)$items` gives them for the item's model: the slopes `a1` to `aD`, and `d`, `g` and `u` for a logistic item or
  * `d1` to `d(K-1)` for a graded one.
  *
+ * @param item - The multidimensional item.
+ * @returns The coefficients by name, in the slope-intercept form.
  * @throws `DataError` when the item's parameters are invalid, or its model is not one of the built-in multidimensional
  * models.
  */
@@ -96,6 +119,9 @@ export function toMirtMultidimensional(item: MultidimensionalItem): MirtCoeffici
 /**
  * Returns the multidimensional item of a model with mirt's coefficients in the slope-intercept form.
  *
+ * @param model - The model of the item.
+ * @param coefficients - The coefficients of one item, as `coef(model, simplify = TRUE)$items` gives them.
+ * @returns The item.
  * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
  * parameters, or the model is not one of the built-in multidimensional models.
  */

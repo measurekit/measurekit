@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Iteration, squarem } from "../src/irt/squarem.js";
+import { type Iteration, squarem } from "../src/irt/internal.js";
 
 /** An iteration of x → x + (target - x) (1 - rate) on one number, whose log-likelihood rises toward the target. */
 function linear(target: number, rate: number, start: number): Iteration & { readonly state: () => number } {

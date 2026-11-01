@@ -7,12 +7,16 @@ import {
   describe,
   type LogisticItem,
 } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import { meanSigmaLinking, type ScaleTransformation, transformItem } from "../equating/linking.js";
-import { type Calibration, calibrateWithCovariance, type ParameterCovariance } from "../irt/calibration.js";
-import type { CalibrationOptions } from "../irt/calibration-options.js";
-import { isLogisticModel } from "../irt/logistic.js";
-import type { IrtItem } from "../irt/model.js";
+import type { ResponseMatrix } from "../data/internal.js";
+import { meanSigmaLinking, type ScaleTransformation, transformItem } from "../equating/internal.js";
+import {
+  type Calibration,
+  type CalibrationOptions,
+  calibrateWithCovariance,
+  type IrtItem,
+  isLogisticModel,
+  type ParameterCovariance,
+} from "../irt/internal.js";
 
 import { invert } from "../math/linear-algebra.js";
 import { checkGroups, type DifGroup } from "./groups.js";
@@ -65,6 +69,12 @@ export interface LordDif extends DifAnalysis<LordChiSquare> {
  * flag the same items, when fewer than two items are left to link on, or after 10 rounds. Missing responses are
  * skipped, as in calibration.
  *
+ * @param matrix - The responses of the persons, dichotomous.
+ * @param groups - The group of each person, in the order of the matrix.
+ * @param options - The model, priors and quadrature of the calibration of each group, its stopping rules and whether to
+ *   purify the link.
+ * @returns The calibration of each group, the transformation that links the focal group to the reference group, the
+ *   chi-square of every item and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, a group has no person, a model is not the 2PL, 3PL or
  * 4PL, `purify` is not a boolean, the locations of the anchors do not vary in a group, or a group's calibration
  * throws it.

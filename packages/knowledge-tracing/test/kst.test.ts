@@ -33,6 +33,7 @@ import {
   surmiseStructure,
   unionClosure,
 } from "../src/index.js";
+import { defined, expectAllClose, expectClose } from "./assertions.js";
 import assessmentFixture from "./fixtures/kst-assessment.json" with { type: "json" };
 import blimFixture from "./fixtures/kst-blim.json" with { type: "json" };
 import constraintFixture from "./fixtures/kst-blim-constraints.json" with { type: "json" };
@@ -44,7 +45,7 @@ import clauseFixture from "./fixtures/kst-structure-clauses.json" with { type: "
 import toolFixture from "./fixtures/kst-structure-tools.json" with { type: "json" };
 import structureFixture from "./fixtures/kst-structures.json" with { type: "json" };
 import validityFixture from "./fixtures/kst-validity.json" with { type: "json" };
-import { defined, expectAllClose, expectClose, expectUnaffectedByLessons, online, withLessons } from "./helpers.js";
+import { expectUnaffectedByLessons, online, withLessons } from "./logs.js";
 
 /** Absolute tolerance of BLIM parameters fitted by EM against pks, which stops on a change of the parameters. */
 const ML_TOLERANCE = 1e-6;

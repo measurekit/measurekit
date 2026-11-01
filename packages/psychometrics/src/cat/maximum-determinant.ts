@@ -1,6 +1,10 @@
 import { cholesky } from "@measurekit/core";
-import { checkedPrior, type MultivariateNormalPrior, priorDimensions } from "../multidimensional/prior.js";
-import type { MultidimensionalEstimate } from "../multidimensional/scoring.js";
+import {
+  checkedPrior,
+  type MultidimensionalEstimate,
+  type MultivariateNormalPrior,
+  priorDimensions,
+} from "../multidimensional/internal.js";
 import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
 import type { ItemSelectionRule } from "./selection.js";
 
@@ -16,8 +20,8 @@ import type { ItemSelectionRule } from "./selection.js";
  * `correlations`, to both. The cost of a selection is a Cholesky factorization of a matrix of the dimensions per eligible
  * item.
  *
- * @param prior - The prior of theta; only its covariance is used, which must be symmetric and positive definite, with
- * as many rows as the items have dimensions.
+ * @param prior - The prior of the thetas; N(0, I) without one.
+ * @returns The selection rule.
  * @defaultValue `prior` is N(0, I) of the items' dimensions
  * @throws `DataError` when `prior` is not an object with a finite mean and a symmetric positive definite covariance of
  * as many rows as the mean has values, or, in a test, when the items have another number of dimensions.

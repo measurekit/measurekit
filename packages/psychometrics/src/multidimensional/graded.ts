@@ -1,5 +1,5 @@
 import { DataError, isRecord, logisticPair } from "@measurekit/core";
-import { formatList, sharesAbove } from "../irt/thresholds.js";
+import { formatList, sharesAbove } from "../irt/internal.js";
 import { linearPredictor, writeInformation } from "./logistic.js";
 import type { MultidimensionalModel } from "./model.js";
 

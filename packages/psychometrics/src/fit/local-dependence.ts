@@ -1,6 +1,5 @@
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import { largestCategoryCount } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
+import type { ResponseMatrix } from "../data/internal.js";
+import { type IrtItem, largestCategoryCount } from "../irt/internal.js";
 import { checkItems, checkPersonThetas, scoreMoments } from "./inputs.js";
 
 /**
@@ -12,6 +11,10 @@ import { checkItems, checkPersonThetas, scoreMoments } from "./inputs.js";
  * dependent pairs. Each pair uses the persons who answered both items. The result is a symmetric matrix in item order
  * with 1 on the diagonal, `null` for a pair with fewer than two such persons or a residual without variance.
  *
+ * @param matrix - The responses of the persons.
+ * @param items - The calibrated items, in the order of the matrix's items.
+ * @param thetas - The estimate of theta of each person, in the order of the matrix.
+ * @returns The matrix of Q3 by rows, with `null` for a pair that has no persons with both items.
  * @throws `DataError` when the matrix, the items or the thetas are invalid, or a response is not a category of its
  * item.
  */

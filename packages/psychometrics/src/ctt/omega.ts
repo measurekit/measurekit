@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { minresLoadings } from "../math/minres.js";
 import { covariance, variance } from "../math/statistics.js";
 import { itemScores } from "./complete-cases.js";
@@ -26,6 +26,8 @@ export interface McDonaldOmega {
  * method from the centroid loadings. Uses the persons who answered every item. A loading above 1, a Heywood case, shows
  * that one factor does not fit.
  *
+ * @param matrix - The responses of the persons.
+ * @returns Omega, the loadings of the items and whether the factor analysis converged.
  * @throws `DataError` when there are fewer than three items, fewer than two persons answered every item, an item's
  * scores have no variance, or the correlations sum to 0, as when the standardized scores of every person sum to the
  * same total.

@@ -29,6 +29,9 @@ const MATRIX_TOLERANCE = 1e-8;
  * and the minimum average partial test need.
  *
  * @param correlations - The symmetric matrix by rows, 1 on its diagonal, with `size` rows.
+ * @param size - The number of rows and columns.
+ * @param options - The smallest eigenvalue that is kept.
+ * @returns The smoothed matrix, by rows.
  * @throws `DataError` when `size` is not a positive integer, `correlations` is not a `Float64Array` of `size` squared
  * finite numbers, symmetric with 1 on the diagonal, or `tolerance` is not positive.
  * @see {@link https://doi.org/10.1177/014662168801200305 | Bock, Gibbons and Muraki (1988)}

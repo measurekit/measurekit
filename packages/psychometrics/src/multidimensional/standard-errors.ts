@@ -1,5 +1,4 @@
-import { covarianceFromInformation } from "../irt/hessian-covariance.js";
-import type { CompressedResponses } from "../irt/responses.js";
+import { type CompressedResponses, covarianceFromInformation } from "../irt/internal.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { symmetrized } from "../math/matrix.js";
 import type { ItemState } from "./calibration-setup.js";

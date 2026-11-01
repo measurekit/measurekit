@@ -1,7 +1,5 @@
 import { checkFinite } from "@measurekit/core";
-import { checkItemList } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
-import { scoreLikelihoods } from "../irt/summed-score.js";
+import { checkItemList, type IrtItem, scoreLikelihoods } from "../irt/internal.js";
 import { checkConversion, conditionalDeviation } from "./conversion.js";
 
 /**
@@ -17,6 +15,10 @@ import { checkConversion, conditionalDeviation } from "./conversion.js";
  * Valid input: items of any models, a finite theta, and as many finite scale scores as the form has total scores,
  * from 0 to the sum of the items' highest categories.
  *
+ * @param items - The items of the form.
+ * @param conversion - The scale score of each total score, from 0.
+ * @param theta - The ability.
+ * @returns The standard deviation of the scale score at theta, in scale points.
  * @throws `DataError` when the items are not an array, there are none, an item is invalid, theta is not finite, or the
  * conversion is not one finite number for each total score.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1996.tb00485.x | Kolen, Zeng and Hanson (1996)}

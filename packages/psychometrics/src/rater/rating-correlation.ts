@@ -23,6 +23,8 @@ function scaledDeviations(ratings: Float64Array): Float64Array {
  * product of their sums of squares, held within -1 and 1 as R's `cor` holds it, where rounding of perfectly correlated
  * ratings could pass them.
  *
+ * @param ratings - The ratings of two raters, one row for each subject; `null` when missing.
+ * @returns The correlation; `null` where it is undefined.
  * @throws `DataError` when the ratings do not have two raters, a rating is not a finite number or `null`, or fewer than
  * two subjects were rated by both.
  * @see {@link https://doi.org/10.1111/j.1745-3992.2011.00223.x | Williamson, Xi and Breyer (2012)}

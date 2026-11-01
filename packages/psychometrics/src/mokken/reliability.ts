@@ -1,5 +1,5 @@
 import { DataError, mean } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { variance } from "../math/statistics.js";
 import { type MokkenData, mokkenData, scoreOf } from "./scores.js";
 
@@ -40,6 +40,8 @@ interface StepMatrix {
  * The statistic uses the persons who answered every item, with the lowest score of all items taken as 0. It is not
  * limited to 1: with data that do not fit the model, it can exceed it.
  *
+ * @param matrix - The responses of the persons.
+ * @returns The coefficient MS, at most 1.
  * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every item,
  * the scores span more than 10 categories, or the total scores have no variance.
  * @see {@link https://doi.org/10.1007/BF02293957 | Sijtsma and Molenaar (1987)}

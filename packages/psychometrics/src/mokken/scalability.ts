@@ -1,4 +1,4 @@
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { type Covariances, covariances, mokkenData } from "./scores.js";
 import { coefficientErrors } from "./standard-errors.js";
 
@@ -38,6 +38,8 @@ export interface Scalability {
  * numbers of persons with each response pattern, as the mokken package's `coefH`. An item without variance has no
  * coefficient, nor do its pairs, and the other coefficients leave it out.
  *
+ * @param matrix - The responses of the persons.
+ * @returns H of the scale, H_i of each item and H_ij of each pair, with their standard errors.
  * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every item,
  * or the scores span more than 10 categories.
  * @see {@link https://doi.org/10.1177/0081175013481958 | Kuijpers, van der Ark and Croon (2013)}

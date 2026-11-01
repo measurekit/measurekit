@@ -8,6 +8,8 @@ import { type CompiledStructure, compile, flipElement, holds, type KnowledgeStru
  * It is `is.forward.graded` of the pks package. A state that holds the element already stays as it is. The structure
  * need not be a knowledge space; a knowledge space is forward graded at every element.
  *
+ * @param structure - The knowledge structure.
+ * @returns Whether the structure is forward graded at each element.
  * @throws `DataError` when the structure is malformed.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
  */
@@ -22,6 +24,8 @@ export function forwardGraded(structure: KnowledgeStructure): Readonly<Record<st
  * @remarks
  * It is `is.backward.graded` of the pks package. A state without the element stays as it is.
  *
+ * @param structure - The knowledge structure.
+ * @returns Whether the structure is backward graded at each element.
  * @throws `DataError` when the structure is malformed.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
  */

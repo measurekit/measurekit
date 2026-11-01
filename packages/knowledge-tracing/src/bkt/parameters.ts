@@ -1,5 +1,5 @@
 import { checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
-import { entry } from "../data/record.js";
+import { entry } from "../data/internal.js";
 
 /**
  * The parameters of a BKT model: plain data, which JSON serializes. Skills are independent, so the parameters of fits

@@ -11,7 +11,7 @@ import {
   iterateToConvergence,
   maxAbs,
 } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 
 /** Options of {@link linearChange}. */

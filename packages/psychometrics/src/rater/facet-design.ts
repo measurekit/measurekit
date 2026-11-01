@@ -1,7 +1,6 @@
 import { DataError, describe } from "@measurekit/core";
-import { checkFacetedScores, type FacetedScore } from "../data/faceted-scores.js";
-import type { LinearRaschModel, LocationRow } from "../irt/linear-rasch.js";
-import type { CompressedResponses } from "../irt/responses.js";
+import { checkFacetedScores, type FacetedScore } from "../data/internal.js";
+import type { CompressedResponses, LinearRaschModel, LocationRow } from "../irt/internal.js";
 import { type DesignInteraction, designInteraction } from "./facet-interactions.js";
 
 /** The elements of one facet in a design, with the scores each element has. */

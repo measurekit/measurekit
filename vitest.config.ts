@@ -3,6 +3,21 @@ import { defineConfig } from "vitest/config";
 /** Resolves core to its source, so that the tests of the packages that depend on it run the code and not a build. */
 const CORE_SOURCE = { "@measurekit/core": new URL("./packages/core/src/index.ts", import.meta.url).pathname };
 
+/** Resolves the packages and their subpaths to their sources, for the examples that import them by name. */
+const PACKAGE_SOURCES = [
+  { find: /^@measurekit\/core$/, replacement: new URL("./packages/core/src/index.ts", import.meta.url).pathname },
+  ...["psychometrics", "knowledge-tracing"].flatMap((name) => [
+    {
+      find: new RegExp(`^@measurekit/${name}$`),
+      replacement: new URL(`./packages/${name}/src/index.ts`, import.meta.url).pathname,
+    },
+    {
+      find: new RegExp(`^@measurekit/${name}/(.+)$`),
+      replacement: new URL(`./packages/${name}/src/$1/index.ts`, import.meta.url).pathname,
+    },
+  ]),
+];
+
 /**
  * Returns the project of the benchmarks of a package. They time its build, as Node.js loads it: Vitest's module runner
  * turns each import of a source file into a getter, which stops the compiler from inlining a call across modules and
@@ -45,6 +60,12 @@ export default defineConfig({
       {
         resolve: { alias: CORE_SOURCE },
         test: { name: "knowledge-tracing", include: ["packages/knowledge-tracing/test/**/*.test.ts"] },
+      },
+      { test: { name: "scripts", include: ["scripts/test/**/*.test.ts"] } },
+      {
+        resolve: { alias: PACKAGE_SOURCES },
+        // The examples run on the sources, as the libraries' own tests do.
+        test: { name: "examples", include: ["examples/test/**/*.test.ts"], testTimeout: 120_000 },
       },
       // `pnpm bench` runs the benchmarks of each package with `vitest bench`, which gives a project the suffix "(bench)".
       benchmarkProject("core", {}),

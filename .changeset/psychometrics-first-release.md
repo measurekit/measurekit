@@ -77,3 +77,5 @@ when its selection rule scores every eligible item `-Infinity`.
 
 Fixed forms are assembled in parallel: `assembleForms` takes several forms from one pool in rotation, with enemy sets,
 testlets taken whole, items in several content areas and a most of `overlap` items that two forms may share.
+
+The options that restrict the items of an adaptive test, `contentTargets`, `enemies` and `withinTestlet`, are one type, `TestControlOptions`, which the options of the adaptive, diagnostic and multidimensional tests extend. Every function documents each parameter and its result.

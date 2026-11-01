@@ -8,7 +8,7 @@ import {
   describe,
   logistic as sigmoid,
 } from "@measurekit/core";
-import type { EventLog } from "../data/event-log.js";
+import type { EventLog } from "../data/internal.js";
 import { checkModel } from "../model.js";
 import type { LogisticFit, LogisticModel } from "./logistic.js";
 
@@ -71,6 +71,8 @@ const DIFFERENCE_STEP = 1e-4;
  *
  * @param build - Builds the model for a list of rates, in the order of `start`.
  * @param log - The log to fit each model to.
+ * @param options - The starting rates, their bounds and the stopping rules.
+ * @returns The best rates, the fit of the model built from them, whether the search converged and the iterations run.
  * @throws `DataError` when the options are out of range, `build` is not a function or does not return a model, or the
  * fit of the model built from `start` is not valid for the log.
  * @see {@link https://doi.org/10.1109/TLT.2021.3113067 | Pavlik, Eglington and Harrell-Williams (2021)}

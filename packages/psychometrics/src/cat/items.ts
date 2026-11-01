@@ -1,5 +1,5 @@
 import { DataError, describe } from "@measurekit/core";
-import type { TestItem } from "../irt/model.js";
+import type { TestItem } from "../irt/internal.js";
 
 /** What the engine of every adaptive test needs of a pool item: an id, and optionally its content areas and exposure. */
 export interface PoolControls {

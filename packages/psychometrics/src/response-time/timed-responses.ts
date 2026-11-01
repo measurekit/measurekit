@@ -1,8 +1,6 @@
 import { checkArray, checkFinite, checkPositive, checkRecord, DataError } from "@measurekit/core";
-import { indexIds } from "../data/ids.js";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
-import { type CompressedResponses, compressResponses } from "../irt/responses.js";
+import { indexIds, type ResponseMatrix, type ResponseRecords } from "../data/internal.js";
+import { type CompressedResponses, compressResponses } from "../irt/internal.js";
 
 /** Answered responses by person with their log times, `NaN` where a response has no time. */
 export interface TimedResponses extends CompressedResponses {

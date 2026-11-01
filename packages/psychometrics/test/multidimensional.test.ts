@@ -1,4 +1,4 @@
-import { cholesky, logistic } from "@measurekit/core";
+import { cholesky, logistic, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -39,22 +39,29 @@ import {
   threeParameterLogistic,
   twoParameterLogistic,
 } from "../src/index.js";
-import { compressResponses } from "../src/irt/responses.js";
-import { setUp } from "../src/multidimensional/calibration-setup.js";
-import { latentDistribution } from "../src/multidimensional/correlation.js";
-import { designOf } from "../src/multidimensional/design.js";
-import { type ExpectationItem, expectationStep } from "../src/multidimensional/expectation.js";
-import { productGrid } from "../src/multidimensional/grid.js";
-import { gridLikelihood } from "../src/multidimensional/grid-likelihood.js";
-import { createChain, responsesByItem, responsesByPerson } from "../src/multidimensional/mhrm-chain.js";
+import { compressResponses } from "../src/irt/internal.js";
 import {
+  createChain,
   createCorrelations,
+  createScratch,
+  designOf,
+  type ExpectationItem,
+  expectationStep,
+  gridLikelihood,
+  itemMoments,
+  latentDistribution,
   latentObservedInformation,
   latentScore,
+  observedItemInformation,
   personLatentScores,
+  productGrid,
+  responsesByItem,
+  responsesByPerson,
   secondMoments,
-} from "../src/multidimensional/mhrm-latent.js";
-import { createScratch, itemMoments, observedItemInformation } from "../src/multidimensional/mhrm-moments.js";
+  setUp,
+} from "../src/multidimensional/internal.js";
+import { defined, expectClose, expectParameters } from "./assertions.js";
+import { MODELS as FIXTURE_MODELS } from "./fixture-items.js";
 import longitudinal from "./fixtures/longitudinal.json" with { type: "json" };
 import longitudinalRecovery from "./fixtures/longitudinal-recovery.json" with { type: "json" };
 import exploratory from "./fixtures/multidimensional-exploratory.json" with { type: "json" };
@@ -67,7 +74,6 @@ import m3pl from "./fixtures/multidimensional-m3pl.json" with { type: "json" };
 import mhrm from "./fixtures/multidimensional-mhrm.json" with { type: "json" };
 import missing from "./fixtures/multidimensional-missing.json" with { type: "json" };
 import rotation from "./fixtures/multidimensional-rotation.json" with { type: "json" };
-import { defined, expectClose, expectParameters, MODELS as FIXTURE_MODELS, mean } from "./helpers.js";
 
 /** The built-in models by the names that fixtures give them. */
 const MODELS = {

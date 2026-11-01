@@ -13,6 +13,9 @@ import { checkPairedScores } from "./paired-scores.js";
  * Valid input: the pre and post scores of the same persons, in the same order, at least two persons, finite scores,
  * and pre scores that are not all equal, as the regression has no slope then.
  *
+ * @param pre - The scores of the first occasion.
+ * @param post - The scores of the second occasion, one for each person.
+ * @returns The residual gain of each person.
  * @throws `DataError` when the scores are not arrays of the same length with at least two finite numbers each, or the
  * pre scores are all equal.
  * @see {@link https://doi.org/10.1037/h0029382 | Cronbach and Furby (1970)}

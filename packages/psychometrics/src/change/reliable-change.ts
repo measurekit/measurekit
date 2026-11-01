@@ -39,13 +39,18 @@ function classify(change: number, standardError: number, critical: number): Reli
  * Valid input: finite scores, a positive standard deviation, a reliability from 0 to below 1 and a level between 0 and
  * 1, exclusive.
  *
+ * @param pre - The score of the first occasion.
+ * @param post - The score of the second occasion.
+ * @param input - The standard deviation and reliability of the scores.
+ * @param options - The level of the interval.
+ * @returns The index of reliable change and its classification: `"improved"`, `"unchanged"` or `"declined"`.
+ *
  * @example
  * ```ts
  * import { reliableChange } from "@measurekit/psychometrics/change";
  *
  * reliableChange(12, 21, { sd: 9, reliability: 0.88 }); // { index: 2.041241452319315, classification: "improved" }
  * ```
- *
  * @throws `DataError` when a score is not a finite number, the test is not an object `{ sd, reliability }` of valid
  * values, the reliability is 1, the options are not an object or the level is not between 0 and 1, exclusive.
  * @see {@link https://doi.org/10.1037/0022-006X.59.1.12 | Jacobson and Truax (1991)}
@@ -78,6 +83,10 @@ export function reliableChange(
  *
  * Valid input: finite estimates with positive, finite standard errors, and a level between 0 and 1, exclusive.
  *
+ * @param before - The estimate of theta of the first occasion, with its standard error.
+ * @param after - The estimate of the second occasion, with its standard error.
+ * @param options - The level of the interval.
+ * @returns The index of reliable change and its classification: `"improved"`, `"unchanged"` or `"declined"`.
  * @throws `DataError` when an estimate is not an object `{ theta, standardError }` with a finite theta and a positive,
  * finite standard error, the options are not an object or the level is not between 0 and 1, exclusive.
  * @see {@link https://doi.org/10.1177/0146621616664046 | Jabrayilov, Emons and Sijtsma (2016)}

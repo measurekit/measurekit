@@ -1,5 +1,5 @@
 import { checkOptions, mean, normalQuantile } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { normalDensity } from "../math/normal.js";
 import { correlation, variance } from "../math/statistics.js";
 import { completeCases, itemScores } from "./complete-cases.js";
@@ -40,6 +40,9 @@ export interface ItemStatistics {
 /**
  * Returns the classical statistics of every item, in item order.
  *
+ * @param matrix - The responses of the persons.
+ * @param options - The share of persons in the upper and lower groups.
+ * @returns The statistics of every item, in item order.
  * @throws `DataError` when the matrix is malformed or `groupFraction` is out of range.
  */
 export function itemStatistics(matrix: ResponseMatrix, options: GroupOptions = {}): ItemStatistics[] {

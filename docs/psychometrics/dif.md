@@ -354,6 +354,17 @@ correction holds the chance of any false flag to 0.05, so one comes about once i
 compares all the groups at once, as `difR::difGMH` does, is a different statistic from this recipe's pairs. The test of
 this recipe runs the code on the seeded groups and checks that item 5 is flagged in both comparisons.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                            | What to do                                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| A group is not `"reference"` or `"focal"`, or one has no persons | Give one group for each person, and persons to both groups                        |
+| An item is not dichotomous, for the dichotomous statistics       | Use `mantelTest` or `ordinalLogisticRegressionDif` for items with more categories |
+| `purify` with `matching`                                         | Purify the total score, or give the matching score and leave `purify` off         |
+| A matching score is not a finite number                          | Give `null` for a person to leave out                                             |
+
 ## Differences from difR
 
 | Topic                 | This package                                                        | difR                                                                                                          |

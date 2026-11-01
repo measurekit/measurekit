@@ -9,6 +9,10 @@ const ROWS = 4;
  *
  * Each entry is A_ij less the sum over k of L_ik L_jk, taken in order of k, so that the blocking below, which only shares
  * the reads of the sums that are independent, leaves every result as an unblocked factorization gives it.
+ *
+ * @param a - The symmetric matrix, by rows.
+ * @param size - The number of rows and columns of `a`.
+ * @returns The factor L by rows, with zeros above the diagonal; `null` when `a` is not positive definite.
  */
 export function cholesky(a: Float64Array, size: number): Float64Array | null {
   const lower = new Float64Array(size * size);

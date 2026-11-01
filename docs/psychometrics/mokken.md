@@ -294,6 +294,18 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
 - **The imputation of missing responses.** Outside the sources: an option of mokken, beside the pairwise treatment that
   is built.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                           | What to do                                                                           |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Fewer than two items, or fewer than three for the item ordering | Give the items the method compares: two for the coefficients, three for the ordering |
+| Fewer than two persons answered every item                      | Keep the persons who answered every item, or the items they all answered             |
+| The scores span more than 10 categories                         | Group the scores into at most 10 categories                                          |
+| The minimum group size is more than half of the persons         | Lower `minimumGroupSize`, or give more persons                                       |
+| The total scores have no variance, for the reliability          | The coefficient is undefined for persons who all score alike                         |
+
 ## Differences from the references
 
 | Topic                                   | This package                                                                 | mokken                                                                                                                                                                                                                                         |

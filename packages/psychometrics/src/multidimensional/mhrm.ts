@@ -1,5 +1,5 @@
 import { backtrack, createRandom, largestChange } from "@measurekit/core";
-import type { CompressedResponses } from "../irt/responses.js";
+import type { CompressedResponses } from "../irt/internal.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Design } from "./design.js";

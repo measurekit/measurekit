@@ -1,6 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { isObserved } from "../data/event.js";
-import type { EventLog } from "../data/event-log.js";
+import { type EventLog, isObserved } from "../data/internal.js";
 
 /** The cells of a table by opportunity, from opportunity 1 at index 0: over all skills, and for each skill. */
 export interface ByOpportunity<T> {

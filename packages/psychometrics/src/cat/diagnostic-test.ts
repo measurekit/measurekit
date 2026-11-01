@@ -1,6 +1,5 @@
 import { checkOptions, type Random } from "@measurekit/core";
-import type { ProfileProportion } from "../cdm/calibration.js";
-import { type ProfileEstimate, profileEstimate } from "../cdm/persons.js";
+import { type ProfileEstimate, type ProfileProportion, profileEstimate } from "../cdm/internal.js";
 import { bindPool, type DiagnosticPoolItem, type DiagnosticTestItem } from "./diagnostic-items.js";
 import { gdinaDiscriminationIndex } from "./diagnostic-selection.js";
 import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
@@ -72,6 +71,9 @@ export interface DiagnosticAdaptiveTest {
  * Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or
  * enemies of an administered item are not eligible. The test holds, for each item, an index of 2^K entries.
  *
+ * @param options - The pool, the attributes, the prior, the stopping and selection rules, and the content balancing,
+ *   enemy sets and testlet order; each option has its default.
+ * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when `stopping` or `selection` is not a rule, the attributes, the prior or the pool are
  * invalid, an item has an attribute that is not among the attributes, a content target is invalid or missing for an
  * item's area, an exposure parameter is outside [0, 1], or an enemy set does not name two or more distinct pool items.

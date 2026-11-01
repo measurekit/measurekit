@@ -4,6 +4,13 @@ Scripts that write the reference fixtures in `packages/<package>/test/fixtures/`
 References, datasets, versions and tolerances are listed in
 [psychometrics](../docs/psychometrics/validation.md) and [knowledge tracing](../docs/knowledge-tracing/validation.md).
 
+```mermaid
+flowchart LR
+  R["References: R packages, base R, pyBKT"] --> S["Scripts in validation/ with a fixed seed"]
+  S --> F["Fixtures in packages/package/test/fixtures"]
+  F --> T["Tests compare within the tolerances of docs/package/validation.md"]
+```
+
 ## Psychometrics
 
 R scripts in `validation/psychometrics/`:

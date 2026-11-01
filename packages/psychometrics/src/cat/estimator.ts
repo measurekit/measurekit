@@ -1,6 +1,5 @@
 import { checkFunction } from "../checks.js";
-import type { AbilityEstimator } from "../irt/ability.js";
-import type { IrtItem } from "../irt/model.js";
+import type { AbilityEstimator, IrtItem } from "../irt/internal.js";
 
 /**
  * Returns an estimator that uses `initial` until the responses are mixed, and `mixed` from then on.
@@ -11,6 +10,9 @@ import type { IrtItem } from "../irt/model.js";
  * are skipped. `untilMixed(posteriorMeanEstimate, maximumLikelihoodEstimate)` gives EAP estimates until the first right
  * and the first wrong answer, and ML estimates after.
  *
+ * @param initial - The estimator for responses that are all in the lowest or all in the highest category.
+ * @param mixed - The estimator for the others.
+ * @returns The estimator.
  * @throws `DataError` when `initial` or `mixed` is not a function.
  */
 export function untilMixed(initial: AbilityEstimator, mixed: AbilityEstimator): AbilityEstimator {

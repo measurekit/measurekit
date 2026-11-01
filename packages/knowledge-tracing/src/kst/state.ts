@@ -1,4 +1,4 @@
-import { checkLearnerState } from "../data/learner.js";
+import { checkLearnerState } from "../data/internal.js";
 import { checkDistribution } from "./parameters.js";
 
 /** A learner's state in a KST model: the probability of each knowledge state, in the structure's order. */

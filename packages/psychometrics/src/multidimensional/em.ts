@@ -1,6 +1,5 @@
 import { checkIntegerFrom, DataError, largestChange } from "@measurekit/core";
-import type { CompressedResponses } from "../irt/responses.js";
-import { type Iteration, squarem } from "../irt/squarem.js";
+import { type CompressedResponses, type Iteration, squarem } from "../irt/internal.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { setUp } from "./calibration-setup.js";
 import type { Latent } from "./correlation.js";

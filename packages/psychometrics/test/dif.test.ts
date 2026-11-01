@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { purified } from "../src/dif/purification.js";
+import { purified } from "../src/dif/internal.js";
 import {
   createRandom,
   DataError,
@@ -23,10 +23,10 @@ import {
   simulateThetas,
   twoParameterLogistic,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/dif.json" with { type: "json" };
 import lordPurification from "./fixtures/dif-lord-purification.json" with { type: "json" };
 import polytomous from "./fixtures/dif-polytomous.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Mantel-Haenszel statistics against difR and base R. */

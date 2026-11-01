@@ -89,6 +89,10 @@ export interface DecisionStudy {
  * universe score variance, which the object's own component starts; effects of fixed facets alone belong to neither.
  * The coefficients are Eρ² = σ²(τ) / (σ²(τ) + σ²(δ)) and Φ = σ²(τ) / (σ²(τ) + σ²(Δ)).
  *
+ * @param study - The G study of the design, as `generalizabilityStudy` returns it.
+ * @param options - The number of elements of each facet in the procedure, the fixed facets and the nesting of facets.
+ * @returns The components of the procedure, the universe score, relative and absolute error variances, and the
+ *   generalizability and dependability coefficients.
  * @throws `DataError` when the study is not the result of `generalizabilityStudy`, with its design and one finite
  * component for each effect of it; when an option is invalid, a size is not a positive integer, a facet named is not one
  * of the study's other than the object, or the added nesting is circular or nests the object; when the study is not

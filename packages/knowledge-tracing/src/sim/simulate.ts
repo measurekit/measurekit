@@ -1,6 +1,5 @@
 import { checkBoolean, checkRandom, checkUnitInterval, type Random } from "@measurekit/core";
-import { type Attempt, checkAttempts } from "../data/event.js";
-import { type EventInput, type EventLog, eventLog } from "../data/event-log.js";
+import { type Attempt, checkAttempts, type EventInput, type EventLog, eventLog } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
 /** An attempt to simulate: with `observe: false` it is a learning opportunity, whose outcome is not drawn. */
@@ -33,6 +32,10 @@ export interface Simulation<TState> {
  * An attempt with `observe: false`, such as a lesson, draws nothing: it is predicted by no one, and the model updates
  * with an event without an outcome.
  *
+ * @param model - The model whose predictions give the probability of a correct outcome.
+ * @param attempts - The attempts, in the order the learners make them.
+ * @param random - The generator of the outcomes.
+ * @returns The log with simulated outcomes and each learner's final state.
  * @throws `DataError` when the model is not a learner model, the attempts are not a non-empty array of attempts, the
  * model rejects one, or a prediction is not from 0 to 1.
  */

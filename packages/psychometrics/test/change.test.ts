@@ -9,9 +9,9 @@ import {
   residualGain,
   simpleGain,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
 import gains from "./fixtures/change-gain.json" with { type: "json" };
 import reliable from "./fixtures/change-reliable.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Gains, residuals of lm and Hake's gains, in base R. */

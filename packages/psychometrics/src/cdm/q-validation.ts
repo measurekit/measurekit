@@ -1,5 +1,5 @@
 import { checkOptions, checkUnitInterval } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { type CdmCalibration, calibratedModel } from "./calibration.js";
 import { forEachPosterior } from "./expectation.js";
 import { profilesOf } from "./q-matrix.js";
@@ -48,6 +48,10 @@ export interface QVectorSuggestion {
  * of the fewest attributes whose PVAF exceeds `eps`, of those the one with the largest PVAF, the first in profile order
  * on ties.
  *
+ * @param matrix - The responses of the persons.
+ * @param calibration - The calibrated model.
+ * @param options - The proportion of variance accounted for that an attribute vector must reach.
+ * @returns For each item, its attributes, the suggested attributes and the PVAF of the suggestion.
  * @throws `DataError` when the matrix is invalid, its items are not the calibration's, a response is neither 0 nor 1,
  * or `eps` is not from 0 to 1.
  * @see {@link https://doi.org/10.1007/s11336-015-9467-8 | de la Torre and Chiu (2016)}

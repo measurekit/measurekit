@@ -1,5 +1,5 @@
 import { checkNonNegative, DataError, type ThetaDistribution } from "@measurekit/core";
-import { checkThetaDistribution } from "../irt/theta-distribution.js";
+import { checkThetaDistribution } from "../irt/internal.js";
 import { normalCdf } from "../math/normal.js";
 import {
   checkLevel,
@@ -29,6 +29,11 @@ const DEFAULT_STANDARD_ERROR = 0;
  * (`highest` - `lowest`) / `step` + 2 at most, the size of the result, so a scale of a few thousand scores or fewer;
  * a standard error from 0 and a level between 0 and 1.
  *
+ * @param posterior - The distribution of the person's theta.
+ * @param scale - The slope, intercept and rounding of the reported score.
+ * @param options - The standard error of the official estimate and the level of the interval.
+ * @returns The expected scale score with its interval, and the distribution of the score.
+ *
  * @example
  * ```ts
  * import { predictThetaScore } from "@measurekit/psychometrics/scaling";
@@ -37,7 +42,6 @@ const DEFAULT_STANDARD_ERROR = 0;
  * const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 };
  * predictThetaScore(posterior, scale, { standardError: 0.3 }).mean; // 500
  * ```
- *
  * @throws `DataError` when the distribution, the scale or the options are invalid, or the scale lacks finite bounds or
  * a step above 0.
  */

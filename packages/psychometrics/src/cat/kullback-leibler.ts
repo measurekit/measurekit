@@ -1,5 +1,4 @@
-import { largestCategoryCount } from "../irt/items.js";
-import { logProbability, MIN_PROBABILITY } from "../irt/probability.js";
+import { largestCategoryCount, logProbability, MIN_PROBABILITY } from "../irt/internal.js";
 import type { PoolItem } from "./items.js";
 import type { ItemSelectionRule } from "./selection.js";
 

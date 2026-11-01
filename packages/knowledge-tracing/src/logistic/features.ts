@@ -1,5 +1,5 @@
 import { checkNonNegative, checkPositive, DataError, describe, isRecord } from "@measurekit/core";
-import { entry } from "../data/record.js";
+import { entry } from "../data/internal.js";
 import { type ExposureHistory, type HistoryNeeds, leakyAt, type SkillHistory } from "./state.js";
 
 /**

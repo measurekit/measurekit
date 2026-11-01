@@ -1,5 +1,5 @@
 import { checkArray, checkRandom, type Random } from "@measurekit/core";
-import { simulateCdmResponses } from "../sim/cdm-responses.js";
+import { simulateCdmResponses } from "../sim/internal.js";
 import type { DiagnosticAdaptiveTest, DiagnosticAdaptiveTestState } from "./diagnostic-test.js";
 import { administer, checkTest, type ExposureRate, responseLookup, summarizeAdministrations } from "./simulation.js";
 
@@ -31,6 +31,11 @@ export interface DiagnosticTestSimulation {
  * draws it. The same `random` draws the responses, then makes the test's random choices, so a seeded generator
  * reproduces the simulation.
  *
+ * @param test - The test to run.
+ * @param profiles - The profile of each person, one 0 or 1 for each attribute.
+ * @param random - The generator of the responses, the first item and ties.
+ * @returns The simulated tests of the persons, the accuracy of the classification of the profiles and of each
+ *   attribute, the mean length and the exposure rate of each item.
  * @throws `DataError` when `test` is not a diagnostic adaptive test, `random` is not a random number generator, there
  * are no profiles or a profile is not a 0 or 1 for each attribute.
  */

@@ -4,6 +4,16 @@ Functions in `@measurekit/psychometrics/data` build the response matrices that e
 response records that calibration and ability estimation also take for sparse data. They are plain objects, so they
 can be built by hand or loaded from JSON; every analysis function checks its input.
 
+```mermaid
+flowchart LR
+  A["Rows of responses"] --> M["responseMatrix"]
+  B["Columns of responses"] --> C["responseMatrixFromColumns"] --> M
+  K["Choices and a key"] --> S["scoreResponses"] --> M
+  Q["Person, item, response"] --> R["responseRecords: sparse data"]
+  M --> X["Every analysis of the package"]
+  R --> Y["Calibration and ability estimation"]
+```
+
 ## Response matrices
 
 A `ResponseMatrix` holds `personIds`, `itemIds` and `responses`: one row per person, one column per item.

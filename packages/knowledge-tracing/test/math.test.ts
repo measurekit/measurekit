@@ -13,10 +13,10 @@ import { permutation } from "../src/math/permutation.js";
 import { quinticDerivative, quinticHermite, quinticMaximum } from "../src/math/quintic.js";
 import { rank } from "../src/math/rank.js";
 import type { SparseMatrix } from "../src/math/sparse-matrix.js";
+import { defined, expectAllClose, expectClose } from "./assertions.js";
 import hiddenMarkov from "./fixtures/math-forward-backward.json" with { type: "json" };
 import functions from "./fixtures/math-functions.json" with { type: "json" };
 import regressions from "./fixtures/math-logistic-regression.json" with { type: "json" };
-import { defined, expectAllClose, expectClose } from "./helpers.js";
 
 /** Relative tolerance of the normal quantile and the logistic function against R. */
 const FUNCTION_TOLERANCE = 1e-14;

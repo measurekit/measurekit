@@ -23,6 +23,7 @@ const GOLDEN_GAMMA = 0x9e3779b9;
  * whose last bit may differ between runtimes.
  *
  * @param seed - A safe integer.
+ * @returns The generator, whose draws are the same for the same seed.
  * @throws `DataError` when `seed` is not a safe integer.
  */
 export function createRandom(seed: number): Random {

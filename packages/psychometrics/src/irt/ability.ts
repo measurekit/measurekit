@@ -114,6 +114,10 @@ const SCAN_STEP = 0.25;
  * the test information of the answered items. Missing responses are skipped. When every response is in its item's
  * lowest or highest category, the likelihood grows toward -∞ or +∞ and the estimate is that end of `range`.
  *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The range of theta to search.
+ * @returns The estimate and its standard error.
  * @throws `DataError` when the items, responses or range are invalid, or no item was answered.
  */
 export function maximumLikelihoodEstimate(
@@ -137,6 +141,10 @@ export function maximumLikelihoodEstimate(
  * response is in the lowest or highest category; where no root exists, the estimate is the end of `range` toward which
  * the weighted likelihood grows.
  *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The range of theta to search.
+ * @returns The estimate and its standard error.
  * @throws `DataError` when the items, responses or range are invalid, or no item was answered.
  */
 export function weightedLikelihoodEstimate(
@@ -155,6 +163,10 @@ export function weightedLikelihoodEstimate(
  * the standard error 1 / √(I(θ) + 1 / sd²). Missing responses are skipped; without responses the estimate is the
  * prior mean.
  *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The prior and the range of theta to search.
+ * @returns The estimate and its standard error.
  * @throws `DataError` when the items, responses, range or prior are invalid.
  */
 export function posteriorModeEstimate(
@@ -179,6 +191,10 @@ export function posteriorModeEstimate(
  * each theta, Σ_g w_g Π_j P_j(x_j | θ + σ z_g); testlets name their items by id. Missing responses are skipped; without
  * responses the estimate is the prior.
  *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The testlets, the prior and the quadrature.
+ * @returns The estimate and its standard error, the standard deviation of the posterior.
  * @throws `DataError` when the items, responses, prior or quadrature are invalid; with testlets, when an item has no id
  * or item ids repeat, a testlet names an id that is not a string or an item that is in a testlet already, or its sd is
  * not positive and finite.
@@ -218,6 +234,10 @@ export function posteriorMoments(nodes: Float64Array, posterior: Float64Array): 
  * answered responses; the nodes are `mean + sd * z_q`, as for `posteriorMeanEstimate`, whose estimate is the mean of
  * this distribution. Missing responses are skipped; without responses the posterior is the prior.
  *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The prior and the quadrature.
+ * @returns The nodes and their posterior weights.
  * @throws `DataError` when the items, responses, prior or quadrature are invalid.
  */
 export function thetaPosterior(

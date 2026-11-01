@@ -9,17 +9,19 @@ import {
   describe,
   normalizeLogs,
 } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
-import type { CalibratedItem } from "../irt/calibration.js";
-import type { CalibrationOptions } from "../irt/calibration-options.js";
-import { setUp } from "../irt/calibration-setup.js";
-import { indexItems } from "../irt/items.js";
-import type { IrtModel } from "../irt/model.js";
-import type { ParameterPrior } from "../irt/prior.js";
-import { logProbability } from "../irt/probability.js";
-import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
-import { respondentsOf } from "../irt/responses.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import {
+  type CalibratedItem,
+  type CalibrationOptions,
+  type IrtModel,
+  indexItems,
+  logProbability,
+  type ParameterPrior,
+  type QuadratureOptions,
+  quadratureRule,
+  respondentsOf,
+  setUp,
+} from "../irt/internal.js";
 import { calibrateResponseTimes } from "./lognormal.js";
 import { expectation, iterate, jointModel } from "./speed-accuracy-em.js";
 import { jointCovariance } from "./speed-accuracy-errors.js";
@@ -150,6 +152,11 @@ const STANDARD_ERRORS: readonly SpeedAccuracyStandardErrors[] = ["none", "hessia
  * The item population level of the hierarchical model, a multivariate normal distribution of the item parameters, is
  * not part of it.
  *
+ * @param data - The responses of the persons with their times.
+ * @param options - The model, priors and quadrature of the responses, the standard errors and the stopping rules; each
+ *   option has its default.
+ * @returns The items with their parameters, the standard deviation of the speed, the correlation of speed and ability
+ *   with its standard error, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations run.
  * @throws `DataError` when the data are malformed or have no times, an item has fewer than two times or times that do
  * not differ, an item cannot be calibrated as `calibrate` requires, or an option is invalid.
  * @see {@link https://doi.org/10.3102/1076998607300422 | van der Linden (2007)}
@@ -233,6 +240,9 @@ export function calibrateSpeedAccuracy<TParameters>(
  * conditional distribution given theta is normal. A person with responses and no times has theta from the responses
  * only and no speed. Items are matched to the calibration by id.
  *
+ * @param data - The responses of the persons with their times.
+ * @param calibration - The calibrated hierarchical model.
+ * @returns The ability and the speed of each person with their standard errors; `null` for a person without responses.
  * @throws `DataError` when the data are malformed or have no times, the calibration is not one, an item of the data is
  * not among its items, or a response is not a category of its item.
  * @see {@link https://doi.org/10.1177/0146621609344844 | van der Linden, Klein Entink and Fox (2010)}

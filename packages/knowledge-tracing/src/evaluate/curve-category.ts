@@ -43,6 +43,9 @@ export interface CurveCategoryOptions {
  * The thresholds depend on the curriculum, so the first four options are required. `slope` comes from a fit of AFM
  * with the log's Q-matrix: the skill's slope. Pass the points of one skill, such as `learningCurve(log).skills.fractions`.
  *
+ * @param points - The error rate of each opportunity, as `learningCurve` gives them.
+ * @param options - DataShop's thresholds for learners, points, slope and error, and the AFM slope of the skill.
+ * @returns The category: `"too little data"`, `"low and flat"`, `"still high"`, `"no learning"` or `"good"`.
  * @see {@link https://pslcdatashop.web.cmu.edu/help?page=learningCurve | DataShop, Learning Curve help}
  * @throws `DataError` when the points or an option are malformed.
  */

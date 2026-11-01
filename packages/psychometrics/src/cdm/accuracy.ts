@@ -1,5 +1,5 @@
 import { checkChoice, checkOptions, DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import type { CdmCalibration } from "./calibration.js";
 import { attributeProfiles } from "./persons.js";
 
@@ -34,6 +34,10 @@ export interface CdmClassificationAccuracy {
  * model, as GDINA's `CA`. τ_c weights each person's posterior of c by whether the person is classified in c, over the
  * persons' posterior of c. Uses the persons with responses.
  *
+ * @param matrix - The responses of the persons.
+ * @param calibration - The calibrated model.
+ * @param options - The classification rule.
+ * @returns The accuracy and consistency of the classification of the profiles and of each attribute.
  * @throws `DataError` when the matrix is invalid, its items are not the calibration's, a response is neither 0 nor 1,
  * no person has a response, or the classification is unknown.
  * @see {@link https://doi.org/10.7282/t3w95d95 | Iaconangelo (2017)}

@@ -25,6 +25,9 @@ export interface DifferenceReliabilityInput {
  *
  * Valid input: positive standard deviations, reliabilities from 0 to 1 and a correlation from -1 to 1.
  *
+ * @param input - The standard deviation and reliability of each occasion, and their correlation.
+ * @returns The reliability of the difference, at most 1; `null` where it is undefined.
+ *
  * @example
  * ```ts
  * import { differenceReliability } from "@measurekit/psychometrics/change";
@@ -35,7 +38,6 @@ export interface DifferenceReliabilityInput {
  *   correlation: 0.5,
  * }); // 0.7451612903225805
  * ```
- *
  * @throws `DataError` when the input is not an object `{ pre, post, correlation }` of valid values.
  * @see {@link https://doi.org/10.1177/001316445601600401 | Lord (1956)}
  * @see {@link https://doi.org/10.1037/h0029382 | Cronbach and Furby (1970)}

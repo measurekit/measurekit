@@ -1,6 +1,5 @@
 import { checkArray, DataError } from "@measurekit/core";
-import { expectedScore, largestCategoryCount } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
+import { expectedScore, type IrtItem, largestCategoryCount } from "../irt/internal.js";
 import { findIncreasingRoot } from "../math/root.js";
 import { scoreLimits } from "./models.js";
 
@@ -15,6 +14,9 @@ import { scoreLimits } from "./models.js";
  * L_from they map linearly from 0 to L_to (Kolen and Brennan's procedure), above U_from linearly from U_to to the
  * highest `to` score.
  *
+ * @param from - The items of the form to equate.
+ * @param to - The items of the form to equate to.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a form's items are not an array or there are none, an item is invalid or not one of the
  * built-in models, or its expected score does not increase with theta: an NRM item, or a slope a ≤ 0.
  * @see {@link https://doi.org/10.4324/9780203056615 | Lord (1980)}

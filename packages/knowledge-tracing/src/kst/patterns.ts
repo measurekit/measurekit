@@ -1,6 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { isObserved } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import { checkLog, type EventLog, isObserved } from "../data/internal.js";
 
 /** The items of a log, and each learner's response pattern over them: 1 for a correct first answer, 0 for a wrong one. */
 export interface ResponsePatterns {

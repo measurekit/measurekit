@@ -7,6 +7,9 @@ import type { ItemSelectionRule } from "./selection.js";
  * probability, the first in pool order on ties. It scores those items with uniform draws from `context.random` and the
  * others `-Infinity`. Items `rule` scores `-Infinity` are not selected.
  *
+ * @param rule - The rule that ranks the items.
+ * @param count - The number of the highest-scored items to draw from.
+ * @returns The selection rule.
  * @throws `DataError` when `rule` is not a selection rule or `count` is not a positive integer.
  * @see {@link https://doi.org/10.1207/s15324818ame0204_6 | Kingsbury and Zara (1989)}
  */

@@ -16,10 +16,10 @@ import {
   splitByLearner,
   splitByTime,
 } from "../src/index.js";
+import { defined } from "./assertions.js";
 import firstAttemptFixture from "./fixtures/data-first-attempts.json" with { type: "json" };
 import rowFixture from "./fixtures/data-rows.json" with { type: "json" };
 import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 const events: EventInput[] = [
   { learner: "ana", item: "q2", time: 3, outcome: 1 },

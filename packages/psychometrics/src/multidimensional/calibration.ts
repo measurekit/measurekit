@@ -1,8 +1,11 @@
 import { checkChoice, checkOptions, checkSeed, checkStopping, DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
-import type { StandardErrorMethod } from "../irt/calibration-options.js";
-import { type CompressedResponses, compressResponses, respondentsOf } from "../irt/responses.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import {
+  type CompressedResponses,
+  compressResponses,
+  respondentsOf,
+  type StandardErrorMethod,
+} from "../irt/internal.js";
 import type { CalibrationMethod, MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { type ItemState, setUp } from "./calibration-setup.js";
 import { pairsOf } from "./correlation.js";
@@ -120,6 +123,11 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  *
  * An exploratory solution is determined up to the signs of its dimensions; {@link rotateLoadings} rotates it.
  *
+ * @param data - The responses of the persons, as a matrix or as records.
+ * @param options - The model, the method, the dimensions or loadings, the groups and fixed items, the priors, the
+ *   quadrature, the standard errors and the stopping rules; each option has its default.
+ * @returns The items with their parameters, the correlations of the dimensions, the groups, the standardized loadings
+ *   and communalities, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations run.
  * @throws `DataError` when the data or an option is invalid, there are no responses, neither or both of `dimensions`
  * and `loadings` are given, an item is not in `loadings` or lacks responses in a category up to its highest or has more
  * categories than its model allows; with EM, when there are more than 3 dimensions or the grid has more than 10⁶ nodes,

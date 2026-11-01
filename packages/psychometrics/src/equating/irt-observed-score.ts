@@ -1,9 +1,12 @@
 import { checkOptions, checkRecord, checkUnitInterval, type ThetaDistribution } from "@measurekit/core";
-import { checkItemList } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
-import { quadratureRule } from "../irt/quadrature.js";
-import { scoreLikelihoods } from "../irt/summed-score.js";
-import { type CheckedThetaDistribution, checkThetaDistribution } from "../irt/theta-distribution.js";
+import {
+  type CheckedThetaDistribution,
+  checkItemList,
+  checkThetaDistribution,
+  type IrtItem,
+  quadratureRule,
+  scoreLikelihoods,
+} from "../irt/internal.js";
 import { equipercentileEquating } from "./observed-score.js";
 
 /** The populations of the groups that took the two forms, on the scale of the forms' items. */
@@ -56,6 +59,10 @@ export interface ObservedScoreSetup {
  * method of the equateIRT package's `score(method = "OSE")`, which takes the populations N(0, 1) and N(B, A²) on
  * Gauss-Hermite points.
  *
+ * @param from - The items of the form to equate.
+ * @param to - The items of the form to equate to.
+ * @param options - The populations and the weight of the first.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a form's items are not an array or there are none, an item is invalid, `populations` is not
  * an object of populations with finite nodes, non-negative weights that sum to 1 within 1e-6 and as many weights as
  * nodes, or `weight` is not a number from 0 to 1.

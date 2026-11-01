@@ -1,3 +1,4 @@
+import { mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -23,10 +24,9 @@ import {
   responseRecords,
   simulateMultidimensionalResponses,
 } from "../src/index.js";
-import { compressResponses } from "../src/irt/responses.js";
-import { patternsOf } from "../src/multidimensional/bifactor-patterns.js";
-import { structureOf } from "../src/multidimensional/bifactor-structure.js";
-import { createWalk } from "../src/multidimensional/bifactor-walk.js";
+import { compressResponses } from "../src/irt/internal.js";
+import { createWalk, patternsOf, structureOf } from "../src/multidimensional/internal.js";
+import { defined, expectClose } from "./assertions.js";
 import graded from "./fixtures/bifactor-graded.json" with { type: "json" };
 import incomplete from "./fixtures/bifactor-incomplete.json" with { type: "json" };
 import long from "./fixtures/bifactor-long.json" with { type: "json" };
@@ -34,7 +34,6 @@ import m2pl from "./fixtures/bifactor-m2pl.json" with { type: "json" };
 import m3pl from "./fixtures/bifactor-m3pl.json" with { type: "json" };
 import recovery from "./fixtures/bifactor-recovery.json" with { type: "json" };
 import twoTier from "./fixtures/bifactor-two-tier.json" with { type: "json" };
-import { defined, expectClose, mean } from "./helpers.js";
 
 type Parameters = MultidimensionalLogisticParameters | MultidimensionalGradedParameters;
 

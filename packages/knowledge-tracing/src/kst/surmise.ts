@@ -16,8 +16,10 @@ export type Prerequisites = Readonly<Record<string, readonly string[]>>;
  * of each of its elements. States are ordered by size, then by the domain's order. The structure is frozen, and the
  * functions of this module trust it instead of checking it again.
  *
- * @param prerequisites - Each element's prerequisites, by element: every element of the domain is a key, with `[]`
- * when it has none. Prerequisites of prerequisites are implied; elements that require each other are learned together.
+ * @param prerequisites - Each element's prerequisites, by element: every element of the domain is a key, with `[]` when
+ *   it has none. Prerequisites of prerequisites are implied; elements that require each other are learned together.
+ * @param options - The most states to build.
+ * @returns The quasi-ordinal knowledge space.
  * @throws `DataError` when an element is the empty string, a prerequisite is not a key, or the space has more states
  * than `maxStates`.
  */

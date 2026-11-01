@@ -25,6 +25,9 @@ const STEP_TOLERANCE = 1e-6;
  * powers without their ill-conditioning. The distribution is the number of persons at each score, from 0 to the
  * highest.
  *
+ * @param distribution - The persons at each score, from 0.
+ * @param degree - The degree of the log-linear model: the number of moments of the distribution that the fit keeps.
+ * @returns The smoothed distribution, whether the fit converged and the iterations run.
  * @throws `DataError` when the distribution is invalid, or the degree is not an integer from 1 to the number of scores
  * less 1.
  * @see {@link https://doi.org/10.3102/10769986025002133 | Holland and Thayer (2000)}

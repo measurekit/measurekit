@@ -1,6 +1,10 @@
 import { DataError, describe } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
-import { checkResponseRecords, type ResponseRecords } from "../data/response-records.js";
+import {
+  checkResponseMatrix,
+  checkResponseRecords,
+  type ResponseMatrix,
+  type ResponseRecords,
+} from "../data/internal.js";
 import type { IrtModel } from "./model.js";
 
 /**

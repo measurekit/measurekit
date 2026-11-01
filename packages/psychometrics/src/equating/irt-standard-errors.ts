@@ -1,7 +1,5 @@
 import { checkArray, checkChoice, checkFinite, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
-import type { ParameterCovariance } from "../irt/calibration.js";
-import { indexItems } from "../irt/items.js";
-import type { IrtItem, TestItem } from "../irt/model.js";
+import { type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
 import { type IrtObservedScoreOptions, observedScoreEquivalents, observedScoreSetup } from "./irt-observed-score.js";
 import { trueScoreEquating } from "./true-score.js";
 
@@ -54,6 +52,8 @@ interface ParameterTarget {
  * @param from - The items of the form to equate, with the ids of the covariance.
  * @param to - The items of the form to equate to.
  * @param covariance - The covariance of the item parameters.
+ * @param options - The method, the populations and the weight of the first.
+ * @returns The standard error at each score of the form to equate.
  * @throws `DataError` when the options are invalid, an item list is not an array of items with distinct string ids, an
  * item on both forms differs between them, the covariance is not a square matrix of finite numbers with a label for each
  * row, a label names a parameter that the item's model does not estimate, no parameter of the covariance belongs to an

@@ -1,4 +1,4 @@
-import type { CompressedResponses } from "../irt/responses.js";
+import type { CompressedResponses } from "../irt/internal.js";
 import type { ItemGroup } from "./bifactor-structure.js";
 
 /** The distinct responses to the items of one group, in lexicographic order. */

@@ -8,8 +8,7 @@ import {
   isNonEmptyString,
   isRecord,
 } from "@measurekit/core";
-import type { CalibratedItem } from "../irt/calibration.js";
-import { checkItem } from "../irt/items.js";
+import { type CalibratedItem, checkItem } from "../irt/internal.js";
 import { checkFullRank, designMatrix, type FeatureEffect, type ItemFeatures } from "./features.js";
 import { remlRegression } from "./reml.js";
 

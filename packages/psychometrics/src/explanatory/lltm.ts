@@ -8,14 +8,21 @@ import {
   type LogisticItem,
   type ThresholdItem,
 } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
-import { fitLinearRasch, type LinearRaschFit, type LocationRow } from "../irt/linear-rasch.js";
-import { twoParameterLogistic } from "../irt/logistic.js";
-import type { TestItem } from "../irt/model.js";
-import { partialCredit } from "../irt/partial-credit.js";
-import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
-import { type CompressedResponses, categoryCounts, checkCategories, compressResponses } from "../irt/responses.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import {
+  type CompressedResponses,
+  categoryCounts,
+  checkCategories,
+  compressResponses,
+  fitLinearRasch,
+  type LinearRaschFit,
+  type LocationRow,
+  partialCredit,
+  type QuadratureOptions,
+  quadratureRule,
+  type TestItem,
+  twoParameterLogistic,
+} from "../irt/internal.js";
 import { checkFullRank, type Design, designMatrix, type FeatureEffect, type ItemFeatures } from "./features.js";
 
 /** How the standard errors of the effects of an LLTM are computed. */

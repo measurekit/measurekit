@@ -6,8 +6,7 @@ import {
   iterateToConvergence,
   largestChange,
 } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
 import { type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
@@ -97,6 +96,11 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * plus the log priors, by central differences of its exact gradient. Missing responses are skipped; persons without
  * responses change nothing.
  *
+ * @param data - The responses of the persons, as a matrix or as records.
+ * @param options - The model, fixed items, priors, quadrature, groups, distributions of theta, covariates, standard
+ *   errors, testlets and stopping rules; each option has its default.
+ * @returns The items with their parameters, the groups, the regression, the testlets, the log-likelihood, AIC and BIC,
+ *   whether the EM converged and the iterations run.
  * @throws `DataError` when the matrix or an option is invalid, there are no responses, a fixed item's parameters are
  * invalid or do not fit its responses, an estimated item lacks responses in a category up to its highest or has more
  * categories than its model allows, estimated items of a model that share parameters, as RSM items share the steps,
@@ -177,6 +181,9 @@ const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian
  * estimated parameters, so it includes the uncertainty of the distributions of theta estimated with the items. A
  * delta method for a function of the item parameters, such as an equated score, is `gᵀ Σ g` with `g` the gradient.
  *
+ * @param data - The responses of the persons, as a matrix or as records.
+ * @param options - The options of `calibrate`.
+ * @returns The calibration and the covariance matrix of the estimated item parameters.
  * @throws `DataError` as {@link calibrate} does.
  */
 export function calibrateWithCovariance<TParameters>(

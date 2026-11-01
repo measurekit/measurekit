@@ -6,7 +6,10 @@ import { checkThetas } from "./responses.js";
 /**
  * Draws `count` thetas from a distribution.
  *
+ * @param count - The number of persons.
+ * @param random - The generator of the draws.
  * @param distribution - The distribution of a theta.
+ * @returns The thetas.
  * @throws `DataError` when `count` is not a positive integer, `random` not a random number generator or `distribution`
  * not a function, or a draw is not finite.
  * @defaultValue `distribution` is `STANDARD_NORMAL`, N(0, 1), the scale of calibration

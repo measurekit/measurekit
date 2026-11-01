@@ -1,7 +1,6 @@
 import { checkOptions, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
-import { type AbilityEstimate, type AbilityEstimator, posteriorMeanEstimate } from "../irt/ability.js";
-import { indexItems } from "../irt/items.js";
+import { type AbilityEstimate, type AbilityEstimator, indexItems, posteriorMeanEstimate } from "../irt/internal.js";
 import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
 import { checkResponse, type PoolItem } from "./items.js";
 import { type ItemSelectionRule, maximumInformation } from "./selection.js";
@@ -60,6 +59,9 @@ export interface AdaptiveTest {
  * Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or enemies
  * of an administered item are not eligible. Items that share a `testlet` are administered together: see the guide.
  *
+ * @param options - The pool, the stopping and selection rules, the estimator, and the content balancing, enemy sets and
+ *   testlet order; each option has its default.
+ * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when `stopping`, `selection` or `estimator` is not a rule or function, an item's id or
  * parameters are invalid, ids repeat, an exposure parameter is outside [0, 1], a testlet is not a non-empty string, a
  * content target is invalid or missing for an item's area, an enemy set does not name two or more distinct pool items,

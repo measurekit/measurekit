@@ -1,6 +1,5 @@
 import { backtrack } from "@measurekit/core";
-import { fromUnbounded, toUnbounded, unboundedDerivative } from "../irt/bounds.js";
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { fromUnbounded, MIN_PROBABILITY, toUnbounded, unboundedDerivative } from "../irt/internal.js";
 import { invert } from "../math/linear-algebra.js";
 import { type ItemState, UNBOUNDED } from "./calibration-setup.js";
 import type { Grid } from "./grid.js";

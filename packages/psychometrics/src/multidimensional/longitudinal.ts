@@ -1,11 +1,15 @@
 import { checkChoice, checkIntegerFrom, checkOptions, checkStopping, DataError, describe } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { StandardErrorMethod } from "../irt/calibration-options.js";
-import { setUp } from "../irt/calibration-setup.js";
-import { gradedResponse } from "../irt/graded.js";
-import { oneParameterLogistic, twoParameterLogistic } from "../irt/logistic.js";
-import { maximization } from "../irt/m-step.js";
-import type { IrtModel, TestItem } from "../irt/model.js";
+import type { ResponseMatrix } from "../data/internal.js";
+import {
+  gradedResponse,
+  type IrtModel,
+  maximization,
+  oneParameterLogistic,
+  type StandardErrorMethod,
+  setUp,
+  type TestItem,
+  twoParameterLogistic,
+} from "../irt/internal.js";
 import { rectangular } from "../math/quadrature.js";
 import { EM_MAX_ITERATIONS, EM_TOLERANCE } from "./calibration.js";
 import { latentDistribution } from "./correlation.js";
@@ -123,6 +127,11 @@ const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian
  * nodes or above its range, leaves `converged` `false`. `changes` gives the moments of the change between consecutive
  * occasions, which determine Embretson's initial ability and modifiability.
  *
+ * @param occasions - The responses on each occasion, 2 or 3 matrices of the same persons and items matched by id.
+ * @param options - The model, the quadrature, the standard errors and the stopping rules; each option has its default.
+ * @returns The items with their parameters, the moments of each occasion, the correlations of the occasions, the change
+ *   between occasions, the standard errors, the log-likelihood, whether the estimation converged and the iterations
+ *   run.
  * @throws `DataError` when `occasions` is not an array of 2 or 3 response matrices, a matrix is malformed, there are no
  * responses, an occasion shares no item with the first, directly or through the others, an item has responses in fewer
  * than two categories, a model other than the three allowed is given or an option is invalid, or the grid has more than

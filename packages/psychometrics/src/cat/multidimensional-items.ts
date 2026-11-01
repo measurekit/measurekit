@@ -1,4 +1,4 @@
-import type { MultidimensionalTestItem } from "../multidimensional/model.js";
+import type { MultidimensionalTestItem } from "../multidimensional/internal.js";
 import type { PoolControls } from "./items.js";
 
 /**

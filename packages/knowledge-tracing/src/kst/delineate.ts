@@ -1,5 +1,5 @@
 import { DataError, type QMatrix } from "@measurekit/core";
-import { checkItemSkills } from "../data/q-matrix.js";
+import { checkItemSkills } from "../data/internal.js";
 import { compareStates, compile, holds, type KnowledgeStructure, seal } from "./structure.js";
 
 /**
@@ -7,6 +7,9 @@ import { compareStates, compile, holds, type KnowledgeStructure, seal } from "./
  * (the conjunctive model). Items are the Q-matrix's, in its order; equal item states appear once. The structure is
  * frozen, and the functions of this module trust it instead of checking it again.
  *
+ * @param structure - The structure over skills.
+ * @param qMatrix - The skills of each item.
+ * @returns The structure over items.
  * @throws `DataError` when the structure or the Q-matrix is malformed, or an item has no skills or a skill outside the
  * structure's domain.
  */

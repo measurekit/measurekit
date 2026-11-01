@@ -1,10 +1,12 @@
 import { checkOptions, checkPositive, checkRecord } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecord, ResponseRecords } from "../data/response-records.js";
-import { type AbilityEstimator, posteriorMeanEstimate } from "../irt/ability.js";
-import { abilityEstimates } from "../irt/ability-estimates.js";
-import type { PersonEstimate } from "../irt/joint-maximum-likelihood.js";
-import type { TestItem } from "../irt/model.js";
+import type { ResponseMatrix, ResponseRecord, ResponseRecords } from "../data/internal.js";
+import {
+  type AbilityEstimator,
+  abilityEstimates,
+  type PersonEstimate,
+  posteriorMeanEstimate,
+  type TestItem,
+} from "../irt/internal.js";
 import { timedResponses } from "./timed-responses.js";
 
 const DEFAULT_PERCENTAGE = 10;
@@ -41,6 +43,9 @@ export interface ResponseTimeEffort {
  * item's times, at most `cap` seconds. A response faster than its item's threshold is a rapid guess. Items
  * without times have no threshold.
  *
+ * @param data - The responses of the persons with their times.
+ * @param options - The percentage of the mean time and the largest threshold.
+ * @returns The threshold of each item by id, in seconds.
  * @throws `DataError` when the data are malformed or have no times, or `percentage` or `cap` is not positive and
  * finite.
  * @see {@link https://doi.org/10.1111/emip.12165 | Wise (2017)}
@@ -74,6 +79,10 @@ export function normativeThresholds(
  * Returns each person's response time effort: the share of the person's responses with times at or above their item's
  * threshold, solution behavior rather than rapid guessing, over the items with thresholds.
  *
+ * @param data - The responses of the persons with their times.
+ * @param thresholds - The rapid-guessing threshold of each item by id, in seconds.
+ * @returns For each person, the effort, from 0 to 1 and `null` without responses with times, and the number of rapid
+ *   guesses.
  * @throws `DataError` when the data are malformed or have no times, or a threshold is not a positive finite number.
  * @see {@link https://doi.org/10.1207/s15324818ame1802_2 | Wise and Kong (2005)}
  */
@@ -99,7 +108,11 @@ export function responseTimeEffort(
  * item's threshold, are treated as missing, and `estimator` estimates theta from the rest, as {@link abilityEstimates}
  * does. Responses without a time or a threshold count.
  *
+ * @param data - The responses of the persons with their times.
+ * @param items - The calibrated items.
+ * @param thresholds - The rapid-guessing threshold of each item by id, in seconds.
  * @param estimator - The estimator of theta from the remaining responses.
+ * @returns The estimate of each person from the responses that were not rapid guesses.
  * @throws `DataError` when the data are malformed or have no times, a threshold is invalid, or in the cases of
  * {@link abilityEstimates}.
  * @defaultValue `estimator` is `posteriorMeanEstimate`

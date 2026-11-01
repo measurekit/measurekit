@@ -1,5 +1,5 @@
 import { DataError, describe, isRecord, logisticPair, logisticProbabilities, validAsymptotes } from "@measurekit/core";
-import type { ModelParameter } from "../irt/model.js";
+import type { ModelParameter } from "../irt/internal.js";
 import type { MultidimensionalModel } from "./model.js";
 
 /**

@@ -6,6 +6,18 @@ base R, observed-score equating, with or without common items, and its bootstrap
 package and base R, true-score equating against base R and equateIRT, IRT observed-score equating against base R and
 equateIRT, and the standard errors of IRT equating against base R and mirt ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  C1["Calibration of form X"] --> L["Linking: moment and characteristic-curve methods"]
+  C2["Calibration of form Y"] --> L
+  L --> T["Transformation: slope and intercept"]
+  S["Score distributions of two forms"] --> E["Observed-score equating"]
+  I["Items of two forms"] --> Q["True-score and IRT observed-score equating"]
+  E --> R["Equated score of each score of form X"]
+  Q --> R
+  B["Bootstrap and delta-method standard errors"] --> R
+```
+
 ## Linking
 
 Each calibration fixes theta ~ N(0, 1) in its own group, so the same item gets different parameters from groups of

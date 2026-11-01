@@ -1,6 +1,5 @@
 import { checkOptions, checkPositive, chiSquareUpperTail } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 
 import { posteriors } from "./lognormal.js";
 import { forEachTime, itemsOfData, type TimedResponses, type TimeItem, timedResponses } from "./timed-responses.js";
@@ -46,6 +45,10 @@ export interface PersonTimeFit extends SpeedEstimate {
  * parameters: with a prior N(0, σ_τ²), the posterior mean Σ α_i² (β_i - y_i) / (1 / σ_τ² + Σ α_i²) and its SD;
  * without, the maximum likelihood estimate Σ α_i² (β_i - y_i) / Σ α_i² and 1 / √Σ α_i². Items are matched by id.
  *
+ * @param data - The responses of the persons with their times.
+ * @param items - The lognormal parameters of each item, matched to the data by id.
+ * @param options - The standard deviation of the speed.
+ * @returns The speed of each person and its standard error; `null` for a person without times.
  * @throws `DataError` when the data are malformed or have no times, an item of the data has no time item, or
  * the prior's sd is not positive and finite.
  */
@@ -67,6 +70,11 @@ export function speedEstimates(
  * preknowledge or rapid guessing. A large residual flags a single time. The speed is estimated as by {@link
  * speedEstimates}.
  *
+ * @param data - The responses of the persons with their times.
+ * @param items - The lognormal parameters of each item, matched to the data by id.
+ * @param options - The standard deviation of the speed.
+ * @returns For each person, the speed estimate with its standard error, the standardized residuals of the times, and
+ *   the chi-square statistic of the residuals with its degrees of freedom and probability.
  * @throws `DataError` in the cases of {@link speedEstimates}.
  * @see {@link https://doi.org/10.1007/s11336-007-9046-8 | van der Linden and Guo (2008)}
  */

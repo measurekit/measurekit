@@ -5,13 +5,18 @@ import {
   checkAttempts,
   checkEvent,
   checkHasSkills,
+  checkLearner,
+  checkLearnerId,
+  checkLog,
+  checkObservedEvents,
+  type EventLog,
+  entry,
   isObserved,
   type ObservedEvent,
-} from "../data/event.js";
-import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
-import { checkLearner, checkLearnerId } from "../data/learner.js";
-import { entry, parametersOf } from "../data/record.js";
-import { replay, type Steps } from "../data/replay.js";
+  parametersOf,
+  replay,
+  type Steps,
+} from "../data/internal.js";
 import { indexOfMax } from "../math/extremes.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import {
@@ -190,6 +195,10 @@ const DEFAULT_THRESHOLD = 0.9;
  * probability of each knowledge state; each event updates it by Bayes' rule, a correct answer having probability 1 -
  * slip where the state masters the item and guess where it does not. Outcomes between 0 and 1 count as partial credit.
  *
+ * @param options - The structure, whether it is over items or skills, the method and the start, fixed and equal rates
+ *   of the fit.
+ * @returns The model: `fit` estimates the slip and guess rates, `update` and `predict` serve online, and
+ *   `mostLikelyState` and `nextQuestion` serve assessment.
  * @throws `DataError` when the structure, the options or the parameters are invalid.
  */
 export function kst(options: KstOptions): KstModel {

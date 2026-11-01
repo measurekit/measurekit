@@ -3,6 +3,10 @@ import { DataError } from "./errors.js";
 /**
  * Describes a value in a message: strings quoted; arrays, functions and other objects as "an array", "a function" and
  * "an object"; other values as `String` prints them.
+ *
+ * @param value - The value to describe.
+ * @returns The description: a quoted string, a number as written, or `an array`, `a function`, `an object`, `null` or
+ *   `undefined`.
  */
 export function describe(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
@@ -12,22 +16,42 @@ export function describe(value: unknown): string {
   return String(value);
 }
 
-/** Returns whether a value is a string of at least one character, as every id is. */
+/**
+ * Returns whether a value is a string of at least one character, as every id is.
+ *
+ * @param value - The value to test.
+ * @returns Whether the value is a string of at least one character; `true` narrows its type.
+ */
 export function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-/** Returns whether a value is a finite number above 0. */
+/**
+ * Returns whether a value is a finite number above 0.
+ *
+ * @param value - The value to test.
+ * @returns Whether the value is a finite number above 0; `true` narrows its type.
+ */
 export function isPositive(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
-/** Returns whether a value is an object that is neither `null` nor an array. */
+/**
+ * Returns whether a value is an object that is neither `null` nor an array.
+ *
+ * @param value - The value to test.
+ * @returns Whether the value is an object other than `null` and an array; `true` narrows its type.
+ */
 export function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Returns whether a value is a number from 0 to 1, such as a probability. */
+/**
+ * Returns whether a value is a number from 0 to 1, such as a probability.
+ *
+ * @param value - The value to test.
+ * @returns Whether the value is a number from 0 to 1; `true` narrows its type.
+ */
 export function isUnitInterval(value: unknown): value is number {
   return typeof value === "number" && value >= 0 && value <= 1;
 }
@@ -35,6 +59,7 @@ export function isUnitInterval(value: unknown): value is number {
 /**
  * Checks that a value is a record, such as an options object or a lookup table.
  *
+ * @param value - The value to check.
  * @param message - Says what the value should be, such as `The states must be an object of states by learner`.
  * @throws `DataError` when it is not.
  */
@@ -45,6 +70,7 @@ export function checkRecord(value: unknown, message: string): void {
 /**
  * Checks that a value is an array, such as a list of items or events.
  *
+ * @param value - The value to check.
  * @param message - Says what the value should be, such as `The items must be an array`.
  * @throws `DataError` when it is not.
  */
@@ -55,6 +81,7 @@ export function checkArray(value: unknown, message: string): void {
 /**
  * Checks a function's options: an object, as a caller from JavaScript may pass `null` or another value.
  *
+ * @param options - The options a caller passed.
  * @throws `DataError` when they are not.
  */
 export function checkOptions(options: unknown): void {
@@ -64,6 +91,8 @@ export function checkOptions(options: unknown): void {
 /**
  * Checks that a value is an object with a method, such as a stopping rule.
  *
+ * @param value - The value to check.
+ * @param method - The name of the method the value must have.
  * @param message - Says what the value should be, such as `The option stopping must be an object with a stops method`.
  * @throws `DataError` when it is not.
  */
@@ -76,6 +105,7 @@ export function checkMethod(value: unknown, method: string, message: string): vo
 /**
  * Checks a random number generator, as `createRandom` returns it.
  *
+ * @param random - The generator a caller passed.
  * @throws `DataError` when it is not an object with the methods `uniform` and `normal`.
  */
 export function checkRandom(random: unknown): void {
@@ -87,6 +117,7 @@ export function checkRandom(random: unknown): void {
 /**
  * Checks that a value is a boolean.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `The option purify`.
  * @throws `DataError` when it is not.
  */
@@ -97,7 +128,9 @@ export function checkBoolean(value: unknown, label: string): asserts value is bo
 /**
  * Checks that a value is one of the given strings.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `The option routing`.
+ * @param choices - The strings the value may be.
  * @throws `DataError` when it is not.
  */
 export function checkChoice(value: unknown, label: string, choices: readonly string[]): void {
@@ -111,6 +144,7 @@ export function checkChoice(value: unknown, label: string, choices: readonly str
 /**
  * Checks that a value is a finite number.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `Theta`.
  * @throws `DataError` when it is not.
  */
@@ -123,6 +157,7 @@ export function checkFinite(value: unknown, label: string): asserts value is num
 /**
  * Checks that a value is a finite number above 0.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `The option sd`.
  * @throws `DataError` when it is not.
  */
@@ -133,6 +168,7 @@ export function checkPositive(value: unknown, label: string): asserts value is n
 /**
  * Checks that a value is a finite number of at least 0.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `The rating of item 2 by panelist 1`.
  * @throws `DataError` when it is not.
  */
@@ -145,6 +181,7 @@ export function checkNonNegative(value: unknown, label: string): asserts value i
 /**
  * Checks that a value is a safe integer of at least 1.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `The option maxIterations`.
  * @throws `DataError` when it is not.
  */
@@ -157,6 +194,7 @@ export function checkPositiveInteger(value: unknown, label: string): asserts val
 /**
  * Checks that a value is a safe integer of at least `minimum`.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `The option points`.
  * @param minimum - The least value allowed.
  * @throws `DataError` when it is not.
@@ -170,6 +208,7 @@ export function checkIntegerFrom(value: unknown, label: string, minimum: number)
 /**
  * Checks that a value is a number from 0 to 1.
  *
+ * @param value - The value to check.
  * @param label - Names the value in the error message, such as `The option missingProbability`.
  * @throws `DataError` when it is not.
  */
@@ -180,6 +219,7 @@ export function checkUnitInterval(value: unknown, label: string): asserts value 
 /**
  * Checks a seed.
  *
+ * @param seed - The seed a caller passed.
  * @throws `DataError` when it is not a safe integer.
  */
 export function checkSeed(seed: unknown): asserts seed is number {
@@ -191,6 +231,8 @@ export function checkSeed(seed: unknown): asserts seed is number {
 /**
  * Checks the options that stop an iterative method.
  *
+ * @param tolerance - The tolerance a caller passed.
+ * @param maxIterations - The most iterations a caller passed.
  * @throws `DataError` when `tolerance` is not a non-negative number or `maxIterations` not a positive integer.
  */
 export function checkStopping(tolerance: unknown, maxIterations: unknown): void {

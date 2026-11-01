@@ -46,6 +46,9 @@ export interface ResponseRecordsOptions {
 /**
  * Builds response records, with the persons and items of `personIds` and `itemIds`. The records are copied.
  *
+ * @param records - The responses, each with a person, an item and a response.
+ * @param options - The ids of the persons and items.
+ * @returns The records with the persons and items.
  * @throws `DataError` when the records are not an array, a record's person or item is not a string among the ids, a
  * response is not a non-negative integer, a time is not a positive finite number, a person has two records of one
  * item, or the ids repeat.

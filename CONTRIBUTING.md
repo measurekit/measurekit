@@ -3,6 +3,15 @@
 Contributions in English or Bahasa Indonesia are welcome.
 Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+```mermaid
+flowchart LR
+  C["Change in packages/ or docs/"] --> V["Reference script and fixture in validation/ for a new statistic"]
+  C --> T["Tests, docs and TSDoc"]
+  V --> G["Gates: lint, check:standards, typecheck, knip, check:packages, docs:api, tests, benchmarks"]
+  T --> G
+  G --> X["Changeset of the package"] --> M["Pull request and merge"]
+```
+
 ## Setup
 
 Node.js 22.18+ and pnpm 12 are required. `pnpm install` also installs the Lefthook git hooks. [AGENTS.md](AGENTS.md)
@@ -19,13 +28,13 @@ the reference function or the formula in the pull request, and add the reference
 
 ## Before opening a pull request
 
-Run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm knip`, then `pnpm build`, `pnpm check:packages` and
-`pnpm docs:api`. A bug fix comes with a test that fails without it. A change to a package goes into the pending
+Run `pnpm lint`, `pnpm check:standards`, `pnpm typecheck`, `pnpm test` and `pnpm knip`, then `pnpm build`,
+`pnpm check:packages` and `pnpm docs:api`. A bug fix comes with a test that fails without it. A change to a package goes into the pending
 release's changeset for that package in `.changeset/`, or a new one made with `pnpm changeset` when none is pending
 ([AGENTS.md](AGENTS.md#releases)).
 
 The pre-commit hook formats staged code, JSON, Markdown and YAML with Biome; the pre-push hook runs the type check,
-tests and Knip. CI tests each package on Node.js 22 and 24.
+tests and Knip. CI tests each package, the scripts that check the repository and the examples on Node.js 22 and 24.
 
 ## License of contributions
 

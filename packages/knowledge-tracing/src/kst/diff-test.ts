@@ -8,7 +8,7 @@ import {
   isRecord,
   normalQuantile,
 } from "@measurekit/core";
-import type { EventLog } from "../data/event-log.js";
+import type { EventLog } from "../data/internal.js";
 import { type Counterexamples, counterexampleData, fitRelation, type IitaVersion } from "./iita.js";
 import { responsePatterns } from "./patterns.js";
 import { type Prerequisites, transitiveClosure } from "./surmise.js";
@@ -82,6 +82,9 @@ export interface DiffTest {
  *
  * @param log - The responses.
  * @param prerequisites - The quasi-order: each item of the log is a key, with its prerequisites.
+ * @param options - The alternative, the tail, the mean to test against, the level of the interval and the version of
+ *   the measure.
+ * @returns The estimate, its z statistic, the probability and the interval.
  * @throws `DataError` when the log is malformed, a learner has not answered every item, an outcome is not 0 or 1, there
  * are fewer than 2 items, an item is solved by no learner, a quasi-order is not over the items of the log or has no
  * implication, an option is invalid, or the estimate has variance 0, as when every learner has the same answers or the

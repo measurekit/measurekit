@@ -36,6 +36,11 @@ export interface ThresholdItem {
  * @remarks
  * `z` is a (θ - b) for one dimension and a · θ + intercept for several. P(0) = (1 - d) + (d - c) logistic(-z) is taken
  * from the tail it is near, so it keeps its precision where P(1) rounds to 1.
+ *
+ * @param z - The logit, a · θ + intercept or a (θ - b).
+ * @param c - The lower asymptote, from 0 to below `d`.
+ * @param d - The upper asymptote, above `c` and at most 1.
+ * @param out - Receives P(0) at index 0 and P(1) at index 1.
  */
 export function logisticProbabilities(z: number, c: number, d: number, out: Float64Array): void {
   logisticPair(z, out);
@@ -52,6 +57,11 @@ export function logisticProbabilities(z: number, c: number, d: number, out: Floa
  * @remarks
  * Each category is written as P(X ≥ k) P(X < k + 1) (1 - exp(-a (b_(k+1) - b_k))), with P(X ≥ 0) = P(X < K) = 1, which
  * equals the difference and keeps the precision of small probabilities in both tails.
+ *
+ * @param a - The slope of the item.
+ * @param b - The thresholds, in the order of the slope's sign.
+ * @param theta - The ability.
+ * @param out - Receives the probability of each category, from index 0.
  */
 export function gradedProbabilities(a: number, b: ArrayLike<number>, theta: number, out: Float64Array): void {
   let above = 1;
@@ -71,6 +81,12 @@ export function gradedProbabilities(a: number, b: ArrayLike<number>, theta: numb
  * @remarks
  * The generalized partial credit model has `location` 0 and its thresholds as `steps`, and the rating scale model its
  * location and the steps around it.
+ *
+ * @param a - The slope of the item.
+ * @param location - The location that is added to every step; 0 for the generalized partial credit model.
+ * @param steps - The thresholds of the K - 1 steps.
+ * @param theta - The ability.
+ * @param out - Receives the probability of each category, from index 0.
  */
 export function partialCreditProbabilities(
   a: number,
@@ -93,6 +109,10 @@ export function partialCreditProbabilities(
  *
  * @remarks
  * Subtracting the largest logit keeps exp from overflowing. The partial credit and nominal response models use it.
+ *
+ * @param values - The logits, which the probabilities replace.
+ * @param count - The number of logits.
+ * @param stride - The distance between two logits in `values`.
  */
 export function softmax(values: Float64Array, count: number, stride = 1): void {
   let largest = Number.NEGATIVE_INFINITY;
@@ -106,7 +126,13 @@ export function softmax(values: Float64Array, count: number, stride = 1): void {
   for (let k = 0; k < count; k++) values[k * stride] = (values[k * stride] ?? 0) / total;
 }
 
-/** Returns whether the asymptotes of a logistic item are valid: numbers with 0 ≤ c < d ≤ 1. */
+/**
+ * Returns whether the asymptotes of a logistic item are valid: numbers with 0 ≤ c < d ≤ 1.
+ *
+ * @param c - The lower asymptote to test.
+ * @param d - The upper asymptote to test.
+ * @returns Whether both are numbers with 0 ≤ c < d ≤ 1.
+ */
 export function validAsymptotes(c: unknown, d: unknown): boolean {
   return isUnitInterval(c) && isUnitInterval(d) && c < d;
 }
@@ -114,6 +140,11 @@ export function validAsymptotes(c: unknown, d: unknown): boolean {
 /**
  * Returns whether the thresholds of a graded response item run strictly with the sign of its slope: increasing when
  * a > 0 and decreasing when a < 0. An item with one threshold is always ordered.
+ *
+ * @param a - The slope.
+ * @param b - The thresholds.
+ * @returns Whether the thresholds are strictly increasing for a positive slope and strictly decreasing for a negative
+ *   one.
  */
 export function orderedThresholds(a: number, b: readonly number[]): boolean {
   return b.every((threshold, k) => k === 0 || a * (threshold - (b[k - 1] ?? 0)) > 0);

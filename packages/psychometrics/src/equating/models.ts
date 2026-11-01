@@ -1,16 +1,18 @@
 import { DataError } from "@measurekit/core";
-import { gradedResponse } from "../irt/graded.js";
-import { checkItem } from "../irt/items.js";
 import {
+  checkItem,
   fourParameterLogistic,
+  generalizedPartialCredit,
+  gradedResponse,
+  type IrtItem,
+  type IrtModel,
+  nominalResponse,
   oneParameterLogistic,
+  partialCredit,
+  ratingScale,
   threeParameterLogistic,
   twoParameterLogistic,
-} from "../irt/logistic.js";
-import type { IrtItem, IrtModel } from "../irt/model.js";
-import { nominalResponse } from "../irt/nominal.js";
-import { generalizedPartialCredit, partialCredit } from "../irt/partial-credit.js";
-import { ratingScale } from "../irt/rating-scale.js";
+} from "../irt/internal.js";
 
 // Each built-in model's parameter vector changes with the theta scale in one of four ways. Under θ' = A θ + B:
 // logistic, a, b, c, d → a / A, A b + B, c, d; threshold, a, b_k → a / A, A b_k + B; rating scale, a, b, τ_k → a / A,

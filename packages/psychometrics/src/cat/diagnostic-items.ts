@@ -1,7 +1,11 @@
 import { checkArray, checkRecord, DataError, describe } from "@measurekit/core";
-import type { CdmItem } from "../cdm/calibration.js";
-import { checkSuccessProbabilities } from "../cdm/calibration.js";
-import { bitPattern, checkItemAttributes, profileIndices } from "../cdm/q-matrix.js";
+import {
+  bitPattern,
+  type CdmItem,
+  checkItemAttributes,
+  checkSuccessProbabilities,
+  profileIndices,
+} from "../cdm/internal.js";
 import type { PoolControls } from "./items.js";
 import type { ProfileSpace } from "./profile-space.js";
 

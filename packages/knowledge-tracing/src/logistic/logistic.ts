@@ -13,13 +13,17 @@ import {
   checkAttempt,
   checkEvent,
   checkHasSkills,
+  checkLearner,
+  checkLearnerId,
+  checkLog,
+  checkObservedEvents,
   checkObservedHasSkills,
+  type EventLog,
+  entry,
   isObserved,
-} from "../data/event.js";
-import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
-import { checkLearner, checkLearnerId } from "../data/learner.js";
-import { entry, parametersOf } from "../data/record.js";
-import type { Steps } from "../data/replay.js";
+  parametersOf,
+  type Steps,
+} from "../data/internal.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { estimate } from "./estimation.js";
 import type { LogisticFeature } from "./features.js";
@@ -157,6 +161,9 @@ export interface LogisticFit extends ModelFit<LogisticState, LogisticParameters>
  * with a random intercept. An item the fit did not see has the intercept 0 and the coefficients 0; a skill it did not see
  * throws.
  *
+ * @param options - The features, the intercepts, the covariates, the proficiency, the ridge and the standard errors;
+ *   each option has its default.
+ * @returns The model: `fit` estimates the coefficients from a log, and `update` and `predict` serve online.
  * @throws `DataError` when an option is out of range, a feature or term is unknown, skill and item intercepts are asked
  * for without a ridge, or the parameters are malformed or lack a coefficient the model has.
  */
@@ -318,6 +325,9 @@ function create(options: LogisticOptions): LogisticModel {
  * Creates the additive factors model: logit P = θ + Σ_k (β_k + γ_k T_k), with T_k the learner's earlier attempts at
  * skill k.
  *
+ * @param options - The proficiency, the intercepts, the covariates, the ridge and the standard errors; each option has
+ *   its default.
+ * @returns The model: `fit` estimates the coefficients from a log, and `update` and `predict` serve online.
  * @throws `DataError` in the cases listed for {@link logistic}.
  * @see {@link https://doi.org/10.1007/11774303_17 | Cen, Koedinger and Junker (2006)}
  */
@@ -332,6 +342,8 @@ export function afm(options: AfmOptions = {}): LogisticModel {
  * earlier successes and failures at skill k. As published, it has no learner parameter unless the `proficiency` option
  * adds one.
  *
+ * @param options - The options of `logistic` but the features.
+ * @returns The model: `fit` estimates the coefficients from a log, and `update` and `predict` serve online.
  * @throws `DataError` in the cases listed for {@link logistic}.
  * @see {@link https://doi.org/10.3233/978-1-60750-028-5-531 | Pavlik, Cen and Koedinger (2009)}
  */

@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { covariance } from "../math/statistics.js";
 
 /** The most categories an item may have: the mokken package handles scores from 0 to 9. */

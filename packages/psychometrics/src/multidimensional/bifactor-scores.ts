@@ -1,4 +1,4 @@
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { MIN_PROBABILITY } from "../irt/internal.js";
 import type { GroupNodes } from "./bifactor-expectation.js";
 import type { ItemState } from "./calibration-setup.js";
 import { itemScales } from "./m-step.js";

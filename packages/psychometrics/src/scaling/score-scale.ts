@@ -1,5 +1,5 @@
 import { checkFinite, checkNonNegative, checkPositive, checkRecord, DataError, describe } from "@measurekit/core";
-import type { ScaleTransformation } from "../equating/linking.js";
+import type { ScaleTransformation } from "../equating/internal.js";
 
 /** The rounding and the bounds of reported scores. */
 export interface ScoreRounding {
@@ -97,6 +97,10 @@ export function scoreOfTheta(theta: number, scale: CheckedScale): number {
  * Valid input: a finite theta, a finite positive slope, a finite intercept, and the rounding of {@link ScoreRounding}.
  * The result is monotone in theta.
  *
+ * @param theta - The ability.
+ * @param scale - The slope, intercept and rounding of the reported score.
+ * @returns The reported score.
+ *
  * @example
  * ```ts
  * import { scaleScore } from "@measurekit/psychometrics/scaling";
@@ -105,7 +109,6 @@ export function scoreOfTheta(theta: number, scale: CheckedScale): number {
  * scaleScore(0.234, scale); // 520
  * scaleScore(-4.2, scale); // 200
  * ```
- *
  * @throws `DataError` when theta is not finite or the scale is invalid.
  */
 export function scaleScore(theta: number, scale: ScoreScale): number {

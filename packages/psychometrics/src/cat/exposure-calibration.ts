@@ -48,6 +48,12 @@ const DEFAULT_MAX_ITERATIONS = 50;
  * are ignored. The same `random` draws every simulation, so a seed reproduces the calibration. When the test length
  * divided by the pool size exceeds r, no parameters can meet r and the procedure does not converge.
  *
+ * @param test - The options of the test, with the pool whose exposure parameters are calibrated.
+ * @param thetas - The abilities of the persons simulated.
+ * @param random - The generator of the simulations.
+ * @param options - The largest exposure rate, the tolerance and the most iterations.
+ * @returns The pool with the calibrated exposure parameters, the exposure rate of each item, whether the calibration
+ *   converged and the iterations run.
  * @throws `DataError` when the options of the test or of the procedure are invalid, or without thetas.
  * @see {@link https://doi.org/10.1037/10244-014 | Hetter and Sympson (1997)}
  */

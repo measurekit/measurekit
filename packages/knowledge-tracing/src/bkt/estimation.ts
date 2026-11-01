@@ -1,7 +1,5 @@
 import { createRandom, DataError, type Random, type Stopping } from "@measurekit/core";
-import { resourceOf } from "../data/event.js";
-import type { EventLog } from "../data/event-log.js";
-import { entry, mapRecord } from "../data/record.js";
+import { type EventLog, entry, mapRecord, resourceOf } from "../data/internal.js";
 import { expectationMaximization } from "../math/expectation-maximization.js";
 import { forwardBackward } from "../math/hidden-markov.js";
 import { type BktBounds, type BktFixedRates, constrain } from "./constraints.js";

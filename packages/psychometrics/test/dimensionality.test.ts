@@ -1,9 +1,12 @@
 import { shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { correlationEigenvalues } from "../src/dimensionality/eigenvalues.js";
-import { type FactorRotation, factorSolution } from "../src/dimensionality/exploratory-factors.js";
-import { averagePartials } from "../src/dimensionality/minimum-average-partial.js";
+import {
+  averagePartials,
+  correlationEigenvalues,
+  type FactorRotation,
+  factorSolution,
+} from "../src/dimensionality/internal.js";
 import {
   createRandom,
   DataError,
@@ -26,11 +29,11 @@ import { bivariateNormalCdf, bivariateNormalDensity } from "../src/math/bivariat
 import { symmetricEigen } from "../src/math/eigen.js";
 import { minres, minresLoadings } from "../src/math/minres.js";
 import { normalCdf } from "../src/math/normal.js";
+import { defined, expectClose } from "./assertions.js";
 import bivariate from "./fixtures/dimensionality-bivariate-normal.json" with { type: "json" };
 import factorFixture from "./fixtures/dimensionality-factors.json" with { type: "json" };
 import parallel from "./fixtures/dimensionality-parallel.json" with { type: "json" };
 import polychoric from "./fixtures/dimensionality-polychoric.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** The bivariate normal distribution function against mvtnorm's Miwa algorithm. */

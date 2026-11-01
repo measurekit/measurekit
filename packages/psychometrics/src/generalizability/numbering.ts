@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { FacetedScore } from "../data/faceted-scores.js";
+import type { FacetedScore } from "../data/internal.js";
 import { facetsOf, type Structure } from "./structure.js";
 
 /** How the elements of the facets are told apart: a facet's elements are numbered within the elements it is nested in. */

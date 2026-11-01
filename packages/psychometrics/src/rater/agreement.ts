@@ -21,6 +21,8 @@ const DEFAULT_WIDTH = 1;
  * As irr's `agree` with `tolerance = 0`, as a proportion rather than a percentage. Uses the subjects every rater rated.
  * Ratings are categories, integers from 0. With two raters it is Cohen's p_o; with more, every rater must agree.
  *
+ * @param ratings - The ratings, one row for each subject and one entry for each rater; `null` when missing.
+ * @returns The share of subjects, from 0 to 1.
  * @throws `DataError` when there are fewer than two raters, a rating is not a category or `null`, or no subject was
  * rated by every rater.
  */
@@ -38,6 +40,9 @@ export function exactAgreement(ratings: readonly (readonly (number | null)[])[])
  * from 0. With two raters, a subject agrees when the raters differ by at most `width`; with more, when no two raters
  * do by more.
  *
+ * @param ratings - The ratings, one row for each subject and one entry for each rater; `null` when missing.
+ * @param options - The width, in categories.
+ * @returns The share of subjects, from 0 to 1.
  * @throws `DataError` when `width` is not a non-negative integer, there are fewer than two raters, a rating is not a
  * category or `null`, or no subject was rated by every rater.
  */

@@ -15,8 +15,9 @@ import {
   type TestItem,
   threeParameterLogistic,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
+import { type FixtureParameters, item2pl, MODELS } from "./fixture-items.js";
 import fixture from "./fixtures/standard-setting.json" with { type: "json" };
-import { defined, expectClose, type FixtureParameters, item2pl, MODELS } from "./helpers.js";
 
 /** Classification probabilities against R's pnorm: Cody's algorithm on both sides. */
 const CLASSIFICATION_TOLERANCE = 1e-14;

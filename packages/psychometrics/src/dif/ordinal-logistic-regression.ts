@@ -1,5 +1,5 @@
 import { backtrack, checkArray, checkOptions, DataError, describe, logistic, logLogistic } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/linear-algebra.js";
 import { type DifData, type DifGroup, itemCases, polytomousData } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
@@ -47,6 +47,10 @@ const DEVIANCE_SLACK = 1e-12;
  * the matching scores are all equal, and where a model's Hessian is singular. Purification flags items whose test of
  * both terms is significant at 0.05.
  *
+ * @param matrix - The responses of the persons.
+ * @param groups - The group of each person, in the order of the matrix.
+ * @param options - A matching score for each person instead of the total score, and whether to purify it.
+ * @returns The tests of every item, and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, either group has no person with a response, `purify`
  * is not a boolean, `matching` is not an array of finite numbers and `null` with one entry per person, or `purify` is
  * `true` with `matching`.

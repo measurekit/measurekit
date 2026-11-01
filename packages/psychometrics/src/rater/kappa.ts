@@ -21,6 +21,9 @@ const WEIGHTS: readonly KappaWeights[] = ["none", "linear", "quadratic"];
  * As irr's `kappa2`, with `weight = "equal"` for linear and `"squared"` for quadratic weights. Uses the subjects both
  * raters rated. Ratings are categories, integers from 0; weights use their values.
  *
+ * @param ratings - The ratings of two raters, one row for each subject; `null` when missing.
+ * @param options - The weights of the disagreements.
+ * @returns Kappa, at most 1.
  * @throws `DataError` when the ratings do not have two raters, a rating is not a category or `null`, no subject was
  * rated by both, the weights are unknown, or the chance agreement is 1, as when every rating is one category.
  * @see {@link https://doi.org/10.1177/001316446002000104 | Cohen (1960)}
@@ -52,6 +55,8 @@ export function cohenKappa(ratings: readonly (readonly (number | null)[])[], opt
  * agreeing pairs of raters, Σ_k n_k (n_k - 1) / (m (m - 1)) for m raters of whom n_k chose category k, and P_e = Σ_k
  * p_k² from the share p_k of all ratings in category k. As irr's `kappam.fleiss`. Uses the subjects every rater rated.
  *
+ * @param ratings - The ratings, one row for each subject and one entry for each rater; `null` when missing.
+ * @returns Kappa, at most 1.
  * @throws `DataError` when there are fewer than two raters, a rating is not a category or `null`, no subject was rated
  * by every rater, or P_e is 1, as when every rating is one category.
  * @see {@link https://doi.org/10.1037/h0031619 | Fleiss (1971)}

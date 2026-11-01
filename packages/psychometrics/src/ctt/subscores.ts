@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { covariance, variance } from "../math/statistics.js";
 import type { CompleteCases } from "./complete-cases.js";
 import { sectionCases, sectionStatistics } from "./sections.js";
@@ -40,8 +40,11 @@ export interface SubscoreValue {
  * A section needs at least two items, for alpha; sections need at least two, as with one the total is the subscore. A
  * section whose subscore has no variance, or whose alpha is not above 0, gets `null` PRMSEs and no added value.
  *
+ * @param matrix - The responses of the persons.
  * @param sections - The ids of the items of each section by the section's name, such as `{ reading: ["r1", "r2"],
- * listening: ["l1", "l2"] }`. A section's ids are items of the matrix, and no item is in two sections.
+ *   listening: ["l1", "l2"] }`. A section's ids are items of the matrix, and no item is in two sections.
+ * @returns For each section, the PRMSE of its subscore and of the total score as predictors of the true subscore, and
+ *   whether the subscore adds value.
  * @throws `DataError` when the matrix is invalid, the sections are not an object of arrays of item ids, there are fewer
  * than two sections, a section has fewer than two items, an id is not an item of the matrix or is in two places, fewer
  * than two persons answered every item of the sections, or their total scores have no variance.

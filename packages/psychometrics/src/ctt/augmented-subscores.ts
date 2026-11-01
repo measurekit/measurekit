@@ -1,5 +1,5 @@
 import { DataError, describe, mean } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { multiply } from "../math/matrix.js";
 import { covariance, standardDeviation } from "../math/statistics.js";
@@ -55,8 +55,11 @@ export interface AugmentedSubscores {
  * least two items, for alpha, and a coefficient alpha above 0; there must be at least two sections, and their
  * observed subscores must not be linearly dependent.
  *
+ * @param matrix - The responses of the persons.
  * @param sections - The ids of the items of each section by the section's name, such as `{ reading: ["r1", "r2"],
- * listening: ["l1", "l2"] }`. A section's ids are items of the matrix, and no item is in two sections.
+ *   listening: ["l1", "l2"] }`. A section's ids are items of the matrix, and no item is in two sections.
+ * @returns The sections with their reliabilities before and after augmenting, the persons with their augmented
+ *   subscores, and the weights of the sections.
  * @throws `DataError` when the matrix is invalid, the sections are not an object of arrays of item ids, there are fewer
  * than two sections, a section has fewer than two items, an id is not an item of the matrix or is in two places, fewer
  * than two persons answered every item of the sections, a section has a coefficient alpha that is not above 0, or the

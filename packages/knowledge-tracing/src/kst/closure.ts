@@ -12,6 +12,8 @@ import { addElement, compile, type KnowledgeStructure, keyOf } from "./structure
  *
  * @param domain - The elements, items or skills, as a non-empty list of distinct ids.
  * @param states - The states to start from, each a list of elements of the domain; repeats are taken once.
+ * @param options - The most states to build.
+ * @returns The knowledge space.
  * @throws `DataError` when the domain is not a non-empty list of distinct ids, a state is not a list of distinct
  * elements of the domain, or the space has more states than `maxStates`.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}

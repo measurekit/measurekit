@@ -1,6 +1,4 @@
-import type { ExpectationItem } from "../irt/expectation.js";
-import { logProbability } from "../irt/probability.js";
-import type { CompressedResponses } from "../irt/responses.js";
+import { type CompressedResponses, type ExpectationItem, logProbability } from "../irt/internal.js";
 import type { Grid } from "./grid.js";
 
 /** The smallest total likelihood of a person that the E-step divides by: below it the person's posterior is skipped. */

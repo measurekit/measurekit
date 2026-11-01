@@ -1,9 +1,7 @@
 import { DataError } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
-import { checkFacetedScores, type FacetedScore } from "../data/faceted-scores.js";
-import { type AbilityEstimator, posteriorMeanEstimate } from "../irt/ability.js";
-import type { PersonEstimate } from "../irt/joint-maximum-likelihood.js";
-import type { IrtItem } from "../irt/model.js";
+import { checkFacetedScores, type FacetedScore } from "../data/internal.js";
+import { type AbilityEstimator, type IrtItem, type PersonEstimate, posteriorMeanEstimate } from "../irt/internal.js";
 import type { ManyFacetRasch } from "./many-facet-rasch.js";
 import { checkManyFacetRasch, ratingStructure, scoredItems } from "./rating-model.js";
 
@@ -17,7 +15,10 @@ import { checkManyFacetRasch, ratingStructure, scoredItems } from "./rating-mode
  * ML and WLE estimates all work. The estimates are on the model's scale, with the person's severity-adjusted position:
  * the raters' and items' measures are accounted for.
  *
+ * @param scores - The scores in long format, each with the element of every facet in `levels`.
+ * @param model - The many-facet Rasch model.
  * @param estimator - The estimator of each person.
+ * @returns The estimate of theta and its standard error for each person, in order of first appearance.
  * @defaultValue `estimator` is `posteriorMeanEstimate` under the normal prior of the model's population
  * @throws `DataError` when the model or the scores are invalid, a score has an element the model does not, a score is
  * not a category of its item, the estimator is not a function, or it throws it.

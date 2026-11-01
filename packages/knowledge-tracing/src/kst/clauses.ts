@@ -22,7 +22,9 @@ import { addElement, compareStates, type KnowledgeStructure, keyOf } from "./str
  * learned together there and cannot be learned here.
  *
  * @param clauses - Each element's clauses, by element: every element of the domain is a key, with `[]` when it has
- * none, and the domain is the keys in order. A clause is a list of keys.
+ *   none, and the domain is the keys in order. A clause is a list of keys.
+ * @param options - The most states to build.
+ * @returns The knowledge space, with its states in the domain's order.
  * @throws `DataError` when `clauses` is not an object of lists of lists of keys, an element has a clause with
  * something that is not a key, an element cannot be learned from the empty state, such as one in a cycle of clauses, or
  * the space has more states than `maxStates`.

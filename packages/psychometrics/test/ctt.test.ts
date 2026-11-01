@@ -20,13 +20,13 @@ import {
   standardErrorOfMeasurement,
   subscoreValue,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
 import augmented from "./fixtures/ctt-augmented-subscores.json" with { type: "json" };
 import bfi from "./fixtures/ctt-bfi-neuroticism.json" with { type: "json" };
 import lsat7 from "./fixtures/ctt-lsat7.json" with { type: "json" };
 import sat12 from "./fixtures/ctt-sat12.json" with { type: "json" };
 import simulated from "./fixtures/ctt-simulated-2pl.json" with { type: "json" };
 import subscores from "./fixtures/ctt-subscores.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 /** Absolute tolerance of CTT statistics against R. */
 const TOLERANCE = 1e-10;

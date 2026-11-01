@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { LocationRow } from "../irt/linear-rasch.js";
+import type { LocationRow } from "../irt/internal.js";
 
 /** The interaction of two facets of a design: the biases of the pairs of elements that were scored together. */
 export interface DesignInteraction {

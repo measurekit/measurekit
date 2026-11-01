@@ -1,4 +1,4 @@
-import { cholesky } from "@measurekit/core";
+import { cholesky, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -36,7 +36,8 @@ import {
   twoParameterLogistic,
   uniformDistribution,
 } from "../src/index.js";
-import { defined, MODELS, mean } from "./helpers.js";
+import { defined } from "./assertions.js";
+import { MODELS } from "./fixture-items.js";
 
 // Statistical checks use fixed seeds and bounds of four standard errors, which a correct simulation exceeds with a
 // probability below 1e-4 per check: a failure is a defect, not chance.

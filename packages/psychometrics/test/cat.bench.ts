@@ -23,12 +23,12 @@ import {
   testLength,
   threeParameterLogistic,
 } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-cat.json" with { type: "json" };
 import boundsFixture from "./fixtures/bench-cat-bounds.json" with { type: "json" };
 import formsFixture from "./fixtures/bench-cat-forms.json" with { type: "json" };
 import cdm from "./fixtures/bench-cdm.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 const SEED = 20261029;
 

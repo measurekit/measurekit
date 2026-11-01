@@ -42,6 +42,10 @@ export interface LevineOptions extends SyntheticOptions {
  * persons at each total score and anchor score; the `from` group took the form to equate and the `to` group the form
  * to equate to.
  *
+ * @param from - The persons at each total score and anchor score of the form to equate.
+ * @param to - The persons at each total score and anchor score of the form to equate to.
+ * @param options - The weight of the first group in the synthetic population.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a distribution is invalid, the two have different numbers of anchor scores, a group has
  * fewer than two persons or total or anchor scores without variance, or the synthetic population's total scores have
  * none; or when `weight` is not a number from 0 to 1.
@@ -76,6 +80,10 @@ export function tuckerEquating(
  * package's `equate(type = "linear", method = "levine")`, with its `internal` and `lts`. Moments have denominator n -
  * 1.
  *
+ * @param from - The persons at each total score and anchor score of the form to equate.
+ * @param to - The persons at each total score and anchor score of the form to equate to.
+ * @param options - The observed-score or true-score method, the kind of anchor and the weight.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` in the cases of {@link tuckerEquating}, or when a group's total and anchor scores do not have a
  * positive covariance; or when `anchor` is not `"internal"` or `"external"`.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
@@ -108,6 +116,9 @@ export function levineEquating(
  * `to` group by that group's linear equating, as the equate package's `equate(type = "linear", method = "chained")`.
  * Moments have denominator n - 1.
  *
+ * @param from - The persons at each total score and anchor score of the form to equate.
+ * @param to - The persons at each total score and anchor score of the form to equate to.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a distribution is invalid, the two have different numbers of anchor scores, or a group has
  * fewer than two persons or total or anchor scores without variance.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}

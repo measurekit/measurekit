@@ -1,6 +1,5 @@
 import type { Random } from "@measurekit/core";
-import { logProbability } from "../irt/probability.js";
-import type { CompressedResponses } from "../irt/responses.js";
+import { type CompressedResponses, logProbability } from "../irt/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Correlations } from "./mhrm-latent.js";
 

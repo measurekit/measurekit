@@ -40,6 +40,9 @@ export interface BivariateLogLinearPresmoothing {
  * give the same fit as the powers without their ill-conditioning. The distribution is the persons at each total score
  * and anchor score.
  *
+ * @param distribution - The persons at each total score and anchor score.
+ * @param options - The degrees of the log-linear model.
+ * @returns The smoothed distribution, whether the fit converged and the iterations run.
  * @throws `DataError` when the distribution is invalid, or a degree is outside its range.
  * @see {@link https://doi.org/10.3102/10769986025002133 | Holland and Thayer (2000)}
  */

@@ -1,6 +1,5 @@
 import { checkChoice, checkOptions, checkUnitInterval, DataError, mean } from "@measurekit/core";
-import { checkDichotomous } from "../data/dichotomous.js";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkDichotomous, checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { correlation, covariance, variance } from "../math/statistics.js";
 import { type CompleteCases, completeCases, itemScores } from "./complete-cases.js";
 
@@ -37,6 +36,8 @@ export interface SplitHalf {
  * Returns Cronbach's coefficient alpha, k / (k - 1) * (1 - sum of item variances / total score variance), over the
  * persons who answered every item.
  *
+ * @param matrix - The responses of the persons.
+ * @returns Alpha, at most 1.
  * @throws `DataError` when there are fewer than two items, fewer than two persons answered every item, or
  * their total scores have no variance.
  */
@@ -47,6 +48,8 @@ export function cronbachAlpha(matrix: ResponseMatrix): number {
 /**
  * Returns the Kuder-Richardson formula 20 coefficient: {@link cronbachAlpha} of dichotomous items.
  *
+ * @param matrix - The responses of the persons, dichotomous.
+ * @returns KR-20, at most 1.
  * @throws `DataError` when a response is neither 0 nor 1, or in the cases listed for {@link cronbachAlpha}.
  */
 export function kr20(matrix: ResponseMatrix): number {
@@ -60,6 +63,8 @@ export function kr20(matrix: ResponseMatrix): number {
  * the variance s² (denominator n) of the total scores of the persons who answered every item. It assumes items of
  * equal difficulty and is at most KR-20.
  *
+ * @param matrix - The responses of the persons, dichotomous.
+ * @returns KR-21, at most 1.
  * @throws `DataError` when a response is neither 0 nor 1, or in the cases listed for {@link cronbachAlpha}.
  */
 export function kr21(matrix: ResponseMatrix): number {
@@ -75,6 +80,9 @@ export function kr21(matrix: ResponseMatrix): number {
 /**
  * Returns the split-half reliability over the persons who answered every item.
  *
+ * @param matrix - The responses of the persons.
+ * @param options - How to split the items.
+ * @returns The correlation of the halves, the Spearman-Brown coefficient and Guttman's coefficient.
  * @throws `DataError` when the split is unknown, there are fewer than two items, fewer than two persons answered every
  * item, a half score has no variance, or the half scores correlate at -1.
  */
@@ -105,7 +113,9 @@ export function splitHalf(matrix: ResponseMatrix, options: SplitHalfOptions = {}
  * Returns the standard error of measurement, s √(1 - reliability), where s is the standard deviation of the total
  * scores of the persons who answered every item.
  *
+ * @param matrix - The responses of the persons.
  * @param reliability - A reliability coefficient from 0 to 1.
+ * @returns The standard error, in score points.
  * @throws `DataError` when `reliability` is outside [0, 1], or in the cases listed for {@link cronbachAlpha}.
  * @defaultValue `reliability` is {@link cronbachAlpha} of `matrix`
  */

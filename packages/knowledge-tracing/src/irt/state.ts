@@ -1,5 +1,5 @@
 import { DataError, describe } from "@measurekit/core";
-import { checkLearnerState } from "../data/learner.js";
+import { checkLearnerState } from "../data/internal.js";
 import { indexOfMax } from "../math/extremes.js";
 
 /**

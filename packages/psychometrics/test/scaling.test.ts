@@ -1,4 +1,4 @@
-import { chiSquareUpperTail } from "@measurekit/core";
+import { chiSquareUpperTail, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -25,13 +25,14 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { normalCdf } from "../src/math/normal.js";
-import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/joint-draws.js";
+import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/internal.js";
+import { defined, expectClose } from "./assertions.js";
+import { type FixtureItems, fixtureItems } from "./fixture-items.js";
 import conversions from "./fixtures/scaling-conversion.json" with { type: "json" };
 import growth from "./fixtures/scaling-growth.json" with { type: "json" };
 import joint from "./fixtures/scaling-joint-draws.json" with { type: "json" };
 import norms from "./fixtures/scaling-norms.json" with { type: "json" };
 import predictions from "./fixtures/scaling-prediction.json" with { type: "json" };
-import { defined, expectClose, type FixtureItems, fixtureItems, mean } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Thetas and standard errors of the EAP of the summed score against mirt's EAPsum and the base R recursion. */

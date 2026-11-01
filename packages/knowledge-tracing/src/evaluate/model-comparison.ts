@@ -1,5 +1,5 @@
 import { DataError, isRecord } from "@measurekit/core";
-import type { Fold } from "../data/split.js";
+import type { Fold } from "../data/internal.js";
 import type { LearnerModel } from "../model.js";
 import { type CrossValidateOptions, type CrossValidation, crossValidate } from "./cross-validation.js";
 
@@ -15,6 +15,10 @@ export interface ModelEvaluation extends CrossValidation {
  * comparisons across folds. With `unseenSkills: "skip"`, every model has a `null` prediction for the same events, those
  * of a skill absent from the training log, so that the metrics still compare the same events.
  *
+ * @param models - The models by name.
+ * @param folds - The folds, the same for every model.
+ * @param options - What to do with a test skill the training log lacks.
+ * @returns The evaluation of each model with its name, in the order of the names.
  * @throws `DataError` when there are no models, or in the cases listed for {@link crossValidate}.
  */
 export function compareModels(

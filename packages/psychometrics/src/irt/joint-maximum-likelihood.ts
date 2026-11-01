@@ -8,7 +8,7 @@ import {
   partialCreditProbabilities,
   type ThresholdItem,
 } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/linear-algebra.js";
 import { type NewtonOptions, newton } from "../math/optimize.js";
 import { findIncreasingRoot } from "../math/root.js";
@@ -84,6 +84,9 @@ const NO_VALUES = new Float64Array(0);
  * for k items. Item standard errors come from the inverse of each item's information matrix given the thetas. Missing
  * responses are skipped; persons without responses take no part.
  *
+ * @param matrix - The responses of the persons.
+ * @param options - The stopping rules.
+ * @returns The items, the persons, the log-likelihood, whether the estimation converged and the iterations run.
  * @throws `DataError` when the matrix or an option is invalid, there are fewer than two items, or an item has
  * responses in fewer than two categories or none in a category below its highest.
  * @see {@link https://doi.org/10.1177/014662167700100216 | Wright and Douglas (1977)}

@@ -7,11 +7,21 @@ import {
   DataError,
   logistic,
 } from "@measurekit/core";
-import { type Attempt, checkAttempt, checkEvent, type Event, isObserved, type ObservedEvent } from "../data/event.js";
-import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
-import { checkLearner, checkLearnerId } from "../data/learner.js";
-import { entry } from "../data/record.js";
-import { onePass } from "../data/replay.js";
+import {
+  type Attempt,
+  checkAttempt,
+  checkEvent,
+  checkLearner,
+  checkLearnerId,
+  checkLog,
+  checkObservedEvents,
+  type Event,
+  type EventLog,
+  entry,
+  isObserved,
+  type ObservedEvent,
+  onePass,
+} from "../data/internal.js";
 import { outcomeLogLikelihood } from "../math/logistic.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { checkParameters, type EloItem, type EloParameters } from "./parameters.js";
@@ -123,6 +133,10 @@ interface Step {
  *
  * Elo defines no mastery, so the model has no `mastery`; `predict` gives the probability of answering an item.
  *
+ * @param options - The uncertainty function, whether abilities are by skill and how skill abilities weigh in; each
+ *   option has its default.
+ * @returns The model: `fit` replays a log, `update` and `predict` serve online, and `updateItem` gives the item's new
+ *   difficulty.
  * @throws `DataError` when an option is out of range or the parameters are malformed.
  * @see {@link https://doi.org/10.1016/j.compedu.2016.03.017 | Pelánek (2016)}
  * @see {@link https://eric.ed.gov/?id=ED560514 | Nižnan, Pelánek and Řihák (2015)}

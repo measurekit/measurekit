@@ -33,9 +33,12 @@ export interface RotatedLoadings<TParameters> {
  * dimensions, as mirt's `fscores(rotate = )` does. The sign of each rotated dimension is chosen so that its largest
  * loading in absolute value is positive, as mirt's.
  *
+ * @param calibration - A calibration of uncorrelated dimensions.
+ * @param options - The rotation method, its normalization and parameter, and the stopping rules.
+ * @returns The rotated loadings, the correlations of the dimensions, the rotation matrix, the items on the rotated
+ *   axes, whether the rotation converged and the iterations run.
  * @throws `DataError` when the options are invalid, the calibration has fewer than two dimensions or correlated
  * dimensions, or is not a calibration.
- *
  * @see {@link https://doi.org/10.1007/BF02294840 | Jennrich (2001)}
  * @see {@link https://doi.org/10.1007/BF02294706 | Jennrich (2002)}
  * @see {@link https://doi.org/10.1177/0013164404272507 | Bernaards and Jennrich (2005)}

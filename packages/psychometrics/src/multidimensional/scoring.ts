@@ -1,8 +1,7 @@
 import { checkIntegerFrom, checkOptions, DataError, normalizeLogs } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
-import { estimatePersons } from "../irt/person-estimates.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import { estimatePersons } from "../irt/internal.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
 import { type GridLikelihood, gridLikelihood } from "./grid-likelihood.js";
@@ -92,6 +91,10 @@ interface PosteriorSetup {
  * skipped; without responses the estimate is the prior, also without items, when the `prior` gives the dimensions. The
  * grid has `points ** dimensions` nodes: more than 10⁶ throw.
  *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The prior and the number of points of the grid.
+ * @returns The thetas, their standard errors and their posterior covariance.
  * @throws `DataError` when the items, responses, prior or points are invalid, there are no items and no prior, or the
  * grid has more than 10⁶ nodes: use {@link multidimensionalPosteriorModeEstimate}, which works in any number of
  * dimensions.
@@ -215,6 +218,10 @@ function addOuterProduct(out: Float64Array, x: Float64Array, weight: number): vo
  * estimate. Missing responses are skipped; without responses the estimate is the prior mean, also without items, when
  * the `prior` gives the dimensions.
  *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The prior.
+ * @returns The thetas, their standard errors and their covariance.
  * @throws `DataError` when the items, responses or prior are invalid, or there are no items and no prior.
  */
 export function multidimensionalPosteriorModeEstimate(
@@ -237,7 +244,10 @@ export function multidimensionalPosteriorModeEstimate(
  * items only, so that sparse data, such as adaptive tests on a large pool, need no row per person over all items.
  * Items are matched to the data by id, as a calibration's items are. Persons without responses get `null` estimates.
  *
+ * @param data - The responses of the persons, as a matrix or as records.
+ * @param items - The items, matched to the data by id.
  * @param estimator - The estimator of each person.
+ * @returns The estimate of each person, with `null` for a person without responses.
  * @defaultValue `estimator` is `multidimensionalPosteriorModeEstimate`
  * @throws `DataError` when the data are malformed, an item is invalid, item ids repeat, an item of the data has no item
  * with its id, a response is not a category of its item, the estimator is not a function, or it throws it.

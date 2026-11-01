@@ -1,12 +1,16 @@
-import { shuffle } from "@measurekit/core";
+import { mean, shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { informationPeak } from "../src/cat/a-stratified.js";
-import { bindPool, type DiagnosticTestItem } from "../src/cat/diagnostic-items.js";
-import { profileSpace } from "../src/cat/profile-space.js";
-import { highestScore } from "../src/cat/selection.js";
-import { poolTestlets, unitSelection } from "../src/cat/testlets.js";
-import { profileEstimate } from "../src/cdm/persons.js";
+import {
+  bindPool,
+  type DiagnosticTestItem,
+  highestScore,
+  informationPeak,
+  poolTestlets,
+  profileSpace,
+  unitSelection,
+} from "../src/cat/internal.js";
+import { profileEstimate } from "../src/cdm/internal.js";
 import {
   type AbilityEstimate,
   type AbilityEstimator,
@@ -88,6 +92,9 @@ import {
   type WithinTestlet,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
+import { arbitraryItem } from "./arbitraries.js";
+import { defined, expectClose } from "./assertions.js";
+import { item2pl, MODELS } from "./fixture-items.js";
 import cat2pl from "./fixtures/cat-2pl.json" with { type: "json" };
 import cat3pl from "./fixtures/cat-3pl.json" with { type: "json" };
 import catBounds from "./fixtures/cat-bounds.json" with { type: "json" };
@@ -98,7 +105,6 @@ import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
 import cutsFixture from "./fixtures/cat-multistage-cuts.json" with { type: "json" };
 import catTestlets from "./fixtures/cat-testlets.json" with { type: "json" };
 import catForms from "./fixtures/form-assembly.json" with { type: "json" };
-import { arbitraryItem, defined, expectClose, item2pl, MODELS, mean } from "./helpers.js";
 
 // Tolerances against catR, explained in docs/validation.md.
 /** ML, MAP and WLE theta and standard error: catR finds roots with uniroot's default tolerance, about 1.2e-4. */

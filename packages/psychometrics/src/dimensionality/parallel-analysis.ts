@@ -9,7 +9,7 @@ import {
   type Random,
   shuffle,
 } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { pearsonMatrix } from "../math/pearson.js";
 import { codeItems } from "./coded-items.js";
 import { correlationEigenvalues } from "./eigenvalues.js";
@@ -84,6 +84,11 @@ const DEFAULT_QUANTILE = 0.95;
  * draws come from `random`, so a seeded generator reproduces the result. The cost of polychoric correlations grows with
  * the pairs of items and the product of their categories; items with many categories suit Pearson correlations.
  *
+ * @param matrix - The responses of the persons.
+ * @param random - The generator of the random data.
+ * @param options - The correlation, the comparison, the replications, the quantile and the correction for continuity.
+ * @returns The observed and the random eigenvalues of the components and of the factors, with the number of each to
+ *   retain.
  * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
  * categories, a pair of items has too few persons for a correlation, an option is invalid, `random` is not a random
  * number generator, or `comparison` is `"normal"` with `correlation` `"polychoric"`.

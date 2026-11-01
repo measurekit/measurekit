@@ -14,6 +14,8 @@ import { isConstant, pairOfRaters } from "./ratings.js";
  * finite numbers, not only categories. It is `null` when both raters' ratings are constant, which leaves the pooled
  * standard deviation 0.
  *
+ * @param ratings - The ratings of two raters, one row for each subject; `null` when missing.
+ * @returns The difference of the means over the pooled standard deviation; `null` where it is undefined.
  * @throws `DataError` when the ratings do not have two raters, a rating is not a finite number or `null`, or fewer than
  * two subjects were rated by both.
  * @see {@link https://doi.org/10.1111/j.1745-3992.2011.00223.x | Williamson, Xi and Breyer (2012)}

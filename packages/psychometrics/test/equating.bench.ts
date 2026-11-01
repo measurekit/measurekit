@@ -16,9 +16,9 @@ import {
   trueScoreEquating,
   tuckerEquating,
 } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-equating.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 const SEED = 20261029;
 /** The replications of the bootstrap of the standard errors. */

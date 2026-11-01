@@ -1,4 +1,4 @@
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { type CdmCalibration, calibratedModel } from "./calibration.js";
 import { forEachPosterior } from "./expectation.js";
 
@@ -86,6 +86,9 @@ function copyOf(values: Float64Array): number[] {
  * probability enters the likelihood as `Number.MIN_VALUE` instead, so that responses no profile can give still have a
  * posterior, on the profiles they contradict least.
  *
+ * @param matrix - The responses of the persons.
+ * @param calibration - The calibrated model.
+ * @returns For each person, the posterior over the profiles and the estimates that follow from it.
  * @throws `DataError` when the matrix is invalid, its items are not the calibration's in its order, or a response is
  * neither 0 nor 1.
  */

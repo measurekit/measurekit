@@ -1,5 +1,4 @@
-import { answeredItems, largestCategoryCount } from "../irt/items.js";
-import { logProbability, MIN_PROBABILITY } from "../irt/probability.js";
+import { answeredItems, largestCategoryCount, logProbability, MIN_PROBABILITY } from "../irt/internal.js";
 import type { MultidimensionalItem } from "./model.js";
 
 /** The likelihood of a response pattern and its derivatives, over the answered items. */

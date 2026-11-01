@@ -12,7 +12,7 @@ import {
   type Random,
   shuffle,
 } from "@measurekit/core";
-import { indexItems } from "../irt/items.js";
+import { indexItems } from "../irt/internal.js";
 import { type ContentConstraint, poolAreas, readConstraint } from "./content-constraints.js";
 import { enemyIndices } from "./enemies.js";
 import type { PoolItem } from "./items.js";
@@ -150,6 +150,8 @@ interface Assembly {
  * the counts and the information to check, and the method cannot prove that a blueprint is infeasible. Where a form
  * cannot be assembled as a solver would, check the counts against the bounds.
  *
+ * @param options - The pool, the length, the content bounds and target, the enemy sets, the number of forms and the
+ *   overlap; each option has its default.
  * @returns The forms, in the order of the rotation's first round.
  * @throws `DataError` when an item's id or parameters are invalid, ids repeat, the length is not an integer from 1 to
  * the pool size, `forms` is not a positive integer, `overlap` is not an integer from 0, a constraint has bounds that are

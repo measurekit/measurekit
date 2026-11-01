@@ -29,11 +29,11 @@ import {
   type ThresholdItem,
   twoParameterLogistic,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
 import changeFixture from "./fixtures/explanatory-linear-change.json" with { type: "json" };
 import lltmFixture from "./fixtures/explanatory-lltm.json" with { type: "json" };
 import polytomousFixture from "./fixtures/explanatory-lltm-polytomous.json" with { type: "json" };
 import fixture from "./fixtures/explanatory-regression.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Effects, standard errors, covariances, residual variance, log-likelihood and predictions against base R. */

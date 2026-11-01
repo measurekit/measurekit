@@ -32,6 +32,10 @@ export interface CalibrationOptions {
  * outcome of each bin. A calibrated model's mean outcome is close to its mean prediction in every bin. Bin k of
  * K covers [k / K, (k + 1) / K), the last one [(K - 1) / K, 1].
  *
+ * @param predictions - The predicted probabilities, from 0 to 1.
+ * @param outcomes - The outcomes, one for each prediction.
+ * @param options - The number of bins.
+ * @returns The bins in order, each with its range, count, mean prediction and mean outcome.
  * @throws `DataError` when the predictions and outcomes are malformed or `binCount` is not a positive integer.
  */
 export function calibration(

@@ -1,5 +1,5 @@
 import { checkArray, DataError, describe, isUnitInterval } from "@measurekit/core";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import { checkLog, type EventLog } from "../data/internal.js";
 
 /** The predictions and outcomes of the events that have both, in log order. */
 export interface ObservedPairs {
@@ -17,7 +17,9 @@ export interface ObservedPairs {
  * take no part of; this pairs them up. An event with an outcome and a `null` prediction, which `unseenSkills` of
  * `crossValidate` gives to a skipped event, is left out too.
  *
+ * @param log - The log the predictions were made for.
  * @param predictions - One entry per event of the log: a probability or `null`.
+ * @returns The predictions and the outcomes of the events that have both, in the order of the log.
  * @throws `DataError` when the log is malformed, the predictions are not one per event, or one is neither a probability
  * nor `null`.
  */

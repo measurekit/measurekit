@@ -1,6 +1,5 @@
 import { checkArray, checkChoice, DataError, describe, isNonEmptyString, isRecord } from "@measurekit/core";
-import type { Attempt } from "../data/event.js";
-import { entry } from "../data/record.js";
+import { type Attempt, entry } from "../data/internal.js";
 import {
   checkFeature,
   type FeatureSpec,

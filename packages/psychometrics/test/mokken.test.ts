@@ -11,9 +11,9 @@ import {
   responseMatrix,
   scalability,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/mokken.json" with { type: "json" };
 import reliability from "./fixtures/mokken-reliability.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Coefficients and their standard errors against coefH, and H^T against coefHT. */

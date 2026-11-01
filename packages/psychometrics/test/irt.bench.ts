@@ -18,10 +18,10 @@ import {
   twoParameterLogistic,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
 import regressionFixture from "./fixtures/bench-irt-latent-regression.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 const binary = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
 const three = responseMatrix(fixture.three.responses, { itemIds: fixture.three.itemIds });

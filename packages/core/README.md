@@ -7,6 +7,13 @@ or
 [`@measurekit/knowledge-tracing`](https://github.com/measurekit/measurekit/tree/main/packages/knowledge-tracing#readme),
 which depend on it and re-export `createRandom`, `Random`, `DataError` and `MeasurekitError`.
 
+```mermaid
+flowchart BT
+  C["@measurekit/core<br/>DataError, checks, createRandom, numerics"]
+  P["@measurekit/psychometrics"] --> C
+  K["@measurekit/knowledge-tracing"] --> C
+```
+
 It holds the errors the packages throw, the checks of their arguments, a seeded random number generator, the numerics
 and the types that both packages use. It has no dependencies and runs in any JavaScript runtime.
 

@@ -1,5 +1,5 @@
 import { checkOptions, logistic, logLogistic } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/linear-algebra.js";
 import { type DifGroup, dichotomousData, type ItemCases, itemCases } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
@@ -38,6 +38,10 @@ export const MAX_ITERATIONS = 100;
  * answered (see the guide). A test is `null` for an item these persons answered alike or that has persons of one group
  * only. Purification flags items whose test of both terms is significant at 0.05, difR's default type.
  *
+ * @param matrix - The responses of the persons, dichotomous.
+ * @param groups - The group of each person, in the order of the matrix.
+ * @param options - Whether to purify the matching score.
+ * @returns The tests of every item, and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, a response is neither 0 nor 1, either group has no
  * person with a response, or `purify` is not a boolean.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1990.tb00754.x | Swaminathan and Rogers (1990)}

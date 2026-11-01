@@ -1,6 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { compressResponses } from "./responses.js";
 
 /**

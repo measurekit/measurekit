@@ -14,6 +14,11 @@ import { checkRounding, roundScore, type ScoreRounding } from "./score-scale.js"
  *
  * Valid input: finite equivalents and at least one finite scale score.
  *
+ * @param equivalents - The equated score for each score, as `equipercentileEquating` gives them.
+ * @param conversion - The scale score of each total score of the form equated to, from 0.
+ * @param options - The rounding and the bounds of the scale scores.
+ * @returns The scale score of each equated score.
+ *
  * @example
  * ```ts
  * import { scaleConversion } from "@measurekit/psychometrics/scaling";
@@ -21,7 +26,6 @@ import { checkRounding, roundScore, type ScoreRounding } from "./score-scale.js"
  * // Form Y's scale scores of the total scores 0 to 3, and the equivalents on Y of form X's scores 0 to 3.
  * scaleConversion([0.4, 1.5, 2.2, 3.4], [300, 410, 520, 650], { step: 10 }); // [340, 470, 550, 650]
  * ```
- *
  * @throws `DataError` when the equivalents or the conversion are not arrays of finite numbers, the conversion is empty,
  * or the rounding is invalid.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}

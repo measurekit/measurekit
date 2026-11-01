@@ -1,5 +1,5 @@
 import { checkBoolean, checkRecord } from "@measurekit/core";
-import { checkFacetedScores, type FacetedScore } from "../data/faceted-scores.js";
+import { checkFacetedScores, type FacetedScore } from "../data/internal.js";
 import { type BalancedScores, balancedScores } from "./balanced-scores.js";
 import { describeElements, facetSizes, numberScores } from "./numbering.js";
 import { buildStructure, type Effect, effectsOf, facetsOf, namesOf, type Structure } from "./structure.js";
@@ -101,6 +101,10 @@ export interface GeneralizabilityStudy {
  * analysis. The sums of squares and mean squares are the analogous ones, and a decision study needs the sizes given.
  * Measures of raters from incomplete designs are the many-facet Rasch model's, of the rater module.
  *
+ * @param scores - The scores in long format, each with the element of every facet in `levels`.
+ * @param design - The object of measurement, the facets and how they are nested.
+ * @returns The sample size of each facet, whether the design is balanced, and the variance components, each with its
+ *   degrees of freedom, mean square and variance.
  * @throws `DataError` when the design is not an object with distinct non-empty facet names and a nesting of the facets
  * that is acyclic and leaves the object crossed, `unbalanced` is not a boolean, the scores are not an array of objects
  * with a finite `score` and the elements of the design's facets, or a facet has fewer than 2 elements. Without

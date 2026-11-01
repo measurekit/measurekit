@@ -27,6 +27,8 @@ export interface ScoringOptions extends ResponseMatrixOptions {
  *
  * @param choices - Chosen option labels by person, then item; `null` when no option was chosen.
  * @param key - The keyed option label of each item.
+ * @param options - The labels of the options, the ids of the persons and items, and the response times.
+ * @returns The scores as a response matrix, with the choices and the key.
  * @throws `DataError` when the choices do not form a matrix with one column per key, a label is not a non-empty string
  * among `optionLabels`, the option labels repeat, or the ids do not match.
  *

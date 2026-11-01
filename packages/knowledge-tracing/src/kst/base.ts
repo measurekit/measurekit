@@ -18,6 +18,8 @@ import {
  * @remarks
  * The base is the union of the atoms of every element. It is `kbase` of the kst package, which also requires a space.
  *
+ * @param structure - The knowledge space.
+ * @returns The base, each state in the domain's order.
  * @throws `DataError` when the structure is malformed or is not a knowledge space.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 3}
  */
@@ -46,6 +48,9 @@ export function structureBase(structure: KnowledgeStructure): readonly (readonly
  * It is `katoms` of the kst package, which matches an element by its name as a pattern, so that its result is right
  * only for ids that no other id contains.
  *
+ * @param structure - The knowledge structure.
+ * @param element - The element of the domain.
+ * @returns The atoms, each a state in the domain's order.
  * @throws `DataError` when the structure is malformed or the element is not in its domain.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 3}
  */
@@ -69,7 +74,9 @@ export function structureAtoms(structure: KnowledgeStructure, element: string): 
  * @remarks
  * It is `ktrace` of the kst package. The trace of a knowledge space is a knowledge space.
  *
+ * @param structure - The knowledge structure.
  * @param elements - A non-empty list of distinct elements of the domain.
+ * @returns The structure on the elements given, which has the empty state and the whole domain of them.
  * @throws `DataError` when the structure is malformed, or `elements` is not a non-empty list of distinct elements of
  * its domain.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
@@ -103,6 +110,8 @@ export function structureTrace(structure: KnowledgeStructure, elements: readonly
  * Elements of one notion cannot be told apart by any state, so a learner has all of them or none. It is `knotions` of
  * the kst package.
  *
+ * @param structure - The knowledge structure.
+ * @returns The notions, each a list of elements in the domain's order.
  * @throws `DataError` when the structure is malformed.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
  */

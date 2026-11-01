@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { type CompressedResponses, personGroups } from "../irt/responses.js";
+import { type CompressedResponses, personGroups } from "../irt/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import { type Latent, latentDistribution } from "./correlation.js";
 import type { Design } from "./design.js";

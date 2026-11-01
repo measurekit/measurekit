@@ -51,11 +51,11 @@ import {
   twoParameterLogistic,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
-import { type ExpectationItem, expectationStep } from "../src/irt/expectation.js";
-import { population } from "../src/irt/latent.js";
-import { maximize } from "../src/irt/linear-rasch.js";
-import { compressResponses } from "../src/irt/responses.js";
+import { compressResponses, type ExpectationItem, expectationStep, maximize, population } from "../src/irt/internal.js";
 import { rectangular } from "../src/math/quadrature.js";
+import { arbitraryItem, arbitraryLocation, arbitraryLocations, arbitrarySlope } from "./arbitraries.js";
+import { defined, expectClose, expectParameters } from "./assertions.js";
+import { definedEntries, type FixtureErrors, type FixtureParameters, MODELS } from "./fixture-items.js";
 import covariance from "./fixtures/irt-covariance.json" with { type: "json" };
 import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json" };
 import latent from "./fixtures/irt-latent.json" with { type: "json" };
@@ -70,19 +70,6 @@ import simulatedMixed from "./fixtures/irt-simulated-mixed.json" with { type: "j
 import simulatedPcm from "./fixtures/irt-simulated-pcm.json" with { type: "json" };
 import testlet from "./fixtures/irt-testlet.json" with { type: "json" };
 import testletGroups from "./fixtures/irt-testlet-groups.json" with { type: "json" };
-import {
-  arbitraryItem,
-  arbitraryLocation,
-  arbitraryLocations,
-  arbitrarySlope,
-  defined,
-  definedEntries,
-  expectClose,
-  expectParameters,
-  type FixtureErrors,
-  type FixtureParameters,
-  MODELS,
-} from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Item parameters against mirt, ltm and the base R posterior mode. */
@@ -1223,7 +1210,7 @@ describe("expectationStep", () => {
 });
 
 describe("gradedResponse", () => {
-  it("names a and the thresholds b1 to b(K-1)", () => {
+  it("names the slope a and one threshold b for each boundary between categories", () => {
     expect(gradedResponse.parameters(4)).toEqual([{ name: "a" }, { name: "b1" }, { name: "b2" }, { name: "b3" }]);
     expect(gradedResponse.categoryCount({ a: 1, b: [0, 1] })).toBe(3);
   });

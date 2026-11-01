@@ -1,5 +1,5 @@
 import { checkArray, DataError } from "@measurekit/core";
-import { checkModelledItem, checkModelShape, checkResponses, indexItemsWith } from "../irt/items.js";
+import { checkModelledItem, checkModelShape, checkResponses, indexItemsWith } from "../irt/internal.js";
 import type { MultidimensionalItem, MultidimensionalModel } from "./model.js";
 
 /** The methods of {@link MultidimensionalModel}, which a model must have. */

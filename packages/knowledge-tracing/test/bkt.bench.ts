@@ -3,7 +3,7 @@ import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import { bkt } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-bkt.json" with { type: "json" };
-import { columnsLog, online } from "./helpers.js";
+import { columnsLog, online } from "./logs.js";
 
 /** 200 learners at 5 skills, 20 attempts at each: 20,000 attempts. */
 const log = columnsLog(fixture);

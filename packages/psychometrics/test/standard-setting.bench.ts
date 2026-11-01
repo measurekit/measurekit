@@ -1,8 +1,8 @@
 import { test } from "vitest";
 import { bookmarkCutScore, classificationAccuracy, type TestItem, twoParameterLogistic } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 const items: TestItem[] = fixture.items.a.map((a, i) => ({
   id: defined(fixture.binary.itemIds[i]),

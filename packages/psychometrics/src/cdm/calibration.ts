@@ -11,8 +11,7 @@ import {
   iterateToConvergence,
   type QMatrix,
 } from "@measurekit/core";
-import { checkDichotomous } from "../data/dichotomous.js";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkDichotomous, checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { type AdditiveMaximizer, additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
 import { type CdmState, type DichotomousRows, type ExpectedCounts, expectedCounts } from "./expectation.js";
 import { type CdmDesign, cdmDesign, profilesOf } from "./q-matrix.js";
@@ -161,6 +160,11 @@ const MIN_PROPORTION = Number.EPSILON;
  * every item. They take O(n p²) for n persons and p success probabilities, and the inversion of the p by p information
  * O(p³) per sweep.
  *
+ * @param matrix - The responses of the persons, dichotomous.
+ * @param qMatrix - The attributes of each item, by item id.
+ * @param options - The model, the standard errors and the stopping rules; each option has its default.
+ * @returns The attributes, the items with their parameters, the proportion of each profile, the log-likelihood, AIC,
+ *   BIC, whether the EM converged and the iterations run.
  * @throws `DataError` when the matrix, the Q-matrix or an option is invalid, a response is neither 0 nor 1, there is
  * no response, or `standardErrors` is `"incomplete"` and an item is not G-DINA.
  */

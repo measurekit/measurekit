@@ -1,5 +1,5 @@
 import { checkChoice, checkNonNegative, checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { symmetricEigen } from "../math/eigen.js";
 import { ITEM_CORRELATIONS, type ItemCorrelation, positiveDefiniteCorrelations } from "./item-correlations.js";
 import { DEFAULT_CORRECTION, type PolychoricOptions } from "./polychoric.js";
@@ -42,6 +42,10 @@ export interface MinimumAveragePartial {
  * which `map` is the `map` it returns, the test starts at one component, so it never answers none. The correlations
  * are smoothed when they are not positive definite.
  *
+ * @param data - The responses of the persons.
+ * @param options - The correlation, the most factors to test and the correction for continuity.
+ * @returns The average squared partial correlation for each number of factors, the number of factors that minimizes it
+ *   and whether the correlations were smoothed.
  * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
  * categories, a pair of items has too few persons for a correlation, or an option is invalid.
  * @see {@link https://doi.org/10.1007/BF02293557 | Velicer (1976)}

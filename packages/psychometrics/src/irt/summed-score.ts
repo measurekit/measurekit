@@ -25,6 +25,9 @@ export interface SummedScoreEstimate {
  * quadrature node comes from the recursion of Lord and Wingersky; the nodes and weights are those of {@link
  * posteriorMeanEstimate}.
  *
+ * @param items - The items of the form.
+ * @param options - The prior and the quadrature.
+ * @returns For each summed score, the EAP estimate of theta with its standard error and the probability of the score.
  * @throws `DataError` without items, or when an item's parameters, the prior or the quadrature are invalid.
  * @see {@link https://doi.org/10.1177/014662169501900105 | Thissen, Pommerich, Billeaud and Williams (1995)}
  * @see {@link https://doi.org/10.1177/014662168400800409 | Lord and Wingersky (1984)}

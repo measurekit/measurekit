@@ -8,6 +8,9 @@ import { checkArray, DataError, describe } from "@measurekit/core";
  * - 1) of the score distributions, as the equate package's `equate(type = "linear")`. Each distribution is the number
  * of persons at each score, from 0 to the highest.
  *
+ * @param from - The persons at each score of the form to equate, from 0.
+ * @param to - The persons at each score of the form to equate to, from 0.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a distribution is invalid or has fewer than two persons, or the `from` scores have no
  * variance.
  */
@@ -30,6 +33,9 @@ export function linearEquating(from: readonly number[], to: readonly number[]): 
  * Ranks of 0 and 1 give -0.5 and the highest `to` score plus 0.5. Each distribution is the number of persons at each
  * score, from 0 to the highest.
  *
+ * @param from - The persons at each score of the form to equate, from 0.
+ * @param to - The persons at each score of the form to equate to, from 0.
+ * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a distribution is invalid.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
  */

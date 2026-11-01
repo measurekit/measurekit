@@ -27,13 +27,17 @@ export interface NormalizedGain {
  * Valid input: the pre and post scores of the same persons, in the same order, at least one person, finite scores
  * that do not exceed the maximum.
  *
+ * @param pre - The scores of the first occasion.
+ * @param post - The scores of the second occasion, one for each person.
+ * @param options - The highest possible score.
+ * @returns The gain of the group and of each person; `null` where a gain is undefined.
+ *
  * @example
  * ```ts
  * import { normalizedGain } from "@measurekit/psychometrics/change";
  *
  * normalizedGain([10, 30, 50], [30, 40, 50], { maximum: 50 }); // { group: 0.5, persons: [0.5, 0.5, null] }
  * ```
- *
  * @throws `DataError` when the scores are not arrays of the same length with at least one finite number each, the
  * options are not an object, the maximum is not a finite number, or a score exceeds it.
  * @see {@link https://doi.org/10.1119/1.18809 | Hake (1998)}

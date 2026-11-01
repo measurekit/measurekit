@@ -166,7 +166,8 @@ docs/performance.md     the benchmarks against the references, and the budgets
 validation/<package>/   R and Python scripts that write the fixtures; validation/README.md lists them
 validation/benchmarks/  the inputs of the benchmarks and the timing of their references, by package and module
 bench/                  the harness of the benchmarks, which each package binds to its budgets
-examples/<package>/     runnable examples, which import the package by name
+examples/<package>/     runnable examples, which import the package by name; examples/test/ runs each of them
+scripts/                check-standards.ts, which checks the rules of STANDARDS.md that a script can, and its test
 biome/                  Biome GritQL plugins
 .changeset/             the pending release: one changeset per package
 ```
@@ -179,6 +180,7 @@ Each package folder also holds `README.md` (the page of the package on npm), `LI
 ```bash
 pnpm install
 pnpm lint             # Biome and cspell; `pnpm format` fixes formatting
+pnpm check:standards  # no section signs, ids in test titles, history phrasing, vague file names, missing diagrams, deep imports; the form of "Not included"
 pnpm typecheck        # tsc over the sources, tests and examples of every package
 pnpm test             # Vitest, one project per package; `pnpm test --project psychometrics` runs one
 pnpm bench            # builds, then the benchmarks of every package, one after another, against the budgets of `test/budgets.ts`
@@ -210,6 +212,8 @@ behavior only, without "now", "no longer", "renamed" or "previously".
   core does not become a place for everything. A generic routine that both use, such as a Cholesky factorization, is
   written once, in core.
 - Code outside `packages/` imports a package by name.
+- A module imports another only through its `index.ts` or its `internal.ts`, which lists what the modules and tests of
+  the package share and is never exported from the package. `pnpm check:standards` fails on a deep path.
 
 Psychometrics: every module of `cat/`, `change/`, `equating/`, `irt/`, `multidimensional/`, `rater/`, `scaling/` and
 `sim/` may also import `checks.ts`.
@@ -339,6 +343,9 @@ others. A new clone is merged into a helper of the module that owns the concept,
   the comments, so they use its tags:
   - The first sentence is the summary. A longer explanation, such as a method, a formula or the edge cases, follows
     under `@remarks`; a description of more than three lines has one.
+  - `@param name - ...` describes every parameter of a function, and `@returns` its result where the summary does not
+    say it: the shape, the units, the range and when it is `null`. A function that returns nothing has no `@returns`; a
+    destructured parameter has one `@param`.
   - `@defaultValue` gives the default of every option and every parameter that has one, as code (`@defaultValue
     \`1e-4\``) or, when the default is a behavior, a short phrase. The summary never states a default. A parameter
     whose initializer is in the signature shows it in TypeDoc; one whose default is computed in the body has
@@ -374,9 +381,9 @@ others. A new clone is merged into a helper of the module that owns the concept,
 - A knowledge tracing model without a package of record, such as Elo, has its equations written out in R and a seeded
   simulation recovery study, with thresholds fixed before the simulation is first run.
 - Use public datasets (mirt, psych, difR, pyBKT) or simulations with a fixed seed.
-- One test file per source folder, named after it: `ctt.test.ts` for `src/ctt/`. `test/helpers.ts` holds shared
-  helpers, such as `expectClose` in psychometrics, which compares with a reference value, and `online` in knowledge
-  tracing, which runs a log through any model as an app would. A file's `describe` blocks follow the order of the
+- One test file per source folder, named after it: `ctt.test.ts` for `src/ctt/`. `test/assertions.ts` holds the shared
+  assertions, such as `expectClose`, which compares with a reference value; `test/logs.ts` of knowledge tracing holds
+  `online`, which runs a log through any model as an app would. A file's `describe` blocks follow the order of the
   folder's source files or the sections of the module's guide, with a closing `properties` block in psychometrics;
   within a block, the comparisons with the reference and the main behavior come first, then the options, then errors and
   edge cases.
@@ -416,4 +423,4 @@ others. A new clone is merged into a helper of the module that owns the concept,
   library; otherwise with the data they check, such as
   `data/dichotomous.ts` and `irt/items.ts` in psychometrics, `data/event.ts` and `model.ts` in knowledge tracing.
 - An example: `examples/<package>/<name>.ts`, importing the package by name, with a header comment that says what it
-  shows and how to run it.
+  shows and how to run it. `pnpm test --project examples` runs every example on the sources and fails when one throws.

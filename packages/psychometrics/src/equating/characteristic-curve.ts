@@ -1,7 +1,5 @@
 import { bfgs, checkOptions, type OptimizerOptions } from "@measurekit/core";
-import { largestCategoryCount } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
-import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
+import { type IrtItem, largestCategoryCount, type QuadratureOptions, quadratureRule } from "../irt/internal.js";
 
 import type { Quadrature } from "../math/quadrature.js";
 import { checkCommonItems, type ScaleTransformation } from "./linking.js";
@@ -39,6 +37,10 @@ const OPTIMIZER: OptimizerOptions = { tolerance: 1e-10, maxIterations: 200 };
  * the transformation. A dichotomous item adds both of its categories, twice the usual term, which leaves the minimum of
  * a dichotomous test unchanged; polytomous items follow Kim and Lee. Items of any model, a custom one included.
  *
+ * @param from - The common items on the scale to move.
+ * @param to - The same items on the scale to move to.
+ * @param options - The quadrature.
+ * @returns The slope and intercept of the transformation, whether the minimization converged and the iterations run.
  * @throws `DataError` when the item lists differ in length or are empty, a pair has different models or numbers of
  * categories, an item is invalid, or the quadrature is invalid.
  * @see {@link https://doi.org/10.4992/psycholres1954.22.144 | Haebara (1980)}
@@ -60,6 +62,10 @@ export function haebaraLinking(
  * squared difference between the common items' test characteristic curves, their total expected score, on the `to`
  * scale and on the `from` scale after the transformation. Items of any model, a custom one included.
  *
+ * @param from - The common items on the scale to move.
+ * @param to - The same items on the scale to move to.
+ * @param options - The quadrature.
+ * @returns The slope and intercept of the transformation, whether the minimization converged and the iterations run.
  * @throws `DataError` in the cases of {@link haebaraLinking}.
  * @see {@link https://doi.org/10.1177/014662168300700208 | Stocking and Lord (1983)}
  */

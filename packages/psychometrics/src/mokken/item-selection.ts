@@ -1,5 +1,5 @@
 import { checkOptions, checkUnitInterval, normalQuantile } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 import { checkLevel } from "./item-check.js";
 import { usableItems } from "./scalability.js";
 import { type Covariances, covariances, mokkenData } from "./scores.js";
@@ -48,6 +48,9 @@ const ROW_EPSILON = 1e-10;
  * scale and are left out of the tests. Where mokken stops because the lower bound is above every H_ij, all items are
  * unscalable.
  *
+ * @param matrix - The responses of the persons.
+ * @param options - The lower bound of H and the level of the tests.
+ * @returns The scales, each a list of items, and the items that belong to none.
  * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every
  * item, the scores span more than 10 categories, or an option is invalid.
  * @see {@link https://doi.org/10.18637/jss.v020.i11 | van der Ark (2007)}

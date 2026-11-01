@@ -66,6 +66,7 @@ interface Judgment {
  * @param rule - The rule that scores the items that pass.
  * @param constraints - The area, the minimum and the maximum, as integers from 0.
  * @param length - The most items a test may have, a positive integer.
+ * @returns The selection rule, which scores like `rule` and `-Infinity` for the items the bounds exclude.
  * @throws `DataError` when `rule` is not a selection rule, the constraints are invalid or on one area twice, or
  * `length` is not a positive integer.
  */

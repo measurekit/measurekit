@@ -14,15 +14,20 @@ import {
   checkAttempt,
   checkEvent,
   checkHasSkills,
+  checkLearner,
+  checkLearnerId,
+  checkLog,
+  checkObservedEvents,
   checkObservedHasSkills,
   type Event,
+  type EventLog,
+  entry,
   isObserved,
+  parametersOf,
+  replay,
   resourceOf,
-} from "../data/event.js";
-import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
-import { checkLearner, checkLearnerId } from "../data/learner.js";
-import { entry, parametersOf } from "../data/record.js";
-import { replay, type Steps } from "../data/replay.js";
+  type Steps,
+} from "../data/internal.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { type BktBounds, type BktFixedRates, checkConstraints, checkWithinBounds } from "./constraints.js";
 import {
@@ -228,6 +233,10 @@ interface Settings extends StructureOptions {
  * An event with `outcome: null`, such as a lesson, moves each of its skills' P(L) to P(L) (1 - P(F)) + (1 - P(L))
  * P(T), with the rates of its resource, and a skill without parameters stays as it is.
  *
+ * @param options - The extensions of the model, such as forgetting or guess and slip by item, and the bounds and starts
+ *   of its fit; each option has its default.
+ * @returns The model: `fit` estimates the rates from a log, `update` and `predict` serve online, and `mastery` gives
+ *   P(L).
  * @throws `DataError` when an option is out of range or the parameters are malformed.
  * @see {@link https://doi.org/10.1007/BF01099821 | Corbett and Anderson (1994)}
  */

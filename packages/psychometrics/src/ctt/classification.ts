@@ -38,6 +38,9 @@ export const DISCRIMINATION_THRESHOLDS: DiscriminationThresholds = { veryGood: 0
 /**
  * Classifies a p-value from 0 to 1.
  *
+ * @param p - The p-value of an item.
+ * @param thresholds - The p-values that separate the classes.
+ * @returns The class.
  * @throws `DataError` when `p` is outside [0, 1] or the thresholds are not numbers ordered within it.
  */
 export function classifyDifficulty(
@@ -59,6 +62,9 @@ export function classifyDifficulty(
 /**
  * Classifies a discrimination value, such as the discrimination index D or an item-total correlation.
  *
+ * @param value - The discrimination index or correlation.
+ * @param thresholds - The values that separate the classes.
+ * @returns The class.
  * @throws `DataError` when `value` is not a finite number or the thresholds are not finite numbers in order.
  */
 export function classifyDiscrimination(

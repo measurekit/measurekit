@@ -1,8 +1,5 @@
 import type { ThetaDistribution } from "@measurekit/core";
-import { checkItemList } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
-import { scoreLikelihoods } from "../irt/summed-score.js";
-import { checkThetaDistribution } from "../irt/theta-distribution.js";
+import { checkItemList, checkThetaDistribution, type IrtItem, scoreLikelihoods } from "../irt/internal.js";
 import { checkConversion } from "./conversion.js";
 import { checkLevel, type ScorePrediction, type ScorePredictionOptions, summarize } from "./prediction.js";
 
@@ -22,6 +19,12 @@ import { checkLevel, type ScorePrediction, type ScorePredictionOptions, summariz
  * Valid input: items of any models; a distribution of finite nodes and non-negative weights that sum to 1 within 1e-6;
  * as many finite scale scores as the form has total scores; a level between 0 and 1.
  *
+ * @param posterior - The distribution of the person's theta.
+ * @param form - The items of the official form.
+ * @param conversion - The scale score of each total score of the form, from 0.
+ * @param options - The level of the interval.
+ * @returns The expected scale score with its interval, and the distribution of the score.
+ *
  * @example
  * ```ts
  * import { predictFormScore, thetaPosterior, twoParameterLogistic } from "@measurekit/psychometrics";
@@ -32,7 +35,6 @@ import { checkLevel, type ScorePrediction, type ScorePredictionOptions, summariz
  * const posterior = thetaPosterior(practice, [1, 1, 0]);
  * predictFormScore(posterior, official, [200, 500, 800]).mean; // 543.9
  * ```
- *
  * @throws `DataError` when the distribution, the form, the conversion or the options are invalid.
  */
 export function predictFormScore(

@@ -8,8 +8,7 @@ import {
   isRecord,
   mean,
 } from "@measurekit/core";
-import { checkItem } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
+import { checkItem, type IrtItem } from "../irt/internal.js";
 import { standardDeviation } from "../math/statistics.js";
 import { itemMoments, rescaledErrors, rescaledItem } from "./models.js";
 
@@ -32,6 +31,9 @@ export interface ScaleTransformation {
  * A = mean a_from / mean a_to and B = mean b_to - A mean b_from, over the slopes of the items and their locations, the
  * difficulty or every threshold. For Rasch items, a = 1 on both scales, A is 1.
  *
+ * @param from - The common items on the scale to move.
+ * @param to - The same items on the scale to move to.
+ * @returns The slope and intercept of the transformation.
  * @throws `DataError` when the item lists differ in length or are empty, a pair has different models or numbers of
  * categories, an item is invalid, an NRM item or not one of the built-in models, or a mean slope is not positive.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1980.tb00825.x | Loyd and Hoover (1980)}
@@ -49,6 +51,9 @@ export function meanMeanLinking(from: readonly IrtItem[], to: readonly IrtItem[]
  * Returns the mean-sigma transformation of the common items' scale in `from` to their scale in `to`: A = sd b_to / sd
  * b_from and B = mean b_to - A mean b_from, over the items' locations, the difficulty or every threshold.
  *
+ * @param from - The common items on the scale to move.
+ * @param to - The same items on the scale to move to.
+ * @returns The slope and intercept of the transformation.
  * @throws `DataError` in the cases of {@link meanMeanLinking} other than the slopes, or when the locations on either
  * scale have no variance.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1977.tb00033.x | Marco (1977)}
@@ -73,6 +78,9 @@ export function meanSigmaLinking(from: readonly IrtItem[], to: readonly IrtItem[
  * transformation as known: a by 1 / A, locations and steps by A. An NRM item moved by an intercept other than 0 has
  * `null` standard errors.
  *
+ * @param item - The item on the old scale.
+ * @param transformation - The transformation to the new scale.
+ * @returns The item on the new scale.
  * @throws `DataError` when the transformation is invalid, or the item is invalid or not one of the built-in models.
  */
 export function transformItem<TItem extends IrtItem>(item: TItem, transformation: ScaleTransformation): TItem {
@@ -99,7 +107,8 @@ export function transformItem<TItem extends IrtItem>(item: TItem, transformation
  * links share the estimates of the form between them, so adding the errors of the links overstates the error of the
  * chain.
  *
- * @param links - The transformations of the successive links, at least one.
+ * @param links - The transformations of consecutive links, in order.
+ * @returns The transformation of the first scale to the last.
  * @throws `DataError` when `links` is not a non-empty array, a link is not a valid transformation, or the chain is not
  * finite.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
@@ -143,6 +152,9 @@ function checkErrors(errors: unknown): Readonly<Record<string, number>> {
  * Returns theta on the new scale of a transformation: slope · theta + intercept. A standard error of theta scales by
  * the slope.
  *
+ * @param theta - The ability on the old scale.
+ * @param transformation - The transformation to the new scale.
+ * @returns The ability on the new scale.
  * @throws `DataError` when theta is not finite or the transformation is invalid.
  */
 export function transformTheta(theta: number, transformation: ScaleTransformation): number {

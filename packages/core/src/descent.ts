@@ -22,6 +22,7 @@ export interface DescentPoint {
  * @param point - The point the step starts from, with its gradient and value.
  * @param search - The direction of the step, a descent direction at `point`.
  * @param trial - Receives the point of each length tried, and so the accepted point.
+ * @returns Whether a length of the step was accepted; `trial` then holds the accepted point.
  */
 export function stepAlong(
   f: GradientFunction,

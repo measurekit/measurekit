@@ -66,8 +66,10 @@ const DESIGNS = ["random-groups", "single-group", "neat"];
  *
  * @param sample - The persons' scores, as whole numbers of persons.
  * @param equate - Returns the equated score of each score of the form to equate, such as `(s) => tuckerEquating(s.from,
- * s.to)`.
+ *   s.to)`.
  * @param random - The source of the draws.
+ * @param options - The number of replications.
+ * @returns The standard error at each score.
  * @throws `DataError` when the sample is invalid or its counts are not whole numbers, `equate` is not a function or does
  * not return a finite equated score at each score, `random` is not a random number generator, or `replications` is
  * not an integer from 2.

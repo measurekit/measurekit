@@ -18,6 +18,7 @@ import {
   simulate,
   splitByLearner,
 } from "../src/index.js";
+import { allPredicted, defined, expectClose } from "./assertions.js";
 import bounded from "./fixtures/bkt-bounds.json" with { type: "json" };
 import fixedFixture from "./fixtures/bkt-fixed.json" with { type: "json" };
 import lessons from "./fixtures/bkt-lessons.json" with { type: "json" };
@@ -26,7 +27,7 @@ import pairFixture from "./fixtures/bkt-pairs.json" with { type: "json" };
 import practice from "./fixtures/bkt-practice.json" with { type: "json" };
 import recovery from "./fixtures/bkt-recovery.json" with { type: "json" };
 import skillFixture from "./fixtures/bkt-skills.json" with { type: "json" };
-import { allPredicted, defined, expectClose, online } from "./helpers.js";
+import { online } from "./logs.js";
 
 /** Absolute tolerance of P(correct) and P(L) against pyBKT at fixed parameters. */
 const INFERENCE_TOLERANCE = 1e-13;

@@ -1,5 +1,5 @@
 import { checkFinite, checkRecord, DataError } from "@measurekit/core";
-import { checkDistribution } from "../equating/observed-score.js";
+import { checkDistribution } from "../equating/internal.js";
 
 /** A panel's bounds in the Hofstee method: the acceptable cut scores and failure rates. */
 export interface HofsteeBounds {
@@ -27,6 +27,8 @@ export interface HofsteeCutScore {
  * and is linear between them, so the cut score need not be a score.
  *
  * @param distribution - The number of persons at each total score, from 0 to the highest.
+ * @param bounds - The lowest and highest cut scores and failure rates that the panel accepts.
+ * @returns The cut score and the failure rate there.
  * @throws `DataError` when the distribution is invalid, the bounds are not ordered within the scores and [0, 1], or
  * the line does not cross the failure rates between k_min and k_max.
  * @see {@link https://openlibrary.org/works/OL19174477W | Hofstee (1983)}

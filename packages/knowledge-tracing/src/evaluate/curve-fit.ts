@@ -19,6 +19,8 @@ export interface PowerLaw {
  * and a curve of few learners per point is noisy at its tail, which the weights count. Pass the points of one skill,
  * such as `learningCurve(log).skills.fractions`, or its `overall` curve.
  *
+ * @param points - The error rate of each opportunity.
+ * @returns The coefficient and the exponent of the law with their fit; `null` where the points cannot be fitted.
  * @throws `DataError` when the points are malformed.
  */
 export function powerLawFit(points: readonly ErrorRatePoint[]): PowerLaw | null {

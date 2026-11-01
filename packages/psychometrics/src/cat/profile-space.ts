@@ -1,7 +1,6 @@
 import { checkArray, checkRecord, checkUnitInterval, DataError, isNonEmptyString } from "@measurekit/core";
-import type { ProfileProportion } from "../cdm/calibration.js";
-import { bitPattern, MAX_ATTRIBUTES, profileIndices, profilesOf } from "../cdm/q-matrix.js";
-import { formatList } from "../irt/thresholds.js";
+import { bitPattern, MAX_ATTRIBUTES, type ProfileProportion, profileIndices, profilesOf } from "../cdm/internal.js";
+import { formatList } from "../irt/internal.js";
 
 /** The attributes of a diagnostic test, the profiles over them and the prior probability of each profile. */
 export interface ProfileSpace {

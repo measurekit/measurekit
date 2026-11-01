@@ -6,6 +6,9 @@ import type { MultidimensionalItem } from "./model.js";
  * Returns the test information matrix at `theta`: the sum of the items' information matrices, by rows. Its inverse is
  * the covariance of a maximum likelihood estimate of theta there.
  *
+ * @param items - The items of the test.
+ * @param theta - The thetas, one for each dimension.
+ * @returns The information matrix, by rows.
  * @throws `DataError` when the items are not an array, there are none, an item is invalid or the items differ in their
  * number of dimensions, or theta is not an array of that many finite numbers.
  */

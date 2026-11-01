@@ -1,8 +1,9 @@
 import { test } from "vitest";
 import { eventLog, irt } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import { defined, online } from "./helpers.js";
+import { online } from "./logs.js";
 
 /** 2,000 learners answer 40 items in turn: 80,000 responses. */
 const DRIFT_LEARNERS = 200;

@@ -11,11 +11,11 @@ import { pseudoInverse } from "../src/math/pseudo-inverse.js";
 import { gaussHermite, rectangular } from "../src/math/quadrature.js";
 import { findIncreasingRoot, findRoot } from "../src/math/root.js";
 import { resolveRotation, rotateLoadingMatrix } from "../src/math/rotation.js";
+import { defined, expectClose } from "./assertions.js";
 import factors from "./fixtures/dimensionality-factors.json" with { type: "json" };
 import eigen from "./fixtures/math-eigen.json" with { type: "json" };
 import functions from "./fixtures/math-functions.json" with { type: "json" };
 import hermite from "./fixtures/math-gauss-hermite.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 /** Relative tolerance of the normal and logistic functions against R. */
 const FUNCTION_TOLERANCE = 1e-14;

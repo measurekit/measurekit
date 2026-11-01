@@ -3,6 +3,14 @@
 `@measurekit/psychometrics/parameterization` converts item parameters ([IRT](irt.md) and
 [multidimensional IRT](multidimensional.md)) to and from mirt's coefficients.
 
+```mermaid
+flowchart LR
+  I["Item of the package: IRT form, D = 1"] -->|"toMirtIrt, toMirtSlopeIntercept"| C["mirt's coefficients"]
+  C -->|"fromMirtIrt, fromMirtSlopeIntercept"| I
+  M["Multidimensional item"] -->|"toMirtMultidimensional"| N["mirt's slope-intercept coefficients"]
+  N -->|"fromMirtMultidimensional"| M
+```
+
 ## mirt
 
 mirt reports an item's coefficients in two forms, both with D = 1: the IRT form, `coef(model, IRTpars = TRUE)`, and

@@ -1,6 +1,5 @@
 import { checkArray, checkChoice, checkOptions, checkRecord, DataError, studentLowerTail } from "@measurekit/core";
-import { checkLog } from "../data/event-log.js";
-import type { Fold } from "../data/split.js";
+import { checkLog, type Fold } from "../data/internal.js";
 import { outcomeLogLikelihood } from "../math/logistic.js";
 import type { CrossValidation } from "./cross-validation.js";
 import { checkPredictionList } from "./observed-pairs.js";
@@ -57,10 +56,13 @@ const ESSENTIALLY_CONSTANT = 10 * Number.EPSILON;
  * A learner with an infinite loss under either model has no difference, and the mean difference, the standard error,
  * the statistic and the p-value are `null`.
  *
- * @see {@link https://jedm.educationaldatamining.org/index.php/JEDM/article/view/JEDM087 | Pelánek (2015)}
  * @param first - The evaluation of the first model on `folds`, as `crossValidate` returns it.
  * @param second - The evaluation of the second model on the same folds.
  * @param folds - The folds both were evaluated on.
+ * @param options - The loss to compare, `"log"` or `"squared"`.
+ * @returns The number of learners, the mean difference of the losses, its standard error, the t statistic, its degrees
+ *   of freedom and the two-sided probability; `null` where the test is undefined.
+ * @see {@link https://jedm.educationaldatamining.org/index.php/JEDM/article/view/JEDM087 | Pelánek (2015)}
  * @throws `DataError` when an evaluation does not belong to the folds, an option is invalid, or no test event with an
  * outcome has a prediction of both models.
  */

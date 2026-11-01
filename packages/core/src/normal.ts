@@ -9,6 +9,9 @@ const CONST2 = 1.6;
 /**
  * Returns the quantile of the standard normal distribution at probability `p`: `-Infinity` at 0, `Infinity` at 1 and
  * `NaN` outside [0, 1]. Uses Wichura's algorithm AS 241, as R's `qnorm` does.
+ *
+ * @param p - The probability, from 0 to 1.
+ * @returns The quantile.
  */
 export function normalQuantile(p: number): number {
   const q = p - 0.5;

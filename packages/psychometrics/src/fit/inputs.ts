@@ -1,7 +1,6 @@
 import { checkArray, checkFinite, DataError } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
-import { checkItem } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
+import { checkItem, type IrtItem } from "../irt/internal.js";
 
 /**
  * Checks a response matrix and its items: one valid item per column, and every response a category of its item.

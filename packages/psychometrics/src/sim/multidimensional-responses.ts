@@ -1,8 +1,7 @@
 import { checkArray, checkFinite, checkRandom, DataError, type Random } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import { largestCategoryCount } from "../irt/items.js";
-import { checkMultidimensionalItems } from "../multidimensional/items.js";
-import type { MultidimensionalItem } from "../multidimensional/model.js";
+import type { ResponseMatrix } from "../data/internal.js";
+import { largestCategoryCount } from "../irt/internal.js";
+import { checkMultidimensionalItems, type MultidimensionalItem } from "../multidimensional/internal.js";
 import { drawCategory, matrixWithMissing, missingProbabilityOf, type ResponseSimulationOptions } from "./responses.js";
 
 /**
@@ -14,7 +13,11 @@ import { drawCategory, matrixWithMissing, missingProbabilityOf, type ResponseSim
  * response is missing with that probability, so a seed gives the same responses with and without missingness, less
  * the missing ones. The matrix has a row per person and a column per item, with the default ids.
  *
+ * @param items - The multidimensional items.
  * @param thetas - One array of thetas per person, as many as the items have dimensions.
+ * @param random - The generator of the responses.
+ * @param options - The probability that a response is missing.
+ * @returns The responses, one row for each person.
  * @throws `DataError` without items or thetas, when an item is invalid, the items differ in their number of dimensions,
  * a person's thetas are not that many finite numbers, `random` is not a random number generator, or
  * `missingProbability` is outside [0, 1].

@@ -24,8 +24,8 @@ import {
   type LogisticState,
   logistic,
 } from "../src/index.js";
+import { defined } from "./assertions.js";
 import stored from "./fixtures/stored-state.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 /** What a build wrote for one model: its parameters and states, and what the model made of them one event later. */
 interface Stored<TOptions, TState, TParameters> {

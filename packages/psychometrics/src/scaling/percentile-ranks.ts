@@ -12,13 +12,16 @@ import { checkArray, checkFinite, DataError, describe } from "@measurekit/core";
  *
  * Valid input: a sample of at least one finite number, and finite scores; the scores need not occur in the sample.
  *
+ * @param sample - The scores of the norm sample.
+ * @param scores - The scores to rank.
+ * @returns The percentile rank of each score, from 0 to 100.
+ *
  * @example
  * ```ts
  * import { percentileRanks } from "@measurekit/psychometrics/scaling";
  *
  * percentileRanks([10, 20, 20, 30, 40], [20, 25, 50]); // [40, 60, 100]
  * ```
- *
  * @throws `DataError` when the sample is not an array of at least one finite number, or the scores are not an array of
  * finite numbers.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}

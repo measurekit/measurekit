@@ -34,6 +34,9 @@ export interface EventLogOptions {
  * Q-matrix, and orders them by time, keeping the given order of events with equal times. It copies the fields of
  * {@link Event} and drops any others; an event without an outcome has `outcome: null`.
  *
+ * @param events - The events, in any order.
+ * @param options - The Q-matrix that gives the skills of events without any.
+ * @returns The events in time order, as a log.
  * @throws `DataError` when there are no events, an event is malformed, the Q-matrix is malformed, or an event without
  * skills has an item the Q-matrix lacks.
  *

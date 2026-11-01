@@ -1,4 +1,4 @@
-import { logProbability } from "../irt/probability.js";
+import { logProbability } from "../irt/internal.js";
 import type { DiagnosticTestItem } from "./diagnostic-items.js";
 
 /**

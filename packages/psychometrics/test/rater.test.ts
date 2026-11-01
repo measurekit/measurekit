@@ -20,13 +20,13 @@ import {
   ratingCorrelation,
   standardizedMeanDifference,
 } from "../src/index.js";
-import { summarizeFacet } from "../src/rater/facet-summary.js";
+import { summarizeFacet } from "../src/rater/internal.js";
+import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/rater.json" with { type: "json" };
 import agreementFixture from "./fixtures/rater-agreement.json" with { type: "json" };
 import biasFixture from "./fixtures/rater-bias.json" with { type: "json" };
 import correlationFixture from "./fixtures/rater-correlation.json" with { type: "json" };
 import manyFacetFixture from "./fixtures/rater-many-facet.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 /** Kappa and intraclass correlations against irr: closed forms of the same counts and sums. */
 const TOLERANCE = 1e-12;

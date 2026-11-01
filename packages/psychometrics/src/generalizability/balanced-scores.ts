@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { FacetedScore } from "../data/faceted-scores.js";
+import type { FacetedScore } from "../data/internal.js";
 import { describeElements, facetSizes, numberScores } from "./numbering.js";
 import type { Structure } from "./structure.js";
 

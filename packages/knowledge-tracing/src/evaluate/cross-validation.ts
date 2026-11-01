@@ -1,7 +1,5 @@
 import { checkChoice, checkOptions, checkRecord, DataError } from "@measurekit/core";
-import { type Event, isObserved } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
-import type { Fold } from "../data/split.js";
+import { checkLog, type Event, type EventLog, type Fold, isObserved } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 import { type Metrics, metrics } from "./metrics.js";
 import { observedPairs } from "./observed-pairs.js";
@@ -57,6 +55,10 @@ export interface CrossValidation {
  * inform the predictions of their later ones, as they would online. An event without an outcome updates the state and
  * has a `null` prediction, and the metrics use the events with an outcome and a prediction.
  *
+ * @param model - The model to fit and evaluate.
+ * @param folds - The folds, each with a training log and a test log.
+ * @param options - What to do with a test skill the training log lacks.
+ * @returns The evaluation of each fold and the metrics of all folds together.
  * @throws `DataError` when the model is not a learner model, there are no folds, a log is malformed, an option is
  * invalid, the model rejects the data, or no test log has an event with an outcome and a prediction.
  */

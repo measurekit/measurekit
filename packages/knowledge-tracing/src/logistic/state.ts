@@ -1,7 +1,5 @@
 import { checkArray, checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
-import { type Attempt, type Event, isObserved } from "../data/event.js";
-import { checkLearnerState } from "../data/learner.js";
-import { entry, put } from "../data/record.js";
+import { type Attempt, checkLearnerState, type Event, entry, isObserved, put } from "../data/internal.js";
 
 /**
  * A learner's state in a logistic model: their history with each skill practiced. Plain data, which JSON serializes.

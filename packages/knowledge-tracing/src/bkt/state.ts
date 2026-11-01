@@ -1,5 +1,5 @@
 import { checkRecord, DataError, describe, isNonEmptyString, isUnitInterval } from "@measurekit/core";
-import { checkLearnerState } from "../data/learner.js";
+import { checkLearnerState } from "../data/internal.js";
 
 /** A learner's state in a BKT model: plain data, which JSON serializes. */
 export interface BktState {

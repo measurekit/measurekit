@@ -1,5 +1,5 @@
 import { checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import { checkLog, type EventLog } from "../data/internal.js";
 import { checkPredictionList } from "./observed-pairs.js";
 import { checkHasSkills, collectByOpportunity } from "./opportunities.js";
 
@@ -57,6 +57,9 @@ export interface LearningCurveOptions {
  * prediction, such as one that `unseenSkills` of `crossValidate` skipped, counts in the observed error rate and leaves
  * the predicted one.
  *
+ * @param log - The log to take the curves of.
+ * @param options - The predictions to put beside the outcomes and the least opportunities a learner needs.
+ * @returns The curve over all skills and the curve of each skill.
  * @throws `DataError` when the log is malformed, no event with an outcome has skills, an option is invalid, the
  * predictions are malformed or not one per event, or no learner and skill pair has `minOpportunities` opportunities.
  */

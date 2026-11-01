@@ -3,6 +3,12 @@
 Libraries for measuring what people know, for JavaScript and TypeScript. This repository holds two libraries and
 the core that they share. They run in any JavaScript runtime.
 
+```mermaid
+flowchart LR
+  P["@measurekit/psychometrics<br/>analyze a test after the fact"] --> C["@measurekit/core<br/>errors, checks, random numbers, numerics"]
+  K["@measurekit/knowledge-tracing<br/>follow a learner over time"] --> C
+```
+
 | Package                                                                 | What it is                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [`@measurekit/psychometrics`](packages/psychometrics/README.md)         | Classical test theory, item response theory including multidimensional models, cognitive diagnosis, adaptive and multistage testing, item fit, differential item functioning, equating, score scaling and prediction, gains and reliable change, dimensionality, explanatory item response models, simulation, standard setting, rater agreement and effects, and response times. Validated against R. |
@@ -44,8 +50,9 @@ Node.js 22.18+ and pnpm 12 are required.
 ```bash
 pnpm install
 pnpm lint             # Biome and cspell
+pnpm check:standards  # the rules of the standards that a script can check
 pnpm typecheck        # every package and its examples
-pnpm test             # Vitest, a project per package; runs offline
+pnpm test             # Vitest, a project per package, the scripts and the examples; runs offline
 pnpm bench            # the benchmarks of every package, against their budgets
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # the built packages
@@ -65,7 +72,8 @@ packages/knowledge-tracing/  @measurekit/knowledge-tracing: src/, test/ with its
 docs/                        guides of each package, in a folder named after it
 validation/                  R and Python scripts that write the fixtures and time the references; README.md runs them
 bench/                       the harness that the benchmarks of the packages share
-examples/                    runnable examples
+examples/                    runnable examples, run by a test
+scripts/                     the check of the standards
 biome/                       GritQL lint rules
 ```
 

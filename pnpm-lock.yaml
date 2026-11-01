@@ -205,9 +205,15 @@ importers:
 
   examples:
     dependencies:
+      '@measurekit/core':
+        specifier: workspace:*
+        version: link:../packages/core
       '@measurekit/knowledge-tracing':
         specifier: workspace:*
         version: link:../packages/knowledge-tracing
+      '@measurekit/psychometrics':
+        specifier: workspace:*
+        version: link:../packages/psychometrics
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

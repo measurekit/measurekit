@@ -4,6 +4,16 @@
 response matrices, also of [multidimensional models](multidimensional.md), for test design and research: recovery studies, the design of forms and pools, and data for any
 other analysis. Every draw comes from the `Random` passed in, so a seed reproduces a simulation.
 
+```mermaid
+flowchart LR
+  R["Random: a seed"] --> T["simulateThetas"]
+  R --> I["simulateItems"]
+  T --> X["simulateResponses"]
+  I --> X
+  X --> M["Response matrix, with missing responses on request"]
+  M --> A["calibrate, DIF, equating and every other analysis"]
+```
+
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
 import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";

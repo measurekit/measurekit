@@ -10,9 +10,9 @@ import {
   twoParameterLogistic,
   yenQ3,
 } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 /** The data and the 2PL items of the IRT benchmarks: 2,000 persons and 40 items, with the posterior means of the abilities. */
 const matrix = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });

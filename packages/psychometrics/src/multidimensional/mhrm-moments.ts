@@ -1,4 +1,4 @@
-import { MIN_PROBABILITY } from "../irt/probability.js";
+import { MIN_PROBABILITY } from "../irt/internal.js";
 import { symmetrized } from "../math/matrix.js";
 import type { ItemState } from "./calibration-setup.js";
 import { assignCoordinates, itemCoordinates, itemScales } from "./m-step.js";

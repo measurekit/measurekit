@@ -1,8 +1,8 @@
 import { test } from "vitest";
 import { type IrtItem, toMirtIrt, toMirtSlopeIntercept, twoParameterLogistic } from "../src/index.js";
+import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import { defined } from "./helpers.js";
 
 /** A pool of 10,000 items: the 40 items of the IRT benchmarks, 250 times. */
 const POOL = 250;

@@ -1,5 +1,5 @@
-import type { ProfileEstimate } from "../cdm/persons.js";
-import { logProbability } from "../irt/probability.js";
+import type { ProfileEstimate } from "../cdm/internal.js";
+import { logProbability } from "../irt/internal.js";
 import type { DiagnosticTestItem } from "./diagnostic-items.js";
 import type { ItemSelectionRule, SelectionContext } from "./selection.js";
 

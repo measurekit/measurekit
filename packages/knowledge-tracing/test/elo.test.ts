@@ -12,16 +12,10 @@ import {
   elo,
   eventLog,
 } from "../src/index.js";
+import { allPredicted, correlation, defined, expectAllClose, expectClose } from "./assertions.js";
 import recovery from "./fixtures/elo-recovery.json" with { type: "json" };
 import worked from "./fixtures/elo-worked.json" with { type: "json" };
-import {
-  allPredicted,
-  correlation,
-  defined,
-  expectAllClose,
-  expectClose,
-  expectUnaffectedByLessons,
-} from "./helpers.js";
+import { expectUnaffectedByLessons } from "./logs.js";
 
 /** Absolute tolerance of Elo estimates and predictions against the R replay. */
 const ELO_TOLERANCE = 1e-12;

@@ -1,7 +1,14 @@
 import { checkRecord, DataError } from "@measurekit/core";
-import { checkFixedCategories, checkFixedIds, modelsOf } from "../irt/items.js";
-import { checkPrior, type ParameterPrior } from "../irt/prior.js";
-import { type CompressedResponses, categoryCounts, checkCategories } from "../irt/responses.js";
+import {
+  type CompressedResponses,
+  categoryCounts,
+  checkCategories,
+  checkFixedCategories,
+  checkFixedIds,
+  checkPrior,
+  modelsOf,
+  type ParameterPrior,
+} from "../irt/internal.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import type { Design } from "./design.js";
 import type { ExpectationItem } from "./expectation.js";

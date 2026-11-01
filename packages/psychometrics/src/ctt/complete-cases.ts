@@ -1,4 +1,4 @@
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 
 /** The persons who answered every item, with their responses and total scores. */
 export interface CompleteCases {

@@ -8,11 +8,20 @@ import {
   DataError,
   type ThetaDistribution,
 } from "@measurekit/core";
-import { checkAttempt, checkEvent, type Event, isObserved, type ObservedEvent } from "../data/event.js";
-import { checkLog, checkObservedEvents, type EventLog } from "../data/event-log.js";
-import { checkLearner, checkLearnerId } from "../data/learner.js";
-import { parametersOf } from "../data/record.js";
-import { onePass } from "../data/replay.js";
+import {
+  checkAttempt,
+  checkEvent,
+  checkLearner,
+  checkLearnerId,
+  checkLog,
+  checkObservedEvents,
+  type Event,
+  type EventLog,
+  isObserved,
+  type ObservedEvent,
+  onePass,
+  parametersOf,
+} from "../data/internal.js";
 import { indexOfMax } from "../math/extremes.js";
 import { reflectedWalk } from "../math/reflected-walk.js";
 import type { LearnerModel, ModelFit } from "../model.js";
@@ -151,6 +160,10 @@ const CATEGORY_TOLERANCE = 1e-9;
  * variance Δt / per to the posterior's variance away from the grid's ends. A state then keeps the time of its latest
  * event: an event, an attempt or an `at` before it takes no drift, and leaves the time as it was.
  *
+ * @param options - The calibrated item parameters, the prior, the grid and the drift of ability; each option has its
+ *   default.
+ * @returns The model: `fit` replays a log, `update` and `predict` serve online, and `ability` and `posterior` read a
+ *   state.
  * @throws `DataError` when an item's parameters, the prior, the number of points or the drift are invalid, or `drift`
  * is given without `points`.
  * @see {@link https://doi.org/10.1214/12-AOAS608 | Wang, Berger and Burdick (2013)}

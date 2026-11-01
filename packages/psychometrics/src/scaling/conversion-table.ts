@@ -1,10 +1,17 @@
 import { checkChoice, checkOptions } from "@measurekit/core";
-import { scoreLimits } from "../equating/models.js";
-import { checkRange, type RangeOptions, type ThetaIntegrationOptions } from "../irt/ability.js";
-import { conditionalStandardError } from "../irt/information.js";
-import { checkItemList, expectedScore, largestCategoryCount } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
-import { scoreLikelihoods, summedScoreTable } from "../irt/summed-score.js";
+import { scoreLimits } from "../equating/internal.js";
+import {
+  checkItemList,
+  checkRange,
+  conditionalStandardError,
+  expectedScore,
+  type IrtItem,
+  largestCategoryCount,
+  type RangeOptions,
+  scoreLikelihoods,
+  summedScoreTable,
+  type ThetaIntegrationOptions,
+} from "../irt/internal.js";
 import { findIncreasingRoot } from "../math/root.js";
 import { conditionalDeviation, highestScore } from "./conversion.js";
 import { checkScale, type ScoreScale, scoreOfTheta } from "./score-scale.js";
@@ -72,6 +79,11 @@ const METHODS: readonly ConversionMethod[] = ["eap-sum", "true-score"];
  * Valid input: items of any models for `"eap-sum"`; a prior with a finite mean and positive sd, and a scale with a
  * positive slope.
  *
+ * @param items - The items of the form.
+ * @param scale - The slope, intercept and rounding of the reported score.
+ * @param options - The method, the prior, the quadrature and the range of theta.
+ * @returns For each total score, its theta, its scale score and the conditional standard error of the scale score.
+ *
  * @example
  * ```ts
  * import { conversionTable, twoParameterLogistic } from "@measurekit/psychometrics";
@@ -84,7 +96,6 @@ const METHODS: readonly ConversionMethod[] = ["eap-sum", "true-score"];
  * const table = conversionTable(items, { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 });
  * table.map((row) => row.scaleScore); // [400, 470, 530, 610]
  * ```
- *
  * @throws `DataError` when the items are not an array, there are none, an item is invalid, the scale, the options, the
  * prior or the quadrature are invalid, or `"true-score"` is asked of a form whose curve does not increase.
  * @see {@link https://doi.org/10.1177/014662169501900105 | Thissen, Pommerich, Billeaud and Williams (1995)}

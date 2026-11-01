@@ -1,5 +1,5 @@
 import { checkRandom, mean, type Random } from "@measurekit/core";
-import { simulateMultidimensionalResponses } from "../sim/multidimensional-responses.js";
+import { simulateMultidimensionalResponses } from "../sim/internal.js";
 import type { MultidimensionalAdaptiveTest, MultidimensionalAdaptiveTestState } from "./multidimensional-test.js";
 import { administer, checkTest, type ExposureRate, responseLookup, summarizeAdministrations } from "./simulation.js";
 
@@ -30,6 +30,11 @@ export interface MultidimensionalTestSimulation {
  * drawn from the item's category probabilities at the person's thetas, as {@link simulateMultidimensionalResponses}
  * draws them. The same `random` then makes the test's random choices, so a seeded generator reproduces the simulation.
  *
+ * @param test - The test to run.
+ * @param thetas - The thetas of each person, one for each dimension.
+ * @param random - The generator of the responses, the first item and ties.
+ * @returns The simulated tests of the persons, the bias and root mean square error of the estimates, the mean length
+ *   and the exposure rate of each item.
  * @throws `DataError` when `test` is not a multidimensional adaptive test, `random` is not a random number generator,
  * there are no persons, or a person's thetas are not as many finite numbers as the items have dimensions.
  */

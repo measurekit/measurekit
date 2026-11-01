@@ -1,9 +1,12 @@
 import { checkArray, checkChoice, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
-import { type AbilityEstimator, posteriorMeanEstimate } from "../irt/ability.js";
-import { indexItems } from "../irt/items.js";
-import type { TestItem } from "../irt/model.js";
-import { formatList } from "../irt/thresholds.js";
+import {
+  type AbilityEstimator,
+  formatList,
+  indexItems,
+  posteriorMeanEstimate,
+  type TestItem,
+} from "../irt/internal.js";
 import { checkResponse, itemById } from "./items.js";
 import { checkState, type TestState } from "./state.js";
 
@@ -72,6 +75,8 @@ export const ROUTINGS: readonly MultistageRouting[] = ["number-correct", "theta"
  * Returns a multistage test of a panel. Every person takes the module of the first stage, then one module of each
  * following stage, chosen by the cut points of the module before.
  *
+ * @param options - The stages and their modules, the routing and the estimator; each option has its default.
+ * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when the panel has no stages, a stage has no modules, the first stage has more than one, a module
  * has no items, ids of modules or items repeat, an item's parameters are invalid, cut points do not match the next
  * stage, the routing is unknown, or the estimator is not a function.

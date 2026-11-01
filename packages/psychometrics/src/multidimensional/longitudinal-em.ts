@@ -1,8 +1,12 @@
 import { largestChange } from "@measurekit/core";
-import type { Setup } from "../irt/calibration-setup.js";
-import { type Maximization, unboundedCoordinates } from "../irt/m-step.js";
-import type { CompressedResponses } from "../irt/responses.js";
-import { type Iteration, squarem } from "../irt/squarem.js";
+import {
+  type CompressedResponses,
+  type Iteration,
+  type Maximization,
+  type Setup,
+  squarem,
+  unboundedCoordinates,
+} from "../irt/internal.js";
 import type { Latent } from "./correlation.js";
 import { runsAway } from "./em.js";
 import type { Grid } from "./grid.js";

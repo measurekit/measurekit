@@ -6,6 +6,13 @@ simulate data with a fixed seed, run the reference, and write the inputs and exp
 to `packages/psychometrics/test/fixtures/`. The tests compare the results with the fixtures. CI runs only the
 TypeScript tests; R runs when fixtures change.
 
+```mermaid
+flowchart LR
+  R["R packages and base R"] --> S["Scripts in validation/psychometrics with a fixed seed"]
+  S --> F["Inputs and expected results as JSON fixtures"]
+  F --> T["Tests compare the results within the tolerances below"]
+```
+
 ## References
 
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
@@ -636,7 +643,7 @@ Several results of the reference packages are not references:
 - **lme4's REML estimates** equal the analysis of variance estimates of a balanced design when no component is negative,
   but lme4's optimizer stops where the REML criterion is flat to its tolerance. The script restarts bobyqa from its own
   estimate three times, after which the estimates agree within 3.3e-7; the test allows 1e-5. gtheory, which wraps lme4
-  for G and D studies, was removed from CRAN in March 2025, so lme4 is the reference. REML keeps estimates at 0 or
+  for G and D studies, is off CRAN since March 2025, so lme4 is the reference. REML keeps estimates at 0 or
   above, so the case with a negative component has the base R computation alone.
 - **Unbalanced designs have no REML reference.** gtheory is off CRAN, and lme4's REML and `VCA::anovaVCA` are other
   estimators than Henderson's Method 1, so they differ from it when the data are not balanced. The reference is Method 1

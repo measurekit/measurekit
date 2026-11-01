@@ -1,5 +1,5 @@
 import { normalQuantile } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 
 /** A rank for a missing response. */
 export const MISSING_RANK = -1;

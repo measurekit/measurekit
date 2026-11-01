@@ -1,8 +1,12 @@
 import { checkArray, checkRandom, checkRecord, DataError, describe, type Random } from "@measurekit/core";
-import { type CdmItem, checkSuccessProbabilities } from "../cdm/calibration.js";
-import { bitPattern, checkItemAttributes, profileIndices } from "../cdm/q-matrix.js";
-import { indexIds } from "../data/ids.js";
-import { type ResponseMatrix, responseMatrix } from "../data/response-matrix.js";
+import {
+  bitPattern,
+  type CdmItem,
+  checkItemAttributes,
+  checkSuccessProbabilities,
+  profileIndices,
+} from "../cdm/internal.js";
+import { indexIds, type ResponseMatrix, responseMatrix } from "../data/internal.js";
 
 /** A cognitive diagnosis model to simulate from: its attributes and items, such as a calibration's. */
 export interface CdmModelDescription {
@@ -17,6 +21,10 @@ export interface CdmModelDescription {
  * success probability of the latent group the profile falls in for the item, drawn by one uniform draw, persons in
  * order, each person's items in order.
  *
+ * @param model - The items with their attributes and the probability of success of each latent group.
+ * @param profiles - The profile of each person: a 0 or 1 for each attribute.
+ * @param random - The generator of the responses.
+ * @returns The responses, one row for each profile.
  * @throws `DataError` when the model, its attributes, its items or the profiles are not objects and arrays of their
  * shape, the attributes repeat, a profile is not 0s and 1s over them, an item has no attributes, repeats one or names
  * one that is not among them, an item does not have one probability from 0 to 1 per latent group, item ids repeat,

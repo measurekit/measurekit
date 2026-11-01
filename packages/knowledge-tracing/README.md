@@ -11,6 +11,15 @@ calibration, cross-validation by learner, item or time, a paired test between mo
 power laws and categories. Every statistic is validated against
 pyBKT or R. Its only dependency is `@measurekit/core`, which has none; it runs in any JavaScript runtime.
 
+```mermaid
+flowchart LR
+  L["Log of events: learner, item, skills, time, outcome"] --> M["Learner model: elo, bkt, logistic, irt, kst"]
+  M --> S["State of each learner: plain data to store"]
+  S --> P["predict, update, mastery"]
+  M --> E["evaluate: cross-validation, metrics, learning curves"]
+  P --> R["practice: next item, mastery criteria"]
+```
+
 ```bash
 npm install @measurekit/knowledge-tracing
 ```

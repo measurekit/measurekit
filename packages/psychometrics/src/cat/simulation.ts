@@ -1,7 +1,6 @@
 import { checkRandom, DataError, describe, isRecord, type Random } from "@measurekit/core";
-import { indexItems, largestCategoryCount } from "../irt/items.js";
-import type { TestItem } from "../irt/model.js";
-import { checkThetas, simulateResponse } from "../sim/responses.js";
+import { indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
+import { checkThetas, simulateResponse } from "../sim/internal.js";
 import type { AdaptiveTest, AdaptiveTestState } from "./adaptive-test.js";
 import { itemById } from "./items.js";
 import { locateModules, type MultistageTest, type MultistageTestState } from "./multistage-test.js";
@@ -50,6 +49,11 @@ export interface TestSimulation<TState extends TestState> {
  * probabilities at the person's theta. The same `random` draws the responses and makes the test's random choices, so
  * a seeded generator reproduces the simulation.
  *
+ * @param test - The test to run.
+ * @param thetas - The abilities of the persons.
+ * @param random - The generator of the responses, the first item and ties.
+ * @returns The simulated tests of the persons, the bias and root mean square error of the estimates, the mean length
+ *   and the exposure rate of each item.
  * @throws `DataError` when `test` is not an adaptive test or `random` not a random number generator, without thetas or
  * when a theta is not finite.
  */
@@ -79,6 +83,11 @@ export function simulateAdaptiveTest(
  * Simulates a multistage test for persons with known thetas: each response is drawn from the item's category
  * probabilities at the person's theta, so a seeded `random` reproduces the simulation.
  *
+ * @param test - The test to run.
+ * @param thetas - The abilities of the persons.
+ * @param random - The generator of the responses and ties.
+ * @returns The simulated tests of the persons, the bias and root mean square error of the estimates, the mean length
+ *   and the exposure rate of each item.
  * @throws `DataError` when `test` is not a multistage test or `random` not a random number generator, without thetas or
  * when a theta is not finite.
  */

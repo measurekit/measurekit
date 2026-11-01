@@ -7,7 +7,7 @@ import {
   type Random,
   type ThetaDistribution,
 } from "@measurekit/core";
-import { checkThetaDistribution } from "../irt/theta-distribution.js";
+import { checkThetaDistribution } from "../irt/internal.js";
 import { symmetricEigen } from "../math/eigen.js";
 import { normalCdf } from "../math/normal.js";
 

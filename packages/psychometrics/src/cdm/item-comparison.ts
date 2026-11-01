@@ -66,7 +66,9 @@ interface ComparableItem {
  * G-DINA. The p-values are not adjusted for the number of tests. The selected model is the one with the largest p-value, as long as it is above 0.05, and the G-DINA otherwise
  * (Ma et al., 2016). An item with one attribute has no reduced form and is left out.
  *
- * @param calibration - A calibration of G-DINA items, from {@link calibrateCdm} with `standardErrors: "incomplete"`.
+ * @param calibration - A G-DINA calibration.
+ * @param options - The reduced models to test.
+ * @returns For each item with two or more attributes, the Wald tests of the reduced models and the model selected.
  * @throws `DataError` when the calibration or the options are invalid, or an item with two or more attributes was not
  * calibrated as the G-DINA or has no covariance.
  * @see {@link https://doi.org/10.1111/jedm.12022 | de la Torre and Lee (2013)}

@@ -1,5 +1,5 @@
 import { checkBoolean, checkOptions, chiSquareUpperTail, normalQuantile } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
+import type { ResponseMatrix } from "../data/internal.js";
 
 import { type DifGroup, dichotomousData, type ItemCases, itemCases } from "./groups.js";
 import {
@@ -68,6 +68,10 @@ const DELTA_SCALE = -2.35;
  * D-DIF| - 1) / SE > 1.645, the one-sided test at 0.05 that |MH D-DIF| exceeds 1; B otherwise. Purification flags items
  * whose chi-square is significant at 0.05.
  *
+ * @param matrix - The responses of the persons, dichotomous.
+ * @param groups - The group of each person, in the order of the matrix.
+ * @param options - The continuity correction and whether to purify the matching score.
+ * @returns The statistics of every item, and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, a response is neither 0 nor 1, either group has no
  * person with a response, or `purify` or `continuityCorrection` is not a boolean.
  * @see {@link https://doi.org/10.1002/j.2333-8504.2012.tb02290.x | Zwick (2012)}

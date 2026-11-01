@@ -7,10 +7,8 @@ import {
   describe,
   isNonEmptyString,
 } from "@measurekit/core";
-import type { FacetedScore } from "../data/faceted-scores.js";
-import type { ThetaPrior } from "../irt/ability.js";
-import { fitLinearRasch } from "../irt/linear-rasch.js";
-import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
+import type { FacetedScore } from "../data/internal.js";
+import { fitLinearRasch, type QuadratureOptions, quadratureRule, type ThetaPrior } from "../irt/internal.js";
 import { facetDesign } from "./facet-design.js";
 import type { FacetSummary } from "./facet-summary.js";
 import { type FacetBias, manyFacetParts, type RatingThresholds } from "./many-facet-result.js";
@@ -129,6 +127,12 @@ const STANDARD_ERRORS: readonly FacetStandardErrors[] = ["none", "hessian"];
  * must connect all persons and elements: each score links its person to its elements, and several subsets that share
  * none cannot be put on one scale. Each set's scores must use the categories from 0 to its highest, at least two.
  *
+ * @param scores - The scores in long format, each with the element of every facet in `levels`.
+ * @param options - The facets, the facet that holds the thresholds, the interactions, the quadrature, the standard
+ *   errors and the stopping rules; each option has its default.
+ * @returns The measures of the facets with their standard errors and summaries, the thresholds, the interactions, the
+ *   distribution of the persons, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations
+ *   run.
  * @throws `DataError` when the options are invalid, the scores are not objects { levels, score } with an element of
  * each facet and an integer score from 0, fewer than two persons were scored, the design is not connected, a
  * threshold set uses fewer than two categories or skips one, or an interaction has no estimable bias.

@@ -1,6 +1,5 @@
 import { checkArray, checkRecord, DataError, describe } from "@measurekit/core";
-import { indexIds } from "../data/ids.js";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkResponseMatrix, indexIds, type ResponseMatrix } from "../data/internal.js";
 import { variance } from "../math/statistics.js";
 import { type CompleteCases, completeCases, itemScores } from "./complete-cases.js";
 import { alphaFromVariances } from "./reliability.js";

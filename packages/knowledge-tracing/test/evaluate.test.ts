@@ -32,6 +32,7 @@ import {
   splitByLearner,
   splitByTime,
 } from "../src/index.js";
+import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
 import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
 import agreement from "./fixtures/evaluate-agreement.json" with { type: "json" };
 import comparison from "./fixtures/evaluate-comparison.json" with { type: "json" };
@@ -40,7 +41,6 @@ import curves from "./fixtures/evaluate-learning-curve.json" with { type: "json"
 import fixture from "./fixtures/evaluate-metrics.json" with { type: "json" };
 import opportunities from "./fixtures/evaluate-opportunity.json" with { type: "json" };
 import unseen from "./fixtures/evaluate-unseen.json" with { type: "json" };
-import { allPredicted, defined, expectAllClose, expectClose } from "./helpers.js";
 
 /** Absolute tolerance of metrics, calibration bins and learning curves against R. */
 const METRIC_TOLERANCE = 1e-12;

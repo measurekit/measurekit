@@ -28,6 +28,9 @@ export function checkPrior(prior: unknown, label: string): void {
 /**
  * Returns the normal prior N(mean, sd²), as mirt's `norm`.
  *
+ * @param mean - The mean of the parameter.
+ * @param sd - The standard deviation, above 0.
+ * @returns The prior, with its log density and the derivatives of it.
  * @throws `DataError` when `mean` is not finite or `sd` is not positive and finite.
  */
 export function normalPrior(mean: number, sd: number): ParameterPrior {
@@ -44,6 +47,9 @@ export function normalPrior(mean: number, sd: number): ParameterPrior {
 /**
  * Returns the log-normal prior: log x ~ N(meanLog, sdLog²), as mirt's `lnorm`. Its support is x > 0.
  *
+ * @param meanLog - The mean of the logarithm of the parameter.
+ * @param sdLog - The standard deviation of the logarithm, above 0.
+ * @returns The prior, with its log density and the derivatives of it.
  * @throws `DataError` when `meanLog` is not finite or `sdLog` is not positive and finite.
  */
 export function logNormalPrior(meanLog: number, sdLog: number): ParameterPrior {
@@ -62,6 +68,9 @@ export function logNormalPrior(meanLog: number, sdLog: number): ParameterPrior {
  * Returns the beta prior Beta(alpha, beta), with its mode at (alpha - 1) / (alpha + beta - 2), as mirt's `expbeta` on
  * `g` intends. Its support is 0 < x < 1.
  *
+ * @param alpha - The first shape parameter, above 0.
+ * @param beta - The second shape parameter, above 0.
+ * @returns The prior, with its log density and the derivatives of it.
  * @throws `DataError` when `alpha` or `beta` is not positive and finite.
  */
 export function betaPrior(alpha: number, beta: number): ParameterPrior {

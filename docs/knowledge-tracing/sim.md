@@ -3,6 +3,15 @@
 `@measurekit/knowledge-tracing/sim` draws outcomes from a learner model, seeded, to check what a fit recovers
 before collecting data, to plan how many learners a fit needs, or to test an app with realistic logs.
 
+```mermaid
+flowchart LR
+  A["Attempts: who answers what and when"] --> P["The model predicts from the learner's state"]
+  P --> O["An outcome is drawn"]
+  O --> U["The state is updated with the outcome"]
+  U --> P
+  O --> L["Log with the simulated outcomes"]
+```
+
 `simulate(model, attempts, random)` takes the attempts, who answers what and when, and returns `{ log, states }`. In
 time order, each attempt is correct with the probability the model predicts from the learner's state, and the state
 is updated with the drawn outcome. Outcomes are 0 or 1.
@@ -47,3 +56,13 @@ truth for each learner is part of the model:
 Elo is an estimator, not a model of how answers arise: simulating from Elo follows its own updates. A prediction of a
 polytomous IRT item is its expected score, so simulate such items with their category probabilities instead.
 [Validation](validation.md#simulation-recovery) lists what each family recovers from simulated learners.
+
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                    | What to do                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------- |
+| The model is not a learner model                         | Pass a model made by `elo`, `bkt`, `logistic`, `irt` or `kst`             |
+| The attempts are not a non-empty array of attempts       | Give at least one attempt, with a learner, an item, skills and a time     |
+| The model rejects an attempt, or predicts outside 0 to 1 | Give attempts the model can predict, for example with the skills it knows |

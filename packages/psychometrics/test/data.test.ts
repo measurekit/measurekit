@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkFacetedScores } from "../src/data/faceted-scores.js";
+import { checkFacetedScores } from "../src/data/internal.js";
 import {
   DataError,
   type FacetedScore,

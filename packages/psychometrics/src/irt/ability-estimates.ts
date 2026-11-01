@@ -1,6 +1,5 @@
 import { checkFunction } from "../checks.js";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { type AbilityEstimator, posteriorMeanEstimate } from "./ability.js";
 import { indexItems } from "./items.js";
 import type { PersonEstimate } from "./joint-maximum-likelihood.js";
@@ -14,7 +13,10 @@ import { sharedPosteriorMeanEstimator } from "./shared-posterior-mean.js";
  * Items are matched to the data by id, as a calibration's items are. Persons without responses get `null` estimates. The
  * posterior mean estimator takes the log-probabilities of the responses at the nodes once for all persons.
  *
+ * @param data - The responses of the persons.
+ * @param items - The items, matched to the data by id.
  * @param estimator - The estimator of each person.
+ * @returns The estimate and standard error of each person, with `null` for a person without responses.
  * @throws `DataError` when the data are malformed, an item is invalid, item ids repeat, an item of the data has no item
  * with its id, a response is not a category of its item, the estimator is not a function, or it throws it.
  * @defaultValue `estimator` is `posteriorMeanEstimate`

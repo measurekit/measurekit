@@ -43,6 +43,10 @@ export interface LearningPathsOptions {
  * With the default distance of 1 these are the states that add or lose one element, `kneighbourhood` of the kst
  * package; a larger distance is `knneighbourhood`.
  *
+ * @param structure - The knowledge structure.
+ * @param state - The state, in any order.
+ * @param options - The distance.
+ * @returns The states of the structure at a distance of 1 to `distance` from the state, in the domain's order.
  * @throws `DataError` when the structure is malformed, `state` is not one of its states, or `distance` is not a
  * positive integer.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
@@ -78,6 +82,9 @@ export function neighbourhood(
  * path, so a structure that is not well-graded may have none. The number of paths grows as a factorial, so the
  * function stops at `maxPaths`.
  *
+ * @param structure - The knowledge structure.
+ * @param options - The most paths to list.
+ * @returns The paths, each an order of the whole domain.
  * @throws `DataError` when the structure is malformed, `maxPaths` is not a positive integer, or the structure has more
  * learning paths than `maxPaths`.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
@@ -128,6 +135,8 @@ export function learningPaths(
  * It is `kstructure_is_wellgraded` of the kst package. A well-graded structure is the case in which every state has a
  * state one element away, toward any other.
  *
+ * @param structure - The knowledge structure.
+ * @returns Whether the structure is well-graded.
  * @throws `DataError` when the structure is malformed.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
  */

@@ -1,6 +1,5 @@
 import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import type { ResponseRecords } from "../data/response-records.js";
+import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { forEachTime, type TimedResponses, type TimeItem, timedResponses } from "./timed-responses.js";
 
@@ -60,6 +59,10 @@ const START_SPEED_SD = 0.5;
  * come from their information, Σ_j X_jᵀ V_j⁻¹ X_j. Uses the responses with times; persons and items without them change
  * nothing.
  *
+ * @param data - The responses of the persons with their times.
+ * @param options - The stopping rules.
+ * @returns The parameters of each item, the standard deviation of the speed, the log-likelihood, AIC and BIC, whether
+ *   the estimation converged and the iterations run.
  * @throws `DataError` when the data are malformed or have no times, an item has fewer than two times or all its times
  * equal, which leaves its variance at 0 and the likelihood unbounded, or an option is invalid.
  * @see {@link https://doi.org/10.3102/10769986031002181 | van der Linden (2006)}

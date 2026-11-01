@@ -1,5 +1,5 @@
 import { normalizeLogs } from "@measurekit/core";
-import { logProbability } from "../irt/probability.js";
+import { logProbability } from "../irt/internal.js";
 import type { CdmDesign } from "./q-matrix.js";
 
 /** Responses by person, then item: 0, 1, or -1 when missing. */

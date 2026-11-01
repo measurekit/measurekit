@@ -1,5 +1,5 @@
 import { checkChoice, checkOptions, type QMatrix } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { dichotomousRows } from "./calibration.js";
 import { cdmDesign } from "./q-matrix.js";
 
@@ -36,6 +36,10 @@ export interface NonparametricClassification {
  * differ from the person's on the fewest answered items. It needs no item parameters, so it suits small samples, such
  * as one classroom. Attributes are in order of first appearance in the Q-matrix; missing responses are skipped.
  *
+ * @param matrix - The responses of the persons, dichotomous.
+ * @param qMatrix - The attributes of each item, by item id.
+ * @param options - The rule that combines the attributes of an item.
+ * @returns For each person, the profile, its distance to the responses and the number of profiles tied with it.
  * @throws `DataError` when the matrix or the Q-matrix is invalid, the rule is unknown, or a response is neither 0
  * nor 1.
  * @see {@link https://doi.org/10.1007/s00357-013-9132-9 | Chiu and Douglas (2013)}

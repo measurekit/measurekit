@@ -3,7 +3,7 @@ import { auc, metrics, metricsByOpportunity } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-evaluate.json" with { type: "json" };
 import opportunity from "./fixtures/bench-evaluate-opportunity.json" with { type: "json" };
-import { columnsLog } from "./helpers.js";
+import { columnsLog } from "./logs.js";
 
 test("scores 100,000 predictions", async (context) => {
   await benchmark(context, "evaluate.auc", () => auc(fixture.predictions, fixture.outcomes));

@@ -10,18 +10,23 @@ import {
   type ThresholdItem,
 } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
-import { gradedResponse } from "../irt/graded.js";
-import { checkItem, checkModel } from "../irt/items.js";
 import {
+  checkItem,
+  checkModel,
   fourParameterLogistic,
+  generalizedPartialCredit,
+  gradedResponse,
+  type IrtItem,
+  type IrtModel,
+  type NominalParameters,
+  nominalResponse,
   oneParameterLogistic,
+  partialCredit,
+  type RatingScaleParameters,
+  ratingScale,
   threeParameterLogistic,
   twoParameterLogistic,
-} from "../irt/logistic.js";
-import type { IrtItem, IrtModel } from "../irt/model.js";
-import { type NominalParameters, nominalResponse } from "../irt/nominal.js";
-import { generalizedPartialCredit, partialCredit } from "../irt/partial-credit.js";
-import { type RatingScaleParameters, ratingScale } from "../irt/rating-scale.js";
+} from "../irt/internal.js";
 import {
   type Distribution,
   logNormalDistribution,
@@ -99,6 +104,11 @@ const DRAWS = new Map<IrtModel, VectorDraws>([
  * = 1 by default. Items come in the form calibration reports, with the RSM's steps and the NRM's slopes and intercepts
  * summing to 0.
  *
+ * @param model - The model of the items.
+ * @param count - The number of items.
+ * @param random - The generator of the parameters.
+ * @param options - The number of categories and the distribution of each parameter.
+ * @returns The items, each with its parameters.
  * @throws `DataError` when the model is not one of the built-in models, `count` is not a positive integer, `random`
  * is not a random number generator, the number of categories is invalid for the model, a distribution is not a
  * function or is given for a parameter the model does not draw, or the draws give an invalid item.

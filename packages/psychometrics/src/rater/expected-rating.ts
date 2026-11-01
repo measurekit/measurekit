@@ -11,7 +11,10 @@ import { checkManyFacetRasch, expectedRatingAt, ratingStructure } from "./rating
  * expected ratings under the thresholds of each of its elements are averaged, each weighing the same. With every facet
  * absent, it is the fair score of a person at theta on the average item and rater.
  *
+ * @param model - The many-facet Rasch model.
+ * @param theta - The ability of the person.
  * @param levels - The element of some facets by facet name, such as `{ rater: "r2" }`.
+ * @returns The expected rating, in the categories of the model.
  * @defaultValue `levels` is `{}`: every facet at its mean
  * @throws `DataError` when the model is invalid, `theta` is not finite, `levels` names a facet the model does not have
  * or an element it does not have.

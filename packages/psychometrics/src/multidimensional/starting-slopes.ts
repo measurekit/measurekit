@@ -1,4 +1,4 @@
-import type { CompressedResponses } from "../irt/responses.js";
+import type { CompressedResponses } from "../irt/internal.js";
 import { symmetricEigen } from "../math/eigen.js";
 import { pearsonMatrix } from "../math/pearson.js";
 import type { Design } from "./design.js";

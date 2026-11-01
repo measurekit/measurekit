@@ -1,5 +1,4 @@
-import type { ThetaPrior } from "../irt/ability.js";
-import type { LinearRaschFit } from "../irt/linear-rasch.js";
+import type { LinearRaschFit, ThetaPrior } from "../irt/internal.js";
 import type { DesignFacet, FacetDesign } from "./facet-design.js";
 import type { DesignInteraction } from "./facet-interactions.js";
 import { type FacetElement, type FacetSummary, summarizeFacet } from "./facet-summary.js";

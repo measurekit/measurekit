@@ -1,5 +1,5 @@
 import { checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
-import { entry, mapRecord } from "../data/record.js";
+import { entry, mapRecord } from "../data/internal.js";
 import type { BktLearning, BktParameters, BktSkill } from "./parameters.js";
 
 /** The rates of a skill that a fit estimates. */

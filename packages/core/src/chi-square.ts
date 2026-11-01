@@ -16,6 +16,7 @@ const MAX_TERMS = 1000;
  * Returns ln Γ(x) for x ≥ 0.5 by the Lanczos approximation, accurate to about 1e-15.
  *
  * @param x - A number of at least 0.5.
+ * @returns ln Γ(x).
  */
 export function logGamma(x: number): number {
   let sum = LANCZOS[0] ?? 0;
@@ -31,6 +32,7 @@ export function logGamma(x: number): number {
  *
  * @param x - The statistic, at least 0.
  * @param df - The degrees of freedom, at least 1.
+ * @returns The upper tail probability, from 0 to 1.
  * @see {@link https://numerical.recipes | Press et al. (2007), section 6.2}
  */
 export function chiSquareUpperTail(x: number, df: number): number {

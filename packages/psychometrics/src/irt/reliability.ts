@@ -9,6 +9,9 @@ import { quadratureRule } from "./quadrature.js";
  * at theta, σ² I(θ) / (σ² I(θ) + 1), with I(θ) the test information, by the quadrature of
  * {@link posteriorMeanEstimate}. For the standard normal it is mirt's `marginal_rxx`.
  *
+ * @param items - The items of the test.
+ * @param options - The prior and the quadrature.
+ * @returns The reliability, from 0 to 1.
  * @throws `DataError` without items, or when an item's parameters, the prior or the quadrature are invalid.
  */
 export function marginalReliability(items: readonly IrtItem[], options: ThetaIntegrationOptions = {}): number {
@@ -30,6 +33,8 @@ export function marginalReliability(items: readonly IrtItem[], options: ThetaInt
  * Returns the empirical reliability of theta estimates: var(θ̂) / (var(θ̂) + mean(SE²)), the variance with
  * denominator n - 1, as mirt's `empirical_rxx`. Pass the estimates of the persons of a sample, such as EAP estimates.
  *
+ * @param estimates - The estimates of theta with their standard errors.
+ * @returns The reliability, from 0 to 1.
  * @throws `DataError` with fewer than two estimates, when an estimate or standard error is not finite or a standard
  * error is negative, or when the estimates and standard errors are all 0.
  */

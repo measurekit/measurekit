@@ -1,5 +1,5 @@
 import { DataError, describe, isUnitInterval } from "@measurekit/core";
-import type { ProfileEstimate } from "../cdm/persons.js";
+import type { ProfileEstimate } from "../cdm/internal.js";
 import type { DiagnosticTestItem } from "./diagnostic-items.js";
 import type { StoppingRule } from "./stopping.js";
 
@@ -8,6 +8,7 @@ import type { StoppingRule } from "./stopping.js";
  * has classified the person into one profile with that confidence.
  *
  * @param probability - From above 0 to 1.
+ * @returns The stopping rule.
  * @throws `DataError` when `probability` is not above 0 and at most 1.
  * @see {@link https://doi.org/10.1111/1467-9876.00272 | Tatsuoka (2002)}
  */
@@ -23,6 +24,7 @@ export function posteriorThreshold(probability: number): StoppingRule<Diagnostic
  * it is at least `probability` or at most `1 - probability`.
  *
  * @param probability - Above 0.5 and at most 1.
+ * @returns The stopping rule.
  * @throws `DataError` when `probability` is not above 0.5 and at most 1.
  * @see {@link https://doi.org/10.1177/0146621613488642 | Hsu, Wang and Chen (2013)}
  */

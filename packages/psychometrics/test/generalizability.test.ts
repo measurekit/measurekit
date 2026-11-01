@@ -11,9 +11,9 @@ import {
   type GeneralizabilityStudy,
   generalizabilityStudy,
 } from "../src/index.js";
+import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/generalizability.json" with { type: "json" };
 import unbalancedFixture from "./fixtures/generalizability-unbalanced.json" with { type: "json" };
-import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Sums of squares, mean squares and variance components against aov and the expected mean squares, relative. */

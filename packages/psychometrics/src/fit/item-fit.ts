@@ -1,6 +1,5 @@
-import type { ResponseMatrix } from "../data/response-matrix.js";
-import { largestCategoryCount } from "../irt/items.js";
-import type { IrtItem } from "../irt/model.js";
+import type { ResponseMatrix } from "../data/internal.js";
+import { type IrtItem, largestCategoryCount } from "../irt/internal.js";
 import { checkItems, checkPersonThetas, isExtreme, scoreMoments } from "./inputs.js";
 import { addResponse, type MeanSquareFit, meanSquares, SUM_COUNT } from "./mean-squares.js";
 
@@ -19,6 +18,10 @@ export interface ItemFit extends MeanSquareFit {
  * extreme scores, every answered response in its item's lowest category or every one in its highest, are left out, and
  * missing responses are skipped. A statistic is `null` for an item without other responses.
  *
+ * @param matrix - The responses of the persons.
+ * @param items - The calibrated items, in the order of the matrix's items.
+ * @param thetas - The estimate of theta of each person, in the order of the matrix.
+ * @returns For each item, the infit and outfit mean squares and their standardized forms.
  * @throws `DataError` when the matrix, the items or the thetas are invalid, or a response is not a category of its
  * item.
  */

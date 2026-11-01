@@ -22,16 +22,22 @@ import {
   simulate,
   splitByLearner,
 } from "../src/index.js";
-import { type FeatureSpec, featureValue, needsOf } from "../src/logistic/features.js";
-import { nextHistory, type SkillHistory } from "../src/logistic/state.js";
-import { checkTerms } from "../src/logistic/terms.js";
+import {
+  checkTerms,
+  type FeatureSpec,
+  featureValue,
+  needsOf,
+  nextHistory,
+  type SkillHistory,
+} from "../src/logistic/internal.js";
+import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
 import exposureFixture from "./fixtures/logistic-exposures.json" with { type: "json" };
 import glm from "./fixtures/logistic-glm.json" with { type: "json" };
 import lkt from "./fixtures/logistic-lkt.json" with { type: "json" };
 import lktFeaturesFixture from "./fixtures/logistic-lkt-features.json" with { type: "json" };
 import rates from "./fixtures/logistic-rates.json" with { type: "json" };
 import termsFixture from "./fixtures/logistic-terms.json" with { type: "json" };
-import { allPredicted, defined, expectAllClose, expectClose, expectUnaffectedByLessons, online } from "./helpers.js";
+import { expectUnaffectedByLessons, online } from "./logs.js";
 
 /** Absolute tolerance of features against LKT's. */
 const FEATURE_TOLERANCE = 1e-12;

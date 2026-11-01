@@ -1,6 +1,5 @@
 import { largestChange } from "@measurekit/core";
-import type { CompressedResponses } from "../irt/responses.js";
-import { type Iteration, squarem } from "../irt/squarem.js";
+import { type CompressedResponses, type Iteration, squarem } from "../irt/internal.js";
 import { type BifactorExpectation, bifactorExpectation, type GroupNodes } from "./bifactor-expectation.js";
 import { groupGrid, groupWeights, specificRule } from "./bifactor-nodes.js";
 import { patternsOf } from "./bifactor-patterns.js";

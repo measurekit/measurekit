@@ -56,3 +56,5 @@ general one, and `model.identifiability()` gives the rank of the Jacobian of the
 measures a structure against responses (gamma, the violational coefficient, the discrepancy index and the distance
 agreement), `forwardGraded` and `backwardGraded` find where a structure is graded, and `diffTest` tests the fit of one
 quasi order, or the difference between two, with a delta-method variance.
+
+Every function documents each parameter and its result.
