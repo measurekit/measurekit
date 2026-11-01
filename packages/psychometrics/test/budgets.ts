@@ -102,6 +102,7 @@ const BUDGETS = {
   "data.scoreResponses": 4,
   "scaling.conversionTableEapSum": 2,
   "scaling.conversionTableTrueScore": 6,
+  "scaling.drawJointThetas": 4,
   "standardSetting.bookmarkCutScore": 0.2,
   "standardSetting.classificationAccuracy": 3,
   "parameterization.toMirtSlopeIntercept": 8,

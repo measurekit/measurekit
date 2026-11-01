@@ -1,3 +1,4 @@
+import { chiSquareUpperTail } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -6,6 +7,7 @@ import {
   conversionTable,
   createRandom,
   DataError,
+  drawJointThetas,
   generalizedPartialCredit,
   type IrtItem,
   nominalResponse,
@@ -23,11 +25,13 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { normalCdf } from "../src/math/normal.js";
+import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/joint-draws.js";
 import conversions from "./fixtures/scaling-conversion.json" with { type: "json" };
 import growth from "./fixtures/scaling-growth.json" with { type: "json" };
+import joint from "./fixtures/scaling-joint-draws.json" with { type: "json" };
 import norms from "./fixtures/scaling-norms.json" with { type: "json" };
 import predictions from "./fixtures/scaling-prediction.json" with { type: "json" };
-import { defined, expectClose, type FixtureItems, fixtureItems } from "./helpers.js";
+import { defined, expectClose, type FixtureItems, fixtureItems, mean } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
 /** Thetas and standard errors of the EAP of the summed score against mirt's EAPsum and the base R recursion. */
@@ -44,6 +48,12 @@ const PREDICTION_TOLERANCE = 1e-12;
 const MEAN_TOLERANCE = 1e-11;
 /** Growth between grades against base R, written out. */
 const GROWTH_TOLERANCE = 1e-12;
+/** The inverse distribution function of a posterior and the transform of normal scores against base R. */
+const JOINT_TRANSFORM_TOLERANCE = 1e-12;
+/** The standard errors that a Monte Carlo estimate may differ from its reference by. */
+const MONTE_CARLO_ERRORS = 4;
+/** The draws that estimate a joint distribution function. */
+const CORNER_DRAWS = 200_000;
 
 /** A scale of a fixture: the bounds and the step are absent where the scale has none. */
 interface FixtureScale {
@@ -859,6 +869,422 @@ describe("predictThetaScore", () => {
   });
 });
 
+describe("drawJointThetas", () => {
+  const Correlation: readonly (readonly number[])[] = [
+    [1, 0.5, 0.3],
+    [0.5, 1, 0.4],
+    [0.3, 0.4, 1],
+  ];
+
+  /** Returns a posterior of the fixture by its name. */
+  const marginNamed = (name: string): ThetaDistribution =>
+    defined((joint.margins as Record<string, ThetaDistribution>)[name]);
+
+  /** Returns the matrix with `value` off the diagonal and 1 on it. */
+  const equicorrelation = (size: number, value: number): number[][] =>
+    Array.from({ length: size }, (_, i) => Array.from({ length: size }, (_, j) => (i === j ? 1 : value)));
+
+  /** Returns the mean and variance of the distribution function of a posterior that is linear within the cell of each node. */
+  function cellMoments({ nodes, weights }: ThetaDistribution): { mean: number; variance: number } {
+    const last = nodes.length - 1;
+    const edges = nodes.map((node, k) => (k === 0 ? node : (defined(nodes[k - 1]) + node) / 2));
+    edges[0] = 2 * defined(nodes[0]) - (nodes.length > 1 ? defined(edges[1]) : defined(nodes[0]));
+    edges.push(2 * defined(nodes[last]) - (nodes.length > 1 ? defined(edges[last]) : defined(nodes[last])));
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    const cells = weights.map((weight, k) => {
+      const lower = defined(edges[k]);
+      const upper = defined(edges[k + 1]);
+      return { weight: weight / total, center: (lower + upper) / 2, width: upper - lower };
+    });
+    const mean = cells.reduce((sum, { weight, center }) => sum + weight * center, 0);
+    const variance = cells.reduce(
+      (sum, { weight, center, width }) => sum + weight * ((center - mean) ** 2 + width ** 2 / 12),
+      0,
+    );
+    return { mean, variance };
+  }
+
+  /** Returns the column `k` of draws. */
+  const column = (draws: readonly (readonly number[])[], k: number): number[] => draws.map((draw) => defined(draw[k]));
+
+  /** Returns the ranks of the values, ties sharing the mean of their places. */
+  function ranks(values: readonly number[]): number[] {
+    const order = values.map((_, i) => i).sort((x, y) => defined(values[x]) - defined(values[y]));
+    const result = new Array<number>(values.length);
+    for (let start = 0; start < order.length; ) {
+      let end = start;
+      while (end + 1 < order.length && values[defined(order[end + 1])] === values[defined(order[start])]) end++;
+      for (let k = start; k <= end; k++) result[defined(order[k])] = (start + end) / 2;
+      start = end + 1;
+    }
+    return result;
+  }
+
+  /** Returns the Spearman correlation of two columns: the Pearson correlation of their ranks. */
+  function spearman(x: readonly number[], y: readonly number[]): number {
+    const rx = ranks(x);
+    const ry = ranks(y);
+    const mx = mean(rx);
+    const my = mean(ry);
+    let cross = 0;
+    let vx = 0;
+    let vy = 0;
+    rx.forEach((value, i) => {
+      const dx = value - mx;
+      const dy = defined(ry[i]) - my;
+      cross += dx * dy;
+      vx += dx * dx;
+      vy += dy * dy;
+    });
+    return cross / Math.sqrt(vx * vy);
+  }
+
+  describe("against base R", () => {
+    joint.inverse.forEach((reference) => {
+      it(`inverts the distribution function of the posterior ${reference.name} as approx and a search of the cells do`, () => {
+        const margin = marginOf({ nodes: reference.nodes, weights: reference.weights }, "posterior");
+        reference.u.forEach((u, k) => {
+          expectClose(quantile(margin, u), defined(reference.theta[k]), JOINT_TRANSFORM_TOLERANCE, `u = ${u}`);
+        });
+      });
+    });
+
+    it("maps the normal scores of mvtnorm's rmvnorm to the thetas that base R gives", () => {
+      const margins = joint.transform.margins.map((name) => marginOf(marginNamed(name), name));
+      joint.transform.scores.forEach((scores, row) => {
+        const thetas = thetasOf(margins, Float64Array.from(scores));
+        joint.transform.thetas[row]?.forEach((theta, k) => {
+          expectClose(defined(thetas[k]), theta, JOINT_TRANSFORM_TOLERANCE, `row ${row}, posterior ${k + 1}`);
+        });
+      });
+    });
+
+    joint.corners.forEach((reference, c) => {
+      it(`gives the joint distribution function of pmvnorm at the corners of case ${c + 1} within ${MONTE_CARLO_ERRORS} standard errors`, () => {
+        const posteriors = reference.margins.map(marginNamed);
+        const draws = drawJointThetas(posteriors, reference.correlation, CORNER_DRAWS, createRandom(20261029 + c));
+        for (const { corner, probability, error } of reference.corners) {
+          const share =
+            draws.filter((draw) => draw.every((theta, k) => theta <= defined(corner[k]))).length / CORNER_DRAWS;
+          const standardError = Math.sqrt((probability * (1 - probability)) / CORNER_DRAWS);
+          expect(Math.abs(share - probability), `corner ${corner}`).toBeLessThanOrEqual(
+            MONTE_CARLO_ERRORS * standardError + error,
+          );
+        }
+      });
+    });
+
+    joint.spearman.forEach((reference) => {
+      it(`gives the rank correlation (6 / pi) asin(r / 2) of the normal scores at r = ${reference.correlation}, whatever the posteriors`, () => {
+        const draws = drawJointThetas(
+          [marginNamed("fine"), marginNamed("uneven")],
+          equicorrelation(2, reference.correlation),
+          reference.draws,
+          createRandom(7),
+        );
+        expect(Math.abs(spearman(column(draws, 0), column(draws, 1)) - reference.expected)).toBeLessThanOrEqual(
+          MONTE_CARLO_ERRORS * reference.standardError,
+        );
+      });
+    });
+
+    it("factors a correlation so that the factor times its transpose is the correlation", () => {
+      const cases = [joint.transform.correlation, Correlation, equicorrelation(6, 1), equicorrelation(4, 0), [[1]]];
+      for (const correlation of cases) {
+        const size = correlation.length;
+        const factor = correlationFactor(correlation, size);
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            let product = 0;
+            for (let k = 0; k < size; k++) product += defined(factor[i * size + k]) * defined(factor[j * size + k]);
+            expectClose(product, defined(correlation[i]?.[j]), 1e-12, `entry (${i + 1}, ${j + 1}) of ${size}`);
+          }
+        }
+      }
+    });
+  });
+
+  describe("draws", () => {
+    it("follow each posterior, with the variance of cells that are linear, as the mean and variance of a draw say", () => {
+      const names = ["fine", "default", "uneven"];
+      const draws = drawJointThetas(names.map(marginNamed), Correlation, CORNER_DRAWS, createRandom(11));
+      names.forEach((name, k) => {
+        const { mean: expectedMean, variance: expectedVariance } = cellMoments(marginNamed(name));
+        const values = column(draws, k);
+        const observedMean = mean(values);
+        const deviations = values.map((value) => value - observedMean);
+        const observedVariance = mean(deviations.map((d) => d * d));
+        const fourth = mean(deviations.map((d) => d ** 4));
+        const meanError = Math.sqrt(observedVariance / CORNER_DRAWS);
+        const varianceError = Math.sqrt((fourth - observedVariance ** 2) / CORNER_DRAWS);
+        expect(Math.abs(observedMean - expectedMean), `mean of ${name}`).toBeLessThanOrEqual(
+          MONTE_CARLO_ERRORS * meanError,
+        );
+        expect(Math.abs(observedVariance - expectedVariance), `variance of ${name}`).toBeLessThanOrEqual(
+          MONTE_CARLO_ERRORS * varianceError,
+        );
+      });
+    });
+
+    it("add h squared over 12 to the variance of a posterior on points h apart", () => {
+      const { nodes, weights } = marginNamed("default");
+      const total = weights.reduce((sum, weight) => sum + weight, 0);
+      const nodeMean = nodes.reduce((sum, node, k) => sum + (node * defined(weights[k])) / total, 0);
+      const nodeVariance = nodes.reduce(
+        (sum, node, k) => sum + ((node - nodeMean) ** 2 * defined(weights[k])) / total,
+        0,
+      );
+      expectClose(cellMoments(marginNamed("default")).variance - nodeVariance, 0.2 ** 2 / 12, 1e-12);
+    });
+
+    it("are independent at the correlation 0, as a chi-square test of independence finds", () => {
+      const names = ["fine", "default", "uneven", "empty_cells"];
+      const posteriors = names.map(marginNamed);
+      const draws = drawJointThetas(posteriors, equicorrelation(4, 0), 20_000, createRandom(3));
+      const bins = 5;
+      const cuts = posteriors.map((posterior, k) => {
+        const margin = marginOf(posterior, defined(names[k]));
+        return Array.from({ length: bins - 1 }, (_, b) => quantile(margin, (b + 1) / bins));
+      });
+      const binOf = (k: number, theta: number): number => defined(cuts[k]).filter((cut) => theta >= cut).length;
+      for (let a = 0; a < names.length; a++) {
+        for (let b = a + 1; b < names.length; b++) {
+          const table = new Float64Array(bins * bins);
+          for (const draw of draws) {
+            const cell = binOf(a, defined(draw[a])) * bins + binOf(b, defined(draw[b]));
+            table[cell] = (table[cell] ?? 0) + 1;
+          }
+          const expected = draws.length / (bins * bins);
+          const statistic = table.reduce((sum, observed) => sum + (observed - expected) ** 2 / expected, 0);
+          expect(chiSquareUpperTail(statistic, (bins - 1) ** 2), `${names[a]} and ${names[b]}`).toBeGreaterThan(0.001);
+        }
+      }
+    });
+
+    it("take the same quantile in every posterior at the correlation 1, for two and six posteriors", () => {
+      for (const size of [2, 6]) {
+        const base = marginNamed("default");
+        const shifts = Array.from({ length: size }, (_, k) => k * 1.5 - 2);
+        const posteriors = shifts.map((shift) => ({
+          nodes: base.nodes.map((node) => node + shift),
+          weights: base.weights,
+        }));
+        const draws = drawJointThetas(posteriors, equicorrelation(size, 1), 1_000, createRandom(5));
+        for (const draw of draws) {
+          shifts.forEach((shift, k) => {
+            expectClose(defined(draw[k]) - shift, defined(draw[0]) - defined(shifts[0]), 1e-12, `${size} posteriors`);
+          });
+        }
+      }
+    });
+
+    it("order the thetas of different posteriors alike at the correlation 1", () => {
+      const draws = drawJointThetas(["fine", "uneven"].map(marginNamed), equicorrelation(2, 1), 400, createRandom(9));
+      for (const a of draws) {
+        for (const b of draws) {
+          if (defined(a[0]) < defined(b[0])) expect(defined(a[1])).toBeLessThanOrEqual(defined(b[1]) + 1e-12);
+        }
+      }
+    });
+
+    it("mirror each other about the center of a symmetric posterior at the correlation -1", () => {
+      const fine = marginNamed("fine");
+      const draws = drawJointThetas([fine, fine], equicorrelation(2, -1), 1_000, createRandom(13));
+      for (const draw of draws) expectClose(defined(draw[0]) + defined(draw[1]), 0, 1e-12);
+    });
+
+    it("are the one node of a posterior of one node", () => {
+      const draws = drawJointThetas(
+        [marginNamed("one_node"), marginNamed("fine")],
+        equicorrelation(2, 0.5),
+        200,
+        createRandom(1),
+      );
+      expect(column(draws, 0)).toEqual(new Array(200).fill(1.5));
+    });
+
+    it("never reach a node without weight, and stay inside the cells of the nodes with weight", () => {
+      const draws = drawJointThetas([marginNamed("empty_cells")], [[1]], 20_000, createRandom(2));
+      // The nodes -2, 0, 3 and 4 have no weight, and the nodes are 1 apart: the cells with weight are (-1.5, -0.5) of
+      // node -1 and (0.5, 1.5) and (1.5, 2.5) of nodes 1 and 2.
+      for (const [theta] of draws) {
+        const inside = [
+          [-1.5, -0.5],
+          [0.5, 2.5],
+        ].some(([lower, upper]) => defined(theta) >= defined(lower) && defined(theta) <= defined(upper));
+        expect(inside, `theta ${theta}`).toBe(true);
+      }
+    });
+
+    it("stay inside the outer edges of a posterior whose weights sum to 1 only within the tolerance", () => {
+      const draws = drawJointThetas([marginNamed("rounded_sum")], [[1]], 20_000, createRandom(4));
+      const thetas = column(draws, 0);
+      expect(Math.max(...thetas)).toBeLessThanOrEqual(1.5 + 1e-12);
+      expect(Math.min(...thetas)).toBeGreaterThanOrEqual(-0.15 - 1e-12);
+      expect(Math.max(...thetas)).toBeGreaterThan(1.4);
+    });
+
+    it("use as many normals as there are posteriors for each draw, whatever the correlation", () => {
+      for (const correlation of [0, 0.4, 1]) {
+        const source = createRandom(8);
+        let normals = 0;
+        const counting = {
+          uniform: () => source.uniform(),
+          normal: () => {
+            normals++;
+            return source.normal();
+          },
+        };
+        drawJointThetas(["fine", "default", "uneven"].map(marginNamed), equicorrelation(3, correlation), 50, counting);
+        expect(normals, `correlation ${correlation}`).toBe(150);
+      }
+    });
+
+    it("repeat for a seed, differ between seeds and leave the inputs unchanged", () => {
+      const posteriors = ["fine", "uneven"].map(marginNamed);
+      const frozenCopy = JSON.parse(JSON.stringify(posteriors));
+      const correlation = equicorrelation(2, 0.4);
+      const first = drawJointThetas(posteriors, correlation, 100, createRandom(21));
+      expect(drawJointThetas(posteriors, correlation, 100, createRandom(21))).toEqual(first);
+      expect(drawJointThetas(posteriors, correlation, 100, createRandom(22))).not.toEqual(first);
+      expect(posteriors).toEqual(frozenCopy);
+      expect(correlation).toEqual(equicorrelation(2, 0.4));
+      for (const draw of first) draw.fill(0);
+      expect(posteriors).toEqual(frozenCopy);
+    });
+
+    it("draw one posterior alone from a correlation of one entry", () => {
+      const draws = drawJointThetas([marginNamed("fine")], [[1]], 10, createRandom(1));
+      expect(draws).toHaveLength(10);
+      expect(draws.every((draw) => draw.length === 1)).toBe(true);
+    });
+
+    it("take posteriors of the practice items, as thetaPosterior returns them", () => {
+      const posterior = thetaPosterior([item(1.2, -0.8), item(0.9, 0), item(1.5, 0.9)], [1, 0, 1]);
+      const draws = drawJointThetas([posterior, posterior], equicorrelation(2, 0.8), 500, createRandom(6));
+      expect(draws).toHaveLength(500);
+      expect(draws.flat().every(Number.isFinite)).toBe(true);
+    });
+  });
+
+  describe("input", () => {
+    const posteriors = [marginNamed("uneven"), marginNamed("default")];
+    const correlation = equicorrelation(2, 0.5);
+    const random = createRandom(1);
+
+    it("rejects posteriors that are not a non-empty array of valid distributions", () => {
+      expect(() => drawJointThetas([], [], 10, random)).toThrow(
+        "Drawing jointly needs at least one posterior, found none.",
+      );
+      expect(() => drawJointThetas(JSON.parse("null"), correlation, 10, random)).toThrow(
+        "The posteriors must be an array of distributions, found null.",
+      );
+      expect(() =>
+        drawJointThetas([marginNamed("fine"), { nodes: [0], weights: [2] }], correlation, 10, random),
+      ).toThrow("The weights of the posterior 2 must sum to 1, found 2.");
+      expect(() => drawJointThetas([JSON.parse("null"), marginNamed("fine")], correlation, 10, random)).toThrow(
+        "The posterior 1 must be an object { nodes, weights }, found null.",
+      );
+    });
+
+    it("rejects nodes that do not ascend strictly", () => {
+      expect(() => drawJointThetas([{ nodes: [0, 1, 1], weights: [0.2, 0.3, 0.5] }], [[1]], 10, random)).toThrow(
+        "The nodes of the posterior 1 must ascend strictly, found 1 after 1 at 2.",
+      );
+      expect(() => drawJointThetas([{ nodes: [0, -1], weights: [0.5, 0.5] }], [[1]], 10, random)).toThrow(
+        "The nodes of the posterior 1 must ascend strictly, found -1 after 0 at 1.",
+      );
+    });
+
+    it("rejects a correlation that is not a symmetric matrix with 1 on the diagonal and entries from -1 to 1", () => {
+      expect(() => drawJointThetas(posteriors, [[1, 0.5]], 10, random)).toThrow(
+        "The correlation needs 2 rows, one for each posterior, found 1.",
+      );
+      expect(() => drawJointThetas(posteriors, [[1, 0.5], [0.5]], 10, random)).toThrow(
+        "Row 2 of the correlation needs 2 entries, found 1.",
+      );
+      expect(() => drawJointThetas(posteriors, [[1, 0.5], JSON.parse("1")], 10, random)).toThrow(
+        "Row 2 of the correlation must be an array, found 1.",
+      );
+      expect(() => drawJointThetas(posteriors, JSON.parse("0.5"), 10, random)).toThrow(
+        "The correlation must be an array of rows, found 0.5.",
+      );
+      expect(() =>
+        drawJointThetas(
+          posteriors,
+          [
+            [1, 0.5],
+            [0.4, 1],
+          ],
+          10,
+          random,
+        ),
+      ).toThrow("The correlation must be symmetric, but entry (1, 2) is 0.5 and entry (2, 1) is 0.4.");
+      expect(() =>
+        drawJointThetas(
+          posteriors,
+          [
+            [1, 0.5],
+            [0.5, 0.9],
+          ],
+          10,
+          random,
+        ),
+      ).toThrow("Entry (2, 2) of the correlation must be 1, found 0.9.");
+      expect(() =>
+        drawJointThetas(
+          posteriors,
+          [
+            [1, 1.2],
+            [1.2, 1],
+          ],
+          10,
+          random,
+        ),
+      ).toThrow("Entry (1, 2) of the correlation must be a number from -1 to 1, found 1.2.");
+      expect(() => drawJointThetas(posteriors, JSON.parse('[[1, "0.5"], [0.5, 1]]'), 10, random)).toThrow(
+        'Entry (1, 2) of the correlation must be a number from -1 to 1, found "0.5".',
+      );
+      expect(() => drawJointThetas(posteriors, JSON.parse("[[1, null], [0.5, 1]]"), 10, random)).toThrow(DataError);
+      expect(() =>
+        drawJointThetas(
+          posteriors,
+          [
+            [1, Number.NaN],
+            [Number.NaN, 1],
+          ],
+          10,
+          random,
+        ),
+      ).toThrow(DataError);
+    });
+
+    it("rejects a correlation that is not positive semidefinite and names the way to fix it", () => {
+      const impossible = [
+        [1, 0.9, -0.9],
+        [0.9, 1, 0.9],
+        [-0.9, 0.9, 1],
+      ];
+      expect(() => drawJointThetas(["fine", "default", "uneven"].map(marginNamed), impossible, 10, random)).toThrow(
+        /The correlation must be positive semidefinite, but has the eigenvalue -[0-9.e-]+\. Pass it through smoothCorrelations/,
+      );
+    });
+
+    it("rejects a number of draws that is not a positive integer, and a random source that is not a generator", () => {
+      for (const draws of [0, -1, 1.5, Number.NaN, JSON.parse('"3"'), JSON.parse("null")]) {
+        expect(() => drawJointThetas(posteriors, correlation, draws, random)).toThrow(DataError);
+      }
+      expect(() => drawJointThetas(posteriors, correlation, 0, random)).toThrow(
+        "The number of draws must be a positive integer, found 0.",
+      );
+      expect(() => drawJointThetas(posteriors, correlation, 10, JSON.parse("{}"))).toThrow(
+        "A random number generator must be one from createRandom, found an object.",
+      );
+      expect(() => drawJointThetas(posteriors, correlation, 10, JSON.parse("null"))).toThrow(DataError);
+    });
+  });
+});
+
 describe("properties", () => {
   const thetas = fc.double({ min: -8, max: 8, noNaN: true });
 
@@ -1004,5 +1430,86 @@ describe("properties", () => {
         },
       ),
     );
+  });
+
+  describe("of joint draws", () => {
+    /** A posterior of 1 to 10 strictly ascending nodes and non-negative weights, one at least above 0, that sum to 1. */
+    const posteriors = fc
+      .tuple(
+        fc.uniqueArray(fc.double({ min: -5, max: 5, noNaN: true }), {
+          minLength: 1,
+          maxLength: 10,
+          comparator: "SameValueZero",
+        }),
+        fc.array(fc.integer({ min: 0, max: 20 }), { minLength: 10, maxLength: 10 }),
+      )
+      .map(([values, masses]): ThetaDistribution => {
+        const nodes = [...values].sort((x, y) => x - y);
+        const used = masses.slice(0, nodes.length);
+        if (!used.some((mass) => mass > 0)) used[0] = 1;
+        const total = used.reduce((sum, mass) => sum + mass, 0);
+        return { nodes, weights: used.map((mass) => mass / total) };
+      });
+    const probabilities = fc.double({ min: 0, max: 1, noNaN: true });
+    const correlations = fc.double({ min: -1, max: 1, noNaN: true });
+
+    /** Returns the lowest and highest theta of a posterior's cells: its outer edges. */
+    function outerEdges({ nodes }: ThetaDistribution): [number, number] {
+      const first = defined(nodes[0]);
+      const last = defined(nodes[nodes.length - 1]);
+      if (nodes.length === 1) return [first, last];
+      return [first - (defined(nodes[1]) - first) / 2, last + (last - defined(nodes[nodes.length - 2])) / 2];
+    }
+
+    it("the theta at a probability does not decrease with the probability and stays within the outer edges", () => {
+      fc.assert(
+        fc.property(posteriors, probabilities, probabilities, (posterior, x, y) => {
+          const margin = marginOf(posterior, "posterior");
+          const [lower, upper] = outerEdges(posterior);
+          const [low, high] = x <= y ? [x, y] : [y, x];
+          expect(quantile(margin, low)).toBeLessThanOrEqual(quantile(margin, high) + 1e-9);
+          expect(quantile(margin, low)).toBeGreaterThanOrEqual(lower - 1e-9);
+          expect(quantile(margin, high)).toBeLessThanOrEqual(upper + 1e-9);
+        }),
+      );
+    });
+
+    it("draws stay within the outer edges of their posteriors and repeat for a seed, for any correlation", () => {
+      fc.assert(
+        fc.property(posteriors, posteriors, correlations, fc.integer({ min: 0, max: 2 ** 31 }), (p, q, r, seed) => {
+          const correlation = [
+            [1, r],
+            [r, 1],
+          ];
+          const draws = drawJointThetas([p, q], correlation, 20, createRandom(seed));
+          expect(drawJointThetas([p, q], correlation, 20, createRandom(seed))).toEqual(draws);
+          const [lowerP, upperP] = outerEdges(p);
+          const [lowerQ, upperQ] = outerEdges(q);
+          for (const [x, y] of draws) {
+            expect(defined(x)).toBeGreaterThanOrEqual(lowerP - 1e-9);
+            expect(defined(x)).toBeLessThanOrEqual(upperP + 1e-9);
+            expect(defined(y)).toBeGreaterThanOrEqual(lowerQ - 1e-9);
+            expect(defined(y)).toBeLessThanOrEqual(upperQ + 1e-9);
+          }
+        }),
+      );
+    });
+
+    it("draws at the correlation 1 order the thetas of two posteriors alike", () => {
+      fc.assert(
+        fc.property(posteriors, posteriors, fc.integer({ min: 0, max: 2 ** 31 }), (p, q, seed) => {
+          const correlation = [
+            [1, 1],
+            [1, 1],
+          ];
+          const draws = drawJointThetas([p, q], correlation, 30, createRandom(seed));
+          for (const a of draws) {
+            for (const b of draws) {
+              if (defined(a[0]) < defined(b[0])) expect(defined(a[1])).toBeLessThanOrEqual(defined(b[1]) + 1e-9);
+            }
+          }
+        }),
+      );
+    });
   });
 });

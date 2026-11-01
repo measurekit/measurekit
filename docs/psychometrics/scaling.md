@@ -3,8 +3,8 @@
 `@measurekit/psychometrics/scaling` turns theta and total scores into the scores a test reports, and predicts the
 score a person will be reported on an official form. It covers a linear scale with rounding and bounds, conversion
 tables from total scores to scale scores, the conditional standard error of measurement of scale scores, the scale
-scores of equated scores, percentile ranks in a norm sample, and predictions from a posterior of theta. Every function
-is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
+scores of equated scores, percentile ranks in a norm sample, predictions from a posterior of theta, and joint draws of
+theta from separate posteriors. Every function is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
 has [its own guide](vertical-scaling.md).
 
 ## Scales
@@ -220,12 +220,101 @@ items and the official form are on one theta scale. Calibrate the practice items
 link their scale first ([linking](equating.md#linking)); the prediction treats theta as constant between practice and
 the test, so pass recent responses where learning is likely.
 
+## Joint draws of theta
+
+A host holds one posterior per section or person, computed apart, and needs the distribution of something that combines
+them: a composite score, a pass on every section, the reliability of a composite. `drawJointThetas(posteriors,
+correlation, draws, random)` draws thetas from all the posteriors at once, coupled by a Gaussian copula: each posterior
+keeps its own distribution, and `correlation` says how the thetas move together.
+
+```mermaid
+flowchart LR
+  E["independent normals e<br/>random.normal()"] --> Z["correlated scores z = F e<br/>F Fᵀ = correlation"]
+  Z --> U["probabilities u = Φ(z)"]
+  U --> T["theta = inverse distribution<br/>function of each posterior at u"]
+  P["posteriors<br/>nodes and weights"] --> T
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { thetaPosterior, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { drawJointThetas } from "@measurekit/psychometrics/scaling";
+
+const item = (a: number, b: number) => ({ model: twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } });
+const quadrature = { points: 241 };
+const reading = thetaPosterior([item(1, -1), item(1.2, -0.2), item(0.9, 0.5), item(1.4, 1.1)], [1, 1, 0, 0], {
+  quadrature,
+});
+const writing = thetaPosterior([item(1.1, -0.6), item(0.8, 0.3), item(1.3, 0.9)], [1, 0, 0], { quadrature });
+
+// The sum of the two thetas at the correlations 0 and 1, which bound it for any correlation.
+for (const r of [0, 1]) {
+  const draws = drawJointThetas(
+    [reading, writing],
+    [
+      [1, r],
+      [r, 1],
+    ],
+    10_000,
+    createRandom(1),
+  );
+  const sums = draws.map(([x, y]) => (x ?? 0) + (y ?? 0));
+  const mean = sums.reduce((total, sum) => total + sum, 0) / sums.length;
+  const sd = Math.sqrt(sums.reduce((total, sum) => total + (sum - mean) ** 2, 0) / (sums.length - 1));
+  console.log(r, mean.toFixed(3), sd.toFixed(3)); // 0 -0.123 1.054, then 1 -0.139 1.474
+}
+```
+
+| Argument      | Valid range                                                                                                       | Meaning                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `posteriors`  | at least one `ThetaDistribution`: finite, strictly ascending `nodes`, non-negative `weights`                      | The distribution of theta of each person or section |
+| `correlation` | a symmetric matrix by rows, one row per posterior, 1 on the diagonal, entries from -1 to 1, positive semidefinite | The correlation of the normal scores z              |
+| `draws`       | a positive integer                                                                                                | The number of draws                                 |
+| `random`      | a `Random`, as `createRandom` returns it                                                                          | The source of the normals                           |
+
+The result holds one array for each draw, with a theta for each posterior in the order given. All four arguments are
+required. A draw takes as many normals from `random` as there are posteriors, whatever the correlation, so a seed gives the
+same draws for the same posteriors.
+
+| Correlation | Draws                                                                                   |
+| ----------- | --------------------------------------------------------------------------------------- |
+| 1           | One quantile in every posterior: the largest variance that a sum of the thetas can have |
+| 0           | Independent draws                                                                       |
+| -1          | Opposite quantiles: u in one posterior and 1 - u in the other (two posteriors)          |
+| between     | Rank correlation (6 / π) asin(r / 2) for any posteriors                                 |
+
+- **Reading a posterior.** The distribution function is linear within the cell of each node. A cell runs from the midpoint
+  with the node below to the midpoint with the node above, and the outer cells are mirrored about their nodes; a node with
+  no weight is never drawn, and one node gives that node. A cell of width h adds h² / 12 to the variance: 0.0033 on the 61
+  points of spacing 0.2 that `thetaPosterior` returns, 3.7% of a variance of 0.09, and 0.0002 on 241 points. Pass 241 or
+  more points for a posterior with a standard deviation under 0.5.
+- **The correlation of the thetas.** `correlation` is that of the normal scores, which is the correlation of the thetas when
+  the posteriors are near normal. A correlation of 1 is exact: the matrix is factored by its eigenvalues, and one below
+  1e-10 in absolute value is taken as 0, so that rounding does not part the draws. A matrix with an eigenvalue below
+  -1e-10 throws `DataError` naming it, and [`smoothCorrelations`](dimensionality.md) gives the nearest valid one.
+- **What separate posteriors leave out.** A posterior of one section says nothing of another, so the copula carries only the
+  correlation you give. Until one is estimated, report a forecast at the correlations 0 and 1. A joint model of the
+  dimensions gives their joint posterior and covariance through the [multidimensional estimates](multidimensional.md#scoring);
+  this function serves posteriors that were computed apart.
+
+| Failure                                                                                                      | Result                                         |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| No posteriors; weights that are negative or do not sum to 1 within 1e-6; nodes that do not strictly ascend   | `DataError` naming the posterior               |
+| A correlation that is not square of the posteriors' number, symmetric, 1 on the diagonal and within -1 and 1 | `DataError` naming the entry                   |
+| An eigenvalue of the correlation below -1e-10                                                                | `DataError` naming it and `smoothCorrelations` |
+| `draws` not a positive integer; `random` not a generator                                                     | `DataError`                                    |
+
+The matrix is checked as symmetric and 1 on the diagonal to within 1e-8. A draw costs the square of the posteriors' number
+plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes take under a millisecond.
+
 ## Not included
 
 - Smoothed or continuous norming, and weighted norm samples: they need a norming model, not a rank.
 - Growth during practice: learning models live in `@measurekit/knowledge-tracing`.
 - Model-based percentiles Φ((θ - μ) / σ): one line with a `GroupDistribution`'s `mean` and `sd`.
 - Scale anchoring and item mapping: descriptive work on a calibrated bank with no statistic of its own.
+- A copula other than the Gaussian: the correlation bounds of comonotonicity and independence hold for any copula, but the
+  Gaussian one is the usual choice for separate posteriors and needs one matrix.
 
 ## Differences from the references
 
@@ -236,15 +325,21 @@ the test, so pass recent responses where learning is likely.
 | True-score theta         | The root of the curve; the range's end where there is none      | A procedure of each program for scores below the guessing level           |
 | Percentile ranks         | Of the sample's scores as given; a step function between scores | Kolen and Brennan interpolate linearly within each integer score          |
 | Error of reported scores | Of the rounded and bounded scores of the table                  | Kolen, Zeng and Hanson give the error before rounding too: slope × SEM(θ) |
+| Joint draws              | A Gaussian copula over separate posteriors                      | mirt's `fscores(plausible.draws =)`: one model's joint posterior          |
 
 ## References
 
 - Kolen, M. J., & Brennan, R. L. (2014). Test equating, scaling, and linking: Methods and practices (3rd ed.). Springer.
 - Kolen, M. J., Zeng, L., & Hanson, B. A. (1996). Conditional standard errors of measurement for scale scores using IRT.
   Journal of Educational Measurement, 33(2), 129-140.
+- Cario, M. C., & Nelson, B. L. (1997). Modeling and generating random vectors with arbitrary marginal distributions and
+  correlation matrix (technical report). Northwestern University.
+- Dhaene, J., Denuit, M., Goovaerts, M. J., Kaas, R., & Vyncke, D. (2002). The concept of comonotonicity in actuarial science
+  and finance: Theory. Insurance: Mathematics and Economics, 31(1), 3-33.
 - Lord, F. M. (1980). Applications of item response theory to practical testing problems. Lawrence Erlbaum.
 - Lord, F. M., & Wingersky, M. S. (1984). Comparison of IRT true-score and equipercentile observed-score "equatings".
   Applied Psychological Measurement, 8(4), 453-461.
+- Nelsen, R. B. (2006). An introduction to copulas (2nd ed.). Springer.
 - Petersen, N. S., Kolen, M. J., & Hoover, H. D. (1989). Scaling, norming, and equating. In R. L. Linn (Ed.),
   Educational measurement (3rd ed., pp. 221-262). American Council on Education.
 - Thissen, D., Pommerich, M., Billeaud, K., & Williams, V. S. L. (1995). Item response theory for scores on tests

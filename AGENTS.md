@@ -133,7 +133,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/mokken/           Mokken scale analysis: scalability coefficients, item selection, monotonicity, invariant item ordering
   src/generalizability/ variance components of balanced crossed and nested designs, decision studies
   src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction,
-                        growth between the groups of a vertical scale
+                        joint draws of theta from separate posteriors, growth between the groups of a vertical scale
   src/rater/            rater agreement and rater effects: exact and adjacent agreement, kappa, intraclass
                         correlations, standardized mean difference, the many-facet Rasch model
   src/response-time/    response times: the lognormal model, speed, aberrant times, the joint model of speed and

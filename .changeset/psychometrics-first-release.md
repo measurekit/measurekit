@@ -31,6 +31,10 @@ Links compose into chains: `chainTransformations` moves the scale of the first f
 between the neighboring groups of a vertical scale, whether they come from a calibration with `groups` or from chained
 links.
 
+`drawJointThetas` draws thetas jointly from separate posteriors, one for each person or section, coupled by a Gaussian copula
+with a correlation matrix you give: every posterior keeps its distribution, a correlation of 1 gives one quantile in all of
+them, and 0 gives independent draws. It forecasts a composite of several scores, or bounds one when the correlation is unknown.
+
 `calibrate` regresses theta on persons' covariates with `covariates`: θ ~ N(xᵀβ, σ²), the coefficients estimated with the
 items. With items that estimate their slopes, σ is 1 and the coefficients are in units of the residual SD; with `fixed`
 items, which set the scale, σ is estimated. The result has a `regression` with the coefficients, the residual SD and, with

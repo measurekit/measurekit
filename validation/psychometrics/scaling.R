@@ -2,13 +2,16 @@
 # probtrace), equate (px, the percentile rank function) and base R written out below: the roots of the test
 # characteristic curve by uniroot, the conditional standard error of scale scores and the distribution of a total score
 # by the recursion of Lord and Wingersky, interpolation by approx, the posterior of theta, and the probabilities of
-# reported scores by pnorm and by summing over scores.
+# reported scores by pnorm and by summing over scores. The joint draws of theta from separate posteriors: the inverse of a
+# posterior's piecewise linear distribution function by approx, normal scores by mvtnorm's rmvnorm and the joint
+# distribution function at corners by its pmvnorm.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
   library(mirt)
   library(equate)
   library(equateIRT)
+  library(mvtnorm)
 })
 
 POINTS <- 61 # measurekit's default rule: 61 equally spaced nodes on [-6, 6]
@@ -306,4 +309,138 @@ for (i in seq_along(norm_cases)) norm_cases[[i]]$ranks <- percentile_ranks(norm_
 write_fixture("scaling-norms", list(
   source = "equate's ACTmath form X total scores (px at the integers) and a simulated normal sample of scale scores.",
   cases = norm_cases
+))
+
+# --- Joint draws of theta ----------------------------------------------------------------------------------------------
+# A posterior is read as a distribution function that is linear within the cell of each node: the cell runs from the
+# midpoint with the node below to the midpoint with the node above, and the outer cells are mirrored about their nodes.
+# The draws take normal scores z with correlation R, u = pnorm(z) and the inverse of each posterior's distribution
+# function at u. Three references: the inverse by approx and by a search of the cells, normal scores by rmvnorm's
+# "eigen" method through the same transform, and the joint distribution function at corners, which is pmvnorm at the
+# normal scores of the margins' probabilities.
+
+set.seed(20261029)
+
+cell_edges <- function(nodes) {
+  n <- length(nodes)
+  if (n == 1) return(c(nodes, nodes))
+  midpoints <- (nodes[-1] + nodes[-n]) / 2
+  c(2 * nodes[1] - midpoints[1], midpoints, 2 * nodes[n] - midpoints[n - 1])
+}
+
+# The distribution function of a posterior at the points `x`, by approx on the edges of its cells.
+joint_cdf <- function(margin, x) {
+  approx(cell_edges(margin$nodes), c(0, cumsum(margin$weights) / sum(margin$weights)), xout = x, rule = 2)$y
+}
+
+# The inverse by a search of the cells: the first cell with weight whose cumulative weight exceeds u. It is the only
+# route for a posterior with cells of no weight, whose distribution function is flat, and the end u = 1 takes the upper
+# edge of the last cell with weight.
+joint_quantile_search <- function(margin, u) {
+  edges <- cell_edges(margin$nodes)
+  cumulative <- cumsum(margin$weights) / sum(margin$weights)
+  positive <- which(margin$weights > 0)
+  sapply(u, function(p) {
+    k <- positive[which(cumulative[positive] > p)[1]]
+    if (is.na(k)) return(edges[max(positive) + 1])
+    below <- if (k == 1) 0 else cumulative[k - 1]
+    edges[k] + (edges[k + 1] - edges[k]) * (p - below) / (cumulative[k] - below)
+  })
+}
+
+# The inverse by approx, on the cumulative weights against the edges, where every cell has weight.
+joint_quantile_approx <- function(margin, u) {
+  approx(c(0, cumsum(margin$weights) / sum(margin$weights)), cell_edges(margin$nodes), xout = u)$y
+}
+
+joint_quantile <- function(margin, u) {
+  if (length(margin$nodes) == 1) return(rep(margin$nodes, length(u)))
+  searched <- joint_quantile_search(margin, u)
+  if (all(margin$weights > 0)) stopifnot(max(abs(searched - joint_quantile_approx(margin, u))) < 1e-12)
+  searched
+}
+
+normal_margin <- function(nodes, mean, sd) {
+  weights <- dnorm(nodes, mean, sd)
+  list(nodes = nodes, weights = weights / sum(weights))
+}
+
+joint_margins <- list(
+  fine = normal_margin(seq(-6, 6, length.out = 241), 0, 1),
+  default = normal_margin(seq(-6, 6, length.out = 61), 0.4, 0.8),
+  uneven = list(nodes = c(-3, -1.2, -0.4, 0, 0.9, 1.1, 4), weights = c(0.05, 0.2, 0.15, 0.3, 0.1, 0.15, 0.05)),
+  empty_cells = list(nodes = c(-2, -1, 0, 1, 2, 3, 4), weights = c(0, 0.3, 0, 0.4, 0.3, 0, 0)),
+  rounded_sum = list(nodes = c(0.2, 0.9, 1.3), weights = c(0.3999996, 0.3000002, 0.3)),
+  one_node = list(nodes = 1.5, weights = 1)
+)
+
+# u: the ends, the probability at each edge of a cell and just beside it, and 40 uniform draws.
+joint_levels <- function(margin) {
+  cumulative <- cumsum(margin$weights) / sum(margin$weights)
+  sort(unique(c(0, 1, 1e-12, 1 - 1e-12, cumulative, pmin(cumulative + 1e-9, 1), pmax(cumulative - 1e-9, 0), runif(40))))
+}
+
+joint_inverse <- lapply(names(joint_margins), function(name) {
+  margin <- joint_margins[[name]]
+  u <- joint_levels(margin)
+  list(name = name, nodes = I(margin$nodes), weights = I(margin$weights), u = I(u), theta = I(joint_quantile(margin, u)))
+})
+
+# Normal scores of a correlation matrix by rmvnorm's "eigen" method, and the thetas that the transform gives.
+transform_margins <- joint_margins[c("fine", "empty_cells", "one_node", "uneven")]
+transform_correlation <- matrix(c(1, 0.6, -0.3, 0.2, 0.6, 1, 0.1, 0.5, -0.3, 0.1, 1, -0.4, 0.2, 0.5, -0.4, 1), 4)
+transform_scores <- rmvnorm(300, sigma = transform_correlation, method = "eigen")
+transform_thetas <- sapply(seq_along(transform_margins), function(i) {
+  joint_quantile(transform_margins[[i]], pnorm(transform_scores[, i]))
+})
+
+# The joint distribution function at corners: the corner is a point of theta in each margin, and the probability of
+# every theta at or below it is pmvnorm at the normal scores qnorm(F_i(c_i)).
+corner_case <- function(keys, correlation, levels) {
+  margins <- joint_margins[keys]
+  support <- lapply(margins, function(margin) range(cell_edges(margin$nodes)))
+  corners <- lapply(levels, function(level) {
+    sapply(seq_along(margins), function(i) support[[i]][1] + level[i] * diff(support[[i]]))
+  })
+  lapply(corners, function(corner) {
+    probabilities <- sapply(seq_along(margins), function(i) joint_cdf(margins[[i]], corner[i]))
+    result <- pmvnorm(upper = qnorm(probabilities), corr = correlation, algorithm = GenzBretz(abseps = 1e-9, maxpts = 1e6))
+    list(corner = I(corner), probability = as.numeric(result), error = attr(result, "error"))
+  })
+}
+
+corner_cases <- list(
+  list(margins = c("fine", "uneven"), correlation = matrix(c(1, 0.7, 0.7, 1), 2),
+       corners = corner_case(c("fine", "uneven"), matrix(c(1, 0.7, 0.7, 1), 2), list(c(0.5, 0.5), c(0.4, 0.7), c(0.6, 0.3)))),
+  list(margins = c("default", "empty_cells"), correlation = matrix(c(1, -0.6, -0.6, 1), 2),
+       corners = corner_case(c("default", "empty_cells"), matrix(c(1, -0.6, -0.6, 1), 2), list(c(0.55, 0.5), c(0.45, 0.65)))),
+  list(margins = c("fine", "uneven", "rounded_sum"),
+       correlation = matrix(c(1, 0.5, 0.3, 0.5, 1, 0.4, 0.3, 0.4, 1), 3),
+       corners = corner_case(c("fine", "uneven", "rounded_sum"), matrix(c(1, 0.5, 0.3, 0.5, 1, 0.4, 0.3, 0.4, 1), 3),
+                             list(c(0.5, 0.5, 0.5), c(0.6, 0.45, 0.7), c(0.4, 0.55, 0.35))))
+)
+
+# Spearman's rank correlation of the thetas is that of the normal scores, (6 / pi) asin(r / 2), whatever the margins.
+# Its standard error for the draws of the test comes from replicated rmvnorm samples of that size.
+SPEARMAN_DRAWS <- 20000
+spearman_cases <- lapply(c(-0.8, -0.3, 0, 0.4, 0.7, 0.95), function(r) {
+  sigma <- matrix(c(1, r, r, 1), 2)
+  estimates <- replicate(400, cor(rmvnorm(SPEARMAN_DRAWS, sigma = sigma, method = "eigen"), method = "spearman")[1, 2])
+  list(correlation = r, expected = 6 / pi * asin(r / 2), standardError = sd(estimates), draws = SPEARMAN_DRAWS)
+})
+
+write_fixture("scaling-joint-draws", list(
+  source = paste("Posteriors read as piecewise linear distribution functions: the inverse by approx and by a search of",
+                 "the cells (a posterior of 241 nodes, 61, uneven nodes, cells with no weight, weights that sum to 1",
+                 "within 1e-6, one node), normal scores by mvtnorm's rmvnorm(method = 'eigen') through pnorm and the",
+                 "inverse, the joint distribution function at corners by pmvnorm, and Spearman's correlation of normal",
+                 "scores, (6 / pi) asin(r / 2), with its standard error from 400 replicated samples."),
+  margins = lapply(joint_margins, function(margin) list(nodes = I(margin$nodes), weights = I(margin$weights))),
+  inverse = joint_inverse,
+  transform = list(
+    margins = names(transform_margins), correlation = transform_correlation, scores = transform_scores,
+    thetas = transform_thetas
+  ),
+  corners = corner_cases,
+  spearman = spearman_cases
 ))
