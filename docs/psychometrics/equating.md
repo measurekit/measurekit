@@ -30,12 +30,13 @@ transformTheta(0.5, transformation); // a theta of form X's calibration on form 
 trueScoreEquating(formXOnY, formY); // the form Y true score of each form X score, 0 to 3
 ```
 
-| Function                                 | A and B                                                                                |
-| ---------------------------------------- | -------------------------------------------------------------------------------------- |
-| `meanMeanLinking(from, to)`              | A = mean a_from / mean a_to; B = mean b_to - A mean b_from (Loyd and Hoover, 1980)     |
-| `meanSigmaLinking(from, to)`             | A = sd b_to / sd b_from; B as mean-mean (Marco, 1977)                                  |
-| `haebaraLinking(from, to, options)`      | Minimize Σ_θ w(θ) Σ_j Σ_k (P_jk(θ; to) - P_jk(θ; from moved))² (Haebara, 1980)         |
-| `stockingLordLinking(from, to, options)` | Minimize Σ_θ w(θ) (Σ_j E_j(θ; to) - Σ_j E_j(θ; from moved))² (Stocking and Lord, 1983) |
+| Function                                 | A and B                                                                                                        |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `meanMeanLinking(from, to)`              | A = mean a_from / mean a_to; B = mean b_to - A mean b_from (Loyd and Hoover, 1980)                             |
+| `meanSigmaLinking(from, to)`             | A = sd b_to / sd b_from; B as mean-mean (Marco, 1977)                                                          |
+| `haebaraLinking(from, to, options)`      | Minimize Σ_θ w(θ) Σ_j Σ_k (P_jk(θ; to) - P_jk(θ; from moved))² (Haebara, 1980)                                 |
+| `stockingLordLinking(from, to, options)` | Minimize Σ_θ w(θ) (Σ_j E_j(θ; to) - Σ_j E_j(θ; from moved))² (Stocking and Lord, 1983)                         |
+| `chainTransformations(links)`            | Compose the links of successive forms: A = A₁ A₂ … Aₙ; B ← B Aᵢ + Bᵢ ([vertical scaling](vertical-scaling.md)) |
 
 ### Moment methods
 
@@ -457,6 +458,8 @@ irtEquatingStandardErrors(formX, formY, covariance, { method: "observed-score" }
 - Braun-Holland linear, circle-arc and nominal weights equating, kernel equating, and cubic-spline postsmoothing:
   presmoothing covers smoothing, and the others see little use.
 - Analytic standard errors of observed-score equating: the bootstrap is equate's method.
+- Standard errors of a chain of links: consecutive links share the estimates of the form between them, so they need the
+  covariance of the calibrations, as the standard errors across separate calibrations do.
 
 ## Differences from the references
 

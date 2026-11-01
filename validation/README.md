@@ -18,6 +18,7 @@ Rscript validation/psychometrics/fit.R               # item and person fit: eRm'
 Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif
 Rscript validation/psychometrics/dif-lord-purification.R # purified Lord's chi-square: difR's difLord(purify = TRUE); run dif.R first
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
+Rscript validation/psychometrics/vertical-scaling.R  # chains of links and growth between grades: equateIRT's chainec, mirt's multipleGroup and base R
 Rscript validation/psychometrics/explanatory.R       # item parameters regressed on item features: mirt, metafor and base R
 Rscript validation/psychometrics/linear-change.R     # linear logistic change: glm on the persons who changed, base R and eRm's LLRA
 Rscript validation/psychometrics/lltm-polytomous.R   # the LLTM of partial credit and rating scale items: base R and TAM

@@ -15,6 +15,7 @@ import {
   type ScorePrediction,
   type ScoreScale,
   scaleConversion,
+  scaleGrowth,
   scaleScore,
   summedScoreTable,
   type ThetaDistribution,
@@ -23,6 +24,7 @@ import {
 } from "../src/index.js";
 import { normalCdf } from "../src/math/normal.js";
 import conversions from "./fixtures/scaling-conversion.json" with { type: "json" };
+import growth from "./fixtures/scaling-growth.json" with { type: "json" };
 import norms from "./fixtures/scaling-norms.json" with { type: "json" };
 import predictions from "./fixtures/scaling-prediction.json" with { type: "json" };
 import { defined, expectClose, type FixtureItems, fixtureItems } from "./helpers.js";
@@ -40,6 +42,8 @@ const SCALE_TOLERANCE = 1e-10;
 const PREDICTION_TOLERANCE = 1e-12;
 /** The means of predicted scores, which are in the hundreds. */
 const MEAN_TOLERANCE = 1e-11;
+/** Growth between grades against base R, written out. */
+const GROWTH_TOLERANCE = 1e-12;
 
 /** A scale of a fixture: the bounds and the step are absent where the scale has none. */
 interface FixtureScale {
@@ -451,6 +455,66 @@ describe("scaleConversion", () => {
     expect(() => scaleConversion([0], [1, 2], { step: -5 })).toThrow(DataError);
     expect(() => scaleConversion([0], [1, 2], { lowest: 9, highest: 3 })).toThrow(
       "The options needs a lowest score below the highest, found 9 and 3.",
+    );
+  });
+});
+
+describe("scaleGrowth", () => {
+  it("matches base R's growth between the grades of a concurrent calibration", () => {
+    const rows = scaleGrowth(growth.groups);
+    expect(rows).toHaveLength(growth.growth.length);
+    for (const [k, row] of rows.entries()) {
+      const expected = defined(growth.growth[k]);
+      expect([row.from, row.to]).toEqual([expected.from, expected.to]);
+      expectClose(row.meanChange, expected.meanChange, GROWTH_TOLERANCE, "mean change");
+      expectClose(row.sdRatio, expected.sdRatio, GROWTH_TOLERANCE, "ratio of standard deviations");
+      expectClose(row.effectSize, expected.effectSize, GROWTH_TOLERANCE, "effect size");
+    }
+  });
+
+  it("gives one row for each pair of neighboring groups, in the order given", () => {
+    const rows = scaleGrowth([
+      { group: "a", mean: 0, sd: 1 },
+      { group: "b", mean: 10, sd: 7 },
+      { group: "c", mean: 4, sd: 7 },
+    ]);
+    expect(rows.map(({ from, to }) => [from, to])).toEqual([
+      ["a", "b"],
+      ["b", "c"],
+    ]);
+    expectClose(defined(rows[0]).effectSize, 2, GROWTH_TOLERANCE);
+    expectClose(defined(rows[0]).sdRatio, 7, GROWTH_TOLERANCE);
+    expect(rows[1]).toMatchObject({ from: "b", to: "c", meanChange: -6, sdRatio: 1 });
+    expectClose(defined(rows[1]).effectSize, -6 / 7, GROWTH_TOLERANCE);
+  });
+
+  it("rejects fewer than two groups, labels that repeat and a scale without spread", () => {
+    const group = { group: "a", mean: 0, sd: 1 };
+    expect(() => scaleGrowth([group])).toThrow("Growth needs at least two groups on the shared scale, found 1.");
+    expect(() => scaleGrowth([group, { ...group, mean: 1 }])).toThrow(
+      'The groups need different labels, found "a" twice.',
+    );
+    expect(() => scaleGrowth([group, { group: "b", mean: 1, sd: 0 }])).toThrow(
+      "The standard deviation of group 2 must be a positive number, found 0.",
+    );
+    expect(() => scaleGrowth([group, { group: "b", mean: Number.NaN, sd: 1 }])).toThrow(
+      "The mean of group 2 must be a finite number, found NaN.",
+    );
+    expect(() => scaleGrowth([group, { group: "", mean: 1, sd: 1 }])).toThrow(
+      'The group 2 needs a label that is a non-empty string, found "".',
+    );
+  });
+
+  it("rejects input of other types", () => {
+    expect(() => scaleGrowth(JSON.parse("null"))).toThrow("The groups must be an array, found null.");
+    expect(() => scaleGrowth(JSON.parse('[{"group":"a","mean":0,"sd":1},null]'))).toThrow(
+      "The group 2 must be an object { group, mean, sd }, found null.",
+    );
+    expect(() => scaleGrowth(JSON.parse('[{"group":"a","mean":0,"sd":1},{"group":"b","mean":"1","sd":1}]'))).toThrow(
+      'The mean of group 2 must be a finite number, found "1".',
+    );
+    expect(() => scaleGrowth(JSON.parse('[{"group":"a","mean":0,"sd":1},{"group":2,"mean":1,"sd":1}]'))).toThrow(
+      "The group 2 needs a label that is a non-empty string, found 2.",
     );
   });
 });
@@ -910,6 +974,33 @@ describe("properties", () => {
           for (const row of rows) {
             expectClose(row.scaleStandardError, enumeratedDeviation(items, conversion, row.theta), 1e-9);
           }
+        },
+      ),
+    );
+  });
+
+  it("growth changes by the slope of a linear rescale of the scale and keeps its effect size and ratio", () => {
+    const group = fc.record({
+      mean: fc.double({ min: -50, max: 50, noNaN: true }),
+      sd: fc.double({ min: 0.5, max: 20, noNaN: true }),
+    });
+    fc.assert(
+      fc.property(
+        fc.array(group, { minLength: 2, maxLength: 5 }),
+        fc.double({ min: 0.1, max: 10, noNaN: true }),
+        fc.double({ min: -100, max: 100, noNaN: true }),
+        (moments, slope, intercept) => {
+          const label = (g: { mean: number; sd: number }, i: number) => ({ group: `grade ${i}`, ...g });
+          const before = scaleGrowth(moments.map(label));
+          const after = scaleGrowth(
+            moments.map((g, i) => label({ mean: slope * g.mean + intercept, sd: slope * g.sd }, i)),
+          );
+          before.forEach((row, k) => {
+            const moved = defined(after[k]);
+            expectClose(moved.meanChange, slope * row.meanChange, 1e-9);
+            expectClose(moved.sdRatio, row.sdRatio, 1e-12);
+            expectClose(moved.effectSize, row.effectSize, 1e-9);
+          });
         },
       ),
     );

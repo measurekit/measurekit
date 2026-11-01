@@ -119,15 +119,16 @@ packages/psychometrics/       the published package @measurekit/psychometrics
                         nonparametric classification
   src/fit/              item and person fit, local dependence
   src/dif/              differential item functioning
-  src/equating/         linking of IRT scales, observed-score equating with and without common items, IRT true-score
-                        and observed-score equating, bootstrap and delta-method standard errors, the anchor screen,
-                        presmoothing
+  src/equating/         linking of IRT scales, chains of links, observed-score equating with and without common
+                        items, IRT true-score and observed-score equating, bootstrap and delta-method standard
+                        errors, the anchor screen, presmoothing
   src/standard-setting/ cut scores by the modified Angoff, Bookmark and Hofstee methods; classification accuracy
   src/explanatory/      the linear logistic test model, linear logistic change, regression of item parameters on item features,
                         prediction of the parameters of new items
   src/mokken/           Mokken scale analysis: scalability coefficients, item selection, monotonicity, invariant item ordering
   src/generalizability/ variance components of balanced crossed and nested designs, decision studies
-  src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction
+  src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction,
+                        growth between the groups of a vertical scale
   src/rater/            rater agreement and rater effects: exact and adjacent agreement, kappa, intraclass
                         correlations, standardized mean difference, the many-facet Rasch model
   src/response-time/    response times: the lognormal model, speed, aberrant times, the joint model of speed and

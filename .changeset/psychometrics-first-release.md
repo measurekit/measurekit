@@ -25,3 +25,8 @@ repeated on the two calibrations until two rounds flag the same items.
 Generalizability studies accept designs with empty cells and unequal numbers of nested elements with
 `unbalanced: true`, estimating the variance components by Henderson's Method 1, as urGENOVA does. A study reports whether
 it is `balanced`, and a decision study of one that is not takes its sizes from the caller.
+
+Links compose into chains: `chainTransformations` moves the scale of the first form of a chain to that of the last, as
+`equateIRT::chainec` does. `scaleGrowth` reports the mean change, the ratio of standard deviations and the effect size
+between the neighboring groups of a vertical scale, whether they come from a calibration with `groups` or from chained
+links.

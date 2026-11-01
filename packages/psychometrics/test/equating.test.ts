@@ -7,6 +7,7 @@ import {
   calibrateWithCovariance,
   chainedEquipercentileEquating,
   chainedLinearEquating,
+  chainTransformations,
   createRandom,
   DataError,
   equipercentileEquating,
@@ -44,6 +45,7 @@ import {
 } from "../src/index.js";
 import bivariatePresmoothing from "./fixtures/equating-bivariate-presmoothing.json" with { type: "json" };
 import bootstrap from "./fixtures/equating-bootstrap.json" with { type: "json" };
+import chain from "./fixtures/equating-chain.json" with { type: "json" };
 import irtObserved from "./fixtures/equating-irt-observed-score.json" with { type: "json" };
 import standardErrors from "./fixtures/equating-irt-standard-errors.json" with { type: "json" };
 import linking from "./fixtures/equating-linking.json" with { type: "json" };
@@ -78,6 +80,10 @@ const BOOTSTRAP_TOLERANCE = 0.1;
 const BOOTSTRAP_FLOOR = 0.05;
 /** Delta-method standard errors against numDeriv's Jacobian, relative. */
 const STANDARD_ERROR_TOLERANCE = 1e-6;
+/** A chain of links computed from items against equateIRT's chainec, which composes its own links to about 1e-8. */
+const CHAIN_TOLERANCE = 1e-6;
+/** A chain of the reference's own links against chainec: the same fold. */
+const FOLD_TOLERANCE = 1e-12;
 
 function expectTransformation(actual: ScaleTransformation, expected: ScaleTransformation, tolerance: number): void {
   expectClose(actual.slope, expected.slope, tolerance, "slope");
@@ -228,6 +234,83 @@ describe("transformItem and transformTheta", () => {
     expect(() => transformItem(JSON.parse("null"), { slope: 1, intercept: 0 })).toThrow(
       "The item must be an item with a model and parameters, found null.",
     );
+  });
+});
+
+describe("chainTransformations", () => {
+  const Quadrature = { method: "gauss-hermite" as const, points: 30 };
+  type Link = (from: IrtItem[], to: IrtItem[]) => ScaleTransformation;
+  const methodLinks: Readonly<Record<string, Link>> = {
+    meanMean: meanMeanLinking,
+    meanSigma: meanSigmaLinking,
+    haebara: (from, to) => haebaraLinking(from, to, { quadrature: Quadrature }),
+    stockingLord: (from, to) => stockingLordLinking(from, to, { quadrature: Quadrature }),
+  };
+
+  for (const fixture of chain.cases) {
+    it(`composes the links of forms 1 to 2 to 3 of the ${fixture.name} items as equateIRT's chainec does`, () => {
+      for (const [method, reference] of Object.entries(fixture.methods)) {
+        expectTransformation(chainTransformations(reference.links), reference.chain, FOLD_TOLERANCE);
+        const link = defined(methodLinks[method]);
+        const links = fixture.links.map(({ from, to }) => link(fixtureItems(from), fixtureItems(to)));
+        expectTransformation(chainTransformations(links), reference.chain, CHAIN_TOLERANCE);
+      }
+    });
+  }
+
+  it("folds A = A1 A2 and B = A2 B1 + B2", () => {
+    expect(chainTransformations([{ slope: 2, intercept: 1 }])).toEqual({ slope: 2, intercept: 1 });
+    expect(
+      chainTransformations([
+        { slope: 2, intercept: 1 },
+        { slope: 0.5, intercept: 3 },
+      ]),
+    ).toEqual({ slope: 1, intercept: 3.5 });
+    expect(
+      chainTransformations([
+        { slope: 2, intercept: 1 },
+        { slope: 0.5, intercept: 3 },
+        { slope: 4, intercept: -2 },
+      ]),
+    ).toEqual({ slope: 4, intercept: 12 });
+  });
+
+  it("moves theta and an item through the links as through the chain", () => {
+    const links = [
+      { slope: 1.25, intercept: -0.3 },
+      { slope: 0.9, intercept: 0.4 },
+    ];
+    const item = { model: threeParameterLogistic, parameters: { a: 1.3, b: 0.2, c: 0.15, d: 1 } };
+    const single = chainTransformations(links);
+    expect(transformTheta(0.7, single)).toBeCloseTo(
+      transformTheta(transformTheta(0.7, defined(links[0])), defined(links[1])),
+      12,
+    );
+    const moved = transformItem(transformItem(item, defined(links[0])), defined(links[1]));
+    const chained = transformItem(item, single);
+    expectClose(chained.parameters.a, moved.parameters.a, 1e-12);
+    expectClose(chained.parameters.b, moved.parameters.b, 1e-12);
+  });
+
+  it("rejects an empty chain, a link that is not a transformation and a chain that overflows", () => {
+    expect(() => chainTransformations([])).toThrow("A chain needs at least one link, found none.");
+    expect(() => chainTransformations(JSON.parse("null"))).toThrow(
+      "The links of a chain must be an array, found null.",
+    );
+    expect(() => chainTransformations(JSON.parse("[null]"))).toThrow(
+      "Link 1 must be an object { slope, intercept }, found null.",
+    );
+    expect(() => chainTransformations(JSON.parse('[{"slope":1,"intercept":0},{"slope":0,"intercept":0}]'))).toThrow(
+      "The slope of link 2 must be a positive number, found 0.",
+    );
+    expect(() => chainTransformations(JSON.parse('[{"slope":"2","intercept":0}]'))).toThrow(
+      'The slope of link 1 must be a positive number, found "2".',
+    );
+    expect(() => chainTransformations([{ slope: 1, intercept: Number.NaN }])).toThrow(
+      "The intercept of link 1 must be a finite number, found NaN.",
+    );
+    const huge = { slope: 1e200, intercept: 0 };
+    expect(() => chainTransformations([huge, huge])).toThrow(DataError);
   });
 });
 
@@ -1391,6 +1474,23 @@ describe("properties", () => {
         expectTransformation(stockingLordLinking(items, items), { slope: 1, intercept: 0 }, 1e-7);
       }),
       { numRuns: 30 },
+    );
+  });
+
+  const transformation = fc.record({
+    slope: fc.double({ min: 0.2, max: 5, noNaN: true }),
+    intercept: fc.double({ min: -3, max: 3, noNaN: true }),
+  });
+
+  it("chains associatively, and a link followed by its inverse is the identity", () => {
+    fc.assert(
+      fc.property(transformation, transformation, transformation, (first, second, third) => {
+        const left = chainTransformations([chainTransformations([first, second]), third]);
+        const right = chainTransformations([first, chainTransformations([second, third])]);
+        expectTransformation(left, right, 1e-9);
+        const inverse = { slope: 1 / first.slope, intercept: -first.intercept / first.slope };
+        expectTransformation(chainTransformations([first, inverse]), { slope: 1, intercept: 0 }, 1e-9);
+      }),
     );
   });
 

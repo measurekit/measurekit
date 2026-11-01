@@ -90,6 +90,37 @@ export function transformItem<TItem extends IrtItem>(item: TItem, transformation
 }
 
 /**
+ * Returns the transformation of the first scale of a chain of links to its last scale, link `i` moving scale `i` to
+ * scale `i + 1`.
+ *
+ * @remarks
+ * Composing θ₂ = A₁ θ₁ + B₁ with θ₃ = A₂ θ₂ + B₂ gives A = A₁ A₂ and B = A₂ B₁ + B₂, so the chain folds as B ← B Aᵢ + Bᵢ
+ * from A = 1 and B = 0. The chain carries the error of every link and gives no standard error of its own: consecutive
+ * links share the estimates of the form between them, so adding the errors of the links overstates the error of the
+ * chain.
+ *
+ * @param links - The transformations of the successive links, at least one.
+ * @throws `DataError` when `links` is not a non-empty array, a link is not a valid transformation, or the chain is not
+ * finite.
+ * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
+ */
+export function chainTransformations(links: readonly ScaleTransformation[]): ScaleTransformation {
+  checkArray(links, "The links of a chain must be an array");
+  if (links.length === 0) throw new DataError("A chain needs at least one link, found none.");
+  let slope = 1;
+  let intercept = 0;
+  links.forEach((link, i) => {
+    checkTransformation(link, `link ${i + 1}`);
+    intercept = intercept * link.slope + link.intercept;
+    slope *= link.slope;
+  });
+  if (!(Number.isFinite(slope) && slope > 0 && Number.isFinite(intercept))) {
+    throw new DataError("The chain of links has a slope or an intercept that is not finite or not positive.");
+  }
+  return { slope, intercept };
+}
+
+/**
  * Checks standard errors by parameter name.
  *
  * @throws `DataError` unless they are an object of non-negative numbers.
@@ -150,12 +181,13 @@ export function checkCommonItems(from: readonly IrtItem[], to: readonly IrtItem[
 /**
  * Checks that a transformation has a positive finite slope and a finite intercept.
  *
+ * @param noun - Names the transformation in the error message.
  * @throws `DataError` when it does not.
  */
-function checkTransformation(transformation: ScaleTransformation): void {
-  checkRecord(transformation, "A scale transformation must be an object { slope, intercept }");
-  checkPositive(transformation.slope, "The slope of a scale transformation");
-  checkFinite(transformation.intercept, "The intercept of a scale transformation");
+function checkTransformation(transformation: ScaleTransformation, noun = "a scale transformation"): void {
+  checkRecord(transformation, `${noun.charAt(0).toUpperCase()}${noun.slice(1)} must be an object { slope, intercept }`);
+  checkPositive(transformation.slope, `The slope of ${noun}`);
+  checkFinite(transformation.intercept, `The intercept of ${noun}`);
 }
 
 /** The slopes and locations of the common items on one scale. */

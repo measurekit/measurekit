@@ -4,7 +4,8 @@
 score a person will be reported on an official form. It covers a linear scale with rounding and bounds, conversion
 tables from total scores to scale scores, the conditional standard error of measurement of scale scores, the scale
 scores of equated scores, percentile ranks in a norm sample, and predictions from a posterior of theta. Every function
-is validated against R ([validation](validation.md)).
+is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
+has [its own guide](vertical-scaling.md).
 
 ## Scales
 
