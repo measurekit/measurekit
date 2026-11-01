@@ -179,7 +179,7 @@ pnpm bench            # builds, then the benchmarks of every package, one after 
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package: tsc -b after deleting dist/, so that no stale output ships
 pnpm check:packages   # builds, then publint and Are the Types Wrong on each packed package
-pnpm docs:api         # TypeDoc into docs/api, a section per package; fails on undocumented exports
+pnpm docs:api         # builds, then TypeDoc into docs/api, a section per package; fails on undocumented exports
 ```
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before

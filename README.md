@@ -50,7 +50,7 @@ pnpm bench            # the benchmarks of every package, against their budgets
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # the built packages
 pnpm check:packages   # publint and Are the Types Wrong on the packed packages
-pnpm docs:api         # TypeDoc into docs/api; fails on undocumented exports
+pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumented exports
 ```
 
 [AGENTS.md](AGENTS.md) states the conventions, [CONTRIBUTING.md](CONTRIBUTING.md) the process and
