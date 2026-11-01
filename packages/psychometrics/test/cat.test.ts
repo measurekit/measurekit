@@ -3805,7 +3805,11 @@ describe("properties", () => {
     const widths = fc.array(fc.integer({ min: 1, max: 4 }), { minLength: 1, maxLength: 2 });
     const populations = fc.option(
       fc
-        .uniqueArray(fc.double({ min: -4, max: 4, noNaN: true }), { minLength: 1, maxLength: 8 })
+        .uniqueArray(fc.double({ min: -4, max: 4, noNaN: true }), {
+          minLength: 1,
+          maxLength: 8,
+          comparator: "SameValueZero",
+        })
         .chain((nodes) => shares(nodes.length).map((weights) => ({ nodes: nodes.toSorted((x, y) => x - y), weights }))),
       { nil: undefined },
     );

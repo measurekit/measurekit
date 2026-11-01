@@ -356,7 +356,9 @@ Knowledge tracing: the model families never import each other, nor does anything
   arguments, a string for a number, an object for an array. Pass such input with `JSON.parse`, not a cast.
 - Properties that hold for any input (alpha at most 1, probabilities from 0 to 1, invariance to the order of persons,
   states left unchanged by `update`, states that continue identically after a JSON round trip, reproducible seeds) are
-  tested with fast-check.
+  tested with fast-check. A generator of distinct doubles is `fc.uniqueArray(..., { comparator: "SameValueZero" })`,
+  because the default comparison draws -0 and 0 as two values, though they are one cut or node; the GritQL plugin
+  `biome/unique-doubles-same-value-zero.grit` makes `pnpm lint` fail otherwise.
 - Edge cases are tested for every function: constant items, persons and items without responses, one item, two persons;
   an empty log, one learner, events out of time order, items and skills that are unknown, outcomes all correct or all
   wrong, and each model's limits, such as BKT parameters at their bounds or a posterior mode beyond the IRT grid.
