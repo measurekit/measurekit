@@ -35,6 +35,10 @@ links.
 with a correlation matrix you give: every posterior keeps its distribution, a correlation of 1 gives one quantile in all of
 them, and 0 gives independent draws. It forecasts a composite of several scores, or bounds one when the correlation is unknown.
 
+The testlet response model of `calibrate` works with `groups`: groups of persons, each with its own distribution of theta
+and the scale set by a standard normal group or fixed items, share one SD for each testlet, so that one concurrent
+calibration covers passages given to several grades or forms.
+
 `calibrate` regresses theta on persons' covariates with `covariates`: θ ~ N(xᵀβ, σ²), the coefficients estimated with the
 items. With items that estimate their slopes, σ is 1 and the coefficients are in units of the residual SD; with `fixed`
 items, which set the scale, σ is estimated. The result has a `regression` with the coefficients, the residual SD and, with

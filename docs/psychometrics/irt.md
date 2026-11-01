@@ -386,8 +386,19 @@ none are ordinary. Calibration integrates by the bifactor dimension reduction (G
 of theta, each testlet contributes Σ_g w_g Π_j P_j(x_j | θ + γ_g), so the quadrature is two-dimensional whatever the
 number of testlets. γ's nodes are those of theta with weights ∝ φ(γ / σ_d), as mirt's `bfactor`; θ + γ falls on a grid
 of 2Q - 1 points, at which each testlet item's probabilities are computed once per iteration. Each σ_d is updated, as a
-normal distribution's SD is, to match its weights' second moment to that of its expected counts. Theta stays N(0, 1);
-testlets take one group, the rectangular rule and standard errors `"none"` or `"hessian"`.
+normal distribution's SD is, to match its weights' second moment to that of its expected counts.
+
+| Option             | With `testlets`                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `groups`, `latent` | Allowed: theta follows the [group distributions](#groups-and-distributions-of-theta), with one σ per testlet in all groups |
+| `quadrature`       | The rectangular rule                                                                                                       |
+| `standardErrors`   | `"none"` or `"hessian"`                                                                                                    |
+| `covariates`       | Not allowed: the [latent regression](#latent-regression) replaces the distribution of theta                                |
+
+The testlet's integral does not depend on the group, so the groups share each σ, as they share the items' parameters:
+the effect of a passage is taken as a property of the passage. The scale is set as without testlets, by a standard normal
+group or `fixed` items, and a group with no respondents to a testlet adds nothing to its σ. A σ for each group is not
+estimated.
 
 `posteriorMeanEstimate(items, responses, { testlets })` scores the general theta with each testlet's effect integrated
 out: `testlets` lists `{ items, sd }`, the ids of each testlet's items and the calibrated SD, such as a calibration's

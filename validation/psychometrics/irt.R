@@ -1158,10 +1158,9 @@ testlet_log_likelihood <- function(par, x, testlet) {
   sum(largest + log(rowSums(exp(log_posterior - largest))))
 }
 
-# BFGS on the log-likelihood with its gradient by central differences, then Newton steps on optimHess; the standard
-# errors from the same Hessian, by the delta method for b and σ.
-testlet_maximum <- function(x, testlet, start) {
-  objective <- function(par) -testlet_log_likelihood(par, x, testlet)
+# BFGS on the negative log-likelihood `objective` with its gradient by central differences, then Newton steps on
+# optimHess; the covariance of the parameters is the inverse of the same Hessian.
+maximum_of <- function(objective, start) {
   gradient <- function(par) {
     sapply(seq_along(par), function(j) {
       step <- 1e-4 * max(1, abs(par[j]))
@@ -1175,7 +1174,11 @@ testlet_maximum <- function(x, testlet, start) {
   par <- optim(start, objective, gradient, method = "BFGS", control = list(reltol = 1e-15, maxit = 5000))$par
   for (step in 1:3) par <- par - solve(optimHess(par, objective, gradient), gradient(par))
   covariance <- solve(optimHess(par, objective, gradient))
-  list(par = par, covariance = covariance, logLikelihood = -objective(par))
+  list(par = par, covariance = covariance, logLikelihood = -objective(par), gradient = gradient(par))
+}
+
+testlet_maximum <- function(x, testlet, start) {
+  maximum_of(function(par) -testlet_log_likelihood(par, x, testlet), start)
 }
 
 # The EAP of theta with each testlet's effect integrated out: 61 rectangular nodes z on the N(0, 1) prior for theta and
@@ -1418,4 +1421,265 @@ write_fixture("irt-posterior", list(
                  "irt-science: the posterior of theta on 61 rectangular points by base R, on mirt's probtrace."),
   forms = list(posterior_case(two_pl, models_2pl, patterns),
                posterior_case(polytomous_fits$gpcm, science_models("gpcm"), science_selected))
+))
+
+# --- Testlet response model in groups -------------------------------------------------------------------------------
+# The testlets' integrals Σ_g w_g Π_j P_j(x_j | θ + γ_g) do not depend on the group, so the marginal likelihood of
+# persons in groups multiplies each person's group prior at the nodes of theta by the testlets' integrals. Base R
+# maximizes it, as above, over the free items' a and d, each testlet's ln σ, which the groups share, and the mean and ln
+# SD of each estimated normal group, on the grid of 21 nodes. A histogram of theta on fixed items is base R's EM with
+# measurekit's updates and stopping rule. Every person answered every item.
+
+# For each testlet: ln ℓ over the grid of θ + γ scaled by its largest value per person, the weights of γ and the
+# integral at each node of theta.
+testlet_pieces <- function(x, testlet, a, d, sd) {
+  nodes <- seq(-6, 6, length.out = TESTLET_POINTS)
+  sums <- seq(-12, 12, length.out = 2 * TESTLET_POINTS - 1)
+  lapply(seq_along(sd), function(t) {
+    items <- which(testlet == t)
+    z <- outer(sums, a[items]) + matrix(d[items], length(sums), length(items), byrow = TRUE)
+    responses <- x[, items, drop = FALSE]
+    s <- responses %*% t(plogis(z, log.p = TRUE)) + (1 - responses) %*% t(plogis(-z, log.p = TRUE))
+    v <- dnorm(nodes / sd[t])
+    v <- v / sum(v)
+    largest <- apply(s, 1, max)
+    e <- exp(s - largest)
+    integral <- sapply(seq_len(TESTLET_POINTS), function(q) e[, q:(q + TESTLET_POINTS - 1), drop = FALSE] %*% v)
+    list(e = e, v = v, integral = integral, log_integral = largest + log(integral))
+  })
+}
+
+testlet_normal_weights <- function(mean, sd) {
+  w <- dnorm(seq(-6, 6, length.out = TESTLET_POINTS), mean, sd)
+  w / sum(w)
+}
+
+# A problem: the responses, each item's testlet, each person's group (1, 2, ...), the distribution of each group
+# ("standard-normal", "normal" or "empirical-histogram"), the items' a and d where fixed, the free items, and the weights
+# of the groups that have a histogram. The parameters are the free items' a, then their d, then ln σ of each testlet, then
+# the mean and ln SD of each normal group.
+group_problem <- function(x, testlet, group, kinds, a, d, free, histograms = list()) {
+  list(x = x, testlet = testlet, group = group, kinds = kinds, a = a, d = d, free = free, histograms = histograms)
+}
+
+unpack_groups <- function(par, problem) {
+  k <- length(problem$free)
+  t <- length(unique(problem$testlet))
+  a <- problem$a
+  d <- problem$d
+  a[problem$free] <- par[seq_len(k)]
+  d[problem$free] <- par[k + seq_len(k)]
+  list(a = a, d = d, sd = exp(par[2 * k + seq_len(t)]), latent = matrix(par[-seq_len(2 * k + t)], ncol = 2, byrow = TRUE))
+}
+
+# The log weights of each group at the nodes of theta, by group, then node.
+group_log_weights <- function(u, problem) {
+  normal <- 0
+  t(sapply(seq_along(problem$kinds), function(g) {
+    if (problem$kinds[g] == "normal") {
+      normal <<- normal + 1
+      return(log(testlet_normal_weights(u$latent[normal, 1], exp(u$latent[normal, 2]))))
+    }
+    if (problem$kinds[g] == "empirical-histogram") return(log(problem$histograms[[g]]))
+    log(testlet_normal_weights(0, 1))
+  }))
+}
+
+# Each person's posterior over the nodes of theta, and the log-likelihood.
+group_posterior <- function(u, problem, pieces) {
+  log_joint <- group_log_weights(u, problem)[problem$group, , drop = FALSE]
+  for (piece in pieces) log_joint <- log_joint + piece$log_integral
+  largest <- apply(log_joint, 1, max)
+  posterior <- exp(log_joint - largest)
+  totals <- rowSums(posterior)
+  list(posterior = posterior / totals, logLikelihood = sum(largest + log(totals)))
+}
+
+# The negative log-likelihood. The testlets' integrals depend on the items and σ only, so they are kept while the
+# parameters of the groups move, as they do in the gradient by central differences.
+group_objective <- function(problem) {
+  last <- NULL
+  pieces <- NULL
+  function(par) {
+    u <- unpack_groups(par, problem)
+    key <- c(u$a, u$d, u$sd)
+    if (is.null(last) || any(key != last)) {
+      pieces <<- testlet_pieces(problem$x, problem$testlet, u$a, u$d, u$sd)
+      last <<- key
+    }
+    -group_posterior(u, problem, pieces)$logLikelihood
+  }
+}
+
+# The fixture of one case: the data, the options and the estimates with their standard errors, by the delta method for
+# b and for each SD.
+group_case <- function(name, ids, problem, labels, group_labels, fixed, start) {
+  maximum <- maximum_of(group_objective(problem), start)
+  stopifnot(max(abs(maximum$gradient)) < 1e-4)
+  u <- unpack_groups(maximum$par, problem)
+  errors <- sqrt(diag(maximum$covariance))
+  k <- length(problem$free)
+  t <- length(labels)
+  items <- lapply(seq_along(ids), function(j) {
+    m <- match(j, problem$free)
+    if (is.na(m)) return(list(parameters = fixed[[ids[j]]], standardErrors = NULL))
+    jacobian <- c(u$d[j] / u$a[j]^2, -1 / u$a[j])
+    block <- maximum$covariance[c(m, k + m), c(m, k + m)]
+    list(parameters = list(a = u$a[j], b = -u$d[j] / u$a[j], c = 0, d = 1),
+         standardErrors = list(a = errors[m], b = sqrt(drop(t(jacobian) %*% block %*% jacobian))))
+  })
+  normal <- 0
+  distributions <- lapply(seq_along(problem$kinds), function(g) {
+    if (problem$kinds[g] != "normal") return(list(mean = 0, sd = 1, standardErrors = NULL))
+    normal <<- normal + 1
+    at <- 2 * k + t + 2 * (normal - 1) + 1:2
+    sd <- exp(maximum$par[at[2]])
+    list(mean = maximum$par[at[1]], sd = sd, standardErrors = list(mean = errors[at[1]], sd = sd * errors[at[2]]))
+  })
+  list(name = name, itemIds = ids, responses = unname(problem$x), groups = group_labels[problem$group],
+       testlets = setNames(lapply(seq_len(t), function(s) ids[problem$testlet == s]), labels),
+       latent = setNames(as.list(problem$kinds), unique(group_labels))[problem$kinds != "standard-normal"],
+       fixed = fixed, items = items, sd = u$sd, sdStandardErrors = u$sd * errors[2 * k + seq_len(t)],
+       distributions = distributions, parameterCount = length(maximum$par), logLikelihood = maximum$logLikelihood)
+}
+
+# Responses of persons in groups to 2PL items in testlets: theta ~ N(mean, sd²) in each group, and a testlet effect with
+# its own SD for each testlet.
+simulate_testlet_groups <- function(sizes, means, sds, effect_sd, a, b, testlet) {
+  group <- rep(seq_along(sizes), sizes)
+  theta <- rnorm(length(group), means[group], sds[group])
+  effects <- sapply(effect_sd, function(s) rnorm(length(group), 0, s))
+  x <- sapply(seq_along(a), function(j) rbinom(length(group), 1, plogis(a[j] * (theta + effects[, testlet[j]] - b[j]))))
+  colnames(x) <- sprintf("q%02d", seq_along(a))
+  list(x = x, group = group, theta = theta)
+}
+
+# mirt's cross-check: bfactor with the groups, each item's slopes and intercept equal across them, each item's two
+# slopes equal, and the variance of each testlet equal across them and free, with the specific means fixed at 0. The
+# first group is standard normal and the other groups' general mean and variance are free.
+mirt_testlet_groups <- function(x, testlet, group) {
+  data <- as.data.frame(x)
+  group <- factor(group)
+  values <- bfactor(data, testlet, group = group, pars = "values",
+                    invariance = c("slopes", "intercepts", "free_means", "free_var"))
+  specific <- sprintf("COV_%d%d", 1 + unique(testlet), 1 + unique(testlet))
+  values$est[values$name %in% specific] <- TRUE
+  values$est[values$name %in% sprintf("MEAN_%d", 1 + unique(testlet))] <- FALSE
+  values$value[values$name %in% sprintf("MEAN_%d", 1 + unique(testlet))] <- 0
+  slopes <- unlist(lapply(levels(group), function(g) {
+    lapply(colnames(data), function(id) {
+      values$parnum[values$group == g & values$item == id & grepl("^a", values$name) & values$value != 0]
+    })
+  }), recursive = FALSE)
+  variances <- lapply(specific, function(name) values$parnum[values$name == name])
+  fit <- bfactor(data, testlet, group = group, pars = values, constrain = c(slopes, variances),
+                 invariance = c("slopes", "intercepts"), TOL = 1e-8, quadpts = TESTLET_POINTS, verbose = FALSE,
+                 technical = list(NCYCLES = 1e5))
+  stopifnot(extract.mirt(fit, "converged"))
+  as.numeric(logLik(fit))
+}
+
+set.seed(20261029)
+group_a <- round(runif(12, 0.8, 1.8), 2)
+group_b <- round(rnorm(12), 2)
+group_effect_sd <- c(0.5, 0.8, 1)
+group_testlet <- rep(1:3, each = 4)
+group_ids <- sprintf("q%02d", 1:12)
+testlet_labels <- c("t1", "t2", "t3")
+
+# The 2PL fit of all persons as a start: a, d, ln σ and the groups' means and ln SDs.
+pooled_start <- function(x, free, normal) {
+  pooled <- coef(mirt(as.data.frame(x), 1, itemtype = "2PL", verbose = FALSE), simplify = TRUE)$items
+  c(pooled[free, "a1"], pooled[free, "d"], log(rep(0.5, 3)), rep(c(0, 0), normal))
+}
+
+group_cases <- list()
+empty_object <- setNames(list(), character(0))
+
+# Two groups: the second has mean 0.6 and SD 1.2; the first is standard normal.
+draw <- simulate_testlet_groups(c(1000, 1000), c(0, 0.6), c(1, 1.2), group_effect_sd, group_a, group_b, group_testlet)
+problem <- group_problem(draw$x, group_testlet, draw$group, c("standard-normal", "normal"),
+                         rep(1, 12), rep(0, 12), 1:12)
+group_cases[[1]] <- group_case("two groups, 2PL testlets, base R maximum", group_ids, problem, testlet_labels,
+                               c("a", "b"), empty_object, pooled_start(draw$x, 1:12, 1))
+group_cases[[1]]$mirtLogLikelihood <- mirt_testlet_groups(draw$x, group_testlet, draw$group)
+message("Two groups: the maximum's log-likelihood exceeds mirt's by ",
+        group_cases[[1]]$logLikelihood - group_cases[[1]]$mirtLogLikelihood)
+stopifnot(abs(group_cases[[1]]$logLikelihood - group_cases[[1]]$mirtLogLikelihood) < 1e-3)
+
+# Three groups: the second has mean 0.5 and SD 1.1, the third mean -0.4 and SD 0.8.
+draw <- simulate_testlet_groups(c(700, 700, 700), c(0, 0.5, -0.4), c(1, 1.1, 0.8), group_effect_sd, group_a, group_b,
+                                  group_testlet)
+problem <- group_problem(draw$x, group_testlet, draw$group, c("standard-normal", "normal", "normal"),
+                         rep(1, 12), rep(0, 12), 1:12)
+group_cases[[2]] <- group_case("three groups, 2PL testlets, base R maximum", group_ids, problem, testlet_labels,
+                               c("a", "b", "c"), empty_object, pooled_start(draw$x, 1:12, 2))
+
+# Fixed items, one in each testlet and a second in the first, with a normal distribution in both groups: the anchors set
+# the scale, so that the means and SDs of both are estimated.
+anchors <- c(1, 2, 5, 9)
+fixed_items <- setNames(lapply(anchors, function(j) list(a = group_a[j], b = group_b[j], c = 0, d = 1)), group_ids[anchors])
+draw <- simulate_testlet_groups(c(800, 800), c(0.3, 0.9), c(0.9, 1.1), group_effect_sd, group_a, group_b, group_testlet)
+problem <- group_problem(draw$x, group_testlet, draw$group, c("normal", "normal"),
+                         group_a, -group_a * group_b, setdiff(1:12, anchors))
+group_cases[[3]] <- group_case("fixed items and normal groups, 2PL testlets, base R maximum", group_ids, problem,
+                               testlet_labels, c("a", "b"), fixed_items,
+                               pooled_start(draw$x, setdiff(1:12, anchors), 2))
+
+# A histogram on fixed items, base R's EM from the standard normal weights and testlet SDs of 1: each cycle the second
+# group's weights are its expected counts over their number, and each SD is the one whose weights have the second moment
+# of the expected counts of its testlet effect, until no weight and no SD changes by more than the tolerance.
+nodes <- seq(-6, 6, length.out = TESTLET_POINTS)
+latent_draw <- function(n) ifelse(runif(n) < 0.6, rnorm(n, -0.3, 0.6), rnorm(n, 1.2, 0.5))
+group <- rep(1:2, each = 800)
+theta <- ifelse(group == 1, rnorm(1600), latent_draw(1600))
+effects <- sapply(group_effect_sd, function(s) rnorm(1600, 0, s))
+x <- sapply(1:12, function(j) rbinom(1600, 1, plogis(group_a[j] * (theta + effects[, group_testlet[j]] - group_b[j]))))
+colnames(x) <- group_ids
+histogram_tolerance <- 1e-4
+weights <- testlet_normal_weights(0, 1)
+sd <- rep(1, 3)
+for (cycle in 1:1e5) {
+  problem <- group_problem(x, group_testlet, group, c("standard-normal", "empirical-histogram"), group_a,
+                           -group_a * group_b, integer(0), list(NULL, weights))
+  pieces <- testlet_pieces(x, group_testlet, group_a, -group_a * group_b, sd)
+  e <- group_posterior(unpack_groups(c(log(sd)), problem), problem, pieces)
+  updated <- colSums(e$posterior[group == 2, ]) / sum(group == 2)
+  updated_sd <- sapply(seq_along(sd), function(t) {
+    piece <- pieces[[t]]
+    factor <- e$posterior / piece$integral
+    counts <- piece$v * sapply(seq_len(TESTLET_POINTS), function(h) {
+      sum(factor * piece$e[, h:(h + TESTLET_POINTS - 1)])
+    })
+    target <- sum(counts * nodes^2) / sum(counts)
+    excess <- function(log_sd) {
+      w <- dnorm(nodes / exp(log_sd))
+      sum(w * nodes^2) / sum(w) - target
+    }
+    exp(uniroot(excess, log(c(1e-4, 1e4)), tol = 1e-14)$root)
+  })
+  change <- max(abs(updated_sd - sd), abs(updated - weights))
+  weights <- updated
+  sd <- updated_sd
+  if (change <= histogram_tolerance) break
+}
+stopifnot(change <= histogram_tolerance)
+problem <- group_problem(x, group_testlet, group, c("standard-normal", "empirical-histogram"), group_a,
+                         -group_a * group_b, integer(0), list(NULL, weights))
+histogram_log_likelihood <- group_posterior(unpack_groups(log(sd), problem), problem,
+                                            testlet_pieces(x, group_testlet, group_a, -group_a * group_b, sd))$logLikelihood
+all_fixed <- setNames(lapply(1:12, function(j) list(a = group_a[j], b = group_b[j], c = 0, d = 1)), group_ids)
+
+write_fixture("irt-testlet-groups", list(
+  source = paste("2PL testlet simulations with groups, set.seed(20261029): two groups of 1000 and 800, three of 700, in 3",
+                 "testlets of 4 items; base R's maximum of the marginal likelihood with the testlet SDs shared by the",
+                 "groups, mirt's bfactor with the same constraints as a cross-check, and base R's EM for a histogram."),
+  points = TESTLET_POINTS,
+  cases = group_cases,
+  histogram = list(
+    name = "a histogram of the second group on 12 fixed items in testlets, base R EM",
+    itemIds = group_ids, responses = unname(x), groups = c("a", "b")[group], testlets = list(t1 = group_ids[1:4],
+      t2 = group_ids[5:8], t3 = group_ids[9:12]), fixed = all_fixed, tolerance = histogram_tolerance,
+    iterations = cycle, weights = weights, sd = sd, logLikelihood = histogram_log_likelihood
+  )
 ))

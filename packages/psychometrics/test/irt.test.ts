@@ -69,6 +69,7 @@ import simulated4pl from "./fixtures/irt-simulated-4pl.json" with { type: "json"
 import simulatedMixed from "./fixtures/irt-simulated-mixed.json" with { type: "json" };
 import simulatedPcm from "./fixtures/irt-simulated-pcm.json" with { type: "json" };
 import testlet from "./fixtures/irt-testlet.json" with { type: "json" };
+import testletGroups from "./fixtures/irt-testlet-groups.json" with { type: "json" };
 import {
   arbitraryItem,
   arbitraryLocation,
@@ -124,6 +125,8 @@ const MARGINAL_RELIABILITY_TOLERANCE = 1e-8;
 const TESTLET_PARAMETER_TOLERANCE = 2e-5;
 /** Their standard errors, relative: numerical Hessians on both sides. */
 const TESTLET_STANDARD_ERROR_TOLERANCE = 1e-4;
+/** How far above measurekit's log-likelihood mirt's may be at its EM tolerance of 1e-8 on the parameters. */
+const MIRT_LOG_LIKELIHOOD_SLACK = 1e-6;
 
 /** Covariance matrices against the delta method on mirt's vcov and the base R Hessian, relative to √(Σ_ii Σ_jj). */
 const COVARIANCE_TOLERANCE = 1e-4;
@@ -2156,6 +2159,147 @@ describe("testlets", () => {
     });
   }
 
+  for (const reference of testletGroups.cases) {
+    it(`matches ${reference.name}`, () => {
+      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const result = calibrate(matrix, {
+        model: twoParameterLogistic,
+        groups: reference.groups,
+        latent: Object.fromEntries(
+          Object.entries(reference.latent).map(([group, name]) => [group, latentDistribution(name)]),
+        ),
+        fixed: definedEntries(reference.fixed),
+        testlets: definedEntries(reference.testlets),
+        quadrature: { points: testletGroups.points },
+        tolerance: 1e-8,
+        maxIterations: 100_000,
+        standardErrors: "hessian",
+      });
+      expect(result.converged).toBe(true);
+      reference.items.forEach((expected, i) => {
+        const actual = defined(result.items[i]);
+        expectParameters(actual.parameters, expected.parameters, TESTLET_PARAMETER_TOLERANCE, actual.id);
+        if (expected.standardErrors === null) {
+          expect(actual.standardErrors, actual.id).toBeNull();
+          return;
+        }
+        for (const [name, value] of Object.entries(expected.standardErrors)) {
+          const relative = TESTLET_STANDARD_ERROR_TOLERANCE * value;
+          expectClose(defined(actual.standardErrors?.[name]), value, relative, `${actual.id} SE of ${name}`);
+        }
+      });
+      result.testlets.forEach((actual, t) => {
+        expect(actual.items).toEqual(Object.values(definedEntries(reference.testlets))[t]);
+        expectClose(actual.sd, defined(reference.sd[t]), TESTLET_PARAMETER_TOLERANCE, `${actual.id} sd`);
+        const error = defined(reference.sdStandardErrors[t]);
+        expectClose(actual.standardError, error, TESTLET_STANDARD_ERROR_TOLERANCE * error, `${actual.id} SE`);
+      });
+      expect(result.groups.map((group) => group.group)).toEqual([...new Set(reference.groups)]);
+      reference.distributions.forEach((expected, g) => {
+        const actual = defined(result.groups[g]);
+        expectClose(actual.mean, expected.mean, TESTLET_PARAMETER_TOLERANCE, `mean of group ${g + 1}`);
+        expectClose(actual.sd, expected.sd, TESTLET_PARAMETER_TOLERANCE, `sd of group ${g + 1}`);
+        if (expected.standardErrors === null) {
+          expect(actual.standardErrors).toBeNull();
+          return;
+        }
+        const errors = defined(actual.standardErrors);
+        expectClose(
+          errors.mean,
+          expected.standardErrors.mean,
+          TESTLET_STANDARD_ERROR_TOLERANCE * errors.mean,
+          "SE of mean",
+        );
+        expectClose(errors.sd, expected.standardErrors.sd, TESTLET_STANDARD_ERROR_TOLERANCE * errors.sd, "SE of sd");
+      });
+      expectClose(result.logLikelihood, reference.logLikelihood, FIXED_LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
+      expectClose(result.aic, -2 * result.logLikelihood + 2 * reference.parameterCount, 1e-9, "AIC");
+      // mirt's bfactor with the same constraints stops at the maximum within its tolerance, never above it.
+      if (reference.mirtLogLikelihood !== undefined) {
+        expect(result.logLikelihood).toBeGreaterThanOrEqual(reference.mirtLogLikelihood - MIRT_LOG_LIKELIHOOD_SLACK);
+      }
+    });
+  }
+
+  it(`matches ${testletGroups.histogram.name}`, () => {
+    const { histogram } = testletGroups;
+    const result = calibrate(responseMatrix(histogram.responses, { itemIds: histogram.itemIds }), {
+      model: twoParameterLogistic,
+      groups: histogram.groups,
+      latent: { b: "empirical-histogram" },
+      fixed: definedEntries(histogram.fixed),
+      testlets: definedEntries(histogram.testlets),
+      quadrature: { points: testletGroups.points },
+      tolerance: histogram.tolerance,
+      maxIterations: 100_000,
+    });
+    expect(result).toMatchObject({ converged: true, iterations: histogram.iterations });
+    histogram.weights.forEach((weight, q) => {
+      expectClose(defined(result.groups[1]?.weights[q]), weight, HISTOGRAM_TOLERANCE, `weight ${q}`);
+    });
+    result.testlets.forEach((actual, t) => {
+      expectClose(actual.sd, defined(histogram.sd[t]), HISTOGRAM_TOLERANCE, `${actual.id} sd`);
+    });
+    expectClose(result.logLikelihood, histogram.logLikelihood, 1e-8, "log-likelihood");
+  });
+
+  it("estimates the same with the groups renamed and the persons in another order", () => {
+    const reference = defined(testletGroups.cases[0]);
+    const options = {
+      model: twoParameterLogistic,
+      latent: { second: latentDistribution("normal") },
+      testlets: definedEntries(reference.testlets),
+      quadrature: { points: testletGroups.points },
+      tolerance: 1e-8,
+      maxIterations: 100_000,
+    };
+    const persons = reference.responses.length;
+    const order = Array.from({ length: persons }, (_, p) => (p * 7 + 3) % persons);
+    const first = calibrate(responseMatrix(reference.responses, { itemIds: reference.itemIds }), {
+      ...options,
+      groups: reference.groups.map((group) => (group === "a" ? "first" : "second")),
+    });
+    const shuffled = calibrate(
+      responseMatrix(
+        order.map((p) => defined(reference.responses[p])),
+        { itemIds: reference.itemIds },
+      ),
+      { ...options, groups: order.map((p) => (defined(reference.groups[p]) === "a" ? "first" : "second")) },
+    );
+    first.items.forEach((item, i) => {
+      expectParameters(defined(shuffled.items[i]).parameters, item.parameters, 1e-6, item.id);
+    });
+    first.testlets.forEach((testletEstimate, t) => {
+      expectClose(defined(shuffled.testlets[t]).sd, testletEstimate.sd, 1e-6, testletEstimate.id);
+    });
+    expectClose(defined(shuffled.groups[1]).mean, defined(first.groups[1]).mean, 1e-6, "mean");
+    expectClose(shuffled.logLikelihood, first.logLikelihood, 1e-6, "log-likelihood");
+  });
+
+  it("lets a group with no respondents to a testlet leave that testlet's SD to the other groups", () => {
+    const reference = defined(testletGroups.cases[0]);
+    const skipped = new Set(defined(Object.values(reference.testlets)[1]));
+    const rows = reference.responses.map((row, p) =>
+      reference.groups[p] === "b"
+        ? row.map((value, j) => (skipped.has(defined(reference.itemIds[j])) ? null : value))
+        : row,
+    );
+    const result = calibrate(responseMatrix(rows, { itemIds: reference.itemIds }), {
+      model: twoParameterLogistic,
+      groups: reference.groups,
+      latent: { b: "normal" },
+      testlets: definedEntries(reference.testlets),
+      quadrature: { points: testletGroups.points },
+      tolerance: 1e-6,
+      maxIterations: 100_000,
+    });
+    expect(result.converged).toBe(true);
+    for (const { sd } of result.testlets) {
+      expect(sd).toBeGreaterThan(0);
+      expect(Number.isFinite(sd)).toBe(true);
+    }
+  });
+
   it("keeps a testlet's SD finite when the data leave no room for testlet effects", () => {
     const matrix = responseMatrix([
       [1, 1, 0, 1, 0, 1],
@@ -2202,9 +2346,19 @@ describe("testlets", () => {
     expect(() =>
       calibrate(matrix, { ...options, testlets, quadrature: { method: "gauss-hermite", points: 21 } }),
     ).toThrow("Testlets need the rectangular quadrature rule.");
+    const groups = rows.map((_, p) => (p < 100 ? "a" : "b"));
+    expect(() => calibrate(matrix, { ...options, testlets, groups, latent: "normal" })).toThrow(
+      "Estimating every group's distribution of theta needs fixed items or a standard normal group to fix the scale.",
+    );
     expect(() =>
-      calibrate(matrix, { ...options, testlets, groups: rows.map((_, p) => (p < 100 ? "a" : "b")) }),
-    ).toThrow("Testlets need one group whose theta is standard normal.");
+      calibrate(matrix, {
+        ...options,
+        testlets,
+        groups,
+        latent: { b: "normal" },
+        quadrature: { method: "gauss-hermite" },
+      }),
+    ).toThrow("Testlets need the rectangular quadrature rule.");
     expect(() => calibrate(matrix, { ...options, testlets, standardErrors: "cross-product" })).toThrow(
       'Testlets need the standard errors "none" or "hessian".',
     );

@@ -129,7 +129,7 @@ export function setUp<TParameters>(
   checkItemPriorNames(priorsOfItem, items);
   const groups = population(options, answered, rule, rectangular, Object.keys(fixed).length > 0, addFree);
   if (design !== null) {
-    checkTestletOptions(options, groups);
+    checkTestletOptions(options);
     testletWeights(design, Float64Array.from(values), rule.nodes);
   }
   return { items, population: groups, design, free, values: Float64Array.from(values) };
@@ -232,14 +232,12 @@ function isList<T>(value: T | readonly T[]): value is readonly T[] {
 }
 
 /**
- * Checks that testlets come with one standard normal group and standard errors the testlet model supports.
+ * Checks that testlets come with standard errors the testlet model supports. The groups and their distributions of
+ * theta need no check: the testlets' integrals do not depend on the group, and `population` checks the scale.
  *
- * @throws `DataError` when they do not.
+ * @throws `DataError` when the standard errors are the cross-product.
  */
-function checkTestletOptions<TParameters>(options: CalibrationOptions<TParameters>, population: Population): void {
-  if (population.groups.length > 1 || population.groups[0]?.distribution !== "standard-normal") {
-    throw new DataError("Testlets need one group whose theta is standard normal.");
-  }
+function checkTestletOptions<TParameters>(options: CalibrationOptions<TParameters>): void {
   if (options.standardErrors === "cross-product") {
     throw new DataError('Testlets need the standard errors "none" or "hessian".');
   }

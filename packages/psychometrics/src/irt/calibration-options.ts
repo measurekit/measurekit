@@ -79,8 +79,9 @@ export interface CalibrationOptions<TParameters> {
   readonly standardErrors?: StandardErrorMethod;
   /**
    * Testlets by id, each the ids of its items, such as the items of a reading passage, for the testlet response model:
-   * an item of a testlet answers at θ + γ, with γ ~ N(0, σ²) per person and testlet. Testlets need one group with the
-   * standard normal, the rectangular rule, and standard errors `"none"` or `"hessian"`.
+   * an item of a testlet answers at θ + γ, with γ ~ N(0, σ²) per person and testlet, and one σ per testlet in all groups.
+   * Testlets need the rectangular rule, a standard normal group or fixed items to fix the scale, and standard errors
+   * `"none"` or `"hessian"`.
    *
    * @defaultValue none: the items answer independently given theta
    */
