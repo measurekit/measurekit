@@ -11,13 +11,34 @@ DAKS ([validation](validation.md#knowledge-space-theory)).
 A structure is plain data: `{ domain, states }`, the elements, skills or items, and each state's elements. It contains
 the empty state and the whole domain.
 
-| Function                                   | Returns                                                                                 |
-| ------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `surmiseStructure(prerequisites, options)` | The quasi-ordinal space: every set that holds the prerequisites of each of its elements |
-| `isKnowledgeSpace(structure)`              | Whether the union of any two states is a state                                          |
-| `isLearningSpace(structure)`               | Whether it is a knowledge space whose every state can be learned one element at a time  |
-| `fringes(structure, state)`                | `{ inner, outer }`: the elements last learned, and those ready to learn                 |
-| `delineate(structure, qMatrix)`            | The item structure of a skill structure: an item is in a state when all its skills are  |
+```mermaid
+flowchart LR
+  P["surmiseStructure<br/>prerequisites"] --> S[(structure)]
+  C["clauseStructure<br/>alternative prerequisites"] --> S
+  G["unionClosure<br/>states to start from"] --> S
+  S --> K["structureBase<br/>structureAtoms"]
+  S --> T["structureTrace<br/>notions<br/>delineate"]
+  S --> L["isKnowledgeSpace<br/>isLearningSpace<br/>isWellGraded"]
+  S --> M["fringes<br/>neighbourhood<br/>learningPaths"]
+  S --> F["kst<br/>a learner model"]
+```
+
+| Function                                   | Returns                                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `surmiseStructure(prerequisites, options)` | The quasi-ordinal space: every set that holds the prerequisites of each of its elements                           |
+| `clauseStructure(clauses, options)`        | The space of elements that each need one of several sets of elements: alternative prerequisites                   |
+| `unionClosure(domain, states, options)`    | The smallest knowledge space that holds the states: their unions, the empty state and the whole domain            |
+| `isKnowledgeSpace(structure)`              | Whether the union of any two states is a state                                                                    |
+| `isLearningSpace(structure)`               | Whether it is a knowledge space whose every state can be learned one element at a time                            |
+| `isWellGraded(structure)`                  | Whether any two states are joined by states that each differ from the next by one element, as many as they differ |
+| `fringes(structure, state)`                | `{ inner, outer }`: the elements last learned, and those ready to learn                                           |
+| `neighbourhood(structure, state, options)` | The states that differ from a state by at least one and at most `distance` elements                               |
+| `learningPaths(structure, options)`        | The orders in which the whole domain is learned from the empty state, one element at a step                       |
+| `structureBase(structure)`                 | The base of a knowledge space: its states that are no union of other states                                       |
+| `structureAtoms(structure, element)`       | The atoms of an element: the smallest states that hold it                                                         |
+| `structureTrace(structure, elements)`      | The structure that its states leave on some elements                                                              |
+| `notions(structure)`                       | The classes of elements that are in the same states                                                               |
+| `delineate(structure, qMatrix)`            | The item structure of a skill structure: an item is in a state when all its skills are                            |
 
 ```ts
 import { fringes, isLearningSpace, surmiseStructure } from "@measurekit/knowledge-tracing/kst";
@@ -39,9 +60,46 @@ elsewhere, such as JSON from storage, is checked in full each time a function ta
 states ([memory and time](storage.md#memory-and-time)). `kst` checks its structure when it builds the model, not at each
 call of the model.
 
-A learner's state holds a probability for each knowledge state, so `surmiseStructure` stops at `maxStates`, default
-`10000`, with a `DataError` that suggests splitting the domain into units, such as chapters, with a structure each.
-Independent elements multiply the states: 14 independent skills give 16,384.
+A learner's state holds a probability for each knowledge state, so `surmiseStructure`, `clauseStructure` and
+`unionClosure` stop at `maxStates`, default `10000`, with a `DataError` that suggests splitting the domain into units,
+such as chapters, with a structure each. Independent elements multiply the states: 14 independent skills give 16,384.
+
+### Alternative prerequisites
+
+`clauseStructure` takes each element's clauses, the sets of elements any one of which lets a learner learn it:
+`{ c: [["a"], ["b", "d"]] }` lets a learner who has a, or has both b and d, learn c. An element with no clauses, or
+with an empty clause, needs nothing.
+
+```ts
+import { clauseStructure, isLearningSpace, learningPaths } from "@measurekit/knowledge-tracing/kst";
+
+const space = clauseStructure({ a: [], b: [], c: [["a"], ["b", "d"]], d: [["a"]] });
+space.states.length; // 10
+isLearningSpace(space); // true
+learningPaths(space).length; // 8
+```
+
+The states grow one element at a time from the empty state, so every state can be learned element by element and the
+result is a learning space. An element that no order of clauses reaches, such as one in a cycle, throws, naming it.
+`surmiseStructure` has one clause for each element, and learns elements that require each other together; with clauses
+they cannot be learned.
+
+### Closure, base and atoms
+
+A knowledge space is closed under union, so its base, the states that are no union of others, holds all of it: `unionClosure(domain, structureBase(space))`
+gives the space back. `structureAtoms` lists the smallest states that hold an element, which are the ways a learner can
+come to know it.
+
+| Function        | Limit                                                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `structureBase` | Throws for a structure that is not a knowledge space                                                                                    |
+| `learningPaths` | `maxPaths`, default `10000`: the paths of independent elements grow as a factorial, and more throw a `DataError` that suggests the base |
+| `isWellGraded`  | Compares every pair of states, so takes time quadratic in their number, as `isKnowledgeSpace` does                                      |
+| `neighbourhood` | `distance`, default `1`: states that add or lose one element                                                                            |
+
+A learning path is a maximal chain of states in which each state adds one element to the one before. In a well-graded
+structure every maximal chain is one. A structure that is not well-graded can have chains with a step of several
+elements, which are not paths here, and may have no path at all.
 
 ## The model
 
@@ -128,6 +186,10 @@ Remove asked items from the candidates, or an uncertain item is asked again. The
 gives what the learner is ready to learn; its items are the candidates of [practice](practice.md#next-item)'s
 `recommend`.
 
+A learner's knowledge state is assumed constant: the probabilities narrow with every answer and do not follow learning,
+and an item answered twice counts twice. For learners who change while they practice, use a model of learning, such as
+[BKT](bkt.md) or [Elo](elo.md).
+
 ## Inductive item tree analysis
 
 `iita(log, { version })` derives prerequisites between items from answers (Schrepp, 2003; Sargin and Ünlü, 2009).
@@ -153,6 +215,7 @@ space.
 - Doignon, J.-P., & Falmagne, J.-C. (1999). Knowledge Spaces. Springer.
 - Falmagne, J.-C., & Doignon, J.-P. (1988). A class of stochastic procedures for the assessment of knowledge. British
   Journal of Mathematical and Statistical Psychology, 41(1), 1-23.
+- Falmagne, J.-C., & Doignon, J.-P. (2011). Learning Spaces. Springer.
 - Heller, J., & Wickelmaier, F. (2013). Minimum discrepancy estimation in probabilistic knowledge structures.
   Electronic Notes in Discrete Mathematics, 42, 49-56.
 - Sargin, A., & Ünlü, A. (2009). Inductive item tree analysis: Corrections, improvements, and comparisons.

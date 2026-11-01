@@ -141,7 +141,7 @@ packages/knowledge-tracing/   the published package @measurekit/knowledge-tracin
   src/bkt/              Bayesian knowledge tracing with pyBKT's extensions
   src/logistic/         AFM, PFA and LKT features, with fixed or random proficiency
   src/irt/              online IRT: the posterior of ability on a grid, from calibrated item parameters
-  src/kst/              knowledge structures, the basic local independence model, IITA, adaptive assessment
+  src/kst/              knowledge structures and their tools, the basic local independence model, IITA, adaptive assessment
   src/practice/         the next item by predicted success, mastery criteria, attempts to a streak
   src/sim/              outcomes simulated from any learner model
   test/<module>.test.ts one file per src folder; fixtures/ holds the reference results

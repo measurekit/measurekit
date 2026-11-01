@@ -75,7 +75,7 @@ export function fringes(structure: KnowledgeStructure, state: readonly string[])
 }
 
 /** Returns the index of a state given as elements, throwing a `DataError` when it is not a state of the structure. */
-function stateIndex(compiled: CompiledStructure, state: readonly string[]): number {
+export function stateIndex(compiled: CompiledStructure, state: readonly string[]): number {
   checkArray(state, "A knowledge state must be a list of elements");
   const probe = new Uint32Array(compiled.words);
   for (const element of state) {

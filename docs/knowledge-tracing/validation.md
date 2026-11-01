@@ -214,6 +214,23 @@ DAKS's `simu`, with `set.seed(20261029)`:
 | IITA: selection sets, `diff` of each quasi-order, the choice, the error rate | `DAKS::ind_gen` and `iita(v = 1, 2, 3)` on `pisa` and 3 simulated data sets                                                                               |
 | Adaptive assessment                                                          | The half-split question and Bayes' rule written out in base R; `kst::kassess` without errors                                                              |
 
+`validation/knowledge-tracing/kst-structure.R` runs kst's structure functions on the same example data, on 2 quasi-ordinal spaces
+and on 8 random families of states, and writes the clause fixtures, with `set.seed(20261029)`:
+
+| Quantity                               | Reference                                                                                                                                                    | Tolerance |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
+| Base of a space; atoms of each element | `kst::kbase`, which throws for a structure that is not a space, and `katoms`                                                                                 | Exact     |
+| Neighbourhoods at distance 1, 2 and 3  | `kst::kneighbourhood`, `knneighbourhood`                                                                                                                     | Exact     |
+| Well-gradedness                        | `kst::kstructure_is_wellgraded`, checked in the script against the definition by a search for tight paths in base R, on every structure of at most 30 states | Exact     |
+| Learning paths                         | `kst::lpath`: the chains whose steps each add one element, as orders of elements                                                                             | Exact     |
+| Traces; notions                        | `kst::ktrace`, `knotions`                                                                                                                                    | Exact     |
+| Closure under union                    | `kst::kspace`, on 8 families of generators                                                                                                                   | Exact     |
+| Spaces from clauses                    | Base R enumeration of the subsets of 15 clause systems, and `kst::kspace` of the `kbase` of each, which gives the same space                                 | Exact     |
+
+Results are sets of states, compared without regard to order. kst's `lpath` returns every maximal chain of the inclusion
+order, including chains with a step of several elements, which `learningPaths` leaves out. `katoms` matches an element's
+name as a pattern, so for ids that another id contains it returns wrong atoms; the fixtures use ids that no other contains.
+
 A learning space is a well-graded knowledge space, equivalently one in which every non-empty state has an element
 whose removal leaves a state (Cosyn and Uzun, 2009); kst's well-gradedness test takes minutes on the chess structure,
 so pks's `is.downgradable` is the reference there.
@@ -319,6 +336,8 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `logistic-glm.json`             | `set.seed(20261029)`: 80 learners, 40 attempts each at 14 items of 5 skills, 4 items of two skills                                                  | Fixed, one-skill fixed, no and random proficiency                        |
 | `irt-abilities.json`            | The learners above                                                                                                                                  | Every item model, extreme patterns, a shifted prior and a coarser grid   |
 | `kst-structures.json`           | 6 surmise relations; pks's `DoignonFalmagne7` and `chess` `dst1`, a space with a gap, a structure that is not a space; a map of 5 items to 4 skills | Equivalent elements, spaces that are not learning spaces                 |
+| `kst-structure-tools.json`      | The 6 structures above and 8 random families of states; 8 families of generators of a closure                                                       | Spaces with a gap, structures that are not spaces, no path               |
+| `kst-structure-clauses.json`    | 15 clause systems of 2 to 7 elements, with the spaces that enumeration gives                                                                        | Cycles, an element that is its own clause, empty clauses                 |
 | `kst-blim.json`                 | `DoignonFalmagne7`: 1000 learners, 5 items, 9 states; `chess`: 92 learners, 16 items, 57 states                                                     | Rates at the bound, states of probability 0                              |
 | `kst-iita.json`                 | DAKS's `pisa`: 340 learners, 5 items; 3 sets of 300 learners and 7 items from `simu`                                                                | Every version, selection sets with conflicting pairs                     |
 | `kst-assessment.json`           | Every state of `DoignonFalmagne7` as the true one, answers drawn with pks's ML estimates                                                            | Stopping at 0.8, questions asked again                                   |

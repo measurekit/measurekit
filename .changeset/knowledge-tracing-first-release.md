@@ -3,7 +3,8 @@
 ---
 
 Knowledge tracing for JavaScript and TypeScript, validated against pyBKT and R: Bayesian knowledge tracing, logistic
-models, Elo, online IRT and knowledge space theory, with serializable learner state, practice recommendations and
+models, Elo, online IRT and knowledge space theory, including structures from alternative prerequisites, closure under union, bases,
+atoms, traces, learning paths and neighbourhoods, with serializable learner state, practice recommendations and
 evaluation by cross-validation and learning curves.
 
 An event may carry no outcome: `outcome: null` is a learning opportunity, such as a lesson or a video, which every model

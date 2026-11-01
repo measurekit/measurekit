@@ -1,18 +1,9 @@
-import { checkIntegerFrom, checkOptions, DataError, describe, isRecord } from "@measurekit/core";
+import { checkOptions, DataError, describe, isRecord } from "@measurekit/core";
+import { checkMaxStates, type StateLimitOptions, tooManyStates } from "./build.js";
 import { compareStates, type KnowledgeStructure, seal } from "./structure.js";
 
-/** The default limit on the number of knowledge states a structure is built with. */
-const DEFAULT_MAX_STATES = 10_000;
-
 /** Options of {@link surmiseStructure}. */
-export interface SurmiseStructureOptions {
-  /**
-   * The most knowledge states to build; more throw a `DataError`, as a learner's state holds a probability for each.
-   *
-   * @defaultValue `10000`
-   */
-  readonly maxStates?: number;
-}
+export type SurmiseStructureOptions = StateLimitOptions;
 
 /**
  * Returns the quasi-ordinal knowledge space of a surmise relation: every set of elements that holds the prerequisites
@@ -104,9 +95,7 @@ function downsets(below: Uint8Array, m: number, maxStates: number): number[][] {
   const visit = (position: number): void => {
     if (position === order.length) {
       if (states.length === maxStates) {
-        throw new DataError(
-          `The structure has more than ${maxStates} knowledge states. Split the domain into units, such as chapters, and build a structure for each, or raise maxStates.`,
-        );
+        throw tooManyStates(maxStates);
       }
       const state: number[] = [];
       chosen.forEach((flag, c) => {
@@ -131,9 +120,4 @@ function countBelow(below: Uint8Array, m: number, e: number): number {
   let count = 0;
   for (let i = 0; i < m; i++) count += below[e * m + i] ?? 0;
   return count;
-}
-
-function checkMaxStates(maxStates: number = DEFAULT_MAX_STATES): number {
-  checkIntegerFrom(maxStates, "The option maxStates", 2);
-  return maxStates;
 }
