@@ -335,8 +335,11 @@ Rscript validation/benchmarks.R table
 ## Budgets
 
 A benchmark fails when its fastest sample is above its budget, which is in `packages/<package>/test/budgets.ts`. The fastest
-sample is the least affected by the other work of a shared machine. The budget of a time is five times the median of the
-fastest samples of three runs, rounded up to one significant digit. The factor allows for CI hardware two to three times
-slower than the laptop, and for noise; it is far below the cost of the changes that the budgets exist to catch. The `bench`
-job of the CI workflow runs the benchmarks on every change. A budget changes only with the reason in the commit that
-changes it.
+sample is the least affected by the other work of a shared machine. The budget of a time is five times the median, over the
+last runs of the `bench` job, of the fastest sample that the CI runner took, rounded up to one significant digit. The sample
+is the runner's, because the gate runs there: the runner took a median of 2.5 times as long as a laptop with an Apple M5 and
+up to 6 times as long (`numerics.logistic`), so a budget holds on a machine up to about five times slower than the runner,
+and on a slower one only the ratios to the references apply. The factor allows for the noise of a shared runner, whose
+fastest samples of one benchmark differed by a median of 1.9 times and by up to 3.2 times between runs; every budget stands at
+least 2.9 times above the slowest of those samples. It is far below the cost of the changes that the budgets exist to catch.
+A budget changes only with the reason in the commit that changes it.
