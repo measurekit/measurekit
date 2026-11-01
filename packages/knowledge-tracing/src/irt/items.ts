@@ -1,5 +1,16 @@
-import { checkRecord, DataError, describe, isUnitInterval, logistic, logLogistic } from "@measurekit/core";
-import { indexOfMax } from "../math/extremes.js";
+import {
+  checkRecord,
+  DataError,
+  describe,
+  gradedProbabilities,
+  logistic,
+  logisticProbabilities,
+  logLogistic,
+  orderedThresholds,
+  partialCreditProbabilities,
+  type ThresholdItem,
+  validAsymptotes,
+} from "@measurekit/core";
 
 /**
  * An item's parameters in the IRT form of mirt and `@measurekit/psychometrics`, D = 1. A dichotomous item has
@@ -32,23 +43,15 @@ export interface DichotomousItem {
  * A graded response item (Samejima): P(category ≥ k) = logistic(a (θ - b_k)), with thresholds increasing when a > 0
  * and decreasing when a < 0.
  */
-export interface GradedItem {
+export interface GradedItem extends ThresholdItem {
   /** The model: `"graded"`. */
   readonly model: "graded";
-  /** The discrimination. */
-  readonly a: number;
-  /** The thresholds b_1 to b_{K-1}. */
-  readonly b: readonly number[];
 }
 
 /** A generalized partial credit item (Muraki): P(k) ∝ exp(Σ_{j ≤ k} a (θ - b_j)). */
-export interface PartialCreditItem {
+export interface PartialCreditItem extends ThresholdItem {
   /** The model: `"gpcm"`. */
   readonly model: "gpcm";
-  /** The discrimination. */
-  readonly a: number;
-  /** The step thresholds b_1 to b_{K-1}. */
-  readonly b: readonly number[];
 }
 
 /** Returns the number of categories of an item: 2 for a dichotomous one. */
@@ -66,30 +69,31 @@ export function categoryTerms(item: IrtItem, k: number, theta: number, out: Floa
 }
 
 /**
- * Returns the log-probability of category k at θ: the first of the terms {@link categoryTerms} writes, without the
- * derivatives that a prediction does not use.
- */
-function categoryLogProbability(item: IrtItem, k: number, theta: number, terms: Float64Array): number {
-  if ("model" in item) {
-    categoryTerms(item, k, theta, terms);
-    return terms[0] ?? 0;
-  }
-  const { a, b, c = 0, d = 1 } = item;
-  const z = a * (theta - b);
-  const floor = k === 1 ? c : 1 - d;
-  if (floor === 0) return Math.log(d - c) + logLogistic(k === 1 ? z : -z);
-  return Math.log(floor + (d - c) * (k === 1 ? logistic(z) : logistic(-z)));
-}
-
-/**
  * Returns the expected outcome at θ: the expected category over K - 1, P(correct) for a dichotomous item. `terms` is
- * scratch space for a polytomous item's terms, which callers evaluating many θ share.
+ * scratch space of at least 2 values for a dichotomous item, which callers evaluating many θ share.
  */
 export function expectedOutcome(item: IrtItem, theta: number, terms: Float64Array): number {
-  const count = categoryCount(item);
+  if (!("model" in item)) {
+    const { a, b, c = 0, d = 1 } = item;
+    logisticProbabilities(a * (theta - b), c, d, terms);
+    return terms[1] ?? 0;
+  }
+  const count = item.b.length + 1;
+  const probabilities = scratchOf(count);
+  if (item.model === "graded") gradedProbabilities(item.a, item.b, theta, probabilities);
+  else partialCreditProbabilities(item.a, 0, item.b, theta, probabilities);
   let sum = 0;
-  for (let k = 1; k < count; k++) sum += k * Math.exp(categoryLogProbability(item, k, theta, terms));
+  for (let k = 1; k < count; k++) sum += k * (probabilities[k] ?? 0);
   return sum / (count - 1);
+}
+
+/** The logits or probabilities of one polytomous item at a time: the calls are synchronous, so one array serves them. */
+let scratch = new Float64Array(0);
+
+/** Returns the scratch space for `count` values, grown when it is too small. */
+function scratchOf(count: number): Float64Array {
+  if (scratch.length < count) scratch = new Float64Array(count);
+  return scratch;
 }
 
 /**
@@ -141,18 +145,20 @@ function gradedTerms(item: GradedItem, k: number, theta: number, out: Float64Arr
 function partialCreditTerms(item: PartialCreditItem, k: number, theta: number, out: Float64Array): void {
   // ln P(k) = z_k - ln Σ exp(z_j), z_j = Σ_{i ≤ j} a (θ - b_i); its derivatives are a (k - E[j]) and -a² Var(j).
   const count = item.b.length + 1;
-  const z = new Float64Array(count);
+  const z = scratchOf(count);
+  z[0] = 0;
   for (let j = 1; j < count; j++) z[j] = (z[j - 1] ?? 0) + item.a * (theta - (item.b[j - 1] ?? 0));
-  const top = z[indexOfMax(z)] ?? 0;
+  let top = 0;
+  for (let j = 1; j < count; j++) top = Math.max(top, z[j] ?? 0);
   let total = 0;
   let mean = 0;
   let squares = 0;
-  z.forEach((value, j) => {
-    const weight = Math.exp(value - top);
+  for (let j = 0; j < count; j++) {
+    const weight = Math.exp((z[j] ?? 0) - top);
     total += weight;
     mean += j * weight;
     squares += j * j * weight;
-  });
+  }
   mean /= total;
   out[0] = (z[k] ?? 0) - top - Math.log(total);
   out[1] = item.a * (k - mean);
@@ -170,7 +176,7 @@ export function checkItem(item: IrtItem, id: string): void {
 
 function checkDichotomous({ b, c = 0, d = 1 }: DichotomousItem, label: string): void {
   if (!Number.isFinite(b)) throw new DataError(`${label} needs b, a finite number, found ${describe(b)}.`);
-  if (!(isUnitInterval(c) && isUnitInterval(d) && c < d)) {
+  if (!validAsymptotes(c, d)) {
     throw new DataError(`${label} needs 0 ≤ c < d ≤ 1, found c = ${describe(c)} and d = ${describe(d)}.`);
   }
 }
@@ -184,7 +190,7 @@ function checkPolytomous(item: GradedItem | PartialCreditItem, label: string): v
   if (!(Array.isArray(b) && b.length > 0 && b.every(Number.isFinite))) {
     throw new DataError(`${label} needs b, a non-empty array of finite thresholds, found ${describe(b)}.`);
   }
-  if (model === "graded" && !b.every((value, j) => j === 0 || a * (value - (b[j - 1] ?? 0)) > 0)) {
+  if (model === "graded" && !orderedThresholds(a, b)) {
     throw new DataError(
       `${label} is graded, so needs thresholds b strictly increasing when a > 0 and decreasing when a < 0, found a = ${a}, b = ${b.join(", ")}.`,
     );

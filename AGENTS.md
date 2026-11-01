@@ -87,7 +87,9 @@ packages/core/                the published package @measurekit/core
                         checkPositiveInteger, checkIntegerFrom, checkUnitInterval, checkSeed, checkStopping
   src/random.ts         Random, createRandom and shuffle
   src/normal.ts         normalQuantile
-  src/logistic.ts       logistic, logLogistic
+  src/logistic.ts       logistic, logLogistic, logisticPair
+  src/item-probabilities.ts LogisticItem and ThresholdItem; the category probabilities of logistic, graded and partial
+                        credit items, softmax, validAsymptotes, orderedThresholds
   src/normalize-logs.ts normalizeLogs
   src/cholesky.ts       cholesky
   src/iteration.ts      Stopping, Convergence, iterateToConvergence

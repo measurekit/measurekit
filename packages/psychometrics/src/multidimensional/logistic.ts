@@ -1,4 +1,4 @@
-import { DataError, describe, isRecord } from "@measurekit/core";
+import { DataError, describe, isRecord, logisticPair, logisticProbabilities, validAsymptotes } from "@measurekit/core";
 import type { ModelParameter } from "../irt/model.js";
 import type { MultidimensionalModel } from "./model.js";
 
@@ -20,7 +20,7 @@ export interface MultidimensionalLogisticParameters {
 
 const LOWER_ASYMPTOTE: ModelParameter = { name: "c", lower: 0, upper: 1 };
 
-/** The two logistic values of {@link logisticPair} that a model reads at once: the calls are synchronous. */
+/** The two logistic values of `logisticPair` that a model reads at once: the calls are synchronous. */
 const tails = new Float64Array(2);
 
 /** The multidimensional two-parameter logistic model (M2PL): slopes and an intercept per item, `c = 0`, `d = 1`. */
@@ -39,8 +39,7 @@ export const multidimensionalThreeParameterLogistic: MultidimensionalModel<Multi
 function checkLogisticParameters(name: string, parameters: MultidimensionalLogisticParameters): void {
   const { a, intercept, c, d }: Partial<MultidimensionalLogisticParameters> = isRecord(parameters) ? parameters : {};
   const slopes = Array.isArray(a) && a.length > 0 && a.every(Number.isFinite);
-  const asymptotes = typeof c === "number" && typeof d === "number" && c >= 0 && c < d && d <= 1;
-  if (!(slopes && Number.isFinite(intercept) && asymptotes)) {
+  if (!(slopes && Number.isFinite(intercept) && validAsymptotes(c, d))) {
     throw new DataError(
       `An ${name} item needs finite slopes a, at least one, a finite intercept and 0 ≤ c < d ≤ 1, found a = ${describe(a)}, intercept = ${describe(intercept)}, c = ${describe(c)}, d = ${describe(d)}.`,
     );
@@ -80,12 +79,8 @@ function logisticModel(name: string, guessing: boolean): MultidimensionalModel<M
         d: 1,
       };
     },
-    probabilities({ a, intercept, c, d }, theta, out) {
-      logisticPair(linearPredictor(a, theta) + intercept, tails);
-      // 1 - P from the complementary logistic keeps the precision of small probabilities of a wrong response.
-      out[0] = 1 - d + (d - c) * (tails[1] ?? 0);
-      out[1] = c + (d - c) * (tails[0] ?? 0);
-    },
+    probabilities: ({ a, intercept, c, d }, theta, out) =>
+      logisticProbabilities(linearPredictor(a, theta) + intercept, c, d, out),
     thetaGradients({ a, intercept, c, d }, theta, out) {
       const slope = logisticSlope(a, theta, intercept, c, d);
       a.forEach((aj, j) => {
@@ -139,16 +134,4 @@ export function linearPredictor(a: readonly number[], theta: Float64Array): numb
 function logisticSlope(a: readonly number[], theta: Float64Array, intercept: number, c: number, d: number): number {
   logisticPair(linearPredictor(a, theta) + intercept, tails);
   return (d - c) * (tails[0] ?? 0) * (tails[1] ?? 0);
-}
-
-/**
- * Writes logistic(x) to `out[0]` and logistic(-x) to `out[1]` from one exponential, each accurate in its own tail: with
- * t = exp(-|x|) and s = 1 / (1 + t), the larger is s and the smaller t s.
- */
-export function logisticPair(x: number, out: Float64Array): void {
-  const t = Math.exp(-Math.abs(x));
-  const larger = 1 / (1 + t);
-  const smaller = t * larger;
-  out[0] = x >= 0 ? larger : smaller;
-  out[1] = x >= 0 ? smaller : larger;
 }

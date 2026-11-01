@@ -1,9 +1,8 @@
-import { checkRecord, DataError, describe } from "@measurekit/core";
+import { checkRecord, DataError, describe, type LogisticItem, type ThresholdItem } from "@measurekit/core";
 import { gradedResponse } from "../irt/graded.js";
 import { checkItem, checkModel } from "../irt/items.js";
 import {
   fourParameterLogistic,
-  type LogisticParameters,
   oneParameterLogistic,
   threeParameterLogistic,
   twoParameterLogistic,
@@ -12,7 +11,6 @@ import type { IrtItem, IrtModel } from "../irt/model.js";
 import { centered, type NominalParameters, nominalResponse } from "../irt/nominal.js";
 import { generalizedPartialCredit, partialCredit } from "../irt/partial-credit.js";
 import { type RatingScaleParameters, ratingScale } from "../irt/rating-scale.js";
-import type { ThresholdParameters } from "../irt/thresholds.js";
 import { type MultidimensionalGradedParameters, multidimensionalGradedResponse } from "../multidimensional/graded.js";
 import { checkMultidimensionalItem, checkMultidimensionalModel } from "../multidimensional/items.js";
 import {
@@ -144,11 +142,11 @@ interface CoefficientReader {
 
 const LOGISTIC: MirtForms = {
   irt: {
-    toMirt: ({ a, b, c, d }: LogisticParameters) => ({ a, b, g: c, u: d }),
+    toMirt: ({ a, b, c, d }: LogisticItem) => ({ a, b, g: c, u: d }),
     fromMirt: (read) => ({ a: read.value("a"), b: read.value("b"), c: read.value("g"), d: read.value("u") }),
   },
   slopeIntercept: {
-    toMirt: ({ a, b, c, d }: LogisticParameters) => ({ a1: a, d: -a * b, g: c, u: d }),
+    toMirt: ({ a, b, c, d }: LogisticItem) => ({ a1: a, d: -a * b, g: c, u: d }),
     fromMirt(read) {
       const a1 = nonzeroSlope(read);
       return { a: a1, b: -read.value("d") / a1, c: read.value("g"), d: read.value("u") };
@@ -157,14 +155,14 @@ const LOGISTIC: MirtForms = {
 };
 
 const THRESHOLD_IRT: MirtForm = {
-  toMirt: ({ a, b }: ThresholdParameters) => ({ a, ...numbered("b", 1, b) }),
+  toMirt: ({ a, b }: ThresholdItem) => ({ a, ...numbered("b", 1, b) }),
   fromMirt: (read) => ({ a: read.value("a"), b: read.series("b", 1) }),
 };
 
 const GRADED: MirtForms = {
   irt: THRESHOLD_IRT,
   slopeIntercept: {
-    toMirt: ({ a, b }: ThresholdParameters) => ({
+    toMirt: ({ a, b }: ThresholdItem) => ({
       a1: a,
       ...numbered(
         "d",
@@ -182,7 +180,7 @@ const GRADED: MirtForms = {
 const PARTIAL_CREDIT: MirtForms = {
   irt: THRESHOLD_IRT,
   slopeIntercept: {
-    toMirt({ a, b }: ThresholdParameters) {
+    toMirt({ a, b }: ThresholdItem) {
       const intercepts = [0];
       for (const threshold of b) intercepts.push((intercepts.at(-1) ?? 0) - a * threshold);
       return {

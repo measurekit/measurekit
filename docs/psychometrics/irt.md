@@ -14,7 +14,7 @@ An item with K categories is scored 0 to K - 1. Parameters follow mirt's `coef(m
 ### Dichotomous
 
 A dichotomous item answers correctly with probability P(θ) = c + (d - c) / (1 + exp(-a (θ - b))). Its parameters are a
-`LogisticParameters` object `{ a, b, c, d }`: mirt's IRT coefficients with g, u named c, d.
+`LogisticItem` object `{ a, b, c, d }`: mirt's IRT coefficients with g, u named c, d.
 
 | Model                    | Estimated per item | Fixed        |
 | ------------------------ | ------------------ | ------------ |
@@ -35,7 +35,7 @@ The 1PL is the Rasch model on the N(0, 1) scale: the Rasch difficulty is a · b 
 | `ratingScale` (RSM)        | `{ a, b, steps: [τ1, ...] }`     | ∝ exp(Σ_(j ≤ k) a (θ - b - τ_j)), a and τ shared                | `rsm` with equal free slopes |
 | `nominalResponse` (NRM)    | `{ a: [a1, ...], c: [c1, ...] }` | ∝ exp(a_k θ + c_k)                                              | `nominal`                    |
 
-The type `ThresholdParameters` is `{ a, b }`; `RatingScaleParameters` and `NominalParameters` are the others.
+The type `ThresholdItem` is `{ a, b }`; `RatingScaleParameters` and `NominalParameters` are the others.
 
 - **GRM** (Samejima). b1 to b(K-1) increase when a > 0 and decrease when a < 0.
 - **GPCM** (Muraki). The step thresholds b1 to b(K-1) need not be ordered.
@@ -73,10 +73,10 @@ import {
   calibrate,
   generalizedPartialCredit,
   type IrtModel,
-  type LogisticParameters,
+  type LogisticItem,
   logNormalPrior,
   threeParameterLogistic,
-  type ThresholdParameters,
+  type ThresholdItem,
 } from "@measurekit/psychometrics/irt";
 
 // Items 1 to 3 are multiple choice, scored 0 or 1; item 4 is a constructed response, scored 0 to 2.
@@ -91,7 +91,7 @@ const matrix = responseMatrix([
   [1, 1, 0, 2],
 ]);
 // TypeScript does not infer a list of models with different parameters: write its type.
-const models: IrtModel<LogisticParameters | ThresholdParameters>[] = [
+const models: IrtModel<LogisticItem | ThresholdItem>[] = [
   threeParameterLogistic,
   threeParameterLogistic,
   threeParameterLogistic,

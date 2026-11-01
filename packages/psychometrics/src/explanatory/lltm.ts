@@ -5,16 +5,17 @@ import {
   checkStopping,
   chiSquareUpperTail,
   DataError,
+  type LogisticItem,
+  type ThresholdItem,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
 import { fitLinearRasch, type LinearRaschFit, type LocationRow } from "../irt/linear-rasch.js";
-import { type LogisticParameters, twoParameterLogistic } from "../irt/logistic.js";
+import { twoParameterLogistic } from "../irt/logistic.js";
 import type { TestItem } from "../irt/model.js";
 import { partialCredit } from "../irt/partial-credit.js";
 import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
 import { type CompressedResponses, categoryCounts, checkCategories, compressResponses } from "../irt/responses.js";
-import type { ThresholdParameters } from "../irt/thresholds.js";
 import { checkFullRank, type Design, designMatrix, type FeatureEffect, type ItemFeatures } from "./features.js";
 
 /** How the standard errors of the effects of an LLTM are computed. */
@@ -87,7 +88,7 @@ export interface RaschComparison {
  * @typeParam TParameters - The parameters of its items: those of the 2PL for the dichotomous model, and of the partial
  * credit model for the others.
  */
-export interface Lltm<TParameters = LogisticParameters> {
+export interface Lltm<TParameters = LogisticItem> {
   /** The effects on difficulty: the intercept, if any, then the features in order of their first appearance. */
   readonly effects: readonly FeatureEffect[];
   /** The standard deviation of theta, whose mean is 0 on the scale of the effects. */
@@ -212,7 +213,7 @@ export function lltm(
   data: ResponseMatrix | ResponseRecords,
   features: ItemFeatures,
   options: LltmOptions & { readonly model: "partial-credit" | "rating-scale" },
-): Lltm<ThresholdParameters>;
+): Lltm<ThresholdItem>;
 /**
  * Estimates the linear logistic test model of the model that `options.model` names, when it is not known to the compiler
  * which: the items are those of the dichotomous or the partial credit model.
@@ -227,12 +228,12 @@ export function lltm(
   data: ResponseMatrix | ResponseRecords,
   features: ItemFeatures,
   options?: LltmOptions,
-): Lltm<LogisticParameters | ThresholdParameters>;
+): Lltm<LogisticItem | ThresholdItem>;
 export function lltm(
   data: ResponseMatrix | ResponseRecords,
   features: ItemFeatures,
   options: LltmOptions = {},
-): Lltm<LogisticParameters | ThresholdParameters> {
+): Lltm<LogisticItem | ThresholdItem> {
   checkOptions(options);
   const {
     model = "dichotomous",
@@ -358,7 +359,7 @@ function itemOf(
   difficulty: number,
   model: LltmModel,
   thresholds: Float64Array | undefined,
-): TestItem<LogisticParameters> | TestItem<ThresholdParameters> {
+): TestItem<LogisticItem> | TestItem<ThresholdItem> {
   if (model === "dichotomous") {
     return { id, model: twoParameterLogistic, parameters: { a: 1, b: difficulty, c: 0, d: 1 } };
   }

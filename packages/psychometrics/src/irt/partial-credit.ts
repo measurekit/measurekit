@@ -1,11 +1,7 @@
-import { divideByTotalThetaDerivatives, softmax } from "./divide-by-total.js";
+import { partialCreditProbabilities, type ThresholdItem } from "@measurekit/core";
+import { divideByTotalThetaDerivatives } from "./divide-by-total.js";
 import type { IrtModel, ModelParameter } from "./model.js";
-import {
-  type ThresholdParameters,
-  thresholdParameterList,
-  thresholdsFromVector,
-  thresholdVector,
-} from "./thresholds.js";
+import { thresholdParameterList, thresholdsFromVector, thresholdVector } from "./thresholds.js";
 
 // The partial credit family gives category k the logit z_k = Σ_(j ≤ k) a (θ - δ_j), z_0 = 0, with the thresholds
 // δ_j = location + steps[j - 1]: the steps are the GPCM's and PCM's thresholds b with location 0, and the RSM's steps
@@ -16,16 +12,16 @@ import {
  * b1 to b(K-1), and P(k) ∝ exp(Σ_(j ≤ k) a (θ - b_j)). The thresholds need not be ordered. This is mirt's `gpcm`
  * item type with `IRTpars = TRUE`.
  */
-export const generalizedPartialCredit: IrtModel<ThresholdParameters> = partialCreditModel("GPCM", { name: "a" });
+export const generalizedPartialCredit: IrtModel<ThresholdItem> = partialCreditModel("GPCM", { name: "a" });
 
 /**
  * The partial credit model (PCM, Masters): the GPCM with one slope `a` for all its items, estimated so that theta
  * keeps the N(0, 1) scale. It is the Rasch model for ordered categories up to scale: the Rasch thresholds are `a * b`
  * and the Rasch ability `a * θ`. With two categories it is the 1PL.
  */
-export const partialCredit: IrtModel<ThresholdParameters> = partialCreditModel("PCM", { name: "a", shared: true });
+export const partialCredit: IrtModel<ThresholdItem> = partialCreditModel("PCM", { name: "a", shared: true });
 
-function partialCreditModel(name: string, slope: ModelParameter): IrtModel<ThresholdParameters> {
+function partialCreditModel(name: string, slope: ModelParameter): IrtModel<ThresholdItem> {
   return {
     name,
     maxCategories: Number.POSITIVE_INFINITY,
@@ -51,35 +47,6 @@ export function stepStarts(proportions: Float64Array): number[] {
   );
 }
 
-/** Writes the logits z_k of a partial credit item at `out[k * stride]`. */
-function writeLogits(
-  a: number,
-  location: number,
-  steps: ArrayLike<number>,
-  theta: number,
-  out: Float64Array,
-  stride: number,
-): void {
-  let z = 0;
-  out[0] = 0;
-  for (let k = 1; k <= steps.length; k++) {
-    z += a * (theta - location - (steps[k - 1] ?? 0));
-    out[k * stride] = z;
-  }
-}
-
-/** Writes the category probabilities of a partial credit item with thresholds `location + steps[j]`. */
-export function partialCreditProbabilities(
-  a: number,
-  location: number,
-  steps: ArrayLike<number>,
-  theta: number,
-  out: Float64Array,
-): void {
-  writeLogits(a, location, steps, theta, out, 1);
-  softmax(out, steps.length + 1);
-}
-
 /** Writes the first and second theta derivatives of a partial credit item's category probabilities. */
 export function partialCreditThetaDerivatives(
   a: number,
@@ -90,8 +57,7 @@ export function partialCreditThetaDerivatives(
   second: Float64Array,
 ): void {
   const count = steps.length + 1;
-  writeLogits(a, location, steps, theta, first, 1);
-  softmax(first, count);
+  partialCreditProbabilities(a, location, steps, theta, first);
   for (let k = 0; k < count; k++) second[k] = k * a;
   divideByTotalThetaDerivatives(first, second, count);
 }
@@ -108,9 +74,10 @@ export function partialCreditDerivatives(
   out: Float64Array,
 ): void {
   const count = steps.length + 1;
-  writeLogits(a, location, steps, theta, out, count);
-  softmax(out, count, count);
-  // Column 0 holds the probabilities until the derivatives with respect to a replace them last.
+  partialCreditProbabilities(a, location, steps, theta, out);
+  // Column 0 holds the probabilities until the derivatives with respect to a replace them last. Row k's moves from
+  // out[k] to out[k * count], highest first: a destination lies beyond every source still to be read.
+  for (let k = count - 1; k >= 1; k--) out[k * count] = out[k] ?? 0;
   writeThresholdDerivatives(a, count, out);
   writeSlopeDerivatives(location, steps, theta, out);
 }

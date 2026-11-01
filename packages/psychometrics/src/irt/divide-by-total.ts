@@ -1,21 +1,5 @@
 // Divide-by-total models, the partial credit family and the nominal response model, give category k the probability
-// exp(z_k) / Σ_j exp(z_j), with logits z_k linear in theta.
-
-/**
- * Turns the logits at `values[k * stride]`, k < `count`, into probabilities in place. Subtracting the largest logit
- * keeps exp from overflowing.
- */
-export function softmax(values: Float64Array, count: number, stride = 1): void {
-  let largest = Number.NEGATIVE_INFINITY;
-  for (let k = 0; k < count; k++) largest = Math.max(largest, values[k * stride] ?? 0);
-  let total = 0;
-  for (let k = 0; k < count; k++) {
-    const weight = Math.exp((values[k * stride] ?? 0) - largest);
-    values[k * stride] = weight;
-    total += weight;
-  }
-  for (let k = 0; k < count; k++) values[k * stride] = (values[k * stride] ?? 0) / total;
-}
+// exp(z_k) / Σ_j exp(z_j), with logits z_k linear in theta: `softmax` of core turns the logits into probabilities.
 
 /**
  * Turns the probabilities in `first` and the logit slopes s_k = dz_k/dθ in `second` into the derivatives of the

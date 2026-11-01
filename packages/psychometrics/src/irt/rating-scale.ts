@@ -1,9 +1,8 @@
-import { DataError, describe, isRecord } from "@measurekit/core";
+import { DataError, describe, isRecord, partialCreditProbabilities } from "@measurekit/core";
 import type { IrtModel } from "./model.js";
 import {
   partialCreditDerivatives,
   partialCreditInformation,
-  partialCreditProbabilities,
   partialCreditThetaDerivatives,
   stepStarts,
 } from "./partial-credit.js";

@@ -1,14 +1,22 @@
-import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
+import {
+  checkOptions,
+  checkStopping,
+  DataError,
+  iterateToConvergence,
+  type LogisticItem,
+  largestChange,
+  partialCreditProbabilities,
+  type ThresholdItem,
+} from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
 import { invert } from "../math/linear-algebra.js";
 import { type NewtonOptions, newton } from "../math/optimize.js";
 import { findIncreasingRoot } from "../math/root.js";
 import type { CalibratedItem } from "./calibration.js";
-import { type LogisticParameters, oneParameterLogistic } from "./logistic.js";
-import { partialCredit, partialCreditInformation, partialCreditProbabilities, stepStarts } from "./partial-credit.js";
+import { oneParameterLogistic } from "./logistic.js";
+import { partialCredit, partialCreditInformation, stepStarts } from "./partial-credit.js";
 import { logProbability } from "./probability.js";
 import { categoryCounts, checkCategories, compressResponses, responseCodes } from "./responses.js";
-import type { ThresholdParameters } from "./thresholds.js";
 
 /** Options of {@link jointMaximumLikelihood}. */
 export interface JointMaximumLikelihoodOptions {
@@ -42,7 +50,7 @@ export interface JointCalibration {
    * The items, in item order, on the Rasch scale (a = 1) after the bias correction: dichotomous items as 1PL items,
    * the others as PCM items. Standard errors are `null` for an item whose information matrix is not invertible.
    */
-  readonly items: readonly CalibratedItem<LogisticParameters | ThresholdParameters>[];
+  readonly items: readonly CalibratedItem<LogisticItem | ThresholdItem>[];
   /** The persons, in person order, with the estimates of the joint solution, before the bias correction. */
   readonly persons: readonly PersonEstimate[];
   /** The joint log-likelihood of the responses at the joint solution, before the bias correction. */
@@ -389,7 +397,7 @@ function correctedItem(
   thresholds: Float64Array,
   errors: Float64Array | null,
   correction: number,
-): CalibratedItem<LogisticParameters | ThresholdParameters> {
+): CalibratedItem<LogisticItem | ThresholdItem> {
   const b = Array.from(thresholds, (threshold) => threshold * correction);
   const corrected = errors === null ? null : Array.from(errors, (error) => error * correction);
   if (b.length === 1) {

@@ -1,9 +1,16 @@
-import { checkArray, checkRecord, DataError, describe, isNonEmptyString } from "@measurekit/core";
+import {
+  checkArray,
+  checkRecord,
+  DataError,
+  describe,
+  isNonEmptyString,
+  partialCreditProbabilities,
+  type ThresholdItem,
+} from "@measurekit/core";
 import type { FacetedScore } from "../data/faceted-scores.js";
 import type { ThetaPrior } from "../irt/ability.js";
 import type { IrtItem } from "../irt/model.js";
-import { partialCredit, partialCreditProbabilities } from "../irt/partial-credit.js";
-import type { ThresholdParameters } from "../irt/thresholds.js";
+import { partialCredit } from "../irt/partial-credit.js";
 
 /** What the functions that use an estimated many-facet model read of it. */
 export interface RatingModelData {
@@ -139,7 +146,7 @@ function setOf(structure: RatingStructure, id: string | null): readonly number[]
  *
  * @throws `DataError` when the model lacks an element.
  */
-function ratingItem(structure: RatingStructure, elements: readonly string[]): IrtItem<ThresholdParameters> {
+function ratingItem(structure: RatingStructure, elements: readonly string[]): IrtItem<ThresholdItem> {
   const location = elements.reduce((sum, id, f) => sum + measureOf(structure, f, id), 0);
   const owner = structure.thresholdFacet < 0 ? null : (elements[structure.thresholdFacet] ?? "");
   return {
@@ -178,11 +185,8 @@ export function expectedRatingAt(
  *
  * @throws `DataError` when the model lacks an element of a score, or a score is not a category of its item.
  */
-export function scoredItems(
-  scores: readonly FacetedScore[],
-  structure: RatingStructure,
-): IrtItem<ThresholdParameters>[] {
-  const cache = new Map<string, IrtItem<ThresholdParameters>>();
+export function scoredItems(scores: readonly FacetedScore[], structure: RatingStructure): IrtItem<ThresholdItem>[] {
+  const cache = new Map<string, IrtItem<ThresholdItem>>();
   return scores.map(({ levels, score }, index) => {
     const elements = structure.facets.map((facet) => levels[facet] ?? "");
     const key = JSON.stringify(elements);

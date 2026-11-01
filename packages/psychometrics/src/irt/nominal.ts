@@ -1,5 +1,5 @@
-import { DataError, isRecord } from "@measurekit/core";
-import { divideByTotalThetaDerivatives, softmax } from "./divide-by-total.js";
+import { DataError, isRecord, softmax } from "@measurekit/core";
+import { divideByTotalThetaDerivatives } from "./divide-by-total.js";
 import type { IrtModel } from "./model.js";
 import { formatList } from "./thresholds.js";
 

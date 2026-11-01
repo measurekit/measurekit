@@ -1,19 +1,13 @@
-import { DataError, logistic } from "@measurekit/core";
+import { DataError, gradedProbabilities, logistic, orderedThresholds, type ThresholdItem } from "@measurekit/core";
 import type { IrtModel } from "./model.js";
-import {
-  formatList,
-  type ThresholdParameters,
-  thresholdParameterList,
-  thresholdsFromVector,
-  thresholdVector,
-} from "./thresholds.js";
+import { formatList, thresholdParameterList, thresholdsFromVector, thresholdVector } from "./thresholds.js";
 
 /**
  * The graded response model (GRM, Samejima): an item with K ordered categories has a slope `a` and thresholds
  * b1 to b(K-1), and P(X ≥ k) = 1 / (1 + exp(-a (θ - b_k))), so that P(k) = P(X ≥ k) - P(X ≥ k + 1). The thresholds
  * increase when a > 0 and decrease when a < 0. This is mirt's `graded` item type with `IRTpars = TRUE`.
  */
-export const gradedResponse: IrtModel<ThresholdParameters> = {
+export const gradedResponse: IrtModel<ThresholdItem> = {
   name: "GRM",
   maxCategories: Number.POSITIVE_INFINITY,
   categoryCount: ({ b }) => b.length + 1,
@@ -31,28 +25,15 @@ export const gradedResponse: IrtModel<ThresholdParameters> = {
   toVector(parameters) {
     const vector = thresholdVector("GRM", parameters);
     const { a, b } = parameters;
-    for (let k = 1; k < b.length; k++) {
-      if (!(a * ((b[k] ?? 0) - (b[k - 1] ?? 0)) > 0)) {
-        throw new DataError(
-          `A GRM item with more than two categories needs a nonzero a and thresholds b strictly increasing when a > 0 and strictly decreasing when a < 0, found a = ${a}, b = ${formatList(b)}.`,
-        );
-      }
+    if (!orderedThresholds(a, b)) {
+      throw new DataError(
+        `A GRM item with more than two categories needs a nonzero a and thresholds b strictly increasing when a > 0 and strictly decreasing when a < 0, found a = ${a}, b = ${formatList(b)}.`,
+      );
     }
     return vector;
   },
   fromVector: thresholdsFromVector,
-  probabilities({ a, b }, theta, out) {
-    // P(k) = P(X ≥ k) P(X < k + 1) (1 - exp(-a (b_(k+1) - b_k))), with P(X ≥ 0) = P(X < K) = 1, equals the difference
-    // of the cumulative probabilities and keeps the precision of small probabilities in both tails.
-    let above = 1;
-    for (let k = 0; k < b.length; k++) {
-      const z = a * (theta - (b[k] ?? 0));
-      const gap = k === 0 ? 1 : -Math.expm1(-a * ((b[k] ?? 0) - (b[k - 1] ?? 0)));
-      out[k] = above * logistic(-z) * gap;
-      above = logistic(z);
-    }
-    out[b.length] = above;
-  },
+  probabilities: ({ a, b }, theta, out) => gradedProbabilities(a, b, theta, out),
   thetaDerivatives({ a, b }, theta, first, second) {
     // Category k gains the slope and curvature of P(X ≥ k) and loses those of P(X ≥ k + 1).
     let slope = 0;

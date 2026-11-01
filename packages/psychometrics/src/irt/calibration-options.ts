@@ -14,7 +14,7 @@ export type StandardErrorMethod = "none" | "hessian" | "cross-product";
 export interface CalibrationOptions<TParameters> {
   /**
    * The model of every item, or one model per item, in item order. A list of models with different parameters needs
-   * its type written out, such as `IrtModel<LogisticParameters | ThresholdParameters>[]`.
+   * its type written out, such as `IrtModel<LogisticItem | ThresholdItem>[]`.
    */
   readonly model: IrtModel<TParameters> | readonly IrtModel<TParameters>[];
   /**

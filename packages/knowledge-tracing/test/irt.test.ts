@@ -1,3 +1,4 @@
+import { gradedProbabilities, logisticProbabilities, partialCreditProbabilities } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -18,6 +19,7 @@ import {
   type ThetaDistribution,
 } from "../src/index.js";
 import { differences } from "../src/irt/ability.js";
+import { categoryCount, categoryTerms, expectedOutcome } from "../src/irt/items.js";
 import { reflectedWalk } from "../src/math/reflected-walk.js";
 import reference from "./fixtures/irt-abilities.json" with { type: "json" };
 import drifting from "./fixtures/irt-drift.json" with { type: "json" };
@@ -33,6 +35,16 @@ const GRID_TOLERANCE = 1e-10;
 const MODE_TOLERANCE = 1e-5;
 /** Absolute tolerance of the MAP standard error at the default spacing, growing with its fourth power. */
 const MODE_ERROR_TOLERANCE = 1e-4;
+/** Absolute tolerance of the log-probabilities of an item against the probabilities of core: rounding only. */
+const CORE_TOLERANCE = 1e-12;
+/**
+ * Absolute tolerance of a slope against a five-point difference of the probabilities of core with the step below: the
+ * truncation error, h⁴ / 30 times the fifth derivative, reaches about 1e-13 for a slope of 3 and 5 categories, and the
+ * rounding error about 1e-12.
+ */
+const DIFFERENCE_TOLERANCE = 1e-9;
+/** The step of that difference. */
+const DIFFERENCE_STEP = 1e-4;
 
 /** Returns the mean and the standard deviation of a distribution of θ. */
 function momentsOf({ nodes, weights }: ThetaDistribution): [number, number] {
@@ -719,5 +731,94 @@ describe("IRT with drift", () => {
     expect(() => fixed.posterior(fixed.initialState("ana"), { at: JSON.parse('"1"') })).toThrow(
       'The option at must be a finite number, found "1".',
     );
+  });
+});
+
+describe("IRT items against the probabilities of core", () => {
+  /** Returns P(k) of an item at θ for each category, from core. */
+  function probabilitiesOf(item: IrtItem, theta: number): Float64Array {
+    const out = new Float64Array(categoryCount(item));
+    if (!("model" in item)) logisticProbabilities(item.a * (theta - item.b), item.c ?? 0, item.d ?? 1, out);
+    else if (item.model === "graded") gradedProbabilities(item.a, item.b, theta, out);
+    else partialCreditProbabilities(item.a, 0, item.b, theta, out);
+    return out;
+  }
+
+  const slopes = fc.double({ min: 0.2, max: 3, noNaN: true });
+  const dichotomous: fc.Arbitrary<IrtItem> = fc.record({
+    a: slopes,
+    b: fc.double({ min: -3, max: 3, noNaN: true }),
+    c: fc.constantFrom(0, 0.2),
+    d: fc.constantFrom(1, 0.95),
+  });
+  const steps = fc.array(fc.double({ min: 0.2, max: 1.5, noNaN: true }), { minLength: 1, maxLength: 4 });
+  const graded: fc.Arbitrary<IrtItem> = fc
+    .tuple(slopes, fc.double({ min: -3, max: 0, noNaN: true }), steps)
+    .map(([a, start, gaps]) => {
+      let location = start;
+      const b = gaps.map((gap) => {
+        location += gap;
+        return location;
+      });
+      return { model: "graded", a, b };
+    });
+  const partialCredit: fc.Arbitrary<IrtItem> = fc
+    .tuple(slopes, fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: 1, maxLength: 4 }))
+    .map(([a, b]) => ({ model: "gpcm", a, b }));
+  const theta = fc.double({ min: -6, max: 6, noNaN: true });
+
+  it("the log-probability of each category is the logarithm of its probability", () => {
+    fc.assert(
+      fc.property(fc.oneof(dichotomous, graded, partialCredit), theta, (item, point) => {
+        const probabilities = probabilitiesOf(item, point);
+        const terms = new Float64Array(3);
+        for (let k = 0; k < probabilities.length; k++) {
+          categoryTerms(item, k, point, terms);
+          expect(Math.abs(Math.exp(terms[0] ?? 0) - (probabilities[k] ?? 0))).toBeLessThan(CORE_TOLERANCE);
+        }
+      }),
+    );
+  });
+
+  it("the slope of the log-probability is the slope of the probability over the probability", () => {
+    const step = DIFFERENCE_STEP;
+    fc.assert(
+      fc.property(fc.oneof(dichotomous, graded, partialCredit), theta, (item, point) => {
+        const [two, one, back, backTwo] = [2 * step, step, -step, -2 * step].map((shift) =>
+          probabilitiesOf(item, point + shift),
+        );
+        const probabilities = probabilitiesOf(item, point);
+        const terms = new Float64Array(3);
+        for (let k = 0; k < probabilities.length; k++) {
+          const derivative =
+            (8 * ((one?.[k] ?? 0) - (back?.[k] ?? 0)) - ((two?.[k] ?? 0) - (backTwo?.[k] ?? 0))) / (12 * step);
+          categoryTerms(item, k, point, terms);
+          expect(Math.abs((terms[1] ?? 0) * (probabilities[k] ?? 0) - derivative)).toBeLessThan(DIFFERENCE_TOLERANCE);
+        }
+      }),
+    );
+  });
+
+  it("the expected outcome is the expected category over K - 1 of the probabilities", () => {
+    fc.assert(
+      fc.property(fc.oneof(dichotomous, graded, partialCredit), theta, (item, point) => {
+        const probabilities = probabilitiesOf(item, point);
+        let expected = 0;
+        probabilities.forEach((probability, k) => {
+          expected += (k * probability) / (probabilities.length - 1);
+        });
+        expect(Math.abs(expectedOutcome(item, point, new Float64Array(3)) - expected)).toBeLessThan(CORE_TOLERANCE);
+      }),
+    );
+  });
+
+  it("evaluates items of more categories than the scratch space of a caller holds", () => {
+    const item: IrtItem = { model: "gpcm", a: 1.1, b: [-1, -0.3, 0.4, 1.2, 2] };
+    const probabilities = probabilitiesOf(item, 0.3);
+    const expected = probabilities.reduce((sum, probability, k) => sum + (k * probability) / 5, 0);
+    expect(expectedOutcome(item, 0.3, new Float64Array(3))).toBeCloseTo(expected, 14);
+    const terms = new Float64Array(3);
+    categoryTerms(item, 5, 0.3, terms);
+    expect(Math.exp(terms[0] ?? 0)).toBeCloseTo(probabilities[5] ?? 0, 14);
   });
 });

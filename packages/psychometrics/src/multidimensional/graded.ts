@@ -1,5 +1,5 @@
-import { DataError, describe, isRecord } from "@measurekit/core";
-import { linearPredictor, logisticPair } from "./logistic.js";
+import { DataError, describe, isRecord, logisticPair } from "@measurekit/core";
+import { linearPredictor } from "./logistic.js";
 import type { MultidimensionalModel } from "./model.js";
 
 /**
@@ -14,7 +14,7 @@ export interface MultidimensionalGradedParameters {
   readonly intercepts: readonly number[];
 }
 
-/** The values of {@link logisticPair} at a boundary: P(X ≥ k) and P(X < k), read at once. */
+/** The values of `logisticPair` at a boundary: P(X ≥ k) and P(X < k), read at once. */
 const tails = new Float64Array(2);
 
 /** The multidimensional graded response model (Samejima): slopes and one intercept per boundary between categories. */

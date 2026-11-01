@@ -5,14 +5,15 @@ import {
   checkRecord,
   DataError,
   describe,
+  type LogisticItem,
   type Random,
+  type ThresholdItem,
 } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import { gradedResponse } from "../irt/graded.js";
 import { checkItem, checkModel } from "../irt/items.js";
 import {
   fourParameterLogistic,
-  type LogisticParameters,
   oneParameterLogistic,
   threeParameterLogistic,
   twoParameterLogistic,
@@ -21,7 +22,6 @@ import type { IrtItem, IrtModel } from "../irt/model.js";
 import { type NominalParameters, nominalResponse } from "../irt/nominal.js";
 import { generalizedPartialCredit, partialCredit } from "../irt/partial-credit.js";
 import { type RatingScaleParameters, ratingScale } from "../irt/rating-scale.js";
-import type { ThresholdParameters } from "../irt/thresholds.js";
 import {
   type Distribution,
   logNormalDistribution,
@@ -151,7 +151,7 @@ function vectorDraws<TParameters>(draws: ItemDraws<TParameters>): VectorDraws {
   };
 }
 
-function logisticDraws(model: IrtModel<LogisticParameters>, slope: Distribution): ItemDraws<LogisticParameters> {
+function logisticDraws(model: IrtModel<LogisticItem>, slope: Distribution): ItemDraws<LogisticItem> {
   const parameters = model.parameters(2);
   const names = parameters.map(({ name }) => name);
   return {
@@ -173,7 +173,7 @@ function logisticDraws(model: IrtModel<LogisticParameters>, slope: Distribution)
   };
 }
 
-function gradedDraws(): ItemDraws<ThresholdParameters> {
+function gradedDraws(): ItemDraws<ThresholdItem> {
   return {
     model: gradedResponse,
     names: ["a", "b"],
@@ -190,7 +190,7 @@ function gradedDraws(): ItemDraws<ThresholdParameters> {
   };
 }
 
-function partialCreditDraws(model: IrtModel<ThresholdParameters>, slope: Distribution): ItemDraws<ThresholdParameters> {
+function partialCreditDraws(model: IrtModel<ThresholdItem>, slope: Distribution): ItemDraws<ThresholdItem> {
   return {
     model,
     names: ["a", "b"],

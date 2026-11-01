@@ -9,7 +9,7 @@ import {
   effortModeratedEstimates,
   gradedResponse,
   type IrtModel,
-  type LogisticParameters,
+  type LogisticItem,
   logNormalPrior,
   normativeThresholds,
   posteriorMeanEstimate,
@@ -266,7 +266,7 @@ function jointData(reference: JointCase): ResponseMatrix {
 function jointCalibration(
   reference: JointCase,
   correlation = reference.correlation,
-): SpeedAccuracyCalibration<LogisticParameters> {
+): SpeedAccuracyCalibration<LogisticItem> {
   return {
     items: reference.itemIds.map((id, i) => ({
       id,
@@ -456,7 +456,7 @@ describe("calibrateSpeedAccuracy", () => {
     const plain = calibrateSpeedAccuracy(matrix, { model: twoParameterLogistic });
     const priors = { a: logNormalPrior(0, 0.05) };
     const shrunk = calibrateSpeedAccuracy(matrix, { model: twoParameterLogistic, priors });
-    const distance = (calibration: SpeedAccuracyCalibration<LogisticParameters>): number =>
+    const distance = (calibration: SpeedAccuracyCalibration<LogisticItem>): number =>
       Math.max(...calibration.items.map((item) => Math.abs(item.parameters.a - 1)));
     expect(distance(shrunk)).toBeLessThan(distance(plain));
     expect(plain.correlationStandardError).toBeNull();

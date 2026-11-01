@@ -10,3 +10,15 @@ export function logistic(x: number): number {
 export function logLogistic(x: number): number {
   return -(Math.max(-x, 0) + Math.log1p(Math.exp(-Math.abs(x))));
 }
+
+/**
+ * Writes logistic(x) to `out[0]` and logistic(-x) to `out[1]` from one exponential, each accurate in its own tail: with
+ * t = exp(-|x|) and s = 1 / (1 + t), the larger is s and the smaller t s.
+ */
+export function logisticPair(x: number, out: Float64Array): void {
+  const t = Math.exp(-Math.abs(x));
+  const larger = 1 / (1 + t);
+  const smaller = t * larger;
+  out[0] = x >= 0 ? larger : smaller;
+  out[1] = x >= 0 ? smaller : larger;
+}

@@ -10,7 +10,7 @@ import {
   gradedResponse,
   type IrtItem,
   type IrtModel,
-  type LogisticParameters,
+  type LogisticItem,
   type MultidimensionalItem,
   type MultidimensionalModel,
   multidimensionalGradedResponse,
@@ -122,7 +122,7 @@ describe("mirt", () => {
   });
 
   it("converts only the built-in models", () => {
-    const custom: IrtModel<LogisticParameters> = { ...oneParameterLogistic, name: "Rasch" };
+    const custom: IrtModel<LogisticItem> = { ...oneParameterLogistic, name: "Rasch" };
     expect(() => toMirtIrt({ model: custom, parameters: { a: 1, b: 0, c: 0, d: 1 } })).toThrow(
       `Only the built-in models convert to and from mirt, found the "Rasch" model.`,
     );

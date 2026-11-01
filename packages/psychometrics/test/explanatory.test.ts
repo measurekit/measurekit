@@ -26,7 +26,7 @@ import {
   responseRecords,
   simulateResponses,
   simulateThetas,
-  type ThresholdParameters,
+  type ThresholdItem,
   twoParameterLogistic,
 } from "../src/index.js";
 import changeFixture from "./fixtures/explanatory-linear-change.json" with { type: "json" };
@@ -778,7 +778,7 @@ function polytomousData(dataset: number): ResponseMatrix {
 }
 
 /** Estimates the LLTM of a case of the polytomous fixture, to the tolerance that matches the base R maximum. */
-function polytomousModel(reference: PolytomousReference): Lltm<ThresholdParameters> {
+function polytomousModel(reference: PolytomousReference): Lltm<ThresholdItem> {
   return lltm(polytomousData(reference.dataset), reference.features, {
     model: reference.model,
     intercept: reference.intercept,
@@ -788,9 +788,9 @@ function polytomousModel(reference: PolytomousReference): Lltm<ThresholdParamete
 }
 
 /** The models of the polytomous cases, estimated once. */
-const POLYTOMOUS_FITTED = new Map<number, Lltm<ThresholdParameters>>();
+const POLYTOMOUS_FITTED = new Map<number, Lltm<ThresholdItem>>();
 
-function polytomousFitted(index: number): Lltm<ThresholdParameters> {
+function polytomousFitted(index: number): Lltm<ThresholdItem> {
   let model = POLYTOMOUS_FITTED.get(index);
   if (model === undefined) {
     model = polytomousModel(defined(polytomousCases[index]));
@@ -1112,7 +1112,7 @@ describe("lltm", () => {
 
   it("counts the free thresholds in the information criteria: one less than the categories, less one, for each set", () => {
     const [partial, , scale, mixed] = [0, 1, 2, 3].map((index) => polytomousFitted(index));
-    const parameters = (model: Lltm<ThresholdParameters>) => (model.aic - -2 * model.logLikelihood) / 2;
+    const parameters = (model: Lltm<ThresholdItem>) => (model.aic - -2 * model.logLikelihood) / 2;
     expect(parameters(defined(partial))).toBe(4 + 1 + 8 * 2);
     expect(parameters(defined(scale))).toBe(4 + 1 + 3);
     expect(parameters(defined(mixed))).toBe(4 + 1 + 5 * 2 + 4 * 1);

@@ -5,7 +5,7 @@
  * @module @measurekit/psychometrics/irt
  */
 
-export type { ThetaDistribution } from "@measurekit/core";
+export type { LogisticItem, ThetaDistribution, ThresholdItem } from "@measurekit/core";
 export {
   type AbilityEstimate,
   type AbilityEstimator,
@@ -42,7 +42,6 @@ export {
 export type { GroupDistribution, LatentDistribution } from "./latent.js";
 export {
   fourParameterLogistic,
-  type LogisticParameters,
   oneParameterLogistic,
   threeParameterLogistic,
   twoParameterLogistic,
@@ -56,4 +55,3 @@ export { type RatingScaleParameters, ratingScale } from "./rating-scale.js";
 export { empiricalReliability, marginalReliability } from "./reliability.js";
 export { type SummedScoreEstimate, summedScoreTable } from "./summed-score.js";
 export type { TestletEstimate } from "./testlets.js";
-export type { ThresholdParameters } from "./thresholds.js";

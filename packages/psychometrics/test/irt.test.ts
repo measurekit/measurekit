@@ -20,7 +20,7 @@ import {
   itemInformation,
   jointMaximumLikelihood,
   type LatentDistribution,
-  type LogisticParameters,
+  type LogisticItem,
   logNormalPrior,
   marginalReliability,
   maximumLikelihoodEstimate,
@@ -41,7 +41,7 @@ import {
   simulateThetas,
   summedScoreTable,
   type ThetaDistribution,
-  type ThresholdParameters,
+  type ThresholdItem,
   testInformation,
   testLength,
   thetaPosterior,
@@ -285,17 +285,17 @@ function simulate(seed: number, persons: number, items: readonly IrtItem[]): rea
   return simulateResponses(items, simulateThetas(persons, random), random).responses;
 }
 
-const PARAMETERS_2PL: readonly LogisticParameters[] = [
+const PARAMETERS_2PL: readonly LogisticItem[] = [
   { a: 1.2, b: -1, c: 0, d: 1 },
   { a: 0.8, b: 0, c: 0, d: 1 },
   { a: 1.5, b: 0.5, c: 0, d: 1 },
   { a: 1, b: 1.2, c: 0, d: 1 },
 ];
-const ITEMS_2PL: readonly IrtItem<LogisticParameters>[] = PARAMETERS_2PL.map((parameters) => ({
+const ITEMS_2PL: readonly IrtItem<LogisticItem>[] = PARAMETERS_2PL.map((parameters) => ({
   model: twoParameterLogistic,
   parameters,
 }));
-const ITEMS_GPCM: readonly IrtItem<ThresholdParameters>[] = [
+const ITEMS_GPCM: readonly IrtItem<ThresholdItem>[] = [
   { model: generalizedPartialCredit, parameters: { a: 1.1, b: [-1, 0.3, 1.2] } },
   { model: generalizedPartialCredit, parameters: { a: 0.8, b: [-0.5, 0.9] } },
   { model: generalizedPartialCredit, parameters: { a: 1.4, b: [0.2, -0.6, 1.5] } },
@@ -732,7 +732,7 @@ describe("calibrate", () => {
   });
 
   it("calibrates multiple-choice and constructed-response items together, typed by their parameters", () => {
-    const models: IrtModel<LogisticParameters | ThresholdParameters>[] = [
+    const models: IrtModel<LogisticItem | ThresholdItem>[] = [
       threeParameterLogistic,
       threeParameterLogistic,
       twoParameterLogistic,
@@ -2215,7 +2215,7 @@ describe("properties", () => {
 
   it("seeded runs reproduce exactly", () => {
     const pool = [...ITEMS_2PL, ...ITEMS_GPCM];
-    const models: IrtModel<LogisticParameters | ThresholdParameters>[] = [
+    const models: IrtModel<LogisticItem | ThresholdItem>[] = [
       ...ITEMS_2PL.map(() => threeParameterLogistic),
       ...ITEMS_GPCM.map(() => generalizedPartialCredit),
     ];

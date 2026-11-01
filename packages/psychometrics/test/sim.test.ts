@@ -12,7 +12,7 @@ import {
   gradedResponse,
   type IrtItem,
   type IrtModel,
-  type LogisticParameters,
+  type LogisticItem,
   logNormalDistribution,
   type MultidimensionalItem,
   type MultidimensionalLogisticParameters,
@@ -31,7 +31,7 @@ import {
   simulateMultidimensionalResponses,
   simulateResponses,
   simulateThetas,
-  type ThresholdParameters,
+  type ThresholdItem,
   threeParameterLogistic,
   twoParameterLogistic,
   uniformDistribution,
@@ -190,7 +190,7 @@ describe("simulateItems", () => {
     simulateItems(model, 20_000, createRandom(seed), { categoryCount }).map((item) => item.parameters);
 
   it("draws logistic items from catR's genDichoMatrix defaults", () => {
-    const parameters: LogisticParameters[] = items(fourParameterLogistic, 4);
+    const parameters: LogisticItem[] = items(fourParameterLogistic, 4);
     for (const [name, expectedMean, expectedSd] of [
       ["a", 1, 0.2],
       ["b", 0, 1],
@@ -205,8 +205,8 @@ describe("simulateItems", () => {
   });
 
   it("draws GRM and GPCM items from catR's genPolyMatrix defaults, the GRM's thresholds increasing", () => {
-    const graded: ThresholdParameters[] = items(gradedResponse, 7, 4);
-    const partial: ThresholdParameters[] = items(generalizedPartialCredit, 8, 4);
+    const graded: ThresholdItem[] = items(gradedResponse, 7, 4);
+    const partial: ThresholdItem[] = items(generalizedPartialCredit, 8, 4);
     for (const [label, parameters] of [
       ["GRM", graded],
       ["GPCM", partial],
@@ -218,7 +218,7 @@ describe("simulateItems", () => {
     expect(graded.every(({ b }) => b.every((threshold, k) => k === 0 || threshold > defined(b[k - 1])))).toBe(true);
     // Each GPCM threshold is one N(0, 1) draw; the GRM's are the order statistics of three, the middle one with
     // variance 1 - √3 / π.
-    const second = (parameters: readonly ThresholdParameters[]): number[] => parameters.map(({ b }) => defined(b[1]));
+    const second = (parameters: readonly ThresholdItem[]): number[] => parameters.map(({ b }) => defined(b[1]));
     expectMoments(second(partial), 0, 1, "GPCM b2");
     expectMoments(second(graded), 0, Math.sqrt(1 - Math.sqrt(3) / Math.PI), "GRM b2");
   });
