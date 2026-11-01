@@ -11,13 +11,14 @@ import { parameterCount, posteriorScoreMoments } from "./posterior-scores.js";
 
 export { parameterCount };
 
-/** What a calibration's standard errors need: the fitted items, the latent distribution and the E-step. */
+/** What a calibration's standard errors need: the fitted items, the distribution of each group and the E-step. */
 export interface Fit<TParameters> {
   readonly items: readonly ItemState<TParameters>[];
   readonly grid: Grid;
-  readonly latent: Latent;
-  /** Whether the correlations are estimated, and so part of the parameters. */
-  readonly correlated: boolean;
+  /** The distribution of each group. */
+  readonly latents: readonly Latent[];
+  /** The index of each person's group, in the order of the persons of the responses. */
+  readonly groupOf: Int32Array;
   readonly maximization: ItemMaximization<TParameters>;
   readonly eStep: ExpectationStep;
   readonly responses: CompressedResponses;
@@ -28,8 +29,8 @@ const STEP = 1e-5;
 
 /**
  * Returns the covariance matrix of the estimated parameters on their own scale, by rows, in the order of the items'
- * estimated entries and then the correlations; `null` when the information cannot be inverted or gives a variance that
- * is not positive.
+ * estimated entries and then the entries of each group's distribution; `null` when the information cannot be inverted or
+ * gives a variance that is not positive.
  *
  * @remarks
  * The observed information of the marginal log-posterior by Louis' formula: the expected complete-data information
@@ -78,11 +79,11 @@ export function crossProductCovariance<TParameters>(fit: Fit<TParameters>): Floa
 
 /**
  * Returns the expected complete-data information of the estimated parameters on the unbounded scale: the Hessian of
- * the negative expected complete-data log-posterior of each item, and of the correlations, at the last E-step's counts.
- * It is block diagonal, as the items and the correlations share no parameters.
+ * the negative expected complete-data log-posterior of each item, and of each group's distribution, at the last
+ * E-step's counts. It is block diagonal, as the items and the groups share no parameters.
  */
 function completeInformation<TParameters>(fit: Fit<TParameters>, size: number): Float64Array {
-  const { items, latent, correlated, maximization, eStep } = fit;
+  const { items, latents, maximization, eStep } = fit;
   const information = new Float64Array(size * size);
   let slot = 0;
   for (const item of items) {
@@ -104,11 +105,17 @@ function completeInformation<TParameters>(fit: Fit<TParameters>, size: number): 
     maximization.assign(item, eta);
     slot += length;
   }
-  if (correlated && latent.pairs.length > 0) latentInformation(latent, eStep.nodeCounts, information, size, slot);
+  latents.forEach((latent, g) => {
+    latentInformation(latent, eStep.groupCounts[g] ?? eStep.nodeCounts, information, size, slot);
+    slot += latent.size;
+  });
   return information;
 }
 
-/** Writes the Hessian of the negative expected log-likelihood of the correlations into the block at `slot`. */
+/**
+ * Writes the Hessian of the negative expected log-likelihood of a group's distribution into the block at `slot`, on the
+ * own scale of its estimated entries.
+ */
 function latentInformation(
   latent: Latent,
   nodeCounts: Float64Array,
@@ -116,29 +123,25 @@ function latentInformation(
   size: number,
   slot: number,
 ): void {
-  const pairs = latent.pairs.length;
-  const start = latent.matrix.slice();
-  const up = new Float64Array(pairs);
-  const down = new Float64Array(pairs);
-  for (let a = 0; a < pairs; a++) {
-    const [i, j] = latent.pairs[a] ?? [0, 0];
-    const at = i * latent.dimensions + j;
-    const step = STEP * Math.max(1, Math.abs(start[at] ?? 0));
-    latent.set(shifted(start, latent.dimensions, i, j, step));
+  const start = latent.entries();
+  const up = new Float64Array(latent.size);
+  const down = new Float64Array(latent.size);
+  for (let a = 0; a < latent.size; a++) {
+    const step = STEP * Math.max(1, Math.abs(start[a] ?? 0));
+    latent.assignEntries(shifted(start, a, step));
     latent.gradient(nodeCounts, up);
-    latent.set(shifted(start, latent.dimensions, i, j, -step));
+    latent.assignEntries(shifted(start, a, -step));
     latent.gradient(nodeCounts, down);
-    for (let b = 0; b < pairs; b++)
+    for (let b = 0; b < latent.size; b++)
       information[(slot + b) * size + slot + a] = ((up[b] ?? 0) - (down[b] ?? 0)) / (2 * step);
   }
-  latent.set(start);
+  latent.assignEntries(start);
 }
 
-/** Returns the correlation matrix with the correlation of dimensions i and j moved by `step`. */
-function shifted(matrix: Float64Array, dimensions: number, i: number, j: number, step: number): Float64Array {
-  const next = matrix.slice();
-  next[i * dimensions + j] = (next[i * dimensions + j] ?? 0) + step;
-  next[j * dimensions + i] = (next[j * dimensions + i] ?? 0) + step;
+/** Returns the entries with entry `a` moved by `step`. */
+function shifted(entries: Float64Array, a: number, step: number): Float64Array {
+  const next = entries.slice();
+  next[a] = (next[a] ?? 0) + step;
   return next;
 }
 

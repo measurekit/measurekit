@@ -3,13 +3,17 @@ import type { CompressedResponses } from "../irt/responses.js";
 import { type Iteration, squarem } from "../irt/squarem.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { setUp } from "./calibration-setup.js";
-import { latentDistribution } from "./correlation.js";
+import type { Latent } from "./correlation.js";
 import type { Design } from "./design.js";
 import { expectationStep } from "./expectation.js";
-import { defaultPoints, productGrid } from "./grid.js";
+import { defaultPoints, type Grid, productGrid } from "./grid.js";
+import { population } from "./groups.js";
 import { itemMaximization } from "./m-step.js";
-import type { Settings, Solution } from "./solution.js";
+import type { GroupMoments, Settings, Solution } from "./solution.js";
 import { crossProductCovariance, type Fit, louisCovariance, parameterCount } from "./standard-errors.js";
+
+/** The label of the group of all persons when fixed items come without the option `groups`. */
+const SINGLE_GROUP = "all";
 
 /** The most dimensions that EM calibrates: its grid grows as the number of points to the power of the dimensions. */
 export const MAX_EM_DIMENSIONS = 3;
@@ -36,10 +40,10 @@ function expectationMaximization<TParameters>(
 
 /**
  * Returns EM as an iteration on the unbounded coordinates of the items' estimated entries, then the parameters of the
- * correlations, which any values keep a correlation matrix when it is positive definite.
+ * distributions of the groups, which any values keep a distribution when the correlations are positive definite.
  */
 function emIteration<TParameters>(fit: Fit<TParameters>): Iteration {
-  const { items, latent, correlated, maximization, eStep } = fit;
+  const { items, latents, maximization, eStep } = fit;
   const itemSize = items.reduce((sum, item) => sum + item.free.length, 0);
   const current = new Float64Array(parameterCount(fit));
   const previous = new Float64Array(current.length);
@@ -48,24 +52,33 @@ function emIteration<TParameters>(fit: Fit<TParameters>): Iteration {
       const logLikelihood = eStep.run();
       estimatesOf(fit, previous);
       for (const item of items) maximization.maximize(item);
-      if (correlated) latent.maximize(eStep.nodeCounts);
+      latents.forEach((latent, g) => {
+        latent.maximize(eStep.groupCounts[g] ?? eStep.nodeCounts);
+      });
       estimatesOf(fit, current);
       return { logLikelihood, change: largestChange(previous, current) };
     },
     get() {
-      const state = new Float64Array(itemSize + (correlated ? latent.pairs.length : 0));
+      const state = new Float64Array(parameterCount(fit));
       let slot = 0;
       for (const item of items) {
         state.set(maximization.coordinates(item), slot);
         slot += item.free.length;
       }
-      if (correlated) state.set(latent.parameters(), itemSize);
+      for (const latent of latents) {
+        state.set(latent.parameters(), slot);
+        slot += latent.size;
+      }
       return state;
     },
     set(state) {
       // Correlations that are not positive definite stay as they were: the log-likelihood at the jump decides.
-      if (correlated) latent.assign(state.subarray(itemSize));
-      let slot = 0;
+      let slot = itemSize;
+      for (const latent of latents) {
+        latent.assign(state.subarray(slot, slot + latent.size));
+        slot += latent.size;
+      }
+      slot = 0;
       for (const item of items) {
         maximization.assign(item, state.subarray(slot, slot + item.free.length));
         slot += item.free.length;
@@ -74,11 +87,17 @@ function emIteration<TParameters>(fit: Fit<TParameters>): Iteration {
   };
 }
 
-/** Writes the estimated parameters, on their own scale, into `out`: the items' estimated entries, then the correlations. */
-function estimatesOf<TParameters>({ items, latent, correlated }: Fit<TParameters>, out: Float64Array): void {
+/**
+ * Writes the estimated parameters, on their own scale, into `out`: the items' estimated entries, then the entries of
+ * each group's distribution, the standard deviations on the logarithmic scale.
+ */
+function estimatesOf<TParameters>({ items, latents }: Fit<TParameters>, out: Float64Array): void {
   let slot = 0;
   for (const item of items) for (const j of item.free) out[slot++] = item.vector[j] ?? 0;
-  if (correlated) for (const [i, j] of latent.pairs) out[slot++] = latent.matrix[i * latent.dimensions + j] ?? 0;
+  for (const latent of latents) {
+    out.set(latent.entries(), slot);
+    slot += latent.size;
+  }
 }
 
 /**
@@ -100,28 +119,69 @@ export function calibrateByEm<TParameters>(
   checkIntegerFrom(points, "The option points", 2);
   const grid = productGrid(dimensions, points);
   const items = setUp(responses, options, design, grid.count);
-  const latent = latentDistribution(grid);
+  const { labels, groupOf, latents } = population(options, responses, items, design, grid);
   const fit: Fit<TParameters> = {
     items,
     grid,
-    latent,
-    correlated: design.correlated,
+    latents,
+    groupOf,
     maximization: itemMaximization(items, grid),
-    eStep: expectationStep(responses, items, grid, latent.logWeights),
+    eStep: expectationStep(
+      responses,
+      items,
+      grid,
+      latents.map((latent) => latent.logWeights),
+      groupOf,
+    ),
     responses,
   };
   const { converged, iterations } = expectationMaximization(fit, settings.tolerance, settings.maxIterations);
   const logLikelihood = fit.eStep.run();
   const covariance = parameterCount(fit) > 0 ? covarianceOf(settings.standardErrors, fit) : null;
+  const [first] = latents;
   return {
     items,
-    correlations: latent.matrix,
+    correlations: first === undefined ? new Float64Array(0) : correlationsOf(first),
     correlated: design.correlated,
+    latentSize: latents.reduce((sum, latent) => sum + latent.size, 0),
+    groups:
+      labels === null && !items.some((item) => item.fixed)
+        ? null
+        : latents.map(
+            (latent, g): GroupMoments => ({
+              group: labels?.[g] ?? SINGLE_GROUP,
+              means: latent.mean.slice(),
+              covariance: latent.matrix.slice(),
+            }),
+          ),
     covariance,
     logLikelihood,
-    converged,
+    converged: converged && !latents.some((latent) => runsAway(latent, grid)),
     iterations,
   };
+}
+
+/** Returns the correlation matrix of a distribution: its covariance over the product of the standard deviations. */
+function correlationsOf({ matrix, standardDeviations, dimensions }: Latent): Float64Array {
+  return Float64Array.from(matrix, (value, k) => {
+    const i = Math.floor(k / dimensions);
+    const j = k % dimensions;
+    return i === j ? 1 : value / ((standardDeviations[i] ?? 1) * (standardDeviations[j] ?? 1));
+  });
+}
+
+/**
+ * Returns whether an estimated distribution has run to a boundary where the likelihood has no maximum: a mean outside
+ * the grid, or a standard deviation below the spacing of its nodes or above their range.
+ */
+function runsAway({ free, mean, standardDeviations }: Latent, { nodes, points }: Grid): boolean {
+  const low = nodes[0] ?? 0;
+  const high = nodes[nodes.length - 1] ?? 0;
+  const spacing = (high - low) / (points - 1);
+  return (
+    (free.means && mean.some((value) => value < low || value > high)) ||
+    (free.variances && standardDeviations.some((value) => value < spacing || value > high - low))
+  );
 }
 
 /** Returns the covariance matrix of the estimated parameters by the method, or `null` without standard errors. */

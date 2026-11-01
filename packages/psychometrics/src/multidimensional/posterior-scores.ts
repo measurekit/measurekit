@@ -18,20 +18,21 @@ export interface ScoreMoments {
   readonly second: Float64Array | null;
 }
 
-/** What the scores need of a fit: its items, grid, latent distribution and E-step. */
+/** What the scores need of a fit: its items, grid, the distribution of each group and E-step. */
 export interface ScoredFit<TParameters> {
   readonly items: readonly ItemState<TParameters>[];
   readonly grid: Grid;
-  readonly latent: Latent;
-  /** Whether the correlations are estimated, and so part of the parameters. */
-  readonly correlated: boolean;
+  /** The distribution of each group. */
+  readonly latents: readonly Latent[];
+  /** The index of each person's group, in the order of the persons of the responses. */
+  readonly groupOf: Int32Array;
   readonly eStep: ExpectationStep;
   readonly responses: CompressedResponses;
 }
 
 /**
- * The scores of one parameter group at the nodes of the subgrid it depends on: an item's entries, or the correlations,
- * by category (0 for the correlations), then node, then entry.
+ * The scores of one parameter group at the nodes of the subgrid it depends on: an item's entries, or the entries of a
+ * group's distribution, by category (0 for the distributions), then node, then entry.
  */
 interface ScoreUnit {
   /** The slot in the parameter vector of its first entry. */
@@ -53,9 +54,9 @@ interface Marginal {
   readonly weights: Float64Array;
 }
 
-/** Returns the number of estimated parameters: the items' estimated entries, then the correlations. */
-export function parameterCount<TParameters>({ items, latent, correlated }: ScoredFit<TParameters>): number {
-  return items.reduce((sum, item) => sum + item.free.length, 0) + (correlated ? latent.pairs.length : 0);
+/** Returns the number of estimated parameters: the items' estimated entries, then those of the distributions. */
+export function parameterCount<TParameters>({ items, latents }: ScoredFit<TParameters>): number {
+  return items.reduce((sum, item) => sum + item.free.length, 0) + latents.reduce((sum, { size }) => sum + size, 0);
 }
 
 /**
@@ -65,8 +66,9 @@ export function parameterCount<TParameters>({ items, latent, correlated }: Score
  * The score of an item depends on theta through the dimensions it loads on, so its expectation over a person's
  * posterior needs only the posterior's marginal over those dimensions, and the product of the scores of two items only
  * the marginal over the union of their dimensions. The marginals have far fewer nodes than the grid for items that load
- * on few dimensions. The correlations' scores depend on every dimension. With `scaled`, the scores are those of the
- * items' entries on the unbounded scale of calibration, the derivatives of ln P times dx/dη.
+ * on few dimensions. The scores of a group's distribution depend on every dimension, and only the persons of the group
+ * have them. With `scaled`, the scores are those of the items' entries on the unbounded scale of calibration, the
+ * derivatives of ln P times dx/dη.
  *
  * @param withSecond - Whether to also sum the second moments E_p[s sᵀ], which Louis' formula needs.
  */
@@ -75,11 +77,14 @@ export function posteriorScoreMoments<TParameters>(
   scaled: boolean,
   withSecond: boolean,
 ): ScoreMoments {
-  const { items, grid, latent, correlated, eStep, responses } = fit;
+  const { items, grid, groupOf, eStep, responses } = fit;
   const size = parameterCount(fit);
   const axis = Float64Array.from({ length: grid.points }, (_, k) => grid.nodes[k * grid.dimensions] ?? 0);
   const units = scoreUnits(fit, axis, scaled);
-  const latentIndex = correlated && latent.pairs.length > 0 ? units.length - 1 : -1;
+  const latentUnits = fit.latents.map((latent, g) => {
+    const before = fit.latents.slice(0, g).filter(({ size }) => size > 0).length;
+    return latent.size > 0 ? items.length + before : -1;
+  });
   const marginals = marginalsOf(units, grid, withSecond);
   const restrictions = restrictionsOf(units, marginals, grid, withSecond);
   const state: Accumulation = {
@@ -94,7 +99,7 @@ export function posteriorScoreMoments<TParameters>(
     second: withSecond ? new Float64Array(size * size) : null,
   };
   eStep.forEachPosterior((index, posterior) => {
-    answeredBy(state.person, units, responses, index, latentIndex);
+    answeredBy(state.person, units, responses, index, latentUnits[groupOf[index] ?? 0] ?? -1);
     accumulate(state, posterior);
   });
   mirror(state.outer, size);
@@ -139,7 +144,7 @@ interface Answered {
   count: number;
 }
 
-/** Sets the units a person answered, by item, then the correlations' unit, and the responses to them. */
+/** Sets the units a person answered, by item, then the unit of the person's group, and the responses to them. */
 function answeredBy(
   person: Answered,
   units: readonly ScoreUnit[],
@@ -167,9 +172,9 @@ function insertAnswered(person: Answered, unit: number, code: number): void {
   person.codes[at] = code;
 }
 
-/** Returns the score units of the items, in item order, and then of the correlations when they are estimated. */
+/** Returns the score units of the items, in item order, and then of each group's distribution that has estimated entries. */
 function scoreUnits<TParameters>(
-  { items, grid, latent, correlated }: ScoredFit<TParameters>,
+  { items, grid, latents }: ScoredFit<TParameters>,
   axis: Float64Array,
   scaled: boolean,
 ): ScoreUnit[] {
@@ -179,14 +184,16 @@ function scoreUnits<TParameters>(
     offset += item.free.length;
     return unit;
   });
-  const pairs = latent.pairs.length;
-  if (correlated && pairs > 0) {
-    const scores = new Float64Array(pairs * grid.count);
+  for (const latent of latents) {
+    const entries = latent.size;
+    if (entries === 0) continue;
+    const scores = new Float64Array(entries * grid.count);
     latent.scores(scores);
-    const table = new Float64Array(grid.count * pairs);
+    const table = new Float64Array(grid.count * entries);
     for (let q = 0; q < grid.count; q++)
-      for (let p = 0; p < pairs; p++) table[q * pairs + p] = scores[p * grid.count + q] ?? 0;
-    units.push({ offset, size: pairs, set: (1 << grid.dimensions) - 1, nodes: grid.count, table });
+      for (let p = 0; p < entries; p++) table[q * entries + p] = scores[p * grid.count + q] ?? 0;
+    units.push({ offset, size: entries, set: (1 << grid.dimensions) - 1, nodes: grid.count, table });
+    offset += entries;
   }
   return units;
 }

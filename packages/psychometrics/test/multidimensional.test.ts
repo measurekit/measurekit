@@ -1,3 +1,4 @@
+import { cholesky } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,6 +9,7 @@ import {
   type LoadingPattern,
   logNormalPrior,
   type MultidimensionalCalibration,
+  type MultidimensionalCalibrationOptions,
   type MultidimensionalGradedParameters,
   type MultidimensionalItem,
   type MultidimensionalLogisticParameters,
@@ -28,12 +30,14 @@ import {
   responseMatrix,
   responseRecords,
   rotateLoadings,
+  simulateMultidimensionalResponses,
   twoParameterLogistic,
 } from "../src/index.js";
 import { compressResponses } from "../src/irt/responses.js";
 import { setUp } from "../src/multidimensional/calibration-setup.js";
 import { latentDistribution } from "../src/multidimensional/correlation.js";
 import { designOf } from "../src/multidimensional/design.js";
+import { type ExpectationItem, expectationStep } from "../src/multidimensional/expectation.js";
 import { productGrid } from "../src/multidimensional/grid.js";
 import { gridLikelihood } from "../src/multidimensional/grid-likelihood.js";
 import { createChain, responsesByItem, responsesByPerson } from "../src/multidimensional/mhrm-chain.js";
@@ -48,6 +52,7 @@ import { createScratch, itemMoments, observedItemInformation } from "../src/mult
 import exploratory from "./fixtures/multidimensional-exploratory.json" with { type: "json" };
 import graded from "./fixtures/multidimensional-graded.json" with { type: "json" };
 import graded3 from "./fixtures/multidimensional-graded3.json" with { type: "json" };
+import groups from "./fixtures/multidimensional-groups.json" with { type: "json" };
 import information from "./fixtures/multidimensional-information.json" with { type: "json" };
 import m2pl from "./fixtures/multidimensional-m2pl.json" with { type: "json" };
 import m3pl from "./fixtures/multidimensional-m3pl.json" with { type: "json" };
@@ -1107,7 +1112,7 @@ describe("MH-RM", () => {
       const four = Object.fromEntries(m2pl.itemIds.map((id, i) => [id, [`D${(i % 4) + 1}`]]));
       expect(() =>
         calibrateMultidimensional(data, { model: multidimensionalTwoParameterLogistic, loadings: four, points: 5 }),
-      ).toThrow('The option points sets the grid of EM, which the method "mhrm" does not use.');
+      ).toThrow('The option points is for EM, which the method "mhrm" does not use.');
       const fit = calibrateMultidimensional(data, {
         model: multidimensionalTwoParameterLogistic,
         loadings: four,
@@ -1367,6 +1372,679 @@ describe("MH-RM internals", () => {
       expect(fresh.matrix).toEqual(Float64Array.of(1, 0, 0, 1));
       expect(fresh.logDeterminant()).toBe(0);
     });
+  });
+});
+
+/** A calibration of mirt in several groups: the data, the group of each person and mirt's estimates. */
+interface GroupsFixture extends Fixture {
+  readonly personGroups: readonly string[];
+  readonly groupMoments: readonly {
+    readonly group: string;
+    readonly means: readonly number[];
+    readonly covariance: readonly (readonly number[])[];
+  }[];
+  readonly fixed?: Readonly<Record<string, FixtureParameters>>;
+  readonly correlated?: boolean;
+}
+
+describe("multiple groups", () => {
+  const twoGroups: GroupsFixture = groups.correlated;
+  const anchored: GroupsFixture = groups.anchors;
+  // The likelihood is flat in the moments of the groups, and mirt's EM stops before its estimates settle: measurekit's,
+  // run to a tolerance of 1e-11, stay where they were at 1e-9 and reach a log-likelihood at least as high as mirt's.
+  const mirtTolerances = { parameters: 2e-4, errors: 5e-4, likelihood: 5e-6 };
+
+  /** Calibrates a fixture's groups, whatever its model and anchors, as mirt's multipleGroup does. */
+  function calibrateGroups(
+    fixture: GroupsFixture,
+    standardErrors: "none" | "hessian" | "cross-product",
+    extra: Partial<MultidimensionalCalibrationOptions<Parameters>> = {},
+  ): MultidimensionalCalibration<Parameters> {
+    const { fixed, correlated } = fixture;
+    return calibrateMultidimensional(responseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
+      model: modelOf(fixture.model),
+      loadings: fixture.loadings,
+      points: fixture.points,
+      groups: [...fixture.personGroups],
+      ...(fixed === undefined
+        ? {}
+        : { fixed: Object.fromEntries(Object.entries(fixed).map(([id, p]) => [id, parametersOf(fixture.model, p)])) }),
+      ...(correlated === undefined ? {} : { correlated }),
+      standardErrors,
+      tolerance: 1e-9,
+      maxIterations: 2000,
+      ...extra,
+    });
+  }
+
+  /** Compares the means and covariance of each group with mirt's. */
+  function expectGroups(fit: MultidimensionalCalibration<Parameters>, fixture: GroupsFixture, tolerance: number): void {
+    expect(fit.groups?.map(({ group }) => group)).toEqual(fixture.groupMoments.map(({ group }) => group));
+    fixture.groupMoments.forEach((expected, g) => {
+      const found = defined(fit.groups?.[g]);
+      expected.means.forEach((value, d) => {
+        expectClose(defined(found.means[d]), value, tolerance, `mean ${d + 1} of group ${expected.group}`);
+      });
+      expected.covariance.forEach((row, i) => {
+        row.forEach((value, j) => {
+          expectClose(
+            defined(found.covariance[i]?.[j]),
+            value,
+            tolerance,
+            `covariance ${i + 1},${j + 1} of group ${expected.group}`,
+          );
+        });
+      });
+    });
+  }
+
+  it("matches mirt's multipleGroup for two groups of correlated dimensions, with standard errors", () => {
+    const fit = calibrateGroups(twoGroups, "hessian");
+    expectCalibration(fit, twoGroups, { parameters: 5e-5, errors: 1e-4, likelihood: 1e-6 }, "two groups");
+    expectGroups(fit, twoGroups, 1e-4);
+    expect(fit.converged).toBe(true);
+    // The first group is the reference: means 0 and variances 1.
+    expect(fit.groups?.[0]?.means).toEqual([0, 0]);
+    expect(fit.groups?.[0]?.covariance.map((row, i) => row[i])).toEqual([1, 1]);
+  }, 120_000);
+
+  it("matches mirt when fixed items set the scale and every group's means and covariance are free", () => {
+    const fit = calibrateGroups(anchored, "hessian");
+    expectCalibration(fit, anchored, mirtTolerances, "fixed items");
+    expectGroups(fit, anchored, 5e-4);
+    // Fixed items keep their parameters and have no standard errors.
+    for (const [id, parameters] of Object.entries(defined(anchored.fixed))) {
+      const item = defined(fit.items.find((each) => each.id === id));
+      expect(item.parameters).toEqual(parametersOf(anchored.model, parameters));
+      expect(item.standardErrors).toBeNull();
+    }
+    expect(defined(fit.groups?.[0]).means.some((mean) => mean !== 0)).toBe(true);
+  }, 120_000);
+
+  it("matches mirt for three groups of uncorrelated dimensions with items missing by design", () => {
+    const uncorrelated: GroupsFixture = groups.uncorrelated;
+    const fit = calibrateGroups(uncorrelated, "hessian");
+    expectCalibration(fit, uncorrelated, mirtTolerances, "three groups");
+    expectGroups(fit, uncorrelated, 5e-4);
+    expect(fit.correlationStandardErrors).toBeNull();
+    // The covariance of every group is diagonal.
+    expect(fit.groups?.every(({ covariance }) => covariance[0]?.[1] === 0)).toBe(true);
+  }, 120_000);
+
+  it("matches mirt for the graded model in two groups", () => {
+    const graded: GroupsFixture = groups.graded;
+    const fit = calibrateGroups(graded, "none");
+    expectCalibration(fit, graded, mirtTolerances, "graded groups");
+    expectGroups(fit, graded, 5e-4);
+  }, 120_000);
+
+  it("matches mirt for two groups on three dimensions", () => {
+    const three: GroupsFixture = groups.three;
+    const fit = calibrateGroups(three, "none");
+    expectCalibration(fit, three, mirtTolerances, "three dimensions");
+    expectGroups(fit, three, 5e-4);
+  }, 120_000);
+
+  it("gives the same calibration with the cross-product standard errors for the same groups", () => {
+    const hessian = calibrateGroups(twoGroups, "hessian");
+    const cross = calibrateGroups(twoGroups, "cross-product");
+    hessian.items.forEach((item, i) => {
+      for (const [name, error] of Object.entries(defined(item.standardErrors))) {
+        expectClose(defined(cross.items[i]?.standardErrors?.[name]) / error, 1, 0.2, `${item.id} ${name}`);
+      }
+    });
+  }, 120_000);
+
+  it("reports no groups without the options groups and fixed", () => {
+    const { itemIds, responses, loadings, points, model } = twoGroups;
+    const fit = calibrateMultidimensional(responseMatrix(responses, { itemIds: [...itemIds] }), {
+      model: modelOf(model),
+      loadings,
+      points,
+    });
+    expect(fit.groups).toBeUndefined();
+  });
+
+  it("names the group of all persons when fixed items come without groups", () => {
+    const { itemIds, responses, loadings, points, model, fixed } = anchored;
+    const fit = calibrateMultidimensional(responseMatrix(responses, { itemIds: [...itemIds] }), {
+      model: modelOf(model),
+      loadings,
+      points,
+      fixed: Object.fromEntries(Object.entries(defined(fixed)).map(([id, p]) => [id, parametersOf(model, p)])),
+    });
+    expect(fit.groups?.map(({ group }) => group)).toEqual(["all"]);
+    expect(fit.converged).toBe(true);
+  });
+
+  it("orders the groups by first appearance and reads a group label as a string", () => {
+    const labels = [...twoGroups.personGroups].reverse();
+    const fit = calibrateGroups(
+      { ...twoGroups, personGroups: labels, responses: [...twoGroups.responses].reverse() },
+      "none",
+      {
+        tolerance: 1e-6,
+      },
+    );
+    expect(fit.groups?.map(({ group }) => group)).toEqual(["B", "A"]);
+    // The first group is now the reference: the other group's mean is the opposite of the earlier difference.
+    expect(defined(fit.groups?.[1]).means[0]).toBeLessThan(0);
+  });
+
+  it("estimates the same groups from sparse records as from a matrix", () => {
+    const small: GroupsFixture = {
+      ...twoGroups,
+      responses: twoGroups.responses.filter((_, person) => person % 3 === 0),
+      personGroups: twoGroups.personGroups.filter((_, person) => person % 3 === 0),
+    };
+    const matrix = responseMatrix(small.responses, { itemIds: [...small.itemIds] });
+    const records = responseRecords(
+      matrix.responses.flatMap((row, person) =>
+        row.flatMap((response, item) =>
+          response === null
+            ? []
+            : [{ person: matrix.personIds[person] ?? "", item: matrix.itemIds[item] ?? "", response }],
+        ),
+      ),
+      { personIds: [...matrix.personIds], itemIds: [...matrix.itemIds] },
+    );
+    const options = {
+      model: modelOf(small.model),
+      loadings: small.loadings,
+      points: 15,
+      groups: [...small.personGroups],
+    };
+    const fromMatrix = calibrateMultidimensional(matrix, options);
+    const fromRecords = calibrateMultidimensional(records, options);
+    expect(fromRecords.groups).toEqual(fromMatrix.groups);
+    expect(fromRecords.logLikelihood).toBeCloseTo(fromMatrix.logLikelihood, 8);
+  }, 120_000);
+
+  it("keeps the estimates when the persons are shuffled together with their groups", () => {
+    const first = twoGroups.personGroups.map((_, k) => k).filter((k) => twoGroups.personGroups[k] === "A");
+    const second = twoGroups.personGroups.map((_, k) => k).filter((k) => twoGroups.personGroups[k] === "B");
+    // Alternating the groups keeps A first, so the reference group and the scale stay the same.
+    const order = first.flatMap((k, n) => (second[n] === undefined ? [k] : [k, defined(second[n])]));
+    const shuffled: GroupsFixture = {
+      ...twoGroups,
+      responses: order.map((k) => defined(twoGroups.responses[k])),
+      personGroups: order.map((k) => defined(twoGroups.personGroups[k])),
+    };
+    const expected = calibrateGroups(twoGroups, "none");
+    const fit = calibrateGroups(shuffled, "none");
+    expectGroups(fit, { ...twoGroups, groupMoments: defined(expected.groups).map((g) => g) }, 1e-6);
+    expectClose(fit.logLikelihood, expected.logLikelihood, 1e-6, "log-likelihood");
+  }, 120_000);
+
+  it("stops at the largest number of iterations and says so", () => {
+    const fit = calibrateGroups(twoGroups, "none", { maxIterations: 3, tolerance: 1e-12 });
+    expect(fit.converged).toBe(false);
+    expect(fit.iterations).toBe(3);
+  });
+
+  it("does not claim convergence when a group's standard deviation is below the spacing of the nodes", () => {
+    const fit = calibrateGroups(twoGroups, "none", { points: 5, tolerance: 1e-6 });
+    expect(fit.iterations).toBeLessThan(2000);
+    expect(fit.converged).toBe(false);
+  }, 120_000);
+
+  describe("recovery", () => {
+    const dimensions = 3;
+    const perDimension = 40;
+    const truth = [
+      {
+        group: "A",
+        means: [0, 0, 0],
+        persons: 700,
+        covariance: [
+          [1, 0.3, 0.2],
+          [0.3, 1, 0.4],
+          [0.2, 0.4, 1],
+        ],
+      },
+      {
+        group: "B",
+        means: [0.4, -0.3, 0.5],
+        persons: 600,
+        covariance: [
+          [1.4, 0.4, 0.3],
+          [0.4, 0.7, 0.2],
+          [0.3, 0.2, 1.2],
+        ],
+      },
+      {
+        group: "C",
+        means: [-0.5, 0.3, 0.2],
+        persons: 600,
+        covariance: [
+          [0.8, 0.2, 0.1],
+          [0.2, 1.3, 0.5],
+          [0.1, 0.5, 0.9],
+        ],
+      },
+    ];
+
+    /** Simulates responses to 40 items on each of 3 dimensions in three groups of the given moments. */
+    function simulate(seed: number) {
+      const random = createRandom(seed);
+      const items = Array.from({ length: dimensions * perDimension }, (_, i) => ({
+        model: multidimensionalTwoParameterLogistic,
+        parameters: {
+          a: Array.from({ length: dimensions }, (__, d) =>
+            d === Math.floor(i / perDimension) ? 0.8 + random.uniform() : 0,
+          ),
+          intercept: random.normal() * 0.7,
+          c: 0,
+          d: 1,
+        } satisfies MultidimensionalLogisticParameters,
+      }));
+      const thetas: number[][] = [];
+      const labels: string[] = [];
+      for (const { group, means, persons, covariance } of truth) {
+        const factor = defined(cholesky(Float64Array.from(covariance.flat()), dimensions));
+        for (let p = 0; p < persons; p++) {
+          const z = Array.from({ length: dimensions }, () => random.normal());
+          thetas.push(
+            means.map(
+              (mean, i) =>
+                mean + z.reduce((sum, value, j) => sum + (j <= i ? (factor[i * dimensions + j] ?? 0) * value : 0), 0),
+            ),
+          );
+          labels.push(group);
+        }
+      }
+      return { matrix: simulateMultidimensionalResponses(items, thetas, random), labels };
+    }
+
+    it("recovers the means and covariances of three groups on three dimensions from 40 items per dimension", () => {
+      const { matrix, labels } = simulate(20261031);
+      const fit = calibrateMultidimensional(matrix, {
+        model: multidimensionalTwoParameterLogistic,
+        loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [`D${Math.floor(i / perDimension) + 1}`]])),
+        groups: labels,
+        points: 21,
+        maxIterations: 1000,
+      });
+      expect(fit.converged).toBe(true);
+      // The first group is the reference and has the moments of its scale. On this seed the errors are at most 0.13 for a
+      // mean and 0.18 for a covariance at 21 nodes, and 0.24 and 0.61 at the default 15, which the tolerances exclude.
+      truth.forEach(({ group, means, covariance }, g) => {
+        const found = defined(fit.groups?.[g]);
+        expect(found.group).toBe(group);
+        means.forEach((value, d) => {
+          expectClose(defined(found.means[d]), value, 0.18, `mean ${d + 1} of group ${group}`);
+        });
+        covariance.forEach((row, i) => {
+          row.forEach((value, j) => {
+            expectClose(
+              defined(found.covariance[i]?.[j]),
+              value,
+              0.25,
+              `covariance ${i + 1},${j + 1} of group ${group}`,
+            );
+          });
+        });
+      });
+    }, 600_000);
+  });
+});
+
+describe("latent distribution of a group", () => {
+  const free = { correlations: true, variances: true, means: true } as const;
+  const Covariance3 = Float64Array.of(1.4, 0.4, -0.2, 0.4, 0.7, 0.3, -0.2, 0.3, 1.1);
+  const Mean3 = [0.5, -0.3, 0.2];
+
+  /** The expected number of persons at each node of a grid under a mean and covariance, for 1,000 persons. */
+  function counts(
+    grid: ReturnType<typeof productGrid>,
+    covariance: Float64Array,
+    mean: readonly number[],
+  ): Float64Array {
+    const latent = latentDistribution(grid);
+    expect(latent.set(covariance, mean)).toBe(true);
+    return latent.logWeights.map((logWeight) => 1000 * Math.exp(logWeight));
+  }
+
+  it("weights the nodes by the normal density of its mean and covariance, summing to 1", () => {
+    const grid = productGrid(3, 9);
+    const latent = latentDistribution(grid, free);
+    expect(latent.set(Covariance3, Mean3)).toBe(true);
+    expect(latent.logWeights.reduce((sum, value) => sum + Math.exp(value), 0)).toBeCloseTo(1, 12);
+    expect(Array.from(latent.mean)).toEqual(Mean3);
+    expect(Array.from(latent.standardDeviations)).toEqual([Math.sqrt(1.4), Math.sqrt(0.7), Math.sqrt(1.1)]);
+    // The weighted mean of the nodes is near the mean, up to the truncation of the grid.
+    const weighted = [0, 0, 0].map((_, d) =>
+      latent.logWeights.reduce((sum, logWeight, q) => sum + Math.exp(logWeight) * (grid.nodes[3 * q + d] ?? 0), 0),
+    );
+    weighted.forEach((value, d) => {
+      expectClose(value, defined(Mean3[d]), 0.15, `weighted mean ${d + 1}`);
+    });
+  });
+
+  it("differentiates the expected negative log-likelihood with respect to its entries", () => {
+    const grid = productGrid(3, 7);
+    const latent = latentDistribution(grid, free);
+    const nodeCounts = counts(grid, Covariance3, Mean3).map((value, q) => value * (1 + 0.3 * Math.sin(q)));
+    latent.set(Float64Array.of(1.2, 0.2, 0.1, 0.2, 0.9, -0.3, 0.1, -0.3, 1), [0.1, 0.2, -0.1]);
+    const start = latent.entries();
+    expect(start.length).toBe(9);
+    const gradient = new Float64Array(9);
+    latent.gradient(nodeCounts, gradient);
+    const objective = (entries: Float64Array): number => {
+      latent.assignEntries(entries);
+      return -nodeCounts.reduce((sum, value, q) => sum + value * (latent.logWeights[q] ?? 0), 0);
+    };
+    const step = 1e-6;
+    start.forEach((_, e) => {
+      const at = (shift: number): number => {
+        const moved = Float64Array.from(start);
+        moved[e] = (moved[e] ?? 0) + shift;
+        return objective(moved);
+      };
+      expectClose(
+        gradient[e] ?? Number.NaN,
+        (at(step) - at(-step)) / (2 * step),
+        1e-5 * Math.max(1, Math.abs(gradient[e] ?? 0)),
+        `entry ${e}`,
+      );
+    });
+  });
+
+  it("gives scores that average to zero under its weights and match the gradient of the log weights", () => {
+    const grid = productGrid(2, 9);
+    const latent = latentDistribution(grid, free);
+    latent.set(Float64Array.of(1.3, 0.3, 0.3, 0.8), [0.2, -0.4]);
+    const scores = new Float64Array(latent.size * grid.count);
+    latent.scores(scores);
+    for (let e = 0; e < latent.size; e++) {
+      let expected = 0;
+      for (let q = 0; q < grid.count; q++)
+        expected += Math.exp(latent.logWeights[q] ?? 0) * (scores[e * grid.count + q] ?? 0);
+      expectClose(expected, 0, 1e-12, `entry ${e}`);
+    }
+    const start = latent.entries();
+    const logWeights = (entries: Float64Array): Float64Array => {
+      latent.assignEntries(entries);
+      return latent.logWeights.slice();
+    };
+    const step = 1e-6;
+    start.forEach((_, e) => {
+      const up = Float64Array.from(start);
+      const down = Float64Array.from(start);
+      up[e] = (up[e] ?? 0) + step;
+      down[e] = (down[e] ?? 0) - step;
+      const high = logWeights(up);
+      const low = logWeights(down);
+      for (let q = 0; q < grid.count; q += 5) {
+        expectClose(
+          scores[e * grid.count + q] ?? Number.NaN,
+          ((high[q] ?? 0) - (low[q] ?? 0)) / (2 * step),
+          1e-6,
+          `entry ${e} node ${q}`,
+        );
+      }
+    });
+  });
+
+  it("recovers the mean and covariance that generated the node counts", () => {
+    const grid = productGrid(3, 11);
+    const latent = latentDistribution(grid, free);
+    latent.maximize(counts(grid, Covariance3, Mean3));
+    Covariance3.forEach((value, k) => {
+      expectClose(latent.matrix[k] ?? Number.NaN, value, 1e-6, `covariance entry ${k}`);
+    });
+    Mean3.forEach((value, d) => {
+      expectClose(latent.mean[d] ?? Number.NaN, value, 1e-6, `mean ${d + 1}`);
+    });
+  });
+
+  it("estimates only the entries it is given as free", () => {
+    const grid = productGrid(2, 15);
+    const source = Float64Array.of(1.5, 0.4, 0.4, 0.6);
+    const nodeCounts = counts(grid, source, [0.3, -0.2]);
+    const means = latentDistribution(grid, { correlations: false, variances: false, means: true });
+    expect(means.size).toBe(2);
+    means.maximize(nodeCounts);
+    expect(Array.from(means.matrix)).toEqual([1, 0, 0, 1]);
+    expect(means.mean[0] ?? 0).toBeGreaterThan(0.1);
+    const diagonal = latentDistribution(grid, { correlations: false, variances: true, means: true });
+    expect(diagonal.size).toBe(4);
+    diagonal.maximize(nodeCounts);
+    expect(diagonal.matrix[1]).toBe(0);
+    expect(diagonal.matrix[0] ?? 0).toBeGreaterThan(1);
+    const fixed = latentDistribution(grid, { correlations: false, variances: false, means: false });
+    expect(fixed.size).toBe(0);
+    fixed.maximize(nodeCounts);
+    expect(Array.from(fixed.matrix)).toEqual([1, 0, 0, 1]);
+  });
+
+  it("round-trips its entries and its parameters", () => {
+    const grid = productGrid(3, 7);
+    const latent = latentDistribution(grid, free);
+    latent.set(Covariance3, Mean3);
+    const entries = latent.entries();
+    const parameters = latent.parameters();
+    const matrix = latent.matrix.slice();
+    latent.set(Float64Array.of(1, 0, 0, 0, 1, 0, 0, 0, 1), [0, 0, 0]);
+    expect(latent.assignEntries(entries)).toBe(true);
+    latent.matrix.forEach((value, k) => {
+      expectClose(value, matrix[k] ?? Number.NaN, 1e-12, `entry ${k}`);
+    });
+    latent.set(Float64Array.of(1, 0, 0, 0, 1, 0, 0, 0, 1), [0, 0, 0]);
+    expect(latent.assign(parameters)).toBe(true);
+    latent.matrix.forEach((value, k) => {
+      expectClose(value, matrix[k] ?? Number.NaN, 1e-12, `parameter entry ${k}`);
+    });
+  });
+
+  it("rejects a covariance that is not positive definite and keeps the distribution", () => {
+    const latent = latentDistribution(productGrid(2, 9), free);
+    const before = Float64Array.from(latent.logWeights);
+    expect(latent.set(Float64Array.of(1, 2, 2, 1), [0.5, 0.5])).toBe(false);
+    expect(latent.set(Float64Array.of(0, 0, 0, 1))).toBe(false);
+    expect(latent.logWeights).toEqual(before);
+    expect(Array.from(latent.mean)).toEqual([0, 0]);
+  });
+});
+
+describe("expectation step with groups", () => {
+  const grid = productGrid(1, 11);
+  const model = multidimensionalTwoParameterLogistic;
+  const rows: readonly (readonly (number | null)[])[] = [
+    [1, 0, 1],
+    [0, 0, 1],
+    [1, 1, 1],
+    [0, 1, 0],
+    [1, 0, 0],
+    [0, 0, 0],
+  ];
+
+  function items(): ExpectationItem[] {
+    return [0.4, -0.2, 0.7].map((intercept) => ({
+      model,
+      categoryCount: 2,
+      parameters: { a: [1.3], intercept, c: 0, d: 1 },
+      counts: new Float64Array(grid.count * 2),
+    }));
+  }
+
+  /** The log weights of a normal distribution of the given mean on the grid. */
+  function weights(mean: number): Float64Array {
+    const latent = latentDistribution(grid, { correlations: false, variances: false, means: true });
+    latent.set(Float64Array.of(1), [mean]);
+    return latent.logWeights;
+  }
+
+  /** Runs the E-step of the rows of one group under its weights alone. */
+  function alone(subset: readonly (readonly (number | null)[])[], logWeights: Float64Array) {
+    const each = items();
+    const step = expectationStep(compressResponses(responseMatrix(subset)), each, grid, logWeights);
+    return {
+      logLikelihood: step.run(),
+      nodeCounts: step.nodeCounts.slice(),
+      counts: each.map((item) => item.counts.slice()),
+    };
+  }
+
+  for (const [name, data] of [
+    ["every person answers every item", rows],
+    ["some responses are missing", rows.map((row, p) => (p === 1 ? [0, null, 1] : row))],
+  ] as const) {
+    it(`counts the persons of each group under the weights of the group when ${name}`, () => {
+      const low = weights(-0.5);
+      const high = weights(0.6);
+      const each = items();
+      const step = expectationStep(
+        compressResponses(responseMatrix(data)),
+        each,
+        grid,
+        [low, high],
+        [0, 0, 0, 1, 1, 1],
+      );
+      const logLikelihood = step.run();
+      const first = alone(data.slice(0, 3), low);
+      const second = alone(data.slice(3), high);
+      expect(logLikelihood).toBeCloseTo(first.logLikelihood + second.logLikelihood, 10);
+      step.groupCounts[0]?.forEach((value, q) => {
+        expect(value).toBeCloseTo(first.nodeCounts[q] ?? Number.NaN, 10);
+      });
+      step.groupCounts[1]?.forEach((value, q) => {
+        expect(value).toBeCloseTo(second.nodeCounts[q] ?? Number.NaN, 10);
+      });
+      step.nodeCounts.forEach((value, q) => {
+        expect(value).toBeCloseTo((first.nodeCounts[q] ?? 0) + (second.nodeCounts[q] ?? 0), 10);
+      });
+      each.forEach((item, i) => {
+        item.counts.forEach((value, k) => {
+          expect(value).toBeCloseTo((first.counts[i]?.[k] ?? 0) + (second.counts[i]?.[k] ?? 0), 10);
+        });
+      });
+    });
+  }
+
+  it("keeps the counts of one group as the counts of all persons", () => {
+    const step = expectationStep(compressResponses(responseMatrix(rows)), items(), grid, weights(0));
+    step.run();
+    expect(step.groupCounts).toHaveLength(1);
+    expect(step.groupCounts[0]).toBe(step.nodeCounts);
+  });
+});
+
+describe("multiple groups errors", () => {
+  const { personGroups, responses, itemIds, loadings, model } = groups.correlated;
+  /** Forty persons of each group, answering every item, on a coarse grid. */
+  const keep = [...Array.from({ length: 40 }, (_, k) => k), ...Array.from({ length: 40 }, (_, k) => 900 + k)];
+  const matrix = (rows: readonly (readonly (number | null)[])[] = keep.map((k) => defined(responses[k]))) =>
+    responseMatrix(rows, { itemIds: [...itemIds] });
+  const labels = keep.map((k) => defined(personGroups[k]));
+  const base = { model: modelOf(model), loadings, points: 7 };
+
+  it("needs one string label for each person", () => {
+    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: ["A", "B"] })).toThrow(
+      "Found 2 groups for 80 persons.",
+    );
+    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: JSON.parse('"A"') })).toThrow(
+      "Found no groups for 80 persons.",
+    );
+    expect(() =>
+      calibrateMultidimensional(matrix(), {
+        ...base,
+        groups: JSON.parse(JSON.stringify([1, ...labels.slice(1)])),
+      }),
+    ).toThrow("The group of person 1 must be a string, found 1.");
+    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: JSON.parse("null") })).toThrow(
+      "Found no groups for 80 persons.",
+    );
+  });
+
+  it("needs a person with a response in each group", () => {
+    const rows = keep.map((k, p) => (p < 40 ? defined(responses[k]) : defined(responses[k]).map(() => null)));
+    expect(() => calibrateMultidimensional(matrix(rows), { ...base, groups: labels })).toThrow(
+      'Group "B" has no person with a response.',
+    );
+  });
+
+  it("needs groups that share items", () => {
+    const rows = keep.map((k, p) =>
+      defined(responses[k]).map((response, i) => (p < 40 ? (i < 6 ? response : null) : i < 6 ? null : response)),
+    );
+    expect(() => calibrateMultidimensional(matrix(rows), { ...base, groups: labels })).toThrow(
+      'The group "B" shares no item with the group "A", directly or through other groups',
+    );
+  });
+
+  it("links groups through other groups", () => {
+    const three = [...labels.slice(0, 40), ...labels.slice(40, 70), ...labels.slice(70).map(() => "C")];
+    const rows = keep.map((k, p) =>
+      defined(responses[k]).map((response, i) => (p >= 70 ? (i >= 3 && i < 9 ? response : null) : response)),
+    );
+    const fit = calibrateMultidimensional(matrix(rows), { ...base, groups: three });
+    expect(fit.groups?.map(({ group }) => group)).toEqual(["A", "B", "C"]);
+  });
+
+  it("needs fixed items that set the scale of every dimension", () => {
+    const fixed = { [defined(itemIds[0])]: { a: [1, 0], intercept: 0.2, c: 0, d: 1 } };
+    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: labels, fixed })).toThrow(
+      'No fixed item with a slope on dimension "F2" was answered by the group "A" or the groups linked to it',
+    );
+    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed })).toThrow(
+      'No fixed item with a slope on dimension "F2" was answered by the persons',
+    );
+  });
+
+  it("checks the fixed items", () => {
+    const parameters = { a: [1, 0], intercept: 0.2, c: 0, d: 1 };
+    const both = { [defined(itemIds[0])]: parameters, [defined(itemIds[6])]: { a: [0, 1], intercept: 0, c: 0, d: 1 } };
+    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed: { nobody: parameters } })).toThrow(
+      'Fixed parameters are given for "nobody", which is not an item id.',
+    );
+    expect(() =>
+      calibrateMultidimensional(matrix(), {
+        ...base,
+        fixed: { ...both, [defined(itemIds[1])]: { ...parameters, a: [1] } },
+      }),
+    ).toThrow('Fixed item "q02" has 1 dimensions, but the calibration has 2.');
+    expect(() =>
+      calibrateMultidimensional(matrix(), {
+        ...base,
+        fixed: { ...both, [defined(itemIds[1])]: { ...parameters, c: 2 } },
+      }),
+    ).toThrow('Fixed item "q02"');
+    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed: JSON.parse("null") })).toThrow(
+      "The option fixed must be an object of item parameters by item id, found null.",
+    );
+    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed: { ...both, q02: JSON.parse("null") } })).toThrow(
+      'Fixed item "q02"',
+    );
+    const graded = responseMatrix(
+      [
+        [0, 1],
+        [1, 2],
+        [2, 0],
+      ],
+      { itemIds: ["g1", "g2"] },
+    );
+    expect(() =>
+      calibrateMultidimensional(graded, {
+        model: multidimensionalGradedResponse,
+        loadings: { g1: ["D"], g2: ["D"] },
+        fixed: { g1: { a: [1], intercepts: [0.5] } },
+      }),
+    ).toThrow('Item "g1" has a response of 2, but its fixed parameters have 2 categories.');
+  });
+
+  it("is for EM and not for MH-RM", () => {
+    expect(() =>
+      calibrateMultidimensional(matrix(), { ...base, points: undefined, method: "mhrm", groups: labels }),
+    ).toThrow('The option groups is for EM, which the method "mhrm" does not use.');
+    expect(() =>
+      calibrateMultidimensional(matrix(), {
+        ...base,
+        points: undefined,
+        method: "mhrm",
+        fixed: { [defined(itemIds[0])]: { a: [1, 0], intercept: 0, c: 0, d: 1 } },
+      }),
+    ).toThrow('The option fixed is for EM, which the method "mhrm" does not use.');
   });
 });
 
@@ -1984,7 +2662,7 @@ describe("errors", () => {
     );
     expect(() => calibrateMultidimensional(data, { ...options, seed: JSON.parse('"7"') })).toThrow(DataError);
     expect(() => calibrateMultidimensional(data, { ...options, method: "mhrm", points: 15 })).toThrow(
-      'The option points sets the grid of EM, which the method "mhrm" does not use.',
+      'The option points is for EM, which the method "mhrm" does not use.',
     );
     expect(() =>
       calibrateMultidimensional(data, { ...options, method: "mhrm", standardErrors: "cross-product" }),

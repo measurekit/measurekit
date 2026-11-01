@@ -1,47 +1,76 @@
 import { bfgs, cholesky } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
-import { identity, multiply, traceOfProduct } from "../math/matrix.js";
+import { identity } from "../math/matrix.js";
 
 import { type Grid, normalLogWeights } from "./grid.js";
 
-/** The gradient norm, per person, at which the M-step of the correlations has converged. */
+/** The gradient norm, per person, at which the M-step of a latent distribution has converged. */
 const CORRELATION_TOLERANCE = 1e-10;
 const CORRELATION_MAX_ITERATIONS = 100;
 
+/** Which entries of a latent distribution the M-step estimates. */
+export interface LatentFree {
+  /** Whether the correlations between the dimensions are estimated. */
+  readonly correlations: boolean;
+  /** Whether the standard deviations of the dimensions are estimated; otherwise they stay as they are set. */
+  readonly variances: boolean;
+  /** Whether the means of the dimensions are estimated; otherwise they stay as they are set. */
+  readonly means: boolean;
+}
+
+/** The entries of a distribution whose dimensions have mean 0 and variance 1, and whose correlations are estimated. */
+const FREE_CORRELATIONS: LatentFree = { correlations: true, variances: false, means: false };
+
 /**
- * The distribution of the dimensions in a calibration: the normal distribution with mean 0 and a correlation matrix,
- * weighted on the nodes of a grid, whose correlations an M-step can estimate.
+ * The distribution of the dimensions in a calibration: the normal distribution with a mean and a covariance matrix,
+ * weighted on the nodes of a grid, whose estimated entries an M-step can maximize.
+ *
+ * @remarks
+ * The estimated entries, on their own scale, are the correlations in the order of `pairs`, then the logarithms of the
+ * standard deviations, then the means, each group only when it is free. `size` counts them.
  */
 export interface Latent {
-  /** The correlation matrix, by rows. */
+  /** The covariance matrix by rows: the correlation matrix while the variances are 1. */
   readonly matrix: Float64Array;
+  /** The mean of each dimension. */
+  readonly mean: Float64Array;
+  /** The standard deviation of each dimension. */
+  readonly standardDeviations: Float64Array;
   /** The log weights of the nodes, normalized so that the weights sum to 1. */
   readonly logWeights: Float64Array;
   /** The number of dimensions. */
   readonly dimensions: number;
   /** The pairs of dimensions below the diagonal, in the order of the correlations: (1, 0), (2, 0), (2, 1), ... */
   readonly pairs: readonly (readonly [number, number])[];
+  /** The entries the M-step estimates. */
+  readonly free: LatentFree;
+  /** The number of estimated entries. */
+  readonly size: number;
   /**
-   * Sets the correlation matrix and the weights. Returns `false`, leaving both unchanged, when the matrix is not
-   * positive definite.
+   * Sets the covariance matrix, and the mean when given, and the weights. Returns `false`, leaving them unchanged,
+   * when the matrix is not positive definite.
    */
-  set(matrix: Float64Array): boolean;
+  set(matrix: Float64Array, mean?: ArrayLike<number>): boolean;
   /**
-   * Writes the gradient of the expected negative complete-data log-likelihood with respect to the correlations into
-   * `out`, in the order of the pairs (1, 0), (2, 0), (2, 1), ..., given the expected number of persons at each node.
+   * Writes the gradient of the expected negative complete-data log-likelihood with respect to the estimated entries
+   * into `out`, given the expected number of persons at each node.
    */
   gradient(nodeCounts: Float64Array, out: Float64Array): void;
-  /** Sets the correlations that maximize the expected complete-data log-likelihood. */
+  /** Sets the estimated entries that maximize the expected complete-data log-likelihood. */
   maximize(nodeCounts: Float64Array): void;
   /**
-   * Returns the parameters of the correlation matrix, which any values keep a correlation matrix when positive definite:
-   * the entries below the diagonal of its Cholesky factor over the diagonal entry of their row, in the order of the
-   * pairs.
+   * Returns the parameters of the distribution, which any values keep a distribution when the correlations are positive
+   * definite: for the correlations the entries below the diagonal of the Cholesky factor over the diagonal entry of
+   * their row, in the order of the pairs, then the logarithms of the standard deviations and the means.
    */
   parameters(): Float64Array;
-  /** Sets the correlation matrix and the weights from parameters. Returns `false`, leaving both unchanged, when singular. */
+  /** Sets the distribution and the weights from parameters. Returns `false`, leaving both unchanged, when singular. */
   assign(parameters: Float64Array): boolean;
-  /** Writes the derivative of ln w_q with respect to each correlation into `out`, by pair, then node. */
+  /** Returns the estimated entries on their own scale. */
+  entries(): Float64Array;
+  /** Sets the estimated entries from their own scale. Returns `false`, leaving them unchanged, when singular. */
+  assignEntries(entries: Float64Array): boolean;
+  /** Writes the derivative of ln w_q with respect to each estimated entry into `out`, by entry, then node. */
   scores(out: Float64Array): void;
 }
 
@@ -52,117 +81,324 @@ export function pairsOf(dimensions: number): [number, number][] {
   return pairs;
 }
 
-/** Returns the latent distribution on a grid, with the identity as its correlation matrix. */
-export function latentDistribution(grid: Grid): Latent {
-  const { dimensions, count } = grid;
-  const size = dimensions * dimensions;
-  const pairs = pairsOf(dimensions);
-  const matrix = new Float64Array(size);
-  const logWeights = new Float64Array(count);
-  const weights = new Float64Array(count);
-  const precision = new Float64Array(size);
-  const zeros = new Float64Array(dimensions);
-  const observed = new Float64Array(size);
-  const expected = new Float64Array(size);
-  const middle = new Float64Array(size);
-  const full = new Float64Array(size);
-  const outer = new Float64Array(size);
-  const candidate = new Float64Array(size);
-  const covector = new Float64Array(dimensions);
-  const factor = {
-    lower: new Float64Array(size),
-    norms: new Float64Array(dimensions),
-    gradient: new Float64Array(size),
-  };
-  let logNormalizer = 0;
-
-  const set = (next: Float64Array): boolean => {
-    const inverse = invertPositiveDefinite(next, dimensions);
-    if (inverse === null) return false;
-    precision.set(inverse);
-    matrix.set(next);
-    logNormalizer = normalLogWeights(grid, zeros, precision, logWeights);
-    for (let q = 0; q < count; q++) weights[q] = Math.exp(logWeights[q] ?? 0);
-    return true;
-  };
-  set(identity(dimensions));
-
-  /**
-   * Writes the gradient with respect to the correlation matrix, as a full symmetric matrix, of the negative expected
-   * log-likelihood per person: -Ω (M_n - M_w) Ω / 2, with Ω the precision, M_n the observed second moments in
-   * `observed` and M_w those of the weights.
-   */
-  const matrixGradient = (out: Float64Array): void => {
-    secondMoments(expected, grid, weights, 1);
-    for (let k = 0; k < size; k++) middle[k] = (observed[k] ?? 0) - (expected[k] ?? 0);
-    multiply(precision, middle, dimensions, dimensions, dimensions, outer);
-    multiply(outer, precision, dimensions, dimensions, dimensions, out);
-    for (let k = 0; k < size; k++) out[k] = -(out[k] ?? 0) / 2;
-  };
-
-  /** Writes the second moments of the expected persons per person into `observed`; returns the number of persons. */
-  const observe = (nodeCounts: Float64Array): number => {
-    const persons = nodeCounts.reduce((sum, value) => sum + value, 0);
-    secondMoments(observed, grid, nodeCounts, persons > 0 ? 1 / persons : 0);
-    return persons;
-  };
-
-  /** Returns the negative expected log-likelihood per person at the parameters, writing its gradient. */
-  const objective = (parameters: Float64Array, gradient: Float64Array): number => {
-    correlationMatrix(parameters, dimensions, factor, candidate);
-    // The parameters give a positive definite matrix, which can still be singular to working precision.
-    if (!set(candidate)) {
-      gradient.fill(0);
-      return Number.POSITIVE_INFINITY;
-    }
-    matrixGradient(full);
-    parametersGradient(full, dimensions, factor, gradient);
-    return 0.5 * traceOfProduct(precision, observed, dimensions) + logNormalizer;
-  };
-
+/**
+ * Returns the latent distribution on a grid, standard normal with uncorrelated dimensions at first.
+ *
+ * @param free - The entries the M-step estimates. The others stay as they are.
+ */
+export function latentDistribution(grid: Grid, free: LatentFree = FREE_CORRELATIONS): Latent {
+  const state = stateOf(grid, free);
+  install(state, state.correlation, state.deviations, state.mean);
   return {
-    matrix,
-    logWeights,
-    dimensions,
-    pairs,
-    set,
+    matrix: state.matrix,
+    mean: state.mean,
+    standardDeviations: state.deviations,
+    logWeights: state.logWeights,
+    dimensions: grid.dimensions,
+    pairs: state.pairs,
+    free,
+    size: state.size,
+    set: (next, location = state.mean) => setCovariance(state, next, location),
     gradient(nodeCounts, out) {
-      const persons = observe(nodeCounts);
-      matrixGradient(full);
-      // The correlation ρ_ij moves the entries (i, j) and (j, i) of the matrix.
-      pairs.forEach(([i, j], p) => {
-        out[p] = 2 * persons * (full[i * dimensions + j] ?? 0);
-      });
+      const persons = observe(state, nodeCounts);
+      entryGradient(state, out);
+      for (let e = 0; e < state.size; e++) out[e] = persons * (out[e] ?? 0);
     },
     maximize(nodeCounts) {
-      const start = pairs.length === 0 ? null : rowParameters(matrix, dimensions);
-      if (start === null || observe(nodeCounts) === 0) return;
-      const { x } = bfgs(objective, start, {
+      const start = state.size === 0 ? null : parametersOf(state);
+      if (start === null || observe(state, nodeCounts) === 0) return;
+      const { x } = bfgs((parameters, gradient) => objective(state, parameters, gradient), start, {
         tolerance: CORRELATION_TOLERANCE,
         maxIterations: CORRELATION_MAX_ITERATIONS,
       });
-      correlationMatrix(x, dimensions, factor, candidate);
-      set(candidate);
+      fromParameters(state, x);
     },
-    parameters() {
-      return rowParameters(matrix, dimensions) ?? new Float64Array(pairs.length);
-    },
-    assign(parameters) {
-      correlationMatrix(parameters, dimensions, factor, candidate);
-      return set(candidate);
-    },
-    scores(out) {
-      secondMoments(expected, grid, weights, 1);
-      multiply(precision, expected, dimensions, dimensions, dimensions, outer);
-      multiply(outer, precision, dimensions, dimensions, dimensions, middle);
-      for (let q = 0; q < count; q++) {
-        precisionTimesNode(precision, grid, q, covector);
-        pairs.forEach(([i, j], p) => {
-          out[p * count + q] = (covector[i] ?? 0) * (covector[j] ?? 0) - (middle[i * dimensions + j] ?? 0);
-        });
-      }
+    parameters: () => parametersOf(state) ?? new Float64Array(state.size),
+    assign: (parameters) => fromParameters(state, parameters),
+    entries: () => entriesOf(state),
+    assignEntries: (entries) => fromEntries(state, entries),
+    scores: (out) => nodeScores(state, out),
+  };
+}
+
+/** A latent distribution during calibration: its moments, the weights they give the nodes, and scratch space. */
+interface State {
+  readonly grid: Grid;
+  readonly free: LatentFree;
+  readonly pairs: readonly (readonly [number, number])[];
+  /** The number of estimated correlations; the standard deviations and the means follow them in the entries. */
+  readonly correlationCount: number;
+  /** The number of estimated entries. */
+  readonly size: number;
+  readonly matrix: Float64Array;
+  readonly correlation: Float64Array;
+  readonly mean: Float64Array;
+  readonly deviations: Float64Array;
+  readonly logWeights: Float64Array;
+  readonly weights: Float64Array;
+  /** The inverse of the covariance matrix. */
+  readonly precision: Float64Array;
+  /** The log of the sum of the unnormalized weights. */
+  logNormalizer: number;
+  readonly scratch: Scratch;
+}
+
+/** The scratch space of the distribution's computations. */
+interface Scratch {
+  readonly candidate: Float64Array;
+  readonly ratio: Float64Array;
+  readonly spread: Float64Array;
+  readonly location: Float64Array;
+  readonly residual: Float64Array;
+  readonly covector: Float64Array;
+  /** The derivative of -Q / 2 with respect to each estimated entry, by node, then entry. */
+  readonly terms: Float64Array;
+  /** The quadratic form (θ - μ)ᵀ Ω (θ - μ) at each node. */
+  readonly quadratic: Float64Array;
+  /** The share of the expected persons at each node. */
+  readonly fractions: Float64Array;
+  readonly natural: Float64Array;
+  readonly full: Float64Array;
+  readonly factor: Factor;
+}
+
+function stateOf(grid: Grid, free: LatentFree): State {
+  const { dimensions, count } = grid;
+  const size = dimensions * dimensions;
+  const pairs = pairsOf(dimensions);
+  const correlationCount = free.correlations ? pairs.length : 0;
+  const entryCount = correlationCount + (free.variances ? dimensions : 0) + (free.means ? dimensions : 0);
+  return {
+    grid,
+    free,
+    pairs,
+    correlationCount,
+    size: entryCount,
+    matrix: new Float64Array(size),
+    correlation: identity(dimensions),
+    mean: new Float64Array(dimensions),
+    deviations: new Float64Array(dimensions).fill(1),
+    logWeights: new Float64Array(count),
+    weights: new Float64Array(count),
+    precision: new Float64Array(size),
+    logNormalizer: 0,
+    scratch: {
+      candidate: new Float64Array(size),
+      ratio: new Float64Array(size),
+      spread: new Float64Array(dimensions),
+      location: new Float64Array(dimensions),
+      residual: new Float64Array(dimensions),
+      covector: new Float64Array(dimensions),
+      terms: new Float64Array(count * entryCount),
+      quadratic: new Float64Array(count),
+      fractions: new Float64Array(count),
+      natural: new Float64Array(entryCount),
+      full: new Float64Array(size),
+      factor: { lower: new Float64Array(size), norms: new Float64Array(dimensions), gradient: new Float64Array(size) },
     },
   };
+}
+
+/** Installs the distribution of correlations `r`, standard deviations `sd` and mean `location`, unless singular. */
+function install(state: State, r: Float64Array, sd: ArrayLike<number>, location: ArrayLike<number>): boolean {
+  const { dimensions, count } = state.grid;
+  const { candidate } = state.scratch;
+  for (let i = 0; i < dimensions; i++) {
+    for (let j = 0; j < dimensions; j++) {
+      // The diagonal of a correlation matrix is 1, whatever rounding the factor that made it left.
+      candidate[i * dimensions + j] = (sd[i] ?? 1) * (sd[j] ?? 1) * (i === j ? 1 : (r[i * dimensions + j] ?? 0));
+    }
+  }
+  const inverse = invertPositiveDefinite(candidate, dimensions);
+  if (inverse === null) return false;
+  state.precision.set(inverse);
+  state.matrix.set(candidate);
+  state.correlation.set(r);
+  for (let i = 0; i < dimensions; i++) state.correlation[i * dimensions + i] = 1;
+  state.deviations.set(sd);
+  state.mean.set(location);
+  state.logNormalizer = normalLogWeights(state.grid, state.mean, state.precision, state.logWeights);
+  for (let q = 0; q < count; q++) state.weights[q] = Math.exp(state.logWeights[q] ?? 0);
+  return true;
+}
+
+/** Sets the covariance matrix and the mean; `false`, leaving the distribution unchanged, when it is not positive definite. */
+function setCovariance(state: State, next: Float64Array, location: ArrayLike<number>): boolean {
+  const { dimensions } = state.grid;
+  const { ratio, spread } = state.scratch;
+  for (let i = 0; i < dimensions; i++) {
+    const variance = next[i * dimensions + i] ?? 0;
+    if (!(variance > 0)) return false;
+    spread[i] = Math.sqrt(variance);
+  }
+  for (let i = 0; i < dimensions; i++) {
+    for (let j = 0; j < dimensions; j++) {
+      ratio[i * dimensions + j] = i === j ? 1 : (next[i * dimensions + j] ?? 0) / ((spread[i] ?? 1) * (spread[j] ?? 1));
+    }
+  }
+  return install(state, ratio, spread, location);
+}
+
+/** Sets the fractions of persons at the nodes from their expected numbers; returns the number of persons. */
+function observe({ grid, scratch }: State, nodeCounts: Float64Array): number {
+  const persons = nodeCounts.reduce((sum, value) => sum + value, 0);
+  for (let q = 0; q < grid.count; q++) scratch.fractions[q] = persons > 0 ? (nodeCounts[q] ?? 0) / persons : 0;
+  return persons;
+}
+
+/**
+ * Writes, for each node, the quadratic form (θ - μ)ᵀ Ω (θ - μ) and the derivative of -Q / 2 with respect to each
+ * estimated entry: σ_i σ_j c_i c_j for the correlation of i and j, c_i (θ_i - μ_i) for the log standard deviation of i
+ * and c_i for the mean of i, with c = Ω (θ - μ).
+ */
+function evaluate(state: State): void {
+  const { dimensions, count, nodes } = state.grid;
+  const { residual, covector, quadratic } = state.scratch;
+  for (let q = 0; q < count; q++) {
+    for (let i = 0; i < dimensions; i++) residual[i] = (nodes[q * dimensions + i] ?? 0) - (state.mean[i] ?? 0);
+    let form = 0;
+    for (let i = 0; i < dimensions; i++) {
+      let sum = 0;
+      for (let j = 0; j < dimensions; j++) sum += (state.precision[i * dimensions + j] ?? 0) * (residual[j] ?? 0);
+      covector[i] = sum;
+      form += (residual[i] ?? 0) * sum;
+    }
+    quadratic[q] = form;
+    entryTerms(state, q * state.size);
+  }
+}
+
+/** Writes the derivatives of -Q / 2 at the node whose residual and covector are in the scratch, from `start` on. */
+function entryTerms(state: State, start: number): void {
+  const { dimensions } = state.grid;
+  const { covector, residual, terms } = state.scratch;
+  let entry = state.free.correlations ? correlationTerms(state, start) : start;
+  if (state.free.variances)
+    for (let i = 0; i < dimensions; i++) terms[entry++] = (covector[i] ?? 0) * (residual[i] ?? 0);
+  if (state.free.means) for (let i = 0; i < dimensions; i++) terms[entry++] = covector[i] ?? 0;
+}
+
+/** Writes the derivatives of -Q / 2 with respect to the correlations from `start` on; returns the next index. */
+function correlationTerms(state: State, start: number): number {
+  const { covector, terms } = state.scratch;
+  let entry = start;
+  for (const [i, j] of state.pairs) {
+    terms[entry++] = (state.deviations[i] ?? 1) * (state.deviations[j] ?? 1) * (covector[i] ?? 0) * (covector[j] ?? 0);
+  }
+  return entry;
+}
+
+/** Writes the gradient of the negative expected log-likelihood per person at the fractions of persons into `out`. */
+function entryGradient(state: State, out: Float64Array): void {
+  evaluate(state);
+  out.fill(0);
+  const { fractions, terms } = state.scratch;
+  for (let q = 0; q < state.grid.count; q++) {
+    const excess = (fractions[q] ?? 0) - (state.weights[q] ?? 0);
+    for (let e = 0; e < state.size; e++) out[e] = (out[e] ?? 0) - excess * (terms[q * state.size + e] ?? 0);
+  }
+}
+
+/** Writes the derivative of ln w_q with respect to each estimated entry into `out`, by entry, then node. */
+function nodeScores(state: State, out: Float64Array): void {
+  evaluate(state);
+  const { count } = state.grid;
+  const { terms } = state.scratch;
+  for (let e = 0; e < state.size; e++) {
+    let expected = 0;
+    for (let q = 0; q < count; q++) expected += (state.weights[q] ?? 0) * (terms[q * state.size + e] ?? 0);
+    for (let q = 0; q < count; q++) out[e * count + q] = (terms[q * state.size + e] ?? 0) - expected;
+  }
+}
+
+/** Reads the entries after the correlations: the standard deviations from their logarithms, then the means. */
+function readTail(state: State, entries: Float64Array, spread: Float64Array, location: Float64Array): void {
+  const { dimensions } = state.grid;
+  let slot = state.correlationCount;
+  if (state.free.variances) for (let i = 0; i < dimensions; i++) spread[i] = Math.exp(entries[slot++] ?? 0);
+  if (state.free.means) for (let i = 0; i < dimensions; i++) location[i] = entries[slot++] ?? 0;
+}
+
+/** Writes the entries after the correlations: the logarithms of the standard deviations, then the means. */
+function writeTail(state: State, out: Float64Array): void {
+  const { dimensions } = state.grid;
+  let slot = state.correlationCount;
+  if (state.free.variances) for (let i = 0; i < dimensions; i++) out[slot++] = Math.log(state.deviations[i] ?? 1);
+  if (state.free.means) for (let i = 0; i < dimensions; i++) out[slot++] = state.mean[i] ?? 0;
+}
+
+/** Installs the distribution of the parameters, whose entries that are not free stay as they are. */
+function fromParameters(state: State, parameters: Float64Array): boolean {
+  const { ratio, spread, location, factor } = state.scratch;
+  if (state.free.correlations) correlationMatrix(parameters, state.grid.dimensions, factor, ratio);
+  else ratio.set(state.correlation);
+  spread.set(state.deviations);
+  location.set(state.mean);
+  readTail(state, parameters, spread, location);
+  return install(state, ratio, spread, location);
+}
+
+/** Returns the parameters of the current distribution, or `null` when its correlations are not positive definite. */
+function parametersOf(state: State): Float64Array | null {
+  const rows = state.free.correlations ? rowParameters(state.correlation, state.grid.dimensions) : new Float64Array(0);
+  if (rows === null) return null;
+  const out = new Float64Array(state.size);
+  out.set(rows);
+  writeTail(state, out);
+  return out;
+}
+
+function entriesOf(state: State): Float64Array {
+  const { dimensions } = state.grid;
+  const out = new Float64Array(state.size);
+  if (state.free.correlations) {
+    state.pairs.forEach(([i, j], p) => {
+      out[p] = state.correlation[i * dimensions + j] ?? 0;
+    });
+  }
+  writeTail(state, out);
+  return out;
+}
+
+/** Installs the distribution of the entries on their own scale, whose entries that are not free stay as they are. */
+function fromEntries(state: State, entries: Float64Array): boolean {
+  const { dimensions } = state.grid;
+  const { ratio, spread, location } = state.scratch;
+  ratio.set(state.correlation);
+  if (state.free.correlations) {
+    state.pairs.forEach(([i, j], p) => {
+      ratio[i * dimensions + j] = entries[p] ?? 0;
+      ratio[j * dimensions + i] = entries[p] ?? 0;
+    });
+  }
+  spread.set(state.deviations);
+  location.set(state.mean);
+  readTail(state, entries, spread, location);
+  return install(state, ratio, spread, location);
+}
+
+/** Returns the negative expected log-likelihood per person at the parameters, writing its gradient. */
+function objective(state: State, parameters: Float64Array, gradient: Float64Array): number {
+  // The parameters give a positive definite matrix, which can still be singular to working precision.
+  if (!fromParameters(state, parameters)) {
+    gradient.fill(0);
+    return Number.POSITIVE_INFINITY;
+  }
+  const { natural, full, factor, fractions, quadratic } = state.scratch;
+  entryGradient(state, natural);
+  let form = 0;
+  for (let q = 0; q < state.grid.count; q++) form += (fractions[q] ?? 0) * (quadratic[q] ?? 0);
+  if (state.free.correlations) {
+    const { dimensions } = state.grid;
+    full.fill(0);
+    state.pairs.forEach(([i, j], p) => {
+      full[i * dimensions + j] = (natural[p] ?? 0) / 2;
+      full[j * dimensions + i] = (natural[p] ?? 0) / 2;
+    });
+    parametersGradient(full, dimensions, factor, gradient);
+  }
+  for (let e = state.correlationCount; e < state.size; e++) gradient[e] = natural[e] ?? 0;
+  return 0.5 * form + state.logNormalizer;
 }
 
 /** The Cholesky-like factor of a correlation matrix with unit rows, and its scratch space. */
@@ -173,37 +409,6 @@ interface Factor {
   readonly norms: Float64Array;
   /** The gradient with respect to the factor. */
   readonly gradient: Float64Array;
-}
-
-/** Writes Ω z_q into `out`. */
-function precisionTimesNode(precision: Float64Array, { dimensions, nodes }: Grid, q: number, out: Float64Array): void {
-  for (let i = 0; i < dimensions; i++) {
-    let sum = 0;
-    for (let j = 0; j < dimensions; j++) sum += (precision[i * dimensions + j] ?? 0) * (nodes[q * dimensions + j] ?? 0);
-    out[i] = sum;
-  }
-}
-
-/** Writes the second moments Σ_q scale v_q z_q z_qᵀ of the nodes under the weights `v` into `out`. */
-function secondMoments(out: Float64Array, { dimensions, count, nodes }: Grid, v: Float64Array, scale: number): void {
-  out.fill(0);
-  for (let q = 0; q < count; q++) {
-    const weight = scale * (v[q] ?? 0);
-    if (weight !== 0) addOuterProduct(out, nodes, q, dimensions, weight);
-  }
-  for (let i = 0; i < dimensions; i++) {
-    for (let j = 0; j < i; j++) out[j * dimensions + i] = out[i * dimensions + j] ?? 0;
-  }
-}
-
-/** Adds `weight` times z_q z_qᵀ to the lower triangle of `out`. */
-function addOuterProduct(out: Float64Array, nodes: Float64Array, q: number, dimensions: number, weight: number): void {
-  for (let i = 0; i < dimensions; i++) {
-    const row = weight * (nodes[q * dimensions + i] ?? 0);
-    for (let j = 0; j <= i; j++) {
-      out[i * dimensions + j] = (out[i * dimensions + j] ?? 0) + row * (nodes[q * dimensions + j] ?? 0);
-    }
-  }
 }
 
 /**

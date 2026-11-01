@@ -4,7 +4,7 @@ import { type CompressedResponses, categoryCounts, checkCategories } from "../ir
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import type { Design } from "./design.js";
 import type { ExpectationItem } from "./expectation.js";
-import { checkMultidimensionalModel } from "./items.js";
+import { checkMultidimensionalItem, checkMultidimensionalModel } from "./items.js";
 import type { MultidimensionalModel } from "./model.js";
 import { startingSlopes } from "./starting-slopes.js";
 
@@ -37,6 +37,8 @@ export interface ItemState<TParameters> extends ExpectationItem {
   readonly free: Int32Array;
   /** The bounds and prior of each estimated entry. */
   readonly entries: readonly FreeEntry[];
+  /** Whether the item is an anchor: its parameters are given, and no entry is estimated. */
+  readonly fixed: boolean;
 }
 
 /**
@@ -50,7 +52,9 @@ function priorName(entry: string): string {
  * Checks the models and priors against the data and builds the items with their starting values.
  *
  * @throws `DataError` when the number of models is not the number of items, a model is invalid, a prior is not a prior
- * or names a parameter that no estimated item has, or an item cannot be estimated from its responses.
+ * or names a parameter that no estimated item has, an item cannot be estimated from its responses, or a fixed item is
+ * not an item of the data, has invalid parameters, other dimensions than the calibration or fewer categories than its
+ * responses.
  */
 export function setUp<TParameters>(
   responses: CompressedResponses,
@@ -62,13 +66,21 @@ export function setUp<TParameters>(
   const dimensions = design.dimensionNames.length;
   const counts = categoryCounts(responses);
   const models = itemModels(options.model, itemIds.length);
-  const { priors = {} } = options;
+  const { priors = {}, fixed = {} } = options;
   checkRecord(priors, "The option priors must be an object of priors by parameter name");
+  // A map, so that an id such as "constructor" finds only its own parameters.
+  checkRecord(fixed, "The option fixed must be an object of item parameters by item id");
+  const anchors = new Map(Object.entries(fixed));
+  for (const id of anchors.keys()) {
+    if (!itemIds.includes(id)) throw new DataError(`Fixed parameters are given for "${id}", which is not an item id.`);
+  }
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);
   const slopes = startingSlopes(design, responses);
   const items = models.map((model, column): ItemState<TParameters> => {
     const id = itemIds[column] ?? "";
     const itemCounts = counts[column] ?? [];
+    const anchor = anchors.get(id);
+    if (anchor !== undefined) return fixedItem(id, model, anchor, itemCounts.length, dimensions, nodeCount);
     const categoryCount = checkCategories(id, model, itemCounts);
     const answered = itemCounts.reduce((sum, count) => sum + count, 0);
     const proportions = Float64Array.from(itemCounts, (count) => count / answered);
@@ -85,6 +97,7 @@ export function setUp<TParameters>(
       counts: new Float64Array(nodeCount * categoryCount),
       names: specifications.map(({ name }) => name),
       vector,
+      fixed: false,
       free,
       entries: Array.from(free, (j) => {
         const {
@@ -103,6 +116,47 @@ export function setUp<TParameters>(
     if (!estimated.has(name)) throw new DataError(`A prior is given for "${name}", which no estimated item has.`);
   }
   return items;
+}
+
+/**
+ * Returns an anchor: an item whose parameters are given and not estimated.
+ *
+ * @throws `DataError` when the parameters are invalid for the model, span other dimensions than the calibration or have
+ * fewer categories than the item's responses.
+ */
+function fixedItem<TParameters>(
+  id: string,
+  model: MultidimensionalModel<TParameters>,
+  parameters: TParameters,
+  responseCategories: number,
+  dimensions: number,
+  nodeCount: number,
+): ItemState<TParameters> {
+  checkMultidimensionalItem({ model, parameters }, `Fixed item "${id}"`);
+  const categoryCount = model.categoryCount(parameters);
+  if (model.dimensionCount(parameters) !== dimensions) {
+    throw new DataError(
+      `Fixed item "${id}" has ${model.dimensionCount(parameters)} dimensions, but the calibration has ${dimensions}.`,
+    );
+  }
+  if (responseCategories > categoryCount) {
+    throw new DataError(
+      `Item "${id}" has a response of ${responseCategories - 1}, but its fixed parameters have ${categoryCount} categories.`,
+    );
+  }
+  return {
+    id,
+    model,
+    categoryCount,
+    dimensions,
+    parameters,
+    counts: new Float64Array(nodeCount * categoryCount),
+    names: model.parameters(categoryCount, dimensions).map(({ name }) => name),
+    vector: model.toVector(parameters),
+    fixed: true,
+    free: new Int32Array(0),
+    entries: [],
+  };
 }
 
 function itemModels<TParameters>(

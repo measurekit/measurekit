@@ -67,6 +67,13 @@ graded_model <- mirt.model("F1 = 1-10\nF2 = 11-20\nCOV = F1*F2")
 calibrate_confirmatory <- function() mirt(confirmatory, confirmatory_model, quadpts = POINTS, TOL = TOL, verbose = FALSE)
 calibrate_graded <- function() mirt(graded, graded_model, itemtype = "graded", quadpts = POINTS, TOL = TOL, verbose = FALSE)
 calibrate_exploratory <- function() mirt(exploratory, 2, quadpts = POINTS, TOL = TOL, verbose = FALSE)
+# The confirmatory data in two groups of the first and the last half of the persons.
+confirmatory_groups <- rep(c("A", "B"), each = persons / 2)
+calibrate_groups <- function() {
+  multipleGroup(confirmatory, confirmatory_model, group = confirmatory_groups,
+                invariance = c("slopes", "intercepts", "free_means", "free_var"), quadpts = POINTS, TOL = TOL,
+                verbose = FALSE)
+}
 
 confirmatory_fit <- calibrate_confirmatory()
 exploratory_fit <- calibrate_exploratory()
@@ -92,6 +99,10 @@ bench_task("multidimensional.calibrateGraded", "Calibration of a confirmatory tw
 bench_task("multidimensional.calibrateExploratory", "Calibration of an exploratory two-dimensional 2PL by EM",
            sprintf("%s persons, 20 items, 2 dimensions", count(persons)), reference("mirt", "mirt(data, 2, quadpts = 31)"),
            calibrate_exploratory, note = "mirt stops at its limit of 500 cycles when it has not converged")
+bench_task("multidimensional.calibrateGroups", "Calibration of a confirmatory two-dimensional 2PL in two groups by EM",
+           sprintf("%s persons in 2 groups, 24 items, 2 correlated dimensions", count(persons)),
+           reference("mirt", "multipleGroup(invariance = c(\"slopes\", \"intercepts\", \"free_means\", \"free_var\"), quadpts = 31)"),
+           calibrate_groups)
 bench_task("multidimensional.calibrateMhrm", "Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro",
            sprintf("%d persons, 25 items of 6 categories, 5 correlated dimensions", nrow(bfi_items)),
            reference("mirt", "mirt(method = \"MHRM\")"),

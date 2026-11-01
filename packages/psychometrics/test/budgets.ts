@@ -24,6 +24,7 @@ const BUDGETS = {
   "multidimensional.calibrateConfirmatory": 2_000,
   "multidimensional.calibrateGraded": 2_000,
   "multidimensional.calibrateExploratory": 9_000,
+  "multidimensional.calibrateGroups": 3_000,
   "multidimensional.calibrateMhrm": 60_000,
   "multidimensional.estimateMode": 200,
   "multidimensional.estimateMean": 200,

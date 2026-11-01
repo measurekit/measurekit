@@ -4,8 +4,10 @@
 slope on each dimension: a high theta on one dimension makes up for a low one on another (compensatory models). It
 calibrates items and the correlations between dimensions by marginal maximum likelihood, exploratory and confirmatory,
 with EM for up to three dimensions and with MH-RM for any number; computes standard errors; rotates exploratory
-solutions; estimates thetas by EAP and MAP in any number of dimensions; and computes information matrices. Every estimate is validated against
-mirt, GPArotation and base R ([validation](validation.md)). The dimensions have mean 0 and variance 1.
+solutions; calibrates several groups of persons on one scale, with fixed anchor items; estimates thetas by EAP and MAP in
+any number of dimensions; and computes information matrices. Every estimate is validated against mirt, GPArotation and
+base R ([validation](validation.md)). The dimensions have mean 0 and variance 1, in the first group of a calibration of
+several groups.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -91,19 +93,21 @@ flowchart TD
 `calibrateMultidimensional(data, options)` takes a response matrix or response records, and a model, one for all items
 or one per item. Missing responses are skipped, and persons without responses change nothing.
 
-| Option           | Default                                   | Meaning                                                                                                    |
-| ---------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `model`          | required                                  | One model, or one per item in item order                                                                   |
-| `method`         | `"em"` up to 3 dimensions, `"mhrm"` above | `"em"` or `"mhrm"`                                                                                         |
-| `dimensions`     | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, at most 3 for EM; every item loads on each      |
-| `loadings`       | none; one of `dimensions` and `loadings`  | Confirmatory: the names of the dimensions of each item, by item id, of every item                          |
-| `correlated`     | `true`                                    | Confirmatory: estimate the correlations; variances are 1 and means 0. Ignored when exploratory             |
-| `priors`         | none                                      | Priors by parameter name: `"a"` for every slope, `"intercept"` and `"c"`; estimates are posterior modes    |
-| `points`         | `61`, `31`, `15` for 1, 2, 3 dimensions   | EM only: nodes per dimension of the grid, at least 2, from -6 to 6 standard deviations: mirt's `quadpts`   |
-| `standardErrors` | `"none"`                                  | `"hessian"`, or `"cross-product"` for EM only                                                              |
-| `seed`           | `0`                                       | MH-RM only: a safe integer; the same seed gives the same calibration                                       |
-| `tolerance`      | `1e-4` for EM, `1e-3` for MH-RM           | Converged when no parameter changes by more than this: in an EM iteration, or in 3 successive MH-RM cycles |
-| `maxIterations`  | `500` for EM, `2000` for MH-RM            | The most EM iterations, or the most cycles of MH-RM's last stage, after the 250 of its first two stages    |
+| Option           | Default                                   | Meaning                                                                                                              |
+| ---------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `model`          | required                                  | One model, or one per item in item order                                                                             |
+| `method`         | `"em"` up to 3 dimensions, `"mhrm"` above | `"em"` or `"mhrm"`                                                                                                   |
+| `dimensions`     | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, at most 3 for EM; every item loads on each                |
+| `loadings`       | none; one of `dimensions` and `loadings`  | Confirmatory: the names of the dimensions of each item, by item id, of every item                                    |
+| `correlated`     | `true`                                    | Confirmatory: estimate the correlations, in every group. Ignored when exploratory                                    |
+| `groups`         | one group                                 | EM only: each person's group label, aligned with the persons; [several groups on one scale](#groups-and-fixed-items) |
+| `fixed`          | none                                      | EM only: parameters of anchor items by item id, which are not estimated and set the scale                            |
+| `priors`         | none                                      | Priors by parameter name: `"a"` for every slope, `"intercept"` and `"c"`; estimates are posterior modes              |
+| `points`         | `61`, `31`, `15` for 1, 2, 3 dimensions   | EM only: nodes per dimension of the grid, at least 2, from -6 to 6 standard deviations: mirt's `quadpts`             |
+| `standardErrors` | `"none"`                                  | `"hessian"`, or `"cross-product"` for EM only                                                                        |
+| `seed`           | `0`                                       | MH-RM only: a safe integer; the same seed gives the same calibration                                                 |
+| `tolerance`      | `1e-4` for EM, `1e-3` for MH-RM           | Converged when no parameter changes by more than this: in an EM iteration, or in 3 successive MH-RM cycles           |
+| `maxIterations`  | `500` for EM, `2000` for MH-RM            | The most EM iterations, or the most cycles of MH-RM's last stage, after the 250 of its first two stages              |
 
 - **Confirmatory.** Each item loads on the dimensions named for it; the dimensions are named in order of first
   appearance among the items, in item order, and their slopes on the other dimensions are fixed at 0. With
@@ -148,18 +152,93 @@ The result:
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `dimensions`                  | The names of the dimensions, in the order of the slopes                                                                        |
 | `items`                       | Each item's `id`, `model`, `parameters` and `standardErrors`                                                                   |
-| `correlations`                | The correlations between dimensions, by rows                                                                                   |
+| `correlations`                | The correlations between dimensions, by rows; of the first group when there are several                                        |
+| `groups`                      | With `groups` or `fixed`: each group's `group` label, `means` and `covariance`, in order of first appearance                   |
 | `correlationStandardErrors`   | By rows with a zero diagonal; `null` if the correlations are not estimated or there are no standard errors                     |
 | `loadings`                    | The standardized loadings, items by dimensions                                                                                 |
 | `communalities`               | λᵀ Φ λ of each item                                                                                                            |
 | `logLikelihood`, `aic`, `bic` | The marginal log-likelihood at the estimates, without priors, by importance sampling for MH-RM; -2 ln L + 2p; -2 ln L + p ln n |
 | `converged`, `iterations`     | Whether `tolerance` was reached, and the iterations run: EM's, or the cycles of MH-RM's last stage                             |
 
-The number of parameters p counts the estimated slopes, intercepts and asymptotes, and the correlations; n is the
-number of persons with a response.
+The number of parameters p counts the estimated slopes, intercepts and asymptotes, and the correlations and, with
+several groups or fixed items, the means and variances; n is the number of persons with a response.
 
 The standardized loadings follow mirt's `summary`: λ = (a / 1.702) / √(1 + (a / 1.702)ᵀ Φ (a / 1.702)), where Φ is the
-correlation matrix, and the communality is λᵀ Φ λ.
+correlation matrix, and the communality is λᵀ Φ λ. With several groups, Φ is the correlation matrix of the first group
+and the slopes are scaled by its standard deviations.
+
+### Groups and fixed items
+
+```mermaid
+flowchart LR
+  P["Persons, with a label in groups"] --> G1["First group: the reference"]
+  P --> G2["Other groups"]
+  I["Items: one set of parameters for all groups"] --> L["Every group's distribution of theta is integrated on the same grid"]
+  G1 --> L
+  G2 --> L
+  F["fixed: anchor items"] -.->|"set the scale: no group is the reference"| L
+```
+
+`groups` calibrates persons from several populations on one scale, as `mirt::multipleGroup` with
+`invariance = c("slopes", "intercepts", "free_means", "free_var")`: every item has the same parameters in every group,
+and each group has its own distribution of theta, normal with a mean vector and a covariance matrix. `fixed` gives the
+parameters of anchor items, which are not estimated; the other items are estimated on their scale.
+
+| Entries of a group's distribution | The first group                        | The other groups                       | Every group, with `fixed`              |
+| --------------------------------- | -------------------------------------- | -------------------------------------- | -------------------------------------- |
+| Means                             | 0                                      | Estimated                              | Estimated                              |
+| Variances                         | 1                                      | Estimated                              | Estimated                              |
+| Correlations                      | Estimated with `correlated`, 0 without | Estimated with `correlated`, 0 without | Estimated with `correlated`, 0 without |
+
+The first group is the first label in order of first appearance. The groups must share items, directly or through other
+groups: a group that shares none with the first throws a `DataError`, as its distribution could not be put on the scale
+of the others. With `fixed`, the fixed items set the scale of each set of groups that share items, so every dimension
+needs a fixed item with a slope on it that the set answered; otherwise a `DataError`. A fixed item needs parameters of
+the calibration's number of dimensions and as many categories as its responses reach. Calibrating persons of one group
+onto the scale of fixed items is the case of `fixed` without `groups`: the result then has one group, labeled `"all"`.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  calibrateMultidimensional,
+  multidimensionalTwoParameterLogistic,
+} from "@measurekit/psychometrics/multidimensional";
+import { simulateMultidimensionalResponses } from "@measurekit/psychometrics/sim";
+
+// Twenty items, ten on each of two dimensions; 1,000 persons in each of two years, the later one 0.4 higher.
+const random = createRandom(5);
+const items = Array.from({ length: 20 }, (_, i) => ({
+  model: multidimensionalTwoParameterLogistic,
+  parameters: { a: [i < 10 ? 1.2 : 0, i < 10 ? 0 : 1.4], intercept: (i % 10) * 0.25 - 1.1, c: 0, d: 1 },
+}));
+const thetas = Array.from({ length: 2000 }, (_, person) => {
+  const shift = person < 1000 ? 0 : 0.4;
+  const [z1, z2] = [random.normal(), random.normal()];
+  return [shift + z1, shift + 0.5 * z1 + Math.sqrt(0.75) * z2];
+});
+const matrix = simulateMultidimensionalResponses(items, thetas, random);
+
+const fit = calibrateMultidimensional(matrix, {
+  model: multidimensionalTwoParameterLogistic,
+  loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [i < 10 ? "verbal" : "quantitative"]])),
+  groups: thetas.map((_, person) => (person < 1000 ? "2025" : "2026")),
+});
+fit.groups?.[0]; // { group: "2025", means: [0, 0], covariance: [[1, 0.5], [0.5, 1]] }
+fit.groups?.[1]; // { group: "2026", means: [0.35, 0.41], covariance: [[0.98, 0.5], [0.5, 1.04]] }
+fit.converged; // true
+```
+
+The groups' distributions can serve as priors of the scoring functions: pass `{ mean: group.means, covariance:
+group.covariance }` as `prior`.
+
+**Standard errors.** With `standardErrors`, the information covers the items and the entries of every group's
+distribution, so an item's standard error accounts for the groups. Fixed items have none, and `correlationStandardErrors`
+are those of the first group's correlations.
+
+**Convergence.** A group's estimated distribution that runs to the edge of the grid, a mean outside it or a standard
+deviation below the spacing of its nodes or above its range, leaves `converged` `false`: a few persons, or too coarse a
+grid, give such a group no maximum. The default grid of three dimensions has 15 nodes per dimension; set `points: 21`
+above 20 items per dimension, where the coarse grid biases the moments of the groups.
 
 ### Standard errors
 
@@ -281,8 +360,10 @@ convert items to and from mirt.
 
 - Noncompensatory models; multidimensional GPCM and nominal models; bifactor and two-tier reduction (the testlet model
   of [IRT](irt.md#testlets) covers equal-slope testlets).
-- Multiple groups, fixed anchor items and multidimensional linking.
-- QMC-EM and latent means other than 0.
+- Multidimensional linking of separate calibrations: groups are calibrated together, on one scale.
+- QMC-EM.
+- Standard errors of the means and covariances of the groups; the items' standard errors account for them.
+- Items whose parameters differ between groups; the groups share one set of item parameters.
 - Multidimensional person fit and DIF.
 
 ## Differences from mirt
@@ -303,6 +384,10 @@ convert items to and from mirt.
   `summary` and `fscores` rotate to GPArotation's default tolerance, 1e-5.
 - **Priors.** A prior of c is on the probability scale; mirt's `norm` on `g` is on its logit.
 - **Dimensions.** EM calibrates up to three dimensions, MH-RM any number; scoring has no limit.
+- **Groups.** The options `groups` and `fixed` stand for mirt's `invariance` and the `est` column of `pars`. mirt cannot
+  constrain parameters that it does not estimate, so for fixed items it needs the other items named in `invariance`;
+  here `fixed` frees the means and covariance of the first group as well. mirt's covariance of a group is free in
+  every entry its model frees; here an uncorrelated model has a diagonal covariance in every group, as mirt's.
 - **MH-RM estimates.** The stages, gains and tolerance are mirt's defaults, and the estimates agree within Monte Carlo
   error, not to the digits that EM does: on 800 persons, 25 graded items and 5 dimensions, mirt's four runs differ from
   their mean by up to 0.08 in a parameter, and a run here from that mean by up to 0.17.

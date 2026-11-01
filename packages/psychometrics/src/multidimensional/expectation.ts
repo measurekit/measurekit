@@ -19,13 +19,15 @@ export interface ExpectationItem {
 /** The E-step of Bock-Aitkin EM over a grid of nodes. */
 export interface ExpectationStep {
   /**
-   * Evaluates every person's posterior over the nodes, under the weights and the items' current parameters; writes the
-   * items' expected counts and the expected number of persons at each node; and returns the marginal log-likelihood:
-   * the sum over persons of log Σ_q w_q Π_i P_i(x_i | θ_q).
+   * Evaluates every person's posterior over the nodes, under the weights of the person's group and the items' current
+   * parameters; writes the items' expected counts and the expected number of persons at each node; and returns the
+   * marginal log-likelihood: the sum over persons of log Σ_q w_q Π_i P_i(x_i | θ_q).
    */
   run(): number;
-  /** The expected number of persons at each node, as of the last run. */
+  /** The expected number of persons at each node, all groups together, as of the last run. */
   readonly nodeCounts: Float64Array;
+  /** The expected number of persons at each node in each group, as of the last run. */
+  readonly groupCounts: readonly Float64Array[];
   /**
    * Calls `visit` with each person who answered an item and the person's posterior over the nodes, at the parameters
    * of the last run. `posterior` is reused between calls.
@@ -46,15 +48,19 @@ export interface ExpectationStep {
  * persons expected at the node less those in the item's other categories. The additions go with the responses that are
  * not the most frequent ones.
  *
- * @param logWeights - The log weights of the nodes, read at each run, so that a caller whose weights depend on its own
- * parameters rewrites them between runs.
+ * @param logWeights - The log weights of the nodes, or one array of them for each group, read at each run, so that a
+ * caller whose weights depend on its own parameters rewrites them between runs.
+ * @param groupOf - The index in `logWeights` of the group of each person, in the order of the persons of `data`. Without
+ * it, every person is in the first group.
  */
 export function expectationStep(
   data: CompressedResponses,
   items: readonly ExpectationItem[],
   grid: Grid,
-  logWeights: Float64Array,
+  logWeights: Float64Array | readonly Float64Array[],
+  groupOf?: ArrayLike<number>,
 ): ExpectationStep {
+  const groupWeights = logWeights instanceof Float64Array ? [logWeights] : logWeights;
   const nodeCount = grid.count;
   const { offsets, codes } = data;
   const responseItems = data.items;
@@ -66,12 +72,14 @@ export function expectationStep(
   const logTable = new Float64Array(tableStarts[items.length] ?? 0);
   const posterior = new Float64Array(nodeCount);
   const nodeCounts = new Float64Array(nodeCount);
+  const groupCounts = groupWeights.length === 1 ? [nodeCounts] : groupWeights.map(() => new Float64Array(nodeCount));
   const references = referenceCategories(data, items);
-  const baseline = references === null ? logWeights : new Float64Array(nodeCount);
+  const baselines = references === null ? groupWeights : groupWeights.map(() => new Float64Array(nodeCount));
+  const referenceTotal = new Float64Array(nodeCount);
 
-  /** Writes a person's log joint densities over the nodes into `posterior`. */
-  const joint = (start: number, end: number): void => {
-    posterior.set(baseline);
+  /** Writes the log joint densities over the nodes of a person of a group into `posterior`. */
+  const joint = (start: number, end: number, group: number): void => {
+    posterior.set(baselines[group] ?? nodeCounts);
     for (let r = start; r < end; r++) {
       const item = responseItems[r] ?? 0;
       const code = codes[r] ?? 0;
@@ -80,17 +88,17 @@ export function expectationStep(
     }
   };
 
-  /** Calls `visit` with each person who answered an item and the bounds of the person's responses. */
-  const forEachRespondent = (visit: (person: number, start: number, end: number) => void): void => {
+  /** Calls `visit` with each person who answered an item, the bounds of the person's responses and the group. */
+  const forEachRespondent = (visit: (person: number, start: number, end: number, group: number) => void): void => {
     for (let person = 0; person < personCount; person++) {
       const start = offsets[person] ?? 0;
       const end = offsets[person + 1] ?? 0;
-      if (end > start) visit(person, start, end);
+      if (end > start) visit(person, start, end, groupOf?.[person] ?? 0);
     }
   };
 
-  /** Adds the posterior to the counts of the categories a person answered in and to the nodes' counts. */
-  const count = (start: number, end: number): void => {
+  /** Adds the posterior to the counts of the categories a person answered in and to the counts of the group. */
+  const count = (start: number, end: number, group: number): void => {
     for (let r = start; r < end; r++) {
       const item = items[responseItems[r] ?? 0];
       const code = codes[r] ?? 0;
@@ -98,28 +106,39 @@ export function expectationStep(
         addRun(item.counts, code * nodeCount, posterior, 0, nodeCount);
       }
     }
-    addRun(nodeCounts, 0, posterior, 0, nodeCount);
+    addRun(groupCounts[group] ?? nodeCounts, 0, posterior, 0, nodeCount);
   };
 
   return {
     nodeCounts,
+    groupCounts,
     run() {
       tabulate(items, grid, tableStarts, logTable);
-      if (references !== null) referenceDensities(items, references, tableStarts, logTable, logWeights, baseline);
+      if (references !== null) {
+        referenceDensities(items, references, tableStarts, logTable, referenceTotal);
+        baselines.forEach((baseline, g) => {
+          baseline.set(groupWeights[g] ?? referenceTotal);
+          addRun(baseline, 0, referenceTotal, 0, nodeCount);
+        });
+      }
       for (const item of items) item.counts.fill(0);
-      nodeCounts.fill(0);
+      for (const counts of groupCounts) counts.fill(0);
       let logLikelihood = 0;
-      forEachRespondent((_, start, end) => {
-        joint(start, end);
+      forEachRespondent((_, start, end, group) => {
+        joint(start, end, group);
         logLikelihood += normalizeLogs(posterior);
-        count(start, end);
+        count(start, end, group);
       });
+      if (groupCounts.length > 1) {
+        nodeCounts.fill(0);
+        for (const counts of groupCounts) addRun(nodeCounts, 0, counts, 0, nodeCount);
+      }
       if (references !== null) referenceCounts(items, references, nodeCounts);
       return logLikelihood;
     },
     forEachPosterior(visit) {
-      forEachRespondent((person, start, end) => {
-        joint(start, end);
+      forEachRespondent((person, start, end, group) => {
+        joint(start, end, group);
         normalizeLogs(posterior);
         visit(person, posterior);
       });
@@ -151,22 +170,22 @@ function referenceCategories(data: CompressedResponses, items: readonly Expectat
 
 /**
  * Turns the table of log-probabilities into rises over the reference category of each item, which every category
- * but the reference keeps, and writes the baseline: the log weights plus the reference categories' log-probabilities.
+ * but the reference keeps, and writes into `total` the reference categories' log-probabilities, which every group's
+ * baseline adds to its log weights.
  */
 function referenceDensities(
   items: readonly ExpectationItem[],
   references: Int32Array,
   tableStarts: Int32Array,
   logTable: Float64Array,
-  logWeights: Float64Array,
-  baseline: Float64Array,
+  total: Float64Array,
 ): void {
-  const nodeCount = baseline.length;
-  baseline.set(logWeights);
+  const nodeCount = total.length;
+  total.fill(0);
   items.forEach((item, i) => {
     const start = tableStarts[i] ?? 0;
     const reference = start + (references[i] ?? 0) * nodeCount;
-    addRun(baseline, 0, logTable, reference, nodeCount);
+    addRun(total, 0, logTable, reference, nodeCount);
     for (let k = 0; k < item.categoryCount; k++) {
       const from = start + k * nodeCount;
       if (from !== reference) subtractRun(logTable, from, reference, nodeCount);

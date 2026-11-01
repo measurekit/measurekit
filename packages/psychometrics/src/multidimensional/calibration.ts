@@ -24,26 +24,50 @@ export interface CalibratedMultidimensionalItem<TParameters> extends Multidimens
   readonly standardErrors: Readonly<Record<string, number>> | null;
 }
 
+/** The distribution of theta in one group of persons, estimated with the items. */
+export interface MultidimensionalGroup {
+  /** The group's label in the option `groups`; `"all"` for the persons of a calibration with fixed items and no groups. */
+  readonly group: string;
+  /** The mean of each dimension, in the order of the dimensions. */
+  readonly means: readonly number[];
+  /** The covariance matrix of the dimensions, by rows. */
+  readonly covariance: readonly (readonly number[])[];
+}
+
 /** Item parameters and correlations of dimensions estimated by marginal maximum likelihood, with fit statistics. */
 export interface MultidimensionalCalibration<TParameters> {
   /** The names of the dimensions, in the order of the slopes. */
   readonly dimensions: readonly string[];
   /** The items, in item order. */
   readonly items: readonly CalibratedMultidimensionalItem<TParameters>[];
-  /** The correlations between dimensions, by rows: the identity unless a confirmatory model estimates them. */
+  /**
+   * The correlations between dimensions, by rows: the identity unless a confirmatory model estimates them. With several
+   * groups or fixed items, those of the first group.
+   */
   readonly correlations: readonly (readonly number[])[];
   /**
    * The standard errors of the correlations, by rows with 0 on the diagonal; `null` when the correlations are not
    * estimated or the calibration has no standard errors.
    */
   readonly correlationStandardErrors: readonly (readonly number[])[] | null;
-  /** The standardized loadings, items by dimensions: λ = (a / 1.702) / √(1 + (a / 1.702)ᵀ Φ (a / 1.702)). */
+  /**
+   * The distribution of theta in each group, in order of first appearance in `groups`. The first group has means 0 and
+   * variances 1 unless fixed items set the scale. Absent without the options `groups` and `fixed`.
+   */
+  readonly groups?: readonly MultidimensionalGroup[];
+  /**
+   * The standardized loadings, items by dimensions: λ = (a / 1.702) / √(1 + (a / 1.702)ᵀ Φ (a / 1.702)), with the
+   * slopes scaled by the standard deviations of the dimensions in the first group.
+   */
   readonly loadings: readonly (readonly number[])[];
-  /** The communality of each item: λᵀ Φ λ, with Φ the correlations. */
+  /** The communality of each item: λᵀ Φ λ, with Φ the correlations of the first group. */
   readonly communalities: readonly number[];
   /** The marginal log-likelihood at the estimates, without the priors. */
   readonly logLikelihood: number;
-  /** Akaike's information criterion: -2 logLikelihood + 2p, with p the number of estimated item parameters and correlations. */
+  /**
+   * Akaike's information criterion: -2 logLikelihood + 2p, with p the number of estimated item parameters,
+   * correlations and, with several groups or fixed items, means and variances.
+   */
   readonly aic: number;
   /** The Bayesian information criterion: -2 logLikelihood + p ln n, with n the number of persons with at least one response. */
   readonly bic: number;
@@ -84,12 +108,22 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * importance sampling, and the standard errors, `"hessian"` only, by Louis' formula from 400 further cycles of draws.
  * `iterations` counts the cycles of the last stage, after the 250 of the first two.
  *
+ * Groups: with `groups`, each group has its own means and covariance, and the items have the same parameters in every
+ * group, as `mirt::multipleGroup` with invariant slopes and intercepts. The first group has means 0 and variances 1,
+ * and the means, variances and, in a model with correlated dimensions, correlations of the others are estimated. With
+ * `fixed`, the fixed items set the scale instead and every group's means and covariance are estimated. The groups must
+ * share items, directly or through other groups, so that one scale holds them. A distribution that runs to the edge of
+ * the grid, a mean outside it or a standard deviation below the spacing of its nodes or above its range, leaves
+ * `converged` `false`.
+ *
  * An exploratory solution is determined up to the signs of its dimensions; {@link rotateLoadings} rotates it.
  *
  * @throws `DataError` when the data or an option is invalid, there are no responses, neither or both of `dimensions`
  * and `loadings` are given, an item is not in `loadings` or lacks responses in a category up to its highest or has more
- * categories than its model allows; with EM, when there are more than 3 dimensions or the grid has more than 10⁶ nodes;
- * with MH-RM, when `points` or the standard errors `"cross-product"` are given.
+ * categories than its model allows; with EM, when there are more than 3 dimensions or the grid has more than 10⁶ nodes,
+ * a group has no person with a response, the groups share no item or a fixed item is invalid, or the fixed items leave
+ * a dimension without a scale; with MH-RM, when `points`, `groups`, `fixed` or the standard errors `"cross-product"`
+ * are given.
  */
 export function calibrateMultidimensional<TParameters>(
   data: ResponseMatrix | ResponseRecords,
@@ -127,8 +161,10 @@ function mhrm<TParameters>(
   design: Design,
   settings: Settings,
 ): Solution<TParameters> {
-  if (options.points !== undefined) {
-    throw new DataError('The option points sets the grid of EM, which the method "mhrm" does not use.');
+  for (const name of ["points", "groups", "fixed"] as const) {
+    if (options[name] !== undefined) {
+      throw new DataError(`The option ${name} is for EM, which the method "mhrm" does not use.`);
+    }
   }
   if (settings.standardErrors === "cross-product") {
     throw new DataError(
@@ -146,6 +182,8 @@ function mhrm<TParameters>(
     items,
     correlations: fit.correlations.matrix,
     correlated: design.correlated,
+    latentSize: design.correlated ? pairsOf(design.dimensionNames.length).length : 0,
+    groups: null,
     covariance: fit.covariance,
     logLikelihood: fit.logLikelihood,
     converged: fit.converged,
@@ -161,15 +199,31 @@ function defaultMethod(dimensions: number): CalibrationMethod {
 /** Builds the calibration from the solution of a method. */
 function assemble<TParameters>(
   design: Design,
-  { items, correlations, correlated, covariance, logLikelihood, converged, iterations }: Solution<TParameters>,
+  {
+    items,
+    correlations,
+    correlated,
+    latentSize,
+    groups,
+    covariance,
+    logLikelihood,
+    converged,
+    iterations,
+  }: Solution<TParameters>,
   respondents: number,
 ): MultidimensionalCalibration<TParameters> {
   const dimensions = design.dimensionNames.length;
-  const size =
-    items.reduce((sum, item) => sum + item.free.length, 0) + (correlated ? (dimensions * (dimensions - 1)) / 2 : 0);
+  const itemSize = items.reduce((sum, item) => sum + item.free.length, 0);
+  const size = itemSize + latentSize;
   const rows = matrixRows(correlations, dimensions);
+  const [first] = groups ?? [];
   const { loadings, communalities } = standardizedLoadings(
-    items.map((item) => Array.from(item.vector.subarray(0, dimensions))),
+    items.map((item) =>
+      Array.from(
+        item.vector.subarray(0, dimensions),
+        (slope, d) => slope * Math.sqrt(first?.covariance[d * dimensions + d] ?? 1),
+      ),
+    ),
     rows,
   );
   return {
@@ -178,11 +232,22 @@ function assemble<TParameters>(
       id: item.id,
       model: item.model,
       parameters: item.parameters,
-      standardErrors: covariance === null ? null : itemErrors(item, i, items, covariance, size),
+      standardErrors: covariance === null || item.fixed ? null : itemErrors(item, i, items, covariance, size),
     })),
     correlations: rows,
     correlationStandardErrors:
-      covariance === null || !correlated ? null : correlationErrors(pairsOf(dimensions), dimensions, covariance, size),
+      covariance === null || !correlated
+        ? null
+        : correlationErrors(pairsOf(dimensions), dimensions, covariance, size, itemSize),
+    ...(groups === null
+      ? {}
+      : {
+          groups: groups.map(({ group, means, covariance: matrix }) => ({
+            group,
+            means: Array.from(means),
+            covariance: matrixRows(matrix, dimensions),
+          })),
+        }),
     loadings,
     communalities,
     logLikelihood,
@@ -214,8 +279,8 @@ function correlationErrors(
   dimensions: number,
   covariance: Float64Array,
   size: number,
+  first: number,
 ): number[][] {
-  const first = size - pairs.length;
   const errors = Array.from({ length: dimensions }, () => new Array<number>(dimensions).fill(0));
   pairs.forEach(([i, j], p) => {
     const error = Math.sqrt(covariance[(first + p) * size + first + p] ?? 0);

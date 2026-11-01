@@ -46,6 +46,23 @@ export interface MultidimensionalCalibrationOptions<TParameters> {
    */
   readonly correlated?: boolean;
   /**
+   * Each person's group, aligned with the persons (the rows of a matrix, the `personIds` of records), for a calibration
+   * of several groups on one scale: every item has the same parameters in every group, and each group has its own means
+   * and covariance. The first group, in order of first appearance, has means 0 and variances 1 unless `fixed` sets the
+   * scale. Its correlations, and every group's, are estimated when `correlated`. EM only.
+   *
+   * @defaultValue one group
+   */
+  readonly groups?: readonly string[];
+  /**
+   * Parameters of anchor items by item id: they stay fixed, and the other items are estimated on their scale. The
+   * anchors fix the scale, so the means and the covariance of every group, the first included, are estimated; every
+   * dimension needs an anchor that loads on it in each set of groups that share items. EM only.
+   *
+   * @defaultValue none: every item is estimated
+   */
+  readonly fixed?: Readonly<Record<string, TParameters>>;
+  /**
    * Priors by parameter name: `"a"` for every slope, `"intercept"` for every intercept, and `"c"`, applied to that
    * parameter of every item whose model estimates it. Estimates with priors are posterior modes.
    *
