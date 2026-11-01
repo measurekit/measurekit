@@ -7,6 +7,7 @@ import {
   DataError,
   exactAgreement,
   expectedRating,
+  type FacetBias,
   type FacetedScore,
   fleissKappa,
   intraclassCorrelation,
@@ -21,6 +22,7 @@ import {
 import { summarizeFacet } from "../src/rater/facet-summary.js";
 import fixture from "./fixtures/rater.json" with { type: "json" };
 import agreementFixture from "./fixtures/rater-agreement.json" with { type: "json" };
+import biasFixture from "./fixtures/rater-bias.json" with { type: "json" };
 import manyFacetFixture from "./fixtures/rater-many-facet.json" with { type: "json" };
 import { expectClose } from "./helpers.js";
 
@@ -596,6 +598,286 @@ describe("manyFacetRasch", () => {
       "The quadrature points must be an integer from 2, found 1.",
     );
     expect(() => manyFacetRasch(JSON.parse("null"), { facets })).toThrow(DataError);
+  });
+});
+
+/** The biases of a result by the ids of their elements, `item` first. */
+function biasesByCell(model: ManyFacetRasch): Map<string, FacetBias> {
+  return new Map(
+    (model.interactions ?? []).map((cell) => {
+      const [item, rater] = cell.facets[0] === "item" ? cell.levels : [cell.levels[1], cell.levels[0]];
+      return [`${item}:${rater}`, cell];
+    }),
+  );
+}
+
+/** The item and rater of a cell of the bias fixture. */
+function cellKey(levels: readonly string[]): string {
+  return `${levels[0]}:${levels[1]}`;
+}
+
+/** Sums the biases of the cells that share one element of the facet at `position` of `levels`. */
+function sumsByElement(cells: readonly FacetBias[], position: 0 | 1): Map<string, number> {
+  const sums = new Map<string, number>();
+  for (const { levels, bias } of cells) sums.set(levels[position], (sums.get(levels[position]) ?? 0) + bias);
+  return sums;
+}
+
+/** A stored model of two items and two raters with the thresholds -0.5 and 0.5, the measures and the biases given. */
+function storedModel(biases: readonly { levels: [string, string]; bias: number }[], itemMeasure = 0.5): ManyFacetRasch {
+  const element = (id: string, measure: number) => ({
+    id,
+    measure,
+    standardError: null,
+    count: 1,
+    observedAverage: 1,
+    fairAverage: 1,
+  });
+  const summary = { separation: null, reliability: null, homogeneity: null };
+  return {
+    person: "person",
+    thresholdFacet: null,
+    facets: [
+      { facet: "item", elements: [element("i1", itemMeasure), element("i2", -0.5)], ...summary },
+      { facet: "rater", elements: [element("r1", 0.3), element("r2", -0.3)], ...summary },
+    ],
+    thresholds: [{ element: null, thresholds: [-0.5, 0.5], standardErrors: null }],
+    interactions: biases.map(({ levels, bias }) => ({
+      facets: ["item", "rater"],
+      levels,
+      bias,
+      standardError: null,
+      z: null,
+    })),
+    population: { mean: 0, sd: 1 },
+    logLikelihood: 0,
+    aic: 0,
+    bic: 0,
+    converged: true,
+    iterations: 0,
+  };
+}
+
+describe("manyFacetRasch with interactions", () => {
+  const interactions = [["item", "rater"]] as const;
+  const model = manyFacetRasch(biasFixture.scores, { facets: ["item", "rater"], interactions, ...PRECISE });
+
+  it("matches the biases, their standard errors and the likelihood of the base R maximum", () => {
+    expect(model.converged).toBe(true);
+    expectClose(model.logLikelihood, biasFixture.logLikelihood, LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
+    expectClose(model.population.mean, biasFixture.mean, ESTIMATE_TOLERANCE, "mean");
+    expectClose(model.population.sd, biasFixture.sd, ESTIMATE_TOLERANCE, "sd");
+    const cells = biasesByCell(model);
+    expect(cells.size).toBe(biasFixture.cells.length);
+    for (const expected of biasFixture.cells) {
+      const cell = cells.get(cellKey(expected.levels));
+      const at = cellKey(expected.levels);
+      expectClose(cell?.bias ?? null, expected.bias, ESTIMATE_TOLERANCE, `${at} bias`);
+      expectClose(
+        cell?.standardError ?? null,
+        expected.standardError,
+        STANDARD_ERROR_TOLERANCE * expected.standardError,
+        `${at} SE`,
+      );
+      const z = expected.bias / expected.standardError;
+      expectClose(cell?.z ?? null, z, STANDARD_ERROR_TOLERANCE * Math.abs(z), `${at} z`);
+    }
+  });
+
+  it("agrees with the biases and the likelihood of TAM within 1e-3", () => {
+    const cells = biasesByCell(model);
+    for (const expected of biasFixture.cells) {
+      expectClose(cells.get(cellKey(expected.levels))?.bias ?? null, expected.tamBias, 1e-3, cellKey(expected.levels));
+    }
+    expectClose(model.logLikelihood, biasFixture.tamLogLikelihood, 1e-3, "log-likelihood");
+  });
+
+  it("recovers the planted biases and flags exactly the two cells that carry them", () => {
+    const flagged = (model.interactions ?? []).filter(({ z }) => Math.abs(z ?? 0) > 3).map(({ levels }) => levels);
+    expect(flagged).toEqual([
+      ["i1", "r1"],
+      ["i1", "r2"],
+    ]);
+    for (const expected of biasFixture.cells) {
+      expectClose(biasesByCell(model).get(cellKey(expected.levels))?.bias ?? null, expected.truth, 0.2, "bias");
+    }
+  });
+
+  it("gives the biases of each element a sum of 0 in both facets, with the main effects as without them", () => {
+    const cells = model.interactions ?? [];
+    for (const position of [0, 1] as const) {
+      for (const [id, sum] of sumsByElement(cells, position)) expectClose(sum, 0, 1e-9, id);
+    }
+    const without = manyFacetRasch(biasFixture.scores, { facets: ["item", "rater"] });
+    expect(without.interactions).toBeUndefined();
+    expect(model.facets.map(({ facet }) => facet)).toEqual(without.facets.map(({ facet }) => facet));
+    expect(model.logLikelihood).toBeGreaterThan(without.logLikelihood);
+    const free = (8 - 1) * (3 - 1);
+    expectClose(
+      model.aic - without.aic,
+      -2 * (model.logLikelihood - without.logLikelihood) + 2 * free,
+      1e-9,
+      "parameters added",
+    );
+  });
+
+  it("gives the same biases whichever facet of the pair comes first", () => {
+    const reversed = manyFacetRasch(biasFixture.scores, {
+      facets: ["item", "rater"],
+      interactions: [["rater", "item"]],
+      ...PRECISE,
+    });
+    const cells = biasesByCell(reversed);
+    expect(reversed.interactions?.[0]?.facets).toEqual(["rater", "item"]);
+    for (const expected of biasFixture.cells) {
+      expectClose(cells.get(cellKey(expected.levels))?.bias ?? null, expected.bias, 1e-7, cellKey(expected.levels));
+    }
+  });
+
+  it("leaves the standard errors and the Wald statistics out with standardErrors none", () => {
+    const cells = manyFacetRasch(biasFixture.scores, {
+      facets: ["item", "rater"],
+      interactions,
+      standardErrors: "none",
+    }).interactions;
+    expect(cells).toHaveLength(biasFixture.cells.length);
+    expect(cells?.every(({ standardError, z }) => standardError === null && z === null)).toBe(true);
+  });
+
+  it("estimates the bias of every pair of facets when there are several", () => {
+    const scores = biasFixture.scores.map(({ levels, score }) => ({
+      levels: { ...levels, task: Number(levels.person?.slice(1)) % 2 === 0 ? "t1" : "t2" },
+      score,
+    }));
+    const result = manyFacetRasch(scores, {
+      facets: ["item", "rater", "task"],
+      interactions: [
+        ["item", "rater"],
+        ["rater", "task"],
+      ],
+      standardErrors: "none",
+    });
+    const pairs = new Set((result.interactions ?? []).map(({ facets }) => facets.join("*")));
+    expect([...pairs]).toEqual(["item*rater", "rater*task"]);
+    expect(result.interactions).toHaveLength(8 * 3 + 3 * 2);
+    expect(result.converged).toBe(true);
+  });
+
+  it("estimates the cells that scores fill, with as many free biases as the cells have cycles", () => {
+    const scores = simulatedScores(21, 90).filter(({ levels }) => !(levels.item === "i0" && levels.rater === "r2"));
+    const result = manyFacetRasch(scores, { facets: ["item", "rater"], interactions, ...PRECISE });
+    const cells = result.interactions ?? [];
+    expect(cells).toHaveLength(5);
+    for (const position of [0, 1] as const) {
+      for (const [id, sum] of sumsByElement(cells, position)) expectClose(sum, 0, 1e-9, id);
+    }
+    const without = manyFacetRasch(scores, { facets: ["item", "rater"], ...PRECISE });
+    expectClose(
+      result.aic - without.aic,
+      -2 * (result.logLikelihood - without.logLikelihood) + 2,
+      1e-9,
+      "one free bias",
+    );
+  });
+
+  it("refuses an interaction that every score's cell fixes at 0", () => {
+    const scores: FacetedScore[] = [];
+    for (let person = 0; person < 6; person++) {
+      scores.push({ levels: { person: `p${person}`, item: "i0", rater: "r0" }, score: person % 3 });
+      scores.push({ levels: { person: `p${person}`, item: "i1", rater: "r1" }, score: (person + 1) % 3 });
+    }
+    expect(() => manyFacetRasch(scores, { facets: ["item", "rater"], interactions })).toThrow(
+      'The interaction of the facets "item" and "rater" cannot be estimated: its 2 cells are fixed by the 2 item and 2 rater elements, so every bias would be 0.',
+    );
+  });
+
+  it("rejects interactions that are not pairs of two different facets, or that repeat", () => {
+    const scores = simulatedScores(2, 20);
+    const facets = ["item", "rater"];
+    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse("null") })).toThrow(DataError);
+    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse('"item"') })).toThrow(
+      'The option interactions must be an array of pairs of facet names, such as [["item", "rater"]], found "item".',
+    );
+    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse('["item"]') })).toThrow(
+      'Interaction 1 of the option interactions must be a pair of facet names, such as ["item", "rater"], found "item".',
+    );
+    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse('[["item"]]') })).toThrow(
+      "Interaction 1 of the option interactions needs two facet names, found 1.",
+    );
+    expect(() => manyFacetRasch(scores, { facets, interactions: [["item", "task"]] })).toThrow(
+      'Interaction 1 of the option interactions must be "item" or "rater", found "task".',
+    );
+    expect(() => manyFacetRasch(scores, { facets, interactions: [["item", "item"]] })).toThrow(
+      'Interaction 1 of the option interactions pairs the facet "item" with itself; it needs two different facets.',
+    );
+    expect(() =>
+      manyFacetRasch(scores, {
+        facets,
+        interactions: [
+          ["item", "rater"],
+          ["rater", "item"],
+        ],
+      }),
+    ).toThrow('Interaction 2 of the option interactions repeats the interaction of "rater" and "item".');
+  });
+
+  it("adds a bias to the location of the cell it belongs to, in the expected ratings, the estimates and the fit", () => {
+    const biased = storedModel([{ levels: ["i1", "r1"], bias: 0.4 }]);
+    const shifted = storedModel([], 0.9);
+    const unbiased = storedModel([]);
+    const cell = { item: "i1", rater: "r1" };
+    expectClose(expectedRating(biased, 0.2, cell), expectedRating(shifted, 0.2, cell), 1e-12, "the biased cell");
+    expectClose(
+      expectedRating(biased, 0.2, { item: "i1", rater: "r2" }),
+      expectedRating(unbiased, 0.2, { item: "i1", rater: "r2" }),
+      1e-12,
+      "another cell",
+    );
+    expect(expectedRating(biased, 0.2, cell)).toBeLessThan(expectedRating(unbiased, 0.2, cell));
+    expectClose(expectedRating(biased, 0.2), expectedRating(unbiased, 0.2), 1e-12, "the fair score fills no cell");
+    const scores = [
+      { levels: { person: "a", ...cell }, score: 2 },
+      { levels: { person: "b", ...cell }, score: 0 },
+    ];
+    const [withBias] = manyFacetEstimates(scores.slice(0, 1), biased);
+    const [withoutBias] = manyFacetEstimates(scores.slice(0, 1), unbiased);
+    expect(withBias?.theta).toBeGreaterThan(withoutBias?.theta ?? 0);
+    const thetas = [
+      { id: "a", theta: 0.2, standardError: 0.5 },
+      { id: "b", theta: 0.2, standardError: 0.5 },
+    ];
+    const fitOf = (stored: ManyFacetRasch) => manyFacetFit(scores, stored, thetas);
+    expect(fitOf(biased)[0]?.outfitMeanSquare).not.toBe(fitOf(unbiased)[0]?.outfitMeanSquare);
+  });
+
+  it("rejects a stored model whose interactions are not cells of its facets", () => {
+    const scores = [{ levels: { person: "a", item: "i1", rater: "r1" }, score: 1 }];
+    const stored = storedModel([{ levels: ["i1", "r1"], bias: 0.4 }]);
+    expect(() => manyFacetEstimates(scores, { ...stored, interactions: JSON.parse('"cells"') })).toThrow(
+      'The model\'s interactions must be an array of { facets, levels, bias }, found "cells".',
+    );
+    expect(() => manyFacetEstimates(scores, { ...stored, interactions: JSON.parse("[null]") })).toThrow(DataError);
+    expect(() => manyFacetEstimates(scores, { ...stored, interactions: JSON.parse('[{"facets":"item"}]') })).toThrow(
+      'Interaction cell 1 of the model needs facets, an array of two facet names, found "item".',
+    );
+    expect(() =>
+      manyFacetEstimates(scores, {
+        ...stored,
+        interactions: [{ facets: ["item", "task"], levels: ["i1", "t1"], bias: 0.1, standardError: null, z: null }],
+      }),
+    ).toThrow(
+      "Interaction cell 1 of the model needs two facets of the model, two string element ids and a finite bias.",
+    );
+    expect(() =>
+      manyFacetEstimates(scores, {
+        ...stored,
+        interactions: [
+          { facets: ["item", "rater"], levels: ["i1", "r1"], bias: Number.NaN, standardError: null, z: null },
+        ],
+      }),
+    ).toThrow(
+      "Interaction cell 1 of the model needs two facets of the model, two string element ids and a finite bias.",
+    );
   });
 });
 

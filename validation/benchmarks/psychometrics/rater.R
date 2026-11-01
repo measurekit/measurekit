@@ -80,3 +80,43 @@ bench_task("rater.manyFacetRasch", "The many-facet Rasch model of items and rate
                                                            formulaA = ~ item + rater + step, constraint = "items",
                                                            control = list(nodes = nodes, conv = 1e-4, convD = 1e-4),
                                                            verbose = FALSE))))
+
+# --- Interactions ---------------------------------------------------------------------------------------------------
+# Every person scored by every rater on every item, with a bias of 0.8 logits in two cells of items by raters.
+
+set.seed(20261029)
+bias_persons <- 150
+bias_items <- 8
+bias_raters <- 3
+bias_ability <- rnorm(bias_persons)
+bias_difficulty <- round(rnorm(bias_items, 0, 0.7), 3)
+bias_severity <- c(-0.3, 0.1, 0.2)
+bias_scores <- expand.grid(person = seq_len(bias_persons), item = seq_len(bias_items), rater = seq_len(bias_raters))
+planted <- matrix(0, bias_items, bias_raters)
+planted[1, 1] <- 0.8
+planted[1, 2] <- -0.8
+eta <- bias_ability[bias_scores$person] - bias_difficulty[bias_scores$item] - bias_severity[bias_scores$rater] -
+  planted[cbind(bias_scores$item, bias_scores$rater)]
+uniform <- runif(nrow(bias_scores))
+bias_scores$score <- as.integer(uniform < plogis(eta - thresholds[1])) + as.integer(uniform < plogis(eta - thresholds[2])) +
+  as.integer(uniform < plogis(eta - thresholds[3]))
+
+bench_fixture("psychometrics", "rater-interactions", list(
+  source = "A simulation, set.seed(20261029): every person scored by every rater on every item, with a bias of 0.8 logits in two cells of items by raters.",
+  scores = lapply(seq_len(nrow(bias_scores)), function(i) {
+    list(levels = list(person = paste0("p", bias_scores$person[i]), item = paste0("i", bias_scores$item[i]),
+                       rater = paste0("r", bias_scores$rater[i])), score = bias_scores$score[i])
+  })
+))
+
+bias_wide <- reshape(bias_scores, idvar = c("person", "rater"), timevar = "item", direction = "wide")
+bias_facets <- data.frame(rater = factor(bias_wide$rater))
+bias_responses <- bias_wide[, grep("^score\\.", names(bias_wide))]
+colnames(bias_responses) <- paste0("i", seq_len(bias_items))
+bench_task("rater.manyFacetRaschInteractions", "The many-facet Rasch model of items and raters with their interaction, with standard errors",
+           sprintf("%d persons, %d items, %d raters: %s scores", bias_persons, bias_items, bias_raters, count(nrow(bias_scores))),
+           reference("TAM", "tam.mml.mfr(formulaA = ~ item + rater + item:rater + step)"),
+           function() invisible(capture.output(tam.mml.mfr(resp = bias_responses, facets = bias_facets, pid = bias_wide$person,
+                                                           formulaA = ~ item + rater + item:rater + step, constraint = "items",
+                                                           control = list(nodes = nodes, conv = 1e-4, convD = 1e-4),
+                                                           verbose = FALSE))))

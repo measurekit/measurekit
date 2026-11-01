@@ -38,3 +38,6 @@ standard errors from the Hessian, the standard errors of the coefficients.
 
 Augmented subscores borrow strength from the other sections of a test, with the reliability of each, and Mokken scale
 analysis reports the reliability of the total score by the Molenaar-Sijtsma method.
+
+The many-facet Rasch model estimates the bias of each pair of elements of two facets, such as a rater on an item, with its
+standard error and Wald statistic, from the same marginal likelihood as the measures.

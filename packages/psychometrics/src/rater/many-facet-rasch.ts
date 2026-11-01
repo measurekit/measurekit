@@ -13,7 +13,7 @@ import { fitLinearRasch } from "../irt/linear-rasch.js";
 import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
 import { facetDesign } from "./facet-design.js";
 import type { FacetSummary } from "./facet-summary.js";
-import { manyFacetParts, type RatingThresholds } from "./many-facet-result.js";
+import { type FacetBias, manyFacetParts, type RatingThresholds } from "./many-facet-result.js";
 
 /** How the standard errors of a many-facet model are computed. */
 export type FacetStandardErrors = "none" | "hessian";
@@ -37,6 +37,14 @@ export interface ManyFacetRaschOptions {
    * @defaultValue one rating scale shared by all elements
    */
   readonly thresholdFacet?: string;
+  /**
+   * Pairs of the facets whose interaction to estimate, such as `[["item", "rater"]]`: for each cell of a pair, the
+   * elements scored together, a bias that the sum of the elements' measures does not explain. Each name is one of
+   * `facets`, a pair names two different facets, and no pair repeats.
+   *
+   * @defaultValue none
+   */
+  readonly interactions?: readonly (readonly [string, string])[];
   /**
    * The quadrature rule over theta.
    *
@@ -74,6 +82,11 @@ export interface ManyFacetRasch {
   readonly facets: readonly FacetSummary[];
   /** The thresholds of each set: one for the shared scale, or one for each element of the threshold facet. */
   readonly thresholds: readonly RatingThresholds[];
+  /**
+   * The bias of every cell of every interaction, one interaction after the other in the order of the option; absent
+   * without `interactions`.
+   */
+  readonly interactions?: readonly FacetBias[];
   /** The mean and the standard deviation of the normal distribution of theta. */
   readonly population: ThetaPrior;
   /** The marginal log-likelihood at the estimates. */
@@ -105,13 +118,20 @@ const STANDARD_ERRORS: readonly FacetStandardErrors[] = ["none", "hessian"];
  * that every person it rated answered, and a person's scores are independent given theta. Estimation is the EM
  * algorithm of `calibrate`, with Newton's method for the measures, thresholds, mean and standard deviation together.
  *
+ * An interaction of two facets adds a bias to the location of each pair of elements that were scored together: the
+ * location of a score is the sum of its elements' measures and the biases of its cells. The biases of the cells of an
+ * element sum to 0 in either facet, so that the measures keep their meaning, and each has a standard error and a Wald
+ * z from the same Hessian as the measures. They enter the same marginal likelihood, as `tam.mml.mfr` with `formulaA`
+ * does; FACETS estimates a bias in a second step with the other measures fixed, so its values differ. Cells that no
+ * score fills have no bias, and a table with empty cells has as many free biases as the pairs of elements have cycles.
+ *
  * A person may have several scores for one combination of elements, which are independent observations. The scores
  * must connect all persons and elements: each score links its person to its elements, and several subsets that share
  * none cannot be put on one scale. Each set's scores must use the categories from 0 to its highest, at least two.
  *
  * @throws `DataError` when the options are invalid, the scores are not objects { levels, score } with an element of
- * each facet and an integer score from 0, fewer than two persons were scored, the design is not connected, or a
- * threshold set uses fewer than two categories or skips one.
+ * each facet and an integer score from 0, fewer than two persons were scored, the design is not connected, a
+ * threshold set uses fewer than two categories or skips one, or an interaction has no estimable bias.
  * @see {@link https://doi.org/10.1007/BF02293801 | Bock and Aitkin (1981)}
  */
 export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFacetRaschOptions): ManyFacetRasch {
@@ -120,6 +140,7 @@ export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFac
     person = "person",
     facets,
     thresholdFacet,
+    interactions = [],
     quadrature = {},
     standardErrors = "hessian",
     tolerance = DEFAULT_TOLERANCE,
@@ -127,10 +148,11 @@ export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFac
   } = options;
   checkFacetNames(person, facets);
   if (thresholdFacet !== undefined) checkChoice(thresholdFacet, "The option thresholdFacet", facets);
+  checkInteractions(interactions, facets);
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERRORS);
   checkStopping(tolerance, maxIterations);
   const rule = quadratureRule(quadrature);
-  const design = facetDesign(scores, person, facets, thresholdFacet);
+  const design = facetDesign(scores, person, facets, thresholdFacet, interactions);
   const fit = fitLinearRasch(design.model, {
     rule,
     tolerance,
@@ -138,16 +160,43 @@ export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFac
     standardErrors: standardErrors === "hessian",
   });
   const persons = design.personIds.length;
+  const { interactions: biases, ...parts } = manyFacetParts(design, fit, person, thresholdFacet ?? null);
   return {
     person,
     thresholdFacet: thresholdFacet ?? null,
-    ...manyFacetParts(design, fit, person, thresholdFacet ?? null),
+    ...parts,
+    ...(biases.length === 0 ? {} : { interactions: biases }),
     logLikelihood: fit.logLikelihood,
     aic: -2 * fit.logLikelihood + 2 * fit.layout.size,
     bic: -2 * fit.logLikelihood + fit.layout.size * Math.log(persons),
     converged: fit.converged,
     iterations: fit.iterations,
   };
+}
+
+function checkInteractions(interactions: readonly (readonly [string, string])[], facets: readonly string[]): void {
+  checkArray(
+    interactions,
+    'The option interactions must be an array of pairs of facet names, such as [["item", "rater"]]',
+  );
+  const seen: string[] = [];
+  interactions.forEach((pair, index) => {
+    const label = `Interaction ${index + 1} of the option interactions`;
+    checkArray(pair, `${label} must be a pair of facet names, such as ["item", "rater"]`);
+    if (pair.length !== 2) {
+      throw new DataError(`${label} needs two facet names, found ${pair.length}.`);
+    }
+    for (const name of pair) checkChoice(name, label, facets);
+    const [first, second] = pair;
+    if (first === second) {
+      throw new DataError(`${label} pairs the facet ${describe(first)} with itself; it needs two different facets.`);
+    }
+    const key = JSON.stringify([...pair].sort());
+    if (seen.includes(key)) {
+      throw new DataError(`${label} repeats the interaction of ${describe(first)} and ${describe(second)}.`);
+    }
+    seen.push(key);
+  });
 }
 
 function checkFacetNames(person: string, facets: readonly string[]): void {

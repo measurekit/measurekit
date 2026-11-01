@@ -4,8 +4,9 @@
 raters, unweighted, linear or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of
 scores; and how far one rater is more lenient than another, by the standardized mean difference. It also estimates what
 raters do to scores: the many-facet Rasch model puts persons, items and raters on one scale, so that a rater's severity
-is a number of logits and a person's score can be adjusted for the raters who gave it. The agreement statistics are
-validated against irr, psych and effsize, the model against base R and TAM ([validation](validation.md)).
+is a number of logits and a person's score can be adjusted for the raters who gave it, and a bias analysis finds the
+raters who are harsher or milder than usual on one item. The agreement statistics are validated against irr, psych and
+effsize, the model against base R and TAM ([validation](validation.md)).
 
 ## Ratings
 
@@ -213,6 +214,11 @@ expectedRating(model, 0.5, { rater: "r1" }); // 1.35: the score of a person of t
 expectedRating(model, 0.5, { rater: "r3" }); // 2.12
 const persons = manyFacetEstimates(scores, model); // EAP: e1 { theta: 0.03, standardError: 0.42 }
 manyFacetFit(scores, model, persons).find(({ id }) => id === "r3")?.infitMeanSquare; // 1.22
+
+// A bias for each rater on each item, [item, rater, bias]: no pair stands out in these few scores.
+const biased = manyFacetRasch(scores, { facets: ["item", "rater"], interactions: [["item", "rater"]] });
+biased.interactions?.map(({ levels, bias }) => [...levels, Math.round(bias * 100) / 100]);
+// [["content", "r1", -0.13], ["style", "r1", 0.13], ["content", "r2", 0.07], ["style", "r2", -0.07], ["content", "r3", 0.05], ["style", "r3", -0.05]]
 ```
 
 ### Scores
@@ -252,6 +258,7 @@ and, for the element each facet's constraint leaves out and for the last thresho
 | `person`         | `"person"`              | The facet that names the persons                                                                        |
 | `facets`         | required                | The other facets, such as `["item", "rater"]`: at least one, none repeated; facets beyond two add terms |
 | `thresholdFacet` | one scale shared by all | A facet whose elements each get their own thresholds, as the partial credit model: one of `facets`      |
+| `interactions`   | none                    | Pairs of `facets` with a bias for each cell, such as `[["item", "rater"]]`; none repeated               |
 | `quadrature`     | 61 rectangular points   | The rule over theta, as `calibrate`                                                                     |
 | `standardErrors` | `"hessian"`             | `"none"` leaves out the standard errors, and with them the separation, reliability and homogeneity test |
 | `tolerance`      | `1e-4`                  | EM stops when no parameter changes by more than this                                                    |
@@ -263,6 +270,7 @@ and, for the element each facet's constraint leaves out and for the last thresho
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `facets`                      | A `FacetSummary` for each facet in `facets`                                                                    |
 | `thresholds`                  | The thresholds and their standard errors for the shared scale, or for each element of `thresholdFacet`         |
+| `interactions`                | The bias of every cell of every interaction; absent without `interactions`                                     |
 | `population`                  | The mean and the standard deviation of θ                                                                       |
 | `logLikelihood`, `aic`, `bic` | The marginal log-likelihood; -2 ln L + 2p; -2 ln L + p ln n, p the parameters, μ and σ included, n the persons |
 | `converged`, `iterations`     | Whether EM reached `tolerance`, and the iterations run                                                         |
@@ -313,12 +321,48 @@ averaged.
 fit; above 1.5, a rater who departs from the others unpredictably; below 0.5, one whose scores are too predictable
 (Linacre, 2002). Scores of persons without an estimate are skipped.
 
+### Bias analysis
+
+A rater can be harsher on one item than the rater's measure and the item's measure predict. `interactions` adds the
+pair of facets to the model, and each cell, a rater scoring an item, gets a bias: the logits that the pair adds to the
+sum of the two measures. Positive is harsher, or harder, than the measures predict. The example under Many-facet Rasch model
+ends with one.
+
+```mermaid
+flowchart LR
+  S["Scores"] --> C["Cells: the pairs of elements scored together"]
+  C --> K["Each element's biases sum to 0 in both facets"]
+  K --> L["One marginal likelihood: measures, thresholds and biases"]
+  L --> B["Bias, standard error and z for each cell"]
+  B --> F["Cells with a large |z| are the biased pairs"]
+```
+
+| Field of a cell | Meaning                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `facets`        | The two facets, in the order of the option                                                       |
+| `levels`        | The ids of the cell's elements in them                                                           |
+| `bias`          | The bias in logits                                                                               |
+| `standardError` | From the same Hessian as the measures, by the delta method; `null` with `standardErrors: "none"` |
+| `z`             | The bias over its standard error; `null` where the standard error is `null` or 0                 |
+
+The biases of the cells of an element sum to 0 in either facet, so that the measures keep their meaning; the cells of one
+interaction have (n - 1) (m - 1) free biases for n by m elements. Cells that no score fills have no bias, and a table
+with empty cells has as many free biases as its cells have cycles; an interaction whose cells leave none, such as raters
+who each score a different item, throws a `DataError`. A pair may not repeat, in either order.
+
+The package flags no cell: compare `z` with a cut-off of your choice. With many cells, some exceed 2 by chance, 5% of them
+when no bias exists. The biases enter the same likelihood as the measures and the thresholds, so `aic` and `bic` count
+them, and a model with the interaction can be compared with one without.
+
+The biases enter `manyFacetEstimates` and `manyFacetFit`, which score each rating at its cell's location. They do not
+enter `expectedRating` or the fair averages of a facet, which are at a facet's mean: a facet that is not in `levels` has
+no cell.
+
 ### Not included
 
 - Joint maximum likelihood (FACETS), whose measures are biased for short tests; marginal maximum likelihood is
   consistent. Measures differ from FACETS' by its bias.
-- Bias (interaction) analysis, rater drift over time and the hierarchical rater model, each of which needs its own
-  terms in the model.
+- Rater drift over time and the hierarchical rater model, each of which needs its own terms in the model.
 - A person facet other than one: the persons are the only random facet.
 
 ### Differences from FACETS
@@ -328,6 +372,7 @@ fit; above 1.5, a rater who departs from the others unpredictably; below 0.5, on
 | Estimation     | Marginal maximum likelihood, theta normal with estimated mean and SD | Joint maximum likelihood, persons as parameters: biased for short tests |
 | Identification | The measures of each facet and the thresholds of each set sum to 0   | Facets centered or anchored as specified; persons free                  |
 | Separation     | The variance of the measures divided by the number of elements       | Reports it for the population (N) and for the sample (N - 1)            |
+| Bias analysis  | The biases enter the likelihood with the measures                    | A second step with the other measures fixed: the biases differ          |
 
 ### Differences from TAM
 
@@ -337,18 +382,25 @@ fit; above 1.5, a rater who departs from the others unpredictably; below 0.5, on
 | Convergence           | EM with Newton's method for all parameters and SQUAREM: 27 to 51 iterations to 1e-11 on the fixtures | EM that stops short of the maximum within 3000 iterations on the fixtures               |
 | Constraints           | Each facet and each set of thresholds sums to 0                                                      | The same, with `constraint = "items"`                                                   |
 | Thresholds by a facet | Any facet                                                                                            | `rater:step` fails with more than three raters in TAM 4.3-25                            |
+| Interaction           | `interactions`: biases within 4e-4 of TAM's on the fixture; standard errors from the Hessian         | `item:rater`: standard errors of its own parameters, 0.6 to 2.4 times the Hessian's     |
 
 ## References
 
 - Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and Psychological Measurement, 20,
   37-46.
 - Cohen, J. (1968). Weighted kappa. Psychological Bulletin, 70, 213-220.
+- Eckes, T. (2023). Introduction to many-facet Rasch measurement: Analyzing and evaluating rater-mediated assessments
+  (3rd ed.). Peter Lang.
 - Fleiss, J. L. (1971). Measuring nominal scale agreement among many raters. Psychological Bulletin, 76, 378-382.
 - Linacre, J. M. (1989). Many-facet Rasch measurement. MESA Press.
 - Linacre, J. M. (2002). What do infit and outfit, mean-square and standardized mean? Rasch Measurement Transactions,
   16(2), 878.
 - McGraw, K. O., & Wong, S. P. (1996). Forming inferences about some intraclass correlation coefficients.
   Psychological Methods, 1, 30-46.
+- Myford, C. M., & Wolfe, E. W. (2003). Detecting and measuring rater effects using many-facet Rasch measurement: Part I.
+  Journal of Applied Measurement, 4, 386-422.
+- Myford, C. M., & Wolfe, E. W. (2004). Detecting and measuring rater effects using many-facet Rasch measurement: Part II.
+  Journal of Applied Measurement, 5, 189-227.
 - Shrout, P. E., & Fleiss, J. L. (1979). Intraclass correlations: Uses in assessing rater reliability. Psychological
   Bulletin, 86, 420-428.
 - Wright, B. D., & Masters, G. N. (1982). Rating scale analysis. MESA Press.

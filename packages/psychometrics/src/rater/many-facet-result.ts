@@ -1,6 +1,7 @@
 import type { ThetaPrior } from "../irt/ability.js";
 import type { LinearRaschFit } from "../irt/linear-rasch.js";
 import type { DesignFacet, FacetDesign } from "./facet-design.js";
+import type { DesignInteraction } from "./facet-interactions.js";
 import { type FacetElement, type FacetSummary, summarizeFacet } from "./facet-summary.js";
 import { expectedRatingAt, ratingStructure } from "./rating-model.js";
 
@@ -15,6 +16,23 @@ export interface RatingThresholds {
    * `null` without standard errors.
    */
   readonly standardErrors: readonly number[] | null;
+}
+
+/** The bias of one cell of an interaction: a pair of elements of two facets scored together. */
+export interface FacetBias {
+  /** The names of the two facets of the interaction, as the option gave them. */
+  readonly facets: readonly [string, string];
+  /** The ids of the cell's elements in the two facets. */
+  readonly levels: readonly [string, string];
+  /**
+   * The bias in logits: what the pair adds to the sum of the elements' measures. Positive is harder or more severe than
+   * the measures predict. The biases of the cells of an element sum to 0 in either facet.
+   */
+  readonly bias: number;
+  /** The standard error of the bias; `null` without standard errors. */
+  readonly standardError: number | null;
+  /** The Wald statistic, the bias over its standard error; `null` where the standard error is `null` or 0. */
+  readonly z: number | null;
 }
 
 /** Returns the variance of Σ coefficients[a] * parameter[indices[a]] under the covariance matrix `covariance`. */
@@ -74,11 +92,33 @@ function setThresholds(fit: LinearRaschFit, set: number, element: string | null)
   return { element, thresholds, standardErrors };
 }
 
-/** The facets, thresholds and population of an estimated many-facet model. */
+/** Returns the biases of the cells of an interaction, with their standard errors by the delta method. */
+function interactionBiases(fit: LinearRaschFit, interaction: DesignInteraction): FacetBias[] {
+  const { covariance, layout, parameters } = fit;
+  return interaction.cells.map((levels, cell) => {
+    const row = interaction.rows[cell];
+    const indices = Array.from(row?.indices ?? []);
+    const coefficients = Array.from(row?.coefficients ?? []);
+    const bias = indices.reduce((sum, index, a) => sum + (coefficients[a] ?? 0) * (parameters[index] ?? 0), 0);
+    const standardError =
+      covariance === null ? null : Math.sqrt(contrastVariance(covariance, layout.size, indices, coefficients));
+    return {
+      facets: interaction.facets,
+      levels,
+      bias,
+      standardError,
+      z: standardError === null || standardError === 0 ? null : bias / standardError,
+    };
+  });
+}
+
+/** The facets, thresholds, population and biases of an estimated many-facet model. */
 export interface ManyFacetEstimates {
   readonly facets: readonly FacetSummary[];
   readonly thresholds: readonly RatingThresholds[];
   readonly population: ThetaPrior;
+  /** The biases of every interaction, one after the other; empty without interactions. */
+  readonly interactions: readonly FacetBias[];
 }
 
 /**
@@ -92,6 +132,7 @@ export function manyFacetParts(
   thresholdFacet: string | null,
 ): ManyFacetEstimates {
   const population: ThetaPrior = { mean: fit.mean, sd: fit.sd };
+  const interactions = design.interactions.flatMap((interaction) => interactionBiases(fit, interaction));
   const measured = design.facets.map((facet) => facetMeasures(fit.parameters, fit.covariance, fit.layout.size, facet));
   const thresholds = design.sets.map((element, set) => setThresholds(fit, set, element));
   const structure = ratingStructure({
@@ -119,5 +160,5 @@ export function manyFacetParts(
     });
     return summarizeFacet(facet.name, elements);
   });
-  return { facets, thresholds, population };
+  return { facets, thresholds, population, interactions };
 }

@@ -25,8 +25,27 @@ export interface RatingModelData {
   }[];
   /** The thresholds of each set. */
   readonly thresholds: readonly { readonly element: string | null; readonly thresholds: readonly number[] }[];
+  /**
+   * The bias of each cell of each interaction, which a score adds to its location; a combination of elements without a
+   * cell has none.
+   *
+   * @defaultValue no interactions
+   */
+  readonly interactions?: readonly {
+    readonly facets: readonly [string, string];
+    readonly levels: readonly [string, string];
+    readonly bias: number;
+  }[];
   /** The distribution of theta. */
   readonly population: ThetaPrior;
+}
+
+/** The biases of the cells of the interaction of two facets, by the ids of their elements. */
+interface InteractionBiases {
+  /** The indices of the two facets in the model's facets. */
+  readonly facets: readonly [number, number];
+  /** The bias of each cell, by `cellKey`. */
+  readonly cells: ReadonlyMap<string, number>;
 }
 
 /** A model with its elements looked up by id. */
@@ -39,6 +58,8 @@ export interface RatingStructure {
   readonly thresholdFacet: number;
   /** The thresholds of each set, by the id of the element that owns it, `null` for the shared set. */
   readonly sets: ReadonlyMap<string | null, readonly number[]>;
+  /** The biases of each interaction. */
+  readonly interactions: readonly InteractionBiases[];
 }
 
 /**
@@ -68,6 +89,27 @@ export function checkManyFacetRasch(model: RatingModelData): void {
     throw new DataError("The model's population needs a finite mean and a positive finite sd.");
   }
   checkSetsMatch(model);
+  if (model.interactions !== undefined) checkBiases(model, model.interactions);
+}
+
+function checkBiases(model: RatingModelData, biases: NonNullable<RatingModelData["interactions"]>): void {
+  checkArray(biases, "The model's interactions must be an array of { facets, levels, bias }");
+  const names = model.facets.map(({ facet }) => facet);
+  biases.forEach((cell, index) => {
+    const label = `Interaction cell ${index + 1} of the model`;
+    checkRecord(cell, `${label} must be an object { facets, levels, bias }`);
+    checkArray(cell.facets, `${label} needs facets, an array of two facet names`);
+    checkArray(cell.levels, `${label} needs levels, an array of two element ids`);
+    const valid =
+      cell.facets.length === 2 &&
+      cell.levels.length === 2 &&
+      cell.facets.every((name) => names.includes(name)) &&
+      cell.levels.every((id) => typeof id === "string") &&
+      Number.isFinite(cell.bias);
+    if (!valid) {
+      throw new DataError(`${label} needs two facets of the model, two string element ids and a finite bias.`);
+    }
+  });
 }
 
 function checkFacet(facet: RatingModelData["facets"][number], index: number): void {
@@ -117,7 +159,41 @@ export function ratingStructure(model: RatingModelData): RatingStructure {
     measures: model.facets.map(({ elements }) => new Map(elements.map(({ id, measure }) => [id, measure]))),
     thresholdFacet: model.thresholdFacet === null ? -1 : facets.indexOf(model.thresholdFacet),
     sets: new Map(model.thresholds.map(({ element, thresholds }) => [element, thresholds])),
+    interactions: interactionBiases(model, facets),
   };
+}
+
+/** The key of a cell among the biases of an interaction. */
+function cellKey(first: string, second: string): string {
+  return JSON.stringify([first, second]);
+}
+
+/** Groups the biases of a model's cells by the pair of facets they belong to. */
+function interactionBiases(model: RatingModelData, facets: readonly string[]): InteractionBiases[] {
+  const groups = new Map<string, { facets: [number, number]; cells: Map<string, number> }>();
+  for (const { facets: pair, levels, bias } of model.interactions ?? []) {
+    const key = JSON.stringify(pair);
+    const group = groups.get(key) ?? {
+      facets: [facets.indexOf(pair[0]), facets.indexOf(pair[1])] as [number, number],
+      cells: new Map<string, number>(),
+    };
+    group.cells.set(cellKey(levels[0], levels[1]), bias);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/** Returns the sum of the biases of the cells that a combination of elements fills; a `null` element fills none. */
+function biasAt(structure: RatingStructure, elements: readonly (string | null)[]): number {
+  let sum = 0;
+  for (const { facets, cells } of structure.interactions) {
+    const first = elements[facets[0]];
+    const second = elements[facets[1]];
+    if (first !== null && first !== undefined && second !== null && second !== undefined) {
+      sum += cells.get(cellKey(first, second)) ?? 0;
+    }
+  }
+  return sum;
 }
 
 /** Returns the measure of an element of the facet at index `facet`, or throws when the model has no such element. */
@@ -142,12 +218,13 @@ function setOf(structure: RatingStructure, id: string | null): readonly number[]
 
 /**
  * Returns the item that a combination of elements, one for each facet of the model in order, is for a person: a
- * partial credit item with a = 1 whose steps are the sum of the measures plus the thresholds of its set.
+ * partial credit item with a = 1 whose steps are the sum of the measures and the biases of its cells plus the
+ * thresholds of its set.
  *
  * @throws `DataError` when the model lacks an element.
  */
 function ratingItem(structure: RatingStructure, elements: readonly string[]): IrtItem<ThresholdItem> {
-  const location = elements.reduce((sum, id, f) => sum + measureOf(structure, f, id), 0);
+  const location = elements.reduce((sum, id, f) => sum + measureOf(structure, f, id), biasAt(structure, elements));
   const owner = structure.thresholdFacet < 0 ? null : (elements[structure.thresholdFacet] ?? "");
   return {
     model: partialCredit,
@@ -157,8 +234,8 @@ function ratingItem(structure: RatingStructure, elements: readonly string[]): Ir
 
 /**
  * Returns the expected rating of a person at `theta` on a combination of elements, one for each facet in order. A
- * `null` stands for the facet's mean, a measure of 0; with the threshold facet at `null`, the expected ratings under the
- * thresholds of each of its elements are averaged.
+ * `null` stands for the facet's mean, a measure of 0, and fills no cell of an interaction; with the threshold facet at
+ * `null`, the expected ratings under the thresholds of each of its elements are averaged.
  *
  * @throws `DataError` when the model lacks an element.
  */
@@ -167,7 +244,10 @@ export function expectedRatingAt(
   theta: number,
   elements: readonly (string | null)[],
 ): number {
-  const location = elements.reduce((sum: number, id, f) => sum + (id === null ? 0 : measureOf(structure, f, id)), 0);
+  const location = elements.reduce(
+    (sum: number, id, f) => sum + (id === null ? 0 : measureOf(structure, f, id)),
+    biasAt(structure, elements),
+  );
   const owner = structure.thresholdFacet < 0 ? null : (elements[structure.thresholdFacet] ?? null);
   const sets =
     structure.thresholdFacet >= 0 && owner === null ? [...structure.sets.values()] : [setOf(structure, owner)];

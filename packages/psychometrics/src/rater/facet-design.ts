@@ -2,6 +2,7 @@ import { DataError, describe } from "@measurekit/core";
 import { checkFacetedScores, type FacetedScore } from "../data/faceted-scores.js";
 import type { LinearRaschModel, LocationRow } from "../irt/linear-rasch.js";
 import type { CompressedResponses } from "../irt/responses.js";
+import { type DesignInteraction, designInteraction } from "./facet-interactions.js";
 
 /** The elements of one facet in a design, with the scores each element has. */
 export interface DesignFacet {
@@ -23,6 +24,8 @@ export interface FacetDesign {
   readonly personIds: readonly string[];
   /** The facets other than the person facet, in the order of the option. */
   readonly facets: readonly DesignFacet[];
+  /** The interactions of pairs of facets, in the order of the option. */
+  readonly interactions: readonly DesignInteraction[];
   /** The element of the threshold facet that owns each threshold set; `null` for the one shared set. */
   readonly sets: readonly (string | null)[];
   /** The model the engine estimates. */
@@ -48,16 +51,19 @@ const LISTED_SUBSETS = 3;
 /**
  * Checks faceted scores and returns them as a linear Rasch model: each distinct combination of elements of the facets
  * other than the person facet is a virtual item, and its location the sum of the facet measures, each facet's summing
- * to 0.
+ * to 0, and of the biases of its cells in each interaction.
  *
+ * @param interactions - Pairs of the facets, each with an interaction.
  * @throws `DataError` when the scores are malformed, a score is not an integer from 0, fewer than two persons were
- * scored, the elements do not form one connected design, a threshold set uses fewer than two categories or skips one.
+ * scored, the elements do not form one connected design, a threshold set uses fewer than two categories or skips one,
+ * or an interaction has no estimable bias.
  */
 export function facetDesign(
   scores: readonly FacetedScore[],
   person: string,
   facets: readonly string[],
   thresholdFacet: string | undefined,
+  interactions: readonly (readonly [string, string])[],
 ): FacetDesign {
   const names = [person, ...facets];
   checkFacetedScores(scores, names);
@@ -69,14 +75,22 @@ export function facetDesign(
   const designFacets = designFacetsOf(indexed);
   const items = virtualItems(indexed);
   const sets = thresholdSets(indexed, items, thresholdFacet === undefined ? -1 : facets.indexOf(thresholdFacet) + 1);
+  const measureCount = designFacets.reduce((sum, facet) => sum + Math.max(facet.ids.length - 1, 0), 0);
+  const designed = designInteractions(designFacets, items, interactions, measureCount);
   const model: LinearRaschModel = {
     data: compressed(indexed, items),
-    locations: items.elements.map((elements) => locationRow(designFacets, elements)),
-    locationCount: designFacets.reduce((sum, facet) => sum + Math.max(facet.ids.length - 1, 0), 0),
+    locations: items.elements.map((elements, item) =>
+      locationRow(
+        designFacets,
+        elements,
+        designed.map(({ rows, cellOf }) => rows[cellOf[item] ?? 0]),
+      ),
+    ),
+    locationCount: designed.reduce((sum, { free }) => sum + free, measureCount),
     setOf: sets.setOf,
     categoryCounts: sets.categoryCounts,
   };
-  return { personIds, facets: designFacets, sets: sets.elements, model };
+  return { personIds, facets: designFacets, interactions: designed, sets: sets.elements, model };
 }
 
 function checkIntegerScores(scores: readonly FacetedScore[]): void {
@@ -201,8 +215,40 @@ function virtualItems(indexed: Indexed): VirtualItems {
   return { elements, itemOf };
 }
 
-/** The location parameters of a virtual item: the measure of its element in each facet, effect coded. */
-function locationRow(facets: readonly DesignFacet[], elements: Int32Array): LocationRow {
+/** Returns the interaction of each pair of facets, its parameters following the measures and the earlier interactions. */
+function designInteractions(
+  facets: readonly DesignFacet[],
+  items: VirtualItems,
+  pairs: readonly (readonly [string, string])[],
+  start: number,
+): DesignInteraction[] {
+  let offset = start;
+  return pairs.map((pair) => {
+    const [f, g] = pair.map((name) => facets.findIndex((facet) => facet.name === name));
+    const first = facets[f ?? -1];
+    const second = facets[g ?? -1];
+    if (first === undefined || second === undefined || f === undefined || g === undefined) {
+      throw new DataError(`The interaction of ${pair.map(describe).join(" and ")} names a facet that the scores lack.`);
+    }
+    const interaction = designInteraction(
+      [first, second],
+      items.elements.map((elements) => [elements[f] ?? 0, elements[g] ?? 0]),
+      offset,
+    );
+    offset += interaction.free;
+    return interaction;
+  });
+}
+
+/**
+ * The location parameters of a virtual item: the measure of its element in each facet, effect coded, and the bias of
+ * its cell in each interaction.
+ */
+function locationRow(
+  facets: readonly DesignFacet[],
+  elements: Int32Array,
+  cells: readonly (LocationRow | undefined)[],
+): LocationRow {
   const indices: number[] = [];
   const coefficients: number[] = [];
   facets.forEach((facet, f) => {
@@ -219,6 +265,10 @@ function locationRow(facets: readonly DesignFacet[], elements: Int32Array): Loca
       coefficients.push(-1);
     }
   });
+  for (const cell of cells) {
+    indices.push(...(cell?.indices ?? []));
+    coefficients.push(...(cell?.coefficients ?? []));
+  }
   return { indices: Int32Array.from(indices), coefficients: Float64Array.from(coefficients) };
 }
 

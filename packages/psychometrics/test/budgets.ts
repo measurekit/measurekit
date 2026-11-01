@@ -83,6 +83,7 @@ const BUDGETS = {
   "rater.fleissKappa": 0.4,
   "rater.intraclassCorrelation": 0.08,
   "rater.manyFacetRasch": 300,
+  "rater.manyFacetRaschInteractions": 300,
   "responseTime.calibrateResponseTimes": 40,
   "responseTime.calibrateSpeedAccuracy": 3_000,
   "responseTime.speedEstimates": 7,

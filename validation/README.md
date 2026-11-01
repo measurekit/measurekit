@@ -32,6 +32,7 @@ Rscript validation/psychometrics/mokken-reliability.R  # Molenaar-Sijtsma reliab
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
 Rscript validation/psychometrics/rater.R             # rater agreement: irr, psych and effsize; the many-facet Rasch model: base R, with TAM and sirt data
+Rscript validation/psychometrics/rater-bias.R        # rater bias analysis: base R and TAM's tam.mml.mfr with the interaction of items and raters
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
 Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
 Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mirt, GPArotation and base R; case names as arguments run only those cases
@@ -42,7 +43,7 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
 sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm, clinicalsignificance and jsonlite;
-`common.R` holds their shared helpers, `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share, and `mokken-data.R` the data that `mokken.R` and `mokken-reliability.R` share.
+`common.R` holds their shared helpers, `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share, `mokken-data.R` the data that `mokken.R` and `mokken-reliability.R` share, and `many-facet-likelihood.R` the many-facet likelihood that `rater.R` and `rater-bias.R` share.
 
 `generalizability-unbalanced.py` checks the fixture that `generalizability-unbalanced.R` writes against GeneralizIT 0.1.2. It
 runs in a Python 3.12 environment in `validation/psychometrics/.venv`, which git ignores, and writes nothing:
