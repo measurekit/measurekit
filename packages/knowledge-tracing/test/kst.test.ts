@@ -2,14 +2,18 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   type Attempt,
+  backwardGraded,
   clauseStructure,
+  compareFits,
   compareModels,
   createRandom,
   crossValidate,
   delineate,
+  diffTest,
   type Event,
   type EventLog,
   eventLog,
+  forwardGraded,
   fringes,
   iita,
   isKnowledgeSpace,
@@ -25,15 +29,21 @@ import {
   structureAtoms,
   structureBase,
   structureTrace,
+  structureValidity,
   surmiseStructure,
   unionClosure,
 } from "../src/index.js";
 import assessmentFixture from "./fixtures/kst-assessment.json" with { type: "json" };
 import blimFixture from "./fixtures/kst-blim.json" with { type: "json" };
+import constraintFixture from "./fixtures/kst-blim-constraints.json" with { type: "json" };
+import diffTestFixture from "./fixtures/kst-diff-test.json" with { type: "json" };
+import gradedFixture from "./fixtures/kst-graded.json" with { type: "json" };
+import identifiabilityFixture from "./fixtures/kst-identifiability.json" with { type: "json" };
 import iitaFixture from "./fixtures/kst-iita.json" with { type: "json" };
 import clauseFixture from "./fixtures/kst-structure-clauses.json" with { type: "json" };
 import toolFixture from "./fixtures/kst-structure-tools.json" with { type: "json" };
 import structureFixture from "./fixtures/kst-structures.json" with { type: "json" };
+import validityFixture from "./fixtures/kst-validity.json" with { type: "json" };
 import { defined, expectAllClose, expectClose, expectUnaffectedByLessons, online, withLessons } from "./helpers.js";
 
 /** Absolute tolerance of BLIM parameters fitted by EM against pks, which stops on a change of the parameters. */
@@ -44,6 +54,17 @@ const ML_LOG_LIKELIHOOD_TOLERANCE = 1e-8;
 const EXACT_TOLERANCE = 1e-12;
 /** Relative tolerance of IITA's diff against DAKS. */
 const DIFF_TOLERANCE = 1e-10;
+/** Absolute tolerance of G² and the log-likelihood of an MD fit, which sum 1,000 learners' logs. */
+const MD_FIT_TOLERANCE = 1e-10;
+/**
+ * Absolute tolerance of G² and the log-likelihood of an MDML fit. Its estimates maximize the likelihood of the nearest
+ * states only, so the whole model's log-likelihood at them changes at first order with their distance from pks's, 1e-6.
+ */
+const MDML_FIT_TOLERANCE = 1e-4;
+/** Relative tolerance of the test of a quasi order against the delta method, which differentiates numerically. */
+const DELTA_TOLERANCE = 1e-6;
+/** How far a mean estimate of a seeded recovery may be from the rate that made the data. */
+const RECOVERY_TOLERANCE = 0.01;
 
 type Prerequisites = Record<string, string[]>;
 interface Structures {
@@ -96,6 +117,85 @@ interface BlimReference {
   readonly slip: Record<string, number>;
   readonly logLikelihood: number;
 }
+type Rates = Readonly<Record<string, number>>;
+interface ConstraintReference {
+  readonly name: string;
+  readonly method: "ml" | "md" | "mdml";
+  readonly structure: KnowledgeStructure;
+  readonly patterns: Record<string, number>;
+  readonly fixed: { readonly guess: Rates; readonly slip: Rates };
+  readonly equal: { readonly guess: string[][]; readonly slip: string[][] };
+  readonly probabilities: number[];
+  readonly guess: Rates;
+  readonly slip: Rates;
+  readonly logLikelihood: number;
+  readonly parameters: number;
+  readonly g2: number;
+  readonly degreesOfFreedom: number;
+  readonly pValue: number | null;
+  readonly discrepancy: number;
+}
+interface ConstraintReferences {
+  readonly cases: readonly ConstraintReference[];
+  readonly comparisons: readonly {
+    name: string;
+    restricted: ConstraintReference;
+    general: ConstraintReference;
+    g2: number;
+    degreesOfFreedom: number;
+    pValue: number;
+  }[];
+  readonly recovery: {
+    structure: KnowledgeStructure;
+    slip: number;
+    guess: number;
+    sets: { patterns: Record<string, number>; slip: number; guess: number; probabilities: number[] }[];
+  };
+}
+interface IdentifiabilityReference {
+  readonly name: string;
+  readonly structure: KnowledgeStructure;
+  readonly probabilities: number[];
+  readonly guess: Rates;
+  readonly slip: Rates;
+  readonly fixed: { readonly guess: Rates; readonly slip: Rates };
+  readonly parameters: number;
+  readonly rank: number;
+}
+interface GradedReference {
+  readonly name: string;
+  readonly structure: KnowledgeStructure;
+  readonly forward: Record<string, boolean>;
+  readonly backward: Record<string, boolean>;
+}
+interface ValidityReference {
+  readonly name: string;
+  readonly structure: KnowledgeStructure;
+  readonly patterns: Record<string, number>;
+  readonly gamma: number | null;
+  readonly concordant: number;
+  readonly discordant: number;
+  readonly violationalCoefficient: number | null;
+  readonly discrepancyIndex: number;
+  readonly distances: Record<string, number>;
+  readonly distanceAgreement: number | null;
+  readonly solutionRates: Record<string, number>;
+}
+interface DiffTestReference {
+  readonly name: string;
+  readonly items: string[];
+  readonly patterns: Record<string, number>;
+  readonly version: "minimized" | "corrected";
+  readonly prerequisites: Prerequisites;
+  readonly alternative: Prerequisites | null;
+  readonly mean: number;
+  readonly confidence: number;
+  readonly estimate: number;
+  readonly variance: number;
+  readonly z: number;
+  readonly pValue: Record<"two-sided" | "less" | "greater", number>;
+  readonly interval: Record<"two-sided" | "less" | "greater", number | number[]>;
+}
 interface IitaVersionReference {
   readonly diff: number[];
   readonly selected: number;
@@ -127,6 +227,13 @@ const clauseReferences: readonly ClauseReference[] = JSON.parse(JSON.stringify(c
 const blims: readonly BlimReference[] = JSON.parse(JSON.stringify(blimFixture));
 const iitas: readonly IitaReference[] = JSON.parse(JSON.stringify(iitaFixture));
 const assessment: Assessment = JSON.parse(JSON.stringify(assessmentFixture));
+const constraints: ConstraintReferences = JSON.parse(JSON.stringify(constraintFixture));
+const identifiabilityReferences: readonly IdentifiabilityReference[] = JSON.parse(
+  JSON.stringify(identifiabilityFixture),
+);
+const gradedReferences: readonly GradedReference[] = JSON.parse(JSON.stringify(gradedFixture));
+const validities: readonly ValidityReference[] = JSON.parse(JSON.stringify(validityFixture));
+const diffTests: readonly DiffTestReference[] = JSON.parse(JSON.stringify(diffTestFixture));
 
 /**
  * Returns the log of learners who each answer every item once, as many with each pattern of responses, a string of 0
@@ -602,6 +709,202 @@ describe("IITA against DAKS", () => {
   });
 });
 
+/** Fits a case of the constraint fixture as pks did, with the same rates held or shared. */
+function fitConstraint(reference: ConstraintReference) {
+  const { structure, method, fixed, equal } = reference;
+  return kst({ structure, over: "items", method, fixed, equal, tolerance: 1e-13, maxIterations: 1e6 }).fit(
+    patternLog(structure.domain, reference.patterns),
+  );
+}
+
+describe("BLIM with fixed and equal rates against pks", () => {
+  it.each(constraints.cases)("fits $name by $method on $structure.domain.length items as pks's blim", (reference) => {
+    const fit = fitConstraint(reference);
+    const tolerance = reference.method === "md" ? EXACT_TOLERANCE : ML_TOLERANCE;
+    expectAllClose(fit.model.parameters.probabilities, reference.probabilities, tolerance, "P(K)");
+    for (const [item, guess] of Object.entries(reference.guess)) {
+      const fitted = defined(fit.model.parameters.items[item]);
+      expectClose(fitted.guess, guess, tolerance, `${item} guess`);
+      expectClose(fitted.slip, defined(reference.slip[item]), tolerance, `${item} slip`);
+    }
+    expect(fit.converged).toBe(true);
+    expectClose(fit.discrepancy, reference.discrepancy, EXACT_TOLERANCE, "discrepancy");
+    const fitted = defined(fit.goodnessOfFit);
+    expect(fitted.degreesOfFreedom).toBe(reference.degreesOfFreedom);
+    const likelihoodTolerance = { md: MD_FIT_TOLERANCE, ml: ML_LOG_LIKELIHOOD_TOLERANCE, mdml: MDML_FIT_TOLERANCE }[
+      reference.method
+    ];
+    expectClose(fit.logLikelihood, reference.logLikelihood, likelihoodTolerance, "log-likelihood");
+    expectClose(fitted.g2, reference.g2, likelihoodTolerance, "G²");
+    expectClose(fitted.pValue, reference.pValue, likelihoodTolerance, "p-value");
+    if (reference.method === "ml") {
+      expectClose(fit.aic, 2 * reference.parameters - 2 * reference.logLikelihood, ML_LOG_LIKELIHOOD_TOLERANCE, "AIC");
+    } else {
+      expect(fit.aic).toBeNull();
+    }
+  });
+
+  it.each(constraints.cases)("holds fixed rates and shares equal rates exactly: $name by $method", (reference) => {
+    const { items } = fitConstraint(reference).model.parameters;
+    for (const [name, rates] of [
+      ["guess", reference.fixed.guess],
+      ["slip", reference.fixed.slip],
+    ] as const) {
+      for (const [item, rate] of Object.entries(rates))
+        expect(defined(items[item])[name], `${item} ${name}`).toBe(rate);
+    }
+    for (const [name, groups] of [
+      ["guess", reference.equal.guess],
+      ["slip", reference.equal.slip],
+    ] as const) {
+      for (const group of groups) {
+        expect(new Set(group.map((item) => defined(items[item])[name])).size, group.join()).toBe(1);
+      }
+    }
+  });
+
+  it.each(constraints.comparisons)("compares fits as pks's anova: $name", (reference) => {
+    const comparison = defined(compareFits(fitConstraint(reference.restricted), fitConstraint(reference.general)));
+    expect(comparison.degreesOfFreedom).toBe(reference.degreesOfFreedom);
+    expectClose(comparison.g2, reference.g2, ML_LOG_LIKELIHOOD_TOLERANCE, "G²");
+    expectClose(comparison.pValue, reference.pValue, ML_LOG_LIKELIHOOD_TOLERANCE, "p-value");
+  });
+
+  it("recovers the rates of a chain of 6 items from 20 seeded sets as pks does, one slip and one guess", () => {
+    const { structure, slip, guess, sets } = constraints.recovery;
+    const rates = sets.map((set) => {
+      const fit = kst({
+        structure,
+        over: "items",
+        equal: { guess: [structure.domain], slip: [structure.domain] },
+        tolerance: 1e-13,
+        maxIterations: 1e6,
+      }).fit(patternLog(structure.domain, set.patterns));
+      const first = defined(fit.model.parameters.items[defined(structure.domain[0])]);
+      expectClose(first.slip, set.slip, ML_TOLERANCE, "slip");
+      expectClose(first.guess, set.guess, ML_TOLERANCE, "guess");
+      expectAllClose(fit.model.parameters.probabilities, set.probabilities, ML_TOLERANCE, "P(K)");
+      return first;
+    });
+    const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+    expect(Math.abs(mean(rates.map((rate) => rate.slip)) - slip)).toBeLessThan(RECOVERY_TOLERANCE);
+    expect(Math.abs(mean(rates.map((rate) => rate.guess)) - guess)).toBeLessThan(RECOVERY_TOLERANCE);
+  });
+});
+
+describe("local identifiability against pks", () => {
+  it.each(identifiabilityReferences)(
+    "finds the rank of the Jacobian of the pattern probabilities: $name",
+    (reference) => {
+      const { structure } = reference;
+      const model = kst({
+        structure,
+        over: "items",
+        fixed: reference.fixed,
+        parameters: {
+          probabilities: reference.probabilities,
+          items: Object.fromEntries(
+            structure.domain.map((item) => [
+              item,
+              { guess: defined(reference.guess[item]), slip: defined(reference.slip[item]) },
+            ]),
+          ),
+        },
+      });
+      expect(model.identifiability()).toEqual({
+        parameters: reference.parameters,
+        rank: reference.rank,
+        identifiable: reference.rank === reference.parameters,
+      });
+    },
+  );
+});
+
+describe("gradedness against pks", () => {
+  it.each(gradedReferences)(
+    "finds the elements at which a structure is forward and backward graded: $name",
+    (reference) => {
+      expect(forwardGraded(reference.structure)).toEqual(reference.forward);
+      expect(backwardGraded(reference.structure)).toEqual(reference.backward);
+    },
+  );
+});
+
+describe("validity of a structure against kst", () => {
+  it.each(validities)("measures gamma, the violational coefficient, discrepancy and agreement: $name", (reference) => {
+    const validity = structureValidity(reference.structure, patternLog(reference.structure.domain, reference.patterns));
+    expectClose(validity.gamma, reference.gamma, EXACT_TOLERANCE, "gamma");
+    expect(validity.concordant).toBe(reference.concordant);
+    expect(validity.discordant).toBe(reference.discordant);
+    expectClose(validity.violationalCoefficient, reference.violationalCoefficient, EXACT_TOLERANCE, "VC");
+    expectClose(validity.discrepancyIndex, reference.discrepancyIndex, EXACT_TOLERANCE, "DI");
+    expectClose(validity.distanceAgreement, reference.distanceAgreement, EXACT_TOLERANCE, "DA");
+    expect(validity.distances).toEqual(reference.distances);
+    for (const [item, rate] of Object.entries(reference.solutionRates)) {
+      expectClose(validity.solutionRates[item] ?? null, rate, EXACT_TOLERANCE, `${item} solution rate`);
+    }
+  });
+});
+
+describe("the test of a quasi order against the delta method", () => {
+  const tails = ["two-sided", "less", "greater"] as const;
+  it.each(diffTests)("tests $name by the $version version against a mean of $mean", (reference) => {
+    const log = patternLog(reference.items, reference.patterns);
+    for (const tail of tails) {
+      const result = diffTest(log, reference.prerequisites, {
+        ...(reference.alternative === null ? {} : { alternative: reference.alternative }),
+        version: reference.version,
+        mean: reference.mean,
+        confidence: reference.confidence,
+        tail,
+      });
+      const close = (actual: number, expected: number, label: string): void => {
+        expect(Math.abs(actual - expected), `${tail} ${label}`).toBeLessThanOrEqual(
+          DELTA_TOLERANCE * Math.abs(expected),
+        );
+      };
+      close(result.estimate, reference.estimate, "estimate");
+      close(result.z, reference.z, "z");
+      close(result.pValue, reference.pValue[tail], "p-value");
+      const expected = reference.interval[tail];
+      const [low, high] = result.interval;
+      if (tail === "two-sided") {
+        close(low, defined(Array.isArray(expected) ? expected[0] : null), "lower end");
+        close(high, defined(Array.isArray(expected) ? expected[1] : null), "upper end");
+      } else if (tail === "less") {
+        expect(low).toBe(Number.NEGATIVE_INFINITY);
+        close(high, Number(expected), "upper end");
+      } else {
+        close(low, Number(expected), "lower end");
+        expect(high).toBe(Number.POSITIVE_INFINITY);
+      }
+    }
+  });
+
+  it("has a standard error that matches the spread of the estimate over bootstrap samples", () => {
+    const reference = defined(
+      diffTests.find((candidate) => candidate.name === "pisa" && candidate.alternative === null),
+    );
+    const learners = Object.entries(reference.patterns).flatMap(([pattern, count]) =>
+      Array.from({ length: count }, () => pattern),
+    );
+    const random = createRandom(20261029);
+    const estimates = Array.from({ length: 400 }, () => {
+      const resample = Array.from({ length: learners.length }, () =>
+        defined(learners[Math.floor(random.uniform() * learners.length)]),
+      );
+      const counts: Record<string, number> = {};
+      for (const pattern of resample) counts[pattern] = (counts[pattern] ?? 0) + 1;
+      return diffTest(patternLog(reference.items, counts), reference.prerequisites, { version: reference.version })
+        .estimate;
+    });
+    const mean = estimates.reduce((sum, value) => sum + value, 0) / estimates.length;
+    const spread = Math.sqrt(estimates.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (estimates.length - 1));
+    const standardError = Math.sqrt(reference.variance / learners.length);
+    expect(Math.abs(spread / standardError - 1)).toBeLessThan(0.15);
+  });
+});
+
 describe("adaptive assessment", () => {
   const [reference] = blims;
   const { structure } = defined(reference);
@@ -850,6 +1153,418 @@ describe("KST edge cases", () => {
   });
 });
 
+describe("BLIM constraints and diagnostics", () => {
+  const chain = surmiseStructure({ a: [], b: ["a"], c: ["b"] });
+  const chainPatterns = { "000": 12, "100": 10, "110": 9, "111": 14, "010": 2, "101": 1 };
+  const chainLog = patternLog(chain.domain, chainPatterns);
+
+  it("is unaffected by events without an outcome when fitted by MDML or with constraints", () => {
+    for (const options of [
+      { method: "mdml" as const },
+      { equal: { slip: [["a", "b", "c"]] }, fixed: { guess: { a: 0.1 } } },
+    ]) {
+      expectUnaffectedByLessons(kst({ structure: chain, over: "items", ...options }), chainLog);
+    }
+  });
+
+  it("gives G² and the discrepancy only for a table of one answer to every item", () => {
+    const model = kst({ structure: chain, over: "items" });
+    const complete = model.fit(chainLog);
+    expect(complete.goodnessOfFit).not.toBeNull();
+    expect(complete.discrepancy).not.toBeNull();
+    const answer = (learner: string, item: string, outcome: number, time: number) => ({
+      learner,
+      item,
+      skills: [],
+      time,
+      outcome,
+    });
+    const events = [...chainLog, answer("l0", "a", 1, 1000)];
+    for (const log of [
+      eventLog(chainLog.slice(1)),
+      eventLog(events),
+      eventLog(chainLog.map((event, i) => ({ ...event, outcome: i === 0 ? 0.5 : event.outcome }))),
+    ]) {
+      const fit = model.fit(log);
+      expect(fit.goodnessOfFit).toBeNull();
+      expect(fit.discrepancy).toBeNull();
+      expect(fit.logLikelihood).toBeLessThan(0);
+    }
+  });
+
+  it("leaves the p-value out when the model has no degrees of freedom", () => {
+    const fit = kst({ structure: chain, over: "items" }).fit(
+      patternLog(chain.domain, { "000": 1, "111": 1, "100": 1 }),
+    );
+    const gof = defined(fit.goodnessOfFit);
+    expect(gof.degreesOfFreedom).toBe(3 - (4 - 1 + 6));
+    expect(gof.pValue).toBeNull();
+    expect(gof.g2).toBeGreaterThanOrEqual(0);
+  });
+
+  it("counts a parameter for each state but one, and for each group of free rates", () => {
+    const parameters = (options: object): number => {
+      const fit = kst({ structure: chain, over: "items", ...options }).fit(chainLog);
+      return (defined(fit.aic) + 2 * fit.logLikelihood) / 2;
+    };
+    expectClose(parameters({}), 3 + 6, 1e-12);
+    expectClose(parameters({ fixed: { guess: { a: 0.1 }, slip: { c: 0.2 } } }), 3 + 4, 1e-12);
+    expectClose(parameters({ equal: { guess: [["a", "b", "c"]], slip: [["a", "b"]] } }), 3 + 1 + 2, 1e-12);
+    expectClose(parameters({ equal: { slip: [["a", "b"]] }, fixed: { slip: { c: 0.1 } } }), 3 + 1 + 3, 1e-12);
+  });
+
+  it("holds a fixed rate at 0 or 1, which an estimated rate cannot reach", () => {
+    const fit = kst({ structure: chain, over: "items", fixed: { guess: { a: 0 }, slip: { c: 0 } } }).fit(chainLog);
+    expect(defined(fit.model.parameters.items.a).guess).toBe(0);
+    expect(defined(fit.model.parameters.items.c).slip).toBe(0);
+    const free = kst({ structure: chain, over: "items" }).fit(chainLog);
+    expect(
+      Math.min(...Object.values(free.model.parameters.items).flatMap((item) => [item.guess, item.slip])),
+    ).toBeGreaterThanOrEqual(1e-6);
+  });
+
+  it("restricts MDML to the states of least discrepancy, so its estimates differ from those of ML", () => {
+    const ml = kst({ structure: chain, over: "items" }).fit(chainLog);
+    const mdml = kst({ structure: chain, over: "items", method: "mdml" }).fit(chainLog);
+    expect(mdml.converged).toBe(true);
+    expect(mdml.aic).toBeNull();
+    expect(mdml.logLikelihood).toBeLessThanOrEqual(ml.logLikelihood + 1e-9);
+    expect(mdml.model.parameters.probabilities).not.toEqual(ml.model.parameters.probabilities);
+  });
+
+  it("compares fits by their G², and leaves the comparison out when it has no meaning", () => {
+    const free = kst({ structure: chain, over: "items" }).fit(chainLog);
+    const equal = kst({ structure: chain, over: "items", equal: { guess: [["a", "b", "c"]] } }).fit(chainLog);
+    const comparison = defined(compareFits(equal, free));
+    expect(comparison.degreesOfFreedom).toBe(2);
+    expectClose(comparison.g2, defined(equal.goodnessOfFit).g2 - defined(free.goodnessOfFit).g2, 1e-12);
+    expect(comparison.g2).toBeGreaterThanOrEqual(0);
+    expect(compareFits(free, free)).toBeNull();
+    expect(compareFits(free, equal)).toBeNull();
+    const incomplete = kst({ structure: chain, over: "items" }).fit(eventLog(chainLog.slice(1)));
+    expect(compareFits(equal, incomplete)).toBeNull();
+    expect(compareFits(incomplete, free)).toBeNull();
+    const md = kst({ structure: chain, over: "items", method: "md" }).fit(chainLog);
+    expect(compareFits(equal, md)).toBeNull();
+  });
+
+  it("finds a single item with both of its rates free not identifiable, by the rank of 1 in 3 parameters", () => {
+    const single = surmiseStructure({ a: [] });
+    const model = kst({
+      structure: single,
+      over: "items",
+      parameters: { probabilities: [0.4, 0.6], items: { a: { guess: 0.1, slip: 0.2 } } },
+    });
+    expect(model.identifiability()).toEqual({ parameters: 3, rank: 1, identifiable: false });
+  });
+
+  it("finds a model identifiable once enough rates are fixed, and keeps the rank within the patterns", () => {
+    const base = { structure: chain, over: "items" as const };
+    const parameters = {
+      probabilities: [0.1, 0.2, 0.3, 0.4],
+      items: { a: { guess: 0.1, slip: 0.2 }, b: { guess: 0.2, slip: 0.1 }, c: { guess: 0.15, slip: 0.25 } },
+    };
+    const free = kst({ ...base, parameters }).identifiability();
+    expect(free.rank).toBeLessThanOrEqual(2 ** 3 - 1);
+    const fixed = kst({ ...base, parameters, fixed: { guess: { a: 0.1 }, slip: { c: 0.25 } } }).identifiability();
+    expect(fixed.parameters).toBe(free.parameters - 2);
+    expect(fixed.rank).toBeLessThanOrEqual(fixed.parameters);
+    expect(fixed.identifiable).toBe(fixed.rank === fixed.parameters);
+  });
+
+  it("starts items without parameters at 0.1 when it checks identifiability", () => {
+    const explicit = {
+      probabilities: [0.25, 0.25, 0.25, 0.25],
+      items: Object.fromEntries(chain.domain.map((item) => [item, { guess: 0.1, slip: 0.1 }])),
+    };
+    const given = kst({ structure: chain, over: "items", parameters: explicit }).identifiability();
+    const absent = kst({ structure: chain, over: "items" }).identifiability();
+    expect(absent).toEqual(given);
+  });
+
+  it("refuses identifiability for a model over skills, with equal rates, or too big for the limit", () => {
+    expect(() => kst({ structure: chain }).identifiability()).toThrow('create the model with over: "items"');
+    expect(() => kst({ structure: chain, over: "items", equal: { slip: [["a", "b"]] } }).identifiability()).toThrow(
+      "with equal rates has no reference",
+    );
+    for (const length of [20, 40, 1100]) {
+      const long = surmiseStructure(
+        Object.fromEntries(Array.from({ length }, (_, i) => [`q${i}`, i === 0 ? [] : [`q${i - 1}`]])),
+        { maxStates: 2000 },
+      );
+      expect(() => kst({ structure: long, over: "items" }).identifiability()).toThrow(
+        `a Jacobian of 2 ^ ${length} patterns by ${length + 2 * length} parameters, more than the limit of 10000000 cells`,
+      );
+    }
+    expect(() => kst({ structure: chain, over: "items", fixed: { slip: { z: 0.1 } } }).identifiability()).toThrow(
+      'The option fixed.slip names item "z", which is not an element of the structure.',
+    );
+  });
+
+  it("rejects rates and groups that are not what they should be", () => {
+    const build = (options: object) => () => kst({ structure: chain, over: "items", ...options });
+    expect(build({ fixed: { guess: { a: 1.5 } } })).toThrow(
+      'The option fixed.guess needs a probability from 0 to 1 for item "a", found 1.5.',
+    );
+    expect(build({ equal: { slip: [["a"]] } })).toThrow(
+      "Each group of the option equal.slip needs at least 2 distinct item ids",
+    );
+    expect(build({ equal: { slip: [["a", "a"]] } })).toThrow("needs at least 2 distinct item ids");
+    expect(
+      build({
+        equal: {
+          guess: [
+            ["a", "b"],
+            ["b", "c"],
+          ],
+        },
+      }),
+    ).toThrow('Item "b" is in two groups of the option equal.guess.');
+    expect(build({ equal: { slip: [["a", "b"]] }, fixed: { slip: { b: 0.1 } } })).toThrow(
+      'Item "b" has a fixed slip and is in a group of the option equal.slip.',
+    );
+    expect(build({ method: "em" })).toThrow('The option method must be "ml", "md" or "mdml", found "em".');
+  });
+
+  it("rejects fixed and equal rates of items that the log does not answer", () => {
+    expect(() => kst({ structure: chain, over: "items", fixed: { guess: { z: 0.1 } } }).fit(chainLog)).toThrow(
+      'The option fixed.guess names item "z", which has no event with an outcome in the log.',
+    );
+    expect(() => kst({ structure: chain, over: "items", equal: { slip: [["a", "z"]] } }).fit(chainLog)).toThrow(
+      'The option equal.slip names item "z", which has no event with an outcome in the log.',
+    );
+  });
+
+  it("rejects a fit that has no state able to give a learner's answers", () => {
+    const model = kst({
+      structure: chain,
+      over: "items",
+      method: "md",
+      fixed: { slip: { a: 0, b: 0, c: 0 }, guess: { a: 0, b: 0, c: 0 } },
+    });
+    expect(() => model.fit(patternLog(chain.domain, { "010": 1, "101": 1 }))).toThrow(
+      "A learner's outcomes have probability 0 under the parameters",
+    );
+  });
+});
+
+describe("gradedness", () => {
+  it("is forward graded where adding an element to any state leaves a state, and backward graded where removing it does", () => {
+    const structure = surmiseStructure({ a: [], b: ["a"] });
+    expect(forwardGraded(structure)).toEqual({ a: true, b: false });
+    expect(backwardGraded(structure)).toEqual({ a: false, b: true });
+    const subsets = unionClosure(["a", "b"], [["a"], ["b"]]);
+    expect(forwardGraded(subsets)).toEqual({ a: true, b: true });
+    expect(backwardGraded(subsets)).toEqual({ a: true, b: true });
+  });
+
+  it("swaps the directions when every state is replaced by its complement", () => {
+    const states = fc.uniqueArray(fc.subarray(["a", "b", "c", "d"]), {
+      selector: (state) => state.join(),
+      maxLength: 9,
+    });
+    fc.assert(
+      fc.property(states, (chosen) => {
+        const domain = ["a", "b", "c", "d"];
+        const build = (family: readonly (readonly string[])[]): KnowledgeStructure => ({
+          domain,
+          states: [...family, [], domain].filter(
+            (state, i, all) => all.findIndex((other) => other.join() === state.join()) === i,
+          ),
+        });
+        const original = build(chosen);
+        const complement = build(original.states.map((state) => domain.filter((element) => !state.includes(element))));
+        expect(forwardGraded(complement)).toEqual(backwardGraded(original));
+        expect(backwardGraded(complement)).toEqual(forwardGraded(original));
+      }),
+    );
+  });
+});
+
+describe("validity of a structure", () => {
+  const structure = surmiseStructure({ a: [], b: ["a"] });
+
+  it("counts the pairs a structure orders, as a table whose answers can be added by hand", () => {
+    const validity = structureValidity(structure, patternLog(["a", "b"], { "11": 1, "10": 1, "01": 1, "00": 1 }));
+    expect(validity).toEqual({
+      gamma: 0,
+      concordant: 1,
+      discordant: 1,
+      violationalCoefficient: 0.25,
+      discrepancyIndex: 0.25,
+      distances: { "0": 3, "1": 1 },
+      distanceAgreement: 1,
+      solutionRates: { a: 0.5, b: 0.5 },
+    });
+  });
+
+  it("calls a structure without ordered pairs valid in no measure that needs a pair", () => {
+    const free = unionClosure(["a", "b"], [["a"], ["b"]]);
+    const validity = structureValidity(free, patternLog(["a", "b"], { "11": 1, "10": 2, "01": 1 }));
+    expect(validity.gamma).toBeNull();
+    expect(validity.violationalCoefficient).toBeNull();
+    expect(validity.concordant + validity.discordant).toBe(0);
+    expect(validity.discrepancyIndex).toBe(0);
+    expect(validity.distanceAgreement).toBeNull();
+  });
+
+  it("leaves the distance agreement out above 20 elements, and keeps the rest", () => {
+    const long = surmiseStructure(
+      Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`q${i}`, i === 0 ? [] : [`q${i - 1}`]])),
+    );
+    const validity = structureValidity(
+      long,
+      patternLog(long.domain, { [`${"1".repeat(10)}${"0".repeat(11)}`]: 3, [`${"1".repeat(21)}`]: 1 }),
+    );
+    expect(validity.distanceAgreement).toBeNull();
+    expect(validity.discrepancyIndex).toBe(0);
+    expect(validity.gamma).toBe(1);
+  });
+
+  it("is invariant to the order of learners and bounded", () => {
+    const patterns = fc.array(fc.array(fc.constantFrom(0, 1), { minLength: 3, maxLength: 3 }), {
+      minLength: 2,
+      maxLength: 25,
+    });
+    const chain3 = surmiseStructure({ a: [], b: ["a"], c: ["b"] });
+    fc.assert(
+      fc.property(patterns, fc.nat(), (rows, shift) => {
+        const log = (order: readonly (readonly number[])[]) =>
+          eventLog(
+            order.flatMap((row, learner) =>
+              row.map((outcome, i) => ({
+                learner: `l${learner}`,
+                item: defined(chain3.domain[i]),
+                skills: [],
+                time: learner * 3 + i,
+                outcome,
+              })),
+            ),
+          );
+        const validity = structureValidity(chain3, log(rows));
+        const turned = rows.slice(shift % rows.length).concat(rows.slice(0, shift % rows.length));
+        expect(structureValidity(chain3, log(turned))).toEqual(validity);
+        expect(validity.gamma === null || (validity.gamma >= -1 && validity.gamma <= 1)).toBe(true);
+        expect(Object.values(validity.distances).reduce((sum, count) => sum + count, 0)).toBe(rows.length);
+        const total = Object.entries(validity.distances).reduce(
+          (sum, [distance, count]) => sum + Number(distance) * count,
+          0,
+        );
+        expectClose(validity.discrepancyIndex, total / rows.length, 1e-12);
+        for (const rate of Object.values(validity.solutionRates)) expect(rate >= 0 && rate <= 1).toBe(true);
+      }),
+    );
+  });
+
+  it("needs a complete table of 0 and 1 over the structure's elements, and names what is missing", () => {
+    const answer = (learner: string, item: string, outcome: number, time: number) => ({
+      learner,
+      item,
+      skills: [],
+      time,
+      outcome,
+    });
+    expect(() =>
+      structureValidity(structure, eventLog([answer("x", "a", 1, 0), answer("x", "b", 0, 1), answer("y", "a", 1, 2)])),
+    ).toThrow('The validity of a structure needs every learner to answer every item; "y" has no answer to "b".');
+    expect(() => structureValidity(structure, eventLog([answer("x", "a", 0.5, 0), answer("x", "b", 1, 1)]))).toThrow(
+      "The validity of a structure needs outcomes 0 or 1",
+    );
+    expect(() => structureValidity(structure, eventLog([answer("x", "a", 1, 0), answer("x", "z", 1, 1)]))).toThrow(
+      'The log has item "z", which is not in the structure\'s domain.',
+    );
+    expect(() => structureValidity(structure, eventLog([answer("x", "a", 1, 0)]))).toThrow(
+      'The structure\'s element "b" is not an item of the log',
+    );
+  });
+});
+
+describe("the test of a quasi order", () => {
+  const pisa = defined(diffTests.find((candidate) => candidate.name === "pisa" && candidate.version === "minimized"));
+  const log = patternLog(pisa.items, pisa.patterns);
+  const learners = Object.values(pisa.patterns).reduce((sum, count) => sum + count, 0);
+
+  it("estimates the fit measure of IITA over the squared number of learners", () => {
+    for (const version of ["minimized", "corrected"] as const) {
+      const result = iita(log, { version });
+      const test = diffTest(log, result.prerequisites, { version });
+      expectClose(test.estimate, result.diff / learners ** 2, 1e-15 * result.diff);
+    }
+  });
+
+  it("tests a quasi order against another by the difference, so that swapping them negates the estimate and z", () => {
+    const first = pisa.prerequisites;
+    const second = defined(
+      diffTests.find((candidate) => candidate.name === "pisa" && candidate.alternative !== null)?.alternative,
+    );
+    const forward = diffTest(log, first, { alternative: second });
+    const backward = diffTest(log, second, { alternative: first });
+    expectClose(forward.estimate, -backward.estimate, 1e-15);
+    expectClose(forward.z, -backward.z, 1e-9);
+    expectClose(forward.pValue, backward.pValue, 1e-12);
+    expect(() => diffTest(log, first, { alternative: first })).toThrow("the two quasi orders are the same");
+  });
+
+  it("splits the probability between the tails, and shifts z with the mean", () => {
+    const less = diffTest(log, pisa.prerequisites, { tail: "less" });
+    const greater = diffTest(log, pisa.prerequisites, { tail: "greater" });
+    const two = diffTest(log, pisa.prerequisites);
+    expectClose(less.pValue + greater.pValue, 1, 1e-12);
+    expectClose(two.pValue, 2 * Math.min(less.pValue, greater.pValue), 1e-12);
+    expect(less.interval[0]).toBe(Number.NEGATIVE_INFINITY);
+    expect(greater.interval[1]).toBe(Number.POSITIVE_INFINITY);
+    expect(two.interval[0]).toBeLessThan(two.estimate);
+    expect(two.interval[1]).toBeGreaterThan(two.estimate);
+    const wide = diffTest(log, pisa.prerequisites, { confidence: 0.99 });
+    expect(wide.interval[1] - wide.interval[0]).toBeGreaterThan(two.interval[1] - two.interval[0]);
+    const shifted = diffTest(log, pisa.prerequisites, { mean: two.estimate });
+    expectClose(shifted.z, 0, 1e-12);
+    expectClose(shifted.pValue, 1, 1e-12);
+  });
+
+  it("closes the prerequisites under transitivity, as a quasi order is", () => {
+    const direct = { a: [], b: ["a"], c: ["b"] };
+    const closed = { a: [], b: ["a"], c: ["a", "b"] };
+    const answers = patternLog(["a", "b", "c"], { "111": 5, "110": 4, "100": 4, "000": 3, "010": 1, "101": 1 });
+    expect(diffTest(answers, direct)).toEqual(diffTest(answers, closed));
+  });
+
+  it("rejects what cannot be tested", () => {
+    const names = ["a", "b", "c"];
+    const answers = patternLog(names, { "111": 5, "110": 4, "100": 4, "000": 3, "010": 1 });
+    const chain3 = { a: [], b: ["a"], c: ["b"] };
+    expect(() => diffTest(patternLog(names, { "111": 5 }), chain3)).toThrow("variance 0");
+    expect(() => diffTest(answers, { a: [], b: [], c: [] })).toThrow("need at least one implication between two items");
+    expect(() => diffTest(answers, { a: [], b: ["a"] })).toThrow(
+      'The prerequisites have no key for item "c" of the log.',
+    );
+    expect(() => diffTest(answers, { ...chain3, z: [] })).toThrow('have key "z", which is not an item of the log');
+    expect(() => diffTest(answers, { a: [], b: ["z"], c: [] })).toThrow(
+      '"b" requires "z", which is not a key of the prerequisites.',
+    );
+    expect(() => diffTest(answers, chain3, { alternative: { a: [], b: [] } })).toThrow(
+      "The alternative prerequisites have no key for item",
+    );
+    expect(() => diffTest(patternLog(names, { "110": 3, "100": 1 }), chain3)).toThrow(
+      'Item "c" is solved by no learner',
+    );
+    expect(() => diffTest(patternLog(["a"], { "1": 3 }), { a: [] })).toThrow("needs at least 2 items");
+    const incomplete = eventLog([...answers.slice(1)]);
+    expect(() => diffTest(incomplete, chain3)).toThrow("The difference test needs every learner to answer every item");
+    expect(() => diffTest(answers, chain3, { tail: "both" as "less" })).toThrow(
+      'The option tail must be "two-sided", "less" or "greater", found "both".',
+    );
+    expect(() => diffTest(answers, chain3, { version: "original" as "minimized" })).toThrow(
+      'The option version must be "minimized" or "corrected", found "original".',
+    );
+    for (const confidence of [0, 1, 1.5]) {
+      expect(() => diffTest(answers, chain3, { confidence })).toThrow(
+        "The option confidence must be above 0 and below 1",
+      );
+    }
+  });
+});
+
 describe("KST options from JavaScript", () => {
   it("rejects options that are not an object", () => {
     const missing = JSON.parse("null");
@@ -878,6 +1593,68 @@ describe("KST options from JavaScript", () => {
       "A knowledge structure must be an object of domain and states, found an array.",
     );
     expect(() => iita(missing)).toThrow("A log must be an array of events, found null.");
+  });
+
+  it("rejects fixed and equal rates of other types, which do not stand for none", () => {
+    const structure = surmiseStructure({ a: [], b: ["a"] });
+    const build = (options: string) => () => kst({ structure, ...JSON.parse(options) });
+    expect(build('{"fixed": null}')).toThrow(
+      "The option fixed must be an object of fixed rates by guess and slip, found null.",
+    );
+    expect(build('{"equal": null}')).toThrow(
+      "The option equal must be an object of groups of items by guess and slip, found null.",
+    );
+    expect(build('{"fixed": {"guess": null}}')).toThrow(
+      "The option fixed.guess must be an object of rates by item, found null.",
+    );
+    expect(build('{"fixed": {"slip": {"a": "x"}}}')).toThrow(
+      'The option fixed.slip needs a probability from 0 to 1 for item "a", found "x".',
+    );
+    expect(build('{"equal": {"slip": "ab"}}')).toThrow(
+      'The option equal.slip must be a list of groups of items, found "ab".',
+    );
+    expect(build('{"equal": {"guess": [null]}}')).toThrow(
+      "Each group of the option equal.guess needs at least 2 distinct item ids, found null.",
+    );
+    expect(build('{"method": null}')).toThrow("The option method must be");
+  });
+
+  it("rejects fits, relations and structures of other types in the diagnostics", () => {
+    const structure = surmiseStructure({ a: [], b: ["a"] });
+    const missing = JSON.parse("null");
+    const log = patternLog(["a", "b"], { "11": 3, "10": 2, "00": 2, "01": 1 });
+    const fit = kst({ structure, over: "items" }).fit(log);
+    expect(() => compareFits(missing, fit)).toThrow("The restricted fit must be a fit of a KST model, found null.");
+    expect(() => compareFits(fit, JSON.parse('{"goodnessOfFit": 3}'))).toThrow(
+      "The general fit needs a goodnessOfFit, an object or null, found 3.",
+    );
+    expect(() => compareFits(fit, JSON.parse('{"goodnessOfFit": {"g2": "a", "degreesOfFreedom": 1}}'))).toThrow(
+      "The general fit needs a goodnessOfFit of numbers, found an object.",
+    );
+    for (const use of [
+      () => forwardGraded(missing),
+      () => backwardGraded(missing),
+      () => structureValidity(missing, log),
+    ]) {
+      expect(use).toThrow("A knowledge structure must be an object of domain and states, found null.");
+    }
+    expect(() => structureValidity(structure, missing)).toThrow("A log must be an array of events, found null.");
+    const prerequisites = { a: [], b: ["a"] };
+    expect(() => diffTest(missing, prerequisites)).toThrow("A log must be an array of events, found null.");
+    expect(() => diffTest(log, missing)).toThrow(
+      "The prerequisites must be an object of lists of items by item, found null.",
+    );
+    expect(() => diffTest(log, prerequisites, missing)).toThrow("The options must be an object, found null.");
+    expect(() => diffTest(log, prerequisites, { alternative: missing })).toThrow(
+      "The alternative prerequisites must be an object of lists of items by item, found null.",
+    );
+    expect(() => diffTest(log, prerequisites, JSON.parse('{"mean": "a"}'))).toThrow(
+      'The option mean must be a finite number, found "a".',
+    );
+    expect(() => diffTest(log, prerequisites, JSON.parse('{"confidence": "0.9"}'))).toThrow(
+      'The option confidence must be above 0 and below 1, found "0.9".',
+    );
+    expect(() => diffTest(log, prerequisites, JSON.parse('{"tail": null}'))).toThrow("The option tail must be");
   });
 
   it("rejects parameters of null, which do not stand for the default", () => {

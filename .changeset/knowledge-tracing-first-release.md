@@ -39,3 +39,11 @@ split by time of a curriculum gives, so that BKT and logistic models can be eval
 whether two models predict differently well, with a paired t test of their losses averaged per learner.
 `metricsByOpportunity` gives the metrics by opportunity, `learningCurve` takes `predictions` and `minOpportunities` in
 an options object, and `powerLawFit` and `categorizeCurve` fit a curve's power law and give DataShop's category of it.
+
+The basic local independence model of `kst` holds rates at given values with `fixed`, gives items one rate with `equal`, and
+is fitted by maximum likelihood, minimum discrepancy or both together (`method: "mdml"`). A fit reports G² against the
+saturated model with pks's degrees of freedom and its mean discrepancy, `compareFits` tests a restricted fit against a
+general one, and `model.identifiability()` gives the rank of the Jacobian of the pattern probabilities. `structureValidity`
+measures a structure against responses (gamma, the violational coefficient, the discrepancy index and the distance
+agreement), `forwardGraded` and `backwardGraded` find where a structure is graded, and `diffTest` tests the fit of one
+quasi order, or the difference between two, with a delta-method variance.

@@ -6,6 +6,12 @@ import { compareStates, type KnowledgeStructure, seal } from "./structure.js";
 export type SurmiseStructureOptions = StateLimitOptions;
 
 /**
+ * A quasi-order of elements as `iita` returns it: each element's prerequisites, the elements that every learner who
+ * masters it is expected to master.
+ */
+export type Prerequisites = Readonly<Record<string, readonly string[]>>;
+
+/**
  * Returns the quasi-ordinal knowledge space of a surmise relation: every set of elements that holds the prerequisites
  * of each of its elements. States are ordered by size, then by the domain's order. The structure is frozen, and the
  * functions of this module trust it instead of checking it again.
@@ -16,7 +22,7 @@ export type SurmiseStructureOptions = StateLimitOptions;
  * than `maxStates`.
  */
 export function surmiseStructure(
-  prerequisites: Readonly<Record<string, readonly string[]>>,
+  prerequisites: Prerequisites,
   options: SurmiseStructureOptions = {},
 ): KnowledgeStructure {
   checkOptions(options);
@@ -37,11 +43,10 @@ export function surmiseStructure(
 /**
  * Returns `below`, an m × m matrix with 1 at j × m + i when i is a prerequisite of j, directly or through others; every
  * element is its own.
+ *
+ * @throws `DataError` when an element's prerequisites are not a list, or one is not in `domain`.
  */
-function transitiveClosure(
-  prerequisites: Readonly<Record<string, readonly string[]>>,
-  domain: readonly string[],
-): Uint8Array {
+export function transitiveClosure(prerequisites: Prerequisites, domain: readonly string[]): Uint8Array {
   const m = domain.length;
   const index = new Map(domain.map((element, e) => [element, e]));
   const below = new Uint8Array(m * m);

@@ -16,6 +16,9 @@ export interface KstParameters {
   readonly items: Readonly<Record<string, KstItem>>;
 }
 
+/** The guess and slip that a fit starts an item without parameters from, as pks's `blim`. */
+export const START_RATE = 0.1;
+
 /** How far the probabilities of a distribution may sum from 1, for the rounding of a sum of many. */
 const SUM_TOLERANCE = 1e-9;
 

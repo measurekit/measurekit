@@ -2,9 +2,24 @@
 
 `@measurekit/knowledge-tracing/kst` models what a learner knows as a knowledge state: the set of skills, or items,
 they master, out of the states a knowledge structure allows. It builds structures from prerequisites,
-derives prerequisites from data, fits the basic local independence model (BLIM), and assesses learners
-adaptively. Results are validated against the R packages kst, pks and
+derives prerequisites from data, fits the basic local independence model (BLIM) with fixed and equal rates, tests its
+fit and local identifiability, measures the validity of a structure and tests a surmise relation against responses, and
+assesses learners adaptively. Results are validated against the R packages kst, pks and
 DAKS ([validation](validation.md#knowledge-space-theory)).
+
+```mermaid
+flowchart LR
+  P[prerequisites] --> S[(structure)]
+  R[responses of a log] --> I[iita] --> P
+  S --> K["kst model<br/>fit, update, nextQuestion"]
+  R --> K
+  K --> G["goodnessOfFit<br/>discrepancy<br/>compareFits"]
+  K --> D["identifiability"]
+  S --> V["structureValidity<br/>forwardGraded<br/>backwardGraded"]
+  R --> V
+  P --> T["diffTest"]
+  R --> T
+```
 
 ## Knowledge structures
 
@@ -18,7 +33,7 @@ flowchart LR
   G["unionClosure<br/>states to start from"] --> S
   S --> K["structureBase<br/>structureAtoms"]
   S --> T["structureTrace<br/>notions<br/>delineate"]
-  S --> L["isKnowledgeSpace<br/>isLearningSpace<br/>isWellGraded"]
+  S --> L["isKnowledgeSpace<br/>isLearningSpace<br/>isWellGraded<br/>forwardGraded<br/>backwardGraded"]
   S --> M["fringes<br/>neighbourhood<br/>learningPaths"]
   S --> F["kst<br/>a learner model"]
 ```
@@ -31,6 +46,8 @@ flowchart LR
 | `isKnowledgeSpace(structure)`              | Whether the union of any two states is a state                                                                    |
 | `isLearningSpace(structure)`               | Whether it is a knowledge space whose every state can be learned one element at a time                            |
 | `isWellGraded(structure)`                  | Whether any two states are joined by states that each differ from the next by one element, as many as they differ |
+| `forwardGraded(structure)`                 | For each element, whether adding it to any state leaves a state                                                   |
+| `backwardGraded(structure)`                | For each element, whether removing it from any state leaves a state                                               |
 | `fringes(structure, state)`                | `{ inner, outer }`: the elements last learned, and those ready to learn                                           |
 | `neighbourhood(structure, state, options)` | The states that differ from a state by at least one and at most `distance` elements                               |
 | `learningPaths(structure, options)`        | The orders in which the whole domain is learned from the empty state, one element at a step                       |
@@ -112,10 +129,12 @@ probability guess, η, the lucky guess. Outcomes between 0 and 1 count as partia
 | --------------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
 | `structure`     | required          | The knowledge structure                                                                                       |
 | `over`          | `"skills"`        | `"skills"`: a state masters an item when it holds all the attempt's skills; `"items"`: when it holds the item |
-| `method`        | `"ml"`            | `"ml"`, maximum likelihood by EM; `"md"`, minimum discrepancy                                                 |
+| `method`        | `"ml"`            | `"ml"`, maximum likelihood by EM; `"md"`, minimum discrepancy; `"mdml"`, maximum likelihood subject to it     |
 | `tolerance`     | `1e-8`            | The change of the log-likelihood at which EM stops                                                            |
 | `maxIterations` | `10000`           | The most EM iterations                                                                                        |
 | `parameters`    | equal π, no items | `{ probabilities, items: { [item]: { guess, slip } } }`, π in the structure's order                           |
+| `fixed`         | none              | `{ guess, slip }`, each an object of rates by item that a fit holds: [constraints](#constraints)              |
+| `equal`         | none              | `{ guess, slip }`, each a list of groups of items that a fit gives one rate: [constraints](#constraints)      |
 
 ## Fitting
 
@@ -125,18 +144,112 @@ guess and slip 0.1 for items without, as pks.
 - `"ml"`: EM. Each learner's events, all of them, inform the posterior of their state; π is the mean posterior, slip
   the expected wrong answers where the state masters the item over the answers there, and guess the expected right
   answers where it does not over the answers there. The log-likelihood is the marginal one, the states summed over;
-  `aic` and `bic` count k = states - 1 + 2 items.
+  `aic` and `bic` count k = states - 1 + one for each group of free slips + one for each group of free guesses, which
+  is `states - 1 + 2 items` without constraints.
 - `"md"`: minimum discrepancy, in one pass (Heller and Wickelmaier, 2013). Each learner is spread evenly over the
   states that need the fewest careless errors and lucky guesses to give their answers, and the parameters are those
   states' frequencies and the errors they need. `aic` and `bic` are `null`.
+- `"mdml"`: EM in which each learner's posterior is spread over those states of least discrepancy only, weighted by
+  their probability. It maximizes the likelihood of the nearest states, so its log-likelihood, that of the whole
+  model at the estimates, is below that of `"ml"`. `aic` and `bic` are `null`.
 
-Both keep guess and slip 1e-6 from 0 and 1, as pks's `blim`, so every outcome keeps a positive probability. Some
+Estimated rates stay 1e-6 from 0 and 1, as pks's `blim`, so every outcome keeps a positive probability. Some
 rates cannot be estimated (Stefanutti et al., 2012): when every state with an item added is a state, as for an item
 without prerequisites, its guess trades off with π, and when every state with it removed is, as for an item nothing
 requires, its slip does. Their estimates depend on the start; the fit's predictions do not. Learners
 with the same answers are computed once. An EM iteration takes time proportional to the learners with different
 answers, the items and the states: on 2,000 learners and 40 items, about 0.07 s with 385 states and 1 s with 5,896.
 The fit's states and predictions are those of online inference with the fitted parameters.
+
+### Constraints
+
+| Option                      | Meaning                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `fixed.guess`, `fixed.slip` | An item's rate stays at the given value, from 0 to 1 and including both, which an estimate cannot reach |
+| `equal.guess`, `equal.slip` | Groups of at least 2 items that share one estimate: the pooled expected errors over the pooled answers  |
+
+```ts
+import { kst } from "@measurekit/knowledge-tracing/kst";
+
+kst({
+  structure,
+  over: "items",
+  fixed: { guess: { add: 0 }, slip: { divide: 0.05 } },
+  equal: { slip: [["subtract", "multiply"]] },
+});
+```
+
+An item has at most one constraint of each kind: it is in one group, and not in one while fixed. Every item named must
+have an event with an outcome in the log. Fixed values are held by every method, the fixed parameters are not counted
+in `aic` and `bic`, and a fit with a fixed rate of 0 gives probability 0 to the states that would need that error: the
+nearest states of `"md"` and `"mdml"` leave them out, as pks's `betafix` and `etafix` do.
+
+### Fit, comparison and identifiability
+
+Each `KstFit` has the fields of any model's fit, and these:
+
+| Field           | Value                                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `goodnessOfFit` | `{ g2, degreesOfFreedom, pValue }`: G² against the model that gives each response pattern its own probability; `null` unless every learner answered every item once, with 0 or 1 |
+| `discrepancy`   | The mean number of items by which a learner's answers differ from the nearest state; `null` where `goodnessOfFit` is                                                             |
+
+The degrees of freedom are pks's: `min(2^items - 1, learners) - parameters` up to 16 items, and `min(patterns that
+occur, learners) - parameters` above. They can reach 0 or below, and `pValue` is then `null`.
+
+`compareFits(restricted, general)` tests a model against one it is nested in, fitted to the same learners, as pks's
+`anova`: the difference of the G² and of the degrees of freedom, and the chi-square probability of the difference. It is
+`null` when either fit has no `goodnessOfFit`, when the restricted fit has no more degrees of freedom, and when its G² is
+the smaller.
+
+`model.identifiability()` is the local identifiability of the model at its parameters (Stefanutti et al., 2012; Heller,
+2017): the rank of the Jacobian of the probabilities of the 2^items response patterns, with a column for each free
+parameter. `{ parameters, rank, identifiable }`: identifiable when the rank is the number of parameters, so that no
+change of them leaves every pattern's probability as it was. Rates of items without parameters are at 0.1, and fixed
+rates are not parameters. The model must be over items. Equal rates are refused, as no reference covers them.
+
+```ts
+import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { compareFits, kst, structureValidity, surmiseStructure } from "@measurekit/knowledge-tracing/kst";
+
+const structure = surmiseStructure({ add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] });
+// 44 learners answer the four items once: a string of 0 and 1 for the items in the domain's order, and how many gave it.
+const counts = { "0000": 6, "1000": 8, "1100": 7, "1010": 5, "1110": 6, "1111": 9, "0100": 1, "0001": 1, "1001": 1 };
+const answers = Object.entries(counts).flatMap(([pattern, count]) =>
+  Array.from({ length: count }, (_, copy) => ({ pattern, copy })),
+);
+const log = eventLog(
+  answers.flatMap(({ pattern }, learner) =>
+    structure.domain.map((item, i) => ({
+      learner: `l${learner}`,
+      item,
+      skills: [],
+      time: i,
+      outcome: Number(pattern[i]),
+    })),
+  ),
+);
+
+const free = kst({ structure, over: "items" }).fit(log);
+free.goodnessOfFit; // { g2: 2.535, degreesOfFreedom: 2, pValue: 0.282 }
+free.discrepancy; // 0.068
+
+const equal = kst({ structure, over: "items", equal: { guess: [structure.domain], slip: [structure.domain] } }).fit(
+  log,
+);
+compareFits(equal, free); // { g2: 1.460, degreesOfFreedom: 6, pValue: 0.962 }: one guess and one slip fit as well
+
+free.model.identifiability(); // { parameters: 13, rank: 11, identifiable: false }
+const held = kst({
+  structure,
+  over: "items",
+  parameters: free.model.parameters,
+  fixed: { guess: { add: 0.05 }, slip: { divide: 0.05 } },
+});
+held.identifiability(); // { parameters: 11, rank: 11, identifiable: true }
+```
+
+The Jacobian has 2^items rows and one column for each parameter, so `identifiability` stops at `MAX_JACOBIAN_CELLS`, 10
+million cells (80 MB): a chain of 12 items takes about 13 ms, and 20 items with 10,000 states would need 84 GB.
 
 ## Events without an outcome
 
@@ -208,6 +321,92 @@ The result has `prerequisites`, `diff`, the mean squared difference of observed 
 resolves conflicting pairs in the order of the items. Pass `prerequisites` to `surmiseStructure` for the knowledge
 space.
 
+## Validity of a structure
+
+`structureValidity(structure, log)` measures how well a structure agrees with learners' answers to its items, as kst's
+`kvalidate`. The surmise relation of the structure orders i before j when every state that holds j holds i.
+
+| Field                      | Value                                                                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gamma`                    | (concordant - discordant) / (concordant + discordant); `null` without ordered pairs                                                                   |
+| `concordant`, `discordant` | Learners and ordered pairs where the prerequisite is solved and the other item is not, and the reverse                                                |
+| `violationalCoefficient`   | discordant / (learners × ordered pairs); `null` without ordered pairs                                                                                 |
+| `discrepancyIndex`         | The mean distance from a learner's answers to the nearest state                                                                                       |
+| `distances`                | The number of learners at each distance to their nearest state                                                                                        |
+| `distanceAgreement`        | The discrepancy index over the mean distance of all 2^items patterns to the nearest state; `null` above 20 elements, or when every pattern is a state |
+| `solutionRates`            | The share of learners who solved each item, from 0 to 1 (`percent` of kvalidate over 100)                                                             |
+
+```ts
+structureValidity(structure, log).gamma; // 0.862
+structureValidity(structure, log).distances; // { "0": 41, "1": 3 }
+```
+
+Each learner's first outcome at each item is used, every learner must have answered every item, with outcomes 0 or 1,
+and the log's items must be the structure's domain.
+
+## Testing a quasi order
+
+`diffTest(log, prerequisites, options)` tests the fit measure `diff` of inductive item tree analysis for one quasi
+order, or the difference of the measures of two (Ünlü and Sargin, 2010). The estimate is `diff` over the squared
+number of learners. Its standard deviation is that of the delta method for the multinomial distribution of the response
+patterns, so `z`, the p-value and the interval are asymptotic.
+
+| Option        | Default       | Meaning                                                                                               |
+| ------------- | ------------- | ----------------------------------------------------------------------------------------------------- |
+| `alternative` | none          | A second quasi order, as `iita` returns it: the test is then of the difference of the two estimates   |
+| `tail`        | `"two-sided"` | `"two-sided"`, `"less"` or `"greater"`: the estimate differs from `mean`, is below it, or is above it |
+| `mean`        | `0`           | The estimate under the null hypothesis                                                                |
+| `confidence`  | `0.95`        | The level of the interval, above 0 and below 1; one-sided for a `tail` of `"less"` or `"greater"`     |
+| `version`     | `"minimized"` | `"minimized"` or `"corrected"`, as `iita`'s versions of the same names                                |
+
+```ts
+import { diffTest, iita } from "@measurekit/knowledge-tracing/kst";
+
+const found = iita(log);
+diffTest(log, found.prerequisites);
+// { estimate: 0.00140, z: 1.293, pValue: 0.196, interval: [-0.00072, 0.00352] }
+const designed = { add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] };
+diffTest(log, found.prerequisites, { alternative: designed }).pValue; // 0.679
+```
+
+`prerequisites` has every item of the log as a key, and is closed under transitivity. The `interval` of a one-sided test
+has an infinite end. `"greater"` is the probability of a statistic at least as large; DAKS's `z_test` returns the
+probability of a smaller one, so values differ for one-sided tests.
+
+## Limits and errors
+
+| Limit                                      | Value                | At the limit                                                                                                   |
+| ------------------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| States of a structure built by the module  | `maxStates`, `10000` | `DataError` that suggests units: [alternative prerequisites](#alternative-prerequisites)                       |
+| Learning paths                             | `maxPaths`, `10000`  | `DataError` that suggests `structureBase`                                                                      |
+| Cells of the Jacobian of `identifiability` | `1e7`                | `DataError` that names the patterns and parameters: check a structure with fewer items or states, or fix rates |
+| Elements for `distanceAgreement`           | `20`                 | `null`, as a table's statistic                                                                                 |
+
+| Error                                                                                                   | What to do                                                                                    |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| An item has a fixed rate and is in a group, or is in two groups                                         | Fix it or group it, in one group per kind                                                     |
+| A rate or an item in `fixed` or `equal` is invalid, or the log has no event with an outcome at the item | Give rates from 0 to 1 and items with answers                                                 |
+| `identifiability` of a model over skills, or with equal rates                                           | Create the model with `over: "items"`; remove `equal`, or fix the rates instead               |
+| `structureValidity` or `diffTest` of an incomplete table                                                | Give every learner an answer of 0 or 1 to every item: the error names the first gap           |
+| `diffTest` with variance 0, or an item solved by no learner                                             | The estimate cannot be tested for identical learners or identical quasi orders; drop the item |
+
+## Not included
+
+- **Stochastic learning paths and the simple learning model.** No reference: Falmagne and Doignon's chapter 12 treats
+  paths, but nothing runs the dynamic model, and `pks::slm` is cross-sectional, so it does not move a learner's state.
+- **`populationIita`.** Outside the sources: DAKS's `pop_iita` takes given rates and no data, a tool for studying IITA
+  itself.
+
+## Differences from the references
+
+| Reference                        | Difference                                                                                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DAKS::z_test`                   | Its variance is not the delta-method variance of its estimate; `diffTest` follows the delta method. See [validation](validation.md#knowledge-space-theory) |
+| `DAKS::z_test`, one-sided tests  | It returns the probability of a smaller statistic for `"greater"`; `diffTest` returns that of a larger one, R's meaning                                    |
+| `DAKS::z_test`, two quasi orders | It adds the two variances; `diffTest` uses the variance of their difference, as both are fitted to the same learners                                       |
+| `pks::blim`, above 16 items      | It renormalizes the probabilities of the patterns that occur before the log-likelihood; `kst` does not                                                     |
+| `pks::jacobian`                  | It has a column for each rate, fixed or not, and takes the parameters from its arguments; `identifiability` drops fixed rates and takes the model's        |
+
 ## References
 
 - Cosyn, E., & Uzun, H. B. (2009). Note on two necessary and sufficient axioms for a well-graded knowledge space.
@@ -216,6 +415,8 @@ space.
 - Falmagne, J.-C., & Doignon, J.-P. (1988). A class of stochastic procedures for the assessment of knowledge. British
   Journal of Mathematical and Statistical Psychology, 41(1), 1-23.
 - Falmagne, J.-C., & Doignon, J.-P. (2011). Learning Spaces. Springer.
+- Heller, J. (2017). Identifiability in probabilistic knowledge structures. Journal of Mathematical Psychology, 77,
+  46-57.
 - Heller, J., & Wickelmaier, F. (2013). Minimum discrepancy estimation in probabilistic knowledge structures.
   Electronic Notes in Discrete Mathematics, 42, 49-56.
 - Sargin, A., & Ünlü, A. (2009). Inductive item tree analysis: Corrections, improvements, and comparisons.

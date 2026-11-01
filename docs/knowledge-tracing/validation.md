@@ -263,6 +263,43 @@ pair of a conflicting two goes. DAKS checks the pairs in the order of the items 
 are checked against the pairs still in; `iita` does the same and reproduces DAKS's selection sets on `pisa` and 40 more
 simulated data sets. DAKS also leaves out quasi-orders without implications.
 
+`validation/knowledge-tracing/kst-diagnostics.R` runs pks, kst and DAKS for the constraints and diagnostics, with
+`set.seed(20261029)`:
+
+| Quantity                                                            | Reference                                                                                                                                                     | Tolerance                                                               |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| BLIM with fixed rates, equal rates and both, by ML, MD and MDML     | `pks::blim(betafix, etafix, betaequal, etaequal, method, tol = 1e-13)` on `DoignonFalmagne7` and `chess` `dst1`: 12 cases                                     | π, guess, slip: 1e-6 by ML and MDML, 1e-12 by MD                        |
+| Log-likelihood, G², its degrees of freedom and p-value, discrepancy | `loglik`, `goodness.of.fit` and `discrepancy` of the same fits                                                                                                | 1e-8 by ML, 1e-10 by MD, 1e-4 by MDML; degrees exact; discrepancy 1e-12 |
+| Comparing fits                                                      | `anova(blim1, blim2)` for equal rates against free rates, on both data sets                                                                                   | G² and p-value 1e-8, degrees exact                                      |
+| Recovery of one slip and one guess                                  | 20 seeded sets of 400 learners on a chain of 6 items, slip 0.1 and guess 0.05, fitted by `blim` with `betaequal` and `etaequal`                               | 1e-6 against pks; means within 0.01 of the truth                        |
+| Local identifiability                                               | `qr(pks::jacobian(...)[, free])$rank` at random parameters, without the columns of fixed rates: 7 structures, `chess` included                                | Exact                                                                   |
+| Forward and backward gradedness                                     | `pks::is.forward.graded`, `is.backward.graded` on 4 example structures and 12 random families                                                                 | Exact                                                                   |
+| Validity of a structure                                             | `kst::kvalidate` with `gamma`, `VC`, `percent` and `DI` on 6 structures; `DA` by `kvalidate` up to 8 items, and in base R, checked against it, for the others | Counts exact; the rest 1e-12                                            |
+| Test of a quasi order: estimate, z, p-value of each tail, interval  | The delta method in base R, 32 cases: 4 data sets, both versions, one quasi order or two, 2 means; the estimate is also `DAKS::z_test`'s `diff_value`         | Estimate 1e-12 relative to DAKS; the rest 1e-6 relative                 |
+
+The estimates of the constrained fits differ from pks's by at most 1.4e-7 by ML, 9.8e-8 by MDML and 1.4e-17 by MD. An MDML
+fit maximizes the likelihood of the states of least discrepancy only, so the log-likelihood of the whole model at its
+estimates changes at first order with them: it differs from pks's by 1.0e-5, against 2.5e-11 by ML. The recovery means
+are 0.1004 and 0.0495. Gamma, the violational coefficient and the counts of validity equal those of kvalidate; the discrepancy
+index and the distance agreement differ by 1.1e-16. The test of a quasi order differs from the delta method by 4.1e-15 in
+the estimate, 6.0e-11 in z and 1.2e-8 in the p-value.
+
+**pks, above 16 items.** For more than 16 items, `blim` renormalizes the probabilities of the patterns that occur before it computes the
+log-likelihood and G²; `kst` computes them from the whole model. The degrees of freedom are pks's in both cases. For an
+MDML fit pks stops when its parameters change by at most `tol`; `kst` when the log-likelihood of the restricted model does.
+
+**DAKS's `z_test`.** It reports the estimate `diff / n²`, which `diffTest` reproduces. Its variance, from `DAKS:::variance`, is
+not the delta-method variance of that estimate: on the 16 comparisons of the fixture it is between 0.39 and 7.3 times the
+variance by central differences of the estimate over the probabilities of the patterns, which `diffTest` matches. Four
+lines of `variance` account for it: the sums `tmp1` and `tmp2` of the derivative of the error rate are set once and not for
+each pattern; the corrected error rate divides by the number of items where the number of learners belongs; the gradient
+of a pair that is related in neither direction leaves out the patterns that solve the first item and fail the second; and the
+derivative of the corrected error rate adds a term that is subtracted. With those four lines changed, which the script does
+to a copy and checks, the variance equals the delta-method one to 1.2e-10 relative on the 8 comparisons of one quasi order.
+`z_test` also adds the variances of two quasi orders, which are fitted to the same learners, where `diffTest` takes the
+variance of their difference, and it returns the probability of a smaller statistic for `"greater"` and of a larger one
+for `"less"`, the reverse of R's convention, which `diffTest` follows.
+
 ## Mastery criteria
 
 No package has mastery criteria over a log, so `validation/knowledge-tracing/practice.R` replays each in base R on a seeded
@@ -386,6 +423,11 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `kst-blim.json`                 | `DoignonFalmagne7`: 1000 learners, 5 items, 9 states; `chess`: 92 learners, 16 items, 57 states                                                     | Rates at the bound, states of probability 0                                                 |
 | `kst-iita.json`                 | DAKS's `pisa`: 340 learners, 5 items; 3 sets of 300 learners and 7 items from `simu`                                                                | Every version, selection sets with conflicting pairs                                        |
 | `kst-assessment.json`           | Every state of `DoignonFalmagne7` as the true one, answers drawn with pks's ML estimates                                                            | Stopping at 0.8, questions asked again                                                      |
+| `kst-blim-constraints.json`     | `DoignonFalmagne7` and `chess` `dst1` with fixed and equal rates by ML, MD and MDML, 2 comparisons; 20 seeded sets of a chain of 6 items            | Rates fixed at 0, groups of rates, a fit with no degrees of freedom to spare                |
+| `kst-identifiability.json`      | 7 structures at random parameters, with and without fixed rates                                                                                     | A single rate fixed at each end, structures with every subset                               |
+| `kst-graded.json`               | 4 example structures and 12 random families of states                                                                                               | Elements at which a structure is graded in neither or both directions                       |
+| `kst-validity.json`             | `DoignonFalmagne7`, `chess` with 2 structures, a simulated quasi order, a chain the data do not follow, all subsets                                 | No ordered pair, perfect fit                                                                |
+| `kst-diff-test.json`            | `pisa` and 3 sets of 300 learners and 7 items from `simu`: both versions, one quasi order or two, 2 means                                           | Quasi orders that differ in direction, a mean other than 0                                  |
 
 ## Tolerances
 
@@ -423,6 +465,11 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | BLIM log-likelihood by ML                                            | 1e-8 absolute                  | 2.8e-11                        |
 | BLIM by MD, the assessment's posteriors                              | 1e-12 absolute                 | 4.5e-13                        |
 | IITA `diff` and error rate                                           | 1e-10 relative, 1e-12 absolute | 1.7e-15, 6.9e-17               |
+| Constrained BLIM by ML and MDML against pks                          | 1e-6 absolute                  | 1.4e-7                         |
+| Constrained BLIM by MD                                               | 1e-12 absolute                 | 1.4e-17                        |
+| Log-likelihood and G² of a constrained fit: ML, MD, MDML             | 1e-8, 1e-10, 1e-4 absolute     | 5.2e-11, 3.2e-12, 2.1e-5       |
+| Validity of a structure                                              | 1e-12 absolute                 | 1.1e-16                        |
+| Test of a quasi order against the delta method                       | 1e-6 relative                  | 1.2e-8                         |
 
 glm stops when the deviance changes by less than 1e-14 relative, the Newton steps of the logistic models when
 no gradient component exceeds 1e-10. The logistic fits' tolerances allow for the references' stopping rules, with

@@ -1,6 +1,16 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
-import { clauseStructure, eventLog, iita, kst, structureBase, surmiseStructure, unionClosure } from "../src/index.js";
+import {
+  clauseStructure,
+  diffTest,
+  eventLog,
+  iita,
+  kst,
+  structureBase,
+  structureValidity,
+  surmiseStructure,
+  unionClosure,
+} from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-kst.json" with { type: "json" };
 import structureFixture from "./fixtures/bench-kst-structure.json" with { type: "json" };
@@ -25,6 +35,29 @@ const structure = surmiseStructure(
 test("fits the basic local independence model of a chain of 12 items", async (context) => {
   const model = kst({ structure, over: "items" });
   await benchmark(context, "kst.blim", () => model.fit(log), SLOW_OPTIONS);
+});
+
+test("fits the basic local independence model of a chain of 12 items by minimum discrepancy maximum likelihood", async (context) => {
+  const model = kst({ structure, over: "items", method: "mdml" });
+  await benchmark(context, "kst.mdml", () => model.fit(log), SLOW_OPTIONS);
+});
+
+test("finds the local identifiability of the model of a chain of 12 items and 13 states", async (context) => {
+  const model = kst({ structure, over: "items" });
+  await benchmark(context, "kst.identifiability", () => model.identifiability());
+});
+
+test("measures the validity of a chain of 12 items against the responses of 1,000 persons", async (context) => {
+  await benchmark(context, "kst.validity", () => structureValidity(structure, log));
+});
+
+/** The first 6 items of the same persons: DAKS's variance sums over all 2 ^ items patterns, so its test is sized there. */
+const testItems = fixture.itemIds.slice(0, 6);
+const testLog = eventLog(log.filter((event) => testItems.includes(event.item)));
+const testPrerequisites = Object.fromEntries(testItems.map((id, i) => [id, i === 0 ? [] : [testItems[i - 1] ?? ""]]));
+
+test("tests the fit of a quasi order of 6 items to the responses of 1,000 persons", async (context) => {
+  await benchmark(context, "kst.diffTest", () => diffTest(testLog, testPrerequisites));
 });
 
 test("runs the inductive item tree analysis of the responses of 1,000 persons to 12 items", async (context) => {

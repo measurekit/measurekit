@@ -9,6 +9,7 @@ import { outcomeLogLikelihood } from "../src/math/logistic.js";
 import { logisticRegression } from "../src/math/logistic-regression.js";
 import { permutation } from "../src/math/permutation.js";
 import { quinticDerivative, quinticHermite, quinticMaximum } from "../src/math/quintic.js";
+import { rank } from "../src/math/rank.js";
 import type { SparseMatrix } from "../src/math/sparse-matrix.js";
 import hiddenMarkov from "./fixtures/math-forward-backward.json" with { type: "json" };
 import functions from "./fixtures/math-functions.json" with { type: "json" };
@@ -311,6 +312,48 @@ describe("quintic Hermite interpolation", () => {
           expect(Math.abs(quinticDerivative(c, quinticMaximum(c)))).toBeLessThan(1e-12);
         },
       ),
+    );
+  });
+});
+
+describe("rank", () => {
+  const columns = (...values: number[][]): Float64Array[] => values.map((column) => Float64Array.from(column));
+
+  it("counts the columns that the earlier ones do not span", () => {
+    expect(rank(columns([1, 0, 0], [0, 1, 0], [0, 0, 1]))).toBe(3);
+    expect(rank(columns([1, 2, 3], [2, 4, 6], [0, 1, 0]))).toBe(2);
+    expect(rank(columns([1, 2], [3, 4], [5, 6]))).toBe(2);
+    expect(rank([])).toBe(0);
+  });
+
+  it("gives a column of 0 no rank, and a column of a different scale its own tolerance", () => {
+    expect(rank(columns([0, 0, 0], [1, 1, 0]))).toBe(1);
+    expect(rank(columns([1e-12, 0], [0, 1e12]))).toBe(2);
+  });
+
+  it("calls a column dependent when under 1e-7 of its norm is left, as the tolerance of R's qr", () => {
+    expect(rank(columns([1, 0], [1, 1e-9]))).toBe(1);
+    expect(rank(columns([1, 0], [1, 1e-6]))).toBe(2);
+  });
+
+  it("finds the same rank in any order of the columns", () => {
+    const independent = fc.uniqueArray(fc.nat({ max: 5 }), { minLength: 1, maxLength: 6 });
+    const weights = fc.array(fc.array(fc.integer({ min: -3, max: 3 }), { minLength: 6, maxLength: 6 }), {
+      maxLength: 6,
+    });
+    fc.assert(
+      fc.property(independent, weights, fc.integer(), (chosen, mixes, seed) => {
+        const unit = (at: number) => Array.from({ length: 6 }, (_, i) => (i === at ? 1 : 0));
+        const mixed = mixes.map((mix) =>
+          chosen
+            .map((at, k) => unit(at).map((value) => value * (mix[k] ?? 0)))
+            .reduce((sum, column) => sum.map((value, i) => value + (column[i] ?? 0)), new Array<number>(6).fill(0)),
+        );
+        const all = [...chosen.map(unit), ...mixed];
+        expect(rank(columns(...all))).toBe(chosen.length);
+        const shuffled = Array.from(permutation(all.length, createRandom(seed)), (at) => defined(all[at]));
+        expect(rank(columns(...shuffled))).toBe(chosen.length);
+      }),
     );
   });
 });

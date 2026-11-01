@@ -1,6 +1,7 @@
 import { checkChoice, checkOptions, DataError } from "@measurekit/core";
-import { isObserved } from "../data/event.js";
-import { checkLog, type EventLog } from "../data/event-log.js";
+import type { EventLog } from "../data/event-log.js";
+import { counterexamples, responsePatterns } from "./patterns.js";
+import type { Prerequisites } from "./surmise.js";
 
 /**
  * The fit measure of inductive item tree analysis.
@@ -27,7 +28,7 @@ export interface IitaOptions {
 /** A quasi-order of the selection set, with its fit. */
 export interface IitaCandidate {
   /** Each item's prerequisites, by item: the items every learner who masters it is expected to master. */
-  readonly prerequisites: Readonly<Record<string, readonly string[]>>;
+  readonly prerequisites: Prerequisites;
   /** The fit measure: the mean squared difference of observed and expected counterexamples. */
   readonly diff: number;
   /** The error rate γ the expected counterexamples use. */
@@ -56,74 +57,41 @@ export function iita(log: EventLog, options: IitaOptions = {}): IitaResult {
   checkOptions(options);
   const { version = DEFAULT_VERSION } = options;
   checkChoice(version, "The IITA version", ["minimized", "corrected", "original"]);
-  const { items, patterns } = responsePatterns(log);
-  const n = patterns.length;
-  const p = items.map((item, i) => {
-    const share = patterns.reduce((sum, pattern) => sum + (pattern[i] ?? 0), 0) / n;
-    if (share === 0) throw new DataError(`Item "${item}" is solved by no learner, so IITA cannot weigh it.`);
-    return share;
-  });
-  const data: Counterexamples = { b: counterexamples(patterns, items.length), p, m: items.length, n };
+  const { items, patterns } = responsePatterns(log, "IITA");
+  if (items.length < 2) throw new DataError("IITA needs at least 2 items.");
+  const data = counterexampleData(items, patterns);
   const candidates = selectionSet(data.b, data.m).map((relation) => ({
     prerequisites: prerequisitesOf(relation, items),
-    ...fit(relation, data, version),
+    ...fitRelation(relation, data, version),
   }));
   const best = candidates.reduce((x, y) => (y.diff < x.diff ? y : x));
   return { ...best, candidates };
 }
 
 /** The counterexamples b and solution rates p of m items answered by n learners. */
-interface Counterexamples {
+export interface Counterexamples {
   readonly b: Float64Array;
   readonly p: readonly number[];
   readonly m: number;
   readonly n: number;
 }
 
-/** Returns b: at i × m + j, the number of learners who fail item i but solve item j. */
-function counterexamples(patterns: readonly (readonly number[])[], m: number): Float64Array {
-  const b = new Float64Array(m * m);
-  for (const pattern of patterns) {
-    pattern.forEach((outcome, i) => {
-      if (outcome === 1) return;
-      pattern.forEach((other, j) => {
-        if (other === 1) b[i * m + j] = (b[i * m + j] ?? 0) + 1;
-      });
-    });
-  }
-  return b;
-}
-
-/** Returns the items in order of their first event and each learner's first outcome at each, checking completeness. */
-function responsePatterns(log: EventLog): { items: string[]; patterns: number[][] } {
-  checkLog(log);
-  // A lesson has no response pattern, and an item met only through events without an outcome is not one either.
-  const observed = log.filter(isObserved);
-  const items = [...new Set(observed.map((event) => event.item))];
-  if (items.length < 2) throw new DataError("IITA needs at least 2 items.");
-  const itemIndex = new Map(items.map((item, i) => [item, i]));
-  const patterns = new Map<string, number[]>();
-  for (const event of observed) {
-    const pattern = patterns.get(event.learner) ?? new Array<number>(items.length).fill(-1);
-    patterns.set(event.learner, pattern);
-    const i = itemIndex.get(event.item) ?? 0;
-    if (pattern[i] !== -1) continue;
-    if (event.outcome !== 0 && event.outcome !== 1) {
-      throw new DataError(
-        `IITA needs outcomes 0 or 1; learner "${event.learner}" has ${event.outcome} at "${event.item}".`,
-      );
-    }
-    pattern[i] = event.outcome;
-  }
-  for (const [learner, pattern] of patterns) {
-    const missing = pattern.indexOf(-1);
-    if (missing !== -1) {
-      throw new DataError(
-        `IITA needs every learner to answer every item; "${learner}" has no answer to "${items[missing]}".`,
-      );
-    }
-  }
-  return { items, patterns: [...patterns.values()] };
+/**
+ * Returns the counterexamples and solution rates of the response patterns of `items`.
+ *
+ * @throws `DataError` when an item is solved by no learner.
+ */
+export function counterexampleData(
+  items: readonly string[],
+  patterns: readonly (readonly number[])[],
+): Counterexamples {
+  const n = patterns.length;
+  const p = items.map((item, i) => {
+    const share = patterns.reduce((sum, pattern) => sum + (pattern[i] ?? 0), 0) / n;
+    if (share === 0) throw new DataError(`Item "${item}" is solved by no learner, so IITA cannot weigh it.`);
+    return share;
+  });
+  return { b: counterexamples(patterns, items.length), p, m: items.length, n };
 }
 
 /**
@@ -185,7 +153,11 @@ function intransitive(relation: Uint8Array, m: number, i: number, j: number): bo
 }
 
 /** Returns diff and γ of a relation for a version of IITA. */
-function fit(relation: Uint8Array, data: Counterexamples, version: IitaVersion): { diff: number; errorRate: number } {
+export function fitRelation(
+  relation: Uint8Array,
+  data: Counterexamples,
+  version: IitaVersion,
+): { diff: number; errorRate: number } {
   const { b, m } = data;
   const gamma = version === "minimized" ? minimizingRate(relation, data) : meanRate(relation, data);
   let sum = 0;

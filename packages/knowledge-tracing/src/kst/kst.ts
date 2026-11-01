@@ -14,8 +14,27 @@ import { entry, parametersOf } from "../data/record.js";
 import { replay, type Steps } from "../data/replay.js";
 import { indexOfMax } from "../math/extremes.js";
 import type { LearnerModel, ModelFit } from "../model.js";
-import { type Blim, type Group, maximumLikelihood, minimumDiscrepancy, type Row } from "./estimation.js";
-import { checkParameters, type KstItem, type KstParameters } from "./parameters.js";
+import {
+  checkRestrictions,
+  constraintsOf,
+  type EqualRates,
+  type FixedRates,
+  type Restrictions,
+} from "./constraints.js";
+import {
+  type Blim,
+  type BlimFit,
+  type Constraints,
+  type Group,
+  maximumLikelihood,
+  meanDiscrepancy,
+  minimumDiscrepancy,
+  minimumDiscrepancyMaximumLikelihood,
+  type Row,
+} from "./estimation.js";
+import { type GoodnessOfFit, goodnessOfFit, parameterCount } from "./goodness.js";
+import { type Identifiability, localIdentifiability } from "./identifiability.js";
+import { checkParameters, type KstItem, type KstParameters, START_RATE } from "./parameters.js";
 import { checkState, type KstState } from "./state.js";
 import { type CompiledStructure, compile, elementsOf, holds, type KnowledgeStructure } from "./structure.js";
 
@@ -31,11 +50,12 @@ export interface KstOptions {
    */
   readonly over?: "skills" | "items";
   /**
-   * `"ml"`, maximum likelihood by EM, or `"md"`, minimum discrepancy in one pass.
+   * `"ml"`, maximum likelihood by EM; `"md"`, minimum discrepancy in one pass; or `"mdml"`, maximum likelihood subject
+   * to minimum discrepancy: EM in which each learner is spread over the states of least discrepancy only.
    *
    * @defaultValue `"ml"`
    */
-  readonly method?: "ml" | "md";
+  readonly method?: "ml" | "md" | "mdml";
   /**
    * The change of the log-likelihood at which EM stops.
    *
@@ -54,6 +74,20 @@ export interface KstOptions {
    * @defaultValue none: the states have equal probabilities
    */
   readonly parameters?: KstParameters;
+  /**
+   * Rates that `fit` holds at the given values, by item: `{ guess: { q1: 0 }, slip: { q2: 0.1 } }`. A fixed rate may be 0
+   * or 1, which an estimated one may not.
+   *
+   * @defaultValue none: every rate is estimated
+   */
+  readonly fixed?: FixedRates;
+  /**
+   * Groups of items that `fit` gives one rate: `{ slip: [["q1", "q2"]] }` estimates one slip for both. An item is in one
+   * group of a kind, and not in one with a fixed rate of that kind.
+   *
+   * @defaultValue none: every rate is estimated apart
+   */
+  readonly equal?: EqualRates;
 }
 
 /** A knowledge state with its probability. */
@@ -83,7 +117,8 @@ export interface KstModel extends LearnerModel<KstState, KstParameters> {
    * `aic` and `bic` count the events with one.
    *
    * @throws `DataError` when the log is malformed or has no event with an outcome, an event's item or skills are
-   * outside the structure, or the outcomes have probability 0 under the parameters.
+   * outside the structure, `fixed` or `equal` names an item with no event with an outcome, or the outcomes have
+   * probability 0 under the parameters.
    */
   fit(log: EventLog): KstFit;
   /**
@@ -110,16 +145,37 @@ export interface KstModel extends LearnerModel<KstState, KstParameters> {
    * @see {@link https://doi.org/10.1111/j.2044-8317.1988.tb00884.x | Falmagne and Doignon (1988)}
    */
   nextQuestion(state: KstState, candidates: readonly Attempt[], options?: NextQuestionOptions): Attempt | null;
+  /**
+   * Returns the local identifiability of the model at its parameters: the rank of the Jacobian of the probabilities of
+   * the patterns of responses, against the number of parameters that are free.
+   *
+   * @remarks
+   * A rank below the parameters means that some change of them leaves every pattern's probability as it was, so the
+   * data cannot tell them apart. The model must be over items, as the patterns are over the elements of the structure;
+   * an item without parameters is at guess and slip 0.1. The Jacobian has 2 ^ items rows and a column for each free
+   * parameter, and at most 10 million cells (80 MB) in all.
+   *
+   * @throws `DataError` when the model is over skills, has equal rates, which no reference covers, or fixes the rate of
+   * an item outside the structure, or the Jacobian would have more than 10 million cells.
+   * @see {@link https://doi.org/10.1016/j.jmp.2016.07.008 | Heller (2017)}
+   * @see {@link https://doi.org/10.3758/s13428-012-0187-z | Stefanutti et al. (2012)}
+   */
+  identifiability(): Identifiability;
 }
 
 /** The outcome of fitting a KST model. */
 export interface KstFit extends ModelFit<KstState, KstParameters> {
   /** The model with the estimated parameters. */
   readonly model: KstModel;
+  /**
+   * G² against the model that gives each response pattern its own probability, with pks's degrees of freedom; `null`
+   * unless every learner answered every item once with 0 or 1.
+   */
+  readonly goodnessOfFit: GoodnessOfFit | null;
+  /** The mean number of items by which a learner's answers differ from the nearest state; `null` where `goodnessOfFit` is. */
+  readonly discrepancy: number | null;
 }
 
-/** The starting guess and slip of an item without parameters, as pks's `blim`. */
-const START_RATE = 0.1;
 const DEFAULT_OVER = "skills";
 const DEFAULT_METHOD = "ml";
 const DEFAULT_TOLERANCE = 1e-8;
@@ -189,48 +245,7 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
 
   const model: KstModel = {
     parameters,
-    fit(log) {
-      checkLog(log);
-      checkObservedEvents(log, "a KST model");
-      const observed = log.filter(isObserved);
-      const items = [...new Set(observed.map((event) => event.item))];
-      const design = groupsOf(observed, items, maskOf);
-      const start: Blim = {
-        probabilities: Float64Array.from(parameters.probabilities),
-        guess: Float64Array.from(items, (id) => entry(parameters.items, id)?.guess ?? START_RATE),
-        slip: Float64Array.from(items, (id) => entry(parameters.items, id)?.slip ?? START_RATE),
-      };
-      const result =
-        settings.method === "ml" ? maximumLikelihood(design, start, settings) : minimumDiscrepancy(design, start);
-      const fitted = create({
-        ...options,
-        parameters: {
-          probabilities: [...result.parameters.probabilities],
-          items: {
-            ...parameters.items,
-            ...Object.fromEntries(
-              items.map((id, i) => [
-                id,
-                { guess: result.parameters.guess[i] ?? 0, slip: result.parameters.slip[i] ?? 0 },
-              ]),
-            ),
-          },
-        },
-      });
-      const { states, predictions } = replay(log, fitted.steps);
-      const k = compiled.count - 1 + 2 * items.length;
-      const ml = settings.method === "ml";
-      return {
-        model: fitted.model,
-        states,
-        predictions,
-        logLikelihood: result.logLikelihood,
-        aic: ml ? 2 * k - 2 * result.logLikelihood : null,
-        bic: ml ? k * Math.log(observed.length) - 2 * result.logLikelihood : null,
-        converged: result.converged,
-        iterations: result.iterations,
-      };
-    },
+    fit: (log) => fitLog({ options, settings, compiled, parameters, maskOf }, log),
     initialState(learner) {
       checkLearnerId(learner);
       return steps.initialState(learner);
@@ -256,6 +271,14 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
       const best = indexOfMax(state.probabilities);
       return { state: elementsOf(compiled, best), probability: state.probabilities[best] ?? 0 };
     },
+    identifiability() {
+      if (settings.over !== "items") {
+        throw new DataError(
+          'The local identifiability of a model needs responses to the elements of the structure: create the model with over: "items".',
+        );
+      }
+      return localIdentifiability(compiled, parameters, settings.restrictions);
+    },
     nextQuestion(state, candidates, questionOptions = {}) {
       checkOptions(questionOptions);
       const { threshold = DEFAULT_THRESHOLD } = questionOptions;
@@ -276,6 +299,79 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
     },
   };
   return { model, steps };
+}
+
+/** What a fit needs of the model it is made from. */
+interface FitContext {
+  readonly options: KstOptions;
+  readonly settings: Settings;
+  readonly compiled: CompiledStructure;
+  readonly parameters: KstParameters;
+  readonly maskOf: (attempt: Attempt) => Uint8Array;
+}
+
+/** Fits the BLIM of a model to a log, and replays the log through the model with the estimates. */
+function fitLog({ options, settings, compiled, parameters, maskOf }: FitContext, log: EventLog): KstFit {
+  checkLog(log);
+  checkObservedEvents(log, "a KST model");
+  const observed = log.filter(isObserved);
+  const items = [...new Set(observed.map((event) => event.item))];
+  const design = groupsOf(observed, items, maskOf);
+  const start: Blim = {
+    probabilities: Float64Array.from(parameters.probabilities),
+    guess: Float64Array.from(items, (id) => entry(parameters.items, id)?.guess ?? START_RATE),
+    slip: Float64Array.from(items, (id) => entry(parameters.items, id)?.slip ?? START_RATE),
+  };
+  const constraints = constraintsOf(settings.restrictions, items, start, "has no event with an outcome in the log");
+  const result = estimate(design, start, constraints, settings);
+  const fitted = create({
+    ...options,
+    parameters: {
+      probabilities: [...result.parameters.probabilities],
+      items: {
+        ...parameters.items,
+        ...Object.fromEntries(
+          items.map((id, i) => [id, { guess: result.parameters.guess[i] ?? 0, slip: result.parameters.slip[i] ?? 0 }]),
+        ),
+      },
+    },
+  });
+  const { states, predictions } = replay(log, fitted.steps);
+  const k = parameterCount(compiled.count, constraints);
+  const ml = settings.method === "ml";
+  const complete = answeredOnce(observed, items.length);
+  return {
+    model: fitted.model,
+    states,
+    predictions,
+    logLikelihood: result.logLikelihood,
+    aic: ml ? 2 * k - 2 * result.logLikelihood : null,
+    bic: ml ? k * Math.log(observed.length) - 2 * result.logLikelihood : null,
+    converged: result.converged,
+    iterations: result.iterations,
+    goodnessOfFit: complete ? goodnessOfFit(design, result.logLikelihood, k, items.length) : null,
+    discrepancy: complete ? meanDiscrepancy(design, result.parameters, constraints) : null,
+  };
+}
+
+/** Fits the BLIM by the method of the settings. */
+function estimate(groups: readonly Group[], start: Blim, constraints: Constraints, settings: Settings): BlimFit {
+  if (settings.method === "md") return minimumDiscrepancy(groups, start, constraints);
+  return settings.method === "ml"
+    ? maximumLikelihood(groups, start, constraints, settings)
+    : minimumDiscrepancyMaximumLikelihood(groups, start, constraints, settings);
+}
+
+/** Returns whether every learner answered every item once, with 0 or 1: the response patterns of a complete table. */
+function answeredOnce(observed: readonly ObservedEvent[], itemCount: number): boolean {
+  const answered = new Map<string, Set<string>>();
+  for (const { learner, item, outcome } of observed) {
+    if (outcome !== 0 && outcome !== 1) return false;
+    const items = answered.get(learner) ?? new Set<string>();
+    if (items.has(item)) return false;
+    answered.set(learner, items.add(item));
+  }
+  return [...answered.values()].every((items) => items.size === itemCount);
 }
 
 /**
@@ -350,9 +446,10 @@ function sumOver(probabilities: readonly number[], mask: Uint8Array): number {
 
 interface Settings {
   readonly over: "skills" | "items";
-  readonly method: "ml" | "md";
+  readonly method: "ml" | "md" | "mdml";
   readonly tolerance: number;
   readonly maxIterations: number;
+  readonly restrictions: Restrictions;
 }
 
 function settingsOf(options: KstOptions): Settings {
@@ -362,9 +459,11 @@ function settingsOf(options: KstOptions): Settings {
     method = DEFAULT_METHOD,
     tolerance = DEFAULT_TOLERANCE,
     maxIterations = DEFAULT_MAX_ITERATIONS,
+    fixed = {},
+    equal = {},
   } = options;
   checkChoice(over, "The option over", ["skills", "items"]);
-  checkChoice(method, "The option method", ["ml", "md"]);
+  checkChoice(method, "The option method", ["ml", "md", "mdml"]);
   checkStopping(tolerance, maxIterations);
-  return { over, method, tolerance, maxIterations };
+  return { over, method, tolerance, maxIterations, restrictions: checkRestrictions(fixed, equal) };
 }
