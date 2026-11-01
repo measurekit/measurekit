@@ -22,10 +22,13 @@ import { type DifAnalysis, type PurificationOptions, purified, significant } fro
 const MINIMUM_ANCHORS = 2;
 
 /**
- * Options of {@link lordChiSquare}: the calibration of each group, without fixed items, groups, distributions of theta
- * or the choice of standard errors, which the statistic needs, and `purify`.
+ * Options of {@link lordChiSquare}: the calibration of each group, without fixed items, groups, distributions of theta,
+ * covariates or the choice of standard errors, which the statistic needs, and `purify`.
  */
-export type LordOptions = Omit<CalibrationOptions<LogisticItem>, "fixed" | "groups" | "latent" | "standardErrors"> &
+export type LordOptions = Omit<
+  CalibrationOptions<LogisticItem>,
+  "fixed" | "groups" | "latent" | "covariates" | "standardErrors"
+> &
   PurificationOptions;
 
 /** Lord's chi-square of one item. */

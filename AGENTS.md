@@ -111,7 +111,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/ctt/              classical test theory
   src/change/           gain scores, the reliability of a difference, reliable change
   src/dimensionality/   polychoric correlations and parallel analysis
-  src/irt/              item response theory: models, calibration, ability estimation, information, reliability
+  src/irt/              item response theory: models, calibration with a latent regression, ability estimation,
+                        information, reliability
   src/multidimensional/ multidimensional item response theory: models, EM and MH-RM calibration, rotation, scoring, information
   src/sim/              simulation of thetas, item parameters and responses, multidimensional ones included
   src/cat/              adaptive and multistage tests, testlets, their simulation, exposure control, form assembly

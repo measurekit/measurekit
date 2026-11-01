@@ -22,9 +22,10 @@ export interface ExpectationItem {
 /** The E-step of Bock-Aitkin EM. */
 export interface ExpectationStep {
   /**
-   * Evaluates every person's posterior over the quadrature nodes, under the weights of the person's group and the
-   * items' current parameters; writes the items' expected counts and each group's expected number of persons at each
-   * node; and returns the marginal log-likelihood: the sum over persons of log Σ_q w_q Π_i P_i(x_i | θ_q).
+   * Evaluates every person's posterior over the quadrature nodes, under the weights of the person's group, or with a
+   * regression of the person's covariates, and the items' current parameters; writes the items' expected counts and
+   * each group's, or each covariate pattern's, expected number of persons at each node; and returns the marginal
+   * log-likelihood: the sum over persons of log Σ_q w_q Π_i P_i(x_i | θ_q).
    */
   run(): number;
   /**
@@ -54,7 +55,7 @@ export function expectationStep(
   data: CompressedResponses,
   items: readonly ExpectationItem[],
   nodes: Float64Array,
-  { groups, groupOf }: Population,
+  { groups, groupOf, regression }: Population,
   design: TestletDesign | null = null,
   logTerms: Float64Array | null = null,
 ): ExpectationStep {
@@ -92,9 +93,19 @@ export function expectationStep(
     for (let q = 0; q < nodeCount; q++) posterior[q] = (posterior[q] ?? 0) + (logTerms[first + q] ?? 0);
   };
 
-  /** Writes a person's log joint densities over the nodes into `posterior`, from the weights of the person's group. */
+  /** Starts `posterior` from the person's prior: the group's log weights, or the log weights of the covariate pattern. */
+  const startFromPrior = (person: number, logWeights: Float64Array): void => {
+    if (regression === undefined) {
+      posterior.set(logWeights);
+      return;
+    }
+    const first = (regression.patternOf[person] ?? 0) * nodeCount;
+    for (let q = 0; q < nodeCount; q++) posterior[q] = regression.logWeights[first + q] ?? 0;
+  };
+
+  /** Writes a person's log joint densities over the nodes into `posterior`, from the weights of the person's prior. */
   const joint = (person: number, start: number, end: number, logWeights: Float64Array): void => {
-    posterior.set(logWeights);
+    startFromPrior(person, logWeights);
     addTerm(person);
     for (let r = start; r < end; r++) {
       const item = responseItems[r] ?? 0;
@@ -104,8 +115,17 @@ export function expectationStep(
     }
   };
 
-  /** Adds the posterior to the counts of the categories a person answered in and to the group's counts. */
-  const count = (start: number, end: number, groupCounts: Float64Array): void => {
+  /** Adds the posterior to the expected counts of the person's covariate pattern, if there is a regression. */
+  const countPattern = (person: number): void => {
+    if (regression === undefined) return;
+    const first = (regression.patternOf[person] ?? 0) * nodeCount;
+    for (let q = 0; q < nodeCount; q++) {
+      regression.counts[first + q] = (regression.counts[first + q] ?? 0) + (posterior[q] ?? 0);
+    }
+  };
+
+  /** Adds the posterior to the counts of the categories a person answered in and to those of the group or pattern. */
+  const count = (person: number, start: number, end: number, groupCounts: Float64Array): void => {
     for (let r = start; r < end; r++) {
       const item = responseItems[r] ?? 0;
       const counts = itemCounts[item];
@@ -113,6 +133,7 @@ export function expectationStep(
       scatter(counts, codes[r] ?? 0, categories[item] ?? 0, posterior);
     }
     for (let q = 0; q < nodeCount; q++) groupCounts[q] = (groupCounts[q] ?? 0) + (posterior[q] ?? 0);
+    countPattern(person);
   };
 
   /** Calls `visit` with each person who answered an item, the bounds of the person's responses and the group. */
@@ -134,6 +155,7 @@ export function expectationStep(
       tabulate();
       for (const counts of itemCounts) counts.fill(0);
       for (const group of groups) group.counts.fill(0);
+      regression?.counts.fill(0);
       for (const testlet of design?.testlets ?? []) testlet.counts.fill(0);
       reduction?.prepare();
       let logLikelihood = 0;
@@ -143,7 +165,7 @@ export function expectationStep(
         joint(person, start, end, group.logWeights);
         reduction?.integrate(person, start, end, posterior);
         logLikelihood += normalizeLogs(posterior);
-        count(start, end, group.counts);
+        count(person, start, end, group.counts);
         reduction?.count(person, start, end, posterior);
       });
       reduction?.finish();

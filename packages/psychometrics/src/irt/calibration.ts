@@ -21,6 +21,7 @@ import {
   histogramChange,
   histogramParameters,
   maximizeDistributions,
+  regressionEstimate,
 } from "./latent.js";
 import { type Maximization, maximization } from "./m-step.js";
 import type { TestItem } from "./model.js";
@@ -42,8 +43,23 @@ export interface CalibratedItem<TParameters> extends TestItem<TParameters> {
 export interface Calibration<TParameters> {
   /** The items, in item order. */
   readonly items: readonly CalibratedItem<TParameters>[];
-  /** The distribution of theta in each group, in order of first appearance in `groups`; one without groups. */
+  /**
+   * The distribution of theta in each group, in order of first appearance in `groups`; one without groups; none with
+   * `covariates`, whose regression gives each person's own.
+   */
   readonly groups: readonly GroupDistribution[];
+  /**
+   * The regression of theta on the covariates; absent without `covariates`. The coefficients are by covariate name, in
+   * units of the residual standard deviation when it is 1.
+   */
+  readonly regression?: {
+    /** The coefficient of each covariate. */
+    readonly coefficients: Readonly<Record<string, number>>;
+    /** The standard deviation of theta given the covariates: estimated when fixed items fix the scale, else 1. */
+    readonly residualSd: number;
+    /** The standard errors of the coefficients; `null` without standard errors. */
+    readonly standardErrors: Readonly<Record<string, number>> | null;
+  };
   /** The standard deviation of each testlet's effect, in the order of the `testlets` option; none without testlets. */
   readonly testlets: readonly TestletEstimate[];
   /** The marginal log-likelihood at the estimates, without the priors. */
@@ -77,6 +93,7 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * @remarks
  * The distribution is N(0, 1) by default; in groups of persons, each with its own distribution; and normal
  * distributions and histograms estimated with the items, on the scale that fixed items or a standard normal group fix.
+ * With `covariates`, theta follows a normal distribution whose mean is a regression on each person's covariates.
  * With priors, the estimates are posterior modes. Standard errors come from the Hessian of the marginal log-likelihood
  * plus the log priors, by central differences of its exact gradient. Missing responses are skipped; persons without
  * responses change nothing.
@@ -84,8 +101,9 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * @throws `DataError` when the matrix or an option is invalid, there are no responses, a fixed item's parameters are
  * invalid or do not fit its responses, an estimated item lacks responses in a category up to its highest or has more
  * categories than its model allows, estimated items of a model that share parameters, as RSM items share the steps,
- * have different numbers of categories, a group has no person with a response, or distributions are estimated without
- * the rectangular rule or without fixed items or a standard normal group.
+ * have different numbers of categories, a group has no person with a response, distributions are estimated without
+ * the rectangular rule or without fixed items or a standard normal group, or covariates are not a finite number for each
+ * person, come with groups, `latent`, testlets or the standard errors `"cross-product"`, or are collinear.
  *
  * @example
  * ```ts
@@ -171,6 +189,7 @@ export function calibrateWithCovariance<TParameters>(
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, standardErrors = "none" } = options;
   checkStopping(tolerance, maxIterations);
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
+  checkRegressionOptions(options, standardErrors);
   const answered = Array.from(responses.personIds, (_, person) => {
     return (responses.offsets[person + 1] ?? 0) > (responses.offsets[person] ?? 0);
   });
@@ -191,6 +210,7 @@ export function calibrateWithCovariance<TParameters>(
   const standardError = covariance === null ? null : (slot: number) => Math.sqrt(covariance[slot * size + slot] ?? 0);
 
   const parameterCount = size + histogramParameters(latent);
+  const regression = regressionEstimate(latent, values, standardError);
   return {
     calibration: {
       items: items.map((item) => ({
@@ -203,6 +223,7 @@ export function calibrateWithCovariance<TParameters>(
             : Object.fromEntries(item.names.map((name, p) => [name, standardError(item.slots[p] ?? 0)])),
       })),
       groups: groupDistributions(latent, values, nodes, standardError),
+      ...(regression !== undefined && { regression }),
       testlets: design === null ? [] : testletEstimates(design, responses.itemIds, values, standardError),
       logLikelihood,
       aic: -2 * logLikelihood + 2 * parameterCount,
@@ -283,4 +304,21 @@ function covarianceOf<TParameters>(
   if (method === "hessian") return hessianCovariance(setup, mStep, eStep);
   if (method === "cross-product") return crossProductCovariance(setup, eStep, responses, nodes);
   return null;
+}
+
+/**
+ * Checks the options a latent regression cannot be used with.
+ *
+ * @throws `DataError` when covariates come with testlets, whose effect is added to a standard normal theta, or with the
+ * cross-product standard errors, which have no score for the coefficients.
+ */
+function checkRegressionOptions<TParameters>(
+  options: CalibrationOptions<TParameters>,
+  standardErrors: StandardErrorMethod,
+): void {
+  if (options.covariates === undefined) return;
+  if (options.testlets !== undefined) throw new DataError("Covariates cannot be used with testlets.");
+  if (standardErrors === "cross-product") {
+    throw new DataError('Covariates need the standard errors "none" or "hessian".');
+  }
 }

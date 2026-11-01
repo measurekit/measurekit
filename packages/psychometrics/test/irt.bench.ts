@@ -20,6 +20,7 @@ import {
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
+import regressionFixture from "./fixtures/bench-irt-latent-regression.json" with { type: "json" };
 import { defined } from "./helpers.js";
 
 const binary = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
@@ -65,6 +66,13 @@ test("calibrates the two-parameter model of 500 persons and 20 items with standa
   const options = { model: twoParameterLogistic, standardErrors: "hessian" } as const;
   expect(calibrate(pilot, options).converged).toBe(true);
   await benchmark(context, "irt.calibrate2plHessian", () => calibrate(pilot, options), SLOW_OPTIONS);
+});
+
+test("calibrates the two-parameter model of 2,000 persons and 40 items with a latent regression", async (context) => {
+  const regression = responseMatrix(regressionFixture.responses, { itemIds: regressionFixture.itemIds });
+  const options = { model: twoParameterLogistic, covariates: { x: regressionFixture.covariate } } as const;
+  expect(calibrate(regression, options).converged).toBe(true);
+  await benchmark(context, "irt.calibrate2plLatentRegression", () => calibrate(regression, options), SLOW_OPTIONS);
 });
 
 test("calibrates the graded response model of 1,500 persons and 20 items of 5 categories", async (context) => {

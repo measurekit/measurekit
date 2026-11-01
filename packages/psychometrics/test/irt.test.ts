@@ -25,6 +25,7 @@ import {
   marginalReliability,
   maximumLikelihoodEstimate,
   nominalResponse,
+  normalDistribution,
   normalPrior,
   oneParameterLogistic,
   type ParameterCovariance,
@@ -35,6 +36,7 @@ import {
   ratingScale,
   responseMatrix,
   responseRecords,
+  type StandardErrorMethod,
   simulateAdaptiveTest,
   simulateItems,
   simulateResponses,
@@ -57,6 +59,7 @@ import { rectangular } from "../src/math/quadrature.js";
 import covariance from "./fixtures/irt-covariance.json" with { type: "json" };
 import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json" };
 import latent from "./fixtures/irt-latent.json" with { type: "json" };
+import latentRegression from "./fixtures/irt-latent-regression.json" with { type: "json" };
 import lsat7 from "./fixtures/irt-lsat7.json" with { type: "json" };
 import posterior from "./fixtures/irt-posterior.json" with { type: "json" };
 import science from "./fixtures/irt-science.json" with { type: "json" };
@@ -107,6 +110,10 @@ const EM_TOLERANCE = 1e-10;
 const LATENT_PARAMETER_TOLERANCE = 1e-7;
 /** Relative tolerance of their standard errors: numerical Hessians on both sides. */
 const LATENT_STANDARD_ERROR_TOLERANCE = 1e-6;
+/** Items, coefficients and residual variances of a latent regression against mirt's EM, which stops near its TOL. */
+const REGRESSION_TOLERANCE = 1e-3;
+/** The standard error of a coefficient against base R's Hessian of the marginal log-likelihood, relative: mirt's estimates differ in the 5th digit. */
+const REGRESSION_STANDARD_ERROR_TOLERANCE = 1e-3;
 /** A histogram on fixed items against base R's EM with the same steps. */
 const HISTOGRAM_TOLERANCE = 1e-12;
 /** EAP summed-score tables against mirt and the base R recursion with the same nodes. */
@@ -1575,6 +1582,225 @@ describe("distributions of theta", () => {
     const silent = responseMatrix([...rows, [null, null, null, null]]);
     expect(() => calibrate(silent, { ...options, groups: [...labels, "c"] })).toThrow(
       'Group "c" has no person with a response.',
+    );
+  });
+});
+
+describe("latent regression", () => {
+  type Reference = (typeof latentRegression.cases)[number];
+  const covariatesOf = (reference: Reference) => definedEntries(reference.covariates);
+  const calibrateReference = (reference: Reference, standardErrors: StandardErrorMethod = "none") =>
+    calibrate(responseMatrix(reference.responses, { itemIds: reference.itemIds }), {
+      model: reference.model === "1pl" ? oneParameterLogistic : twoParameterLogistic,
+      fixed: definedEntries(reference.fixed),
+      covariates: covariatesOf(reference),
+      tolerance: 1e-8,
+      maxIterations: 5000,
+      standardErrors,
+    });
+
+  for (const reference of latentRegression.cases.filter(({ model }) => model === "2pl")) {
+    it(`matches mirt's items, coefficients and residual variance of ${reference.name}`, () => {
+      const result = calibrateReference(reference);
+      expect(result.converged).toBe(true);
+      reference.mirt.items.forEach((expected, i) => {
+        const actual = defined(result.items[i]).parameters as LogisticItem;
+        expectClose(actual.a, expected.a, REGRESSION_TOLERANCE, `a of item ${i + 1}`);
+        expectClose(actual.b, expected.b, REGRESSION_TOLERANCE, `b of item ${i + 1}`);
+      });
+      const regression = defined(result.regression);
+      for (const [name, expected] of Object.entries(reference.mirt.coefficients)) {
+        expectClose(defined(regression.coefficients[name]), expected, REGRESSION_TOLERANCE, `coefficient of ${name}`);
+      }
+      const fixedItems = Object.keys(reference.fixed).length;
+      expectClose(
+        regression.residualSd ** 2,
+        fixedItems === 0 ? 1 : reference.mirt.residualVariance,
+        REGRESSION_TOLERANCE,
+      );
+      expect(result.groups).toEqual([]);
+    });
+  }
+
+  it("matches mirt's slopes, thresholds and coefficient of the generalized partial credit model", () => {
+    const reference = latentRegression.polytomous;
+    const result = calibrate(responseMatrix(reference.responses, { itemIds: reference.itemIds }), {
+      model: generalizedPartialCredit,
+      covariates: reference.covariates,
+      tolerance: 1e-8,
+      maxIterations: 5000,
+    });
+    expect(result.converged).toBe(true);
+    reference.mirt.items.forEach((expected, i) => {
+      const actual = defined(result.items[i]).parameters as ThresholdItem;
+      expectClose(actual.a, expected.a, REGRESSION_TOLERANCE, `a of item ${i + 1}`);
+      expected.b.forEach((threshold, k) => {
+        expectClose(actual.b[k] ?? null, threshold, REGRESSION_TOLERANCE, `threshold ${k + 1} of item ${i + 1}`);
+      });
+    });
+    const regression = defined(result.regression);
+    expectClose(defined(regression.coefficients.x), defined(reference.mirt.coefficients.x), REGRESSION_TOLERANCE);
+    expect(regression.residualSd).toBe(1);
+  });
+
+  it("matches mirt's and TAM's Rasch model after moving the 1PL, whose slope a is estimated, to the Rasch scale", () => {
+    const reference = defined(latentRegression.cases.find(({ model }) => model === "1pl"));
+    const result = calibrateReference(reference);
+    expect(result.converged).toBe(true);
+    const a = (defined(result.items[0]).parameters as LogisticItem).a;
+    const regression = defined(result.regression);
+    expect(regression.residualSd).toBe(1);
+    const tam = defined(
+      (reference as { tam?: { difficulties: number[]; coefficient: number; residualVariance: number } }).tam,
+    );
+    expectClose(a * defined(regression.coefficients.x), defined(reference.mirt.coefficients.x), REGRESSION_TOLERANCE);
+    expectClose(a * defined(regression.coefficients.x), tam.coefficient, REGRESSION_TOLERANCE);
+    expectClose(a * a, reference.mirt.residualVariance, REGRESSION_TOLERANCE);
+    expectClose(a * a, tam.residualVariance, REGRESSION_TOLERANCE);
+    reference.mirt.items.forEach((expected, i) => {
+      expectClose(a * (defined(result.items[i]).parameters as LogisticItem).b, expected.b, REGRESSION_TOLERANCE);
+    });
+  });
+
+  it("matches the Hessian of the marginal log-likelihood in base R for the standard error of a coefficient", () => {
+    const reference = defined(latentRegression.cases.find(({ name }) => name === "2PL, a binary covariate"));
+    const result = calibrateReference(reference, "hessian");
+    const expected = defined((reference as { hessianStandardErrors?: { group: number } }).hessianStandardErrors).group;
+    const actual = defined(defined(defined(result.regression).standardErrors).group);
+    expectClose(actual, expected, REGRESSION_STANDARD_ERROR_TOLERANCE * expected);
+  });
+
+  it("recovers the coefficient, in units of the residual SD with free slopes and in theta's with fixed items", () => {
+    const random = createRandom(11);
+    const items = simulateItems(twoParameterLogistic, 25, random);
+    const x = simulateThetas(1500, random);
+    const noise = simulateThetas(1500, random, normalDistribution(0, 0.8));
+    const responses = simulateResponses(
+      items,
+      x.map((value, person) => 0.6 * value + (noise[person] ?? 0)),
+      random,
+    );
+    const free = defined(calibrate(responses, { model: twoParameterLogistic, covariates: { x } }).regression);
+    expect(free.residualSd).toBe(1);
+    expectClose(defined(free.coefficients.x), 0.6 / 0.8, 0.07);
+    const fixed = Object.fromEntries(items.slice(0, 8).map((item, j) => [`item${j + 1}`, item.parameters]));
+    const anchored = defined(
+      calibrate(responses, { model: twoParameterLogistic, covariates: { x }, fixed }).regression,
+    );
+    expectClose(defined(anchored.coefficients.x), 0.6, 0.06);
+    expectClose(anchored.residualSd, 0.8, 0.06);
+  });
+
+  it("reports standard errors only when asked, and none of a distribution of theta", () => {
+    const reference = defined(latentRegression.cases[0]);
+    expect(calibrateReference(reference).regression?.standardErrors).toBeNull();
+    const result = calibrateReference(reference, "hessian");
+    expect(Object.keys(defined(result.regression?.standardErrors))).toEqual(Object.keys(reference.covariates));
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    expect(calibrate(matrix, { model: twoParameterLogistic }).regression).toBeUndefined();
+  });
+
+  it("counts the coefficients, and the residual SD when estimated, among the parameters", () => {
+    const [free, anchored] = [defined(latentRegression.cases[0]), defined(latentRegression.cases.at(-1))];
+    const withoutCovariates = calibrate(responseMatrix(free.responses, { itemIds: free.itemIds }), {
+      model: twoParameterLogistic,
+    });
+    const withCovariates = calibrateReference(free);
+    const parameters = (aic: number, logLikelihood: number) => (aic + 2 * logLikelihood) / 2;
+    const base = parameters(withoutCovariates.aic, withoutCovariates.logLikelihood);
+    expect(parameters(withCovariates.aic, withCovariates.logLikelihood)).toBeCloseTo(base + 2, 9);
+    const fixedCount = Object.keys(anchored.fixed).length;
+    const result = calibrateReference(anchored);
+    expect(parameters(result.aic, result.logLikelihood)).toBeCloseTo(base - 2 * fixedCount + 3, 9);
+  });
+
+  it("gives the same estimates in any order of the persons, and for persons without responses whatever their covariates", () => {
+    const reference = defined(latentRegression.cases[0]);
+    const order = reference.responses.map((_, person) => (person * 7 + 3) % reference.responses.length);
+    expect(new Set(order).size).toBe(order.length);
+    const options = { model: twoParameterLogistic, tolerance: 1e-9, maxIterations: 5000 } as const;
+    const original = calibrate(responseMatrix(reference.responses, { itemIds: reference.itemIds }), {
+      ...options,
+      covariates: covariatesOf(reference),
+    });
+    const permuted = calibrate(
+      responseMatrix(
+        order.map((person) => defined(reference.responses[person])),
+        { itemIds: reference.itemIds },
+      ),
+      {
+        ...options,
+        covariates: Object.fromEntries(
+          Object.entries(covariatesOf(reference)).map(([name, values]) => [
+            name,
+            order.map((person) => defined(values[person])),
+          ]),
+        ),
+      },
+    );
+    expectClose(defined(permuted.regression?.coefficients.x), defined(original.regression?.coefficients.x), 1e-7);
+    const silent = [...reference.responses, reference.itemIds.map(() => null)];
+    const withSilent = calibrate(responseMatrix(silent, { itemIds: reference.itemIds }), {
+      ...options,
+      covariates: Object.fromEntries(
+        Object.entries(covariatesOf(reference)).map(([name, values]) => [name, [...values, 1e6]]),
+      ),
+    });
+    expectClose(defined(withSilent.regression?.coefficients.x), defined(original.regression?.coefficients.x), 1e-7);
+  });
+
+  it("rejects covariates that conflict with other options or do not give a number to every person", () => {
+    const reference = defined(latentRegression.cases[0]);
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const covariates = covariatesOf(reference);
+    const x = defined(covariates.x);
+    const persons = reference.responses.length;
+    const options = { model: twoParameterLogistic, covariates } as const;
+    expect(() => calibrate(matrix, { ...options, groups: reference.responses.map(() => "a") })).toThrow(
+      "Covariates need one group: a group is a covariate in a latent regression.",
+    );
+    expect(() => calibrate(matrix, { ...options, latent: "normal" })).toThrow(
+      "Covariates replace the distribution of theta: the option latent must be absent or standard-normal.",
+    );
+    expect(() => calibrate(matrix, { ...options, quadrature: { method: "gauss-hermite" } })).toThrow(
+      "A latent regression needs the rectangular quadrature rule.",
+    );
+    expect(() => calibrate(matrix, { ...options, standardErrors: "cross-product" })).toThrow(
+      'Covariates need the standard errors "none" or "hessian".',
+    );
+    expect(() => calibrate(matrix, { ...options, testlets: { t1: [defined(reference.itemIds[0])] } })).toThrow(
+      "Covariates cannot be used with testlets.",
+    );
+    expect(() => calibrate(matrix, { ...options, covariates: {} })).toThrow(
+      "The option covariates needs at least one covariate.",
+    );
+    expect(() => calibrate(matrix, { ...options, covariates: { x: x.slice(1) } })).toThrow(
+      `Covariate "x" has ${persons - 1} values for ${persons} persons.`,
+    );
+    expect(() =>
+      calibrate(matrix, { ...options, covariates: { x: x.map((v, i) => (i === 4 ? Number.NaN : v)) } }),
+    ).toThrow('Covariate "x" of person 5 must be a finite number, found NaN.');
+    expect(() => calibrate(matrix, { ...options, covariates: { x: x.map(() => 1), y: x.map(() => 1) } })).toThrow(
+      "The covariates of the persons who answered are collinear: leave one of them out.",
+    );
+  });
+
+  it("rejects covariates of other types, as JavaScript or JSON pass them", () => {
+    const reference = defined(latentRegression.cases[0]);
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const options = { model: twoParameterLogistic } as const;
+    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse("null") })).toThrow(
+      "The option covariates must be an object of values by covariate name, found null.",
+    );
+    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse('{ "x": "high" }') })).toThrow(
+      'Covariate "x" must be an array with a value for each person, found "high".',
+    );
+    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse('{ "x": { "0": 1 } }') })).toThrow(
+      'Covariate "x" must be an array with a value for each person, found an object.',
+    );
+    const column = reference.responses.map((_, person) => (person === 2 ? "2" : person % 5));
+    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse(JSON.stringify({ x: column })) })).toThrow(
+      'Covariate "x" of person 3 must be a finite number, found "2".',
     );
   });
 });

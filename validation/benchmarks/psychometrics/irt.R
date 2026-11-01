@@ -138,3 +138,27 @@ bench_task("irt.summedScoreTable", "The posterior mean of the ability given each
 grid <- matrix(seq(-6, 6, length.out = 121))
 bench_task("irt.testInformation", "Information of a test at 121 values of theta", sprintf("%d items", item_count),
            reference("mirt", "testinfo"), function() testinfo(fit_2pl, grid))
+
+# --- Latent regression -----------------------------------------------------------------------------------------------
+# The two-parameter model of 2,000 persons and 40 items whose theta is 0.6 x + e with e ~ N(0, 0.64), x centered. mirt
+# regresses theta on x with covdata and a formula.
+
+set.seed(20261029)
+covariate <- rnorm(persons)
+covariate <- covariate - mean(covariate)
+theta_regression <- 0.6 * covariate + rnorm(persons, 0, 0.8)
+a_regression <- round(runif(item_count, 0.8, 2), 3)
+b_regression <- round(rnorm(item_count), 3)
+regression_data <- sapply(seq_len(item_count), function(j) {
+  rbinom(persons, 1, plogis(a_regression[j] * (theta_regression - b_regression[j])))
+})
+colnames(regression_data) <- ids(item_count)
+
+bench_fixture("psychometrics", "irt-latent-regression", list(
+  source = "A simulation, set.seed(20261029): 2PL responses of persons whose theta is 0.6 x + e, e ~ N(0, 0.64).",
+  itemIds = ids(item_count), responses = unname(regression_data), covariate = I(covariate)
+))
+
+bench_task("irt.calibrate2plLatentRegression", "Calibration of the two-parameter model with a latent regression by EM",
+           sizes$binary, reference("mirt", "mirt(itemtype = \"2PL\", covdata, formula = ~ x)"),
+           function() calibrate(regression_data, "2PL", covdata = data.frame(x = covariate), formula = ~ x))

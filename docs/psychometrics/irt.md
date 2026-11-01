@@ -121,6 +121,7 @@ in proportion to the responses only.
 | `quadrature`     | 61 rectangular      | Nodes over theta: `{ method: "rectangular" \| "gauss-hermite", points }`.                                                |
 | `groups`         | one group           | Each person's group label, for [several groups on one scale](#groups-and-distributions-of-theta).                        |
 | `latent`         | `"standard-normal"` | The distribution of theta, for every group or by group label: `"standard-normal"`, `"normal"`, `"empirical-histogram"`.  |
+| `covariates`     | none                | Each person's covariates by name, for a [latent regression](#latent-regression) of theta.                                |
 | `standardErrors` | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                         |
 | `testlets`       | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                              |
 | `tolerance`      | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                      |
@@ -260,6 +261,74 @@ const result = calibrate(simulateResponses(items, thetas, random), {
 });
 result.groups[1]; // { group: "2026", distribution: "normal", mean: 0.54, sd: 1.21, standardErrors: null, ... }
 ```
+
+### Latent regression
+
+`covariates` replaces the distribution of theta with a regression on the persons' covariates: θ ~ N(xᵀβ, σ²), the
+coefficients β estimated with the items. Persons with the same covariates share one prior, so the E-step integrates once
+for each distinct pattern of covariates.
+
+```mermaid
+flowchart LR
+  X["Covariates x of each person"] --> P["Prior of each pattern of covariates: N(xᵀβ, σ²) on the nodes"]
+  P --> E["E-step: each person's posterior over the nodes"]
+  R["Responses"] --> E
+  E --> M["M-step: β by least squares on the posterior means; σ² from the residuals plus the posterior variances"]
+  M --> P
+```
+
+| Rule                 | Definition                                                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Covariates           | An object of arrays by name, each with a finite number for every person, aligned with the rows of the responses or the `personIds` of records |
+| No intercept         | The mean of theta is xᵀβ, so a covariate with a mean other than 0 moves the scale; center the covariates to keep the mean near 0              |
+| Scale                | Items with estimated slopes fix the unit of theta, so σ is 1 and β is in units of the residual SD; with `fixed` items, σ is estimated         |
+| Result               | `regression`: `coefficients` by name, `residualSd` and `standardErrors` of the coefficients; `groups` is empty                                |
+| Estimates            | β = (XᵀX)⁻¹ Σ x · (posterior mean); σ² is the mean over persons of the squared residual of the posterior mean plus the posterior variance     |
+| Information criteria | The coefficients, and σ when estimated, count as parameters                                                                                   |
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrate, posteriorMeanEstimate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { normalDistribution, simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 1,500 persons answer 20 items. Their theta is 0.6 x + e, e ~ N(0, 0.8²), with the covariate x centered.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 20, random);
+const raw = simulateThetas(1500, random);
+const mean = raw.reduce((sum, value) => sum + value, 0) / raw.length;
+const x = raw.map((value) => value - mean);
+const noise = simulateThetas(1500, random, normalDistribution(0, 0.8));
+const thetas = x.map((value, person) => 0.6 * value + (noise[person] ?? 0));
+const responses = simulateResponses(items, thetas, random);
+
+// Free slopes: sigma is 1, so the coefficient is 0.6 / 0.8 in units of the residual SD.
+const free = calibrate(responses, { model: twoParameterLogistic, covariates: { x }, standardErrors: "hessian" });
+free.regression; // { coefficients: { x: 0.72 }, residualSd: 1, standardErrors: { x: 0.04 } }
+
+// Six items fixed at their generating values fix the scale, so sigma is estimated.
+const anchors = Object.fromEntries(items.slice(0, 6).map((item, j) => [`item${j + 1}`, item.parameters]));
+const anchored = calibrate(responses, { model: twoParameterLogistic, covariates: { x }, fixed: anchors });
+anchored.regression; // { coefficients: { x: 0.57 }, residualSd: 0.79, standardErrors: null }
+
+// A person's ability given the responses: the prior is N(xᵀβ, σ²) with the person's own mean.
+const prior = {
+  mean: (anchored.regression?.coefficients.x ?? 0) * (x[0] ?? 0),
+  sd: anchored.regression?.residualSd ?? 1,
+};
+posteriorMeanEstimate(anchored.items, responses.responses[0] ?? [], { prior }); // { theta: -1.80, standardError: 0.48 }
+```
+
+The 1PL and the PCM estimate one slope `a` for all items, so they belong to the free-slope row: σ is 1. Their Rasch
+equivalents, which mirt's `Rasch` and TAM's `tam.mml(Y = x)` estimate, are the residual SD `a`, the coefficients `a β`
+and the locations `a b`.
+
+| `covariates` cannot be used with        | Because                                                                          |
+| --------------------------------------- | -------------------------------------------------------------------------------- |
+| `groups`                                | A group is a covariate in a latent regression: give it as a (centered) indicator |
+| `latent` other than `"standard-normal"` | The regression is the distribution of theta                                      |
+| `quadrature` other than rectangular     | The priors are normal densities on the nodes, as for an estimated distribution   |
+| `testlets`                              | The testlet effects are added to a standard normal theta                         |
+| `standardErrors: "cross-product"`       | It has no score for the coefficients; use `"hessian"`                            |
 
 ### Online calibration
 

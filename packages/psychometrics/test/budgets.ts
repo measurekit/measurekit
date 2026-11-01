@@ -10,6 +10,7 @@ const BUDGETS = {
   "irt.calibrate3pl": 4_000,
   "irt.calibrate2plCrossProduct": 2_000,
   "irt.calibrate2plHessian": 600,
+  "irt.calibrate2plLatentRegression": 700,
   "irt.calibrateGraded": 300,
   "irt.calibrateGpcm": 500,
   "irt.calibrateTestlets": 400,

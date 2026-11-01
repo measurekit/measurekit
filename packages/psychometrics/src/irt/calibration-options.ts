@@ -61,6 +61,16 @@ export interface CalibrationOptions<TParameters> {
    */
   readonly latent?: LatentDistribution | Readonly<Record<string, LatentDistribution>>;
   /**
+   * Each person's covariates by name, aligned with the persons, for a latent regression: theta ~ N(xᵀβ, σ²) with no
+   * intercept, so a covariate with a mean other than 0 moves the scale and is better centered. The coefficients β, and σ
+   * when fixed items fix the scale, are estimated with the items; otherwise the items' slopes carry the scale and σ
+   * is 1. Covariates replace the distribution of theta, so they need one group, no `latent` other than the standard
+   * normal, the rectangular rule, no testlets, and `standardErrors` `"none"` or `"hessian"`.
+   *
+   * @defaultValue none: theta follows `latent`
+   */
+  readonly covariates?: Readonly<Record<string, readonly number[]>>;
+  /**
    * The method of the standard errors. `"hessian"` runs two E-steps per estimated parameter; `"cross-product"` one pass
    * over the persons, so it suits large pools.
    *

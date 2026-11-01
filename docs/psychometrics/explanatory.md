@@ -454,8 +454,8 @@ and for these cases:
 - **Polytomous linear change.** No reference: Fischer and Ponocny (1995) treat it, and eRm, the only package, warns that
   it equates the two lowest categories.
 - Item features computed from text: finding the features is the caller's job.
-- Person covariates (latent regression), the one-stage random-item model estimated from the responses, and the 2PL
-  model whose slopes are constrained by features: the two-stage regression of ln a gives the slopes' prior.
+- The one-stage random-item model estimated from the responses, and the 2PL model whose slopes are constrained by
+  features: the two-stage regression of ln a gives the slopes' prior.
 - Standard errors adjusted for few items (Knapp and Hartung), and the regression of several parameters at once.
 
 ## Differences from the references

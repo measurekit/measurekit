@@ -11,6 +11,7 @@ R scripts in `validation/psychometrics/`:
 ```bash
 Rscript validation/psychometrics/ctt.R               # classical test theory; the value of subscores by subscore's CTTsub
 Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
+Rscript validation/psychometrics/latent-regression.R # latent regression in `calibrate`: mirt's covdata and formula, TAM's tam.mml(Y = x)
 Rscript validation/psychometrics/dimensionality.R    # polychoric correlations, parallel analysis: psych, polycor
 Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic: cdcatR; multidimensional: mirtCAT; testlets: base R and mirtCAT
 Rscript validation/psychometrics/multistage-cuts.R   # routing cuts of multistage panels: base R over mirt's iteminfo and expected.item

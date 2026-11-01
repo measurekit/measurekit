@@ -30,3 +30,8 @@ Links compose into chains: `chainTransformations` moves the scale of the first f
 `equateIRT::chainec` does. `scaleGrowth` reports the mean change, the ratio of standard deviations and the effect size
 between the neighboring groups of a vertical scale, whether they come from a calibration with `groups` or from chained
 links.
+
+`calibrate` regresses theta on persons' covariates with `covariates`: θ ~ N(xᵀβ, σ²), the coefficients estimated with the
+items. With items that estimate their slopes, σ is 1 and the coefficients are in units of the residual SD; with `fixed`
+items, which set the scale, σ is estimated. The result has a `regression` with the coefficients, the residual SD and, with
+standard errors from the Hessian, the standard errors of the coefficients.
