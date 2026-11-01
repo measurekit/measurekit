@@ -1,4 +1,4 @@
-# Interoperability fixtures: mirt's coefficients of the same items in the IRT form, coef(IRTpars = TRUE), and the
+# Parameterization fixtures: mirt's coefficients of the same items in the IRT form, coef(IRTpars = TRUE), and the
 # slope-intercept form, coef(IRTpars = FALSE), for every item type measurekit converts, with the category probabilities
 # from probtrace. The items are set, not estimated.
 
@@ -60,7 +60,7 @@ nominal <- set_items(science, "nominal", data.frame(
   d3 = c(4.5, 0.3, 3.9, 1.6)
 ))
 
-write_fixture("interop-mirt", list(
+write_fixture("parameterization-mirt", list(
   source = "LSAT7 and Science items set to given slope-intercept coefficients in mirt, one model per item type.",
   theta = THETA,
   items = c(
@@ -130,7 +130,7 @@ graded_3d <- set_multidimensional_items(graded_data(5, 3), 3, "graded", data.fra
   d1 = c(1.5, 1, 0.8, 2, 0.4), d2 = c(-1, -0.5, -1.4, 0.2, -2)
 ))
 
-write_fixture("interop-multidimensional", list(
+write_fixture("parameterization-multidimensional", list(
   source = "Items on 2 and 3 dimensions set to given slope-intercept coefficients in mirt, one model per item type.",
   items = c(
     multidimensional_items_of(m2pl_2d, "2PL", "m2pl", 2),

@@ -321,7 +321,7 @@
       }
     },
     {
-      "includes": ["packages/psychometrics/src/interop/**"],
+      "includes": ["packages/psychometrics/src/parameterization/**"],
       "linter": {
         "rules": {
           "style": {
@@ -331,7 +331,7 @@
                 "patterns": [
                   {
                     "group": ["../*", "../*/**", "!../irt/**", "!../multidimensional/**"],
-                    "message": "interop/ converts the parameters of irt/ and multidimensional/ only."
+                    "message": "parameterization/ converts the parameters of irt/ and multidimensional/ only."
                   }
                 ]
               }

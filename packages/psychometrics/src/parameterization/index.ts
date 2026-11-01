@@ -1,7 +1,7 @@
 /**
  * Conversion of item parameters to and from mirt's coefficients, for every built-in model, multidimensional ones included.
  *
- * @module @measurekit/psychometrics/interop
+ * @module @measurekit/psychometrics/parameterization
  */
 export {
   fromMirtIrt,

@@ -104,10 +104,6 @@
       "types": "./dist/generalizability/index.d.ts",
       "default": "./dist/generalizability/index.js"
     },
-    "./interop": {
-      "types": "./dist/interop/index.d.ts",
-      "default": "./dist/interop/index.js"
-    },
     "./irt": {
       "types": "./dist/irt/index.d.ts",
       "default": "./dist/irt/index.js"
@@ -119,6 +115,10 @@
     "./multidimensional": {
       "types": "./dist/multidimensional/index.d.ts",
       "default": "./dist/multidimensional/index.js"
+    },
+    "./parameterization": {
+      "types": "./dist/parameterization/index.d.ts",
+      "default": "./dist/parameterization/index.js"
     },
     "./rater": {
       "types": "./dist/rater/index.d.ts",

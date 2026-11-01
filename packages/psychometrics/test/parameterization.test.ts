@@ -24,8 +24,8 @@ import {
   toMirtSlopeIntercept,
   twoParameterLogistic,
 } from "../src/index.js";
-import mirt from "./fixtures/interop-mirt.json" with { type: "json" };
-import multidimensional from "./fixtures/interop-multidimensional.json" with { type: "json" };
+import mirt from "./fixtures/parameterization-mirt.json" with { type: "json" };
+import multidimensional from "./fixtures/parameterization-multidimensional.json" with { type: "json" };
 import { arbitraryItem, defined, expectClose, expectParameters, MODELS } from "./helpers.js";
 
 /** Conversions against mirt's coefficients: a few multiplications, divisions and sums. */

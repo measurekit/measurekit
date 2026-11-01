@@ -28,7 +28,7 @@ Rscript validation/psychometrics/rater.R             # rater agreement: irr, psy
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
 Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
 Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mirt, GPArotation and base R; case names as arguments run only those cases
-Rscript validation/psychometrics/interop.R           # mirt's coefficient forms of every item type, multidimensional ones included
+Rscript validation/psychometrics/parameterization.R  # mirt's coefficient forms of every item type, multidimensional ones included
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
 ```
 
@@ -39,7 +39,7 @@ sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, c
 `multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`
 and `information` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and
 the base R maximum are slow, and `mhrm`, which runs mirt's MH-RM four times on five dimensions, takes about as long. `rotation` reads the fixture that `exploratory` writes, so run `exploratory` first.
-`multidimensional-items.R` holds the helper of `multidimensional.R` and `interop.R` that sets items in mirt.
+`multidimensional-items.R` holds the helper of `multidimensional.R` and `parameterization.R` that sets items in mirt.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in

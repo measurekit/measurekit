@@ -36,7 +36,7 @@ Use these words with these meanings in code, comments and docs.
 | upper, lower group | The persons with the highest and lowest total scores, `groupFraction` of them each.                                        |
 | category           | One possible response to an item: an integer from 0. A dichotomous item has categories 0 and 1.                            |
 | theta              | A person's ability: on the N(0, 1) scale, and on the Rasch scale, a = 1, in joint maximum likelihood.                      |
-| IRT parameters     | mirt's IRT form, D = 1: `a` discrimination, `b` difficulty or thresholds, `c`, `d` asymptotes. See `interop/`.             |
+| IRT parameters     | mirt's IRT form, D = 1: `a` discrimination, `b` difficulty or thresholds, `c`, `d` asymptotes. See `parameterization/`.    |
 | cut score          | The total score, or theta, at or above which a person meets a standard.                                                    |
 | attribute          | A skill or piece of knowledge a cognitive diagnosis model classifies as mastered or not; knowledge tracing calls it skill. |
 | profile, Q-matrix  | A profile marks each attribute mastered (1) or not (0); a Q-matrix lists each item's attributes by item id.                |
@@ -129,7 +129,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
                         correlations, standardized mean difference, the many-facet Rasch model
   src/response-time/    response times: the lognormal model, speed, aberrant times, the joint model of speed and
                         accuracy, rapid guessing
-  src/interop/          conversion of item parameters, multidimensional ones included, to and from mirt
+  src/parameterization/ conversion of item parameters, multidimensional ones included, to and from mirt
   test/<module>.test.ts one file per src folder; fixtures/ holds R results
 packages/knowledge-tracing/   the published package @measurekit/knowledge-tracing
   src/index.ts          re-exports every module, the model interface, and DataError, MeasurekitError and
@@ -205,7 +205,7 @@ Psychometrics: every module of `cat/`, `equating/`, `irt/`, `multidimensional/`,
 | `ctt/`              | `data/`, `math/`                                      |
 | `dimensionality/`   | `data/`, `math/`                                      |
 | `irt/`              | `data/`, `math/`                                      |
-| `interop/`          | `irt/`, `multidimensional/`                           |
+| `parameterization/` | `irt/`, `multidimensional/`                           |
 | `cdm/`              | `data/`, `irt/`, `math/`                              |
 | `fit/`              | `data/`, `irt/`, `math/`                              |
 | `response-time/`    | `data/`, `irt/`, `math/`                              |

@@ -14,6 +14,8 @@ const items: IrtItem[] = Array.from({ length: POOL }, () =>
 ).flat();
 
 test("converts the 2PL items of a pool of 10,000 to the forms of mirt", async (context) => {
-  await benchmark(context, "interop.toMirtSlopeIntercept", () => items.map((item) => toMirtSlopeIntercept(item)));
-  await benchmark(context, "interop.toMirtIrt", () => items.map((item) => toMirtIrt(item)));
+  await benchmark(context, "parameterization.toMirtSlopeIntercept", () =>
+    items.map((item) => toMirtSlopeIntercept(item)),
+  );
+  await benchmark(context, "parameterization.toMirtIrt", () => items.map((item) => toMirtIrt(item)));
 });

@@ -49,7 +49,7 @@ multidimensionalPosteriorModeEstimate(fit.items, [1, 1, 0, 1, null, 1, 1, 0], { 
 ## Models
 
 Items have K ordered categories scored 0 to K - 1. With the slopes `a` and the thetas θ of a person, z = a · θ. The
-parameters follow mirt's slope-intercept form, `coef(model, IRTpars = FALSE)`, with D = 1 ([interop](interop.md)
+parameters follow mirt's slope-intercept form, `coef(model, IRTpars = FALSE)`, with D = 1 ([parameterization](parameterization.md)
 converts them); the intercept is mirt's `d`, named in full because `d` is the upper asymptote of the IRT form.
 
 | Model                                    | Parameters                                 | P(X = 1) or P(X ≥ k)                                                 | mirt item type |
@@ -271,10 +271,10 @@ responses such as `(items, responses) => multidimensionalPosteriorMeanEstimate(i
 the items of Σ_k ∇P_k ∇P_kᵀ / P_k. The information of an item in the direction of a unit vector u is uᵀ I u, and the
 inverse of the matrix is the covariance of a maximum likelihood estimate of theta there.
 
-## Simulation, interoperability
+## Simulation, parameterization
 
 `simulateMultidimensionalResponses` ([simulation](sim.md#multidimensional-responses)) draws responses from a
-vector of thetas per person; `toMirtMultidimensional` and `fromMirtMultidimensional` ([interop](interop.md#multidimensional-items))
+vector of thetas per person; `toMirtMultidimensional` and `fromMirtMultidimensional` ([parameterization](parameterization.md#multidimensional-items))
 convert items to and from mirt.
 
 ## Not included

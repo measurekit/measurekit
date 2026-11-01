@@ -9,7 +9,7 @@ on the N(0, 1) scale unless a calibration estimates its distribution.
 ## Models
 
 An item with K categories is scored 0 to K - 1. Parameters follow mirt's `coef(model, IRTpars = TRUE)` with D = 1
-([interop](interop.md) converts them).
+([parameterization](parameterization.md) converts them).
 
 ### Dichotomous
 
@@ -563,7 +563,7 @@ A model is an object implementing `IrtModel<TParameters>`. Calibration, ability 
 multistage tests, fit, characteristic curve linking and `simulateResponses` use only its members, so a model defined
 outside the package works there as a built-in one does. Functions that rely on the parameters of the built-in
 models take those only: moment linking, `transformItem`, true-score equating, Lord's chi-square, `simulateItems`,
-the Bookmark method and the conversions of `@measurekit/psychometrics/interop`.
+the Bookmark method and the conversions of `@measurekit/psychometrics/parameterization`.
 
 | Member                                               | Purpose                                                                                                         |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |

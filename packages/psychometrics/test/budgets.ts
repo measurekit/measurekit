@@ -92,8 +92,8 @@ const BUDGETS = {
   "scaling.conversionTableTrueScore": 6,
   "standardSetting.bookmarkCutScore": 0.2,
   "standardSetting.classificationAccuracy": 3,
-  "interop.toMirtSlopeIntercept": 8,
-  "interop.toMirtIrt": 9,
+  "parameterization.toMirtSlopeIntercept": 8,
+  "parameterization.toMirtIrt": 9,
 } as const;
 
 /** Runs a benchmark against its budget. */

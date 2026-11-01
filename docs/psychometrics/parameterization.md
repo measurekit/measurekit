@@ -1,6 +1,6 @@
-# Interoperability
+# Parameterization
 
-`@measurekit/psychometrics/interop` converts item parameters ([IRT](irt.md) and
+`@measurekit/psychometrics/parameterization` converts item parameters ([IRT](irt.md) and
 [multidimensional IRT](multidimensional.md)) to and from mirt's coefficients.
 
 ## mirt
@@ -57,7 +57,7 @@ name the form does not use, or when the parameters are invalid for the model. On
 number of dimensions is the number of `a` names, `a1` up to the first one not given.
 
 ```ts
-import { fromMirtMultidimensional } from "@measurekit/psychometrics/interop";
+import { fromMirtMultidimensional } from "@measurekit/psychometrics/parameterization";
 import { multidimensionalGradedResponse } from "@measurekit/psychometrics/multidimensional";
 
 const item = fromMirtMultidimensional(multidimensionalGradedResponse, { a1: 1.1, a2: 0.4, d1: 2, d2: 0, d3: -1.5 });
@@ -74,7 +74,7 @@ write_json(as.data.frame(coef(model, IRTpars = TRUE, simplify = TRUE)$items), "i
 and read them as items for ability estimation, or take their `parameters` as anchors for calibration:
 
 ```ts
-import { fromMirtIrt } from "@measurekit/psychometrics/interop";
+import { fromMirtIrt } from "@measurekit/psychometrics/parameterization";
 import { generalizedPartialCredit, threeParameterLogistic } from "@measurekit/psychometrics/irt";
 
 const items = [

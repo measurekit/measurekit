@@ -19,7 +19,7 @@
     "src/standard-setting/index.ts",
     "src/rater/index.ts",
     "src/response-time/index.ts",
-    "src/interop/index.ts",
+    "src/parameterization/index.ts",
     "src/index.ts"
   ],
   "tsconfig": "tsconfig.build.json",

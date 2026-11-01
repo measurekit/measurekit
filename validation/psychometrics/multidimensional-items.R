@@ -1,4 +1,4 @@
-# Helper for the fixture scripts of multidimensional items (multidimensional.R and interop.R).
+# Helper for the fixture scripts of multidimensional items (multidimensional.R and parameterization.R).
 
 # Returns mirt's model of `data` with `dimensions` dimensions and the items set to slope-intercept coefficients, one
 # data frame column per name, NA where an item lacks the name. The items are set, not estimated: mirt evaluates its
