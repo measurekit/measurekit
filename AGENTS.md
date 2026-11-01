@@ -1,21 +1,17 @@
 # AGENTS.md
 
-Conventions for people and coding agents working in this repository. Read this before changing anything. Most
-rules are enforced by `pnpm lint` (Biome and cspell), `pnpm typecheck`, `pnpm knip` and `pnpm docs:api`; the rest
-are checked in review.
+Conventions for people and coding agents working in this repository. Read this before changing anything. `pnpm lint`,
+`pnpm check:standards`, `pnpm typecheck`, `pnpm knip` and `pnpm docs:api` enforce most of the rules; this file holds the
+ones they cannot.
 
 measurekit holds two libraries for JavaScript and TypeScript, which do not import each other, and the core that they
-share:
+share. Follow the principles of the package you change.
 
-- `@measurekit/psychometrics` is a psychometrics library, validated against R.
-  [docs/psychometrics/architecture.md](docs/psychometrics/architecture.md) states its design principles.
-- `@measurekit/knowledge-tracing` is a knowledge tracing library, validated against pyBKT and R.
-  [docs/knowledge-tracing/architecture.md](docs/knowledge-tracing/architecture.md) states its design principles and the
-  learner model interface.
-- `@measurekit/core` holds what both libraries use: their errors, the checks of their arguments, the random number
-  generator and common numerics. It is the only dependency of the libraries, and it has none.
-
-Follow the principles of the package you change. The rules below apply to every package unless a section names one.
+- `@measurekit/psychometrics`: psychometrics, validated against R. Principles: [architecture](docs/psychometrics/architecture.md).
+- `@measurekit/knowledge-tracing`: knowledge tracing, validated against pyBKT and R. Principles and the learner model
+  interface: [architecture](docs/knowledge-tracing/architecture.md).
+- `@measurekit/core`: what both use, their errors, the checks of their arguments, the random number generator and the
+  common numerics. It has no dependencies, and the libraries depend on it alone.
 
 ## Terms
 
@@ -81,113 +77,42 @@ Use these words with these meanings in code, comments and docs.
 ## Layout
 
 ```
-packages/core/                the published package @measurekit/core
-  src/index.ts          re-exports everything below
-  src/errors.ts         MeasurekitError, DataError
-  src/checks.ts         checks of one value: describe; the predicates isNonEmptyString, isPositive, isRecord,
-                        isUnitInterval; and checkRecord, checkArray, checkOptions, checkMethod, checkRandom,
-                        checkBoolean, checkChoice, checkFinite, checkPositive, checkNonNegative,
-                        checkPositiveInteger, checkIntegerFrom, checkUnitInterval, checkSeed, checkStopping
-  src/random.ts         Random, createRandom and shuffle
-  src/normal.ts         normalQuantile
-  src/logistic.ts       logistic, logLogistic, logisticPair
-  src/item-probabilities.ts LogisticItem and ThresholdItem; the category probabilities of logistic, graded and partial
-                        credit items, softmax, validAsymptotes, orderedThresholds
-  src/normalize-logs.ts normalizeLogs
-  src/cholesky.ts       cholesky
-  src/iteration.ts      Stopping, Convergence, iterateToConvergence
-  src/line-search.ts    ARMIJO, backtrack
-  src/descent.ts        GradientFunction, DescentPoint, stepAlong
-  src/bfgs.ts           bfgs, OptimizerOptions, OptimizationResult
-  src/continued-fraction.ts continuedFraction, for the two tails below; not exported
-  src/chi-square.ts     logGamma, chiSquareUpperTail
-  src/student-t.ts      studentLowerTail
-  src/kappa.ts          KappaWeights, kappaOfPairs
-  src/vectors.ts        dot, largestChange, maxAbs, mean, multiplyVector
-  src/q-matrix.ts       QMatrix
-  src/theta-distribution.ts ThetaDistribution
-  test/<file>.test.ts   one file per concern; the numerics are validated by the fixtures of the packages
-packages/psychometrics/       the published package @measurekit/psychometrics
-  src/index.ts          re-exports every module, and DataError, MeasurekitError and createRandom of core
-  src/checks.ts         checkFunction and checkOpenUnitInterval, the checks of one value that only this package uses
-  src/data/             response matrices and records, scoring
-  src/math/             numerics
-  src/ctt/              classical test theory
-  src/change/           gain scores, the reliability of a difference, reliable change
-  src/dimensionality/   polychoric correlations, parallel analysis, exploratory factor analysis, the minimum average partial
-                        test, smoothing of correlation matrices
-  src/irt/              item response theory: models, calibration with a latent regression, ability estimation,
-                        information, reliability
-  src/multidimensional/ multidimensional item response theory: models, EM and MH-RM calibration, groups and fixed items by EM,
-                        bifactor and two-tier models, a trait over two or three occasions, rotation, scoring,
-                        information
-  src/sim/              simulation of thetas, item parameters and responses, multidimensional ones included
-  src/cat/              adaptive and multistage tests, testlets, content bounds, their simulation, exposure control, form assembly
-  src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, A-CDM, LLM, R-RUM, Wald tests of reduced models for
-                        each item, Q-matrix validation, nonparametric classification
-  src/fit/              item and person fit, local dependence
-  src/dif/              differential item functioning
-  src/equating/         linking of IRT scales, chains of links, observed-score equating with and without common
-                        items, IRT true-score and observed-score equating, bootstrap and delta-method standard
-                        errors, the anchor screen, presmoothing
-  src/standard-setting/ cut scores by the modified Angoff, Bookmark and Hofstee methods; classification accuracy
-  src/explanatory/      the linear logistic test model, linear logistic change, regression of item parameters on item features,
-                        prediction of the parameters of new items
-  src/mokken/           Mokken scale analysis: scalability coefficients, item selection, monotonicity, invariant item ordering
-  src/generalizability/ variance components of balanced crossed and nested designs, decision studies
-  src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction,
-                        joint draws of theta from separate posteriors, growth between the groups of a vertical scale
-  src/rater/            rater agreement and rater effects: exact and adjacent agreement, kappa, intraclass
-                        correlations, the correlation and standardized mean difference of two raters, the many-facet
-                        Rasch model
-  src/response-time/    response times: the lognormal model, speed, aberrant times, the joint model of speed and
-                        accuracy, rapid guessing
-  src/parameterization/ conversion of item parameters, multidimensional ones included, to and from mirt
-  test/<module>.test.ts one file per src folder; fixtures/ holds R results
-packages/knowledge-tracing/   the published package @measurekit/knowledge-tracing
-  src/index.ts          re-exports every module, the model interface, and DataError, MeasurekitError and
-                        createRandom of core
-  src/model.ts          LearnerModel and ModelFit, the interface every model implements, and checkModel
-  src/data/             events, logs, Q-matrices, learner checks, first attempts, splits, the replay of a log through a model
-  src/math/             numerics
-  src/evaluate/         metrics, calibration, cross-validation, model comparison, the test between models, learning curves,
-                        metrics by opportunity
-  src/elo/              learner-item and concept-specific Elo
-  src/bkt/              Bayesian knowledge tracing with pyBKT's extensions
-  src/logistic/         AFM, PFA and LKT features over skills, items or the learner, intercepts, covariates, standard errors, fixed or random
-                        proficiency, and the search for the rates of the features
-  src/irt/              online IRT: the posterior of ability on a grid, from calibrated item parameters
-  src/kst/              knowledge structures and their tools, the basic local independence model, IITA, adaptive assessment
-  src/practice/         the next item by predicted success, mastery criteria, attempts to a streak
-  src/sim/              outcomes simulated from any learner model
-  test/<module>.test.ts one file per src folder; fixtures/ holds the reference results
-docs/<package>/         guides of each package; TypeDoc publishes them with the API reference
-docs/performance.md     the benchmarks against the references, and the budgets
-validation/<package>/   R and Python scripts that write the fixtures; validation/README.md lists them
-validation/benchmarks/  the inputs of the benchmarks and the timing of their references, by package and module
-bench/                  the harness of the benchmarks, which each package binds to its budgets
-examples/<package>/     runnable examples, which import the package by name; examples/test/ runs each of them
-scripts/                check-standards.ts, which checks the rules of STANDARDS.md that a script can, and its test
-biome/                  Biome GritQL plugins
-.changeset/             the pending release: one changeset per package
+packages/core/                src/ is flat, a file for each concept: errors, checks, random, normal, logistic,
+                              item-probabilities, normalize-logs, cholesky, iteration, line-search, descent, bfgs,
+                              chi-square, student-t, kappa, vectors, q-matrix, theta-distribution; continued-fraction.ts
+                              is not exported
+packages/psychometrics/       src/<module>/ for data, math, ctt, change, dimensionality, irt, multidimensional, cdm, fit, dif,
+                              equating, standard-setting, explanatory, mokken, generalizability, scaling, rater,
+                              response-time, parameterization, sim and cat; src/checks.ts holds checkFunction and
+                              checkOpenUnitInterval, which only this package uses; src/index.ts re-exports every module
+                              and DataError, MeasurekitError and createRandom
+packages/knowledge-tracing/   src/<module>/ for data, math, evaluate, elo, bkt, logistic, irt, kst, practice and sim;
+                              src/model.ts holds LearnerModel, ModelFit and checkModel, which every model implements;
+                              src/index.ts re-exports every module, the model interface, and DataError, MeasurekitError
+                              and createRandom
+packages/<package>/           src/<module>/index.ts is the public API of a module, internal.ts what the package shares; test/<module>.test.ts, one for each src folder, with fixtures/ of reference results;
+                              README.md, LICENSE, NOTICE, package.json, typedoc.json and the tsconfig files
+docs/<package>/               guides, which TypeDoc publishes with the API reference; docs/performance.md the benchmarks
+validation/<package>/         R and Python scripts that write the fixtures; validation/README.md lists them
+validation/benchmarks/        the inputs of the benchmarks and the timing of their references; bench/ their harness
+examples/<package>/           runnable examples; examples/test/ runs each of them
+scripts/                      check-standards.ts and its test
+biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
 ```
-
-Each package folder also holds `README.md` (the page of the package on npm), `LICENSE`, `NOTICE`, `package.json`,
-`typedoc.json` and its `tsconfig` files.
 
 ## Commands
 
 ```bash
 pnpm install
 pnpm lint             # Biome and cspell; `pnpm format` fixes formatting
-pnpm check:standards  # no section signs, ids in test titles, history phrasing, vague file names, missing diagrams, deep imports; the form of "Not included"
-pnpm typecheck        # tsc over the sources, tests and examples of every package
-pnpm test             # Vitest, one project per package; `pnpm test --project psychometrics` runs one
-pnpm bench            # builds, then the benchmarks of every package, one after another, against the budgets of `test/budgets.ts`
+pnpm check:standards  # the rules of STANDARDS.md that a script can check, over the whole repository
+pnpm typecheck        # tsc over the sources, tests, examples and scripts
+pnpm test             # Vitest, a project for each package, the scripts and the examples; `--project psychometrics` runs one
+pnpm bench            # builds, then the benchmarks of every package against the budgets of `test/budgets.ts`
 pnpm knip             # unused files, exports and dependencies
-pnpm build            # every package: tsc -b after deleting dist/, so that no stale output ships
+pnpm build            # every package, from a clean dist/
 pnpm check:packages   # builds, then publint and Are the Types Wrong on each packed package
-pnpm docs:api         # builds, then TypeDoc into docs/api, a section per package; fails on undocumented exports
+pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumented exports
 ```
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before
@@ -196,11 +121,10 @@ finishing a change. Development needs Node.js 22.18+ and pnpm 12.
 ## Releases
 
 Changesets version and publish the packages, each on its own version. A release has one changeset per package in
-`.changeset/`; changes made before the release extend it. To release, a pull request from a `changeset-release/` branch
-runs `pnpm changeset version`, which bumps the versions, writes `CHANGELOG.md` and consumes the changesets. After it is
-merged, the maintainer runs the Release workflow by hand: it builds and publishes the versions not yet on npm. No
-workflow opens pull requests, and Dependabot version updates are off. Changesets, docs and TSDoc describe current
-behavior only, without "now", "no longer", "renamed" or "previously".
+`.changeset/`; changes made before the release extend it. A pull request from a `changeset-release/` branch runs
+`pnpm changeset version`, which bumps the versions, writes `CHANGELOG.md` and consumes the changesets. After it is
+merged, the maintainer runs the Release workflow by hand: it publishes the versions not yet on npm. No workflow opens
+pull requests, and Dependabot version updates are off. Changesets, docs and TSDoc describe current behavior only.
 
 ## Dependencies
 
@@ -253,67 +177,55 @@ Knowledge tracing: the model families never import each other, nor does anything
 
 ## Naming
 
-- Files: kebab-case. One concept per file, named after it. Group files in folders by module.
-- Values and functions: camelCase. Module-level constant data (thresholds, coefficient tables): SCREAMING_SNAKE.
-- Types: PascalCase. Type parameters: `T` or `T` plus a name.
 - Acronyms are words: `kr20`, `bfgs`, `auc`, `rmse`. Other statistics are named in full: `standardErrorOfMeasurement`,
-  `logLoss`, not `sem`, `ll`. `QMatrix` keeps the field's spelling, with a Biome exception.
-- Errors are `DataError` and its base class `MeasurekitError`, both of `@measurekit/core`, which the
-  libraries re-export. A package that needs an error of its own extends `MeasurekitError`.
+  `logLoss`. `QMatrix` keeps the field's spelling, with a Biome exception.
+- Errors are `DataError` and its base class `MeasurekitError`, both of `@measurekit/core`, which the libraries
+  re-export. A package that needs an error of its own extends `MeasurekitError`.
 - Function options are `<Name>Options`; options shared by several functions are named after what they configure
-  (`GroupOptions`), and a method's are named after it (`NextQuestionOptions`). Results are nouns: `ItemStatistics`,
-  `SplitHalf`, `CrossValidation`, `LearningCurve`.
+  (`GroupOptions`), and a method's after it (`NextQuestionOptions`). Results are nouns: `ItemStatistics`, `SplitHalf`.
 - Psychometrics labels are string unions in kebab-case (`"very-good"`); their thresholds are `<NAME>_THRESHOLDS`.
-- A knowledge tracing model family has a factory named after it, `elo(options)`, that returns a `LearnerModel`, or
-  a type extending it when the family adds members: `EloModel`. Its files: `<family>.ts` for the factory, `state.ts` and
-  `parameters.ts` for the plain data and their checks, `estimation.ts` for a fit's numerics.
+- A knowledge tracing model family has a factory named after it, `elo(options)`, that returns a `LearnerModel` or a type
+  extending it (`EloModel`). Its files: `<family>.ts` for the factory, `state.ts` and `parameters.ts` for the plain data
+  and their checks, `estimation.ts` for a fit's numerics.
 - Iterative methods take `tolerance` and `maxIterations` and report `converged` and `iterations`; random starts take
   `restarts` and `seed`. Defaults are named constants, such as `DEFAULT_TOLERANCE`.
 
 ## Code
 
-- TypeScript strict, ESM, named exports only, `.js` extensions in relative imports, `import type` for types.
-- No `as` casts except where untyped data enters and is validated next. No non-null assertions.
-- Public functions validate their input and throw `DataError` with a full sentence that says what is wrong and
-  what is expected, e.g. `A seed must be a safe integer, found 1.5.` Input may come from plain JavaScript or JSON, so
-  every argument is checked for its type before it is read, once, where the public function reads it, with a `check`
-  function of `@measurekit/core`: options with `checkOptions`, arrays with `checkArray`, objects with `checkRecord`,
-  an object with a method with `checkMethod`, a function with `checkFunction` (`checks.ts` of psychometrics), a
-  `Random` with `checkRandom`, a number with `checkFinite`, `checkPositive`, `checkNonNegative`,
-  `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval` or `checkOpenUnitInterval` (`checks.ts` of
-  psychometrics), `tolerance` and `maxIterations` with `checkStopping`, a seed
-  with `checkSeed`, a boolean with `checkBoolean` and a string option with
-  `checkChoice`: `<Label> must be a positive number, found <value>.` An option's label is `The option <name>`. A
-  field of a record is tested with a predicate of core or the language, such as `isUnitInterval` or
-  `Number.isFinite`, and the message names the record; a predicate of core is never written out by hand. Other
-  messages show values with `describe`. The messages read alike in both libraries, as one set of checks writes them.
-- Psychometrics checks items with `checkItem` or `checkItemList` and an IRT model with `checkModel`, all of
-  `irt/items.ts`. Knowledge tracing checks a learner model passed in with `checkModel` of `model.ts`, lists of attempts
-  with `checkAttempts`, and the model's predictions with `checkUnitInterval`. A field's message names its record:
-  `Event 3 needs an outcome from 0 to 1, found 2.`
-- Options and optional fields are destructured with their defaults, `const { tolerance = DEFAULT_TOLERANCE } =
-  options`, so that a value set to `null` is checked and rejected, never taken as absent.
-- Missing responses are `null`. Each function documents which persons a statistic uses.
-- A statistic undefined for the data is `null` in tables and a `DataError` from single-value functions. Never
-  return `NaN`. Iterative methods report `converged` and `iterations` instead of throwing.
+- No `as` casts except where untyped data enters and is validated next.
+- A public function validates its input once, where it reads it, and throws `DataError` with a full sentence that says
+  what is wrong and what is expected (`A seed must be a safe integer, found 1.5.`). Input may come from plain JavaScript
+  or JSON, so every argument is checked for its type first, with the checks of `@measurekit/core` (`checkOptions`,
+  `checkArray`, `checkRecord`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`,
+  `checkPositive`, `checkNonNegative`, `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval`, `checkSeed`,
+  `checkStopping`) and `checkFunction` and `checkOpenUnitInterval` of psychometrics. An option's label is `The option
+  <name>`: `<Label> must be a positive number, found <value>.` A field of a record is tested with a predicate of core or
+  of the language, such as `isUnitInterval` or `Number.isFinite`, and the message names the record
+  (`Event 3 needs an outcome from 0 to 1, found 2.`); values are shown with `describe`.
+- Psychometrics checks items with `checkItem` or `checkItemList` and a model with `checkModel`, all of `irt/items.ts`.
+  Knowledge tracing checks a learner model with `checkModel` of `model.ts`, attempts with `checkAttempts`, and a
+  model's predictions with `checkUnitInterval`.
+- Options are destructured with their defaults, `const { tolerance = DEFAULT_TOLERANCE } = options`, so that a value set
+  to `null` is rejected, never taken as absent.
+- Missing responses are `null`, and each function documents which persons a statistic uses. A statistic undefined for
+  the data is `null` in tables and a `DataError` from a function that returns only it; never `NaN`. Iterative methods
+  report `converged` and `iterations` instead of throwing.
 - Knowledge tracing models are immutable: `update` returns a new state and `fit` a new model. States and parameters are
-  plain data that JSON serializes; model methods check them, as they may come from storage.
-- A state or parameters stored by a 1.x release stay readable by every later 1.x release. A new field is optional, and
-  its absence means the old behavior. A change that cannot be optional is a major version. `test/model.test.ts` reads
-  `test/fixtures/stored-state.json`, which no build regenerates.
+  plain data that JSON serializes, and model methods check them, as they may come from storage. A state or parameters
+  stored by a 1.x release stay readable by every later 1.x release: a new field is optional, its absence means the old
+  behavior, and a change that cannot be optional is a major version (`test/model.test.ts` reads
+  `test/fixtures/stored-state.json`, which no build regenerates).
 - An event with `outcome: null` is a learning opportunity: `update` accepts it, `predict` is never called for it, a fit
   gives it a `null` prediction and no likelihood term, and `n` of the information criteria counts the events with an
   outcome. Only an explicit `null` means that nothing was observed: a missing outcome throws `DataError`.
-- Never use `Math.random`; take a `Random`. The GritQL plugin `biome/no-math-random.grit` makes `pnpm lint` fail on
-  `Math.random` anywhere in `packages/*/src`.
-- Numerics work on `Float64Array` and do not allocate in inner loops.
-- Numerics stay defined at extreme parameters. A weight that underflows to 0 is skipped before it divides; a loop that
-  grows or shrinks a value until a test passes also stops when the value is not finite. In psychometrics, a response's
-  probability enters a log-likelihood as at least `MIN_PROBABILITY` of `irt/probability.ts`, through its `logProbability`,
-  so that no likelihood is 0; knowledge tracing throws `DataError` for outcomes of probability 0.
+- Numerics work on `Float64Array`, do not allocate in inner loops and stay defined at extreme parameters: a weight that
+  underflows to 0 is skipped before it divides, and a loop that grows or shrinks a value until a test passes also stops
+  when the value is not finite. A response's probability enters a psychometrics log-likelihood as at least
+  `MIN_PROBABILITY` of `irt/probability.ts`, through `logProbability`; knowledge tracing throws `DataError` for outcomes
+  of probability 0.
 - A number with a meaning is a named constant with its source, such as the reference's name for it.
-- A capability is built when the sources listed in `docs/<package>/architecture.md` treat it as standard practice, a usable
-  reference exists and it fits a library. The guide lists the rest under "Not included", one bullet per method, each
+- A capability is built when the sources of `docs/<package>/architecture.md` treat it as standard practice, a usable
+  reference exists and it fits a library. The guide lists the rest under "Not included", one bullet for each method,
   `- **Method.** Reason: why`, with Reason one of No fit, No reference or Outside the sources. No speculative options,
   abstractions or modules.
 
@@ -338,89 +250,83 @@ others. A new clone is merged into a helper of the module that owns the concept,
 
 ## Comments and docs
 
-- Every export has a TSDoc comment: types and constants a noun phrase, functions a third-person verb phrase
-  ("Returns ...", "Builds ..."), properties a short phrase. Formulas use plain notation: `k / (k - 1)`. TypeDoc renders
-  the comments, so they use its tags:
-  - The first sentence is the summary. A longer explanation, such as a method, a formula or the edge cases, follows
-    under `@remarks`; a description of more than three lines has one.
-  - `@param name - ...` describes every parameter of a function, and `@returns` its result where the summary does not
-    say it: the shape, the units, the range and when it is `null`. A function that returns nothing has no `@returns`; a
+- Every export has a TSDoc comment: types and constants a noun phrase, functions a third-person verb phrase ("Returns
+  ...", "Builds ..."), properties a short phrase. Formulas use plain notation: `k / (k - 1)`. The tags:
+  - The first sentence is the summary. A longer explanation, such as a method, a formula or the edge cases, follows under
+    `@remarks`; a description of more than three lines has one.
+  - `@param name - ...` describes every parameter of a function, and `@returns` its result where the summary does not say
+    it: the shape, the units, the range and when it is `null`. A function that returns nothing has no `@returns`; a
     destructured parameter has one `@param`.
   - `@defaultValue` gives the default of every option and every parameter that has one, as code (`@defaultValue
-    \`1e-4\``) or, when the default is a behavior, a short phrase. The summary never states a default. A parameter
-    whose initializer is in the signature shows it in TypeDoc; one whose default is computed in the body has
-    `@defaultValue` on the function, naming the parameter. An option whose default differs between functions that take
-    it has an options type of its own.
+    \`1e-4\``) or, when the default is a behavior, a short phrase. The summary never states a default. A parameter whose
+    initializer is in the signature shows it in TypeDoc; one whose default is computed in the body has `@defaultValue` on
+    the function, naming the parameter. An option whose default differs between functions has an options type of its own.
   - `@throws` lists the errors.
-  - `@see {@link https://doi.org/... | Author (year)}` cites the literature, one tag per work, with the DOI where the
-    work has one. The summary and `@remarks` name no year.
+  - `@see {@link https://doi.org/... | Author (year)}` cites the literature, one tag per work, with the DOI where it has
+    one. The summary and `@remarks` name no year.
   - `@example` goes only on a public entry point where an example truly helps. It shows its imports, and the values in
     its comments come from running it.
   - No other tags and no boilerplate.
 - `//` comments only explain why something non-obvious is done, or cite a source. No commented-out code.
-- Docs lead with a picture, then tables, then prose. Diagrams and charts are Mermaid in Markdown: GitHub renders them, and
+- Docs lead with a picture, then tables, then prose. Diagrams are Mermaid in Markdown: GitHub renders them, and
   `typedoc-plugin-mermaid`, pinned in `typedoc.json` with the Mermaid version it loads, renders them on the docs site.
-- US English. Docs state facts in short sentences; prefer a table or list to prose. Code samples are complete: they
-  show their imports. Values shown in samples come from running them. No marketing language, emojis or filler. A
-  section of a source is cited in words ("section 3.1").
-- Each document has one purpose: a package's `README.md` for its users, `docs/<package>/` for its guides,
-  `CONTRIBUTING.md` for the contribution process, `AGENTS.md` for conventions, `validation/README.md` for running the
-  reference scripts.
+- US English; short sentences, a table or list rather than prose; complete samples with their imports, and values
+  shown in samples come from running them; a source's section is cited in words ("section 3.1"). No marketing, emojis or
+  filler.
+- One purpose for each document: a package's `README.md` for its users, `docs/<package>/` for its guides,
+  `CONTRIBUTING.md` for the process, `AGENTS.md` for conventions, `validation/README.md` for running the reference scripts.
 
 ## Validation and tests
 
-- Every statistic has a reference: a function of an established R or Python package, or a base R computation written
-  out in the script. The script writes inputs and expected values to
-  `packages/<package>/test/fixtures/<module>-<case>.json`; the test compares within the tolerance in
-  `docs/<package>/validation.md`. Never type expected values by hand except for edge cases small enough to derive
-  exactly.
-- The numerics of `@measurekit/core`, such as `normalQuantile` and `logistic`, are validated by the fixtures of the
-  packages that use them; core's tests cover its edge cases and the rest of its behavior.
-- Psychometrics `sim/` has no R reference, as R's generator differs from `createRandom`: seeded tests check its
-  distributions, and a calibration recovers the items it simulates.
-- A knowledge tracing model without a package of record, such as Elo, has its equations written out in R and a seeded
-  simulation recovery study, with thresholds fixed before the simulation is first run.
-- Use public datasets (mirt, psych, difR, pyBKT) or simulations with a fixed seed.
-- One test file per source folder, named after it: `ctt.test.ts` for `src/ctt/`. `test/assertions.ts` holds the shared
-  assertions, such as `expectClose`, which compares with a reference value; `test/logs.ts` of knowledge tracing holds
-  `online`, which runs a log through any model as an app would. A file's `describe` blocks follow the order of the
-  folder's source files or the sections of the module's guide, with a closing `properties` block in psychometrics;
-  within a block, the comparisons with the reference and the main behavior come first, then the options, then errors and
-  edge cases.
-- Every public function has a test of input of other types, as JavaScript or JSON pass it: `null` options and
-  arguments, a string for a number, an object for an array. Pass such input with `JSON.parse`, not a cast.
+- Every statistic has a reference: a function of an established R or Python package, or a base R computation written out
+  in the script. The script writes inputs and expected values to `packages/<package>/test/fixtures/<module>-<case>.json`,
+  from public datasets (mirt, psych, difR, pyBKT) or simulations with a fixed seed, and the test compares within the
+  tolerance in `docs/<package>/validation.md`. Expected values are never typed by hand, except for edge cases small enough
+  to derive exactly.
+- The numerics of `@measurekit/core` are validated by the fixtures of the packages that use them; core's tests cover its
+  edge cases. Psychometrics `sim/` has no R reference, as R's generator differs from `createRandom`: seeded tests check its
+  distributions, and a calibration recovers the items it simulates. A knowledge tracing model without a package of
+  record, such as Elo, has its equations written out in R and a seeded recovery study, with thresholds fixed before the
+  simulation is first run.
+- One test file for each source folder, named after it. `test/assertions.ts` holds the shared assertions, such as
+  `expectClose`, which compares with a reference value; `test/logs.ts` of knowledge tracing holds `online`, which runs a
+  log through any model as an app would. A file's `describe` blocks follow the order of the folder's source files or the
+  guide's sections, with a closing `properties` block in psychometrics; within a block, the comparisons with the reference
+  and the main behavior come first, then the options, then errors and edge cases. Titles are plain sentences about
+  behavior: `it("shares the places at a tied boundary equally")`.
+- Every public function has a test of input of other types, as JavaScript or JSON pass it: `null` options and arguments,
+  a string for a number, an object for an array, passed with `JSON.parse`, not a cast.
 - Properties that hold for any input (alpha at most 1, probabilities from 0 to 1, invariance to the order of persons,
   states left unchanged by `update`, states that continue identically after a JSON round trip, reproducible seeds) are
-  tested with fast-check. A generator of distinct doubles is `fc.uniqueArray(..., { comparator: "SameValueZero" })`,
-  because the default comparison draws -0 and 0 as two values, though they are one cut or node; the GritQL plugin
-  `biome/unique-doubles-same-value-zero.grit` makes `pnpm lint` fail otherwise.
+  tested with fast-check. A generator of distinct doubles is `fc.uniqueArray(..., { comparator: "SameValueZero" })`, as
+  the default comparison draws -0 and 0 as two values; the GritQL plugin `biome/unique-doubles-same-value-zero.grit`
+  makes `pnpm lint` fail otherwise.
 - Edge cases are tested for every function: constant items, persons and items without responses, one item, two persons;
-  an empty log, one learner, events out of time order, items and skills that are unknown, outcomes all correct or all
-  wrong, and each model's limits, such as BKT parameters at their bounds or a posterior mode beyond the IRT grid.
-- A module has benchmarks of its hot path in `test/<module>.bench.ts`, with the size of the input in the title of each, a
-  budget in `test/budgets.ts` and, where a reference does the task, the same task timed in
+  an empty log, one learner, events out of time order, unknown items and skills, outcomes all correct or all wrong, and
+  each model's limits, such as BKT parameters at their bounds or a posterior mode beyond the IRT grid.
+- A module has benchmarks of its hot path in `test/<module>.bench.ts`, the size of the input in the title of each, a budget
+  in `test/budgets.ts` and, where a reference does the task, the same task timed in
   `validation/benchmarks/<package>/<module>.R` on the same data. `docs/performance.md` explains the method and the budgets.
-- Test names are plain sentences about behavior: `it("shares the places at a tied boundary equally")`.
 - A bug fix comes with a test that fails without it, in the test file of the fixed folder.
 
 ## Where things go
 
-- A statistic: a file in its module folder, exported from the module's `index.ts`, with a row in the module's guide
-  in `docs/<package>/`, a reference in `validation/<package>/<module>.R` (or `.py`), a fixture, tests, and a tolerance
-  row in `docs/<package>/validation.md` if it needs its own.
+- A statistic: a file in its module folder, exported from the module's `index.ts`, with a row in the module's guide, a
+  reference in `validation/<package>/<module>.R` (or `.py`), a fixture, tests, and a tolerance row in
+  `docs/<package>/validation.md` if it needs its own.
 - A knowledge tracing model family: a module whose factory returns a `LearnerModel`, with its state and parameters as
   plain data and their checks, its steps for `replay` in `fit`, and the property tests of the interface.
-- A module: a folder in `src/` with `index.ts`, a subpath in the package's `package.json` `exports`, an entry point in
-  its `typedoc.json`, `export *` in `src/index.ts`, a test file, a guide in `docs/<package>/`, a reference script if it
-  computes statistics, benchmarks of its hot path with their budgets and, where a reference does the task, its timing in
-  `validation/benchmarks/`, import rules in `biome.json` and the table above, and a row in the API table of the package's
-  `README.md`.
-- A new package: a folder in `packages/` with the files listed under Layout, a project and a benchmark project in `vitest.config.ts`, an
-  entry in the root `typedoc.json`, a changeset, a row in the package table of the root `README.md` and, for a library,
+- A module: a folder in `src/` with `index.ts` (and `internal.ts` for what others share), a subpath in the package's
+  `exports`, an entry point in its `typedoc.json`, `export *` in `src/index.ts`, a test file, a guide, a reference script
+  if it computes statistics, benchmarks of its hot path with their budgets and, where a reference does the task, its
+  timing in `validation/benchmarks/`, import rules in `biome.json` and the table above, and a row in the API table of the
+  package's `README.md`.
+- A package: a folder in `packages/` with the files listed under Layout, a project and a benchmark project in
+  `vitest.config.ts`, an entry in the root `typedoc.json`, a changeset, a row in the root `README.md` and, for a library,
   `docs/<package>/`.
 - Numerics shared by modules: `math/`, internal unless users need them; numerics both libraries use: `@measurekit/core`.
 - Checks shared by modules: of one value in `@measurekit/core` or, if only that library uses it, `checks.ts` of the
-  library; otherwise with the data they check, such as
-  `data/dichotomous.ts` and `irt/items.ts` in psychometrics, `data/event.ts` and `model.ts` in knowledge tracing.
-- An example: `examples/<package>/<name>.ts`, importing the package by name, with a header comment that says what it
-  shows and how to run it. `pnpm test --project examples` runs every example on the sources and fails when one throws.
+  library; otherwise with the data they check, such as `data/dichotomous.ts` and `irt/items.ts` in psychometrics,
+  `data/event.ts` and `model.ts` in knowledge tracing.
+- An example: `examples/<package>/<name>.ts`, importing the package by name, with a header comment that says what it shows
+  and how to run it. `pnpm test --project examples` runs every example on the sources and fails when one throws.
