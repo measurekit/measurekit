@@ -1639,6 +1639,18 @@ describe("nominalResponse", () => {
     });
   });
 
+  it("computes the information of almost equal slopes to rounding, whatever their size", () => {
+    // Two categories give (a2 - a1)² p (1 - p) with p the logistic function of (a2 - a1) θ. The slopes differ by 6e-5,
+    // so their variance is 1e-9 and a rounding error of their mean, 4e-16, would show in its 7th digit.
+    const [low, high] = [-2.9999997615268814, -2.9999389350413916];
+    const item = { a: [low, high], c: [0, 0] };
+    const gap = high - low;
+    for (let theta = -6; theta <= 6; theta += 0.05) {
+      const p = 1 / (1 + Math.exp(-gap * theta));
+      expectClose(nominalResponse.information(item, theta) / (gap * gap * p * (1 - p)), 1, 1e-12, `theta ${theta}`);
+    }
+  });
+
   it("rejects slopes and intercepts of different lengths", () => {
     expect(() => nominalResponse.toVector({ a: [0, 1], c: [0, 1, 2] })).toThrow(
       "An NRM item needs finite slopes a and intercepts c, one of each per category and at least two categories, found a = [0, 1], c = [0, 1, 2].",

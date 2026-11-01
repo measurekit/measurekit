@@ -90,15 +90,19 @@ export const nominalResponse: IrtModel<NominalParameters> = {
     }
   },
   information({ a, c }, theta) {
-    // The variance of the slopes under the probabilities, by West's weighted update, which never goes below 0.
+    // The variance of the slopes under the probabilities, by West's weighted update, which never goes below 0. The
+    // slopes are taken from the first one: a variance does not change, and the first element then leaves a mean of 0
+    // exactly, where a mean of the slopes themselves has a rounding error that, as slopes come closer, grows against
+    // their variance.
     let largest = Number.NEGATIVE_INFINITY;
     for (let k = 0; k < a.length; k++) largest = Math.max(largest, (a[k] ?? 0) * theta + (c[k] ?? 0));
+    const origin = a[0] ?? 0;
     let total = 0;
     let mean = 0;
     let squares = 0;
     for (let k = 0; k < a.length; k++) {
-      const slope = a[k] ?? 0;
-      const weight = Math.exp(slope * theta + (c[k] ?? 0) - largest);
+      const slope = (a[k] ?? 0) - origin;
+      const weight = Math.exp((a[k] ?? 0) * theta + (c[k] ?? 0) - largest);
       // A weight that underflows adds nothing, and while the total is 0 it would make the mean 0 / 0.
       if (weight === 0) continue;
       total += weight;

@@ -106,7 +106,7 @@ export type AbilityEstimator = (items: readonly IrtItem[], responses: readonly (
 /** The interval of theta that estimation and information peaks search. */
 export const DEFAULT_THETA_RANGE = [-6, 6] as const;
 const STANDARD_PRIOR: ThetaPrior = { mean: 0, sd: 1 };
-/** Spacing of the grid on which modal estimation looks for maxima before refining them. */
+/** Spacing of the grid on which modal estimation looks for maxima before refining them, unless a caller asks for finer. */
 const SCAN_STEP = 0.25;
 
 /**
@@ -398,18 +398,21 @@ function answered(items: readonly IrtItem[], responses: readonly (number | null)
  * Returns the theta in [lower, upper] at which a function is largest, given its derivative `slope`.
  *
  * @remarks
- * The slope is evaluated on a grid; each change of sign from positive to negative brackets a local maximum, refined by
- * root finding. The ends are candidates where the function decreases into the interval. Candidates are compared by
- * `objective`, the function itself, when it is given; otherwise by the integral of the slope from `lower` by the
- * trapezoid rule, so that maxima can be compared when only the slope is known, as for the weighted likelihood.
+ * The slope is evaluated on a grid of spacing `step`; each change of sign from positive to negative brackets a local
+ * maximum, refined by root finding. A maximum and the minimum beside it that lie within one step of each other are not
+ * seen, so a function whose maxima can be that close, such as a polytomous item's information, needs a finer step.
+ * The ends are candidates where the function decreases into the interval. Candidates are compared by `objective`, the
+ * function itself, when it is given; otherwise by the integral of the slope from `lower` by the trapezoid rule, so that
+ * maxima can be compared when only the slope is known, as for the weighted likelihood.
  */
 export function modalTheta(
   slope: (theta: number) => number,
   [lower, upper]: readonly [number, number],
   objective?: (theta: number) => number,
+  step = SCAN_STEP,
 ): number {
   const valueAt = (theta: number, integral: number): number => (objective === undefined ? integral : objective(theta));
-  const intervals = Math.ceil((upper - lower) / SCAN_STEP);
+  const intervals = Math.ceil((upper - lower) / step);
   let previousTheta = lower;
   let previousSlope = slope(lower);
   let value = 0;

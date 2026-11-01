@@ -27,6 +27,7 @@ import {
   diagnosticKullbackLeibler,
   gdinaDiscriminationIndex,
   generalizedPartialCredit,
+  gradedResponse,
   type ItemSelectionRule,
   informationThreshold,
   itemInformation,
@@ -285,6 +286,21 @@ describe("aStratified", () => {
       const peak = informationPeak({ model: threeParameterLogistic, parameters });
       expectClose(peak, defined(cat3pl.peaks[i]), PEAK_TOLERANCE, id);
     });
+  });
+
+  it("finds the higher of two maxima of a graded item's information a few hundredths of theta apart", () => {
+    // The information peaks at 0.450 and at 0.512, the first higher by 1e-9 of itself, and dips between them by 1e-6:
+    // a grid of 0.25 steps over the first and finds the second. The second item mirrors the first with a positive slope.
+    const negative = { a: -2.844320553297738, b: [1.4756847516587377, 0.7572582335927899, 0.11278932628252365, 0] };
+    const positive = { a: 2.844320553297738, b: [-1.4756847516587377, -0.7572582335927899, -0.11278932628252365, 0] };
+    for (const parameters of [negative, positive]) {
+      const information = (theta: number): number => gradedResponse.information(parameters, theta);
+      let largest = 0;
+      for (let step = 0; step <= 12_000; step++) largest = Math.max(largest, information(-6 + step / 1000));
+      const peak = informationPeak({ model: gradedResponse, parameters });
+      expect(information(peak)).toBeGreaterThanOrEqual(largest * (1 - 1e-12));
+      expect(Math.abs(Math.abs(peak) - 0.45)).toBeLessThan(0.005);
+    }
   });
 
   it("takes the first items from the stratum of the lowest slopes of 2PL items, with b closest to theta", () => {

@@ -5,6 +5,13 @@ import { MIN_PROBABILITY } from "../irt/probability.js";
 import type { PoolItem } from "./items.js";
 import type { ItemSelectionRule } from "./selection.js";
 
+/**
+ * The spacing of the grid on which an item's information is searched for maxima. The information of a polytomous item
+ * can have two maxima a few hundredths of theta apart with almost equal heights, as a graded item of slope 2.8 and
+ * thresholds 0, 0.11, 0.76 and 1.48 has at 0.45 and 0.51; a coarser grid steps over the pair and may keep the lower one.
+ */
+const PEAK_SCAN_STEP = 0.01;
+
 /** The strata of a pool: each item's stratum and the theta at which its information peaks. */
 interface Strata {
   readonly stratum: Int32Array;
@@ -95,7 +102,8 @@ function eligibleStratum(stratum: Int32Array, eligible: Uint8Array, scheduled: n
 
 /**
  * Returns the theta in [-6, 6] at which an item's information is largest: of the roots of its derivative
- * I'(θ) = Σ_k (2 P'_k P''_k / P_k - P'_k³ / P_k²) and the ends, the one with the most information.
+ * I'(θ) = Σ_k (2 P'_k P''_k / P_k - P'_k³ / P_k²) found on a grid of 0.01, and the ends, the one with the most
+ * information.
  */
 export function informationPeak({ model, parameters }: IrtItem): number {
   const count = model.categoryCount(parameters);
@@ -113,5 +121,5 @@ export function informationPeak({ model, parameters }: IrtItem): number {
     }
     return sum;
   };
-  return modalTheta(slope, DEFAULT_THETA_RANGE, (theta) => model.information(parameters, theta));
+  return modalTheta(slope, DEFAULT_THETA_RANGE, (theta) => model.information(parameters, theta), PEAK_SCAN_STEP);
 }
