@@ -352,13 +352,80 @@ const fixed = decisionStudy(crossed, {
 A study is plain data that JSON serializes; `decisionStudy` checks one that comes from storage: its design, a size for
 every facet and one finite component for each effect.
 
+## Recipe: a multivariate G study
+
+Two scores of the same persons on the same items, such as a reading and a listening score on six items each, have a
+covariance as well as variances. The variance components of a score X + Y are those of X and Y plus twice their
+covariance components, so the covariance component of every effect comes from three studies of the univariate
+functions:
+
+```mermaid
+flowchart LR
+  X["generalizabilityStudy of X"] --> C["σ(X, Y) = (σ²(X + Y) - σ²(X) - σ²(Y)) / 2, effect by effect"]
+  Y["generalizabilityStudy of Y"] --> C
+  S["generalizabilityStudy of X + Y"] --> C
+  C --> R["Correlation of the universe scores: σ_p(X, Y) / √(σ²_p(X) σ²_p(Y))"]
+```
+
+The facets must be linked across the two scores: the same persons and the same items in both, which the cell of a
+person and an item having both scores gives. The sum is formed cell by cell.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { generalizabilityStudy } from "@measurekit/psychometrics/generalizability";
+
+// 300 persons answer 6 items twice; the universe scores correlate 0.6.
+const persons = 300;
+const items = 6;
+const random = createRandom(2026);
+const reading = Array.from({ length: persons }, () => random.normal());
+const listening = reading.map((score) => 0.6 * score + 0.8 * random.normal());
+const readingItems = Array.from({ length: items }, () => 0.3 * random.normal());
+const listeningItems = Array.from({ length: items }, () => 0.3 * random.normal());
+const x = reading.map((truth) => readingItems.map((effect) => truth + effect + random.normal()));
+const y = listening.map((truth) => listeningItems.map((effect) => truth + effect + random.normal()));
+
+/** The variance components of p × i for a score at each cell: the person, the item and the person by item. */
+const components = (cell: (person: number, item: number) => number): number[] =>
+  generalizabilityStudy(
+    Array.from({ length: persons * items }, (_, k) => {
+      const person = Math.floor(k / items);
+      const item = k % items;
+      return { levels: { person: `p${person}`, item: `i${item}` }, score: cell(person, item) };
+    }),
+    { facets: ["item"] },
+  ).components.map(({ variance }) => variance);
+
+const varianceX = components((p, i) => x[p]?.[i] ?? 0);
+const varianceY = components((p, i) => y[p]?.[i] ?? 0);
+const varianceSum = components((p, i) => (x[p]?.[i] ?? 0) + (y[p]?.[i] ?? 0));
+const covariance = varianceSum.map((total, k) => (total - (varianceX[k] ?? 0) - (varianceY[k] ?? 0)) / 2);
+// [0.568, 0.018, 0.0076], after rounding
+const correlation = (covariance[0] ?? 0) / Math.sqrt((varianceX[0] ?? 1) * (varianceY[0] ?? 1)); // 0.567
+```
+
+The covariance components equal those from the mean products of the two scores, (MP(p) - MP(pi)) / n_i for the person,
+within rounding. The universe scores correlate 0.567 here, against 0.6 in the data. The test of this recipe runs the
+code on the seeded scores and compares it with the mean products to 1e-9.
+
 ## Not included
 
-- Other estimators of the components of an unbalanced design: Henderson's Methods 2 and 3, REML and MIVQUE. Method 1 is
-  what urGENOVA and GeneralizIT compute; lme4 fits REML.
-- Multivariate generalizability theory, and standard errors and confidence intervals of the components.
-- Mixed-model G studies: fixed facets are handled in the D study, from the random-effects components.
-- Facets in the object of measurement: an object nested in another facet, such as persons within schools.
+- **Henderson's Method 2.** Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and
+  GeneralizIT compute and which is built.
+- **Henderson's Method 3.** Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and
+  GeneralizIT compute and which is built.
+- **REML estimates of the components of an unbalanced design.** Outside the sources: the estimator for unbalanced
+  designs is Method 1, which urGENOVA and GeneralizIT compute and which is built; lme4 fits REML.
+- **MIVQUE estimates of the components of an unbalanced design.** Outside the sources: the estimator for unbalanced
+  designs is Method 1, which urGENOVA and GeneralizIT compute and which is built.
+- **Multivariate generalizability theory.** No reference: Brennan's chapters 9 to 12 treat it, but no package runs it,
+  as mGENOVA is a Windows program. [A recipe](#recipe-a-multivariate-g-study) gets the covariance components from three
+  univariate studies.
+- **Standard errors and confidence intervals of the components.** No reference: Brennan's chapter 6 treats them, but no
+  package runs them.
+- **Mixed-model G studies.** No fit: fixed facets are handled in the D study, from the random-effects components.
+- **Facets in the object of measurement.** No reference: no package that fits an object nested in another facet, such as
+  persons within schools, was found.
 
 ## Differences from the references
 

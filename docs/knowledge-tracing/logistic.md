@@ -198,10 +198,10 @@ Every name of `computefeatures` in LKT 1.7.0, 49 in all, and what measurekit doe
 | `dashafm`, `dashsuc`, `ppe`                                                                                                                             | `dash`, `dashSuccess`, `ppe`                                                                                  |
 | `intercept`                                                                                                                                             | The intercept of each skill or item: the option `intercepts`                                                  |
 | `numer`                                                                                                                                                 | A covariate: the option `covariates`, one coefficient for each name                                           |
-| `recencytest`, `recencystudy`                                                                                                                           | Not included: they read `previousstudy`, whose line is commented out in LKT 1.7.0                             |
-| `base4`, `base5suc`, `base5fail`                                                                                                                        | Not included: their scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing effect              |
-| `diffrelcor1`, `diffrelcor2`, `diffcor1`, `diffcor2`, `diffcorComp`, `diffincorComp`, `diffallComp`, `diffincor1`, `diffincor2`, `diffall1`, `diffall2` | Not included: they read other learners, so a state is not a function of a learner's own events                |
-| `errordec`, `logitdecevol`, `baseratepropdec`                                                                                                           | Not included: they read an earlier model, or a parameter free for each item                                   |
+| `recencytest`, `recencystudy`                                                                                                                           | [Not included](#not-included)                                                                                 |
+| `base4`, `base5suc`, `base5fail`                                                                                                                        | [Not included](#not-included)                                                                                 |
+| `diffrelcor1`, `diffrelcor2`, `diffcor1`, `diffcor2`, `diffcorComp`, `diffincorComp`, `diffallComp`, `diffincor1`, `diffincor2`, `diffall1`, `diffall2` | [Not included](#not-included)                                                                                 |
+| `errordec`, `logitdecevol`, `baseratepropdec`                                                                                                           | [Not included](#not-included)                                                                                 |
 
 Of the 49 names, 28 are features, `intercept` and `numer` are the intercepts and covariates, and 19 are not included. The
 exposure features and the DAS3H windows are not LKT's. LKT's components map to the terms: a feature over `"skill"` or
@@ -277,6 +277,26 @@ skill; outcomes from 0 to 1 count as partial credit.
 | Singular information | `glm` gives `NA` to an aliased column  | `standardErrors` is `null`, as one number for a coefficient would not tell which is aliased                              |
 | Fixed proficiency    | `glm` drops an aliased column          | θ has a mean of 0 in each set, and the errors are those of the centered estimates, as sum contrasts give                 |
 | Estimated rates      | LKT's `seedpars` fits with a penalty   | `searchRates` maximizes the log-likelihood, so its rates differ from LKT's in the second decimal                         |
+
+## Not included
+
+- **Random slopes per learner.** No fit: `lme4` fits them, and a solver for random slopes would change the numerics that
+  every logistic model shares. iAFM users stay in R.
+- **`base4` of LKT.** Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing
+  effect.
+- **`base5suc` of LKT.** Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing
+  effect.
+- **`base5fail` of LKT.** Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing
+  effect.
+- **The `diff` features of LKT (`diffrelcor1` to `diffall2`).** No fit: they read other learners, so a state is not a
+  function of a learner's own events.
+- **`errordec` of LKT.** No fit: it reads an earlier model, so a state is not a function of a learner's own events.
+- **`logitdecevol` of LKT.** No fit: it reads an earlier model, or a parameter free for each item, so a state is not a
+  function of a learner's own events.
+- **`baseratepropdec` of LKT.** No fit: it reads an earlier model, or a parameter free for each item, so a state is not
+  a function of a learner's own events.
+- **`recencytest` of LKT.** No reference: it reads `previousstudy`, whose line is commented out in LKT 1.7.0.
+- **`recencystudy` of LKT.** No reference: it reads `previousstudy`, whose line is commented out in LKT 1.7.0.
 
 ## Errors
 

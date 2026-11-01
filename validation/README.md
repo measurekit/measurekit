@@ -106,6 +106,7 @@ Rscript validation/knowledge-tracing/kst.R       # structures, fringes, BLIM, II
 Rscript validation/knowledge-tracing/kst-structure.R  # base, atoms, neighbourhoods, paths, traces and closures by kst; clauses in base R
 Rscript validation/knowledge-tracing/kst-diagnostics.R  # BLIM with fixed and equal rates, comparison, identifiability, gradedness by pks; validity by kst; the test of a quasi order by the delta method (takes about 6 minutes)
 validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/bkt.py  # BKT by pyBKT: inference, EM from given and random starts, recovery; lessons as correct = -1, fixed rates, multipair
+validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/data-rows.py  # the sequences of outcomes that pyBKT's convert_data makes of the rows of ASSISTments and DataShop exports
 ```
 
 The R scripts need R with the packages pROC, irr, lme4, LiblineaR, LKT, mirt, kst, pks, DAKS, sets and jsonlite; `common.R`
@@ -114,7 +115,7 @@ or `irt.R drift` runs one part. `bkt.py` needs the Python environment below, and
 
 ### Python
 
-`bkt.py` runs in a Python 3.12 environment in `validation/knowledge-tracing/.venv`, which git ignores:
+`bkt.py` and `data-rows.py` run in a Python 3.12 environment in `validation/knowledge-tracing/.venv`, which git ignores:
 
 ```bash
 uv venv --python 3.12 validation/knowledge-tracing/.venv

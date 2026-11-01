@@ -191,6 +191,13 @@ the marginal log-likelihood of the outcomes on the grid, the learners' θ integr
 forward likelihood, each outcome predicted from the posterior advanced to its time; `aic` and `bic` are `null`, as the
 item parameters were estimated elsewhere.
 
+## Not included
+
+- **Multidimensional online IRT.** No fit: on the one-dimensional slice of the product grid, against 1,921 points and
+  the worst of 8 learners, 31 nodes err by 0.026 at 100 items and 0.104 at 300, 15 nodes by 0.282, 9 by 0.612 and 7 by
+  0.805, while the posterior SD is 0.10 to 0.18. A batch test sees one test, but an online state accumulates without
+  limit. Use one model for each section.
+
 ## References
 
 - Bock, R. D., & Mislevy, R. J. (1982). Adaptive EAP estimation of ability in a microcomputer environment. Applied

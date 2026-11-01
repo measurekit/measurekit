@@ -208,12 +208,17 @@ Invalid input throws `DataError` with the value found.
 
 ## Not included
 
-| Method                                  | Reason                                                                                                              |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Standard errors of a chain              | `equateIRT::chainec` gives them from each form's covariance; the library has no covariance of separate calibrations |
-| Growth curves and mixed models          | General statistics applied to scores; `lme4` fits them                                                              |
-| Student growth percentiles, value-added | Quantile regression and accountability policy, a wider domain than scaling                                          |
-| Hieronymus and Thurstone scaling        | Kolen and Brennan treat them, but no package gives a reference                                                      |
+- **Standard errors of a chain.** No fit: consecutive links share the estimates of the form between them, so per-link
+  covariances overstate the errors; `equateIRT::chainec` gives them from each form's covariance, and the library has no
+  covariance of separate calibrations.
+- **Growth curves.** No fit: general statistics applied to scores.
+- **Mixed models.** No fit: general statistics applied to scores; `lme4` fits them.
+- **Student growth percentiles.** No fit: quantile regression and accountability policy are a wider domain than scaling;
+  `SGP` exists on CRAN.
+- **Value-added models.** No fit: accountability policy is a wider domain than scaling.
+- **Hieronymus scaling.** No reference: Kolen and Brennan's chapter 9 treats it, and no package on CRAN does.
+- **Thurstone scaling.** No reference: Kolen and Brennan's chapter 9 treats it, and no package on CRAN does.
+- **Grade equivalents.** No reference: Kolen and Brennan's chapter 9 treats them, and no package on CRAN does.
 
 ## Differences from the references
 

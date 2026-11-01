@@ -267,13 +267,32 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
 
 ## Not included
 
-- The genetic algorithm and the extended search of the automated item selection, the Wald-based and range-preserving
-  tests of the item selection (`type.z`), and its test of H_i against the lower bound (`test.Hi`).
-- The other coefficients of `check.reliability` (λ₂ and LCRC, which needs a latent class model), `check.pmatrix` and
-  `check.restscore`; `monotonicity` covers the checks of the curves.
-- The other methods of the invariant item ordering check, item steps and the scale-level conditional proportions
-  (`IT` and `MSCPM`), and clustered items with a fixed item order.
-- Two-level scalability for clustered persons, such as raters, and the imputation of missing responses.
+- **The genetic algorithm of the automated item selection.** Outside the sources: an option of `mokken::aisp`
+  (`search`), off by default.
+- **The extended search of the automated item selection.** Outside the sources: an option of `mokken::aisp`, off by
+  default.
+- **The Wald-based test of the item selection (`type.z`).** Outside the sources: an option of `mokken::aisp`, off by
+  default.
+- **The range-preserving test of the item selection (`type.z`).** Outside the sources: an option of `mokken::aisp`, off
+  by default.
+- **The test of H_i against the lower bound (`test.Hi`).** Outside the sources: an option of `mokken::aisp`, off by
+  default.
+- **The coefficient λ₂ of `check.reliability`.** Outside the sources: Sijtsma and van der Ark (2017) name the
+  Molenaar-Sijtsma coefficient as a step, and it is built.
+- **The coefficient LCRC of `check.reliability`.** Outside the sources: Sijtsma and van der Ark (2017) name the
+  Molenaar-Sijtsma coefficient as a step, and it is built; LCRC needs a latent class model.
+- **`check.pmatrix`.** Outside the sources: `monotonicity` covers the checks of the curves.
+- **`check.restscore`.** Outside the sources: `monotonicity` covers the checks of the curves.
+- **Invariant item ordering by item steps (`IT`).** Outside the sources: the method of manifest invariant item ordering
+  (MIIO) is the practice, and is built.
+- **Invariant item ordering by the scale-level conditional proportions (`MSCPM`).** Outside the sources: the method of
+  manifest invariant item ordering (MIIO) is the practice, and is built.
+- **Clustered items with a fixed item order.** Outside the sources: the method of manifest invariant item ordering
+  (MIIO) is the practice, and is built.
+- **Two-level scalability for clustered persons, such as raters.** Outside the sources: a multilevel option of mokken
+  (`MLcoefH`).
+- **The imputation of missing responses.** Outside the sources: an option of mokken, beside the pairwise treatment that
+  is built.
 
 ## Differences from the references
 

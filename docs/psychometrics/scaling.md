@@ -309,12 +309,16 @@ plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes tak
 
 ## Not included
 
-- Smoothed or continuous norming, and weighted norm samples: they need a norming model, not a rank.
-- Growth during practice: learning models live in `@measurekit/knowledge-tracing`.
-- Model-based percentiles Φ((θ - μ) / σ): one line with a `GroupDistribution`'s `mean` and `sd`.
-- Scale anchoring and item mapping: descriptive work on a calibrated bank with no statistic of its own.
-- A copula other than the Gaussian: the correlation bounds of comonotonicity and independence hold for any copula, but the
-  Gaussian one is the usual choice for separate posteriors and needs one matrix.
+- **Smoothed or continuous norming.** Outside the sources: a clinical practice with competing models (`cNORM`); it needs
+  a norming model, not a rank.
+- **Weighted norm samples.** Outside the sources: a clinical practice with competing models; they need a norming model,
+  not a rank.
+- **Growth during practice.** No fit: learning models live in `@measurekit/knowledge-tracing`.
+- **Model-based percentiles Φ((θ - μ) / σ).** No fit: one line with a `GroupDistribution`'s `mean` and `sd`.
+- **Scale anchoring.** No reference: descriptive work on a calibrated bank with no statistic of its own.
+- **Item mapping.** No reference: descriptive work on a calibrated bank with no statistic of its own.
+- **A copula other than the Gaussian.** Outside the sources: the correlation bounds of comonotonicity and independence
+  hold for any copula, but the Gaussian one is the usual choice for separate posteriors and needs one matrix.
 
 ## Differences from the references
 

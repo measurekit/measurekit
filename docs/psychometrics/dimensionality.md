@@ -246,10 +246,18 @@ negative.
 
 ## Not included
 
-- Factor extraction other than minres, such as maximum likelihood, and other rotations, such as promax.
-- DETECT and DIMTEST.
-- Polyserial correlations of scores with categories, and standard errors of the correlations.
-- Weights of persons, and a correlation matrix as input: the functions take responses.
+- **Factor extraction other than minres, such as maximum likelihood.** Outside the sources: an option of `psych::fa`,
+  beside the minres extraction that is built.
+- **Rotations other than varimax and oblimin, such as promax.** Outside the sources: options of `psych::fa`, beside
+  oblimin, its default, and varimax, which are built.
+- **DETECT.** Outside the sources: a method for clusters of items, beside the parallel analysis, MAP and factor analysis
+  that are built.
+- **DIMTEST.** No reference: no package that runs it was found.
+- **Polyserial correlations of scores with categories.** Outside the sources: not confirmed in them; `itemRest` serves
+  polytomous item analysis.
+- **Standard errors of the correlations.** Outside the sources: a bootstrap over the persons gives them.
+- **Weights of persons.** Outside the sources: the functions take responses.
+- **A correlation matrix as input.** Outside the sources: the functions take responses.
 
 ## Differences from psych
 

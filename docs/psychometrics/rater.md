@@ -403,10 +403,12 @@ no cell.
 
 ### Not included
 
-- Joint maximum likelihood (FACETS), whose measures are biased for short tests; marginal maximum likelihood is
-  consistent. Measures differ from FACETS' by its bias.
-- Rater drift over time and the hierarchical rater model, each of which needs its own terms in the model.
-- A person facet other than one: the persons are the only random facet.
+- **Joint maximum likelihood (FACETS).** Outside the sources: its measures are biased for short tests, and marginal
+  maximum likelihood is consistent. Measures differ from FACETS' by its bias.
+- **Rater drift over time.** No reference: it needs its own terms in the model, and no package that runs it was found.
+- **The hierarchical rater model.** No reference: it needs its own terms in the model, and no package that runs it was
+  found.
+- **A person facet other than one.** No reference: the persons are the only random facet.
 
 ### Differences from FACETS
 

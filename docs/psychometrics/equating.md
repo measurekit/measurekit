@@ -453,13 +453,22 @@ irtEquatingStandardErrors(formX, formY, covariance, { method: "observed-score" }
 
 ## Not included
 
-- Standard errors of IRT equating across separate calibrations joined by linking: they need the joint covariance of the
-  linking coefficients and both calibrations (Ogasawara, 2001).
-- Braun-Holland linear, circle-arc and nominal weights equating, kernel equating, and cubic-spline postsmoothing:
-  presmoothing covers smoothing, and the others see little use.
-- Analytic standard errors of observed-score equating: the bootstrap is equate's method.
-- Standard errors of a chain of links: consecutive links share the estimates of the form between them, so they need the
-  covariance of the calibrations, as the standard errors across separate calibrations do.
+- **Standard errors of IRT equating across separate calibrations.** No fit: they need each form's item parameters and
+  their covariance, and the joint covariance of the linking coefficients (Ogasawara, 2001).
+- **Standard errors of a chain of links.** No fit: consecutive links share the estimates of the form between them, so
+  per-link covariances overstate the errors; `equateIRT::chainec` gives them from each form's covariance.
+- **Braun-Holland linear equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the
+  linear, equipercentile and frequency estimation families that are built.
+- **Circle-arc equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the families
+  that are built.
+- **Nominal weights equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the
+  families that are built.
+- **Kernel equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is presmoothed
+  equipercentile equating, which is built.
+- **Cubic-spline postsmoothing.** No reference: no R package for it was found, and the C code of Equating Recipes was
+  not run.
+- **Analytic standard errors of observed-score equating.** No reference: `equate` has only the bootstrap, and
+  `bootstrapEquating` is built.
 
 ## Differences from the references
 

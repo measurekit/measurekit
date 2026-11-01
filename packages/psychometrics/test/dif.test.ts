@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { purified } from "../src/dif/purification.js";
 import {
+  createRandom,
   DataError,
   type DifGroup,
   type DifPurification,
@@ -17,6 +18,9 @@ import {
   ordinalLogisticRegressionDif,
   type PurificationOptions,
   responseMatrix,
+  simulateItems,
+  simulateResponses,
+  simulateThetas,
   twoParameterLogistic,
 } from "../src/index.js";
 import fixture from "./fixtures/dif.json" with { type: "json" };
@@ -822,5 +826,39 @@ describe("properties", () => {
         });
       }),
     );
+  });
+});
+
+describe("the recipe for several focal groups", () => {
+  const random = createRandom(2026);
+  const items = simulateItems(twoParameterLogistic, 10, random);
+  const harder = (shifts: Readonly<Record<number, number>>) =>
+    items.map((item, j) => ({ ...item, parameters: { ...item.parameters, b: item.parameters.b + (shifts[j] ?? 0) } }));
+  // Item 5 is one point harder for both focal groups, and item 8 half a point harder for the second.
+  const populations = { reference: items, first: harder({ 4: 1 }), second: harder({ 4: 1, 7: 0.5 }) };
+  const responses = Object.fromEntries(
+    Object.entries(populations).map(([name, population]) => [
+      name,
+      simulateResponses(population, simulateThetas(500, random), random).responses,
+    ]),
+  );
+
+  /** The ids of the items that Mantel-Haenszel flags for a focal group against the reference group, Bonferroni over the 20 tests. */
+  const flagged = (focal: "first" | "second"): string[] => {
+    const matrix = responseMatrix([...(responses.reference ?? []), ...(responses[focal] ?? [])]);
+    const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+    return mantelHaenszel(matrix, groups)
+      .items.filter((item) => (item.significance ?? 1) < 0.05 / 20)
+      .map((item) => item.id);
+  };
+
+  it("flags the item that is harder for both focal groups against the reference group in each comparison", () => {
+    expect(flagged("first")).toContain("item5");
+    expect(flagged("second")).toContain("item5");
+  });
+
+  it("flags the item that is harder for the second focal group alone in its comparison", () => {
+    expect(flagged("second")).toContain("item8");
+    expect(flagged("first")).not.toContain("item8");
   });
 });

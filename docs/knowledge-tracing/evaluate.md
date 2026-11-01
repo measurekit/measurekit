@@ -348,6 +348,9 @@ categorizeCurve(fractions, { minLearners: 3, minPoints: 3, slope: 0.2, minSlope:
 
 - **DeLong's test of two AUCs.** No fit: it assumes independent events, which a log breaks. Use `compareByLearner`;
   `pROC` has DeLong's.
+- **Knowledge component search.** No reference: no package implements Learning Factors Analysis, as one search and a
+  CRAN listing found. LKT's `autoKC` clusters items, which is another method. The evaluation tools compare candidate
+  Q-matrices.
 
 ## Differences from the references
 

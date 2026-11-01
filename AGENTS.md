@@ -308,7 +308,10 @@ Knowledge tracing: the model families never import each other, nor does anything
   probability enters a log-likelihood as at least `MIN_PROBABILITY` of `irt/probability.ts`, through its `logProbability`,
   so that no likelihood is 0; knowledge tracing throws `DataError` for outcomes of probability 0.
 - A number with a meaning is a named constant with its source, such as the reference's name for it.
-- No speculative options, abstractions or modules. Add a method only when a real use needs it, with its validation.
+- A capability is built when the sources listed in `docs/<package>/architecture.md` treat it as standard practice, a usable
+  reference exists and it fits a library. The guide lists the rest under "Not included", one bullet per method, each
+  `- **Method.** Reason: why`, with Reason one of No fit, No reference or Outside the sources. No speculative options,
+  abstractions or modules.
 
 ## Repeats left on purpose
 

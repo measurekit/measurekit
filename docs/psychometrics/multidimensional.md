@@ -194,7 +194,9 @@ parameters of anchor items, which are not estimated; the other items are estimat
 | Variances                         | 1                                      | Estimated                              | Estimated                              |
 | Correlations                      | Estimated with `correlated`, 0 without | Estimated with `correlated`, 0 without | Estimated with `correlated`, 0 without |
 
-The first group is the first label in order of first appearance. The groups must share items, directly or through other
+The means of the other groups are their latent means on the scale of the first group, in the `means` of each group of the
+result; the longitudinal calibration below estimates the means of the occasions after the first in the same way. The
+first group is the first label in order of first appearance. The groups must share items, directly or through other
 groups: a group that shares none with the first throws a `DataError`, as its distribution could not be put on the scale
 of the others. With `fixed`, the fixed items set the scale of each set of groups that share items, so every dimension
 needs a fixed item with a slope on it that the set answered; otherwise a `DataError`. A fixed item needs parameters of
@@ -600,18 +602,24 @@ convert items to and from mirt.
 
 ## Not included
 
-- Noncompensatory models; multidimensional GPCM and nominal models.
-- Bifactor models with an item in two specific dimensions, correlated specific dimensions or more than two primary
-  dimensions: `calibrateMultidimensional` with `loadings` fits them by MH-RM.
-- Multidimensional linking of separate calibrations: groups are calibrated together, on one scale.
-- QMC-EM.
-- Standard errors of the means and covariances of the groups; the items' standard errors account for them.
-- Items whose parameters differ between groups; the groups share one set of item parameters.
-- More than three occasions: the grid has a dimension for each, and the grids that a product can afford are too coarse
-  for the correlations that longitudinal data have ([why](#longitudinal-calibration)).
-- Structured means and covariances of the occasions, such as a growth curve or an autoregressive covariance: every
-  mean, standard deviation and correlation of the later occasions is free.
-- Multidimensional person fit and DIF.
+- **Noncompensatory models.** Outside the sources: a variant of the compensatory models; the graded model covers ordered
+  items.
+- **Multidimensional GPCM.** Outside the sources: a variant of the graded model, which covers ordered items.
+- **Multidimensional nominal models.** Outside the sources: a variant of the graded model, which covers ordered items.
+- **Multidimensional linking of separate calibrations.** Outside the sources: concurrent calibration of groups is the
+  practice here, though Reckase gives linking a chapter; the groups are calibrated together, on one scale.
+- **QMC-EM.** Outside the sources: an option of mirt (`method = "QMCEM"`), and MH-RM serves high dimensions.
+- **Standard errors of the means and covariances of the groups.** Outside the sources: the items' standard errors
+  account for them.
+- **Items whose parameters differ between groups.** Outside the sources: the groups share one set of item parameters.
+- **More than three occasions.** No fit: the grid has a dimension for each, and the grids that a product can afford are
+  too coarse for the correlations that longitudinal data have; on them mirt itself returns wrong moments that report
+  `converged` ([why](#longitudinal-calibration)).
+- **Structured means and covariances of the occasions, such as a growth curve or an autoregressive covariance.** No fit:
+  every mean, standard deviation and correlation of the later occasions is free, and a structure on them is a model of
+  growth fitted to the estimated moments.
+- **Multidimensional person fit.** Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.
+- **Multidimensional DIF.** Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.
 
 ## Differences from mirt
 

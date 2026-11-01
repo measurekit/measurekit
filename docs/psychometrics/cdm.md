@@ -272,11 +272,19 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 
 ## Not included
 
-- The likelihood ratio and Lagrange multiplier tests of `modelcomp`, which refit each item under each model, and the
-  item-wise and complete information matrices of `SE.type` 1 and 3.
-- Monotonicity constraints, sequential CDMs and hierarchical attribute structures.
-- The R-RUM's original (π*, r*) parameters, which follow from `coefficients` as above.
-- Adaptive cognitive diagnosis (CD-CAT), higher-order attribute models and polytomous attributes.
+- **The likelihood ratio test of `modelcomp`.** Outside the sources: the Wald test is the step for choosing a model per
+  item, and it is built; the likelihood ratio refits each item under each model.
+- **The Lagrange multiplier test of `modelcomp`.** Outside the sources: the Wald test is the step for choosing a model
+  per item, and it is built; the Lagrange multiplier test refits each item under each model.
+- **The item-wise and complete information matrices of `SE.type` 1 and 3.** Outside the sources: options of GDINA,
+  beside the standard errors that are built.
+- **Monotonicity constraints.** Outside the sources: an option of GDINA (`mono.constraint`), off by default.
+- **Sequential CDMs.** Outside the sources: an option of GDINA (`sequential`), off by default.
+- **Hierarchical attribute structures.** Outside the sources: an option of GDINA (`att.str`), off by default.
+- _*The R-RUM's original (π*, r_) parameters.** No fit: they follow from `coefficients`, as above.
+- **Higher-order attribute models.** Outside the sources: a variant, as GDINA's `att.dist` shows; the saturated
+  distribution of the profiles is its default.
+- **Polytomous attributes.** Outside the sources: a variant of the models for attributes mastered or not.
 
 ## References
 

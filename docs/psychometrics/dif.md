@@ -282,11 +282,77 @@ example above. A matching score that is not a sum of items cannot lose items to 
 
 ## Not included
 
-- The exact Mantel-Haenszel test, Wald tests, and matching on a score other than the total for the Mantel-Haenszel
-  and logistic regression statistics.
-- Polytomous IRT likelihood-ratio and Lord tests, which need multiple-group IRT; lordif's iterated theta with
-  group-specific item parameters, of which one pass is the composition above; lordif's `minCell` collapsing of sparse
-  categories; the Mantel test matched on theta, which needs a discretization; multiple focal groups.
+- **The exact Mantel-Haenszel test.** Outside the sources: an option of `difR::difMH`, off by default.
+- **Wald tests.** Outside the sources: an option of difR (`criterion = "Wald"` of `difLogistic`), whose default, the
+  likelihood ratio, is built.
+- **Matching on a score other than the total for the Mantel-Haenszel and logistic regression statistics.** Outside the
+  sources: an option of difR, off by default.
+- **Polytomous IRT likelihood-ratio tests.** Outside the sources: they need multiple-group IRT, and ordinal logistic
+  regression and the Mantel test are the practice for polytomous items.
+- **Lord's test for polytomous items.** Outside the sources: it needs multiple-group IRT, and ordinal logistic
+  regression and the Mantel test are the practice.
+- **The iterated theta of lordif with group-specific item parameters.** Outside the sources: one pass of lordif is the
+  composition above, and ordinal logistic regression is the practice.
+- **lordif's `minCell` collapsing of sparse categories.** Outside the sources: ordinal logistic regression and the
+  Mantel test are the practice.
+- **The Mantel test matched on theta.** Outside the sources: it needs a discretization, and the Mantel test matched on
+  the total score is the practice.
+- **Multiple focal groups.** Outside the sources: the sources were not confirmed to treat it, and [a
+  recipe](#recipe-several-focal-groups) runs `mantelHaenszel` for each focal group.
+
+## Recipe: several focal groups
+
+The functions compare one focal group with the reference group. For several focal groups, such as the languages of a
+test, compare each with the reference group on the persons of the two, and correct the level of significance for the
+number of tests. This is what `difR::difMH` does for one pair, repeated.
+
+```mermaid
+flowchart LR
+  R["Reference group"] --> A["Persons of the reference group and focal group 1"] --> M1["mantelHaenszel"]
+  F1["Focal group 1"] --> A
+  R --> B["Persons of the reference group and focal group 2"] --> M2["mantelHaenszel"]
+  F2["Focal group 2"] --> B
+  M1 --> C["Items flagged at 0.05 over the number of tests"]
+  M2 --> C
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { type DifGroup, mantelHaenszel } from "@measurekit/psychometrics/dif";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 500 persons in each of three groups answer 10 items. Item 5 is one point harder for both focal groups, and item 8
+// half a point harder for the second.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 10, random);
+const harder = (shifts: Record<number, number>) =>
+  items.map((item, j) => ({ ...item, parameters: { ...item.parameters, b: item.parameters.b + (shifts[j] ?? 0) } }));
+const populations = { reference: items, first: harder({ 4: 1 }), second: harder({ 4: 1, 7: 0.5 }) };
+const responses = Object.fromEntries(
+  Object.entries(populations).map(([name, population]) => [
+    name,
+    simulateResponses(population, simulateThetas(500, random), random).responses,
+  ]),
+);
+
+// The items each focal group's comparison flags, with 20 tests in all.
+const flagged = (focal: "first" | "second"): string[] => {
+  const matrix = responseMatrix([...(responses.reference ?? []), ...(responses[focal] ?? [])]);
+  const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+  return mantelHaenszel(matrix, groups)
+    .items.filter((item) => (item.significance ?? 1) < 0.05 / 20)
+    .map((item) => item.id);
+};
+flagged("first"); // ["item4", "item5"]
+flagged("second"); // ["item5", "item8"]
+```
+
+Item 5 is flagged for both focal groups and item 8 for the second alone. Item 4 is a chance flag at this seed: the
+correction holds the chance of any false flag to 0.05, so one comes about once in 20 such analyses. A statistic that
+compares all the groups at once, as `difR::difGMH` does, is a different statistic from this recipe's pairs. The test of
+this recipe runs the code on the seeded groups and checks that item 5 is flagged in both comparisons.
 
 ## Differences from difR
 

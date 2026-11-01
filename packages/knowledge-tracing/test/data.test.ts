@@ -17,6 +17,7 @@ import {
   splitByTime,
 } from "../src/index.js";
 import firstAttemptFixture from "./fixtures/data-first-attempts.json" with { type: "json" };
+import rowFixture from "./fixtures/data-rows.json" with { type: "json" };
 import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
 import { defined } from "./helpers.js";
 
@@ -495,5 +496,69 @@ describe("data input from JavaScript", () => {
       'The number of folds must be an integer from 2, found "2".',
     );
     expect(() => splitByTime(log, missing)).toThrow("The number of folds must be an integer from 1, found null.");
+  });
+});
+
+describe("the recipe for the rows of an export", () => {
+  /** An ASSISTments row: one for each skill of an attempt, with the attempt's `order_id`. */
+  type AssistmentsRow = (typeof rowFixture.assistments.rows)[number];
+  /** A DataShop row. */
+  type DataShopRow = (typeof rowFixture.dataShop.rows)[number];
+
+  const assistmentsLog = (rows: readonly AssistmentsRow[]): EventLog => {
+    const attempts = new Map<
+      number,
+      { learner: string; item: string; skills: string[]; time: number; outcome: number }
+    >();
+    for (const row of rows) {
+      const attempt = attempts.get(row.order_id) ?? {
+        learner: String(row.user_id),
+        item: String(row.problem_id),
+        skills: [],
+        time: row.order_id,
+        outcome: row.correct,
+      };
+      attempt.skills.push(row.skill_name);
+      attempts.set(row.order_id, attempt);
+    }
+    return eventLog([...attempts.values()]);
+  };
+
+  const dataShopLog = (rows: readonly DataShopRow[]): EventLog =>
+    eventLog(
+      rows.map((row) => ({
+        learner: row["Anon Student Id"],
+        item: `${row["Problem Name"]} ${row["Step Name"]}`,
+        skills: row["KC (Default)"] === "" ? [] : row["KC (Default)"].split("~~"),
+        time: row.Row,
+        outcome: row["First Attempt"] === "correct" ? 1 : 0,
+      })),
+    );
+
+  /** The outcomes of each learner for each skill, in the order of the log. */
+  const sequencesBySkill = (log: EventLog): Record<string, Record<string, number[]>> => {
+    const sequences: Record<string, Record<string, number[]>> = {};
+    for (const event of log) {
+      for (const skill of event.skills) {
+        const learners = sequences[skill] ?? {};
+        const outcomes = learners[event.learner] ?? [];
+        outcomes.push(event.outcome ?? 0);
+        learners[event.learner] = outcomes;
+        sequences[skill] = learners;
+      }
+    }
+    return sequences;
+  };
+
+  it("makes the sequences of outcomes that pyBKT's convert_data makes of ASSISTments rows", () => {
+    expect(sequencesBySkill(assistmentsLog(rowFixture.assistments.rows))).toEqual(rowFixture.assistments.sequences);
+  });
+
+  it("makes the sequences that convert_data makes of DataShop rows with the skills of a step split", () => {
+    const log = dataShopLog(rowFixture.dataShop.rows);
+    expect(sequencesBySkill(log)).toEqual(rowFixture.dataShop.sequences);
+    // The steps that no skill covers are attempts at no skill, and a hint or an error counts as incorrect.
+    expect(log.filter((event) => event.skills.length === 0)).toHaveLength(3);
+    expect(log.filter((event) => event.skills.length === 2).length).toBeGreaterThan(0);
   });
 });

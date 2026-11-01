@@ -142,6 +142,7 @@ Invalid input throws `DataError` with the value found.
 
 ## Not included
 
-| Method                                                                             | Reason                                                                                          |
-| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| The cutoffs of clinical significance, and other forms of the reliable change index | Outside the sources the module follows, Cronbach and Furby (1970) and Jacobson and Truax (1991) |
+- **The cutoffs of clinical significance.** Outside the sources: the module takes from Jacobson and Truax (1991) the
+  reliable change index and from Cronbach and Furby (1970) the measurement of change.
+- **Other forms of the reliable change index.** Outside the sources: the module follows the index of Jacobson and Truax
+  (1991).

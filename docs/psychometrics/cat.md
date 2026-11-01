@@ -1022,28 +1022,45 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 
 ## Not included
 
-- Diagnostic tests of polytomous items or attributes, and tests that mix IRT and diagnostic items.
-- Exposure calibration for diagnostic tests: `calibrateExposure` takes IRT tests only; set `exposure` on the items.
-- The dual rule on the two largest posteriors, the Jensen-Shannon divergence rule, which ranks items as `shannonEntropy`
-  does, and the nonparametric selection rules NPS and GNPS.
-- Multidimensional selection by A-, E- and KL-optimality, which change no use that the D-rule does not serve; polytomous
+- **Diagnostic tests of polytomous items or attributes.** No reference: `cdcatR::cdcat` takes a GDINA fit, and none was
+  found for polytomous items or attributes.
+- **Tests that mix IRT and diagnostic items.** No reference: no package that mixes the two was found.
+- **Exposure calibration for diagnostic tests.** Outside the sources: progressive restriction, as `cdcatR` does it, is a
+  research topic. `calibrateExposure` takes IRT tests only; set `exposure` on the items.
+- **The dual rule on the two largest posteriors.** Outside the sources: GDI and PWKL are the practice, and both are
+  built.
+- **The Jensen-Shannon divergence rule.** Outside the sources: GDI and PWKL are the practice, and it ranks items as
+  `shannonEntropy` does.
+- **The nonparametric selection rules NPS and GNPS.** Outside the sources: GDI and PWKL are the practice, and both are
+  built.
+- **A-optimal multidimensional selection.** Outside the sources: the D-rule is the practice, and is built; polytomous
   items are supported through any model of the pool.
-- Exposure calibration for multidimensional tests: `calibrateExposure` takes IRT tests only; set `exposure` by hand.
-- Testlets from which only some items are administered, such as a passage with more questions than a test takes, and
-  testlets whose items are in several target areas under content balancing.
-- Shadow tests: a test that solves an integer program at each step to meet its bounds exactly, as mirtCAT's `constr_fun`
-  does. It needs a solver, and measurekit has no dependency. The bounds of `contentBounds` hold by a filter, with a greedy
-  cover for items in several areas; a shadow test fits `ItemSelectionRule` as a rule, so a later start changes no type.
-- Content bounds across the stages of a multistage panel: a module is assembled by [form assembly](#form-assembly), which
-  holds bounds per module.
-- Exact assembly: a solver proves a blueprint infeasible and finds a smaller gap from the target, by integer programming
-  with the minimax model; measurekit has no solver dependency, and a later one fits an option with no type changed.
-- Items every form must hold, such as the anchors of a NEAT design: assemble the rest around them, lowering the bounds
-  and the targets by the anchors' values.
-- A testlet-level exposure parameter: the `exposure` of the first item to be administered acts for its testlet.
-- Routing cuts by other rules than equal information and shares of a population, such as optimizing the accuracy of
-  classification, and cuts that differ with the route that led to a module, except through the items on the scale
-  `"number-correct"`.
+- **E-optimal multidimensional selection.** Outside the sources: the D-rule is the practice, and is built.
+- **KL-optimal multidimensional selection.** Outside the sources: van der Linden and Glas give it a chapter as a variant
+  of the D-rule, which is the practice and is built.
+- **Exposure calibration for multidimensional tests.** No reference: no package that calibrates it was found.
+  `calibrateExposure` takes IRT tests only; set `exposure` by hand.
+- **Testlets from which only some items are administered, such as a passage with more questions than a test takes.** No
+  reference: no package that administers part of a testlet was found.
+- **Testlets whose items are in several target areas under content balancing.** No reference: no package that balances
+  content over testlets was found, so a rule for items in several areas has nothing to match.
+- **A testlet-level exposure parameter.** No reference: the `exposure` of the first item to be administered acts for its
+  testlet.
+- **Shadow tests.** No fit: a test that solves an integer program at each step to meet its bounds exactly, as mirtCAT's
+  `constr_fun` does, needs a solver, and measurekit has no dependency. The bounds of `contentBounds` hold by a filter,
+  with a greedy cover for items in several areas; a shadow test fits `ItemSelectionRule` as a rule, so a later start
+  changes no type.
+- **Content bounds across the stages of a multistage panel.** No fit: a module is assembled by [form
+  assembly](#form-assembly), which holds bounds per module.
+- **Exact assembly.** No fit: a solver proves a blueprint infeasible and finds a smaller gap from the target, by integer
+  programming with the minimax model; measurekit has no solver dependency, and a later one fits an option with no type
+  changed.
+- **Items every form must hold, such as the anchors of a NEAT design.** No fit: a host assembles the rest around them,
+  lowering the bounds and the targets by the anchors' values.
+- **Routing cuts by other rules than equal information and shares of a population.** Outside the sources: optimizing the
+  accuracy of classification is a variant of the two rules that are built.
+- **Cuts that differ with the route that led to a module.** Outside the sources: the cuts of a stage are the same for
+  every route, except through the items on the scale `"number-correct"`.
 
 ## Differences from catR
 

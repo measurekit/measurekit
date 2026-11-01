@@ -132,8 +132,8 @@ both PRMSEs are `null` and `addedValue` is `false`.
 
 ### Not included
 
-- The comparison of the PRMSEs' significance (Olkin, Williams): `addedValue` is the plain comparison, as CTTsub's
-  `added.value.s`.
+- **The significance of differences between PRMSEs (Olkin, Williams).** Outside the sources: `subscore` has no such
+  test, and `addedValue` is the plain comparison, as CTTsub's `added.value.s`.
 
 ### Differences from the subscore package
 

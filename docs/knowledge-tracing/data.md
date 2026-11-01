@@ -125,3 +125,88 @@ const byTime = splitByTime(log, 1); // [{ train: the earlier events, test: the l
 - **By time.** Blocks have about equal numbers of events. A boundary falls after the last event of its time, so a
   model never trains on an event at or after the time of one it predicts. `folds` is at least 1; one fold is a single
   split at the middle of the log. Too few distinct times for the blocks throw `DataError`.
+
+## Recipe: the rows of an export
+
+A log read from a file is a table of rows. The package does no I/O, so a caller reads the file and maps the columns to
+events in a few lines. The mapping decides three things: which column orders the attempts, which holds the outcome, and
+how an attempt with several skills is written. `eventLog` then orders the events by that time and checks them.
+
+```mermaid
+flowchart LR
+  A["ASSISTments: one row for each skill of an attempt, order_id"] -->|"rows with one order_id are one attempt"| E["Event: skills of the rows"]
+  D["DataShop: one row for each step, KC joined by ~~"] -->|"split the KC at ~~"| E
+  E --> L["eventLog: ordered by time, checked"]
+```
+
+| Event field | ASSISTments                                  | DataShop                                                          |
+| ----------- | -------------------------------------------- | ----------------------------------------------------------------- |
+| `learner`   | `user_id`                                    | `Anon Student Id`                                                 |
+| `item`      | `problem_id`                                 | `Problem Name` and `Step Name`                                    |
+| `skills`    | The `skill_name` of every row of the attempt | `KC (Default)` split at `~~`; none where it is empty              |
+| `time`      | `order_id`                                   | `Row`, which orders the steps and breaks ties of equal timestamps |
+| `outcome`   | `correct`                                    | 1 for `correct`; 0 for `incorrect` and `hint`, as DataShop counts |
+
+```ts
+import { eventLog } from "@measurekit/knowledge-tracing/data";
+
+interface AssistmentsRow {
+  order_id: number;
+  user_id: number;
+  problem_id: number;
+  skill_name: string;
+  correct: number;
+}
+
+// Rows that share an order_id are one attempt at several skills.
+function assistmentsLog(rows: readonly AssistmentsRow[]) {
+  const attempts = new Map<
+    number,
+    { learner: string; item: string; skills: string[]; time: number; outcome: number }
+  >();
+  for (const row of rows) {
+    const attempt = attempts.get(row.order_id) ?? {
+      learner: String(row.user_id),
+      item: String(row.problem_id),
+      skills: [],
+      time: row.order_id,
+      outcome: row.correct,
+    };
+    attempt.skills.push(row.skill_name);
+    attempts.set(row.order_id, attempt);
+  }
+  return eventLog([...attempts.values()]);
+}
+
+interface DataShopRow {
+  Row: number;
+  "Anon Student Id": string;
+  "Problem Name": string;
+  "Step Name": string;
+  "KC (Default)": string;
+  "First Attempt": string;
+}
+
+function dataShopLog(rows: readonly DataShopRow[]) {
+  return eventLog(
+    rows.map((row) => ({
+      learner: row["Anon Student Id"],
+      item: `${row["Problem Name"]} ${row["Step Name"]}`,
+      skills: row["KC (Default)"] === "" ? [] : row["KC (Default)"].split("~~"),
+      time: row.Row,
+      outcome: row["First Attempt"] === "correct" ? 1 : 0,
+    })),
+  );
+}
+```
+
+A step with no skill is an attempt at none, which no skill's model counts. The test of this recipe runs both functions
+on seeded rows of each export and compares the outcomes of each learner at each skill, in order, with the data that
+pyBKT's `convert_data` makes of the same rows ([validation](validation.md)).
+
+## Not included
+
+- **Reading files.** No fit: the package does no I/O, so a caller reads the file and maps its rows, as the recipe above
+  shows.
+- **Reading the rows of DataShop and ASSISTments.** No fit: a map of column names is not a method; the [recipe
+  above](#recipe-the-rows-of-an-export) is the map.

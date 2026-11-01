@@ -115,6 +115,13 @@ a malformed state, naming the field. Item ratings `{ difficulty, count }` are pl
 Elo defines no mastery, so the model has no `mastery` member. `predict` gives the probability of answering a given
 item, which practice decisions can use directly.
 
+## Not included
+
+- **Glicko.** Outside the sources: Pelánek (2016) names it and sets it aside, as its Bayesian derivation is hard to
+  modify for a new situation, such as the shifted logistic of multiple-choice answers; Elo with an uncertainty function is
+  built.
+- **Urnings.** Outside the sources: it postdates Pelánek (2016), and no package has it.
+
 ## References
 
 - Nižnan, J., Pelánek, R., & Řihák, J. (2015). Student models for prior knowledge estimation. In Proceedings of the

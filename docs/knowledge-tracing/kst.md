@@ -392,8 +392,13 @@ probability of a smaller one, so values differ for one-sided tests.
 
 ## Not included
 
-- **Stochastic learning paths and the simple learning model.** No reference: Falmagne and Doignon's chapter 12 treats
-  paths, but nothing runs the dynamic model, and `pks::slm` is cross-sectional, so it does not move a learner's state.
+- **Stochastic learning paths.** No reference: Falmagne and Doignon's chapter 12 treats them, but nothing runs the
+  dynamic model.
+- **The simple learning model.** No reference: `pks::slm` is cross-sectional, so it does not move a learner's state.
+- **QUERY.** No reference: Falmagne and Doignon's chapters 15 and 16 treat it, and no package has it: not `kst`, `pks`,
+  `DAKS`, `kstMatrix` or `CbKST`.
+- **Domains of ALEKS size.** No reference: no package handles them; `kst` and `pks` enumerate states, as here.
+  `maxStates` and units cover the large domains.
 - **`populationIita`.** Outside the sources: DAKS's `pop_iita` takes given rates and no data, a tool for studying IITA
   itself.
 

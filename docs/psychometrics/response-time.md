@@ -242,10 +242,15 @@ effortModeratedEstimates(data, items, thresholds); // person2 from item 3 alone
 
 ## Not included
 
-- The item population level of the hierarchical model, a multivariate normal distribution of the item parameters: only
-  Bayesian estimation uses it.
-- Response times as collateral information in adaptive tests: `AbilityEstimator` sees no times.
-- Speed that changes within a test, and mixture and rapid-guessing models of the joint distribution.
+- **The item population level of the hierarchical model.** Outside the sources: it is a multivariate normal distribution
+  of the item parameters, which only Bayesian estimation (`LNIRT`) uses.
+- **Response times as collateral information in adaptive tests.** No reference: no package that uses them was found, and
+  `AbilityEstimator` sees no times.
+- **Speed that changes within a test.** No reference: no package that fits it was found.
+- **Mixture models of the joint distribution of times and responses.** No reference: no package that fits them was
+  found.
+- **Rapid-guessing models of the joint distribution of times and responses.** No reference: no package that fits them
+  was found.
 
 ## Differences from LNIRT
 

@@ -203,6 +203,17 @@ limit + (P(L) - limit) (1 - P(T) - P(F))ⁿ with limit = P(T) / (P(T) + P(F)). T
 threshold, and `Infinity` when the limit is at or below it or the number exceeds the largest double, as for a P(T) near
 the smallest double. It uses the skill's P(T) and P(F), as the items to come are not known.
 
+## Not included
+
+- **Contextual BKT.** No reference: no package has it, not pyBKT, nor its R port `BKT`.
+- **Partial-credit BKT.** No reference: no package has it, not pyBKT, nor its R port `BKT`.
+- **Conjunctive BKT.** No reference: no package has it, and the multi-skill form of `hmm-scalable` is compensatory.
+- **Individualized BKT.** No reference: Yudelson et al. (2013) describe it, but no tool reaches the joint fit:
+  `hmm-scalable` does not finish, and two `optim` starts end 62 nats apart. As written the model is not identified,
+  since a constant moved between every offset and a skill's logit leaves the likelihood unchanged. On 200 seeded
+  learners it does not beat standard BKT on held-out events. It can return with an L2 penalty, offsets of mean 0, and a
+  joint reference that converges.
+
 ## References
 
 - Baker, R. S. J. d., Corbett, A. T., & Gowda, S. M. (2008). More accurate student modeling through contextual

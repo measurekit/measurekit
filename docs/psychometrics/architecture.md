@@ -21,7 +21,47 @@
   convergence instead of throwing.
 - **Extensible.** Where methods have alternatives, such as models or estimators, they are interfaces, and built-ins
   implement the same interfaces as user code.
-- **Lean.** A method is added when a real use needs it, and ships validated. No speculative options.
+- **Complete at the first version.** Each module has an approved list of authoritative [sources](#sources). A capability is
+  built when those sources treat it as standard practice, a usable reference exists and it fits a library. "Not included"
+  holds the rest, one method per line, each No fit, No reference or Outside the sources. A new capability afterwards means
+  changing the list.
+
+## Sources
+
+A capability is built when the sources of its module treat it as standard practice, a usable reference exists and it fits a library. Every method that is not built is listed under "Not included" in the module's guide, with the first test it fails.
+
+```mermaid
+flowchart LR
+  C["A capability of the module's domain"] --> Q1{"Do the sources treat it<br/>as standard practice?"}
+  Q1 -- no --> O["Not included: Outside the sources"]
+  Q1 -- yes --> Q2{"Is there a usable<br/>reference?"}
+  Q2 -- no --> R["Not included: No reference"]
+  Q2 -- yes --> Q3{"Does it fit<br/>a library?"}
+  Q3 -- no --> F["Not included: No fit"]
+  Q3 -- yes --> B["Built, and validated against the reference"]
+```
+
+| Module             | Sources                                                                                                                                                                                                                                                         | Covers                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `ctt`              | [McDonald (1999)](https://doi.org/10.4324/9781410601087); [Thissen and Wainer (2001)](https://doi.org/10.4324/9781410604729-16); [Sinharay, Puhan and Haberman (2011)](https://doi.org/10.1111/j.1745-3992.2011.00208.x)                                        | Reliability and item analysis; scoring and augmented scores; subscores                                          |
+| `dimensionality`   | [Reckase (2009)](https://doi.org/10.1007/978-0-387-89976-3), chapter 7; [Fabrigar et al. (1999)](https://doi.org/10.1037/1082-989X.4.3.272)                                                                                                                     | The structure of test data; factor analysis                                                                     |
+| `irt`              | [van der Linden (2016)](https://doi.org/10.1201/9781315374512), Models; [van der Linden (2017)](https://doi.org/10.1201/b19166), Statistical Tools; [Lord (1980)](https://doi.org/10.4324/9780203056615)                                                        | Unidimensional models, estimation, tests of the model                                                           |
+| `multidimensional` | [Reckase (2009)](https://doi.org/10.1007/978-0-387-89976-3), chapters 4, 6, 8, 9; [van der Linden (2016)](https://doi.org/10.1201/9781315374512), Models; [Andersen (1985)](https://doi.org/10.1007/BF02294143)                                                 | Models, estimation, rotation, linking; two-tier, covariates and multiple groups; repeated testings              |
+| `cat`              | [van der Linden and Glas (2010)](https://doi.org/10.1007/978-0-387-85461-8); [Magis, Yan and von Davier (2017)](https://doi.org/10.1007/978-3-319-69218-0); [Reckase (2009)](https://doi.org/10.1007/978-0-387-89976-3), chapter 10                             | Adaptive and multistage testing, multidimensional selection                                                     |
+| `cdm`              | [von Davier and Lee (2019)](https://doi.org/10.1007/978-3-030-05584-4), chapters 7, 13, 15, 16, 29                                                                                                                                                              | G-DINA, item fit, adaptive diagnosis, identifiability, the GDINA package                                        |
+| `fit`              | [van der Linden (2017)](https://doi.org/10.1201/b19166), Statistical Tools                                                                                                                                                                                      | Tests of model fit                                                                                              |
+| `dif`              | [Holland and Wainer (1993)](https://doi.org/10.4324/9780203357811); [Penfield and Camilli (2006)](https://doi.org/10.1016/S0169-7161(06)26005-X); [Lord (1980)](https://doi.org/10.4324/9780203056615-20), "Study of item bias"                                 | DIF methods; Lord's chi-square and its purification                                                             |
+| `equating`         | [Kolen and Brennan (2014)](https://doi.org/10.1007/978-1-4939-0317-7), chapters 1 to 8; [Brennan et al. (2009)](https://education.uiowa.edu/casma/computer-programs), Equating Recipes; [González and Wiberg (2017)](https://doi.org/10.1007/978-3-319-51824-4) | Designs, smoothing, linear, equipercentile and IRT methods, kernel, errors                                      |
+| `scaling`          | [Kolen and Brennan (2014)](https://doi.org/10.1007/978-1-4939-0317-7), chapters 9 and 10                                                                                                                                                                        | Score scales, linking, vertical scaling                                                                         |
+| `standard-setting` | [Cizek and Bunch (2007)](https://doi.org/10.4135/9781412985918); [Cizek (2013)](https://doi.org/10.4324/9781410600264)                                                                                                                                          | Methods of setting cut scores                                                                                   |
+| `explanatory`      | [De Boeck and Wilson (2004)](https://doi.org/10.1007/978-1-4757-3990-9), chapters 5 to 7; [Fischer and Molenaar (1995)](https://doi.org/10.1007/978-1-4612-4230-7)                                                                                              | Person regression, item predictors; linear logistic models, for dichotomous and polytomous items and for change |
+| `change`           | [Cronbach and Furby (1970)](https://doi.org/10.1037/h0029382); [Jacobson and Truax (1991)](https://doi.org/10.1037/0022-006X.59.1.12)                                                                                                                           | Measuring change; reliable change                                                                               |
+| `mokken`           | [Sijtsma and Molenaar (2002)](https://doi.org/10.4135/9781412984676); [Sijtsma and van der Ark (2017)](https://doi.org/10.1111/bmsp.12078)                                                                                                                      | The method and its eight steps                                                                                  |
+| `generalizability` | [Brennan (2001)](https://doi.org/10.1007/978-1-4757-3456-0), chapters 1 to 12                                                                                                                                                                                   | Balanced and unbalanced univariate designs in chapters 1 to 8; multivariate designs in 9 to 12                  |
+| `rater`            | [Eckes (2023)](https://doi.org/10.3726/b20875); Myford and Wolfe (2003, 2004)                                                                                                                                                                                   | Many-facet models, facet interactions, rater effects                                                            |
+| `response-time`    | [van der Linden (2016)](https://doi.org/10.1201/9781315374512), Models; [De Boeck and Jeon (2019)](https://doi.org/10.3389/fpsyg.2019.00102)                                                                                                                    | Lognormal and hierarchical models; the overview of the field                                                    |
+
+`data`, `math`, `sim` and `parameterization` have no list of their own: they follow what the other modules need.
 
 ## Modules
 

@@ -178,6 +178,14 @@ card = scheduler.review({ card, grade, now: new Date() }).card; // card.dueAt: t
 
 Store the card beside the learner's state; a failed review can send the skill back to practice.
 
+## Not included
+
+- **Bandit and reinforcement-learning sequencing.** No fit: reward design and policy evaluation are a wider domain than
+  tracing.
+- **Spaced repetition.** No fit: a domain with its own library,
+  [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs); [the section above](#spaced-repetition) shows how to use
+  it beside mastery.
+
 ## References
 
 - Corbett, A. T., & Anderson, J. R. (1994). Knowledge tracing: Modeling the acquisition of procedural knowledge. User

@@ -25,7 +25,37 @@
   returns only that statistic; results never contain `NaN`. Iterative methods report convergence instead of throwing.
 - **Extensible.** Every model implements one interface, `LearnerModel`, and evaluation uses only that interface, so a
   model written outside the package is evaluated as a built-in one is.
-- **Lean.** A method is added when a real use needs it, and ships validated. No speculative options.
+- **Complete at the first version.** Each module has an approved list of authoritative [sources](#sources). A capability is
+  built when those sources treat it as standard practice, a usable reference exists and it fits a library. "Not included"
+  holds the rest, one method per line, each No fit, No reference or Outside the sources. A new capability afterwards means
+  changing the list.
+
+## Sources
+
+A capability is built when the sources of its module treat it as standard practice, a usable reference exists and it fits a library. Every method that is not built is listed under "Not included" in the module's guide, with the first test it fails.
+
+```mermaid
+flowchart LR
+  C["A capability of the module's domain"] --> Q1{"Do the sources treat it<br/>as standard practice?"}
+  Q1 -- no --> O["Not included: Outside the sources"]
+  Q1 -- yes --> Q2{"Is there a usable<br/>reference?"}
+  Q2 -- no --> R["Not included: No reference"]
+  Q2 -- yes --> Q3{"Does it fit<br/>a library?"}
+  Q3 -- no --> F["Not included: No fit"]
+  Q3 -- yes --> B["Built, and validated against the reference"]
+```
+
+| Module     | Sources                                                                                                                                                                                   | Covers                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `bkt`      | [Pelánek (2017)](https://doi.org/10.1007/s11257-017-9193-2); [Pardos and Heffernan (2009)](https://researchr.org/publication/PardosH09-0)                                                 | The BKT family; the item-pair model                                                         |
+| `logistic` | [Pavlik, Eglington and Harrell-Williams (2021)](https://doi.org/10.1109/TLT.2021.3128569); [Gervet et al. (2020)](https://jedm.educationaldatamining.org/index.php/JEDM/article/view/451) | LKT features; Best-LR and the logistic family                                               |
+| `elo`      | [Pelánek (2016)](https://doi.org/10.1016/j.compedu.2016.03.017)                                                                                                                           | Elo in adaptive education                                                                   |
+| `irt`      | [Pelánek (2017)](https://doi.org/10.1007/s11257-017-9193-2); [Wang, Berger and Burdick (2013)](https://doi.org/10.1214/12-AOAS608)                                                        | Online ability; ability that drifts                                                         |
+| `kst`      | [Falmagne and Doignon (2011)](https://doi.org/10.1007/978-3-642-01039-2), chapters 2 to 5, 11 to 16; [Heller and Wickelmaier (2013)](https://doi.org/10.1016/j.endm.2013.05.145)          | Structures, spaces, surmise systems, probabilistic models, assessment, building; estimation |
+| `evaluate` | [Pelánek (2015)](https://jedm.educationaldatamining.org/index.php/JEDM/article/view/JEDM087)                                                                                              | Metrics of student models                                                                   |
+| `practice` | [Pelánek and Řihák (2017)](https://doi.org/10.1145/3079628.3079667)                                                                                                                       | Mastery criteria                                                                            |
+
+`data`, `math` and `sim` have no list of their own: they follow what the other modules need.
 
 ## Modules
 
@@ -204,3 +234,15 @@ Evaluation, practice and simulation check that a model passed in is an object wi
   α_t(i) A(i, j) / p_(t+1)(j) · γ_(t+1)(j), from probabilities and shares of them only: a sequence of thousands of
   attempts, where a state's filtered probability underflows to 0, gives no `NaN`.
 - AUC comes from midranks, exact for ties; calibration bins compare predictions with the bounds k / K as computed.
+
+## Not included
+
+- **DKT.** No fit: a recurrent network needs a tensor runtime, against the one-dependency rule, and its state is a
+  hidden vector, not a mastery for each skill. `pyKT` is the reference, and it belongs in a package of its own.
+  [`LearnerModel`](#the-learner-model-interface) lets one be evaluated here.
+- **DKVMN.** No fit: as DKT, it needs a tensor runtime and its state is a hidden memory, not a mastery for each skill;
+  `pyKT` is the reference.
+- **SAKT.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill;
+  `pyKT` is the reference.
+- **AKT.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill;
+  `pyKT` is the reference.
