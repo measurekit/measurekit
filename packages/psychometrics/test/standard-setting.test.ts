@@ -224,6 +224,9 @@ describe("classificationAccuracy", () => {
     expect(() => classificationAccuracy([], [0])).toThrow("Classification accuracy needs at least one estimate.");
     expect(() => classificationAccuracy([estimate], [])).toThrow("Classification accuracy needs at least one cut.");
     expect(() => classificationAccuracy([estimate], [1, 1])).toThrow("The cuts must increase; cut 2 is 1.");
+    // Zero has two signs in floating point, but it is one cut.
+    expect(() => classificationAccuracy([estimate], [-0, 0])).toThrow("The cuts must increase; cut 2 is 0.");
+    expect(() => classificationAccuracy([estimate], [0, -0])).toThrow("The cuts must increase; cut 2 is 0.");
     expect(() => classificationAccuracy([{ theta: 0, standardError: 0 }], [0])).toThrow(
       "The standard error of estimate 1 must be a positive number, found 0.",
     );
@@ -298,7 +301,12 @@ describe("properties", () => {
       theta: fc.double({ min: -4, max: 4, noNaN: true }),
       standardError: fc.double({ min: 0.05, max: 2, noNaN: true }),
     });
-    const cuts = fc.uniqueArray(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: 1, maxLength: 4 });
+    // SameValueZero takes -0 and 0 as one value, as the check that the cuts increase does; the default comparison draws them as two cuts.
+    const cuts = fc.uniqueArray(fc.double({ min: -3, max: 3, noNaN: true }), {
+      minLength: 1,
+      maxLength: 4,
+      comparator: "SameValueZero",
+    });
     fc.assert(
       fc.property(fc.array(estimate, { minLength: 1, maxLength: 20 }), cuts, (estimates, values) => {
         const result = classificationAccuracy(
