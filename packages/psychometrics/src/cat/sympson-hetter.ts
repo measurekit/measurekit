@@ -1,4 +1,4 @@
-import { checkUnitInterval, DataError } from "@measurekit/core";
+import { checkUnitInterval } from "@measurekit/core";
 import type { PoolControls } from "./items.js";
 import { highestScore, type ItemSelectionRule, type SelectionContext } from "./selection.js";
 
@@ -23,7 +23,8 @@ export function checkExposure(item: PoolControls): void {
  *
  * @param membersOf - Returns the pool indices of the items administered or withheld together with an item, itself
  * included.
- * @throws `DataError` when the rule scores every eligible item `-Infinity`.
+ * @returns The index of the item to administer, or `null` when the rule scores every eligible item `-Infinity`, as when
+ * no item is left.
  * @defaultValue `membersOf` returns the item alone
  * @see {@link https://doi.org/10.1037/10244-014 | Hetter and Sympson (1997)}
  */
@@ -32,14 +33,14 @@ export function selectItem<TItem extends PoolControls, TEstimate>(
   context: SelectionContext<TItem, TEstimate>,
   withheld: number[],
   membersOf: (index: number) => readonly number[] = (index) => [index],
-): number {
+): number | null {
   const { pool, eligible, random } = context;
   const scores = new Float64Array(pool.length);
   let remaining = eligible.reduce((sum, flag) => sum + flag, 0);
   for (;;) {
     rule.scores(context, scores);
     const index = highestScore(scores, eligible);
-    if (index < 0) throw new DataError("The selection rule scored every eligible item -Infinity.");
+    if (index < 0) return null;
     const exposure = pool[index]?.exposure ?? 1;
     const unit = membersOf(index).filter((member) => eligible[member] === 1);
     if (remaining === unit.length || exposure >= 1 || random.uniform() < exposure) return index;

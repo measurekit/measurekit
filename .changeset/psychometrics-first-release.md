@@ -69,3 +69,8 @@ test for the number of factors, and `smoothCorrelations` makes a correlation mat
 occasion is a dimension of a normal distribution whose means, standard deviations and correlations are estimated, with
 the first occasion N(0, 1); items have one set of parameters across the occasions, and the result reports the moments of
 each occasion and of the change between consecutive ones, as `mirt` with constrained items does.
+
+Adaptive tests keep to a blueprint. An item is in several content areas (`contentAreas`), `contentBounds` holds a minimum
+and a maximum number of items in each area for any selection rule, `maximumPriorityIndex` orders the items by how near their
+areas are to their bounds, and `contentMinimumsMet` keeps a stop on precision from coming before the minimums. A test ends
+when its selection rule scores every eligible item `-Infinity`.

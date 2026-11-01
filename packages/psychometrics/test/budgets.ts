@@ -50,6 +50,7 @@ const BUDGETS = {
   "cat.simulateDiagnostic": 70,
   "cat.simulateMultidimensional": 700,
   "cat.multistageCuts": 10,
+  "cat.contentBoundsStep": 0.7,
   "fit.itemFit": 30,
   "fit.personFit": 40,
   "fit.summedScoreFit": 30,

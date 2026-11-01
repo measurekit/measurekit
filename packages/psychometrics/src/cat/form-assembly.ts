@@ -8,23 +8,8 @@ import {
   describe,
 } from "@measurekit/core";
 import { indexItems } from "../irt/items.js";
+import { type ContentConstraint, readConstraint } from "./content-constraints.js";
 import type { PoolItem } from "./items.js";
-
-/** A content constraint of a form: the number of its items in a content area. */
-export interface ContentConstraint {
-  /** The content area, as the pool items' `contentArea`. */
-  readonly area: string;
-  /** The fewest items of the area. */
-  readonly minimum: number;
-  /** The most items of the area. */
-  readonly maximum: number;
-  /**
-   * The weight of a deviation of one item from the bounds.
-   *
-   * @defaultValue `1`
-   */
-  readonly weight?: number;
-}
 
 /** A point of a form's target information function. */
 export interface InformationTarget {
@@ -166,21 +151,9 @@ function projectedDeviation(properties: readonly Property[], progress: Progress,
 }
 
 function contentProperty(pool: readonly PoolItem[], constraint: ContentConstraint): Property {
-  checkRecord(constraint, "A content constraint must be an object { area, minimum, maximum }");
-  const { area, minimum, maximum, weight = 1 } = constraint;
-  if (typeof area !== "string") {
-    throw new DataError(`A content constraint needs a string area, found ${describe(area)}.`);
-  }
-  checkFinite(minimum, `The minimum of the constraint on "${area}"`);
-  checkFinite(maximum, `The maximum of the constraint on "${area}"`);
-  if (!(minimum <= maximum)) {
-    throw new DataError(
-      `The constraint on "${area}" needs the minimum at most the maximum, found ${minimum} and ${maximum}.`,
-    );
-  }
-  checkPositive(weight, `The weight of the constraint on "${area}"`);
+  const { area, minimum, maximum, weight } = readConstraint(constraint);
   return {
-    values: Float64Array.from(pool, (item) => (item.contentArea === area ? 1 : 0)),
+    values: Float64Array.from(pool, (item) => (item.contentAreas?.includes(area) === true ? 1 : 0)),
     lower: minimum,
     upper: maximum,
     weight,

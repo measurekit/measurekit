@@ -130,3 +130,58 @@ bench_task("cat.simulateMultidimensional", "Simulation of multidimensional adapt
 bench_task("cat.multistageCuts", "Routing cuts of a multistage panel by maximum information",
            sprintf("a panel of 1-3-3-3 modules of %d items, from a pool of %d 3PL items", module_size, pool_size),
            reference("stats", "uniroot on the information curves"), derive_cuts)
+
+# --- Content bounds ---------------------------------------------------------------------------------------------------
+# One step of a test of 30 items on a pool of 1,000 3PL items in 12 content areas (two facets of six), after 12 items of a
+# hidden feasible form. The reference is the step of a shadow test: mirtCAT's information of every item, and the integer
+# program of lpSolve through findNextItem that maximizes it subject to the length, the bounds of every area and the items
+# given. measurekit scores every item by the information, the priority index and the filter.
+
+set.seed(20261030)
+bounds_pool <- 1000
+bounds_length <- 30
+bounds_given <- 12
+bounds_bank <- cbind(a = round(rlnorm(bounds_pool, 0, 0.3), 3), b = round(rnorm(bounds_pool), 3),
+                     c = round(runif(bounds_pool, 0.05, 0.25), 3), d = 1)
+bounds_areas <- cbind(paste0("first", sample(6, bounds_pool, replace = TRUE)), paste0("second", sample(6, bounds_pool, replace = TRUE)))
+bounds_names <- sort(unique(as.vector(bounds_areas)))
+bounds_membership <- sapply(bounds_names, function(area) as.numeric(rowSums(bounds_areas == area) > 0))
+bounds_hidden <- sample(bounds_pool, bounds_length)
+bounds_counts <- colSums(bounds_membership[bounds_hidden, , drop = FALSE])
+bounds_minimum <- pmax(0, bounds_counts - sample(0:1, length(bounds_names), replace = TRUE))
+bounds_maximum <- bounds_counts + sample(0:1, length(bounds_names), replace = TRUE)
+bounds_taken <- bounds_hidden[seq_len(bounds_given)]
+bounds_responses <- rbinom(bounds_given, 1, 0.6)
+
+bounds_model <- generate.mirt_object(data.frame(a1 = bounds_bank[, "a"], d = -bounds_bank[, "a"] * bounds_bank[, "b"], g = bounds_bank[, "c"]), "3PL")
+bounds_constr_fun <- function(design, person, test) {
+  lhs <- rbind(rep(1, bounds_pool), t(bounds_membership), t(bounds_membership))
+  data.frame(lhs, c("==", rep(">=", length(bounds_names)), rep("<=", length(bounds_names))),
+             c(bounds_length, bounds_minimum, bounds_maximum))
+}
+bounds_design <- mirtCAT(mo = bounds_model, design_elements = TRUE, design = list(constr_fun = bounds_constr_fun))
+for (k in seq_len(bounds_given)) {
+  bounds_design <- updateDesign(bounds_design, new_item = bounds_taken[k], new_response = bounds_responses[k])
+}
+bounds_theta <- as.numeric(extract.mirtCAT(bounds_design$person, "thetas"))
+bounds_error <- as.numeric(extract.mirtCAT(bounds_design$person, "thetas_SE_history")[bounds_given + 1, ])
+
+bench_fixture("psychometrics", "cat-bounds", list(
+  source = "Simulations, set.seed(20261030): a 3PL pool of 1,000 items in 12 content areas and the first 12 items of a hidden feasible form of 30.",
+  pool = list(a = I(bounds_bank[, "a"]), b = I(bounds_bank[, "b"]), c = I(bounds_bank[, "c"])),
+  areas = unname(lapply(seq_len(bounds_pool), function(i) I(bounds_areas[i, ]))),
+  constraints = lapply(seq_along(bounds_names), function(k) list(area = bounds_names[k], minimum = bounds_minimum[k], maximum = bounds_maximum[k])),
+  length = bounds_length,
+  given = I(bounds_taken - 1),
+  responses = I(bounds_responses),
+  theta = bounds_theta,
+  standardError = bounds_error
+))
+
+shadow_step <- function() {
+  findNextItem(bounds_design, objective = computeCriteria(bounds_design, criteria = "MI"))
+}
+
+bench_task("cat.contentBoundsStep", "One item selection under content bounds, by the information at the estimate",
+           sprintf("a pool of %d 3PL items in %d content areas, a test of %d items after %d", bounds_pool, length(bounds_names), bounds_length, bounds_given),
+           reference("mirtCAT", "findNextItem(objective = computeCriteria(criteria = \"MI\"))` with lpSolve's `lp"), shadow_step)

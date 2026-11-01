@@ -185,13 +185,13 @@ describe("transformItem and transformTheta", () => {
     const transformation = { slope: 2, intercept: 0.5 };
     const multipleChoice = {
       id: "q1",
-      contentArea: "algebra",
+      contentAreas: ["algebra"],
       model: threeParameterLogistic,
       parameters: { a: 1.2, b: 0.3, c: 0.2, d: 1 },
       standardErrors: { a: 0.1, b: 0.2, c: 0.05 },
     };
     const moved = transformItem(multipleChoice, transformation);
-    expect(moved).toMatchObject({ id: "q1", contentArea: "algebra", standardErrors: { a: 0.05, b: 0.4, c: 0.05 } });
+    expect(moved).toMatchObject({ id: "q1", contentAreas: ["algebra"], standardErrors: { a: 0.05, b: 0.4, c: 0.05 } });
     const essay = {
       id: "q2",
       model: ratingScale,

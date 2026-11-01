@@ -105,6 +105,8 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | Routing cuts by information and by shares                    | Base R over mirt's `iteminfo` and `expected.item` (below)                                               |
 | Enemy sets, exposure calibration, form assembly              | Properties (below); catR has no enemy sets or form assembly                                             |
 | Testlet selection, administration, withholding and stopping  | Base R replay of the documented rules, with catR's `Ii`; mirtCAT's `ordered` groups (below)             |
+| Content bounds: items, estimates, withholding and stopping   | Base R replay of the documented rules, with catR's `Ii` (below)                                         |
+| Content bounds: tests outside the bounds, precision          | mirtCAT's shadow test, `findNextItem` with `lp` (below)                                                 |
 
 | Diagnostic CAT quantity                                    | Reference                                                                                                    |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -468,6 +470,29 @@ as at a `max_items` that falls inside a group mirtCAT stops with the error "Ran 
 add properties: whatever the testlets, responses and order, each testlet is one block of the items, in pool order when
 the test administers them in order, and the test passes its length by less than the largest testlet.
 
+`validation/psychometrics/cat-bounds.R` replays adaptive tests under content bounds on a bank of 60 3PL items from catR's
+`genDichoMatrix`, in 12 cells of 4 domains and 3 item types. Five persons answer every item once, at their true thetas. The base R
+replay writes out the documented rules: the EAP estimate on the 61 points, checked against catR's `thetaEst` in the script;
+catR's `Ii` for the information; the priority index `weight x f1 x f2` of each area; for each unit, an item or a testlet that has
+not begun, the fit, the maximums and the minimums, by the count of items still needed or else by a greedy cover over the eligible
+items grouped by their sets of areas; and the units that fill the most needs where none is safe. Fifteen cases run it: one facet,
+two facets with exact bounds and with margins, each with and without the index, the index alone, three areas with and without
+the index, two exact areas with and without the index, maximums that end the test, testlets taken in order and adaptively with
+enemies and exposure parameters of 0, enemies that leave a minimum out of reach, and a precision stop once the minimums are met.
+The script stops unless the filter alone and with the index give the same tests on two exact areas, differ on three areas, and
+every branch of the minimums runs. The test replays the persons' responses through `adaptiveTest` and compares the items
+and every estimate (1e-12).
+
+The same script runs the shadow test of mirtCAT on two blueprints, of two and three facets, for banks of 300 items, 2,000
+persons each. Each blueprint is built from a hidden feasible form of 30 items, with each area's bounds the form's count
+less or plus a margin of 0 or 1; `lp` confirms it feasible. `findNextItem` maximizes the information at the current estimate subject to the
+length, the bounds of every area and the items given, and the script estimates every final theta by its own EAP. The test
+simulates the same thetas with `contentBounds(maximumPriorityIndex(maximumInformation))` and expects no test outside the
+bounds and a root mean square error at most 1.05 times the shadow test's. The shadow test has none outside, with errors of 0.335
+and 0.330; the rules have none outside, with errors 2% and 3% above them. The tests add properties: whatever the blueprint, no test
+gives more items than its length or more of an area than its maximum, and on blueprints built from a hidden feasible form in
+the cases of a fixed seed, every bound is met.
+
 `validation/psychometrics/fit.R`, `dif.R` and `equating.R` store the inputs each reference used: the items, the
 thetas, the calibrations. The tests compute the statistics from those inputs, so a difference is the statistic's alone.
 
@@ -721,6 +746,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `cat-content.json`                       | `genDichoMatrix(items = 60, model = "3PL", cbControl)`: areas with targets 0.5, 0.3 and 0.2                                                                                                                                                                                                                                                 | Content balancing                                                                                                                      |
 | `cat-cdm.json`                           | GDINA's `sim30GDINA` and `CDM::data.ecpe` calibrated by GDINA: G-DINA; ECPE also DINA and G-DINA under a linear hierarchy; 4 persons, 10 items, 5 rules each                                                                                                                                                                                | The five diagnostic selection rules, posterior thresholds, a prior with zeros, DINA items, fixed precision                             |
 | `cat-testlets.json`                      | catR's `genDichoMatrix(items = 30, model = "3PL", seed = 20261630)` with 16 items in five testlets; the first 4 persons answer all items at thetas of -1.4, -0.2, 0.7 and 1.6; the pool with equal items within each testlet                                                                                                                | In order, adaptively, precision stop, exposure parameters of 0, enemy sets; mirtCAT's ordered groups                                   |
+| `cat-bounds.json`                        | catR's `genDichoMatrix(items = 60, model = "3PL", seed = 20261730)` in 12 cells of 4 domains and 3 types, and two banks of 300 items; 15 replays of 5 persons, and the shadow test of 2,000 persons on each bank                                                                                                                            | content bounds: item sequences and estimates; tests outside the bounds and the error of the shadow test                                |
 | `cat-mirt.json`                          | Seeded pools of 30 to 36 M2PL and M3PL items set in mirt (`generate.mirt_object`): 2 dimensions, 2 dimensions with correlation 0.5, 3 dimensions; 4 persons, 10 items                                                                                                                                                                       | The D-rule on between- and within-dimension items, guessing, a correlated prior, the standard error stopping rule                      |
 | `parameterization-mirt.json`             | 25 items set in mirt: 2PL, 3PL, 4PL, `graded` (one negative slope), `gpcm`, `Rasch`, `rsm`, `nominal`                                                                                                                                                                                                                                       | Both coefficient forms, probabilities                                                                                                  |
 | `parameterization-multidimensional.json` | 6 M2PL, 6 M3PL, 4 graded items on 2 dimensions and 5 graded items on 3 dimensions, set in mirt                                                                                                                                                                                                                                              | Both models' coefficients, probabilities at vectors of theta                                                                           |

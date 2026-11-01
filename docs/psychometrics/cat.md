@@ -5,7 +5,7 @@ model](irt.md), adaptive tests that classify a person's attribute profile with t
 model](cdm.md), and adaptive tests that estimate a vector of thetas with [multidimensional](multidimensional.md) items,
 derives the routing cuts of multistage panels, simulates them, calibrates their exposure control and assembles fixed
 forms. Item selection, ability estimates, content balancing and stopping decisions are validated against catR step by
-step; diagnostic tests against a replay of every rule written out in base R and against cdcatR; multidimensional tests
+step; content bounds against a replay in base R and mirtCAT's shadow test; diagnostic tests against a replay of every rule written out in base R and against cdcatR; multidimensional tests
 against a replay in base R and against mirtCAT; testlets against a replay in base R and mirtCAT's ordered groups;
 routing cuts against root finders in base R ([validation](validation.md)).
 
@@ -33,12 +33,27 @@ import {
 } from "@measurekit/psychometrics/irt";
 
 const pool = [
-  { id: "q1", model: threeParameterLogistic, parameters: { a: 1.2, b: -1, c: 0.2, d: 1 }, contentArea: "algebra" },
-  { id: "q2", model: threeParameterLogistic, parameters: { a: 0.9, b: -0.2, c: 0.15, d: 1 }, contentArea: "algebra" },
-  { id: "q3", model: threeParameterLogistic, parameters: { a: 1.5, b: 0.4, c: 0.2, d: 1 }, contentArea: "algebra" },
-  { id: "q4", model: threeParameterLogistic, parameters: { a: 1.1, b: 1.2, c: 0.25, d: 1 }, contentArea: "geometry" },
-  { id: "q5", model: generalizedPartialCredit, parameters: { a: 1, b: [-0.8, 0.5] }, contentArea: "geometry" },
-  { id: "q6", model: generalizedPartialCredit, parameters: { a: 1.3, b: [-0.2, 0.9, 1.6] }, contentArea: "geometry" },
+  { id: "q1", model: threeParameterLogistic, parameters: { a: 1.2, b: -1, c: 0.2, d: 1 }, contentAreas: ["algebra"] },
+  {
+    id: "q2",
+    model: threeParameterLogistic,
+    parameters: { a: 0.9, b: -0.2, c: 0.15, d: 1 },
+    contentAreas: ["algebra"],
+  },
+  { id: "q3", model: threeParameterLogistic, parameters: { a: 1.5, b: 0.4, c: 0.2, d: 1 }, contentAreas: ["algebra"] },
+  {
+    id: "q4",
+    model: threeParameterLogistic,
+    parameters: { a: 1.1, b: 1.2, c: 0.25, d: 1 },
+    contentAreas: ["geometry"],
+  },
+  { id: "q5", model: generalizedPartialCredit, parameters: { a: 1, b: [-0.8, 0.5] }, contentAreas: ["geometry"] },
+  {
+    id: "q6",
+    model: generalizedPartialCredit,
+    parameters: { a: 1.3, b: [-0.2, 0.9, 1.6] },
+    contentAreas: ["geometry"],
+  },
 ];
 const test = adaptiveTest({
   pool,
@@ -57,7 +72,7 @@ state.estimate; // { theta, standardError }
 
 | Option           | Default                 | Meaning                                                                                             |
 | ---------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `pool`           | required                | Items `{ id, model, parameters }`, with an optional `contentArea`, `testlet` and `exposure`.        |
+| `pool`           | required                | Items `{ id, model, parameters }`, with an optional `contentAreas`, `testlet` and `exposure`.       |
 | `stopping`       | required                | A [stopping rule](#stopping-rules).                                                                 |
 | `selection`      | `maximumInformation`    | An [item selection rule](#item-selection).                                                          |
 | `estimator`      | `posteriorMeanEstimate` | An [estimator](#estimators).                                                                        |
@@ -71,7 +86,8 @@ A calibration's `items` are a valid pool. Ids must be unique. Before each item, 
 2. ends, with `next: null`, when `stopping` holds or no item is left: an item is left unless administered, withheld or
    an enemy of an administered item;
 3. restricts the eligible items to one content area, with `contentTargets`;
-4. scores the eligible items with `selection` and selects the highest, the first in pool order on ties;
+4. scores the eligible items with `selection` and selects the highest, the first in pool order on ties; the test ends
+   if `selection` scores every eligible item `-Infinity`;
 5. administers it with probability `exposure`, or withholds it for the rest of the test and selects again.
 
 With [testlets](#testlets), the items of a testlet that has begun follow one after another, without steps 2, 3 and 5.
@@ -129,7 +145,7 @@ Every rule works for items of any model, through the model's methods.
   `randomesque(aStratified([5, 5, 10]), 3)`.
 
 A custom rule implements `ItemSelectionRule`. `scores(context, out)` writes a score to `out[i]` for each eligible
-item `i`; `-Infinity` excludes an item. The test throws `DataError` when a rule excludes every eligible item.
+item `i`; `-Infinity` excludes an item. The test ends when a rule excludes every eligible item.
 
 | Context field  | Meaning                                              |
 | -------------- | ---------------------------------------------------- |
@@ -155,10 +171,122 @@ export const randomSelection: ItemSelectionRule = {
 
 ### Content balancing
 
-With `contentTargets`, every pool item needs one of their areas. Before each item, Kingsbury and Zara's rule picks an
+With `contentTargets`, every pool item needs exactly one of their areas among its `contentAreas`; its other areas are
+not counted. Before each item, Kingsbury and Zara's rule picks an
 area, as catR's `cbControl` does: an area without administered items, at random among several; otherwise the area
 whose administered proportion falls furthest below its target, at random among ties. Only areas with eligible items
-are picked. Selection then considers that area's items only.
+are picked. Selection then considers that area's items only. To hold a minimum and a maximum number of items in each of
+several areas instead, use [content bounds](#content-bounds), not both.
+
+### Content bounds
+
+`contentBounds` keeps a test within a minimum and a maximum number of items in each content area, for any selection rule.
+`maximumPriorityIndex` orders the items by how near their areas are to their bounds, and `contentMinimumsMet` keeps a stop
+on precision from coming before the minimums. An item is in any number of areas, such as a domain and an item type: list
+them in its `contentAreas`.
+
+```mermaid
+flowchart LR
+  I[maximumInformation] --> P["maximumPriorityIndex: score x priority of the item's areas"]
+  P --> B["contentBounds: a unit that breaks a bound scores -Infinity"]
+  B --> R[randomesque]
+  R --> N[the highest score is administered]
+  S[contentMinimumsMet] --> E["allOf with a precision stop"]
+```
+
+| Export                                            | Kind           | Does                                                                                         |
+| ------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------- |
+| `contentBounds(rule, constraints, length)`        | selection rule | Scores like `rule`, except `-Infinity` for each unit that breaks a bound. Works for any rule |
+| `maximumPriorityIndex(rule, constraints, length)` | selection rule | Multiplies the scores of `rule`, which are at least 0, by the priority of each item's areas  |
+| `contentMinimumsMet(constraints)`                 | stopping rule  | Stops once every minimum is met; compose it with `allOf`                                     |
+
+| Argument      | Default  | Meaning                                                                                                                    |
+| ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `rule`        | required | The rule that scores the items                                                                                             |
+| `constraints` | required | `{ area, minimum, maximum, weight }` for each area: counts as integers from 0, one constraint for each area, `weight` is 1 |
+| `length`      | required | The most items a test may have, a positive integer                                                                         |
+
+A unit is an item, or a [testlet](#testlets) that has not begun, which the test administers whole. With `length` L, t items
+given, x of them in an area and a of the unit's items in it, `contentBounds` keeps a unit that passes these steps, in order:
+
+| Step      | A unit passes when                                                                                                                                                                                                                                                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fit       | t + its items ≤ L                                                                                                                                                                                                                                                                                                                                                                           |
+| Maximum   | x + a ≤ the maximum, for each area                                                                                                                                                                                                                                                                                                                                                          |
+| Minimums  | The items still needed, the sum over the areas of max(0, minimum - x - a), are at most the places left, L - t - its items. Where they are more, as with items in two areas, a greedy cover decides: the places take eligible items of the kinds, the sets of areas, whose areas have the most items still needed, each breaking no maximum, and the unit passes if that meets every minimum |
+| None safe | If no unit passes, the units that fit and keep every maximum and fill the most needs pass. If there are none, every item scores `-Infinity`: the test ends                                                                                                                                                                                                                                  |
+
+The testlet in progress passes, as its items follow without a selection. The filter works on kinds of items, so a step costs
+little at any pool size.
+
+`maximumPriorityIndex` is the index of Cheng and Chang, with the one-phase form for both bounds of Su: an item's score is
+multiplied by `weight x f1 x f2` of each area it is in, with `f1` = (maximum - x) / maximum, the share of the maximum left,
+and `f2` = ((L - minimum) - (t - x)) / (L - minimum), the share of the items outside the area that can still be given. The
+factor is the weight alone once `f2` is 0 or less, and `f1` is 0 for a maximum of 0. It orders the items and holds no
+bound: an item outside an area that is needed can still win, so wrap it in `contentBounds`. The index differs from the
+filter alone only where three or more areas compete. With two areas and exact bounds `f` is equal for both at every step,
+so the test is the filter's; with three or more it spreads the areas, as a shorter longest run of one area shows. A rule
+that scores below 0, such as `aStratified` and `shannonEntropy`, goes to `contentBounds` alone.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  adaptiveTest,
+  allOf,
+  anyOf,
+  contentBounds,
+  contentMinimumsMet,
+  maximumInformation,
+  maximumPriorityIndex,
+  randomesque,
+  standardErrorThreshold,
+  testLength,
+} from "@measurekit/psychometrics/cat";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems } from "@measurekit/psychometrics/sim";
+
+const domains = ["algebra", "geometry", "number"];
+const types = ["recall", "apply"];
+const pool = simulateItems(twoParameterLogistic, 120, createRandom(4)).map((item, i) => ({
+  ...item,
+  id: `q${i + 1}`,
+  contentAreas: [domains[i % 3], types[Math.floor(i / 3) % 2]],
+}));
+const constraints = [
+  { area: "algebra", minimum: 8, maximum: 12 },
+  { area: "geometry", minimum: 8, maximum: 12 },
+  { area: "number", minimum: 8, maximum: 12 },
+  { area: "recall", minimum: 12, maximum: 18 },
+  { area: "apply", minimum: 12, maximum: 18 },
+];
+const test = adaptiveTest({
+  pool,
+  selection: randomesque(contentBounds(maximumPriorityIndex(maximumInformation, constraints, 30), constraints, 30), 3),
+  stopping: anyOf(testLength(30), allOf(standardErrorThreshold(0.3), contentMinimumsMet(constraints))),
+});
+const random = createRandom(7);
+let state = test.start(random);
+while (state.next !== null) state = test.answer(state, random.uniform() < 0.6 ? 1 : 0, random);
+state.items.length; // 30
+// The counts of the items in algebra, geometry, number, recall and apply: 10, 9, 11, 12 and 18.
+```
+
+| Situation                                                                                                                                         | Result                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Invalid bounds, a bound that is not an integer from 0, an area twice, `length` not a positive integer                                             | `DataError` when the rule is made                                           |
+| An item whose `contentAreas` is not an array of distinct non-empty strings                                                                        | `DataError` at the first selection                                          |
+| A finite score below 0 in `maximumPriorityIndex`                                                                                                  | `DataError`: the index is a product; give the rule to `contentBounds` alone |
+| An area with fewer pool items than its minimum, a minimum above `length`, or minimums that sum above `length` when no item is in two of the areas | `DataError` at the first selection, so that a host finds it at `start`      |
+| Minimums that sum above `length` where an item is in two areas                                                                                    | No error: the cover decides at each step                                    |
+| Exposure control or enemies leave a minimum out of reach                                                                                          | The test goes on within the maximums; the counts are in `state.items`       |
+| No unit within the maximums                                                                                                                       | `next: null`: a shorter test                                                |
+
+Where the areas share no item, a pool with enough items in each area meets every minimum. With items in several areas the
+cover is a heuristic that can miss a completion that exists: in 4 of 12,000 blueprints of 6 to 12 items built from a
+hidden feasible form on 60 items in 12 to 24 cells, and in none of 6,000 on pools of 300. Check the counts in
+`state.items` against the blueprint. The first selection reads the areas of each pool array once and keeps them, so a pool
+must not change after its first use. `contentBounds` keeps `-Infinity` where `rule` gave it, and a stop on `length` is the
+host's: `anyOf(testLength(L), ...)`, as in the sample.
 
 ### Enemy sets
 
@@ -334,7 +462,7 @@ other adaptive tests run on the same engine as `adaptiveTest`.
 | `TestState`                                         | `TEstimate`                               | `AbilityEstimate`             |
 | `AdaptiveState`: a state with `withheld` and `next` | `TEstimate`                               | none                          |
 
-`PoolControls` is what every adaptive test needs of an item: `id`, `contentArea`, `testlet` and `exposure`. `PoolItem` adds the
+`PoolControls` is what every adaptive test needs of an item: `id`, `contentAreas`, `testlet` and `exposure`. `PoolItem` adds the
 model and parameters of an IRT item. The context of a rule has the fields of the [table above](#item-selection) whatever
 the types: `estimate` is the estimate the test computes from the responses, an `AbilityEstimate` for `adaptiveTest`.
 
@@ -405,16 +533,16 @@ result.attributeAccuracy; // [0.938, 0.934, 0.946]
 result.meanLength; // 6.726
 ```
 
-| Option           | Default                    | Meaning                                                                                                      |
-| ---------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `pool`           | required                   | Items `{ id, attributes, probabilities }`, with an optional `contentArea`, `testlet`, `exposure`; see below. |
-| `attributes`     | required                   | From 1 to 20 distinct attribute names, in the order of the profiles. A calibration's `attributes`.           |
-| `prior`          | uniform over the profiles  | `{ profile, proportion }` for each profile: a calibration's `profiles`. A [hierarchy](#prior) has zeros.     |
-| `stopping`       | required                   | A [stopping rule](#stopping-of-diagnostic-tests).                                                            |
-| `selection`      | `gdinaDiscriminationIndex` | An [item selection rule](#selection-of-diagnostic-tests).                                                    |
-| `contentTargets` | none                       | As for [`adaptiveTest`](#content-balancing).                                                                 |
-| `enemies`        | none                       | As for [`adaptiveTest`](#enemy-sets).                                                                        |
-| `withinTestlet`  | `"in-order"`               | As for [`adaptiveTest`](#testlets): items with a `testlet` are administered together.                        |
+| Option           | Default                    | Meaning                                                                                                       |
+| ---------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `pool`           | required                   | Items `{ id, attributes, probabilities }`, with an optional `contentAreas`, `testlet`, `exposure`; see below. |
+| `attributes`     | required                   | From 1 to 20 distinct attribute names, in the order of the profiles. A calibration's `attributes`.            |
+| `prior`          | uniform over the profiles  | `{ profile, proportion }` for each profile: a calibration's `profiles`. A [hierarchy](#prior) has zeros.      |
+| `stopping`       | required                   | A [stopping rule](#stopping-of-diagnostic-tests).                                                             |
+| `selection`      | `gdinaDiscriminationIndex` | An [item selection rule](#selection-of-diagnostic-tests).                                                     |
+| `contentTargets` | none                       | As for [`adaptiveTest`](#content-balancing).                                                                  |
+| `enemies`        | none                       | As for [`adaptiveTest`](#enemy-sets).                                                                         |
+| `withinTestlet`  | `"in-order"`               | As for [`adaptiveTest`](#testlets): items with a `testlet` are administered together.                         |
 
 The pool is an array of calibrated items; a calibration's `items` are one. `attributes` of an item lists the attributes
 it measures, each among the test's, and `probabilities` the probability of a correct response in each of its latent
@@ -564,19 +692,19 @@ result.rootMeanSquareError; // [0.538, 0.478]
 result.meanLength; // 16.34
 ```
 
-| Option           | Default                      | Meaning                                                                                  |
-| ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------- |
-| `pool`           | required                     | Items `{ id, model, parameters }`, with an optional `contentArea`, `testlet`, `exposure` |
-| `stopping`       | required                     | A [stopping rule](#stopping-rules-of-multidimensional-tests)                             |
-| `selection`      | `maximumDeterminant()`       | An [item selection rule](#selection-of-multidimensional-tests)                           |
-| `estimator`      | posterior mode under N(0, I) | A [multidimensional estimator](#estimates-of-multidimensional-tests), with a prior       |
-| `contentTargets` | none                         | As for [`adaptiveTest`](#content-balancing)                                              |
-| `enemies`        | none                         | As for [`adaptiveTest`](#enemy-sets)                                                     |
-| `withinTestlet`  | `"in-order"`                 | As for [`adaptiveTest`](#testlets): items with a `testlet` are administered together     |
+| Option           | Default                      | Meaning                                                                                   |
+| ---------------- | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `pool`           | required                     | Items `{ id, model, parameters }`, with an optional `contentAreas`, `testlet`, `exposure` |
+| `stopping`       | required                     | A [stopping rule](#stopping-rules-of-multidimensional-tests)                              |
+| `selection`      | `maximumDeterminant()`       | An [item selection rule](#selection-of-multidimensional-tests)                            |
+| `estimator`      | posterior mode under N(0, I) | A [multidimensional estimator](#estimates-of-multidimensional-tests), with a prior        |
+| `contentTargets` | none                         | As for [`adaptiveTest`](#content-balancing)                                               |
+| `enemies`        | none                         | As for [`adaptiveTest`](#enemy-sets)                                                      |
+| `withinTestlet`  | `"in-order"`                 | As for [`adaptiveTest`](#testlets): items with a `testlet` are administered together      |
 
 The pool is an array of at least one item with a model of the [multidimensional models](multidimensional.md#models) and
 valid parameters for it, a string id and, as a calibration's `items` have, the same number of dimensions as every other;
-ids are unique. `contentArea`, `testlet` and `exposure` are as in an [adaptive test's pool](#adaptive-tests). Responses are
+ids are unique. `contentAreas`, `testlet` and `exposure` are as in an [adaptive test's pool](#adaptive-tests). Responses are
 categories of the item: 0 or 1 for the logistic models. Before each item the steps are those of `adaptiveTest`.
 
 ### Estimates of multidimensional tests
@@ -814,7 +942,7 @@ with the smallest weighted sum of deviations of the projections from their bound
 
 | Option    | Default  | Meaning                                                                                                |
 | --------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| `pool`    | required | Items with ids and `contentArea`s, as for an adaptive test                                             |
+| `pool`    | required | Items with ids and `contentAreas`, as for an adaptive test                                             |
 | `length`  | required | The number of items, from 1 to the pool size                                                           |
 | `content` | none     | `{ area, minimum, maximum, weight }`: bounds on the number of items of an area; `weight` defaults to 1 |
 | `target`  | none     | `{ theta, information, weight }`: the test information wanted at a theta; `weight` defaults to 1       |
@@ -835,7 +963,7 @@ const areas = ["algebra", "geometry", "number"];
 const pool = simulateItems(twoParameterLogistic, 300, createRandom(4)).map((item, i) => ({
   ...item,
   id: `q${i + 1}`,
-  contentArea: areas[i % 3],
+  contentAreas: [areas[i % 3]],
 }));
 const form = assembleForm({
   pool,
@@ -863,7 +991,12 @@ form.contentCounts; // the number of items of each constrained area, within its 
   items are supported through any model of the pool.
 - Exposure calibration for multidimensional tests: `calibrateExposure` takes IRT tests only; set `exposure` by hand.
 - Testlets from which only some items are administered, such as a passage with more questions than a test takes, and
-  testlets whose items are in several content areas under content balancing.
+  testlets whose items are in several target areas under content balancing.
+- Shadow tests: a test that solves an integer program at each step to meet its bounds exactly, as mirtCAT's `constr_fun`
+  does. It needs a solver, and measurekit has no dependency. The bounds of `contentBounds` hold by a filter, with a greedy
+  cover for items in several areas; a shadow test fits `ItemSelectionRule` as a rule, so a later start changes no type.
+- Content bounds across the stages of a multistage panel: a module is assembled by [form assembly](#form-assembly), which
+  holds bounds per module.
 - A testlet-level exposure parameter: the `exposure` of the first item to be administered acts for its testlet.
 - Routing cuts by other rules than equal information and shares of a population, such as optimizing the accuracy of
   classification, and cuts that differ with the route that led to a module, except through the items on the scale
@@ -900,17 +1033,18 @@ form.contentCounts; // the number of items of each constrained area, within its 
 
 ## Differences from mirtCAT
 
-| Topic             | This package                                                      | mirtCAT                                                                                       |
-| ----------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| D-rule            | `maximumDeterminant`: the precision of the prior is always added  | `DPrule` adds it, as this package does; `Drule` does not: every score is 0 at first           |
-| Prior             | One `prior` for the rule and one for the estimator                | The `latent_covariance` of the model, for both                                                |
-| Estimates         | `MultidimensionalEstimate`: `theta`, `standardErrors`, covariance | A matrix of estimates by step, `thetas_history`, and `thetas_SE_history`                      |
-| Estimators        | Posterior mode and mean, or your own function                     | MAP, EAP, ML, WLE and others, by the `method` of the design                                   |
-| First item        | The D-rule at the prior                                           | `start_item = 1` by default; `"DPrule"` selects as this package does                          |
-| Other rules       | `randomesque` of any rule, and your own                           | A-, E-, T- and W-optimality, and Kullback-Leibler rules                                       |
-| Content, exposure | Kingsbury-Zara balancing, enemy sets, Sympson-Hetter              | Content proportions, exclusion sets and its own exposure control                              |
-| Testlets          | A testlet is scored by the mean of its items; `withinTestlet`     | `ordered` and `unordered` groups: the group of the most informative item, from its first item |
-| Test length       | A test ends after a testlet that began; any stopping rule         | `min_SEM` ends after the group; `max_items` inside a group stops with an error                |
+| Topic             | This package                                                             | mirtCAT                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| D-rule            | `maximumDeterminant`: the precision of the prior is always added         | `DPrule` adds it, as this package does; `Drule` does not: every score is 0 at first                             |
+| Prior             | One `prior` for the rule and one for the estimator                       | The `latent_covariance` of the model, for both                                                                  |
+| Estimates         | `MultidimensionalEstimate`: `theta`, `standardErrors`, covariance        | A matrix of estimates by step, `thetas_history`, and `thetas_SE_history`                                        |
+| Estimators        | Posterior mode and mean, or your own function                            | MAP, EAP, ML, WLE and others, by the `method` of the design                                                     |
+| First item        | The D-rule at the prior                                                  | `start_item = 1` by default; `"DPrule"` selects as this package does                                            |
+| Other rules       | `randomesque` of any rule, and your own                                  | A-, E-, T- and W-optimality, and Kullback-Leibler rules                                                         |
+| Content, exposure | Kingsbury-Zara balancing, content bounds, enemy sets, Sympson-Hetter     | Content proportions, exclusion sets and its own exposure control                                                |
+| Content bounds    | A filter and a priority index; a greedy cover for items in several areas | A shadow test: `constr_fun` and `lp` solve an integer program at each step, which proves a blueprint infeasible |
+| Testlets          | A testlet is scored by the mean of its items; `withinTestlet`            | `ordered` and `unordered` groups: the group of the most informative item, from its first item                   |
+| Test length       | A test ends after a testlet that began; any stopping rule                | `min_SEM` ends after the group; `max_items` inside a group stops with an error                                  |
 
 ## Implementation
 

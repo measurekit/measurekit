@@ -1,16 +1,21 @@
 import { DataError, describe } from "@measurekit/core";
 import type { TestItem } from "../irt/model.js";
 
-/** What the engine of every adaptive test needs of a pool item: an id, and optionally a content area and exposure. */
+/** What the engine of every adaptive test needs of a pool item: an id, and optionally its content areas and exposure. */
 export interface PoolControls {
   /** The item's id, unique in the pool. */
   readonly id: string;
-  /** The item's content area, which content balancing uses. */
-  readonly contentArea?: string;
+  /**
+   * The item's content areas, such as a domain and an item type: the strings that content balancing and content bounds
+   * count. Kingsbury-Zara content balancing needs exactly one of its targets' areas in each item.
+   *
+   * @defaultValue none
+   */
+  readonly contentAreas?: readonly string[];
   /**
    * The id of the item's testlet: a set, such as a stimulus with its questions, whose items are administered together.
    * Items that share an id are one testlet; an item without one is administered alone. With content targets, the items
-   * of a testlet share one content area.
+   * of a testlet share one target area.
    */
   readonly testlet?: string;
   /**

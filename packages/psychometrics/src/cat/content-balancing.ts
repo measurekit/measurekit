@@ -1,8 +1,11 @@
-import { checkPositive, checkRecord, DataError, describe, type Random } from "@measurekit/core";
+import { checkPositive, checkRecord, DataError, type Random } from "@measurekit/core";
+import { describeAreas, poolAreas } from "./content-constraints.js";
 import type { PoolControls } from "./items.js";
 
 /** The content areas of a pool with their target proportions, and each item's area. */
 export interface ContentBalancing {
+  /** The areas with a target, in the order of the targets. */
+  readonly areas: readonly string[];
   /** The target proportion of each area, summing to 1. */
   readonly targets: Float64Array;
   /** The index of each pool item's area. */
@@ -13,7 +16,7 @@ export interface ContentBalancing {
  * Returns the content balancing of a pool: the target proportions, normalized to sum to 1, and each item's area.
  *
  * @throws `DataError` when the targets are not an object or empty, a target is not a positive finite number, or when an
- * item has no content area among the targets.
+ * item does not have exactly one content area among the targets.
  */
 export function contentBalancing(
   pool: readonly PoolControls[],
@@ -28,16 +31,16 @@ export function contentBalancing(
     return target;
   });
   const sum = proportions.reduce((total, target) => total + target, 0);
-  const itemAreas = Int32Array.from(pool, (item) => {
-    const area = item.contentArea === undefined ? -1 : areas.indexOf(item.contentArea);
-    if (area < 0) {
+  const itemAreas = Int32Array.from(poolAreas(areas)(pool), ([area, ...others], index) => {
+    if (area === undefined || others.length > 0) {
+      const { id, contentAreas } = pool[index] ?? { id: "" };
       throw new DataError(
-        `Item "${item.id}" needs a content area among the targets (${areas.join(", ")}), found ${describe(item.contentArea)}.`,
+        `Item "${id}" needs exactly one content area among the targets (${areas.join(", ")}), found ${describeAreas(contentAreas)}.`,
       );
     }
     return area;
   });
-  return { targets: proportions.map((target) => target / sum), itemAreas };
+  return { areas, targets: proportions.map((target) => target / sum), itemAreas };
 }
 
 /**

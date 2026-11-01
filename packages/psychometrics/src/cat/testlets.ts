@@ -1,4 +1,5 @@
 import { checkChoice, DataError, describe, isNonEmptyString } from "@measurekit/core";
+import type { ContentBalancing } from "./content-balancing.js";
 import type { PoolControls } from "./items.js";
 import type { ItemSelectionRule, SelectionContext } from "./selection.js";
 
@@ -54,18 +55,22 @@ export function poolTestlets(pool: readonly PoolControls[]): Testlets | null {
 }
 
 /**
- * Checks that the items of each testlet share one content area, as content balancing chooses the area of a testlet as a
+ * Checks that the items of each testlet share one target area, as content balancing chooses the area of a testlet as a
  * whole.
  *
- * @throws `DataError` when a testlet has items in two content areas.
+ * @throws `DataError` when a testlet has items in two target areas.
  */
-export function checkTestletAreas(pool: readonly PoolControls[], testlets: Testlets): void {
-  for (const members of testlets.members) {
-    const [first, ...rest] = members.map((index) => pool[index]);
-    const other = rest.find((item) => item?.contentArea !== first?.contentArea);
-    if (first !== undefined && other !== undefined) {
+export function checkTestletAreas(
+  pool: readonly PoolControls[],
+  testlets: Testlets,
+  balancing: ContentBalancing,
+): void {
+  const { areas, itemAreas } = balancing;
+  for (const [first = -1, ...rest] of testlets.members) {
+    const other = rest.find((index) => itemAreas[index] !== itemAreas[first]);
+    if (other !== undefined) {
       throw new DataError(
-        `The items of testlet "${first.testlet}" are in content areas ${describe(first.contentArea)} and ${describe(other.contentArea)}; with content targets they must share one area.`,
+        `The items of testlet "${pool[first]?.testlet}" are in content areas ${describe(areas[itemAreas[first] ?? -1])} and ${describe(areas[itemAreas[other] ?? -1])}; with content targets they must share one area.`,
       );
     }
   }

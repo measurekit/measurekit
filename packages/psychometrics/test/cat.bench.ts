@@ -5,11 +5,14 @@ import {
   adaptiveTest,
   attributeProfiles,
   calibrateCdm,
+  contentBounds,
   diagnosticAdaptiveTest,
   maximumInformation,
+  maximumPriorityIndex,
   multidimensionalAdaptiveTest,
   multidimensionalTwoParameterLogistic,
   multistageCuts,
+  type PoolItem,
   posteriorMeanEstimate,
   responseMatrix,
   simulateAdaptiveTest,
@@ -21,6 +24,7 @@ import {
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-cat.json" with { type: "json" };
+import boundsFixture from "./fixtures/bench-cat-bounds.json" with { type: "json" };
 import cdm from "./fixtures/bench-cdm.json" with { type: "json" };
 import { defined } from "./helpers.js";
 
@@ -116,4 +120,29 @@ test("simulates multidimensional adaptive tests of 20 items for 100 persons on a
     () => simulateMultidimensionalAdaptiveTest(test, thetas, createRandom(SEED)),
     SLOW_OPTIONS,
   );
+});
+
+test("selects an item under content bounds on a pool of 1,000 3PL items in 12 content areas", async (context) => {
+  const { pool: parameters, areas, constraints, length, given, theta, standardError } = boundsFixture;
+  const pool: PoolItem[] = parameters.a.map((a, i) => ({
+    id: `item${i + 1}`,
+    model: threeParameterLogistic,
+    parameters: { a, b: defined(parameters.b[i]), c: defined(parameters.c[i]), d: 1 },
+    contentAreas: defined(areas[i]),
+  }));
+  const rule = contentBounds(maximumPriorityIndex(maximumInformation, constraints, length), constraints, length);
+  const eligible = new Uint8Array(pool.length).fill(1);
+  for (const index of given) eligible[index] = 0;
+  const selection = {
+    pool,
+    administered: given,
+    responses: boundsFixture.responses,
+    estimate: { theta, standardError },
+    eligible,
+    random: createRandom(SEED),
+  };
+  const scores = new Float64Array(pool.length);
+  rule.scores(selection, scores);
+  expect(scores.filter((score) => score > Number.NEGATIVE_INFINITY).length).toBeGreaterThan(0);
+  await benchmark(context, "cat.contentBoundsStep", () => rule.scores(selection, scores));
 });

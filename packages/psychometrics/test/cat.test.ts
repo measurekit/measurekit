@@ -1,3 +1,4 @@
+import { shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { informationPeak } from "../src/cat/a-stratified.js";
@@ -17,7 +18,10 @@ import {
   anyOf,
   aStratified,
   assembleForm,
+  type ContentConstraint,
   calibrateExposure,
+  contentBounds,
+  contentMinimumsMet,
   createRandom,
   DataError,
   type DiagnosticAdaptiveTest,
@@ -45,6 +49,7 @@ import {
   maximumDeterminant,
   maximumInformation,
   maximumLikelihoodEstimate,
+  maximumPriorityIndex,
   modifiedPosteriorWeightedKullbackLeibler,
   multidimensionalAdaptiveTest,
   multidimensionalInformation,
@@ -83,6 +88,7 @@ import {
 } from "../src/index.js";
 import cat2pl from "./fixtures/cat-2pl.json" with { type: "json" };
 import cat3pl from "./fixtures/cat-3pl.json" with { type: "json" };
+import catBounds from "./fixtures/cat-bounds.json" with { type: "json" };
 import catCdm from "./fixtures/cat-cdm.json" with { type: "json" };
 import catContent from "./fixtures/cat-content.json" with { type: "json" };
 import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
@@ -138,6 +144,10 @@ interface CatRun {
 }
 
 const LENGTH = 15;
+/** The seed of the simulations that compare the content bounds with the shadow test. */
+const SEED_BOUNDS = 20261029;
+/** The estimate at which the rules of content bounds are scored directly. */
+const BOUNDS_ESTIMATE: AbilityEstimate = { theta: 0, standardError: 1 };
 // By catR's names.
 const ESTIMATORS = new Map<string, AbilityEstimator>([
   ["BM", posteriorModeEstimate],
@@ -169,7 +179,7 @@ const POOL_GPCM: readonly PoolItem[] = catGpcm.items.map(({ id, ...parameters })
 }));
 const POOL_CONTENT: readonly PoolItem[] = catContent.items.map(({ id, contentArea, ...parameters }) => ({
   id,
-  contentArea,
+  contentAreas: [contentArea],
   model: threeParameterLogistic,
   parameters,
 }));
@@ -510,10 +520,19 @@ describe("adaptiveTest", () => {
     );
   });
 
-  it("throws when the selection rule scores every eligible item -Infinity", () => {
+  it("ends the test when the selection rule scores every eligible item -Infinity", () => {
     const none: ItemSelectionRule = { scores: (_, out) => out.fill(Number.NEGATIVE_INFINITY) };
-    const test = adaptiveTest({ pool: POOL_3PL, selection: none, stopping: testLength(1) });
-    expect(() => test.start(createRandom(1))).toThrow("The selection rule scored every eligible item -Infinity.");
+    const test = adaptiveTest({ pool: POOL_3PL, selection: none, stopping: testLength(5) });
+    expect(test.start(createRandom(1)).next).toBeNull();
+    const afterTwo: ItemSelectionRule = {
+      scores: ({ administered, eligible }, out) => {
+        eligible.forEach((flag, i) => {
+          if (flag === 1) out[i] = administered.length < 2 ? 1 : Number.NEGATIVE_INFINITY;
+        });
+      },
+    };
+    const short = adaptiveTest({ pool: POOL_3PL, selection: afterTwo, stopping: testLength(5) });
+    expect(administer(short, () => 1).items).toHaveLength(2);
   });
 });
 
@@ -553,10 +572,10 @@ describe("content balancing", () => {
         ? areas.filter((_, a) => shares[a] === 0)
         : areas.filter((_, a) => gaps[a] === Math.max(...gaps));
       const next = defined(POOL_CONTENT[poolIndex(POOL_CONTENT, defined(state.next))]);
-      expect(candidates, `step ${k}`).toContain(next.contentArea);
+      expect(candidates, `step ${k}`).toContain(next.contentAreas?.[0]);
       if (candidates.length === 1) expect(next.id, `step ${k}`).toBe(step.nextItem);
       const remaining = POOL_CONTENT.filter(
-        ({ id, contentArea }) => contentArea === next.contentArea && !state.items.includes(id),
+        ({ id, contentAreas }) => contentAreas?.[0] === next.contentAreas?.[0] && !state.items.includes(id),
       );
       const information = remaining.map((item) => itemInformation(item, state.estimate.theta));
       expect(itemInformation(next, state.estimate.theta), `step ${k}`).toBe(Math.max(...information));
@@ -565,7 +584,10 @@ describe("content balancing", () => {
 
   it("takes each area first, then the area furthest below its target", () => {
     const pool = ["x", "y"].flatMap((area) =>
-      Array.from({ length: 10 }, (_, i) => ({ ...item2pl(`${area}${i}`, 1 + i / 10, i / 5 - 1), contentArea: area })),
+      Array.from({ length: 10 }, (_, i) => ({
+        ...item2pl(`${area}${i}`, 1 + i / 10, i / 5 - 1),
+        contentAreas: [area],
+      })),
     );
     // Targets 3 : 1. One item of each area, then x twice, when both areas meet their targets and the fifth item may
     // be either; 8 items then hold 6 of x.
@@ -580,12 +602,36 @@ describe("content balancing", () => {
 
   it("skips areas without eligible items", () => {
     const pool = [
-      { ...item2pl("x1", 1, 0), contentArea: "x" },
-      { ...item2pl("y1", 1, 0.5), contentArea: "y" },
-      { ...item2pl("y2", 1, -0.5), contentArea: "y" },
+      { ...item2pl("x1", 1, 0), contentAreas: ["x"] },
+      { ...item2pl("y1", 1, 0.5), contentAreas: ["y"] },
+      { ...item2pl("y2", 1, -0.5), contentAreas: ["y"] },
     ];
     const balanced = adaptiveTest({ pool, stopping: testLength(3), contentTargets: { x: 0.9, y: 0.1 } });
     expect(administer(balanced, () => 0).items).toHaveLength(3);
+  });
+
+  it("counts the areas of an item among the targets only, and rejects an item in two of them", () => {
+    const pool = [
+      { ...item2pl("x1", 1, 0), contentAreas: ["x", "hard"] },
+      { ...item2pl("y1", 1, 0.5), contentAreas: ["easy", "y"] },
+      { ...item2pl("y2", 1, -0.5), contentAreas: ["y"] },
+    ];
+    const balanced = adaptiveTest({ pool, stopping: testLength(3), contentTargets: { x: 1, y: 1 } });
+    expect(
+      new Set(
+        administer(balanced, () => 0)
+          .items.slice(0, 2)
+          .map((id) => id.charAt(0)),
+      ),
+    ).toEqual(new Set(["x", "y"]));
+    const both = [...pool, { ...item2pl("xy", 1, 0), contentAreas: ["x", "y"] }];
+    expect(() => adaptiveTest({ pool: both, stopping: testLength(1), contentTargets: { x: 1, y: 1 } })).toThrow(
+      'Item "xy" needs exactly one content area among the targets (x, y), found ["x", "y"].',
+    );
+    const text = [{ ...item2pl("x1", 1, 0), contentAreas: JSON.parse('"x"') }];
+    expect(() => adaptiveTest({ pool: text, stopping: testLength(1), contentTargets: { x: 1 } })).toThrow(
+      'The contentAreas of item "x1" must be an array of distinct non-empty strings, found "x".',
+    );
   });
 
   it("rejects missing and invalid targets", () => {
@@ -595,12 +641,652 @@ describe("content balancing", () => {
       adaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: { ...catContent.targets, algebra: 0 } }),
     ).toThrow('The target of content area "algebra" must be a positive number, found 0.');
     expect(() => adaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: { algebra: 1 } })).toThrow(
-      'Item "item001" needs a content area among the targets (algebra), found "statistics".',
+      'Item "item001" needs exactly one content area among the targets (algebra), found ["statistics"].',
     );
     expect(() => adaptiveTest({ pool: POOL_3PL, stopping, contentTargets: { algebra: 1 } })).toThrow(DataError);
     expect(() => adaptiveTest({ pool: POOL_3PL, stopping, contentTargets: JSON.parse("null") })).toThrow(
       "The option contentTargets must be an object of target proportions by area, found null.",
     );
+  });
+});
+
+describe("content bounds", () => {
+  const indicesOf = (ids: readonly string[], pool: readonly PoolItem[]): readonly number[] =>
+    ids.map((id) => poolIndex(pool, id));
+  /** Answers right and wrong in turn, so that theta stays near 0, where the items' information falls with their rank. */
+  const alternating = (): ((id: string) => number) => {
+    let answered = 0;
+    return () => answered++ % 2;
+  };
+  /** A 2PL item in content areas whose information at theta 0 falls as `rank` rises. */
+  const areaItem = (id: string, areas: readonly string[], rank = 0): PoolItem => ({
+    ...item2pl(id, 2 - rank / 10, 0),
+    contentAreas: areas,
+  });
+  /** The selection context after the items with the given ids, the others eligible except those in `ineligible`. */
+  const contextAfterIds = (
+    pool: readonly PoolItem[],
+    given: readonly string[],
+    ineligible: readonly string[] = [],
+  ): SelectionContext => {
+    const administered = indicesOf(given, pool);
+    const eligible = new Uint8Array(pool.length).fill(1);
+    for (const index of [...administered, ...indicesOf(ineligible, pool)]) eligible[index] = 0;
+    return {
+      pool,
+      administered,
+      responses: administered.map(() => 1),
+      estimate: BOUNDS_ESTIMATE,
+      eligible,
+      random: createRandom(0),
+    };
+  };
+  const scoresOf = (rule: ItemSelectionRule, context: SelectionContext): Float64Array => {
+    const out = new Float64Array(context.pool.length).fill(Number.NaN);
+    rule.scores(context, out);
+    return out;
+  };
+  /** The ids of the eligible items that a rule scores above -Infinity. */
+  const allowed = (rule: ItemSelectionRule, context: SelectionContext): string[] => {
+    const out = scoresOf(rule, context);
+    return context.pool.flatMap((item, i) => (context.eligible[i] === 1 && (out[i] ?? 0) > -Infinity ? [item.id] : []));
+  };
+  const countIn = (items: readonly string[], pool: readonly PoolItem[], area: string): number =>
+    items.filter((id) => pool.find((item) => item.id === id)?.contentAreas?.includes(area)).length;
+
+  describe("replays", () => {
+    const stoppingOf = (c: (typeof catBounds.cases)[number]): StoppingRule =>
+      c.stopping.value === undefined
+        ? testLength(c.length)
+        : anyOf(
+            testLength(c.stopping.length ?? c.length),
+            allOf(standardErrorThreshold(c.stopping.value), contentMinimumsMet(c.constraints)),
+          );
+    const selectionOf = (c: (typeof catBounds.cases)[number]): ItemSelectionRule => {
+      if (c.rule === "bounds") return contentBounds(maximumInformation, c.constraints, c.length);
+      const index = maximumPriorityIndex(maximumInformation, c.constraints, c.length);
+      return c.rule === "priority" ? index : contentBounds(index, c.constraints, c.length);
+    };
+
+    for (const c of catBounds.cases) {
+      it(`takes the items of a replay in base R of the case ${c.name}`, () => {
+        const pool: PoolItem[] = c.items.map((item) => ({
+          id: item.id,
+          model: threeParameterLogistic,
+          parameters: { a: item.a, b: item.b, c: item.c, d: item.d },
+          contentAreas: item.contentAreas,
+          exposure: item.exposure,
+          ...("testlet" in item && { testlet: item.testlet }),
+        }));
+        const test = adaptiveTest({
+          pool,
+          selection: selectionOf(c),
+          stopping: stoppingOf(c),
+          enemies: c.enemies,
+          withinTestlet: c.within === "adaptive" ? "adaptive" : "in-order",
+        });
+        c.persons.forEach((person, p) => {
+          const respond = (id: string): number => defined(catBounds.responses[p]?.[poolIndex(pool, id)]);
+          const random = createRandom(1);
+          let state = test.start(random);
+          expectClose(state.estimate.theta, person.initial.theta, REPLAY_TOLERANCE, `${c.name}, person ${p}, start`);
+          person.administered.forEach((id, k) => {
+            expect(state.next, `${c.name}, person ${p}, item ${k + 1}`).toBe(id);
+            state = test.answer(state, respond(id), random);
+            const expected = defined(person.estimates[k]);
+            expectClose(
+              state.estimate.theta,
+              expected.theta,
+              REPLAY_TOLERANCE,
+              `${c.name}, person ${p}, theta ${k + 1}`,
+            );
+            expectClose(
+              state.estimate.standardError,
+              expected.standardError,
+              REPLAY_TOLERANCE,
+              `${c.name}, person ${p}, standard error ${k + 1}`,
+            );
+          });
+          expect(state.next, `${c.name}, person ${p}, end`).toBeNull();
+          expect(state.items).toEqual(person.administered);
+        });
+      });
+    }
+  });
+
+  describe("on persons simulated against the shadow test of mirtCAT", () => {
+    for (const blueprint of catBounds.shadowTests) {
+      it(`holds every bound of the ${blueprint.name} blueprint with the precision of the shadow test`, () => {
+        const pool: PoolItem[] = blueprint.bank.map(({ id, a, b, c, d, contentAreas }) => ({
+          id,
+          model: threeParameterLogistic,
+          parameters: { a, b, c, d },
+          contentAreas,
+        }));
+        const { constraints, length } = blueprint;
+        const test = adaptiveTest({
+          pool,
+          selection: contentBounds(maximumPriorityIndex(maximumInformation, constraints, length), constraints, length),
+          stopping: testLength(length),
+        });
+        const simulation = simulateAdaptiveTest(test, blueprint.thetas, createRandom(SEED_BOUNDS));
+        expect(simulation.persons).toHaveLength(blueprint.thetas.length);
+        const outside = simulation.persons.filter(({ state }) =>
+          constraints.some(({ area, minimum, maximum }) => {
+            const count = countIn(state.items, pool, area);
+            return count < minimum || count > maximum;
+          }),
+        );
+        expect(outside).toHaveLength(0);
+        expect(simulation.meanLength).toBe(length);
+        expect(simulation.rootMeanSquareError).toBeLessThanOrEqual(1.05 * blueprint.shadow.rmse);
+      });
+    }
+  });
+
+  describe("contentBounds", () => {
+    const run = (
+      pool: readonly PoolItem[],
+      constraints: readonly ContentConstraint[],
+      length: number,
+      stopping: StoppingRule = testLength(length),
+    ): AdaptiveTestState =>
+      administer(
+        adaptiveTest({ pool, selection: contentBounds(maximumInformation, constraints, length), stopping }),
+        alternating(),
+      );
+
+    it("keeps a test within the maximum of an area", () => {
+      const pool = [
+        ...[0, 1, 2, 3, 4, 5].map((rank) => areaItem(`x${rank + 1}`, ["x"], rank)),
+        ...[6, 7, 8, 9, 10, 11].map((rank) => areaItem(`y${rank - 5}`, ["y"], rank)),
+      ];
+      const items = run(pool, [{ area: "x", minimum: 0, maximum: 2 }], 6).items;
+      expect(items).toEqual(["x1", "x2", "y1", "y2", "y3", "y4"]);
+    });
+
+    it("takes the items of an area before the places run out for its minimum", () => {
+      const pool = [
+        ...[0, 1, 2, 3, 4].map((rank) => areaItem(`x${rank + 1}`, ["x"], rank)),
+        ...[5, 6, 7, 8, 9].map((rank) => areaItem(`y${rank - 4}`, ["y"], rank)),
+      ];
+      const constraints = [
+        { area: "x", minimum: 0, maximum: 5 },
+        { area: "y", minimum: 3, maximum: 5 },
+      ];
+      expect(run(pool, constraints, 5).items).toEqual(["x1", "x2", "y1", "y2", "y3"]);
+    });
+
+    it("scores the items that break a bound -Infinity and leaves the scores of the others as the rule gave them", () => {
+      const pool = [
+        areaItem("x1", ["x"], 0),
+        areaItem("x2", ["x"], 1),
+        areaItem("x3", ["x"], 2),
+        areaItem("y1", ["y"], 3),
+        areaItem("z1", [], 4),
+      ];
+      const rule = contentBounds(maximumInformation, [{ area: "x", minimum: 0, maximum: 2 }], 5);
+      const context = contextAfterIds(pool, ["x1", "x2"]);
+      const out = scoresOf(rule, context);
+      const reference = scoresOf(maximumInformation, context);
+      expect(out[poolIndex(pool, "x3")]).toBe(Number.NEGATIVE_INFINITY);
+      for (const id of ["y1", "z1"]) expect(out[poolIndex(pool, id)]).toBe(reference[poolIndex(pool, id)]);
+      expect(allowed(rule, contextAfterIds(pool, ["x1"]))).toEqual(["x2", "x3", "y1", "z1"]);
+    });
+
+    it("keeps a test within the length: a testlet that does not fit is out", () => {
+      const pool = [
+        ...[0, 1, 2].map((rank) => ({ ...areaItem(`t${rank + 1}`, [], rank), testlet: "T" })),
+        areaItem("s1", [], 3),
+        areaItem("s2", [], 4),
+      ];
+      const rule = contentBounds(maximumInformation, [], 4);
+      expect(allowed(rule, contextAfterIds(pool, []))).toEqual(["t1", "t2", "t3", "s1", "s2"]);
+      expect(allowed(rule, contextAfterIds(pool, ["s1", "s2"]))).toEqual([]);
+      expect(allowed(rule, contextAfterIds(pool, ["s1"]))).toEqual(["t1", "t2", "t3", "s2"]);
+      const fitting = contentBounds(maximumInformation, [], 3);
+      expect(allowed(fitting, contextAfterIds(pool, ["s1"]))).toEqual(["s2"]);
+    });
+
+    it("decides by a greedy cover where the items still needed in two areas sum to more than the places left", () => {
+      // Minimums 3 and 3 in a test of 4 need two items in both areas.
+      const pool = [
+        ...[0, 1, 2, 3].map((rank) => areaItem(`a${rank + 1}`, ["a"], rank)),
+        ...[4, 5, 6, 7].map((rank) => areaItem(`b${rank - 3}`, ["b"], rank)),
+        areaItem("ab1", ["a", "b"], 8),
+        areaItem("ab2", ["a", "b"], 9),
+      ];
+      const constraints = [
+        { area: "a", minimum: 3, maximum: 4 },
+        { area: "b", minimum: 3, maximum: 4 },
+      ];
+      const items = run(pool, constraints, 4).items;
+      expect(items).toHaveLength(4);
+      expect(countIn(items, pool, "a")).toBeGreaterThanOrEqual(3);
+      expect(countIn(items, pool, "b")).toBeGreaterThanOrEqual(3);
+      const rule = contentBounds(maximumInformation, constraints, 4);
+      // After one item of each area, only an item of both can still meet both minimums.
+      expect(allowed(rule, contextAfterIds(pool, ["a1", "b1"]))).toEqual(["ab1", "ab2"]);
+    });
+
+    it("takes the units within the maximums that fill the most needs where none can meet the minimums", () => {
+      const pool = [
+        areaItem("a1", ["a"], 0),
+        areaItem("a2", ["a"], 1),
+        areaItem("b1", ["b"], 2),
+        areaItem("b2", ["b"], 3),
+        areaItem("ab", ["a", "b"], 4),
+        areaItem("z1", [], 5),
+      ];
+      const rule = contentBounds(
+        maximumInformation,
+        [
+          { area: "a", minimum: 2, maximum: 3 },
+          { area: "b", minimum: 2, maximum: 3 },
+        ],
+        3,
+      );
+      expect(allowed(rule, contextAfterIds(pool, ["a1", "b1"]))).toEqual(["ab"]);
+      // Without the item of both areas, no item reaches both minimums: those that fill a need stay.
+      expect(allowed(rule, contextAfterIds(pool, ["a1", "b1"], ["ab"]))).toEqual(["a2", "b2"]);
+    });
+
+    it("lets the testlet in progress pass and judges a testlet that has not begun as a whole", () => {
+      const pool = [
+        ...[0, 1, 2].map((rank) => ({ ...areaItem(`t${rank + 1}`, ["x"], rank), testlet: "T" })),
+        areaItem("x1", ["x"], 3),
+        areaItem("y1", ["y"], 4),
+      ];
+      const rule = contentBounds(maximumInformation, [{ area: "x", minimum: 0, maximum: 3 }], 5);
+      // The testlet fits within the maximum of 3 items of x; a single item of x then does not fit.
+      expect(allowed(rule, contextAfterIds(pool, []))).toEqual(["t1", "t2", "t3", "x1", "y1"]);
+      expect(allowed(rule, contextAfterIds(pool, ["x1"]))).toEqual(["y1"]);
+      // With a maximum of 2, the testlet is out whole; after its first item, the rest of it is not judged.
+      const tight = contentBounds(maximumInformation, [{ area: "x", minimum: 0, maximum: 2 }], 5);
+      expect(allowed(tight, contextAfterIds(pool, []))).toEqual(["x1", "y1"]);
+      expect(allowed(tight, contextAfterIds(pool, ["t1"]))).toEqual(["t2", "t3", "x1", "y1"]);
+    });
+
+    it("keeps -Infinity where the rule gave it", () => {
+      const pool = [areaItem("x1", ["x"], 0), areaItem("x2", ["x"], 1), areaItem("y1", ["y"], 2)];
+      const excluding: ItemSelectionRule = {
+        scores: (context, out) => {
+          maximumInformation.scores(context, out);
+          out[poolIndex(pool, "x2")] = Number.NEGATIVE_INFINITY;
+        },
+      };
+      const rule = contentBounds(excluding, [{ area: "x", minimum: 1, maximum: 2 }], 2);
+      expect(allowed(rule, contextAfterIds(pool, []))).toEqual(["x1", "y1"]);
+    });
+
+    it("ends the test where no item is within the maximums", () => {
+      const pool = [
+        ...[0, 1, 2, 3].map((rank) => areaItem(`x${rank + 1}`, ["x"], rank)),
+        ...[4, 5, 6, 7].map((rank) => areaItem(`y${rank - 3}`, ["y"], rank)),
+      ];
+      const constraints = [
+        { area: "x", minimum: 0, maximum: 2 },
+        { area: "y", minimum: 0, maximum: 2 },
+      ];
+      const state = run(pool, constraints, 8);
+      expect(state.items).toHaveLength(4);
+      expect(state.next).toBeNull();
+    });
+
+    it("takes the order of a testlet's items from the rule while the testlet is in progress", () => {
+      const pool = [
+        ...[0, 1, 2].map((rank) => ({ ...areaItem(`t${rank + 1}`, ["x"], rank), testlet: "T" })),
+        areaItem("y1", ["y"], 3),
+      ];
+      const test = adaptiveTest({
+        pool,
+        selection: contentBounds(maximumInformation, [{ area: "x", minimum: 3, maximum: 3 }], 4),
+        stopping: testLength(4),
+        withinTestlet: "adaptive",
+      });
+      expect(administer(test, alternating()).items).toEqual(["t1", "t2", "t3", "y1"]);
+    });
+
+    it("works inside randomesque and with exposure control, and holds the maximums", () => {
+      const pool = [
+        ...[0, 1, 2, 3, 4, 5].map((rank) => ({ ...areaItem(`x${rank + 1}`, ["x"], rank), exposure: 0.5 })),
+        ...[6, 7, 8, 9, 10, 11].map((rank) => ({ ...areaItem(`y${rank - 5}`, ["y"], rank), exposure: 0.5 })),
+      ];
+      const constraints = [
+        { area: "x", minimum: 2, maximum: 3 },
+        { area: "y", minimum: 2, maximum: 3 },
+      ];
+      const test = adaptiveTest({
+        pool,
+        selection: randomesque(contentBounds(maximumInformation, constraints, 6), 3),
+        stopping: testLength(6),
+      });
+      // A withheld item can leave an area with no item to take, and the test ends short, within the maximums.
+      const lengths = Array.from({ length: 20 }, (_, seed) => {
+        const { items } = administer(test, alternating(), createRandom(seed));
+        expect(countIn(items, pool, "x")).toBeLessThanOrEqual(3);
+        expect(countIn(items, pool, "y")).toBeLessThanOrEqual(3);
+        return items.length;
+      });
+      expect(Math.max(...lengths)).toBe(6);
+    });
+
+    it("does not change what a call receives or an earlier call left", () => {
+      const pool = [areaItem("x1", ["x"], 0), areaItem("y1", ["y"], 1)];
+      const rule = contentBounds(maximumInformation, [{ area: "x", minimum: 0, maximum: 1 }], 2);
+      const context = contextAfterIds(pool, []);
+      const before = [...context.eligible];
+      expect(scoresOf(rule, context)).toEqual(scoresOf(rule, context));
+      expect([...context.eligible]).toEqual(before);
+    });
+
+    it("throws for a proof that the bounds cannot be met, at the first selection", () => {
+      const pool = [
+        areaItem("x1", ["x"], 0),
+        areaItem("x2", ["x"], 1),
+        areaItem("y1", ["y"], 2),
+        areaItem("y2", ["y"], 3),
+      ];
+      const first = (constraints: readonly ContentConstraint[], length: number) => () =>
+        adaptiveTest({
+          pool,
+          selection: contentBounds(maximumInformation, constraints, length),
+          stopping: testLength(2),
+        }).start(createRandom(1));
+      expect(first([{ area: "x", minimum: 3, maximum: 4 }], 4)).toThrow(
+        'The pool has 2 items in content area "x", fewer than its minimum 3; add items or lower the minimum.',
+      );
+      expect(first([{ area: "x", minimum: 2, maximum: 2 }], 1)).toThrow(
+        'The minimum 2 of content area "x" is above the test length 1; lower the minimum or raise the length.',
+      );
+      expect(
+        first(
+          [
+            { area: "x", minimum: 2, maximum: 2 },
+            { area: "y", minimum: 2, maximum: 2 },
+          ],
+          3,
+        ),
+      ).toThrow(
+        "The minimums of the content areas sum to 4, above the test length 3, and no item is in two of the areas; lower a minimum or raise the length.",
+      );
+      expect(first([{ area: "z", minimum: 1, maximum: 2 }], 3)).toThrow(
+        'The pool has 0 items in content area "z", fewer than its minimum 1; add items or lower the minimum.',
+      );
+      // Minimums that sum to more than the length are no proof where an item is in two of the areas.
+      const overlap = [...pool, areaItem("xy", ["x", "y"], 4)];
+      const constraints = [
+        { area: "x", minimum: 2, maximum: 3 },
+        { area: "y", minimum: 2, maximum: 3 },
+      ];
+      expect(() =>
+        adaptiveTest({
+          pool: overlap,
+          selection: contentBounds(maximumInformation, constraints, 3),
+          stopping: testLength(3),
+        }).start(createRandom(1)),
+      ).not.toThrow();
+    });
+
+    it("rejects constraints, lengths, rules and pools of other types and invalid ones", () => {
+      const ok = [{ area: "x", minimum: 1, maximum: 2 }];
+      expect(() => contentBounds(maximumInformation, JSON.parse("null"), 4)).toThrow(
+        "The content constraints must be an array of { area, minimum, maximum }, found null.",
+      );
+      expect(() => contentBounds(maximumInformation, JSON.parse("[null]"), 4)).toThrow(
+        "A content constraint must be an object { area, minimum, maximum }, found null.",
+      );
+      expect(() => contentBounds(maximumInformation, JSON.parse('[{"area":1,"minimum":0,"maximum":1}]'), 4)).toThrow(
+        "A content constraint needs a string area, found 1.",
+      );
+      expect(() =>
+        contentBounds(maximumInformation, JSON.parse('[{"area":"x","minimum":"1","maximum":2}]'), 4),
+      ).toThrow('The minimum of the constraint on "x" must be a finite number, found "1".');
+      expect(() => contentBounds(maximumInformation, [{ area: "x", minimum: 3, maximum: 2 }], 4)).toThrow(
+        'The constraint on "x" needs the minimum at most the maximum, found 3 and 2.',
+      );
+      expect(() => contentBounds(maximumInformation, [{ area: "x", minimum: 0.5, maximum: 2 }], 4)).toThrow(
+        'The minimum of the constraint on "x" must be an integer from 0, found 0.5.',
+      );
+      expect(() => contentBounds(maximumInformation, [{ area: "x", minimum: -1, maximum: 2 }], 4)).toThrow(
+        'The minimum of the constraint on "x" must be an integer from 0, found -1.',
+      );
+      expect(() => contentBounds(maximumInformation, [{ area: "x", minimum: 0, maximum: Infinity }], 4)).toThrow(
+        DataError,
+      );
+      expect(() => contentBounds(maximumInformation, [{ area: "x", minimum: 0, maximum: 2, weight: 0 }], 4)).toThrow(
+        'The weight of the constraint on "x" must be a positive number, found 0.',
+      );
+      expect(() => contentBounds(maximumInformation, [...ok, ...ok], 4)).toThrow(
+        'Content area "x" has two constraints; give it one.',
+      );
+      for (const length of [0, 1.5, -2, Number.NaN]) {
+        expect(() => contentBounds(maximumInformation, ok, length)).toThrow(
+          `The length of contentBounds must be a positive integer, found ${length}.`,
+        );
+      }
+      expect(() => contentBounds(maximumInformation, ok, JSON.parse('"4"'))).toThrow(
+        'The length of contentBounds must be a positive integer, found "4".',
+      );
+      expect(() => contentBounds(JSON.parse("null"), ok, 4)).toThrow(
+        "contentBounds needs a selection rule, such as maximumInformation, found null.",
+      );
+      const pool = [{ ...areaItem("x1", [], 0), contentAreas: JSON.parse('"x"') }];
+      const test = adaptiveTest({ pool, selection: contentBounds(maximumInformation, ok, 4), stopping: testLength(1) });
+      expect(() => test.start(createRandom(1))).toThrow(
+        'The contentAreas of item "x1" must be an array of distinct non-empty strings, found "x".',
+      );
+      const twice = [{ ...areaItem("x1", [], 0), contentAreas: ["x", "x"] }];
+      expect(() =>
+        adaptiveTest({
+          pool: twice,
+          selection: contentBounds(maximumInformation, ok, 4),
+          stopping: testLength(1),
+        }).start(createRandom(1)),
+      ).toThrow('The contentAreas of item "x1" must be an array of distinct non-empty strings, found ["x", "x"].');
+    });
+  });
+
+  describe("maximumPriorityIndex", () => {
+    const pool = [
+      areaItem("x1", ["x"], 0),
+      areaItem("x2", ["x"], 1),
+      areaItem("y1", ["y"], 2),
+      areaItem("y2", ["y"], 3),
+      areaItem("xy", ["x", "y"], 4),
+      areaItem("z1", [], 5),
+    ];
+    const constraints = [
+      { area: "x", minimum: 2, maximum: 4 },
+      { area: "y", minimum: 1, maximum: 3, weight: 2 },
+    ];
+
+    it("multiplies each score by the weight, the share of the maximum left and the share of the places the others may take", () => {
+      const rule = maximumPriorityIndex(maximumInformation, constraints, 6);
+      const context = contextAfterIds(pool, ["x1"]);
+      const out = scoresOf(rule, context);
+      const reference = scoresOf(maximumInformation, context);
+      // x: (4 - 1) / 4 times ((6 - 2) - (1 - 1)) / (6 - 2) = 0.75. y: 2 times (3 - 0) / 3 times ((6 - 1) - (1 - 0)) / (6 - 1) = 1.6.
+      const factor = (id: string): number =>
+        defined(out[poolIndex(pool, id)]) / defined(reference[poolIndex(pool, id)]);
+      expectClose(factor("x2"), 0.75, 1e-14);
+      expectClose(factor("y1"), 1.6, 1e-14);
+      expectClose(factor("xy"), 0.75 * 1.6, 1e-14);
+      expectClose(factor("z1"), 1, 1e-14);
+    });
+
+    it("gives the weight alone where the items outside an area have used up the places its minimum leaves", () => {
+      const rule = maximumPriorityIndex(
+        maximumInformation,
+        [
+          { area: "x", minimum: 4, maximum: 6, weight: 3 },
+          { area: "y", minimum: 6, maximum: 6, weight: 5 },
+        ],
+        6,
+      );
+      const context = contextAfterIds(pool, ["y1", "y2"]);
+      const out = scoresOf(rule, context);
+      const reference = scoresOf(maximumInformation, context);
+      // x: 6 - 4 = 2 places outside, both used by y1 and y2, so f2 = 0 and f = 1. y: the minimum is the length.
+      expectClose(defined(out[poolIndex(pool, "x1")]) / defined(reference[poolIndex(pool, "x1")]), 3, 1e-14);
+      expectClose(defined(out[poolIndex(pool, "xy")]) / defined(reference[poolIndex(pool, "xy")]), 15, 1e-14);
+    });
+
+    it("scores 0 for an item of an area whose maximum is 0, and keeps -Infinity", () => {
+      const excluding: ItemSelectionRule = {
+        scores: (context, out) => {
+          maximumInformation.scores(context, out);
+          out[poolIndex(pool, "y2")] = Number.NEGATIVE_INFINITY;
+        },
+      };
+      const rule = maximumPriorityIndex(
+        excluding,
+        [
+          { area: "x", minimum: 0, maximum: 0 },
+          { area: "y", minimum: 0, maximum: 4 },
+        ],
+        6,
+      );
+      const out = scoresOf(rule, contextAfterIds(pool, []));
+      expect(out[poolIndex(pool, "x1")]).toBe(0);
+      expect(out[poolIndex(pool, "y2")]).toBe(Number.NEGATIVE_INFINITY);
+      expect(defined(out[poolIndex(pool, "y1")])).toBeGreaterThan(0);
+    });
+
+    it("throws for a score below 0, which a product would put in the wrong order", () => {
+      const negative: ItemSelectionRule = {
+        scores: (context, out) =>
+          context.eligible.forEach((_, i) => {
+            out[i] = -0.5;
+          }),
+      };
+      const rule = maximumPriorityIndex(negative, constraints, 6);
+      expect(() => rule.scores(contextAfterIds(pool, []), new Float64Array(pool.length))).toThrow(
+        'The rule scored item "x1" -0.5; maximumPriorityIndex multiplies scores of at least 0, so give a rule that scores below 0 to contentBounds alone.',
+      );
+      const aStratifiedScores = aStratified([3]);
+      const test = adaptiveTest({
+        pool,
+        selection: contentBounds(aStratifiedScores, constraints, 3),
+        stopping: testLength(3),
+      });
+      expect(administer(test, alternating()).items).toHaveLength(3);
+      expect(() =>
+        adaptiveTest({
+          pool,
+          selection: maximumPriorityIndex(aStratifiedScores, constraints, 3),
+          stopping: testLength(3),
+        }).start(createRandom(1)),
+      ).toThrow(DataError);
+    });
+
+    it("spreads three areas that compete, where the filter alone takes the most informative", () => {
+      const spread = [
+        ...[0, 1, 2, 3, 4, 5].map((rank) => areaItem(`a${rank + 1}`, ["a"], rank)),
+        ...[6, 7, 8, 9, 10, 11].map((rank) => areaItem(`b${rank - 5}`, ["b"], rank)),
+        ...[12, 13, 14, 15, 16, 17].map((rank) => areaItem(`c${rank - 11}`, ["c"], rank)),
+      ];
+      const bounds = [
+        { area: "a", minimum: 2, maximum: 4 },
+        { area: "b", minimum: 2, maximum: 4 },
+        { area: "c", minimum: 2, maximum: 4 },
+      ];
+      const filter = administer(
+        adaptiveTest({
+          pool: spread,
+          selection: contentBounds(maximumInformation, bounds, 9),
+          stopping: testLength(9),
+        }),
+        alternating(),
+      ).items;
+      const index = administer(
+        adaptiveTest({
+          pool: spread,
+          selection: contentBounds(maximumPriorityIndex(maximumInformation, bounds, 9), bounds, 9),
+          stopping: testLength(9),
+        }),
+        alternating(),
+      ).items;
+      const longestRun = (items: readonly string[]): number => {
+        let longest = 0;
+        let run = 0;
+        items.forEach((id, i) => {
+          run = i > 0 && items[i - 1]?.charAt(0) === id.charAt(0) ? run + 1 : 1;
+          longest = Math.max(longest, run);
+        });
+        return longest;
+      };
+      expect(index).not.toEqual(filter);
+      expect(longestRun(index)).toBeLessThan(longestRun(filter));
+      for (const items of [filter, index]) {
+        expect(items).toHaveLength(9);
+        for (const area of ["a", "b", "c"]) {
+          expect(countIn(items, spread, area)).toBeGreaterThanOrEqual(2);
+          expect(countIn(items, spread, area)).toBeLessThanOrEqual(4);
+        }
+      }
+    });
+
+    it("rejects constraints, lengths and rules of other types and invalid ones", () => {
+      expect(() => maximumPriorityIndex(maximumInformation, JSON.parse("{}"), 6)).toThrow(
+        "The content constraints must be an array of { area, minimum, maximum }, found an object.",
+      );
+      expect(() => maximumPriorityIndex(maximumInformation, [{ area: "x", minimum: 2, maximum: 1 }], 6)).toThrow(
+        DataError,
+      );
+      expect(() => maximumPriorityIndex(maximumInformation, constraints, 0)).toThrow(
+        "The length of maximumPriorityIndex must be a positive integer, found 0.",
+      );
+      expect(() => maximumPriorityIndex(JSON.parse("{}"), constraints, 6)).toThrow(
+        "maximumPriorityIndex needs a selection rule, such as maximumInformation, found an object.",
+      );
+    });
+  });
+
+  describe("contentMinimumsMet", () => {
+    const pool = [areaItem("x1", ["x"], 0), areaItem("x2", ["x"], 1), areaItem("y1", ["y"], 2), areaItem("z1", [], 3)];
+    const constraints = [
+      { area: "x", minimum: 2, maximum: 3 },
+      { area: "y", minimum: 1, maximum: 3 },
+    ];
+
+    it("stops once every minimum is met", () => {
+      const rule = contentMinimumsMet<PoolItem, AbilityEstimate>(constraints);
+      const stops = (given: readonly string[]): boolean => rule.stops(contextAfterIds(pool, given));
+      expect(stops([])).toBe(false);
+      expect(stops(["x1", "x2"])).toBe(false);
+      expect(stops(["x1", "y1", "z1"])).toBe(false);
+      expect(stops(["x1", "x2", "y1"])).toBe(true);
+    });
+
+    it("stops a test on precision only after the minimums, in allOf", () => {
+      const test = adaptiveTest({
+        pool,
+        selection: contentBounds(maximumInformation, constraints, 4),
+        stopping: anyOf(testLength(4), allOf(standardErrorThreshold(100), contentMinimumsMet(constraints))),
+      });
+      expect(administer(test, alternating()).items).toHaveLength(3);
+    });
+
+    it("stops at once without a minimum, and with no constraint", () => {
+      expect(
+        contentMinimumsMet<PoolItem, AbilityEstimate>([{ area: "x", minimum: 0, maximum: 2 }]).stops(
+          contextAfterIds(pool, []),
+        ),
+      ).toBe(true);
+      expect(contentMinimumsMet<PoolItem, AbilityEstimate>([]).stops(contextAfterIds(pool, []))).toBe(true);
+    });
+
+    it("rejects constraints of other types and invalid ones", () => {
+      expect(() => contentMinimumsMet(JSON.parse("null"))).toThrow(
+        "The content constraints must be an array of { area, minimum, maximum }, found null.",
+      );
+      expect(() => contentMinimumsMet([{ area: "x", minimum: 1.5, maximum: 2 }])).toThrow(DataError);
+      const bad = [{ ...areaItem("x1", [], 0), contentAreas: JSON.parse("[1]") }];
+      expect(() => contentMinimumsMet<PoolItem, AbilityEstimate>(constraints).stops(contextAfterIds(bad, []))).toThrow(
+        'The contentAreas of item "x1" must be an array of distinct non-empty strings, found [1].',
+      );
+    });
   });
 });
 
@@ -933,7 +1619,7 @@ describe("testlets", () => {
 
   it("balances content areas between testlets", () => {
     const area = (testlet: string, ids: readonly string[], contentArea: string) =>
-      ids.map((id, i) => ({ ...item2pl(id, 1 + i / 10, i / 4), testlet, contentArea }));
+      ids.map((id, i) => ({ ...item2pl(id, 1 + i / 10, i / 4), testlet, contentAreas: [contentArea] }));
     const pool = [...area("X", ["x1", "x2", "x3"], "x"), ...area("Y", ["y1", "y2", "y3"], "y")];
     const test = adaptiveTest({ pool, stopping: testLength(4), contentTargets: { x: 1, y: 1 } });
     const firsts = new Set<string>();
@@ -948,8 +1634,8 @@ describe("testlets", () => {
 
   it("rejects the testlets of a content balanced test whose items are in several areas", () => {
     const pool = [
-      { ...item2pl("a", 1, 0), testlet: "T", contentArea: "x" },
-      { ...item2pl("b", 1, 0), testlet: "T", contentArea: "y" },
+      { ...item2pl("a", 1, 0), testlet: "T", contentAreas: ["x"] },
+      { ...item2pl("b", 1, 0), testlet: "T", contentAreas: ["y"] },
     ];
     expect(() => adaptiveTest({ pool, stopping: stopped, contentTargets: { x: 1, y: 1 } })).toThrow(
       'The items of testlet "T" are in content areas "x" and "y"; with content targets they must share one area.',
@@ -1162,7 +1848,7 @@ describe("assembleForm", () => {
   const pool: PoolItem[] = simulateItems(twoParameterLogistic, 300, random).map((item, i) => ({
     ...item,
     id: `q${i + 1}`,
-    contentArea: defined(areas[i % 3]),
+    contentAreas: [defined(areas[i % 3])],
   }));
 
   it("meets the content constraints and comes near the information target", () => {
@@ -1179,7 +1865,7 @@ describe("assembleForm", () => {
     const form = assembleForm({ pool, length: 30, content, target });
     expect(new Set(form.items.map((item) => item.id)).size).toBe(30);
     for (const { area, minimum, maximum } of content) {
-      const count = form.items.filter((item) => item.contentArea === area).length;
+      const count = form.items.filter((item) => item.contentAreas?.includes(area)).length;
       expect(form.contentCounts[area]).toBe(count);
       expect(count).toBeGreaterThanOrEqual(minimum);
       expect(count).toBeLessThanOrEqual(maximum);
@@ -2251,7 +2937,7 @@ describe("diagnosticAdaptiveTest", () => {
   });
 
   it("selects among the items of the content area furthest below its target", () => {
-    const pool = SKILL_POOL.map((item, i) => ({ ...item, contentArea: i === 2 ? "both" : "single" }));
+    const pool = SKILL_POOL.map((item, i) => ({ ...item, contentAreas: [i === 2 ? "both" : "single"] }));
     const test = diagnosticAdaptiveTest({
       pool,
       attributes: SKILLS,
@@ -2260,7 +2946,7 @@ describe("diagnosticAdaptiveTest", () => {
     });
     for (let seed = 0; seed < 10; seed++) {
       const { items } = defined(administerDiagnostic(test, () => 1, createRandom(seed)).at(-1));
-      expect(new Set(items.map((id) => pool.find((item) => item.id === id)?.contentArea))).toEqual(
+      expect(new Set(items.map((id) => pool.find((item) => item.id === id)?.contentAreas?.[0]))).toEqual(
         new Set(["single", "both"]),
       );
     }
@@ -2368,7 +3054,7 @@ describe("diagnosticAdaptiveTest", () => {
       'The exposure parameter of item "q1" must be a number from 0 to 1, found 2.',
     );
     expect(() => diagnosticAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
-      'Item "q1" needs a content area among the targets (easy), found undefined.',
+      'Item "q1" needs exactly one content area among the targets (easy), found undefined.',
     );
     expect(() => diagnosticAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
       'Enemy set 1 names "zz", which is not a pool item.',
@@ -3139,7 +3825,7 @@ describe("multidimensionalAdaptiveTest", () => {
       multidimensionalItem("q3", [1, 1], 0),
     ];
     const balanced = multidimensionalAdaptiveTest({
-      pool: base.map((item, i) => ({ ...item, contentArea: i === 2 ? "both" : "single" })),
+      pool: base.map((item, i) => ({ ...item, contentAreas: [i === 2 ? "both" : "single"] })),
       contentTargets: { single: 0.5, both: 0.5 },
       stopping: testLength(2),
     });
@@ -3212,7 +3898,7 @@ describe("multidimensionalAdaptiveTest", () => {
       multidimensionalAdaptiveTest({ ...options, pool: [{ ...defined(pool[0]), exposure: 2 }, ...pool.slice(1)] }),
     ).toThrow('The exposure parameter of item "q1" must be a number from 0 to 1, found 2.');
     expect(() => multidimensionalAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
-      'Item "q1" needs a content area among the targets (easy), found undefined.',
+      'Item "q1" needs exactly one content area among the targets (easy), found undefined.',
     );
     expect(() => multidimensionalAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
       'Enemy set 1 names "zz", which is not a pool item.',
@@ -3568,6 +4254,79 @@ describe("properties", () => {
         },
       ),
       { numRuns: 30 },
+    );
+  });
+
+  /** A test on a blueprint built from a hidden feasible form of `length` items, whose bounds are its counts less or plus up to `margin`. */
+  function hiddenFormTest(domains: number, types: number, size: number, length: number, margin: number, seed: number) {
+    const random = createRandom(seed);
+    const pool: PoolItem[] = Array.from({ length: size }, (_, i) => ({
+      ...item2pl(`q${i}`, 0.5 + 1.5 * random.uniform(), random.normal()),
+      contentAreas: [`d${Math.floor(random.uniform() * domains)}`, `t${Math.floor(random.uniform() * types)}`],
+    }));
+    const order = Int32Array.from(pool.keys());
+    shuffle(order, random);
+    const hidden = Array.from(order.slice(0, length), (index) => defined(pool[index]));
+    const areas = [...new Set(pool.flatMap((item) => item.contentAreas ?? []))];
+    const counts = (items: readonly PoolItem[]) =>
+      areas.map((area) => items.filter((item) => item.contentAreas?.includes(area)).length);
+    const constraints = counts(hidden).map((count, k) => ({
+      area: defined(areas[k]),
+      minimum: Math.max(0, count - Math.floor(random.uniform() * (margin + 1))),
+      maximum: count + Math.floor(random.uniform() * (margin + 1)),
+    }));
+    const test = adaptiveTest({
+      pool,
+      selection: contentBounds(maximumPriorityIndex(maximumInformation, constraints, length), constraints, length),
+      stopping: testLength(length),
+    });
+    const state = administer(test, () => (random.uniform() < 0.5 ? 1 : 0), random);
+    const given = counts(state.items.map((id) => defined(pool.find((item) => item.id === id))));
+    return { constraints, state, given };
+  }
+
+  it("tests never give more items than the length or more of an area than its maximum", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 2, max: 4 }),
+        fc.integer({ min: 2, max: 3 }),
+        fc.integer({ min: 40, max: 120 }),
+        fc.integer({ min: 4, max: 14 }),
+        fc.integer({ min: 0, max: 2 }),
+        fc.integer(),
+        (domains, types, size, length, margin, seed) => {
+          const { constraints, state, given } = hiddenFormTest(domains, types, size, length, margin, seed);
+          expect(state.items.length).toBeLessThanOrEqual(length);
+          constraints.forEach(({ area, maximum }, k) => {
+            expect(given[k], area).toBeLessThanOrEqual(maximum);
+          });
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("tests on blueprints built from a hidden feasible form meet every bound, in the cases of a fixed seed", () => {
+    // The greedy cover of the minimums is a heuristic that can miss a feasible completion, in about 1 of 3,000 blueprints
+    // as tight as 60 items for 24 cells; the seed fixes the cases, so that a change of the cover shows as a change here.
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 2, max: 4 }),
+        fc.integer({ min: 2, max: 3 }),
+        fc.integer({ min: 60, max: 120 }),
+        fc.integer({ min: 6, max: 14 }),
+        fc.integer({ min: 0, max: 1 }),
+        fc.integer(),
+        (domains, types, size, length, margin, seed) => {
+          const { constraints, state, given } = hiddenFormTest(domains, types, size, length, margin, seed);
+          expect(state.items).toHaveLength(length);
+          constraints.forEach(({ area, minimum, maximum }, k) => {
+            expect(given[k], area).toBeGreaterThanOrEqual(minimum);
+            expect(given[k], area).toBeLessThanOrEqual(maximum);
+          });
+        },
+      ),
+      { numRuns: 200, seed: 20261029 },
     );
   });
 

@@ -7,6 +7,8 @@
  */
 export { aStratified } from "./a-stratified.js";
 export { type AdaptiveTest, type AdaptiveTestOptions, type AdaptiveTestState, adaptiveTest } from "./adaptive-test.js";
+export { contentBounds } from "./bounds.js";
+export type { ContentConstraint } from "./content-constraints.js";
 export type {
   DiagnosticPoolItem,
   DiagnosticTestItem,
@@ -40,7 +42,6 @@ export {
 export {
   type AssembledForm,
   assembleForm,
-  type ContentConstraint,
   type FormAssemblyOptions,
   type InformationTarget,
 } from "./form-assembly.js";
@@ -72,6 +73,7 @@ export {
   type MultistageTestState,
   multistageTest,
 } from "./multistage-test.js";
+export { maximumPriorityIndex } from "./priority-index.js";
 export { randomesque } from "./randomesque.js";
 export {
   type AdaptiveTestContext,
@@ -90,6 +92,7 @@ export type { TestState } from "./state.js";
 export {
   allOf,
   anyOf,
+  contentMinimumsMet,
   informationThreshold,
   type PrecisionEstimate,
   type StoppingRule,

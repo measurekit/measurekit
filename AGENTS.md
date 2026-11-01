@@ -45,6 +45,8 @@ Use these words with these meanings in code, comments and docs.
 | occasion           | One administration of the same items to the same persons; a longitudinal calibration gives each its own trait.             |
 | testlet            | Items that share a stimulus, such as a reading passage; the testlet model adds one effect per person and testlet.          |
 | pool, form, panel  | A pool holds the items an adaptive test selects from; a form is a fixed set of items; a panel has stages of modules.       |
+| content area       | A group of items a blueprint counts, such as a domain or an item type; an item is in several (`contentAreas`).             |
+| unit               | An item, or a testlet that has not begun, which an adaptive test administers whole.                                        |
 | response time      | Seconds a person spent on an item, aligned with the response: `times` of a matrix, `time` of a record.                     |
 | subject, rater     | In rater agreement, what is rated, such as an essay, and who rates it: a row and a column of ratings.                      |
 
@@ -119,7 +121,7 @@ packages/psychometrics/       the published package @measurekit/psychometrics
                         bifactor and two-tier models, a trait over two or three occasions, rotation, scoring,
                         information
   src/sim/              simulation of thetas, item parameters and responses, multidimensional ones included
-  src/cat/              adaptive and multistage tests, testlets, their simulation, exposure control, form assembly
+  src/cat/              adaptive and multistage tests, testlets, content bounds, their simulation, exposure control, form assembly
   src/cdm/              cognitive diagnosis: G-DINA, DINA, DINO, A-CDM, LLM, R-RUM, Wald tests of reduced models for
                         each item, Q-matrix validation, nonparametric classification
   src/fit/              item and person fit, local dependence

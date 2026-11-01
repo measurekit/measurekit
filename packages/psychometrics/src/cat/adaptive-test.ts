@@ -12,7 +12,7 @@ import type { WithinTestlet } from "./testlets.js";
 export interface AdaptiveTestOptions {
   /** The item pool. */
   readonly pool: readonly PoolItem[];
-  /** The rule that ends the test. The test also ends when no item is left. */
+  /** The rule that ends the test. The test also ends when no item is left or the selection rule scores every eligible item `-Infinity`. */
   readonly stopping: StoppingRule;
   /**
    * The rule that selects the next item.
@@ -28,7 +28,7 @@ export interface AdaptiveTestOptions {
   readonly estimator?: AbilityEstimator;
   /**
    * Target proportions of the content areas, by area, for Kingsbury-Zara content balancing; they need not sum to 1.
-   * Every pool item then needs one of these areas.
+   * Every pool item then needs exactly one of these areas among its `contentAreas`.
    *
    * @defaultValue none: no content balancing
    */

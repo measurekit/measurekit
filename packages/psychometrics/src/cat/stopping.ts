@@ -1,5 +1,6 @@
 import { checkMethod, checkPositive, checkPositiveInteger, DataError } from "@measurekit/core";
 import type { AbilityEstimate } from "../irt/ability.js";
+import { type ContentConstraint, countAreas, poolAreas, readBounds } from "./content-constraints.js";
 import type { PoolControls, PoolItem } from "./items.js";
 import type { AdaptiveTestContext } from "./selection.js";
 
@@ -69,6 +70,30 @@ export function informationThreshold(threshold: number): StoppingRule {
       pool.every(
         (item, index) => eligible[index] !== 1 || item.model.information(item.parameters, estimate.theta) <= threshold,
       ),
+  };
+}
+
+/**
+ * Returns a rule that stops once the administered items meet every minimum of the content constraints, so that a stop
+ * on precision, composed with {@link allOf}, never comes before the blueprint's minimums are met. Alone it stops a test
+ * whose constraints have no minimum at once.
+ *
+ * @remarks
+ * Areas are counted by the pool array, so a pool must not change after its first use.
+ *
+ * @throws `DataError` when the constraints are invalid or on one area twice, or a bound is not an integer from 0; from
+ * the rule, when an item's `contentAreas` is not an array of distinct non-empty strings.
+ */
+export function contentMinimumsMet<TItem extends PoolControls, TEstimate>(
+  constraints: readonly ContentConstraint[],
+): StoppingRule<TItem, TEstimate> {
+  const { areas, minimums } = readBounds(constraints);
+  const itemAreasOf = poolAreas(areas);
+  return {
+    stops: ({ pool, administered }) => {
+      const counts = countAreas(administered, itemAreasOf(pool), areas.length);
+      return minimums.every((minimum, k) => (counts[k] ?? 0) >= minimum);
+    },
   };
 }
 

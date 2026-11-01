@@ -95,7 +95,8 @@ export function checkRules(stopping: unknown, selection: unknown, selectionExamp
  * Before each item the engine estimates from the responses so far and checks the stopping rule; unless the test ends,
  * content balancing restricts the eligible items to one content area, the selection rule selects among them, and
  * Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or
- * enemies of an administered item are not eligible.
+ * enemies of an administered item are not eligible. The test ends where the selection rule scores every eligible item
+ * `-Infinity`, as where no item is eligible.
  *
  * Items of a testlet are administered together. The selection rule scores each testlet as a unit, by the mean of its
  * eligible items' scores, and the testlet's first item to be administered goes through content balancing, which takes
@@ -130,7 +131,7 @@ export function adaptiveEngine<TItem extends PoolControls, TEstimate>(
     return testlet < 0 ? [index] : (testlets?.members[testlet] ?? [index]);
   };
   const balancing = contentTargets === undefined ? null : contentBalancing(pool, contentTargets);
-  if (balancing !== null && testlets !== null) checkTestletAreas(pool, testlets);
+  if (balancing !== null && testlets !== null) checkTestletAreas(pool, testlets, balancing);
   const enemies = enemyIndices(pool, indices, enemySets);
 
   /** Returns the item to administer next, or `null` when the test ends: the rest of a testlet, else a selection. */

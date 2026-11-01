@@ -13,7 +13,7 @@ import type { WithinTestlet } from "./testlets.js";
 
 /** Options of {@link diagnosticAdaptiveTest}. */
 export interface DiagnosticAdaptiveTestOptions {
-  /** The item pool: calibrated items `{ id, attributes, probabilities }`, with `contentArea` and `exposure` optional. */
+  /** The item pool: calibrated items `{ id, attributes, probabilities }`, with `contentAreas` and `exposure` optional. */
   readonly pool: readonly DiagnosticPoolItem[];
   /** The attributes, from 1 to 20, in the order of the profiles. Every attribute of an item is among them. */
   readonly attributes: readonly string[];
@@ -25,7 +25,7 @@ export interface DiagnosticAdaptiveTestOptions {
    * @defaultValue uniform over the profiles
    */
   readonly prior?: readonly ProfileProportion[];
-  /** The rule that ends the test. The test also ends when no item is left. */
+  /** The rule that ends the test. The test also ends when no item is left or the selection rule scores every eligible item `-Infinity`. */
   readonly stopping: StoppingRule<DiagnosticTestItem, ProfileEstimate>;
   /**
    * The rule that selects the next item.
@@ -35,7 +35,7 @@ export interface DiagnosticAdaptiveTestOptions {
   readonly selection?: ItemSelectionRule<DiagnosticTestItem, ProfileEstimate>;
   /**
    * Target proportions of the content areas, by area, for Kingsbury-Zara content balancing; they need not sum to 1.
-   * Every pool item then needs one of these areas.
+   * Every pool item then needs exactly one of these areas among its `contentAreas`.
    *
    * @defaultValue none: no content balancing
    */
