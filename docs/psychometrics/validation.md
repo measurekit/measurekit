@@ -83,6 +83,9 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | Polychoric and tetrachoric correlations, thresholds                  | Base R: the log-likelihood of the table from `pmvnorm` cells, maximized by `optimize(tol = 1e-12)` and polished at the root of its score; `psych::polychoric` and `tetrachoric` (`smooth = FALSE`); `polycor::polychor` on complete data |
 | Eigenvalues of the correlations and of the one-factor reduced matrix | Base R `eigen`; the minres loadings by L-BFGS-B, then Newton on the loadings not at a bound; `psych::fa(nfactors = 1, fm = "minres")`'s `values`                                                                                         |
 | Eigenvalues of random data, suggested numbers                        | `psych::fa.parallel(n.iter, fa = "both")`; for Pearson correlations of `psych::bfi`, 2,000 permuted data sets in base R                                                                                                                  |
+| Minres factors, rotations, communalities                             | Base R: L-BFGS-B on the communalities, then Newton; `GPArotation::oblimin`, `Varimax`; `psych::fa(fm = "minres")`                                                                                                                        |
+| Minimum average partial test                                         | Base R: the formula written out; `psych::VSS(rotate = "none")$map` of the raw data                                                                                                                                                       |
+| Smoothed correlations                                                | `psych::cor.smooth`                                                                                                                                                                                                                      |
 
 | CAT quantity                                                 | Reference                                                                                               |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
@@ -341,6 +344,22 @@ distribution and missing responses exactly. The two give means that differ by le
 comparison, about 1e-3 for `bfi`. Its simulated data, `sim`, are normal data, which the package's `comparison: "normal"`
 draws; psych's own suggested numbers of components and factors come from them, even for polychoric correlations, so the
 tests compare those with the normal comparison for Pearson correlations only, and the resampled ones elsewhere.
+
+`validation/psychometrics/exploratory-factors.R` solves the minimum residual problem in base R, independently of the
+package: L-BFGS-B on the communalities with an exact gradient, then Newton steps with a Hessian by central differences of
+the gradient, to a projected gradient below 1e-10; the oblimin and Varimax rotations are GPArotation's to a gradient of
+1e-10, and each solution has psych's signs and order. The cases are 12 seeded tetrachoric items on 2 factors, `bfi` with
+Pearson and polychoric correlations, SAT12's tetrachoric correlations, which are not positive definite, the 24 tests of
+Harman's data, and a matrix of one factor with a loading of 0.99999, whose communality is beyond its bound. The package
+solves each matrix as base R does within 1e-8, for the minimum residuals, the rotations and the correlations of the
+factors, in 5 to 18 iterations. psych's `fa` stops at about 1e-5 of the minimum, and the loadings agree with it within
+that, also on the matrix beyond its bound, where psych's communality is the package's. psych's varimax is `stats::varimax`,
+which stops at 1e-5 of its criterion: its loadings are within 1e-2 of the package's, and within 2e-5 of a run of
+`stats::varimax` to 1e-14. The correlations the package computes from the responses are its own: its polychoric
+correlations differ from psych's by 2e-5, so the factors and the partial correlations that come from them agree with psych
+within 3e-4 and 5e-5. The formula of the minimum average partial test is written out in base R, as psych's `VSS` does,
+and `VSS`'s `map` of the raw data is compared; the package finds the 2 factors of the simulation and 5 of `bfi`, as psych's
+minimum does. The smoothed matrix of SAT12 and of a matrix of three items equal `cor.smooth`'s within 1e-9.
 
 `validation/psychometrics/scaling.R` checks its references against each other: the base R EAP of the summed score equals
 mirt's EAPsum within 1e-10, and the base R percentile ranks equal equate's `px` of `ACTmath` within 1e-10. The tests add
@@ -646,6 +665,9 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   simulated persons in three groups with their own means and covariances: at 21 nodes per dimension every mean within
   0.18 and every covariance within 0.25 of the true value (0.13 and 0.18 found); at the default 15 nodes the errors are
   0.24 and 0.61, which is why the guide advises 21 above 20 items per dimension.
+- **Factor recovery.** 12 simulated dichotomous items, 6 on each of 2 factors correlated 0.3, from 1,500 simulated
+  persons, with loadings 0.7 and 0.6: the tetrachoric factors give mean loadings within 0.05 of the truth and a
+  correlation within 0.07 (0.010, 0.006 and 0.016 found), and the minimum average partial test finds 2 factors.
 - **Multidimensional categories.** The frequency of each category of 20,000 responses at one vector of thetas, for
   M2PL, M3PL and graded items on two and three dimensions.
 
@@ -714,6 +736,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `dimensionality-bivariate-normal.json`   | `mvtnorm::pmvnorm` at 400 random points and 42 × 9 points at both sides of each switch of the algorithm (                                                                                                                                                                                                                                   | ρ                                                                                                                                      |
 | `dimensionality-polychoric.json`         | `mirt::LSAT7` expanded (5 items), `mirt::SAT12` scored with its key (32 items, 8 as missing), `psych::bfi` recoded 0-5 (25 items, 508 missing responses) and its complete cases                                                                                                                                                             | Tetrachoric and polychoric correlations, a pair with an empty cell, missing responses, `correction = 0`                                |
 | `dimensionality-parallel.json`           | The same data: `psych::fa.parallel` of `bfi` with Pearson correlations (2,000 data sets) and of 8 `bfi` items, LSAT7 and 10 SAT12 items with polychoric and tetrachoric correlations; 60 permuted `bfi` data sets                                                                                                                           | Resampled and normal random data, the numbers suggested, matrices with a loading at its bound                                          |
+| `dimensionality-factors.json`            | The correlations of 12 simulated tetrachoric items, `bfi`, `SAT12` smoothed, Harman's 24 tests and a Heywood matrix; the base R solutions, psych's `fa`, `VSS` maps and `cor.smooth`                                                                                                                                                        |
 | `irt-covariance.json`                    | The calibrations of `irt-lsat7` and `irt-science`; the LSAT7 2PL with a log-normal prior on a and priors by item                                                                                                                                                                                                                            | Covariances between items; a prior replaced for one item                                                                               |
 | `irt-posterior.json`                     | The calibrations of `irt-lsat7` and `irt-science`: 36 patterns of LSAT7, 8 of Science; under N(0, 1) and N(0.4, 1.3²)                                                                                                                                                                                                                       | Posteriors on 61 nodes, a prior other than N(0, 1), missing responses                                                                  |
 | `scaling-conversion.json`                | LSAT7 under the 2PL and Science under the GPCM, as mirt calibrates them; forms 1 and 2 of equateIRT's `est3pl` (20 3PL items each) set in mirt                                                                                                                                                                                              | Tables of both methods on four scales, a prior other than N(0, 1), polytomous forms, scores with no theta                              |
@@ -848,6 +871,12 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Correlations against psych and polycor                                                           | 1e-4 absolute                                      | 2.2e-5                   |
 | Eigenvalues of the correlations and of the reduced matrix, against base R                        | 1e-8 absolute                                      | 2.4e-9                   |
 | Factor eigenvalues of the data against psych's `fa`                                              | 1e-4 absolute                                      | 7.3e-7                   |
+| Minres communalities, loadings, rotations, factor correlations, against base R                   | 1e-8 absolute                                      | 1.1e-11                  |
+| Loadings, factor correlations, communalities against psych's `fa`                                | 1e-4 absolute                                      | 1.7e-5                   |
+| Varimax loadings against psych's `fa`                                                            | 2e-2 absolute                                      | 1.2e-2                   |
+| Factors from this package's polychoric correlations against psych's `fa`                         | 3e-4 absolute                                      | 5.8e-5                   |
+| Average partials against base R; against `VSS`, Pearson; polychoric                              | 1e-8; 1e-12; 5e-5 absolute                         | 1.6e-15; 5.7e-16; 5.0e-6 |
+| Smoothed correlations against `cor.smooth`                                                       | 1e-9 absolute                                      | 3.3e-15                  |
 | Means of random eigenvalues against the reference's                                              | 4 Monte Carlo standard errors                      | 3.0                      |
 | 0.95 quantiles of random eigenvalues against the reference's                                     | 6 standard errors of a normal quantile             | 5.2                      |
 | Purified and sparse Mantel-Haenszel statistics                                                   | 1e-12 absolute                                     | 4e-16                    |

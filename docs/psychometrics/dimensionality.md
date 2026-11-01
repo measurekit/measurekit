@@ -1,9 +1,21 @@
 # Dimensionality
 
 `@measurekit/psychometrics/dimensionality` estimates the correlations of the normal variables behind item responses,
-polychoric for items with several categories and tetrachoric for dichotomous items, and runs Horn's parallel analysis on
-them to suggest how many dimensions a test has. The correlations are validated against psych and polycor, the bivariate
-normal distribution against mvtnorm, and the eigenvalues against base R and psych ([validation](validation.md)).
+polychoric for items with several categories and tetrachoric for dichotomous items, and asks how many dimensions a test
+has: by Horn's parallel analysis and by Velicer's minimum average partial test. It fits that many factors to the items by
+the minimum residual method, rotated to a simple structure, and smooths correlation matrices that are not positive
+definite. The correlations are validated against psych and polycor, the bivariate normal distribution against mvtnorm,
+and the eigenvalues, the factors and the partial correlations against base R and psych ([validation](validation.md)).
+
+```mermaid
+flowchart LR
+  R["Response matrix"] --> C["Correlations: Pearson or polychoric"]
+  C --> PA["parallelAnalysis: how many dimensions, against random data"]
+  C --> S["Smoothed if not positive definite"]
+  S --> MAP["minimumAveragePartial: how many, by partial correlations"]
+  S --> F["exploratoryFactorAnalysis: minimum residual fit, rotation"]
+  F --> L["Loadings, communalities, correlations of the factors"]
+```
 
 ## Correlations
 
@@ -127,34 +139,150 @@ correlations as for the data. The `"normal"` comparison draws standard normal sc
 psych's simulated data do, and takes their Pearson correlations: it suits `correlation: "pearson"`, and `"polychoric"`
 with it throws `DataError`.
 
+## Exploratory factor analysis
+
+`exploratoryFactorAnalysis(matrix, options)` fits `factors` common factors to the items by the minimum residual (minres)
+method, as `psych::fa(fm = "minres")`. It takes a [response matrix](data.md), correlates the items, smooths the
+correlations if they are not positive definite, and returns the rotated loadings, the communalities and the correlations
+between the factors.
+
+| Option          | Default     | Meaning                                                                                                               |
+| --------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `factors`       | required    | The number of factors, a positive integer that the items identify: 12 items identify at most 7                        |
+| `correlation`   | `"pearson"` | `"pearson"` for scores treated as continuous, over the persons who answered a pair; `"polychoric"` for item responses |
+| `rotation`      | `"oblimin"` | `"none"`; `"varimax"`, orthogonal with Kaiser's normalization; `"oblimin"`, oblique. One factor is not rotated        |
+| `tolerance`     | `1e-6`      | The largest change of a communality in an iteration at which the fit stops                                            |
+| `maxIterations` | `100`       | The most iterations of the fit                                                                                        |
+| `correction`    | `0.5`       | As for [`polychoricCorrelations`](#correlations)                                                                      |
+
+| Field           | Meaning                                                                            |
+| --------------- | ---------------------------------------------------------------------------------- |
+| `itemIds`       | The item ids, in the matrix's order                                                |
+| `loadings`      | Items by factors; the factors are in the order of the variance they account for    |
+| `communalities` | The part of each item's variance that the factors share                            |
+| `correlations`  | Between the factors, by rows: the identity unless the rotation is oblique          |
+| `converged`     | Whether the fit and the rotation both reached their tolerances                     |
+| `iterations`    | The iterations of the fit                                                          |
+| `smoothed`      | Whether the correlations of the items were not positive definite and were smoothed |
+
+```ts
+import { exploratoryFactorAnalysis } from "@measurekit/psychometrics/dimensionality";
+
+// `matrix` is the response matrix of the example above: two independent traits, six items each.
+const fit = exploratoryFactorAnalysis(matrix, { factors: 2, correlation: "polychoric" });
+fit.loadings.slice(0, 2); // [[0.774, -0.021], [0.753, 0.025]]: items 1 and 2 load on the first factor
+fit.loadings.slice(6, 8); // [[-0.01, 0.717], [-0.073, 0.718]]: items 7 and 8 on the second
+fit.communalities.slice(0, 3); // [0.599, 0.569, 0.476]
+fit.correlations; // [[1, 0.017], [0.017, 1]]: the traits are independent
+fit.converged; // true
+```
+
+**The fit.** The unknowns are the communalities h, which lie from 0 to 0.995: each item's uniqueness is at least 0.005, as
+in psych's `fa`. For some h, the correlation matrix with h on its diagonal has eigenvalues, and the best fit of the
+factors to it keeps the leading ones; what the fit leaves out, half the sum of the squares of the other eigenvalues, is
+the objective. It is the sum of the squared residuals of the off-diagonal correlations, where the communalities are those
+of the fit. Each iteration takes a Newton step on the communalities, with the Hessian that the objective has at a perfect
+fit, a backtracking line search that keeps the bounds, and an eigendecomposition of the matrix. The search starts from
+the squared multiple correlations. Convergence takes 5 to 20 iterations and a few milliseconds for 25 items.
+
+**The solution.** The unrotated loadings are the leading eigenvectors of the reduced matrix scaled by the roots of their
+eigenvalues. They are rotated by gradient projection from there, with the oblimin criterion without normalization, as
+`GPArotation::oblimin`, or the varimax criterion with each item's loadings scaled to unit length, as `stats::varimax`
+does. Each factor's sign makes its loadings sum to a positive number, and the factors follow the variance they account
+for, the diagonal of Φ ΛᵀΛ, as psych orders them. The communalities are the diagonal of Λ Φ Λᵀ for every rotation.
+
+A communality that the fit pushes beyond 0.995, a Heywood case, stays at the bound in the matrix the fit starts from, and
+the communality of the loadings can exceed it, as it does in psych; `converged` is `true`. More factors than the items
+identify throw `DataError`: the number of correlations must be at least the number of loadings less the rotations that
+leave the model as it is.
+
+**Which function.** `exploratoryFactorAnalysis` works on the correlations of the items, takes milliseconds and returns
+the factors. `calibrateMultidimensional` with `dimensions` estimates a compensatory item response model from the
+responses, by full information, and returns item parameters, a likelihood and standard errors, in seconds to minutes.
+The two agree on what they share: on the 12 simulated tetrachoric items of the validation, the loadings of the first
+factor average 0.710 here and 0.724 by full information after `rotateLoadings`, those of the second 0.606 and 0.618, and
+the correlation of the factors 0.316 and 0.306, for the truth of 0.7, 0.6 and 0.3. Use the factors to explore and to
+choose the number of dimensions, and the calibration when the item parameters matter.
+
+## Minimum average partial test
+
+`minimumAveragePartial(matrix, options)` is Velicer's test for the number of factors. It removes the principal
+components of the correlations one at a time and, after each, squares and averages the partial correlations of the
+items. While the components remove common variance the average falls; when they start removing the variance of single
+items it rises, and the number of components at the minimum is the number of factors.
+
+| Option        | Default                 | Meaning                                                             |
+| ------------- | ----------------------- | ------------------------------------------------------------------- |
+| `correlation` | `"pearson"`             | As for [`exploratoryFactorAnalysis`](#exploratory-factor-analysis)  |
+| `maxFactors`  | the number of items - 1 | The most components to remove, from 1 to the number of items less 1 |
+| `correction`  | `0.5`                   | As for [`polychoricCorrelations`](#correlations)                    |
+
+The result holds `map`, the mean squared partial correlation after 1, 2, ... components, `factors`, the number at the
+lowest value, the first when tied, and `smoothed`.
+
+```ts
+import { minimumAveragePartial } from "@measurekit/psychometrics/dimensionality";
+
+const { map, factors } = minimumAveragePartial(matrix, { correlation: "polychoric" });
+map.slice(0, 4); // [0.0782, 0.0219, 0.0364, 0.0518]: the lowest is after 2 components
+factors; // 2
+```
+
+`map` is the `map` of psych's `VSS`, which starts at one component, so the test never answers none; Velicer's original also
+scores zero components. With all the components but one removed, what is left of each pair is a correlation of 1 in
+absolute value, so the last value is 1.
+
+## Smoothing
+
+`smoothCorrelations(correlations, size, options)` returns a correlation matrix that is positive definite. A matrix whose
+least eigenvalue is below the machine epsilon has its eigenvalues below `tolerance` (`1e-12`) raised to 100 times it,
+rescaled to sum to the number of variables, and the matrix rebuilt and rescaled to a correlation matrix, as
+`psych::cor.smooth`. A matrix that is positive definite comes back as it is, in a copy.
+
+Polychoric correlations come from pairs of items estimated apart and can fail to be positive definite: the tetrachoric
+correlations of `SAT12`, 32 items, have a least eigenvalue of -0.09. `exploratoryFactorAnalysis` and
+`minimumAveragePartial` smooth and report it in `smoothed`; `parallelAnalysis` does not, so that its eigenvalues can be
+negative.
+
 ## Not included
 
-- Exploratory factor analysis beyond the one-factor minres solution, Velicer's minimum average partial test, DETECT and
-  DIMTEST.
-- Smoothing of correlation matrices that are not positive definite.
+- Factor extraction other than minres, such as maximum likelihood, and other rotations, such as promax.
+- DETECT and DIMTEST.
 - Polyserial correlations of scores with categories, and standard errors of the correlations.
 - Weights of persons, and a correlation matrix as input: the functions take responses.
 
 ## Differences from psych
 
-| Topic                     | This package                                                                  | psych                                                                         |
-| ------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Maximum of the likelihood | Newton's method with derivatives, to 1e-13; the maximum of `optimize`         | `optimize` with its default tolerance, within about 2e-5 of the maximum       |
-| Correlation matrix        | As estimated: not smoothed                                                    | `smooth = TRUE` by default, which makes the matrix positive definite          |
-| `correct`                 | Two items with two categories each, over the pair's persons                   | The same for `tetrachoric`; `polychoric` ignores it with global thresholds    |
-| Thresholds                | From all responses, over the observed categories                              | The same (`global = TRUE`), over a range of categories shared by every item   |
-| Random data               | Each item permuted among the persons (`resampled`), or normal data (`normal`) | `fa.parallel` resamples each item with replacement, and also simulates normal |
-| Suggested numbers         | From the quantile of the comparison you choose                                | From the simulated normal data, also for polychoric correlations              |
-| Replications              | 100                                                                           | 20 (`n.iter`)                                                                 |
-| Factor eigenvalues        | One-factor minres by Newton's method from the centroid loadings, to 1e-8      | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations        |
-| Items without variance    | `null` in the correlations; an error in parallel analysis                     | Deleted with a message                                                        |
+| Topic                     | This package                                                                      | psych                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Maximum of the likelihood | Newton's method with derivatives, to 1e-13; the maximum of `optimize`             | `optimize` with its default tolerance, within about 2e-5 of the maximum       |
+| Correlation matrix        | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite          |
+| `correct`                 | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds    |
+| Thresholds                | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item   |
+| Random data               | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal |
+| Suggested numbers         | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations              |
+| Replications              | 100                                                                               | 20 (`n.iter`)                                                                 |
+| Factor eigenvalues        | One-factor minres by Newton's method from the centroid loadings, to 1e-8          | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations        |
+| Minres solution           | Newton steps on the communalities from the squared multiple correlations          | L-BFGS-B on the same objective, within about 1e-5 of its minimum              |
+| Varimax                   | Gradient projection to a gradient of 1e-10, with Kaiser's normalization           | `stats::varimax`, which stops at 1e-5 of its criterion: loadings within 1e-2  |
+| Smoothed correlations     | Of the items' correlations in the factors and the test; not in `parallelAnalysis` | Of every correlation matrix `tetrachoric` and `polychoric` return             |
+| Items without variance    | `null` in the correlations; an error in parallel analysis                         | Deleted with a message                                                        |
 
 ## References
 
+- Bock, R. D., Gibbons, R., and Muraki, E. (1988). Full-information item factor analysis. Applied Psychological
+  Measurement, 12, 261-280.
+- Fabrigar, L. R., Wegener, D. T., MacCallum, R. C., and Strahan, E. J. (1999). Evaluating the use of exploratory factor
+  analysis in psychological research. Psychological Methods, 4, 272-299.
 - Genz, A. (2004). Numerical computation of rectangular bivariate and trivariate normal and t probabilities. Statistics
   and Computing, 14, 251-260.
 - Glorfeld, L. W. (1995). An improvement on Horn's parallel analysis methodology for selecting the correct number of
   factors to retain. Educational and Psychological Measurement, 55, 377-393.
 - Horn, J. L. (1965). A rationale and test for the number of factors in factor analysis. Psychometrika, 30, 179-185.
+- Jöreskog, K. G. (1967). Some contributions to maximum likelihood factor analysis. Psychometrika, 32, 443-482.
 - Olsson, U. (1979). Maximum likelihood estimation of the polychoric correlation coefficient. Psychometrika, 44,
   443-460.
+- Velicer, W. F. (1976). Determining the number of components from the matrix of partial correlations. Psychometrika, 41,
+  321-327.
+- Wothke, W. (1993). Nonpositive definite matrices in structural modeling. In K. A. Bollen and J. S. Long (Eds.), Testing
+  structural equation models (pp. 256-293). Sage.

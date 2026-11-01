@@ -75,6 +75,8 @@ const BUDGETS = {
   "ctt.subscoreValue": 20,
   "dimensionality.polychoricCorrelations": 100,
   "dimensionality.parallelAnalysis": 2_000,
+  "dimensionality.exploratoryFactorAnalysis": 70,
+  "dimensionality.minimumAveragePartial": 60,
   "mokken.scalability": 10,
   "mokken.automatedItemSelection": 5,
   "mokken.monotonicity": 20,

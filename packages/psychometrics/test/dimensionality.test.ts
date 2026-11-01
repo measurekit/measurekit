@@ -1,10 +1,16 @@
+import { shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { correlationEigenvalues } from "../src/dimensionality/eigenvalues.js";
+import { type FactorRotation, factorSolution } from "../src/dimensionality/exploratory-factors.js";
+import { averagePartials } from "../src/dimensionality/minimum-average-partial.js";
 import {
   createRandom,
   DataError,
+  type ExploratoryFactorOptions,
+  exploratoryFactorAnalysis,
   mcdonaldOmega,
+  minimumAveragePartial,
   type ParallelAnalysis,
   type ParallelAnalysisOptions,
   parallelAnalysis,
@@ -13,12 +19,15 @@ import {
   simulateItems,
   simulateResponses,
   simulateThetas,
+  smoothCorrelations,
   twoParameterLogistic,
 } from "../src/index.js";
 import { bivariateNormalCdf, bivariateNormalDensity } from "../src/math/bivariate-normal.js";
-import { minresLoadings } from "../src/math/minres.js";
+import { symmetricEigen } from "../src/math/eigen.js";
+import { minres, minresLoadings } from "../src/math/minres.js";
 import { normalCdf } from "../src/math/normal.js";
 import bivariate from "./fixtures/dimensionality-bivariate-normal.json" with { type: "json" };
+import factorFixture from "./fixtures/dimensionality-factors.json" with { type: "json" };
 import parallel from "./fixtures/dimensionality-parallel.json" with { type: "json" };
 import polychoric from "./fixtures/dimensionality-polychoric.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
@@ -36,6 +45,14 @@ const PSYCH_CORRELATION_TOLERANCE = 1e-4;
 const EIGENVALUE_TOLERANCE = 1e-8;
 /** The factor eigenvalues against psych's, whose L-BFGS-B stops short of the minimum of its residuals. */
 const PSYCH_EIGENVALUE_TOLERANCE = 1e-4;
+/** The minres solution, its rotation and the minimum average partial test against base R on the same matrix. */
+const FACTOR_TOLERANCE = 1e-8;
+/** Loadings against psych's, whose L-BFGS-B and GPArotation stop at about 1e-5 of their optima. */
+const PSYCH_FACTOR_TOLERANCE = 1e-4;
+/** Varimax loadings against psych's, whose `stats::varimax` stops at 1e-5 of its criterion, about 1e-2 of the loadings. */
+const PSYCH_VARIMAX_TOLERANCE = 2e-2;
+/** Factors and partial correlations of this package's polychoric correlations against psych's, which differ by 1e-4. */
+const PSYCH_POLYCHORIC_FACTOR_TOLERANCE = 3e-4;
 /** Means of random eigenvalues against a reference of its own random data: this many Monte Carlo standard errors. */
 const MONTE_CARLO_SIGMAS = 4;
 /**
@@ -53,6 +70,35 @@ function simulated(items: number, persons: number, seed: number): ReturnType<typ
   const random = createRandom(seed);
   const pool = simulateItems(twoParameterLogistic, items, random);
   return simulateResponses(pool, simulateThetas(persons, random), random);
+}
+
+/** The responses of the datasets that the cases of the factor fixture use. */
+const FACTOR_DATA = {
+  bfi: responseMatrix(defined(parallel.cases[0]).responses, { itemIds: defined(parallel.cases[0]).itemIds }),
+  sat12: responseMatrix(defined(polychoric.cases.find(({ name }) => name === "SAT12")).responses),
+  simulated: responseMatrix(factorFixture.simulated.responses, { itemIds: factorFixture.simulated.itemIds }),
+};
+
+/** Compares two matrices of the same shape entry by entry. */
+function expectMatrix(
+  actual: readonly (readonly number[])[],
+  expected: readonly (readonly number[])[],
+  tolerance: number,
+  label: string,
+): void {
+  expect(actual.length, label).toBe(expected.length);
+  expected.forEach((row, i) => {
+    row.forEach((value, j) => {
+      expectClose(defined(actual[i]?.[j]), value, tolerance, `${label} ${i + 1},${j + 1}`);
+    });
+  });
+}
+
+/** A correlation matrix by rows with `value` off the diagonal. */
+function equicorrelation(size: number, value: number): Float64Array {
+  return Float64Array.from({ length: size * size }, (_, index) =>
+    Math.floor(index / size) === index % size ? 1 : value,
+  );
 }
 
 describe("bivariateNormalCdf", () => {
@@ -336,13 +382,6 @@ describe("polychoricCorrelations", () => {
 });
 
 describe("minresLoadings", () => {
-  /** A correlation matrix by rows with `value` off the diagonal. */
-  function equicorrelation(size: number, value: number): Float64Array {
-    return Float64Array.from({ length: size * size }, (_, index) =>
-      Math.floor(index / size) === index % size ? 1 : value,
-    );
-  }
-
   it("gives the loadings sqrt(r) for equal correlations r, which one factor fits exactly", () => {
     const { loadings, converged } = minresLoadings(equicorrelation(4, 0.36), 4);
     expect(converged).toBe(true);
@@ -383,6 +422,128 @@ describe("minresLoadings", () => {
     const result = mcdonaldOmega(simulated(6, 300, 4));
     expect(result.converged).toBe(true);
     expect(result.loadings).toHaveLength(6);
+  });
+});
+
+describe("minres", () => {
+  const solved = factorFixture.cases.map((c) => ({ c, r: Float64Array.from(c.matrix.flat()), size: c.matrix.length }));
+
+  for (const { c, r, size } of solved) {
+    it(`matches the minimum residual solution of base R for ${c.name}`, () => {
+      const fit = minres(r, size, c.factors, { tolerance: 1e-12, maxIterations: 500 });
+      expect(fit.converged).toBe(true);
+      c.base.communalities.forEach((value, i) => {
+        expectClose(defined(fit.communalities[i]), value, FACTOR_TOLERANCE, `communality ${i + 1}`);
+      });
+      c.base.unrotated.forEach((row, i) => {
+        row.forEach((value, k) => {
+          expectClose(defined(fit.loadings[i * c.factors + k]), value, FACTOR_TOLERANCE, `loading ${i + 1},${k + 1}`);
+        });
+      });
+    });
+  }
+
+  it("reaches the loadings of base R to 1e-6 at the default tolerance, in few iterations", () => {
+    for (const { c, r, size } of solved) {
+      const fit = minres(r, size, c.factors);
+      expect(fit.converged, c.name).toBe(true);
+      expect(fit.iterations, c.name).toBeLessThan(15);
+      c.base.unrotated.forEach((row, i) => {
+        row.forEach((value, k) => {
+          expectClose(defined(fit.loadings[i * c.factors + k]), value, 1e-6, `${c.name} loading ${i + 1},${k + 1}`);
+        });
+      });
+    }
+  });
+
+  it("agrees with the one-factor loadings of minresLoadings where no loading is at its bound", () => {
+    const { c, r, size } = defined(solved.find(({ c: each }) => each.name === "bfi, one factor, Pearson"));
+    expect(c.factors).toBe(1);
+    const one = minresLoadings(r, size);
+    const fit = minres(r, size, 1, { tolerance: 1e-12 });
+    one.loadings.forEach((loading, i) => {
+      expectClose(defined(fit.loadings[i]), loading, 1e-8, `loading ${i + 1}`);
+    });
+  });
+
+  it("fits a correlation matrix of exactly one factor, whatever the loadings", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.double({ min: 0.3, max: 0.9, noNaN: true }), { minLength: 4, maxLength: 9 }),
+        (lambda) => {
+          const size = lambda.length;
+          const r = Float64Array.from({ length: size * size }, (_, k) => {
+            const i = Math.floor(k / size);
+            const j = k % size;
+            return i === j ? 1 : defined(lambda[i]) * defined(lambda[j]);
+          });
+          const fit = minres(r, size, 1, { tolerance: 1e-12, maxIterations: 200 });
+          expect(fit.converged).toBe(true);
+          lambda.forEach((value, i) => {
+            expectClose(defined(fit.loadings[i]), value, 1e-7, `loading ${i + 1}`);
+          });
+        },
+      ),
+      { numRuns: 40 },
+    );
+  });
+
+  it("fits the correlations of two orthogonal factors, up to a rotation of the loadings", () => {
+    const first = [0.8, 0.7, 0.6, 0.5, 0, 0, 0, 0];
+    const second = [0, 0, 0.3, 0.4, 0.7, 0.6, 0.8, 0.5];
+    const size = first.length;
+    const r = Float64Array.from({ length: size * size }, (_, k) => {
+      const i = Math.floor(k / size);
+      const j = k % size;
+      if (i === j) return 1;
+      return defined(first[i]) * defined(first[j]) + defined(second[i]) * defined(second[j]);
+    });
+    const fit = minres(r, size, 2, { tolerance: 1e-12, maxIterations: 200 });
+    expect(fit.converged).toBe(true);
+    for (let i = 0; i < size; i++) {
+      for (let j = i + 1; j < size; j++) {
+        const model =
+          defined(fit.loadings[i * 2]) * defined(fit.loadings[j * 2]) +
+          defined(fit.loadings[i * 2 + 1]) * defined(fit.loadings[j * 2 + 1]);
+        expectClose(model, defined(r[i * size + j]), 1e-9, `correlation ${i + 1},${j + 1}`);
+      }
+    }
+  });
+
+  it("keeps the communality of an item at its bound where the fit would take it beyond", () => {
+    const reference = defined(factorFixture.cases.find(({ dataset }) => dataset === "heywood"));
+    const fit = minres(Float64Array.from(reference.matrix.flat()), reference.matrix.length, 1, { tolerance: 1e-12 });
+    expect(fit.converged).toBe(true);
+    // The first item's loading is 0.99999, which a communality of at most 0.995 cannot reach: psych's solution has the
+    // reduced matrix at the bound and a communality of the fit beyond it.
+    expectClose(fit.communalities[0] ?? null, defined(reference.psych.communalities[0]), PSYCH_FACTOR_TOLERANCE);
+    expect(defined(fit.communalities[0])).toBeGreaterThan(0.995);
+  });
+
+  it("gives loadings with each factor's sum not negative, the factors in the order of their eigenvalues", () => {
+    for (const { c, r, size } of solved) {
+      const { loadings } = minres(r, size, c.factors);
+      for (let k = 0; k < c.factors; k++) {
+        let sum = 0;
+        for (let i = 0; i < size; i++) sum += defined(loadings[i * c.factors + k]);
+        expect(sum, c.name).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("stops at the largest number of iterations and says so", () => {
+    const { c, r, size } = defined(solved[3]);
+    const fit = minres(r, size, c.factors, { tolerance: 1e-14, maxIterations: 2 });
+    expect(fit.converged).toBe(false);
+    expect(fit.iterations).toBe(2);
+  });
+
+  it("starts from the squared largest correlations where the matrix is not positive definite", () => {
+    // Items 1 and 2 correlate 0.9 with each other and -0.9 and 0.9 with the third: not positive definite.
+    const r = Float64Array.of(1, 0.9, 0.9, 0.9, 1, -0.9, 0.9, -0.9, 1);
+    const fit = minres(r, 3, 1);
+    expect(fit.loadings.every(Number.isFinite)).toBe(true);
+    expect(fit.communalities.every((value) => value >= 0)).toBe(true);
   });
 });
 
@@ -682,6 +843,374 @@ describe("parallelAnalysis", () => {
   });
 });
 
+describe("exploratoryFactorAnalysis", () => {
+  const cases = factorFixture.cases;
+  const withData = cases.filter(({ dataset }) => dataset !== "harman74" && dataset !== "heywood");
+
+  /** Options of a fixture case; the tolerance is tight so that the fit does not limit the comparison. */
+  function optionsOf(c: (typeof cases)[number]): ExploratoryFactorOptions {
+    return {
+      factors: c.factors,
+      correlation: c.correlation === "polychoric" ? "polychoric" : "pearson",
+      rotation: c.rotation as FactorRotation,
+      tolerance: 1e-10,
+    };
+  }
+
+  for (const c of cases) {
+    it(`solves the correlations of ${c.name} as base R does, whatever their source`, () => {
+      const size = c.matrix.length;
+      const solution = factorSolution(
+        Float64Array.from(c.matrix.flat()),
+        size,
+        c.factors,
+        c.rotation as FactorRotation,
+        {
+          tolerance: 1e-12,
+          maxIterations: 500,
+        },
+      );
+      expect(solution.converged).toBe(true);
+      expectMatrix(solution.loadings, c.base.loadings, FACTOR_TOLERANCE, "loading");
+      expectMatrix(solution.correlations, c.base.phi, FACTOR_TOLERANCE, "factor correlation");
+      c.base.communalities.forEach((value, i) => {
+        expectClose(defined(solution.communalities[i]), value, FACTOR_TOLERANCE, `communality ${i + 1}`);
+      });
+      const tolerance = c.rotation === "varimax" ? PSYCH_VARIMAX_TOLERANCE : PSYCH_FACTOR_TOLERANCE;
+      expectMatrix(solution.loadings, c.psych.loadings, tolerance, "psych loading");
+      expectMatrix(solution.correlations, c.psych.phi, PSYCH_FACTOR_TOLERANCE, "psych factor correlation");
+      c.psych.communalities.forEach((value, i) => {
+        expectClose(defined(solution.communalities[i]), value, PSYCH_FACTOR_TOLERANCE, `psych communality ${i + 1}`);
+      });
+    });
+  }
+
+  for (const c of withData) {
+    it(`matches psych's fa on the responses of ${c.name}`, () => {
+      const fit = exploratoryFactorAnalysis(FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA], optionsOf(c));
+      expect(fit.converged).toBe(true);
+      const polychoricTolerance =
+        c.correlation === "polychoric" ? PSYCH_POLYCHORIC_FACTOR_TOLERANCE : PSYCH_FACTOR_TOLERANCE;
+      const tolerance = c.rotation === "varimax" ? PSYCH_VARIMAX_TOLERANCE : polychoricTolerance;
+      expectMatrix(fit.loadings, c.psych.loadings, tolerance, "loading");
+      expectMatrix(fit.correlations, c.psych.phi, polychoricTolerance, "factor correlation");
+      c.psych.communalities.forEach((value, i) => {
+        expectClose(defined(fit.communalities[i]), value, polychoricTolerance, `communality ${i + 1}`);
+      });
+    });
+  }
+
+  it("matches base R to rounding on Pearson correlations, which both compute alike", () => {
+    for (const c of withData.filter(({ correlation }) => correlation === "pearson")) {
+      const fit = exploratoryFactorAnalysis(FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA], optionsOf(c));
+      expectMatrix(fit.loadings, c.base.loadings, FACTOR_TOLERANCE, `${c.name} loading`);
+      expectMatrix(fit.correlations, c.base.phi, FACTOR_TOLERANCE, `${c.name} factor correlation`);
+    }
+  });
+
+  it("recovers the loadings 0.7 and 0.6 and the correlation 0.3 of two factors from tetrachoric correlations", () => {
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, correlation: "polychoric" });
+    const own = fit.loadings.map((row) => Math.max(...row));
+    const meanOf = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
+    expectClose(meanOf(own.slice(0, 6)), factorFixture.truth.loadings[0] ?? null, 0.05);
+    expectClose(meanOf(own.slice(6)), factorFixture.truth.loadings[1] ?? null, 0.05);
+    expectClose(fit.correlations[0]?.[1] ?? null, factorFixture.truth.correlation, 0.07);
+    expect(fit.itemIds).toEqual(factorFixture.simulated.itemIds);
+  });
+
+  it("reports whether the correlations were smoothed, as they are when not positive definite", () => {
+    const smoothedCase = defined(cases.find(({ dataset }) => dataset === "sat12"));
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.sat12, optionsOf(smoothedCase)).smoothed).toBe(true);
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2 }).smoothed).toBe(false);
+  });
+
+  it("orders the factors by the variance they account for, with each factor's loadings summing to a positive number", () => {
+    for (const c of withData) {
+      const fit = exploratoryFactorAnalysis(FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA], optionsOf(c));
+      const accounted = fit.correlations.map((row, k) =>
+        row.reduce(
+          (total, phi, j) =>
+            total + phi * fit.loadings.reduce((sum, item) => sum + defined(item[j]) * defined(item[k]), 0),
+          0,
+        ),
+      );
+      accounted.forEach((value, k) => {
+        if (k > 0) expect(value, c.name).toBeLessThanOrEqual(defined(accounted[k - 1]) + 1e-12);
+        expect(
+          fit.loadings.reduce((sum, item) => sum + defined(item[k]), 0),
+          c.name,
+        ).toBeGreaterThan(0);
+      });
+    }
+  });
+
+  it("gives communalities that are the diagonal of the model, Λ Φ Λᵀ, for every rotation", () => {
+    for (const rotation of ["none", "varimax", "oblimin"] as const) {
+      const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 4, rotation, tolerance: 1e-10 });
+      fit.loadings.forEach((row, i) => {
+        let model = 0;
+        row.forEach((a, j) => {
+          row.forEach((b, k) => {
+            model += a * defined(fit.correlations[j]?.[k]) * b;
+          });
+        });
+        expectClose(defined(fit.communalities[i]), model, 1e-8, `${rotation} communality ${i + 1}`);
+      });
+    }
+  });
+
+  it("leaves the factors uncorrelated for no rotation and for varimax, and correlated for oblimin", () => {
+    for (const rotation of ["none", "varimax"] as const) {
+      const { correlations } = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3, rotation });
+      expect(correlations).toEqual([
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ]);
+    }
+    const oblique = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3 });
+    expect(oblique.correlations.some((row, i) => row.some((value, j) => i !== j && Math.abs(value) > 0.05))).toBe(true);
+  });
+
+  it("does not rotate one factor", () => {
+    const unrotated = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 1, rotation: "none" });
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 1, rotation: "varimax" })).toEqual(unrotated);
+    expect(unrotated.correlations).toEqual([[1]]);
+  });
+
+  it("uses Pearson correlations and oblimin by default, and polychoric correlations when asked", () => {
+    const explicit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, {
+      factors: 2,
+      correlation: "pearson",
+      rotation: "oblimin",
+      tolerance: 1e-6,
+      maxIterations: 100,
+      correction: 0.5,
+    });
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2 })).toEqual(explicit);
+    const polychoricFit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, correlation: "polychoric" });
+    expect(polychoricFit.loadings).not.toEqual(explicit.loadings);
+    const uncorrected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, {
+      factors: 2,
+      correlation: "polychoric",
+      correction: 0,
+    });
+    expect(uncorrected.converged).toBe(true);
+  });
+
+  it("stops at the largest number of iterations and says so", () => {
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 5, tolerance: 1e-14, maxIterations: 2 });
+    expect(fit.converged).toBe(false);
+    expect(fit.iterations).toBe(2);
+  });
+
+  it("uses the persons who answered each pair of items, as bfi's missing responses need", () => {
+    const missing = FACTOR_DATA.bfi.responses.reduce(
+      (total, row) => total + row.filter((value) => value === null).length,
+      0,
+    );
+    expect(missing).toBeGreaterThan(0);
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 5 }).loadings).toHaveLength(25);
+  });
+
+  describe("errors", () => {
+    const data = FACTOR_DATA.simulated;
+
+    it("needs the number of factors, a positive integer that the items identify", () => {
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse("{}"))).toThrow("The option factors");
+      for (const factors of [0, 1.5, -1]) {
+        expect(() => exploratoryFactorAnalysis(data, { factors })).toThrow("The option factors");
+      }
+      // 12 items identify 7 factors: 66 correlations against 12 · 8 - 28 free parameters of the loadings.
+      expect(() => exploratoryFactorAnalysis(data, { factors: 8 })).toThrow("12 items identify at most 7 factors");
+      expect(exploratoryFactorAnalysis(data, { factors: 7, rotation: "none" }).loadings[0]).toHaveLength(7);
+    });
+
+    it("needs at least three items, each with two observed categories, and a correlation for every pair", () => {
+      expect(() =>
+        exploratoryFactorAnalysis(
+          responses([
+            [0, 1],
+            [1, 0],
+            [1, 1],
+          ]),
+          { factors: 1 },
+        ),
+      ).toThrow("Exploratory factor analysis needs at least 3 items");
+      const constant = responses([
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 1, 1],
+        [0, 0, 1],
+      ]);
+      expect(() => exploratoryFactorAnalysis(constant, { factors: 1 })).toThrow('item "item3" has 1');
+      const apart = responses([
+        [0, 1, null],
+        [1, 0, null],
+        [0, 0, null],
+        [null, 1, 0],
+        [null, 0, 1],
+        [null, 1, 1],
+      ]);
+      expect(() => exploratoryFactorAnalysis(apart, { factors: 1 })).toThrow(
+        'gives no correlation of items "item1" and "item3"',
+      );
+    });
+
+    it("rejects options of other types", () => {
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse("null"))).toThrow(DataError);
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": "2"}'))).toThrow("The option factors");
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "rotation": "promax"}'))).toThrow(
+        "The option rotation",
+      );
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "correlation": 1}'))).toThrow(
+        "The option correlation",
+      );
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "tolerance": -1}'))).toThrow(DataError);
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "maxIterations": 1.5}'))).toThrow(
+        DataError,
+      );
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "correction": -1}'))).toThrow(
+        "The option correction",
+      );
+      expect(() => exploratoryFactorAnalysis(JSON.parse("null"), { factors: 2 })).toThrow(DataError);
+    });
+  });
+});
+
+describe("minimumAveragePartial", () => {
+  const withMap = factorFixture.cases.filter(({ map }) => map !== null && map !== undefined);
+
+  it("matches the formula written out in base R on the correlations of each case", () => {
+    expect(withMap).toHaveLength(2);
+    for (const c of withMap) {
+      const { base } = defined(c.map);
+      const size = c.matrix.length;
+      const values = averagePartials(Float64Array.from(c.matrix.flat()), size, base.length);
+      base.forEach((value, k) => {
+        expectClose(defined(values[k]), value, FACTOR_TOLERANCE, `${c.name} after ${k + 1} components`);
+      });
+    }
+  });
+
+  it("matches psych's VSS on the responses, finding the 2 factors of the simulated test", () => {
+    for (const c of withMap) {
+      const { psych } = defined(c.map);
+      const polychoricCase = c.correlation === "polychoric";
+      const result = minimumAveragePartial(FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA], {
+        correlation: polychoricCase ? "polychoric" : "pearson",
+        maxFactors: psych.length,
+      });
+      expect(result.map).toHaveLength(psych.length);
+      psych.forEach((value, k) => {
+        expectClose(
+          defined(result.map[k]),
+          value,
+          polychoricCase ? PSYCH_POLYCHORIC_FACTOR_TOLERANCE / 6 : 1e-12,
+          `${c.name} after ${k + 1} components`,
+        );
+      });
+      expect(result.factors).toBe(psych.indexOf(Math.min(...psych)) + 1);
+    }
+    expect(minimumAveragePartial(FACTOR_DATA.simulated, { correlation: "polychoric", maxFactors: 6 }).factors).toBe(2);
+    expect(minimumAveragePartial(FACTOR_DATA.bfi, { maxFactors: 8 }).factors).toBe(5);
+  });
+
+  it("removes every component but one by default, which leaves partial correlations of 1 in absolute value", () => {
+    const { map, factors } = minimumAveragePartial(FACTOR_DATA.simulated);
+    expect(map).toHaveLength(11);
+    expectClose(map[10] ?? null, 1, 1e-8);
+    expect(map[factors - 1]).toBe(Math.min(...map));
+    expect(map.every((value) => value >= 0 && value <= 1 + 1e-9)).toBe(true);
+  });
+
+  it("takes the first of the numbers of components that tie", () => {
+    // Two copies of one item have the same partial correlations after any component, so equal values come from equal
+    // matrices; a matrix of equal correlations gives the same average after the first component and the second.
+    const result = minimumAveragePartial(responses(Array.from({ length: 6 }, (_, i) => [i % 2, i % 2, 1 - (i % 2)])), {
+      maxFactors: 1,
+    });
+    expect(result.factors).toBe(1);
+  });
+
+  it("limits the components to maxFactors, giving the first of the same values", () => {
+    const all = minimumAveragePartial(FACTOR_DATA.bfi);
+    expect(all.map).toHaveLength(24);
+    const some = minimumAveragePartial(FACTOR_DATA.bfi, { maxFactors: 6 });
+    expect(some.map).toEqual(all.map.slice(0, 6));
+    expect(some.smoothed).toBe(false);
+  });
+
+  it("smooths correlations that are not positive definite and says so", () => {
+    expect(minimumAveragePartial(FACTOR_DATA.sat12, { correlation: "polychoric" }).smoothed).toBe(true);
+  });
+
+  it("rejects what it cannot use", () => {
+    const data = FACTOR_DATA.simulated;
+    expect(() => minimumAveragePartial(data, { maxFactors: 0 })).toThrow("The option maxFactors");
+    expect(() => minimumAveragePartial(data, { maxFactors: 12 })).toThrow("at most the number of items less 1, 11");
+    expect(() => minimumAveragePartial(data, JSON.parse('{"correlation": "tetrachoric"}'))).toThrow(
+      "The option correlation",
+    );
+    expect(() => minimumAveragePartial(data, JSON.parse('{"correction": "a"}'))).toThrow("The option correction");
+    expect(() => minimumAveragePartial(data, JSON.parse("null"))).toThrow(DataError);
+    expect(() =>
+      minimumAveragePartial(
+        responses([
+          [0, 1],
+          [1, 0],
+        ]),
+      ),
+    ).toThrow("at least 3 items");
+  });
+});
+
+describe("smoothCorrelations", () => {
+  for (const reference of factorFixture.smoothing) {
+    it(`matches psych's cor.smooth for ${reference.name}`, () => {
+      const size = reference.raw.length;
+      const smoothed = smoothCorrelations(Float64Array.from(reference.raw.flat()), size);
+      reference.smoothed.forEach((row, i) => {
+        row.forEach((value, j) => {
+          expectClose(defined(smoothed[i * size + j]), value, 1e-9, `entry ${i + 1},${j + 1}`);
+        });
+      });
+      const { values } = symmetricEigen(smoothed, size);
+      expect(defined(values[size - 1])).toBeGreaterThan(0);
+    });
+  }
+
+  it("returns a matrix that is already positive definite as it is, in a copy", () => {
+    const r = Float64Array.from(defined(factorFixture.cases[3]).matrix.flat());
+    const smoothed = smoothCorrelations(r, 25);
+    expect(smoothed).toEqual(r);
+    expect(smoothed).not.toBe(r);
+  });
+
+  it("raises eigenvalues below the tolerance, so that a larger tolerance changes the result", () => {
+    const reference = defined(factorFixture.smoothing[1]);
+    const raw = Float64Array.from(reference.raw.flat());
+    const small = smoothCorrelations(raw, 3, { tolerance: 1e-12 });
+    const large = smoothCorrelations(raw, 3, { tolerance: 1e-3 });
+    expect(Math.abs(defined(small[1]) - defined(large[1]))).toBeGreaterThan(1e-6);
+    expect(defined(symmetricEigen(large, 3).values[2])).toBeGreaterThan(1e-4);
+  });
+
+  it("rejects what is not a correlation matrix and options of other types", () => {
+    const r = Float64Array.of(1, 0.5, 0.5, 1);
+    expect(() => smoothCorrelations(r, 0)).toThrow("The size of the correlation matrix");
+    expect(() => smoothCorrelations(r, 1.5)).toThrow("The size of the correlation matrix");
+    expect(() => smoothCorrelations(r, 3)).toThrow("must be a Float64Array of 9 numbers");
+    expect(() => smoothCorrelations(JSON.parse("[1, 0.5, 0.5, 1]"), 2)).toThrow("must be a Float64Array");
+    expect(() => smoothCorrelations(Float64Array.of(1, 0.5, 0.4, 1), 2)).toThrow("symmetric");
+    expect(() => smoothCorrelations(Float64Array.of(1, 0.5, 0.5, 0.9), 2)).toThrow("1 on the diagonal");
+    expect(() => smoothCorrelations(Float64Array.of(1, Number.NaN, Number.NaN, 1), 2)).toThrow("finite");
+    expect(() => smoothCorrelations(r, 2, JSON.parse("null"))).toThrow(DataError);
+    expect(() => smoothCorrelations(r, 2, JSON.parse('{"tolerance": 0}'))).toThrow("The option tolerance");
+    expect(() => smoothCorrelations(r, JSON.parse('"2"'))).toThrow("The size of the correlation matrix");
+  });
+});
+
 describe("properties", () => {
   it("the bivariate normal distribution function is a probability, symmetric, and increasing in rho", () => {
     const point = fc.record({
@@ -833,6 +1362,56 @@ describe("properties", () => {
         }
       }),
       { numRuns: 30 },
+    );
+  });
+  /** The simulated persons with the responses of `order`, as rows. */
+  const simulatedRows = FACTOR_DATA.simulated.responses;
+
+  it("exploratory factor analysis does not depend on the order of the persons", () => {
+    const expected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, tolerance: 1e-10 });
+    fc.assert(
+      fc.property(fc.integer(), (seed) => {
+        const random = createRandom(seed);
+        const keys = Int32Array.from(simulatedRows.keys());
+        shuffle(keys, random);
+        const order = Array.from(keys);
+        const shuffled = responseMatrix(
+          order.map((person) => defined(simulatedRows[person])),
+          {
+            itemIds: [...FACTOR_DATA.simulated.itemIds],
+          },
+        );
+        const fit = exploratoryFactorAnalysis(shuffled, { factors: 2, tolerance: 1e-10 });
+        expectMatrix(fit.loadings, expected.loadings, 1e-8, "loading");
+        expectMatrix(fit.correlations, expected.correlations, 1e-8, "factor correlation");
+      }),
+      { numRuns: 8 },
+    );
+  });
+
+  it("exploratory factor analysis and the minimum average partial test follow the order of the items", () => {
+    const expected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, tolerance: 1e-10 });
+    const expectedMap = minimumAveragePartial(FACTOR_DATA.simulated);
+    fc.assert(
+      fc.property(fc.integer(), (seed) => {
+        const keys = Int32Array.from(FACTOR_DATA.simulated.itemIds.keys());
+        shuffle(keys, createRandom(seed));
+        const order = Array.from(keys);
+        const permuted = responseMatrix(
+          simulatedRows.map((row) => order.map((item) => defined(row[item]))),
+          { itemIds: order.map((item) => defined(FACTOR_DATA.simulated.itemIds[item])) },
+        );
+        const fit = exploratoryFactorAnalysis(permuted, { factors: 2, tolerance: 1e-10 });
+        order.forEach((item, row) => {
+          expectMatrix([defined(fit.loadings[row])], [defined(expected.loadings[item])], 1e-6, `item ${item + 1}`);
+          expectClose(defined(fit.communalities[row]), defined(expected.communalities[item]), 1e-8, "communality");
+        });
+        const map = minimumAveragePartial(permuted);
+        map.map.forEach((value, k) => {
+          expectClose(value, defined(expectedMap.map[k]), 1e-10, `after ${k + 1} components`);
+        });
+      }),
+      { numRuns: 8 },
     );
   });
 });

@@ -116,7 +116,10 @@ or one per item. Missing responses are skipped, and persons without responses ch
   leaves the likelihood unchanged, so the first D - 1 items' slopes beyond their own index are fixed at 0 (item j loads
   on the first j dimensions): the solution is then determined up to the signs of the dimensions. The dimensions are
   named `F1` to `FD`. EM starts from the first D eigenvectors of the items' correlations as loadings, converted to
-  slopes by a = 1.702 λ / √(1 - h²). Use `rotateLoadings` for a simpler structure.
+  slopes by a = 1.702 λ / √(1 - h²). Use `rotateLoadings` for a simpler structure. To explore the number of factors and
+  their loadings from the correlations of the items, in milliseconds, use
+  [`exploratoryFactorAnalysis`](dimensionality.md#exploratory-factor-analysis); this route estimates the item
+  parameters by full information, in seconds.
 - **One dimension.** The model equals the one-dimensional model in the slope-intercept form: slope a, intercept
   -a b.
 - **EM.** The grid is the product of `points` equally spaced nodes per dimension, weighted by the normal density of the

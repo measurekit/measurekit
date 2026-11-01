@@ -14,6 +14,7 @@ Rscript validation/psychometrics/augmented-subscores.R  # augmented subscores: t
 Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
 Rscript validation/psychometrics/latent-regression.R # latent regression in `calibrate`: mirt's covdata and formula, TAM's tam.mml(Y = x)
 Rscript validation/psychometrics/dimensionality.R    # polychoric correlations, parallel analysis: psych, polycor
+Rscript validation/psychometrics/exploratory-factors.R # minres factors, rotations, minimum average partial test, smoothing: psych, GPArotation and base R
 Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic: cdcatR; multidimensional: mirtCAT; testlets: base R and mirtCAT
 Rscript validation/psychometrics/multistage-cuts.R   # routing cuts of multistage panels: base R over mirt's iteminfo and expected.item
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
@@ -62,6 +63,8 @@ the base R maximum are slow, and `mhrm`, which runs mirt's MH-RM four times on f
 `multidimensional-items.R` holds the helper of `multidimensional.R` and `parameterization.R` that sets items in mirt.
 `multidimensional-groups.R` writes one fixture of five cases, two groups of correlated dimensions, the same data with fixed
 items, three groups with items missing by design, the graded model and three dimensions, and takes about a minute.
+`exploratory-factors.R` writes one fixture of ten correlation matrices, simulated, `bfi`, `SAT12`, Harman's tests and a Heywood case,
+with their minres solutions in base R and psych, and takes seconds.
 
 `bifactor.R` takes the cases `m2pl`, `long`, `two-tier`, `m3pl`, `graded`, `incomplete` and `recovery` as arguments, and runs
 all of them without; it takes about half an hour, as mirt's EM at `TOL = 1e-10` runs to its limit of 5,000 cycles on the 3PL and

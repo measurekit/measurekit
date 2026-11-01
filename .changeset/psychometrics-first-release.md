@@ -51,3 +51,8 @@ group's means and covariance in `groups`, as `mirt::multipleGroup` does.
 
 Bifactor and two-tier models are calibrated by `calibrateBifactor`, which integrates the specific dimensions one group of
 items at a time, as mirt's `bfactor` does, and runs 8 to 17 times as fast on 2,000 persons.
+
+`exploratoryFactorAnalysis` fits several factors to the items by the minimum residual method, from Pearson or polychoric
+correlations, with varimax or oblimin rotation, as `psych::fa(fm = "minres")` does. `minimumAveragePartial` is Velicer's
+test for the number of factors, and `smoothCorrelations` makes a correlation matrix that is not positive definite so, as
+`psych::cor.smooth` does.

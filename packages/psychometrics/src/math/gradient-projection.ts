@@ -1,6 +1,6 @@
-import { symmetricEigen } from "../math/eigen.js";
-import { invert } from "../math/linear-algebra.js";
-import { identity, multiply, transpose } from "../math/matrix.js";
+import { symmetricEigen } from "./eigen.js";
+import { invert } from "./linear-algebra.js";
+import { identity, multiply, transpose } from "./matrix.js";
 
 /** The criterion of the varimax rotation, which is orthogonal, or of the oblimin rotation, which is oblique. */
 export type RotationCriterion = { readonly kind: "varimax" } | { readonly kind: "oblimin"; readonly gamma: number };

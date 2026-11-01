@@ -5,6 +5,7 @@
  * @module @measurekit/psychometrics/multidimensional
  */
 
+export type { RotationMethod, RotationOptions } from "../math/rotation.js";
 export { type BifactorOptions, calibrateBifactor } from "./bifactor.js";
 export {
   type CalibratedMultidimensionalItem,
@@ -27,7 +28,7 @@ export type {
   MultidimensionalTestItem,
 } from "./model.js";
 export type { MultivariateNormalPrior } from "./prior.js";
-export { type RotatedLoadings, type RotationMethod, type RotationOptions, rotateLoadings } from "./rotation.js";
+export { type RotatedLoadings, rotateLoadings } from "./rotation.js";
 export {
   type MultidimensionalEstimate,
   type MultidimensionalEstimator,

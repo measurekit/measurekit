@@ -110,7 +110,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
   src/math/             numerics
   src/ctt/              classical test theory
   src/change/           gain scores, the reliability of a difference, reliable change
-  src/dimensionality/   polychoric correlations and parallel analysis
+  src/dimensionality/   polychoric correlations, parallel analysis, exploratory factor analysis, the minimum average partial
+                        test, smoothing of correlation matrices
   src/irt/              item response theory: models, calibration with a latent regression, ability estimation,
                         information, reliability
   src/multidimensional/ multidimensional item response theory: models, EM and MH-RM calibration, groups and fixed items by EM,

@@ -1,56 +1,9 @@
-import {
-  checkArray,
-  checkBoolean,
-  checkChoice,
-  checkFinite,
-  checkOptions,
-  checkRecord,
-  checkStopping,
-  DataError,
-} from "@measurekit/core";
-import { invert } from "../math/linear-algebra.js";
-import { multiply, transpose } from "../math/matrix.js";
+import { checkArray, checkRecord, DataError } from "@measurekit/core";
+import { multiply } from "../math/matrix.js";
+import { type RotationOptions, resolveRotation, rotateLoadingMatrix } from "../math/rotation.js";
 import type { MultidimensionalCalibration } from "./calibration.js";
-import { gradientProjection, type RotationCriterion } from "./gradient-projection.js";
 import { checkMultidimensionalItem } from "./items.js";
 import type { MultidimensionalTestItem } from "./model.js";
-
-/** The rotations: `"varimax"` is orthogonal, `"oblimin"` oblique. */
-export type RotationMethod = "varimax" | "oblimin";
-
-/** Options of {@link rotateLoadings}. */
-export interface RotationOptions {
-  /**
-   * The rotation criterion.
-   *
-   * @defaultValue `"oblimin"`
-   */
-  readonly method?: RotationMethod;
-  /**
-   * Whether to scale each item's loadings to unit length before rotating and back after (Kaiser normalization).
-   *
-   * @defaultValue `false`
-   */
-  readonly normalize?: boolean;
-  /**
-   * The parameter γ of the oblimin criterion: 0 is quartimin and 0.5 biquartimin. Ignored by varimax.
-   *
-   * @defaultValue `0`
-   */
-  readonly gamma?: number;
-  /**
-   * The rotation has converged when the norm of the projected gradient falls to this.
-   *
-   * @defaultValue `1e-10`
-   */
-  readonly tolerance?: number;
-  /**
-   * The most iterations to run.
-   *
-   * @defaultValue `1000`
-   */
-  readonly maxIterations?: number;
-}
 
 /** A rotated solution of a calibration. */
 export interface RotatedLoadings<TParameters> {
@@ -67,10 +20,6 @@ export interface RotatedLoadings<TParameters> {
   /** Iterations run. */
   readonly iterations: number;
 }
-
-const METHODS: readonly RotationMethod[] = ["varimax", "oblimin"];
-const DEFAULT_TOLERANCE = 1e-10;
-const DEFAULT_MAX_ITERATIONS = 1000;
 
 /**
  * Rotates the standardized loadings of a calibration of uncorrelated dimensions, such as an exploratory one, to a
@@ -95,42 +44,24 @@ export function rotateLoadings<TParameters>(
   calibration: MultidimensionalCalibration<TParameters>,
   options: RotationOptions = {},
 ): RotatedLoadings<TParameters> {
-  checkOptions(options);
-  const {
-    method = "oblimin",
-    normalize = false,
-    gamma = 0,
-    tolerance = DEFAULT_TOLERANCE,
-    maxIterations = DEFAULT_MAX_ITERATIONS,
-  } = options;
-  checkChoice(method, "The option method", METHODS);
-  checkBoolean(normalize, "The option normalize");
-  checkFinite(gamma, "The option gamma");
-  checkStopping(tolerance, maxIterations);
+  const resolved = resolveRotation(options);
   const dimensions = checkCalibration(calibration);
   const items = calibration.items.length;
-  const unrotated = Float64Array.from(calibration.loadings.flat());
-  const weights = Float64Array.from(calibration.loadings, (row) =>
-    normalize ? Math.max(Math.hypot(...row), Number.EPSILON) : 1,
+  const result = rotateLoadingMatrix(
+    Float64Array.from(calibration.loadings.flat()),
+    items,
+    dimensions,
+    resolved,
+    "largest",
   );
-  const scaled = unrotated.map((loading, k) => loading / (weights[Math.floor(k / dimensions)] ?? 1));
-  const criterion: RotationCriterion = method === "varimax" ? { kind: "varimax" } : { kind: "oblimin", gamma };
-  const result = gradientProjection(scaled, items, dimensions, criterion, tolerance, maxIterations);
-  const rotation = signed(result.rotation, unrotated, items, dimensions);
-  const inverse = invert(rotation, dimensions) ?? new Float64Array(dimensions * dimensions);
-  const inverseTranspose = transpose(inverse, dimensions, dimensions);
-  const rotated = new Float64Array(items * dimensions);
-  multiply(unrotated, inverseTranspose, items, dimensions, dimensions, rotated);
-  const correlations = new Float64Array(dimensions * dimensions);
-  multiply(transpose(rotation, dimensions, dimensions), rotation, dimensions, dimensions, dimensions, correlations);
   return {
-    loadings: rows(rotated, items, dimensions),
-    correlations: rows(correlations, dimensions, dimensions),
-    rotation: rows(rotation, dimensions, dimensions),
+    loadings: rows(result.loadings, items, dimensions),
+    correlations: rows(result.correlations, dimensions, dimensions),
+    rotation: rows(result.rotation, dimensions, dimensions),
     items: calibration.items.map((item) => ({
       id: item.id,
       model: item.model,
-      parameters: rotatedParameters(item, inverseTranspose, dimensions),
+      parameters: rotatedParameters(item, result.transform, dimensions),
     })),
     converged: result.converged,
     iterations: result.iterations,
@@ -165,22 +96,6 @@ function checkCalibration(calibration: MultidimensionalCalibration<unknown>): nu
     );
   }
   return dimensions;
-}
-
-/** Flips the columns of the rotation so that each rotated dimension's largest loading in absolute value is positive. */
-function signed(rotation: Float64Array, unrotated: Float64Array, items: number, dimensions: number): Float64Array {
-  const inverseTranspose = transpose(invert(rotation, dimensions) ?? rotation, dimensions, dimensions);
-  const loadings = new Float64Array(items * dimensions);
-  multiply(unrotated, inverseTranspose, items, dimensions, dimensions, loadings);
-  const flipped = Float64Array.from(rotation);
-  for (let j = 0; j < dimensions; j++) {
-    let largest = 0;
-    for (let i = 0; i < items; i++)
-      if (Math.abs(loadings[i * dimensions + j] ?? 0) > Math.abs(largest)) largest = loadings[i * dimensions + j] ?? 0;
-    if (largest < 0)
-      for (let i = 0; i < dimensions; i++) flipped[i * dimensions + j] = -(rotation[i * dimensions + j] ?? 0);
-  }
-  return flipped;
 }
 
 /** Returns an item's parameters with the slopes a (Tᵀ)⁻¹. */

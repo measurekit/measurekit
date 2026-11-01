@@ -31,7 +31,8 @@ export interface PolychoricCorrelations {
   readonly thresholds: readonly (readonly number[])[];
 }
 
-const DEFAULT_CORRECTION = 0.5;
+/** The count added to an empty cell of a table of two items with two categories each: psych's `correct`. */
+export const DEFAULT_CORRECTION = 0.5;
 
 /**
  * Returns the polychoric correlations of the items of a response matrix: the correlation of the normal variables

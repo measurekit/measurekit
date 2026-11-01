@@ -10,10 +10,11 @@ import {
   shuffle,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
-import { type CodedItem, codeItems } from "./coded-items.js";
+import { codeItems } from "./coded-items.js";
 import { correlationEigenvalues } from "./eigenvalues.js";
+import { checkedMatrix, checkItems, correlateItems, ITEM_CORRELATIONS } from "./item-correlations.js";
 import { pearsonMatrix } from "./pearson.js";
-import { type PolychoricOptions, polychoricMatrix } from "./polychoric.js";
+import { DEFAULT_CORRECTION, type PolychoricOptions } from "./polychoric.js";
 
 /** Options of {@link parallelAnalysis}. */
 export interface ParallelAnalysisOptions extends PolychoricOptions {
@@ -65,12 +66,9 @@ export interface ParallelAnalysis {
   readonly factors: EigenvalueComparison;
 }
 
-const CORRELATIONS = ["pearson", "polychoric"] as const;
 const COMPARISONS = ["resampled", "normal"] as const;
-const DEFAULT_CORRECTION = 0.5;
 const DEFAULT_REPLICATIONS = 100;
 const DEFAULT_QUANTILE = 0.95;
-const MIN_ITEMS = 3;
 
 /**
  * Returns Horn's parallel analysis of the items of a response matrix: the eigenvalues of the observed correlations
@@ -105,7 +103,7 @@ export function parallelAnalysis(
     quantile = DEFAULT_QUANTILE,
     correction = DEFAULT_CORRECTION,
   } = options;
-  checkChoice(correlation, "The option correlation", CORRELATIONS);
+  checkChoice(correlation, "The option correlation", ITEM_CORRELATIONS);
   checkChoice(comparison, "The option comparison", COMPARISONS);
   checkPositiveInteger(replications, "The option replications");
   checkUnitInterval(quantile, "The option quantile");
@@ -115,11 +113,10 @@ export function parallelAnalysis(
     throw new DataError('The option comparison "normal" needs the option correlation "pearson", found "polychoric".');
   }
   const items = codeItems(matrix);
-  checkItems(items);
+  checkItems(items, "Parallel analysis");
   const size = items.length;
   const persons = matrix.responses.length;
-  const correlate = (): Float64Array =>
-    correlation === "pearson" ? pearsonMatrix(items.map((item) => item.values)) : polychoricMatrix(items, correction);
+  const correlate = (): Float64Array => correlateItems(items, correlation, correction);
 
   const observed = correlationEigenvalues(checkedMatrix(correlate(), items, "The observed data"), size);
   const components = new Float64Array(replications * size);
@@ -144,45 +141,6 @@ export function parallelAnalysis(
     components: compare(observed.components, components, replications, quantile),
     factors: compare(observed.factors, factors, replications, quantile),
   };
-}
-
-/**
- * Checks that there are at least three items and each has two observed categories.
- *
- * @throws `DataError` when not.
- */
-function checkItems(items: readonly CodedItem[]): void {
-  if (items.length < MIN_ITEMS) {
-    throw new DataError(
-      `Parallel analysis needs at least ${MIN_ITEMS} items, as one factor is not identified by two, found ${items.length}.`,
-    );
-  }
-  for (const item of items) {
-    if (item.levels < 2) {
-      throw new DataError(
-        `Parallel analysis needs items with at least two observed categories; item "${item.id}" has ${item.levels}.`,
-      );
-    }
-  }
-}
-
-/**
- * Returns the correlations after checking that every pair has one.
- *
- * @throws `DataError` naming the first pair without a correlation and `what`.
- */
-function checkedMatrix(correlations: Float64Array, items: readonly CodedItem[], what: string): Float64Array {
-  const size = items.length;
-  for (let i = 0; i < size; i++) {
-    for (let j = i + 1; j < size; j++) {
-      if (Number.isNaN(correlations[i * size + j])) {
-        throw new DataError(
-          `${what} gives no correlation of items "${items[i]?.id}" and "${items[j]?.id}": too few persons answered both.`,
-        );
-      }
-    }
-  }
-  return correlations;
 }
 
 /** Returns the comparison of observed eigenvalues with `samples`, one row of `observed.length` per replication. */

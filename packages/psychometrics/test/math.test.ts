@@ -10,6 +10,8 @@ import { newton } from "../src/math/optimize.js";
 import { pseudoInverse } from "../src/math/pseudo-inverse.js";
 import { gaussHermite, rectangular } from "../src/math/quadrature.js";
 import { findIncreasingRoot, findRoot } from "../src/math/root.js";
+import { resolveRotation, rotateLoadingMatrix } from "../src/math/rotation.js";
+import factors from "./fixtures/dimensionality-factors.json" with { type: "json" };
 import eigen from "./fixtures/math-eigen.json" with { type: "json" };
 import functions from "./fixtures/math-functions.json" with { type: "json" };
 import hermite from "./fixtures/math-gauss-hermite.json" with { type: "json" };
@@ -499,5 +501,69 @@ describe("findIncreasingRoot", () => {
     const point = findIncreasingRoot(() => -1, 0);
     expect(Number.isFinite(point)).toBe(true);
     expect(Number.isFinite(point * 2)).toBe(false);
+  });
+});
+
+describe("rotateLoadingMatrix", () => {
+  // The unrotated loadings of five factors of the bfi items: a rotation of them has structure to find.
+  const unrotated = Float64Array.from(defined(factors.cases[3]).base.unrotated.flat());
+  const rows = 25;
+  const columns = 5;
+
+  /** The sum and the largest loading in absolute value of a column of loadings by rows. */
+  function summaries(loadings: Float64Array, column: number): { sum: number; largest: number } {
+    let sum = 0;
+    let largest = 0;
+    for (let i = 0; i < rows; i++) {
+      const loading = defined(loadings[i * columns + column]);
+      sum += loading;
+      if (Math.abs(loading) > Math.abs(largest)) largest = loading;
+    }
+    return { sum, largest };
+  }
+
+  it("gives each rotated dimension the sign of its rule, and the same loadings up to the signs", () => {
+    for (const method of ["varimax", "oblimin"] as const) {
+      const options = resolveRotation({ method });
+      const bySum = rotateLoadingMatrix(unrotated, rows, columns, options, "sum");
+      const byLargest = rotateLoadingMatrix(unrotated, rows, columns, options, "largest");
+      for (let j = 0; j < columns; j++) {
+        expect(summaries(bySum.loadings, j).sum, method).toBeGreaterThan(0);
+        expect(summaries(byLargest.loadings, j).largest, method).toBeGreaterThan(0);
+      }
+      bySum.loadings.forEach((loading, k) => {
+        expectClose(Math.abs(loading), Math.abs(defined(byLargest.loadings[k])), 1e-12, `${method} loading ${k}`);
+      });
+    }
+  });
+
+  it("gives loadings Λ (Tᵀ)⁻¹ and correlations Tᵀ T of the rotation it returns", () => {
+    const rotated = rotateLoadingMatrix(unrotated, rows, columns, resolveRotation(), "sum");
+    const product = new Float64Array(rows * columns);
+    multiply(rotated.loadings, transpose(rotated.rotation, columns, columns), rows, columns, columns, product);
+    unrotated.forEach((loading, k) => {
+      expectClose(defined(product[k]), loading, 1e-10, `loading ${k}`);
+    });
+    const gram = new Float64Array(columns * columns);
+    multiply(transpose(rotated.rotation, columns, columns), rotated.rotation, columns, columns, columns, gram);
+    gram.forEach((value, k) => {
+      expectClose(defined(rotated.correlations[k]), value, 1e-12, `correlation ${k}`);
+    });
+    expect(rotated.converged).toBe(true);
+  });
+
+  it("keeps the dimensions orthogonal for varimax, with or without Kaiser's normalization", () => {
+    for (const normalize of [false, true]) {
+      const { correlations } = rotateLoadingMatrix(
+        unrotated,
+        rows,
+        columns,
+        resolveRotation({ method: "varimax", normalize }),
+        "sum",
+      );
+      correlations.forEach((value, k) => {
+        expectClose(value, Math.floor(k / columns) === k % columns ? 1 : 0, 1e-10, `correlation ${k}`);
+      });
+    }
   });
 });
