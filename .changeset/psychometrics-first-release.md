@@ -10,8 +10,9 @@ polytomous items, linking and equating, including equating through common items,
 standard errors by bootstrap and the delta method, score scaling and prediction, dimensionality by polychoric
 correlations and parallel analysis, explanatory item response models, including the linear logistic test model of
 partial credit and rating scale items and the linear logistic model of change, generalizability theory, Mokken scale analysis,
-simulation, standard setting, rater agreement and rater effects, including the many-facet Rasch model, and response
-times with the joint model of speed and accuracy.
+simulation, standard setting, rater agreement and rater effects, including the many-facet Rasch model, response
+times with the joint model of speed and accuracy, and change between two occasions: gains, the reliability of a
+difference and reliable change.
 
 The EM calibrations of the multidimensional models, the many-facet Rasch model and the linear logistic test model
 accelerate EM with SQUAREM, and the posterior means of a data set tabulate the log probabilities of each item once. At the

@@ -103,10 +103,11 @@ packages/core/                the published package @measurekit/core
   test/<file>.test.ts   one file per concern; the numerics are validated by the fixtures of the packages
 packages/psychometrics/       the published package @measurekit/psychometrics
   src/index.ts          re-exports every module, and DataError, MeasurekitError and createRandom of core
-  src/checks.ts         checkFunction, the one check of a value that only this package uses
+  src/checks.ts         checkFunction and checkOpenUnitInterval, the checks of one value that only this package uses
   src/data/             response matrices and records, scoring
   src/math/             numerics
   src/ctt/              classical test theory
+  src/change/           gain scores, the reliability of a difference, reliable change
   src/dimensionality/   polychoric correlations and parallel analysis
   src/irt/              item response theory: models, calibration, ability estimation, information, reliability
   src/multidimensional/ multidimensional item response theory: models, EM and MH-RM calibration, rotation, scoring, information
@@ -196,12 +197,13 @@ behavior only, without "now", "no longer", "renamed" or "previously".
   written once, in core.
 - Code outside `packages/` imports a package by name.
 
-Psychometrics: every module of `cat/`, `equating/`, `irt/`, `multidimensional/`, `rater/` and `sim/` may also import
-`checks.ts`.
+Psychometrics: every module of `cat/`, `change/`, `equating/`, `irt/`, `multidimensional/`, `rater/`, `scaling/` and
+`sim/` may also import `checks.ts`.
 
 | Module              | Imports                                               |
 | ------------------- | ----------------------------------------------------- |
 | `math/`, `data/`    | none                                                  |
+| `change/`           | none                                                  |
 | `ctt/`              | `data/`, `math/`                                      |
 | `dimensionality/`   | `data/`, `math/`                                      |
 | `irt/`              | `data/`, `math/`                                      |
@@ -260,7 +262,8 @@ Knowledge tracing: the model families never import each other, nor does anything
   function of `@measurekit/core`: options with `checkOptions`, arrays with `checkArray`, objects with `checkRecord`,
   an object with a method with `checkMethod`, a function with `checkFunction` (`checks.ts` of psychometrics), a
   `Random` with `checkRandom`, a number with `checkFinite`, `checkPositive`, `checkNonNegative`,
-  `checkPositiveInteger`, `checkIntegerFrom` or `checkUnitInterval`, `tolerance` and `maxIterations` with `checkStopping`, a seed
+  `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval` or `checkOpenUnitInterval` (`checks.ts` of
+  psychometrics), `tolerance` and `maxIterations` with `checkStopping`, a seed
   with `checkSeed`, a boolean with `checkBoolean` and a string option with
   `checkChoice`: `<Label> must be a positive number, found <value>.` An option's label is `The option <name>`. A
   field of a record is tested with a predicate of core or the language, such as `isUnitInterval` or

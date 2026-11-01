@@ -72,6 +72,10 @@
       "types": "./dist/cdm/index.d.ts",
       "default": "./dist/cdm/index.js"
     },
+    "./change": {
+      "types": "./dist/change/index.d.ts",
+      "default": "./dist/change/index.js"
+    },
     "./ctt": {
       "types": "./dist/ctt/index.d.ts",
       "default": "./dist/ctt/index.js"

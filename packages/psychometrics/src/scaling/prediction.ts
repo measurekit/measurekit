@@ -1,4 +1,5 @@
-import { checkOptions, DataError, describe } from "@measurekit/core";
+import { checkOptions } from "@measurekit/core";
+import { checkOpenUnitInterval } from "../checks.js";
 
 /** Options of {@link predictFormScore}. */
 export interface ScorePredictionOptions {
@@ -51,9 +52,7 @@ const DEFAULT_LEVEL = 0.8;
 export function checkLevel(options: ScorePredictionOptions): number {
   checkOptions(options);
   const { level = DEFAULT_LEVEL } = options;
-  if (!(typeof level === "number" && level > 0 && level < 1)) {
-    throw new DataError(`The option level must be a number between 0 and 1, exclusive, found ${describe(level)}.`);
-  }
+  checkOpenUnitInterval(level, "The option level");
   return level;
 }
 

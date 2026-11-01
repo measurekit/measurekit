@@ -6,6 +6,7 @@
 export { createRandom, DataError, MeasurekitError, type Random } from "@measurekit/core";
 export * from "./cat/index.js";
 export * from "./cdm/index.js";
+export * from "./change/index.js";
 export * from "./ctt/index.js";
 export * from "./data/index.js";
 export * from "./dif/index.js";

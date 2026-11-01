@@ -183,6 +183,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/change/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../checks.js"],
+                    "message": "change/ imports no other module of the package."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/ctt/**"],
       "linter": {
         "rules": {
@@ -410,7 +430,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../irt/**", "!../equating/**", "!../math/**"],
+                    "group": ["../*", "../*/**", "!../checks.js", "!../irt/**", "!../equating/**", "!../math/**"],
                     "message": "scaling/ builds on irt/, equating/ and math/ only."
                   }
                 ]

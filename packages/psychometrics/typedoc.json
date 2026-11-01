@@ -3,6 +3,7 @@
   "entryPoints": [
     "src/data/index.ts",
     "src/ctt/index.ts",
+    "src/change/index.ts",
     "src/irt/index.ts",
     "src/multidimensional/index.ts",
     "src/cat/index.ts",
