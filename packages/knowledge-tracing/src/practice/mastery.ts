@@ -1,4 +1,5 @@
 import {
+  checkIntegerFrom,
   checkMethod,
   checkOptions,
   checkPositiveInteger,
@@ -6,7 +7,7 @@ import {
   DataError,
   describe,
 } from "@measurekit/core";
-import { type Event, isObserved } from "../data/event.js";
+import { checkObservedHasSkills, type Event, isObserved } from "../data/event.js";
 import { checkLog, type EventLog } from "../data/event-log.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
@@ -43,6 +44,34 @@ export interface ThresholdOptions {
   readonly threshold?: number;
 }
 
+/** Options of {@link movingAverageMastery}. */
+export interface MovingAverageOptions {
+  /**
+   * The weight d of the average on its past, from 0 to 1: the average of a skill moves by 1 - d of its distance to the
+   * outcome. Required, as its values depend on the domain.
+   */
+  readonly decay: number;
+  /** The value of the average that counts as mastery, from 0 to 1. Required, for the same reason. */
+  readonly threshold: number;
+}
+
+/** Options of {@link windowMastery}. */
+export interface WindowOptions {
+  /** The number of outcomes of 1 among the last `window` that counts as mastery: an integer from 1 to `window`. Required. */
+  readonly correct: number;
+  /** The number of the latest outcomes to look at, a positive integer. Required. */
+  readonly window: number;
+}
+
+/** Options of {@link predictedMastery}. */
+export interface PredictedOptions {
+  /**
+   * The predicted probability of a correct answer that counts as mastery, from 0 to 1. Required: it does not mean what
+   * the threshold of {@link thresholdMastery} means, as a prediction of 0.95 is out of reach at a slip above 0.05.
+   */
+  readonly threshold: number;
+}
+
 /** Options of {@link opportunitiesToStreak}. */
 export interface OpportunitiesToStreakOptions extends StreakOptions {
   /**
@@ -66,11 +95,61 @@ export function streakMastery(log: EventLog, options: StreakOptions = {}): Maste
   checkPositiveInteger(length, "The length");
   checkLog(log);
   const runs = new Map<string, number>();
-  return firstOpportunities(log, (event) => (skill) => {
+  return firstOpportunities(log, (event) => (skill, outcome) => {
     const key = `${event.learner}\u0000${skill}`;
-    const run = event.outcome === 1 ? (runs.get(key) ?? 0) + 1 : 0;
+    const run = outcome === 1 ? (runs.get(key) ?? 0) + 1 : 0;
     runs.set(key, run);
     return run >= length;
+  });
+}
+
+/**
+ * Returns the opportunity at which each learner's moving average of the outcomes at each skill first reached the
+ * threshold: m moves to d m + (1 - d) y at each attempt from m = 0. Outcomes from 0 to 1 count as partial credit. An
+ * event without an outcome is no opportunity and leaves the average as it is.
+ *
+ * @throws `DataError` when the log is malformed, or the decay or the threshold is not from 0 to 1.
+ * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
+ */
+export function movingAverageMastery(log: EventLog, options: MovingAverageOptions): MasteryTable {
+  checkOptions(options);
+  const { decay, threshold } = options;
+  checkUnitInterval(decay, "The option decay");
+  checkUnitInterval(threshold, "The option threshold");
+  checkLog(log);
+  const averages = new Map<string, number>();
+  return firstOpportunities(log, (event) => (skill, outcome) => {
+    const key = `${event.learner}\u0000${skill}`;
+    const average = decay * (averages.get(key) ?? 0) + (1 - decay) * outcome;
+    averages.set(key, average);
+    return average >= threshold;
+  });
+}
+
+/**
+ * Returns the opportunity at which each learner first had `correct` outcomes of 1 among their last `window` attempts at
+ * each skill, the attempts so far where there are fewer than `window`. Only an outcome of 1 is correct. An event without
+ * an outcome is no opportunity and leaves the window as it is.
+ *
+ * @throws `DataError` when the log is malformed, `window` is not a positive integer, or `correct` is not an integer from
+ * 1 to `window`.
+ * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
+ */
+export function windowMastery(log: EventLog, options: WindowOptions): MasteryTable {
+  checkOptions(options);
+  const { correct, window } = options;
+  checkPositiveInteger(window, "The option window");
+  checkIntegerFrom(correct, "The option correct", 1);
+  if (correct > window) {
+    throw new DataError(`The option correct must be at most the window ${window}, found ${correct}.`);
+  }
+  checkLog(log);
+  const recent = new Map<string, number[]>();
+  return firstOpportunities(log, (event) => (skill, outcome) => {
+    const key = `${event.learner}\u0000${skill}`;
+    const latest = [...(recent.get(key) ?? []), outcome === 1 ? 1 : 0].slice(-window);
+    recent.set(key, latest);
+    return latest.reduce((sum, flag) => sum + flag, 0) >= correct;
   });
 }
 
@@ -104,6 +183,37 @@ export function thresholdMastery<TState>(
 }
 
 /**
+ * Returns the opportunity at which the model's prediction for each learner's attempt, made after the attempt's own
+ * outcome, first reached the threshold, for each skill of the attempt. It serves the models that define no mastery,
+ * such as logistic models and Elo. An event without an outcome updates the model, is no opportunity and is never
+ * predicted, so a lesson alone never records mastery.
+ *
+ * @throws `DataError` when the model is not a learner model, the log is malformed, the threshold is not from 0 to 1, an
+ * event with an outcome has no skills, as the table is by skill, or the model rejects an event or an attempt.
+ */
+export function predictedMastery<TState>(
+  model: LearnerModel<TState>,
+  log: EventLog,
+  options: PredictedOptions,
+): MasteryTable {
+  checkModel(model, "predictedMastery needs a learner model");
+  checkOptions(options);
+  const { threshold } = options;
+  checkUnitInterval(threshold, "The option threshold");
+  checkLog(log);
+  log.forEach((event, index) => {
+    checkObservedHasSkills(event, `Event ${index + 1}`, "mastery table");
+  });
+  const states = new Map<string, TState>();
+  return firstOpportunities(log, (event) => {
+    const state = model.update(states.get(event.learner) ?? model.initialState(event.learner), event);
+    states.set(event.learner, state);
+    const reached = isObserved(event) && model.predict(state, event) >= threshold;
+    return () => reached;
+  });
+}
+
+/**
  * Returns the expected number of further attempts until `length` correct answers in a row, each attempt correct with
  * `probability`: (p⁻ⁿ - p⁻ʳ) / (1 - p) from a run of r, which is n - r at p = 1 and `Infinity` at p = 0.
  *
@@ -126,11 +236,14 @@ export function opportunitiesToStreak(probability: number, options: Opportunitie
 }
 
 /**
- * Goes through the log: `observe` takes each event and returns whether the criterion is met for each of its
- * skills after it. Records, per learner and skill, the opportunity of the first event with an outcome after which it
- * is; an event without one is observed, so that a model updates, and counts for nothing else.
+ * Goes through the log: `observe` takes each event and returns whether the criterion is met for each of its skills after
+ * it, given the skill and the event's outcome. Records, per learner and skill, the opportunity of the first event with an
+ * outcome after which it is; an event without one is observed, so that a model updates, and counts for nothing else.
  */
-function firstOpportunities(log: EventLog, observe: (event: Event) => (skill: string) => boolean): MasteryTable {
+function firstOpportunities(
+  log: EventLog,
+  observe: (event: Event) => (skill: string, outcome: number) => boolean,
+): MasteryTable {
   const table = new Map<string, Map<string, number | null>>();
   const counts = new Map<string, number>();
   for (const event of log) {
@@ -142,7 +255,7 @@ function firstOpportunities(log: EventLog, observe: (event: Event) => (skill: st
       const key = `${event.learner}\u0000${skill}`;
       const count = (counts.get(key) ?? 0) + 1;
       counts.set(key, count);
-      const reached = met(skill);
+      const reached = met(skill, event.outcome);
       if ((skills.get(skill) ?? null) === null) skills.set(skill, reached ? count : null);
     }
   }

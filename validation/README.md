@@ -58,6 +58,7 @@ Rscript validation/knowledge-tracing/elo.R       # Elo updates written out, held
 Rscript validation/knowledge-tracing/exposures.R # the exposure features, written out in base R, and their fit by glm
 Rscript validation/knowledge-tracing/logistic.R  # LKT's features; AFM, PFA and LKT fits by glm, lme4's Laplace approximation, LiblineaR
 Rscript validation/knowledge-tracing/lkt-features.R  # LKT's other features by computefeatures, and the windows of DAS3H in base R
+Rscript validation/knowledge-tracing/practice.R  # mastery criteria over a seeded log, replayed in base R
 Rscript validation/knowledge-tracing/irt.R       # the grid posterior and exact mode of θ, against mirt's fscores; with drift, passes in logs and a particle filter
 Rscript validation/knowledge-tracing/kst.R       # structures, fringes, BLIM, IITA and assessment by kst, pks and DAKS
 Rscript validation/knowledge-tracing/kst-structure.R  # base, atoms, neighbourhoods, paths, traces and closures by kst; clauses in base R

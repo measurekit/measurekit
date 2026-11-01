@@ -28,3 +28,7 @@ Logistic models take the features of LKT's other names (`proportion`, `netSucces
 `decayedProportionFailed`, `recencySuccess`, `recencyFailure`, `base`, `basePractice`, `dash`, `ppe` and their success
 and failure forms), and the time-window counts of DAS3H (`windowOpportunities`, `windowSuccesses`, `windowFailures`). A
 skill's history gains a field only when a feature reads it, and `basePractice` reads the `duration` of every event.
+
+Mastery criteria over a log are the probability of mastery (`thresholdMastery`), a streak (`streakMastery`), a moving
+average (`movingAverageMastery`), a window of outcomes (`windowMastery`) and a predicted success (`predictedMastery`),
+which serves logistic models and Elo.

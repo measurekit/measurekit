@@ -256,6 +256,23 @@ pair of a conflicting two goes. DAKS checks the pairs in the order of the items 
 are checked against the pairs still in; `iita` does the same and reproduces DAKS's selection sets on `pisa` and 40 more
 simulated data sets. DAKS also leaves out quasi-orders without implications.
 
+## Mastery criteria
+
+No package has mastery criteria over a log, so `validation/knowledge-tracing/practice.R` replays each in base R on a seeded
+log of 1,500 events of 15 learners at 4 skills, with items of one or two skills, outcomes of 0 and 1, 10% of 0.5 and 8%
+lessons with no outcome. Each table gives, by learner and skill, the opportunity after which the criterion was first met:
+
+| Criterion                                               | Reference                                                                                                                    | Tolerance |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `streakMastery`, lengths 3 and 5                        | Base R: a run per learner and skill                                                                                          | Exact     |
+| `movingAverageMastery`, three decay and threshold pairs | Base R: m ← d m + (1 - d) y                                                                                                  | Exact     |
+| `windowMastery`, four windows                           | Base R: `sum(tail(c(past, y), window)) >= correct`                                                                           | Exact     |
+| `predictedMastery`, thresholds 0.8, 0.9 and 0.95        | Base R: the performance factors analysis `plogis(Σ over the skills of β + 0.06 s + 0.01 f)` of the attempt after its outcome | Exact     |
+
+The tables are opportunities, integers, so they are compared for equality; each has learners and skills that meet the
+criterion and others that do not. The tests add the identities that a window of `k` correct in `k` is a streak of `k`,
+and that a stricter criterion is met no earlier.
+
 ## Simulation recovery
 
 **Elo.** R's generator differs from `createRandom`, so the study is simulated in R and replayed in both. 400
@@ -345,6 +362,7 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `bkt-recovery.json`             | The simulation above                                                                                                                                | Recovery, 20,000 events                                                  |
 | `bkt-opportunities.json`        | 14 cases of P(L), P(T), P(F) and threshold                                                                                                          | Forgetting, P(T) + P(F) ≥ 1, limits below the threshold                  |
 | `logistic-lkt.json`             | LKT's `samplelkt`: 1941 attempts of 17 learners at 143 skills, times from the durations                                                             | Every feature; ridge fits of AFM and PFA                                 |
+| `practice-mastery.json`         | `set.seed(20261029)`: 1500 events of 15 learners at 4 skills, items of 1 or 2 skills, 8% lessons, 10% outcomes of 0.5; the tables of 12 criteria    | Skills never mastered, lessons, partial credit, events of two skills     |
 | `logistic-lkt-features.json`    | LKT's `samplelkt` with seeded times: 1941 events of 17 learners with their durations; 16 features of LKT and 3 windows                              | Events at the same time not reached, gaps of 0 to 3 days                 |
 | `logistic-glm.json`             | `set.seed(20261029)`: 80 learners, 40 attempts each at 14 items of 5 skills, 4 items of two skills                                                  | Fixed, one-skill fixed, no and random proficiency                        |
 | `irt-abilities.json`            | The learners above                                                                                                                                  | Every item model, extreme patterns, a shifted prior and a coarser grid   |

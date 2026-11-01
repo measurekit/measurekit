@@ -39,26 +39,69 @@ polytomous item ranks by its expected score.
 
 ## Mastery
 
-| Criterion                              | Online                                              | Over a log                                    |
-| -------------------------------------- | --------------------------------------------------- | --------------------------------------------- |
-| P(mastery) ≥ threshold, default `0.95` | `model.mastery(state, skill) >= 0.95`               | `thresholdMastery(model, log, { threshold })` |
-| `length` correct in a row, default `3` | keep a run per skill: `outcome === 1 ? run + 1 : 0` | `streakMastery(log, { length })`              |
+```mermaid
+flowchart LR
+  L[Log of events] --> R[Replay by learner]
+  R --> C{Criterion}
+  C --> P["P(mastery) of the model"]
+  C --> S[A streak of correct answers]
+  C --> A[A moving average of outcomes]
+  C --> W[Correct answers in a window]
+  C --> Q[A predicted success]
+  P --> T["Table: the opportunity at which each learner met it, by skill"]
+  S --> T
+  A --> T
+  W --> T
+  Q --> T
+```
+
+| Criterion                                     | Online                                                       | Over a log                                        |
+| --------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------- |
+| P(mastery) ≥ threshold, default `0.95`        | `model.mastery(state, skill) >= 0.95`                        | `thresholdMastery(model, log, { threshold })`     |
+| `length` correct in a row, default `3`        | keep a run per skill: `outcome === 1 ? run + 1 : 0`          | `streakMastery(log, { length })`                  |
+| Moving average m ≥ threshold                  | `m = decay * m + (1 - decay) * outcome`, from 0              | `movingAverageMastery(log, { decay, threshold })` |
+| `correct` of the last `window` outcomes are 1 | keep the last `window` outcomes per skill                    | `windowMastery(log, { correct, window })`         |
+| Predicted success ≥ threshold                 | `model.predict(state, attempt) >= threshold` after the event | `predictedMastery(model, log, { threshold })`     |
+
+| Criterion              | Needs                                                      | Options                                                                                   |
+| ---------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `thresholdMastery`     | A model that defines mastery                               | `threshold`, default `0.95`                                                               |
+| `streakMastery`        | Nothing                                                    | `length`, default `3`                                                                     |
+| `movingAverageMastery` | Nothing                                                    | `decay` from 0 to 1 and `threshold` from 0 to 1, both required                            |
+| `windowMastery`        | Nothing                                                    | `window`, a positive integer, and `correct`, an integer from 1 to `window`, both required |
+| `predictedMastery`     | Any learner model; every event with an outcome has a skill | `threshold` from 0 to 1, required                                                         |
 
 The threshold criterion needs a model that defines mastery, as [BKT](bkt.md#mastery) and [KST](kst.md#the-model); 0.95
 is Corbett and Anderson's (1994). Three correct in a row is the rule of ASSISTments' skill builders. Only an outcome of
-1 extends a run.
+1 extends a run or counts in a window. The moving average takes an outcome as it is, so partial credit moves it by
+part of the distance; Pelánek and Řihák (2017) recommend it, and its values depend on the domain, so a decay and a
+threshold are required, as are those of the window. A window has the outcomes so far where there are fewer than
+`window`, so a window of `k` correct in `k` is a streak of `k`.
 
-An event without an outcome, such as a lesson, is no opportunity. A streak is left as it is by it, and a threshold
-criterion tests the model's mastery only after events with an outcome, though the model is updated by the lesson, so a
-lesson alone never records mastery.
+`predictedMastery` serves models without a `mastery`, such as logistic models and Elo: after each event with an outcome
+it asks the model for P(correct) of the same attempt, with its state updated by the outcome, and credits a prediction at
+or above the threshold to each skill of the attempt. A threshold of 0.95 is out of reach for a model whose slip is above
+0.05, so it does not mean what the threshold of `thresholdMastery` means, and is required. Every event with an outcome
+needs a skill, as the table is by skill.
 
-Over a log, both return, for each learner and each skill they practiced, the opportunity after which the criterion was
+An event without an outcome, such as a lesson, is no opportunity. A streak, a moving average and a window are left as they
+are by it, and the criteria that read a model test it only after events with an outcome, though the model is updated by the
+lesson, so a lesson alone never records mastery.
+
+Over a log, every criterion returns, for each learner and each skill they practiced, the opportunity after which it was
 first met, 1 being the first attempt at the skill, or `null` if the log ends before:
 
 ```ts
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
 import { eventLog } from "@measurekit/knowledge-tracing/data";
-import { streakMastery, thresholdMastery } from "@measurekit/knowledge-tracing/practice";
+import { logistic } from "@measurekit/knowledge-tracing/logistic";
+import {
+  movingAverageMastery,
+  predictedMastery,
+  streakMastery,
+  thresholdMastery,
+  windowMastery,
+} from "@measurekit/knowledge-tracing/practice";
 
 const attempt = (learner: string, item: string, skill: string, time: number, outcome: number) => ({
   learner,
@@ -85,10 +128,23 @@ const model = bkt({
 });
 streakMastery(log); // { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
 thresholdMastery(model, log); // { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
+movingAverageMastery(log, { decay: 0.5, threshold: 0.75 }); // { ana: { fractions: 3, decimals: null }, budi: { decimals: null } }
+windowMastery(log, { correct: 2, window: 3 }); // { ana: { fractions: 3, decimals: null }, budi: { decimals: null } }
+
+// A logistic model has no mastery: the criterion is a predicted success of 0.7.
+const performance = logistic({
+  features: ["successes", "failures"],
+  parameters: {
+    skills: {
+      fractions: { intercept: -0.5, coefficients: { successes: 0.5, failures: 0.1 } },
+      decimals: { intercept: 0, coefficients: { successes: 0.5, failures: 0.1 } },
+    },
+  },
+});
+predictedMastery(performance, log, { threshold: 0.7 }); // { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
 ```
 
-Comparing the opportunities of two criteria on the same log shows how much practice each asks for (Pelánek and Řihák,
-2017). `thresholdMastery` updates each learner from the model's initial state, with the model's parameters as given.
+Comparing the opportunities of criteria on the same log shows how much practice each asks for (Pelánek and Řihák, 2017). `thresholdMastery` updates each learner from the model's initial state, with the model's parameters as given.
 
 ## Time to mastery
 
