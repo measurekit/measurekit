@@ -47,9 +47,28 @@ for (name in names(models)) {
                reference("GDINA", sprintf("GDINA(model = \"%s\")", model)), function() calibrate(model))
   })
 }
+# personparm reads the log posterior that the fit stored. measurekit's calibration holds none, so attributeProfiles computes
+# each person's from the responses. This does the same in R with matrix products, and agrees with the stored posterior.
+profile_matrix <- attributepattern(attribute_count)
+log_proportions <- log(as.numeric(gdina_fit$struc.parm))
+posterior_from_responses <- function() {
+  log_posterior <- responses %*% log(gdina_fit$LC.prob) + (1 - responses) %*% log(1 - gdina_fit$LC.prob) +
+    rep(log_proportions, each = nrow(responses))
+  posterior <- exp(log_posterior - apply(log_posterior, 1, max))
+  posterior / rowSums(posterior)
+}
+stopifnot(max(abs(posterior_from_responses() - exp(gdina_fit$technicals$logposterior.i))) < 1e-12)
+from_responses <- time_calls(function() {
+  posterior <- posterior_from_responses()
+  mastery <- posterior %*% profile_matrix
+  list(posterior, mastery, mastery > 0.5, profile_matrix[max.col(posterior, "first"), ])
+})
 bench_task("cdm.attributeProfiles", "Posterior profiles of the persons of a calibration", size,
            reference("GDINA", "personparm(what = \"EAP\")"), function() personparm(gdina_fit, what = "EAP"),
-           note = "personparm multiplies the log posterior that the fit stored by the profiles and returns the EAP classification; measurekit's calibration holds no posterior, so it computes each person's from the responses, and returns the posterior, the probability of each attribute and the MAP and EAP profiles")
+           note = sprintf(paste("personparm multiplies the log posterior that the fit stored by the profiles, which is work of the",
+                                "fit; measurekit's calibration holds no posterior, so it computes each person's from the responses,",
+                                "and returns the posterior, the probability of each attribute and the MAP and EAP profiles. The same",
+                                "computation in R, with matrix products, takes %.2f ms"), from_responses$median))
 bench_task("cdm.accuracy", "Accuracy and consistency of the classification", size,
            reference("GDINA", "CA"), function() CA(gdina_fit))
 bench_task("cdm.validateQMatrix", "Validation of the Q-matrix by the proportion of variance accounted for", size,

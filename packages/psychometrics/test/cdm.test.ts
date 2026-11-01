@@ -864,6 +864,24 @@ describe("attributeProfiles", () => {
     );
   });
 
+  it("keeps the id and the place of every person among persons without responses", () => {
+    const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), { maxIterations: 5 });
+    const [first, second] = matrix.responses.map((row) => row.slice());
+    const none = reference.itemIds.map(() => null);
+    const options = { itemIds: reference.itemIds };
+    const alone = attributeProfiles(responseMatrix([defined(first), defined(second)], options), calibration);
+    const mixed = attributeProfiles(
+      responseMatrix([none, defined(first), none, defined(second)], { ...options, personIds: ["a", "b", "c", "d"] }),
+      calibration,
+    );
+    expect(mixed.map((person) => person.id)).toEqual(["a", "b", "c", "d"]);
+    expect(mixed[1]).toEqual({ ...defined(alone[0]), id: "b" });
+    expect(mixed[3]).toEqual({ ...defined(alone[1]), id: "d" });
+    const proportions = calibration.profiles.map((profile) => profile.proportion);
+    expect(defined(mixed[0]).posterior).toEqual(proportions);
+    expect(mixed[2]).toEqual({ ...defined(mixed[0]), id: "c" });
+  });
+
   it("places responses that no profile can give on the profiles they contradict least", () => {
     const qMatrix = { item1: ["A"], item2: ["B"], item3: ["A", "B"] };
     const data = responseMatrix([

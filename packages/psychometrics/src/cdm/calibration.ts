@@ -267,16 +267,18 @@ export function dichotomousRows(matrix: ResponseMatrix): DichotomousRows {
   const responses = new Int8Array(matrix.responses.length * itemCount).fill(-1);
   let respondents = 0;
   let complete = true;
-  matrix.responses.forEach((row, person) => {
+  for (let person = 0; person < matrix.responses.length; person++) {
+    const row = matrix.responses[person] ?? [];
     let answers = 0;
-    row.forEach((response, item) => {
-      if (response === null) return;
+    for (let item = 0; item < row.length; item++) {
+      const response = row[item];
+      if (response === null || response === undefined) continue;
       responses[person * itemCount + item] = response;
       answers++;
-    });
+    }
     if (answers > 0) respondents++;
     if (answers > 0 && answers < itemCount) complete = false;
-  });
+  }
   return { itemCount, responses, respondents, complete };
 }
 

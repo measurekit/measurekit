@@ -25,16 +25,48 @@ export function profileEstimate(
   posterior: readonly number[],
   profiles: readonly (readonly number[])[],
 ): ProfileEstimate {
-  const mastery: number[] = new Array<number>(profiles[0]?.length ?? 0).fill(0);
-  let best = 0;
-  for (let c = 0; c < posterior.length; c++) {
-    const p = posterior[c] ?? 0;
-    const profile = profiles[c];
-    if (profile !== undefined)
-      for (let k = 0; k < mastery.length; k++) mastery[k] = (mastery[k] ?? 0) + p * (profile[k] ?? 0);
-    if (p > (posterior[best] ?? 0)) best = c;
+  const { mastery, map, eap } = estimate(posterior, profiles, tableOf(profiles));
+  return { posterior, mastery, map, eap };
+}
+
+/** Returns the profiles in one array, by profile and then attribute, which the sums over the profiles read in order. */
+function tableOf(profiles: readonly (readonly number[])[]): Float64Array {
+  const attributeCount = profiles[0]?.length ?? 0;
+  const table = new Float64Array(profiles.length * attributeCount);
+  for (let c = 0; c < profiles.length; c++) {
+    const profile = profiles[c] ?? [];
+    for (let k = 0; k < attributeCount; k++) table[c * attributeCount + k] = profile[k] ?? 0;
   }
-  return { posterior, mastery, map: profiles[best] ?? [], eap: mastery.map((p) => (p > 0.5 ? 1 : 0)) };
+  return table;
+}
+
+/**
+ * Returns the estimates of a posterior over `profiles`, whose attributes `table` holds as {@link tableOf} returns them.
+ */
+function estimate(
+  posterior: ArrayLike<number>,
+  profiles: readonly (readonly number[])[],
+  table: Float64Array,
+): Omit<ProfileEstimate, "posterior"> {
+  const attributeCount = profiles[0]?.length ?? 0;
+  const mastery = new Array<number>(attributeCount);
+  const eap = new Array<number>(attributeCount);
+  for (let k = 0; k < attributeCount; k++) {
+    let sum = 0;
+    for (let c = 0; c < posterior.length; c++) sum += (posterior[c] ?? 0) * (table[c * attributeCount + k] ?? 0);
+    mastery[k] = sum;
+    eap[k] = sum > 0.5 ? 1 : 0;
+  }
+  let best = 0;
+  let largest = posterior[0] ?? 0;
+  for (let c = 1; c < posterior.length; c++) {
+    const p = posterior[c] ?? 0;
+    if (p > largest) {
+      best = c;
+      largest = p;
+    }
+  }
+  return { mastery, map: profiles[best] ?? [], eap };
 }
 
 /** Returns the values as an array: a loop is several times faster than `Array.from` on a typed array. */
@@ -59,13 +91,16 @@ function copyOf(values: Float64Array): number[] {
  */
 export function attributeProfiles(matrix: ResponseMatrix, calibration: CdmCalibration): AttributeProfile[] {
   const { data, design, state } = calibratedModel(matrix, calibration);
-  const estimates: (ProfileEstimate | undefined)[] = [];
+  const table = tableOf(design.profiles);
+  const persons = new Array<AttributeProfile>(matrix.personIds.length);
   forEachPosterior(data, design, state, (person, posterior) => {
-    estimates[person] = profileEstimate(copyOf(posterior), design.profiles);
+    const { mastery, map, eap } = estimate(posterior, design.profiles, table);
+    persons[person] = { id: matrix.personIds[person] ?? "", posterior: copyOf(posterior), mastery, map, eap };
   });
-  return matrix.personIds.map((id, person) => {
-    const { posterior, mastery, map, eap } =
-      estimates[person] ?? profileEstimate(Array.from(state.proportions), design.profiles);
-    return { id, posterior, mastery, map, eap };
-  });
+  for (let person = 0; person < persons.length; person++) {
+    if (persons[person] !== undefined) continue;
+    const { mastery, map, eap } = estimate(state.proportions, design.profiles, table);
+    persons[person] = { id: matrix.personIds[person] ?? "", posterior: copyOf(state.proportions), mastery, map, eap };
+  }
+  return persons;
 }

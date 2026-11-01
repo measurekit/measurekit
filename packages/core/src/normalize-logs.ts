@@ -8,7 +8,7 @@
  */
 export function normalizeLogs(values: Float64Array): number {
   let largest = Number.NEGATIVE_INFINITY;
-  for (const value of values) largest = Math.max(largest, value);
+  for (let k = 0; k < values.length; k++) largest = Math.max(largest, values[k] ?? 0);
   if (largest === Number.NEGATIVE_INFINITY) return largest;
   let total = 0;
   for (let k = 0; k < values.length; k++) {
