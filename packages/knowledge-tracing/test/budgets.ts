@@ -14,6 +14,7 @@ const BUDGETS = {
   "logistic.features": 300,
   "logistic.fitItems": 700,
   "logistic.fitManyItems": 6_000,
+  "logistic.searchRates": 2_000,
   "irt.replay": 2_000,
   "irt.drift": 1_000,
   "kst.blim": 200,

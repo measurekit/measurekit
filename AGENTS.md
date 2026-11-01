@@ -148,7 +148,7 @@ packages/knowledge-tracing/   the published package @measurekit/knowledge-tracin
   src/elo/              learner-item and concept-specific Elo
   src/bkt/              Bayesian knowledge tracing with pyBKT's extensions
   src/logistic/         AFM, PFA and LKT features over skills, items or the learner, intercepts, covariates, standard errors, fixed or random
-                        proficiency
+                        proficiency, and the search for the rates of the features
   src/irt/              online IRT: the posterior of ability on a grid, from calibrated item parameters
   src/kst/              knowledge structures and their tools, the basic local independence model, IITA, adaptive assessment
   src/practice/         the next item by predicted success, mastery criteria, attempts to a streak

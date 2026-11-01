@@ -5,7 +5,8 @@ performance factors analysis (PFA) and models of the features of logistic knowle
 features of instructional factors analysis. Intercepts and features count over skills, items or the learner, with a
 coefficient for each skill or item or one for all, and covariates enter with one coefficient each, as Best-LR of Gervet
 et al. (2020) has them. Learner proficiency is absent, a fixed effect per learner, or a random intercept. `fit` returns
-standard errors. Fits are validated against `glm`, `lme4::glmer` and LiblineaR, and the features against the LKT package ([validation](validation.md#logistic-models)).
+standard errors, and `searchRates` estimates the decays and exponents of the features. Fits are validated against `glm`,
+`lme4::glmer` and LiblineaR, and the features against the LKT package ([validation](validation.md#logistic-models)).
 
 ```mermaid
 flowchart LR
@@ -206,6 +207,41 @@ Of the 49 names, 28 are features, `intercept` and `numer` are the intercepts and
 exposure features and the DAS3H windows are not LKT's. LKT's components map to the terms: a feature over `"skill"` or
 `"item"` with a coefficient for each is a component with `$`, one with a shared coefficient is a component without it.
 
+## Estimating the rates of the features
+
+The decays and exponents of the features are given, or estimated by `searchRates` as LKT's `seedpars` does: the rates
+that maximize the log-likelihood of the log, found by BFGS over the rates mapped to the whole line.
+
+```ts
+import type { EventLog } from "@measurekit/knowledge-tracing/data";
+import { logistic, searchRates } from "@measurekit/knowledge-tracing/logistic";
+
+/** Finds the decay of the proportion of successes and the exponent of the recency that fit a log best. */
+export function bestRates(log: EventLog) {
+  const found = searchRates(
+    (rates) => logistic({ features: [{ decayedProportion: rates[0] ?? 0 }, { recency: rates[1] ?? 0 }] }),
+    log,
+    { start: [0.5, 0.5], lower: [0.05, 0.01], upper: [1, 3] },
+  );
+  return { rates: found.rates, model: found.fit.model };
+}
+```
+
+| Option           | Meaning                                                                                    | Default |
+| ---------------- | ------------------------------------------------------------------------------------------ | ------- |
+| `start`          | The rates to start from, each strictly between its bounds: one for each rate `build` takes | none    |
+| `lower`, `upper` | The bounds of each rate                                                                    | none    |
+| `tolerance`      | The largest absolute gradient component, over the rates mapped to the line, at convergence | `1e-6`  |
+| `maxIterations`  | The most iterations                                                                        | `100`   |
+
+Each trial fits the model, and a gradient takes two fits for each rate, so the cost is the cost of a fit times the trials.
+The result may be a local optimum: the log-likelihood in the rates need not have one maximum, so a search from another
+start can end elsewhere. A fit that does not converge counts as a failed trial and the search steps back from it; a search
+that ends on failed trials has not converged, and one whose start does not converge returns it with `converged: false`. An
+error that `build` or the fit throws ends the search. Rates that a feature does not identify, such as the decay of a
+proportion that changes little with it, scatter from log to log; the recency exponent is poorly identified when learners
+return at once, since Δt⁻ᵉ grows without bound as Δt falls.
+
 ## Online
 
 ```ts
@@ -240,18 +276,20 @@ skill; outcomes from 0 to 1 count as partial credit.
 | Ridge fits           | LiblineaR stops at a relative gradient | Newton-CG stops at a gradient of `tolerance` in every component, 1e-8 by default, so the minimum is reached more exactly |
 | Singular information | `glm` gives `NA` to an aliased column  | `standardErrors` is `null`, as one number for a coefficient would not tell which is aliased                              |
 | Fixed proficiency    | `glm` drops an aliased column          | θ has a mean of 0 in each set, and the errors are those of the centered estimates, as sum contrasts give                 |
+| Estimated rates      | LKT's `seedpars` fits with a penalty   | `searchRates` maximizes the log-likelihood, so its rates differ from LKT's in the second decimal                         |
 
 ## Errors
 
-| `DataError` when                                                                                     | What to do                                                                                     |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `intercepts` has both kinds and `ridge` is 0                                                         | Add a ridge, or keep one kind                                                                  |
-| A term over the learner has `coefficient: "each"`                                                    | Use `"shared"`: a slope for each learner is a random-slope model, which this module leaves out |
-| An exposure feature is over items or the learner                                                     | Count exposures over skills                                                                    |
-| A fit has more than 5,000 coefficients without a ridge, or with random θ                             | Add a ridge and use `"none"` or `"fixed"` proficiency; a ridge has no standard errors          |
-| An event with an outcome, or an attempt to predict, lacks a covariate                                | Give every attempt each name of `covariates`                                                   |
-| A model with shared coefficients has no `shared` parameters when it predicts                         | Fit it, or pass `parameters` with `shared`                                                     |
-| An attempt is earlier than the learner's last attempt at a skill, item or any item that a term reads | Give the attempts in time order                                                                |
+| `DataError` when                                                                                        | What to do                                                                                     |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `intercepts` has both kinds and `ridge` is 0                                                            | Add a ridge, or keep one kind                                                                  |
+| A term over the learner has `coefficient: "each"`                                                       | Use `"shared"`: a slope for each learner is a random-slope model, which this module leaves out |
+| An exposure feature is over items or the learner                                                        | Count exposures over skills                                                                    |
+| A fit has more than 5,000 coefficients without a ridge, or with random θ                                | Add a ridge and use `"none"` or `"fixed"` proficiency; a ridge has no standard errors          |
+| An event with an outcome, or an attempt to predict, lacks a covariate                                   | Give every attempt each name of `covariates`                                                   |
+| A model with shared coefficients has no `shared` parameters when it predicts                            | Fit it, or pass `parameters` with `shared`                                                     |
+| An attempt is earlier than the learner's last attempt at a skill, item or any item that a term reads    | Give the attempts in time order                                                                |
+| `searchRates` gets bounds of the wrong length, a start outside them, or a `build` that returns no model | Pass one start, lower and upper bound for each rate `build` takes                              |
 
 ## References
 

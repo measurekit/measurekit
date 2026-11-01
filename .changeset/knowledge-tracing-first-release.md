@@ -33,7 +33,8 @@ Logistic models take intercepts for items beside those of skills (`intercepts`),
 learner with a coefficient for each skill or item or one for all (`{ feature, over, coefficient }`), covariates, and
 standard errors (`standardErrors`), which expresses Best-LR of Gervet et al. and LKT's components and `numer`. Fits with
 a ridge solve by Newton-CG on Hessian-vector products, so that 50,000 items are no obstacle; fits without one, and with a
-random intercept, solve with dense matrices up to 5,000 coefficients.
+random intercept, solve with dense matrices up to 5,000 coefficients. `searchRates` finds the decays and exponents of the
+features by maximum likelihood, as LKT's `seedpars` does.
 
 Mastery criteria over a log are the probability of mastery (`thresholdMastery`), a streak (`streakMastery`), a moving
 average (`movingAverageMastery`), a window of outcomes (`windowMastery`) and a predicted success (`predictedMastery`),

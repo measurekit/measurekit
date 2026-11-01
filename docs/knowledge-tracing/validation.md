@@ -146,6 +146,23 @@ intercepts (item intercepts alone, or one skill per event) is fitted with sum co
 | Standard errors, no or fixed proficiency                                           | `summary(glm)`, the error of the last sum-contrast learner from the others'                                                      | 1e-6 relative | 2.8e-7             |
 | Standard errors, random intercept                                                  | The inverse Schur complement written out in base R, equal to `vcov(glmer, use.hessian = FALSE)` at glmer's estimates within 1e-4 | 1e-6 relative | 1.5e-9             |
 
+`validation/knowledge-tracing/rate-search.R` simulates a log of 60 learners with 60 events each at 4 skills, written out in
+base R: the decayed proportion of successes with decay 0.6 and the recency of the last attempt with exponent 0.4. It writes the
+features for any two rates, fits the intercepts and slopes of each skill by `glm` at a tight tolerance, and maximizes the
+log-likelihood over the rates with `optim(method = "L-BFGS-B")` on central differences, then Newton steps to a gradient
+below 1e-6; a search from another start and a grid of 340 points reach the same maximum. `LKT` with `seedpars` finds
+0.703 and 0.403 on the same log, in the second decimal of 0.705 and 0.425, as its fits are penalized and stop at epsilon 1e-4.
+
+| Quantity                      | Reference                    | Tolerance     | Largest difference |
+| ----------------------------- | ---------------------------- | ------------- | ------------------ |
+| Estimated decay and exponent  | `optim` over `glm`, as above | 1e-3 absolute | 9e-10              |
+| Log-likelihood at the maximum | The same                     | 1e-4 absolute | 1e-11              |
+
+Twelve logs are not in a fixture: a seeded recovery study simulates eight logs of 2,000 events from the model at decay 0.6 and
+exponent 0.4, with gaps of at least 5 units, and the mean of the estimates of each rate is within 0.12 of the truth. A
+simulation with gaps near 0 and a stronger recency leaves the exponent at the bound of 3 in some logs: the likelihood rises
+with the exponent as Δt⁻ᵉ grows for short gaps.
+
 The seeded times give no age of 0 and no tie, where LKT returns infinity and NaN; the tests check measurekit's values at
 those edges by hand. The features map to LKT's names in [the logistic guide](logistic.md#features). With every event of one skill, glm
 drops a skill's intercept; the script moves the intercepts so that the learners' mean proficiency is 0, as `fit`
@@ -430,6 +447,7 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `logistic-lkt-features.json`    | LKT's `samplelkt` with seeded times: 1941 events of 17 learners with their durations; 16 features of LKT and 3 windows                              | Events at the same time not reached, gaps of 0 to 3 days                                    |
 | `logistic-glm.json`             | `set.seed(20261029)`: 80 learners, 40 attempts each at 14 items of 5 skills, 4 items of two skills                                                  | Fixed, one-skill fixed, no and random proficiency                                           |
 | `logistic-terms.json`           | `set.seed(20261101)`: 60 learners, 36 events each at 24 items of 6 skills, 6 items of two skills, a covariate                                       | Item intercepts, shared coefficients, terms over items and the learner, standard errors     |
+| `logistic-rates.json`           | `set.seed(20261102)`: 60 learners, 60 events each at 4 skills; the rates by `optim` over `glm`                                                      | A maximum inside the bounds, reached from two starts                                        |
 | `irt-abilities.json`            | The learners above                                                                                                                                  | Every item model, extreme patterns, a shifted prior and a coarser grid                      |
 | `kst-structures.json`           | 6 surmise relations; pks's `DoignonFalmagne7` and `chess` `dst1`, a space with a gap, a structure that is not a space; a map of 5 items to 4 skills | Equivalent elements, spaces that are not learning spaces                                    |
 | `kst-structure-tools.json`      | The 6 structures above and 8 random families of states; 8 families of generators of a closure                                                       | Spaces with a gap, structures that are not spaces, no path                                  |
@@ -474,6 +492,7 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | Random-intercept log-likelihood                                      | 1e-6 absolute                  | 4.3e-12                        |
 | Terms beyond the skill against glm, lme4 and LiblineaR               | 1e-8, 1e-5, 1e-6 absolute      | 1.3e-9, 1.3e-8, 3.2e-10        |
 | Logistic standard errors against `summary(glm)` and lme4             | 1e-6 relative                  | 2.8e-7                         |
+| Estimated rates and their log-likelihood                             | 1e-3, 1e-4 absolute            | 9e-10, 1e-11                   |
 | IRT EAP, its standard error, predictions and log-likelihood          | 1e-10 absolute                 | 2.2e-15                        |
 | IRT MAP, at the default grid spacing 0.2, × (spacing / 0.2)⁵         | 1e-5 absolute                  | 3.1e-7; 2.1e-5 at spacing 0.45 |
 | IRT MAP standard error, × (spacing / 0.2)⁴                           | 1e-4 absolute                  | 2.5e-6; 1.3e-4 at spacing 0.45 |

@@ -17,6 +17,8 @@ import {
   logistic,
   type Proficiency,
   pfa,
+  searchRates,
+  simulate,
   splitByLearner,
 } from "../src/index.js";
 import { type FeatureSpec, featureValue, needsOf } from "../src/logistic/features.js";
@@ -26,8 +28,9 @@ import exposureFixture from "./fixtures/logistic-exposures.json" with { type: "j
 import glm from "./fixtures/logistic-glm.json" with { type: "json" };
 import lkt from "./fixtures/logistic-lkt.json" with { type: "json" };
 import lktFeaturesFixture from "./fixtures/logistic-lkt-features.json" with { type: "json" };
+import rates from "./fixtures/logistic-rates.json" with { type: "json" };
 import termsFixture from "./fixtures/logistic-terms.json" with { type: "json" };
-import { allPredicted, defined, expectClose, expectUnaffectedByLessons, online } from "./helpers.js";
+import { allPredicted, defined, expectAllClose, expectClose, expectUnaffectedByLessons, online } from "./helpers.js";
 
 /** Absolute tolerance of features against LKT's. */
 const FEATURE_TOLERANCE = 1e-12;
@@ -1356,3 +1359,128 @@ describe("logistic options of terms from JavaScript", () => {
     expect(model.predict(stored, { ...attempt, time: 5 })).toBeGreaterThan(0);
   });
 });
+
+describe("rate search", () => {
+  const log = eventLog(JSON.parse(JSON.stringify(rates.events)));
+  const bounds = rates.bounds;
+  const build = (values: readonly number[]) =>
+    logistic({ features: [{ decayedProportion: values[0] ?? 0 }, { recency: values[1] ?? 0 }] });
+
+  it("finds the rates that maximize the log-likelihood, as optim over glm does", () => {
+    const found = searchRates(build, log, bounds);
+    expect(found.converged).toBe(true);
+    expectAllClose(found.rates, rates.rates, 1e-3, "rates");
+    expectClose(found.fit.logLikelihood, rates.logLikelihood, 1e-4, "log-likelihood");
+    expect(found.fit.logLikelihood).toBeGreaterThan(build(bounds.start).fit(log).logLikelihood);
+    expect(found.iterations).toBeGreaterThan(0);
+  });
+
+  it("recovers the rates of simulated logs", () => {
+    // Thresholds fixed before this run: every search converges, and the mean of the 8 estimates of each rate is within
+    // 0.12 of the truth, twice the standard error of the mean for the spread of one estimate, 0.17.
+    const truth = [0.6, 0.4];
+    const parameters = {
+      skills: Object.fromEntries(
+        ["s1", "s2", "s3"].map((skill, k) => [
+          skill,
+          { intercept: -0.3 + 0.2 * k, coefficients: { "decayedProportion(0.6)": 2, "recency(0.4)": 1.2 } },
+        ]),
+      ),
+    };
+    const truthModel = logistic({ features: [{ decayedProportion: 0.6 }, { recency: 0.4 }], parameters });
+    const estimates = Array.from({ length: 8 }, (_, seed) => {
+      const random = createRandom(seed + 1);
+      const attempts = Array.from({ length: 50 }, (_, l) => {
+        let time = 0;
+        return Array.from({ length: 40 }, (_, a) => {
+          // Gaps of at least 5 units, as a learner who returns at once is not one whose recency can be told apart.
+          time += 5 - 25 * Math.log(1 - random.uniform());
+          return { learner: `l${l}`, item: `q${a}`, skills: [`s${1 + Math.floor(random.uniform() * 3)}`], time };
+        });
+      }).flat();
+      const found = searchRates(build, simulate(truthModel, attempts, random).log, {
+        start: [0.5, 0.5],
+        lower: [0.05, 0.01],
+        upper: [1, 3],
+      });
+      expect(found.converged).toBe(true);
+      return found.rates;
+    });
+    truth.forEach((rate, j) => {
+      const values = estimates.map((found) => defined(found[j]));
+      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+      expect(Math.abs(mean - rate), `mean of rate ${j + 1}`).toBeLessThanOrEqual(0.12);
+    });
+    // Eight searches of about 0.4 s: under the default timeout of 5 s on a quiet machine, over it on a loaded one.
+  }, 60_000);
+
+  it("is reproducible and keeps the rates inside their bounds", () => {
+    const narrow = { start: [0.65, 0.35], lower: [0.6, 0.3], upper: [0.8, 0.5] };
+    const found = searchRates(build, log, narrow);
+    const again = searchRates(build, log, narrow);
+    expect(again.rates).toEqual(found.rates);
+    expect([again.fit.logLikelihood, again.iterations]).toEqual([found.fit.logLikelihood, found.iterations]);
+    found.rates.forEach((rate, j) => {
+      expect(rate).toBeGreaterThan(defined(narrow.lower[j]));
+      expect(rate).toBeLessThan(defined(narrow.upper[j]));
+    });
+  });
+
+  it("counts a fit that does not converge as a failed trial and steps back, or stops at the start", () => {
+    // Fits at a decay above 0.9 are cut after one iteration and do not converge: the maximum, at 0.7, lies below.
+    const cut = (values: readonly number[]) =>
+      logistic({
+        features: [{ decayedProportion: values[0] ?? 0 }, { recency: values[1] ?? 0 }],
+        maxIterations: (values[0] ?? 0) > 0.9 ? 1 : 100,
+      });
+    const found = searchRates(cut, log, { start: [0.5, 0.5], lower: [0.05, 0.01], upper: [1, 3] });
+    expect(found.converged).toBe(true);
+    expectAllClose(found.rates, rates.rates, 1e-3, "rates");
+    const stuck = searchRates(cut, log, { start: [0.95, 0.5], lower: [0.05, 0.01], upper: [1, 3] });
+    expect(stuck).toMatchObject({ rates: [0.95, 0.5], converged: false, iterations: 0 });
+    expect(stuck.fit.converged).toBe(false);
+  });
+
+  it("passes on the error that building or fitting a model throws", () => {
+    const failing = () => {
+      throw new DataError("No model for these rates.");
+    };
+    expect(() => searchRates(failing, log, bounds)).toThrow("No model for these rates.");
+    expect(() => searchRates((values) => build(values), eventLog([{ ...first(), skills: [] }]), bounds)).toThrow(
+      DataError,
+    );
+  });
+
+  it("rejects options out of range or of another type", () => {
+    const options = (patch: Record<string, unknown>) => ({ ...bounds, ...patch }) as typeof bounds;
+    expect(() => searchRates(JSON.parse("null"), log, bounds)).toThrow(
+      "The argument build must be a function from the rates to a logistic model, found null.",
+    );
+    expect(() => searchRates(build, log, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => searchRates(build, log, options({ start: JSON.parse("null") }))).toThrow(
+      "The option start must be an array of rates, found null.",
+    );
+    expect(() => searchRates(build, log, options({ lower: [0.05] }))).toThrow(
+      "The option lower must hold one number for each rate, as many as the 2 of start, found 1.",
+    );
+    expect(() => searchRates(build, log, options({ start: [], lower: [], upper: [] }))).toThrow(
+      "The option start must hold one number for each rate",
+    );
+    expect(() => searchRates(build, log, options({ upper: ["a", 3] }))).toThrow(
+      'The upper of rate 1 must be a finite number, found "a".',
+    );
+    expect(() => searchRates(build, log, options({ start: [1, 0.5] }))).toThrow(
+      "The start of rate 1 must lie strictly between its bounds 0.05 and 1, found 1.",
+    );
+    expect(() => searchRates(build, log, options({ tolerance: -1 }))).toThrow("The option tolerance");
+    expect(() => searchRates(build, log, options({ maxIterations: 1.5 }))).toThrow("The option maxIterations");
+    expect(() => searchRates(() => JSON.parse("{}"), log, bounds)).toThrow(
+      "The function build must return a logistic model, found an object.",
+    );
+  });
+});
+
+/** A valid event, for the cases that need a log of one event. */
+function first(): Event {
+  return { learner: "ana", item: "q1", skills: ["a"], time: 1, outcome: 1 };
+}

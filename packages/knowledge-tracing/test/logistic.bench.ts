@@ -1,11 +1,12 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
-import { afm, type Event, eventLog, logistic } from "../src/index.js";
+import { afm, type Event, eventLog, logistic, searchRates } from "../src/index.js";
 import { checkTerms } from "../src/logistic/terms.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-bkt.json" with { type: "json" };
 import itemsFixture from "./fixtures/bench-logistic-items.json" with { type: "json" };
 import lktFeatures from "./fixtures/logistic-lkt-features.json" with { type: "json" };
+import ratesFixture from "./fixtures/logistic-rates.json" with { type: "json" };
 import { columnsLog, online } from "./helpers.js";
 
 /** The log of the BKT benchmark: 20,000 attempts of 200 learners at 5 skills. */
@@ -77,4 +78,17 @@ test("fits 20,000 events at 1,000 items with intercepts of skills and items, a p
 test("fits 150,000 events at 49,546 items with intercepts of skills and items, a proficiency for each learner and a ridge", async (context) => {
   const log = codedLog(itemsFixture.large);
   await benchmark(context, "logistic.fitManyItems", () => bestLr.fit(log), SLOW_OPTIONS);
+});
+
+test("searches the decay of a proportion of successes and the exponent of a recency over 3,600 events", async (context) => {
+  const log = eventLog(JSON.parse(JSON.stringify(ratesFixture.events)));
+  const { lower, upper, start } = ratesFixture.bounds;
+  const build = (rates: readonly number[]) =>
+    logistic({ features: [{ decayedProportion: rates[0] ?? 0 }, { recency: rates[1] ?? 0 }] });
+  await benchmark(
+    context,
+    "logistic.searchRates",
+    () => searchRates(build, log, { start, lower, upper }),
+    SLOW_OPTIONS,
+  );
 });
