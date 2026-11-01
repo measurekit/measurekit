@@ -84,6 +84,7 @@ const BUDGETS = {
   "responseTime.calibrateSpeedAccuracy": 3_000,
   "responseTime.speedEstimates": 7,
   "explanatory.lltm": 400,
+  "explanatory.linearChange": 5,
   "explanatory.itemFeatureRegression": 2,
   "sim.simulateResponses": 30,
   "data.scoreResponses": 6,

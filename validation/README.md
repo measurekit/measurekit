@@ -18,6 +18,8 @@ Rscript validation/psychometrics/fit.R               # item and person fit: eRm'
 Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/explanatory.R       # item parameters regressed on item features: mirt, metafor and base R
+Rscript validation/psychometrics/linear-change.R     # linear logistic change: glm on the persons who changed, base R and eRm's LLRA
+Rscript validation/psychometrics/lltm-polytomous.R   # the LLTM of partial credit and rating scale items: base R and TAM
 Rscript validation/psychometrics/generalizability.R  # variance components and decision studies of balanced designs: base R aov and lme4
 Rscript validation/psychometrics/mokken.R            # Mokken scale analysis: mokken's coefH, aisp, check.monotonicity and check.iio
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
@@ -91,4 +93,4 @@ Rscript validation/benchmarks.R table                                           
 
 They need the packages of the scripts above, and for the tasks of
 `validation/benchmarks/` psych, TAM, nlme, metafor, pROC, irr, equate, equateIRT, difR, rms, GDINA, NPCD, catR, cdcatR,
-mirtCAT, pks and DAKS. The results go to `validation/benchmarks/results/`, which git ignores.
+mirtCAT, pks, DAKS, kst, sets and eRm. The results go to `validation/benchmarks/results/`, which git ignores.

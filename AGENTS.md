@@ -120,7 +120,8 @@ packages/psychometrics/       the published package @measurekit/psychometrics
                         and observed-score equating, bootstrap and delta-method standard errors, the anchor screen,
                         presmoothing
   src/standard-setting/ cut scores by the modified Angoff, Bookmark and Hofstee methods; classification accuracy
-  src/explanatory/      regression of item parameters on item features, prediction of the parameters of new items
+  src/explanatory/      the linear logistic test model, linear logistic change, regression of item parameters on item features,
+                        prediction of the parameters of new items
   src/mokken/           Mokken scale analysis: scalability coefficients, item selection, monotonicity, invariant item ordering
   src/generalizability/ variance components of balanced crossed and nested designs, decision studies
   src/scaling/          scale scores, conversion tables, conditional errors of scale scores, norms, score prediction

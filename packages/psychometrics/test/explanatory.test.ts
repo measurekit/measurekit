@@ -9,12 +9,16 @@ import {
   type ItemFeatureRegression,
   type ItemFeatures,
   itemFeatureRegression,
+  type LinearChange,
+  type LinearChangeOptions,
   type Lltm,
   type LltmOptions,
+  linearChange,
   lltm,
   logNormalPrior,
   normalPrior,
   oneParameterLogistic,
+  partialCredit,
   predictItemParameter,
   type Random,
   type ResponseMatrix,
@@ -22,9 +26,12 @@ import {
   responseRecords,
   simulateResponses,
   simulateThetas,
+  type ThresholdParameters,
   twoParameterLogistic,
 } from "../src/index.js";
+import changeFixture from "./fixtures/explanatory-linear-change.json" with { type: "json" };
 import lltmFixture from "./fixtures/explanatory-lltm.json" with { type: "json" };
+import polytomousFixture from "./fixtures/explanatory-lltm-polytomous.json" with { type: "json" };
 import fixture from "./fixtures/explanatory-regression.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
 
@@ -37,6 +44,14 @@ const LLTM_PARAMETER_TOLERANCE = 1e-7;
 const LLTM_STANDARD_ERROR_TOLERANCE = 1e-6;
 /** LLTM log-likelihoods, information criteria and the likelihood-ratio statistic. */
 const LLTM_LOG_LIKELIHOOD_TOLERANCE = 1e-8;
+/** Linear change effects against the reference: glm on the persons who changed, or the conditional likelihood in base R. */
+const CHANGE_TOLERANCE = 1e-6;
+/** Their standard errors, relative: the base R information is a numerical Jacobian. */
+const CHANGE_STANDARD_ERROR_TOLERANCE = 1e-5;
+/** Conditional log-likelihoods of the linear change cases. */
+const CHANGE_LOG_LIKELIHOOD_TOLERANCE = 1e-8;
+/** The effects of the polytomous LLTM against TAM, whose quadrature nodes are fixed where the package's follow sigma. */
+const TAM_TOLERANCE = 5e-4;
 /** EM tolerance of the LLTM comparisons: the base R maxima are exact to 1e-10. */
 const LLTM_EM_TOLERANCE = 1e-10;
 
@@ -445,7 +460,7 @@ function lltmFeatures(reference: (typeof lltmFixture.cases)[number]): ItemFeatur
 }
 
 /** Estimates the LLTM of a case of the LLTM fixture, to the tolerance that matches the base R maximum. */
-function lltmOf(reference: (typeof lltmFixture.cases)[number], options: LltmOptions = {}): Lltm {
+function lltmOf(reference: (typeof lltmFixture.cases)[number], options: Omit<LltmOptions, "model"> = {}): Lltm {
   return lltm(lltmData(reference.dataset), lltmFeatures(reference), {
     intercept: reference.intercept,
     tolerance: LLTM_EM_TOLERANCE,
@@ -462,6 +477,324 @@ function fitted(index: number): Lltm {
   if (model === undefined) {
     model = lltmOf(defined(lltmFixture.cases[index]));
     FITTED.set(index, model);
+  }
+  return model;
+}
+
+interface ChangeReference {
+  readonly name: string;
+  readonly reference: "glm" | "base R";
+  readonly occasions: (number | null)[][][];
+  readonly itemIds: string[];
+  readonly groups: string[] | null;
+  readonly baseline: string | null;
+  readonly itemGroups: Record<string, string> | null;
+  readonly effects: { itemGroup: string; occasion: number; group: string; estimate: number; standardError: number }[];
+  readonly logLikelihood: number;
+}
+const changeCases: readonly ChangeReference[] = JSON.parse(JSON.stringify(changeFixture.cases));
+
+/** The occasions of a case of the linear change fixture, as response matrices of the same persons and items. */
+function changeOccasions({ occasions, itemIds }: ChangeReference): ResponseMatrix[] {
+  return occasions.map((rows) => responseMatrix(rows, { itemIds }));
+}
+
+/** The options of a case of the linear change fixture. */
+function changeOptions({ groups, baseline, itemGroups }: ChangeReference): LinearChangeOptions {
+  return {
+    ...(groups === null ? {} : { groups, ...(baseline === null ? {} : { baseline }) }),
+    ...(itemGroups === null ? {} : { itemGroups }),
+  };
+}
+
+/** The case of the fixture with this name. */
+function changeCase(name: string): ChangeReference {
+  return defined(changeCases.find((reference) => reference.name.startsWith(name)));
+}
+
+/**
+ * Six persons answer 4 items twice. On each item at least one person gains and one loses, so that every effect is
+ * finite; the last two persons answer 1 and 0 throughout, and so add nothing.
+ */
+const SMALL_OCCASIONS = [
+  responseMatrix([
+    [0, 1, 0, 1],
+    [1, 0, 1, 0],
+    [0, 0, 1, 1],
+    [1, 1, 0, 0],
+    [1, 1, 1, 1],
+    [0, 0, 0, 0],
+  ]),
+  responseMatrix([
+    [1, 0, 1, 0],
+    [0, 1, 0, 1],
+    [0, 1, 1, 0],
+    [1, 0, 0, 1],
+    [1, 1, 1, 1],
+    [0, 0, 0, 0],
+  ]),
+];
+const POOLED_ITEMS = { item1: "a", item2: "a", item3: "b", item4: "b" };
+
+describe("linearChange", () => {
+  changeCases.forEach((reference) => {
+    const source =
+      reference.reference === "glm" ? "glm on the persons who changed" : "the conditional likelihood in base R";
+    it(`matches ${source} for ${reference.name}`, () => {
+      const actual = linearChange(changeOccasions(reference), changeOptions(reference));
+      expect(actual.converged).toBe(true);
+      expect(actual.effects).toHaveLength(reference.effects.length);
+      reference.effects.forEach((expected, i) => {
+        const effect = defined(actual.effects[i]);
+        const label = `${expected.itemGroup}, occasion ${expected.occasion}, ${expected.group}`;
+        expect([effect.itemGroup, effect.occasion, effect.group], label).toEqual([
+          expected.itemGroup,
+          expected.occasion,
+          expected.group,
+        ]);
+        expectClose(effect.estimate, expected.estimate, CHANGE_TOLERANCE, `${label} estimate`);
+        expectClose(
+          effect.standardError,
+          expected.standardError,
+          CHANGE_STANDARD_ERROR_TOLERANCE * expected.standardError,
+          `${label} error`,
+        );
+      });
+      expectClose(actual.logLikelihood, reference.logLikelihood, CHANGE_LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
+    });
+  });
+
+  it("uses only the persons who changed on an item with two occasions: the others add nothing", () => {
+    const base = linearChange(SMALL_OCCASIONS);
+    const changers = SMALL_OCCASIONS.map(({ responses }) => responseMatrix(responses.slice(0, 4)));
+    const constant = linearChange(changers);
+    expect(constant.effects.map(({ estimate }) => estimate)).toEqual(base.effects.map(({ estimate }) => estimate));
+    expect(constant.logLikelihood).toBe(base.logLikelihood);
+  });
+
+  it("negates every effect when the responses are recoded, 0 as 1", () => {
+    const recoded = SMALL_OCCASIONS.map(({ responses }) =>
+      responseMatrix(responses.map((row) => row.map((response) => 1 - defined(response)))),
+    );
+    const base = linearChange(SMALL_OCCASIONS, { itemGroups: POOLED_ITEMS });
+    const flipped = linearChange(recoded, { itemGroups: POOLED_ITEMS });
+    base.effects.forEach((effect, i) => {
+      expectClose(defined(flipped.effects[i]).estimate, -effect.estimate, 1e-9, `effect ${i + 1}`);
+    });
+    expectClose(flipped.logLikelihood, base.logLikelihood, 1e-9);
+  });
+
+  it("moves the baseline to another group as the contrast: the trend gains its effect, which changes sign", () => {
+    const reference = changeCase("two occasions");
+    const occasions = changeOccasions(reference);
+    const groups = defined(reference.groups);
+    const control = linearChange(occasions, { groups, baseline: "ctl" });
+    const treated = linearChange(occasions, { groups, baseline: "trt" });
+    expect(treated.effects.map(({ group }) => group).slice(0, 2)).toEqual(["trt", "ctl"]);
+    for (let item = 0; item < 8; item++) {
+      const trend = defined(control.effects[2 * item]);
+      const effect = defined(control.effects[2 * item + 1]);
+      expectClose(
+        defined(treated.effects[2 * item]).estimate,
+        trend.estimate + effect.estimate,
+        1e-6,
+        `trend ${item + 1}`,
+      );
+      expectClose(defined(treated.effects[2 * item + 1]).estimate, -effect.estimate, 1e-6, `effect ${item + 1}`);
+    }
+    expectClose(treated.logLikelihood, control.logLikelihood, 1e-8);
+  });
+
+  it("does not depend on the order of the persons", () => {
+    const reference = changeCase("three occasions");
+    const occasions = changeOccasions(reference);
+    const groups = defined(reference.groups);
+    const order = Array.from({ length: groups.length }, (_, p) => (p * 7 + 3) % groups.length);
+    expect(new Set(order).size).toBe(groups.length);
+    const shuffled = occasions.map(({ responses }) => responseMatrix(order.map((p) => defined(responses[p]))));
+    const actual = linearChange(shuffled, { groups: order.map((p) => defined(groups[p])), baseline: "ctl" });
+    const expected = linearChange(occasions, { groups, baseline: "ctl" });
+    expected.effects.forEach((effect, i) => {
+      expectClose(defined(actual.effects[i]).estimate, effect.estimate, 1e-7, `effect ${i + 1}`);
+    });
+  });
+
+  it("gives the same effects with each item as a set of its own as without itemGroups, under the names of the sets", () => {
+    const own = linearChange(SMALL_OCCASIONS, {
+      itemGroups: { item1: "own1", item2: "own2", item3: "own3", item4: "own4" },
+    });
+    const plain = linearChange(SMALL_OCCASIONS);
+    expect(own.effects.map(({ estimate }) => estimate)).toEqual(plain.effects.map(({ estimate }) => estimate));
+    expect(plain.effects.map(({ itemGroup }) => itemGroup)).toEqual(["item1", "item2", "item3", "item4"]);
+    expect(own.effects.map(({ itemGroup }) => itemGroup)).toEqual(["own1", "own2", "own3", "own4"]);
+  });
+
+  it("leaves a person out of an item at which a response is missing, as a person who did not change on it", () => {
+    const reference = changeCase("two occasions with 10%");
+    const occasions = changeOccasions(reference);
+    const options = changeOptions(reference);
+    const items = defined(occasions[0]).itemIds.length;
+    const unchanged = occasions.map(({ responses }, t) =>
+      responseMatrix(
+        responses.map((row, person) =>
+          row.map((response, item) => {
+            const missing = occasions.some((occasion) => defined(occasion.responses[person])[item] === null);
+            return missing ? t * 0 : response;
+          }),
+        ),
+      ),
+    );
+    expect(unchanged.every((matrix) => matrix.responses.every((row) => row.length === items))).toBe(true);
+    const actual = linearChange(occasions, options);
+    const filled = linearChange(unchanged, options);
+    actual.effects.forEach((effect, i) => {
+      expectClose(defined(filled.effects[i]).estimate, effect.estimate, 1e-9, `effect ${i + 1}`);
+    });
+    expectClose(filled.logLikelihood, actual.logLikelihood, 1e-9);
+  });
+
+  it("names the group of everyone `all`, and takes the first person's group as the baseline", () => {
+    expect(new Set(linearChange(SMALL_OCCASIONS).effects.map(({ group }) => group))).toEqual(new Set(["all"]));
+    const effects = linearChange(SMALL_OCCASIONS, { groups: ["x", "y", "x", "y", "x", "y"] }).effects;
+    expect(effects.map(({ group }) => group)).toEqual(["x", "y", "x", "y", "x", "y", "x", "y"]);
+  });
+
+  it("reports an effect at infinity, where every person who changed changed one way, as not converged", () => {
+    const before = responseMatrix(Array.from({ length: 40 }, () => [0]));
+    const after = responseMatrix(Array.from({ length: 40 }, (_, person) => [person < 20 ? 1 : 0]));
+    const actual: LinearChange = linearChange([before, after]);
+    expect(actual.converged).toBe(false);
+    expect(defined(actual.effects[0]).estimate).toBeGreaterThan(20);
+  });
+
+  it("reports non-convergence within the iteration limit, and converges faster at a looser tolerance", () => {
+    const reference = changeCase("three occasions");
+    const occasions = changeOccasions(reference);
+    const options = changeOptions(reference);
+    expect(linearChange(occasions, { ...options, maxIterations: 1 })).toMatchObject({
+      converged: false,
+      iterations: 1,
+    });
+    const strict = linearChange(occasions, options);
+    const loose = linearChange(occasions, { ...options, tolerance: 1e-2 });
+    expect(loose.iterations).toBeLessThan(strict.iterations);
+  });
+
+  it("rejects options of other types from JavaScript", () => {
+    expect(() => linearChange(SMALL_OCCASIONS, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => linearChange(SMALL_OCCASIONS, { tolerance: -1 })).toThrow(
+      "The option tolerance must be a non-negative number, found -1.",
+    );
+    expect(() => linearChange(SMALL_OCCASIONS, { maxIterations: JSON.parse('"5"') })).toThrow(DataError);
+    expect(() => linearChange(SMALL_OCCASIONS, { groups: JSON.parse('"ab"') })).toThrow(
+      'The option groups must be an array of group names, found "ab".',
+    );
+    expect(() => linearChange(SMALL_OCCASIONS, { itemGroups: JSON.parse("[]") })).toThrow(
+      "The option itemGroups must be an object of set names by item id, found an array.",
+    );
+  });
+
+  it("rejects occasions that are not 2 to 12 matrices of the same persons and items with responses 0 and 1", () => {
+    const [first, second] = SMALL_OCCASIONS;
+    expect(() => linearChange(JSON.parse("null"))).toThrow(
+      "The occasions must be an array of response matrices, found null.",
+    );
+    expect(() => linearChange([defined(first)])).toThrow("Linear change needs 2 to 12 occasions, found 1.");
+    expect(() => linearChange(Array.from({ length: 13 }, () => defined(first)))).toThrow("found 13");
+    expect(() => linearChange([defined(first), JSON.parse("{}")])).toThrow(
+      "A response matrix needs the arrays personIds, itemIds and responses.",
+    );
+    const fewer = responseMatrix(defined(second).responses.slice(0, 5));
+    expect(() => linearChange([defined(first), fewer])).toThrow("Occasion 2 lists other persons than occasion 1");
+    const narrower = responseMatrix(defined(second).responses.map((row) => row.slice(0, 3)));
+    expect(() => linearChange([defined(first), narrower])).toThrow("Occasion 2 lists other items than occasion 1");
+    const three = responseMatrix(defined(second).responses.map((row, p) => (p === 1 ? [3, ...row.slice(1)] : row)));
+    expect(() => linearChange([defined(first), three])).toThrow(
+      'The response of person "person2" to item "item1" at occasion 2 must be 0, 1 or null, found 3.',
+    );
+  });
+
+  it("rejects groups and sets that do not name every person and item, and a baseline that is nobody's", () => {
+    const groups = ["a", "a", "b", "b", "a", "b"];
+    expect(() => linearChange(SMALL_OCCASIONS, { groups: groups.slice(0, 5) })).toThrow(
+      "The option groups needs a group name for each of the 6 persons.",
+    );
+    expect(() => linearChange(SMALL_OCCASIONS, { groups, baseline: "c" })).toThrow(
+      'The baseline "c" is not the group of any person.',
+    );
+    expect(() => linearChange(SMALL_OCCASIONS, { itemGroups: { item1: "a" } })).toThrow(
+      'The option itemGroups needs a set name for item "item2", found undefined.',
+    );
+    expect(() => linearChange(SMALL_OCCASIONS, { itemGroups: { ...POOLED_ITEMS, item9: "a" } })).toThrow(
+      'The option itemGroups names "item9", which is not an item.',
+    );
+  });
+
+  it("rejects an effect that no person changed on", () => {
+    const before = responseMatrix([
+      [0, 0],
+      [1, 1],
+      [0, 1],
+      [1, 0],
+    ]);
+    const after = responseMatrix([
+      [1, 0],
+      [1, 1],
+      [1, 1],
+      [1, 0],
+    ]);
+    expect(() => linearChange([before, after])).toThrow(
+      'The effect of item group "item2" at occasion 2 in group "all" has no unique estimate',
+    );
+  });
+});
+
+interface PolytomousReference {
+  readonly name: string;
+  readonly model: "partial-credit" | "rating-scale";
+  readonly intercept: boolean;
+  readonly dataset: number;
+  readonly features: ItemFeatures;
+  readonly effects: { name: string; estimate: number; standardError: number }[];
+  readonly sd: number;
+  readonly steps: number[][];
+  readonly logLikelihood: number;
+  readonly aic: number;
+  readonly bic: number;
+  readonly raschLogLikelihood: number;
+  readonly chiSquare: number;
+  readonly degreesOfFreedom: number;
+  readonly significance: number;
+  readonly tamEstimates: number[];
+}
+const polytomousCases: readonly PolytomousReference[] = JSON.parse(JSON.stringify(polytomousFixture.cases));
+
+/** The responses of a dataset of the polytomous LLTM fixture. */
+function polytomousData(dataset: number): ResponseMatrix {
+  const { itemIds, responses } = defined(polytomousFixture.datasets[dataset]);
+  return responseMatrix(responses as (number | null)[][], { itemIds });
+}
+
+/** Estimates the LLTM of a case of the polytomous fixture, to the tolerance that matches the base R maximum. */
+function polytomousModel(reference: PolytomousReference): Lltm<ThresholdParameters> {
+  return lltm(polytomousData(reference.dataset), reference.features, {
+    model: reference.model,
+    intercept: reference.intercept,
+    tolerance: LLTM_EM_TOLERANCE,
+    maxIterations: 10_000,
+  });
+}
+
+/** The models of the polytomous cases, estimated once. */
+const POLYTOMOUS_FITTED = new Map<number, Lltm<ThresholdParameters>>();
+
+function polytomousFitted(index: number): Lltm<ThresholdParameters> {
+  let model = POLYTOMOUS_FITTED.get(index);
+  if (model === undefined) {
+    model = polytomousModel(defined(polytomousCases[index]));
+    POLYTOMOUS_FITTED.set(index, model);
   }
   return model;
 }
@@ -651,6 +984,200 @@ describe("lltm", () => {
     expectClose(defined(group).mean, 0, 1e-3);
     expectClose(defined(group).sd, model.sd, 1e-3);
     expectClose(calibration.logLikelihood, model.logLikelihood, 1e-3);
+  });
+
+  polytomousCases.forEach((reference, index) => {
+    it(`matches the base R maximum, and TAM, for the ${reference.model} model: ${reference.name}`, () => {
+      const actual = polytomousFitted(index);
+      expect(actual.converged).toBe(true);
+      expect(actual.effects.map(({ name }) => name)).toEqual(reference.effects.map(({ name }) => name));
+      reference.effects.forEach((expected, j) => {
+        const effect = defined(actual.effects[j]);
+        expectClose(effect.estimate, expected.estimate, LLTM_PARAMETER_TOLERANCE, `${expected.name} estimate`);
+        expectClose(effect.estimate, defined(reference.tamEstimates[j]), TAM_TOLERANCE, `${expected.name} against TAM`);
+        expectClose(
+          effect.standardError,
+          expected.standardError,
+          LLTM_STANDARD_ERROR_TOLERANCE * expected.standardError,
+          `${expected.name} error`,
+        );
+      });
+      expectClose(actual.sd, reference.sd, LLTM_PARAMETER_TOLERANCE, "sd of theta");
+      expect(actual.items.map(({ id }) => id)).toEqual(defined(polytomousFixture.datasets[reference.dataset]).itemIds);
+      reference.steps.forEach((expected, i) => {
+        const { model, parameters } = defined(actual.items[i]);
+        expect(model).toBe(partialCredit);
+        expect(parameters.a).toBe(1);
+        expect(parameters.b).toHaveLength(expected.length);
+        expected.forEach((step, j) => {
+          expectClose(defined(parameters.b[j]), step, LLTM_PARAMETER_TOLERANCE, `step ${j + 1} of item ${i + 1}`);
+        });
+      });
+      expectClose(actual.logLikelihood, reference.logLikelihood, LLTM_LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
+      expectClose(actual.aic, reference.aic, 2 * LLTM_LOG_LIKELIHOOD_TOLERANCE, "AIC");
+      expectClose(actual.bic, reference.bic, 2 * LLTM_LOG_LIKELIHOOD_TOLERANCE, "BIC");
+      const { comparison } = actual;
+      expectClose(comparison.raschLogLikelihood, reference.raschLogLikelihood, LLTM_LOG_LIKELIHOOD_TOLERANCE, "Rasch");
+      expectClose(comparison.chiSquare, reference.chiSquare, 2 * LLTM_LOG_LIKELIHOOD_TOLERANCE, "chi-square");
+      expect(comparison.degreesOfFreedom).toBe(reference.degreesOfFreedom);
+      expectClose(comparison.significance, reference.significance, 1e-9, "significance");
+    });
+  });
+
+  it("keeps the features' locations against the Rasch model where they hold, and rejects them where they do not", () => {
+    const [intercept, withoutIntercept, scale, mixed, residual] = polytomousCases.map(
+      (_, index) => polytomousFitted(index).comparison,
+    );
+    expect(defined(intercept).significance).toBeGreaterThan(0.05);
+    expect(defined(scale).significance).toBeGreaterThan(0.05);
+    expect(defined(mixed).significance).toBeGreaterThan(0.05);
+    expect(defined(withoutIntercept).significance).toBeLessThan(1e-3);
+    expect(defined(residual).significance).toBeLessThan(1e-10);
+  });
+
+  it("gives each item steps whose mean is the location the features give it", () => {
+    polytomousCases.forEach((reference, index) => {
+      const { effects, items } = polytomousFitted(index);
+      Object.entries(reference.features).forEach(([id, features], i) => {
+        const location = effects.reduce(
+          (sum, { name, estimate }) => sum + estimate * (name === "(intercept)" ? 1 : defined(features[name])),
+          0,
+        );
+        const steps = defined(items[i]).parameters.b;
+        expect(steps.reduce((sum, step) => sum + step, 0) / steps.length, id).toBeCloseTo(location, 10);
+      });
+    });
+  });
+
+  it("gives the items of a rating scale the same distances between their steps", () => {
+    const { items } = polytomousFitted(2);
+    const [first] = items;
+    const gaps = (b: readonly number[]): number[] => b.slice(1).map((step, j) => step - defined(b[j]));
+    for (const { parameters } of items) {
+      gaps(parameters.b).forEach((gap, j) => {
+        expect(gap).toBeCloseTo(defined(gaps(defined(first).parameters.b)[j]), 10);
+      });
+    }
+    expect(defined(first).parameters.b).toHaveLength(4);
+  });
+
+  it("does not depend on the order of the items under either polytomous model, each item keeping its own steps", () => {
+    for (const index of [0, 3]) {
+      const reference = defined(polytomousCases[index]);
+      const matrix = polytomousData(reference.dataset);
+      const order = matrix.itemIds.map((_, i) => matrix.itemIds.length - 1 - i);
+      const permuted = responseMatrix(
+        matrix.responses.map((row) => order.map((i) => row[i] ?? null)),
+        { itemIds: order.map((i) => defined(matrix.itemIds[i])) },
+      );
+      const base = polytomousFitted(index);
+      const result = lltm(permuted, reference.features, {
+        model: reference.model,
+        intercept: reference.intercept,
+        tolerance: LLTM_EM_TOLERANCE,
+        maxIterations: 10_000,
+      });
+      base.effects.forEach(({ estimate }, j) => {
+        expectClose(defined(result.effects[j]).estimate, estimate, LLTM_PARAMETER_TOLERANCE, `effect ${j + 1}`);
+      });
+      expectClose(result.logLikelihood, base.logLikelihood, LLTM_LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
+      order.forEach((original, position) => {
+        defined(base.items[original]).parameters.b.forEach((step, j) => {
+          expectClose(defined(result.items[position]).parameters.b[j] ?? null, step, LLTM_PARAMETER_TOLERANCE, "step");
+        });
+      });
+    }
+  });
+
+  it("gives the dichotomous model from either polytomous model of dichotomous responses", () => {
+    const reference = defined(lltmFixture.cases[0]);
+    const dichotomous = fitted(0);
+    for (const model of ["partial-credit", "rating-scale"] as const) {
+      const actual = lltm(lltmData(reference.dataset), lltmFeatures(reference), {
+        model,
+        intercept: reference.intercept,
+        tolerance: LLTM_EM_TOLERANCE,
+        maxIterations: 10_000,
+      });
+      dichotomous.effects.forEach((effect, j) => {
+        expectClose(defined(actual.effects[j]).estimate, effect.estimate, LLTM_PARAMETER_TOLERANCE, model);
+      });
+      expectClose(actual.logLikelihood, dichotomous.logLikelihood, LLTM_LOG_LIKELIHOOD_TOLERANCE, model);
+      expect(actual.aic).toBeCloseTo(dichotomous.aic, 6);
+      dichotomous.items.forEach(({ parameters }, i) => {
+        expectClose(defined(actual.items[i]).parameters.b[0] ?? null, parameters.b, LLTM_PARAMETER_TOLERANCE, model);
+      });
+    }
+  });
+
+  it("counts the free thresholds in the information criteria: one less than the categories, less one, for each set", () => {
+    const [partial, , scale, mixed] = [0, 1, 2, 3].map((index) => polytomousFitted(index));
+    const parameters = (model: Lltm<ThresholdParameters>) => (model.aic - -2 * model.logLikelihood) / 2;
+    expect(parameters(defined(partial))).toBe(4 + 1 + 8 * 2);
+    expect(parameters(defined(scale))).toBe(4 + 1 + 3);
+    expect(parameters(defined(mixed))).toBe(4 + 1 + 5 * 2 + 4 * 1);
+  });
+
+  it("recovers the effects and the standard deviation of theta of simulated partial credit responses", () => {
+    const random = createRandom(20261105);
+    const steps = [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6, 2, 3, 4, 5];
+    const open = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1];
+    const items = steps.map((count, i) => {
+      const location = -0.5 + 0.3 * count + 0.5 * defined(open[i]);
+      return { model: partialCredit, parameters: { a: 1, b: [location - 0.7, location + 0.7] } };
+    });
+    const matrix = simulateResponses(
+      items,
+      Array.from({ length: 2000 }, () => 1.2 * random.normal()),
+      random,
+    );
+    const features = Object.fromEntries(
+      steps.map((count, i) => [matrix.itemIds[i] ?? "", { steps: count, open: defined(open[i]) }]),
+    );
+    const model = lltm(matrix, features, { model: "partial-credit" });
+    for (const [effect, expected] of [
+      [model.effects[0], -0.5],
+      [model.effects[1], 0.3],
+      [model.effects[2], 0.5],
+    ] as const) {
+      const found = defined(effect);
+      expect(Math.abs(found.estimate - expected), found.name).toBeLessThan(4 * defined(found.standardError));
+    }
+    expect(Math.abs(model.sd - 1.2)).toBeLessThan(0.1);
+    expect(model.comparison.significance).toBeGreaterThan(0.001);
+    // The first item has one step and is not open: its location is -0.5 + 0.3, and its steps lie 0.7 either side of it.
+    defined(model.items[0]).parameters.b.forEach((step, j) => {
+      expect(Math.abs(step - defined([-0.9, 0.5][j]))).toBeLessThan(0.25);
+    });
+  });
+
+  it("rejects a model that is not one of the three, and responses that no model of them takes", () => {
+    const reference = defined(polytomousCases[0]);
+    const matrix = polytomousData(reference.dataset);
+    const features = reference.features;
+    expect(() => lltm(matrix, features, { model: JSON.parse('"ordinal"') })).toThrow(
+      'The option model must be "dichotomous", "partial-credit" or "rating-scale", found "ordinal".',
+    );
+    expect(() => lltm(matrix, features, { model: JSON.parse("null") })).toThrow(
+      'The option model must be "dichotomous", "partial-credit" or "rating-scale", found null.',
+    );
+    expect(() => lltm(matrix, features)).toThrow(
+      'Item "q01" has a response of 3, but the 2PL model allows responses from 0 to 1.',
+    );
+    const skipped = responseMatrix(
+      matrix.responses.map((row) => row.map((response) => (response === 2 ? 3 : response))),
+      { itemIds: matrix.itemIds },
+    );
+    expect(() => lltm(skipped, features, { model: "partial-credit" })).toThrow(
+      'Item "q01" has no response in category 2; calibration needs responses in every category up to the highest.',
+    );
+  });
+
+  it("rejects a rating scale whose items have different numbers of categories, naming the first that differs", () => {
+    const mixed = defined(polytomousCases[3]);
+    expect(() => lltm(polytomousData(mixed.dataset), mixed.features, { model: "rating-scale" })).toThrow(
+      'The rating scale needs the same number of categories for every item, found 4 for item "q01" and 3 for item "q02".',
+    );
   });
 
   it("rejects options of other types from JavaScript", () => {
@@ -962,6 +1489,95 @@ describe("documentation examples", () => {
     expect(defined(model.items[0]).parameters).toEqual({ a: 1, b: expect.closeTo(-1.06, 2), c: 0, d: 1 });
   });
 
+  it("estimates the gain of two groups on four items from 800 simulated persons, as the linear change example shows", () => {
+    const random = createRandom(5);
+    const thetas = simulateThetas(800, random);
+    const group = thetas.map((_, person) => (person < 400 ? "control" : "treated"));
+    const items = [-0.5, 0, 0.5, 1].map((b) => ({ model: twoParameterLogistic, parameters: { a: 1, b, c: 0, d: 1 } }));
+    const before = simulateResponses(items, thetas, random);
+    const gain = (person: number) => (group[person] === "treated" ? 0.8 : 0.3);
+    const after = simulateResponses(
+      items,
+      thetas.map((theta, person) => theta + gain(person)),
+      random,
+    );
+    const change = linearChange([before, after], {
+      groups: group,
+      baseline: "control",
+      itemGroups: Object.fromEntries(before.itemIds.map((id) => [id, "test"])),
+    });
+    const [control, treated] = change.effects;
+    expect([defined(control).group, defined(control).estimate, defined(control).standardError]).toEqual([
+      "control",
+      expect.closeTo(0.35, 2),
+      expect.closeTo(0.08, 2),
+    ]);
+    expect([defined(treated).group, defined(treated).estimate, defined(treated).standardError]).toEqual([
+      "treated",
+      expect.closeTo(0.35, 2),
+      expect.closeTo(0.12, 2),
+    ]);
+  });
+
+  it("explains the mean steps of six items of three categories by their steps, as the partial credit example shows", () => {
+    const random = createRandom(7);
+    const items = [1, 2, 3, 4, 5, 6].map((steps) => ({
+      model: partialCredit,
+      parameters: { a: 1, b: [-1.5 + 0.5 * steps, -0.5 + 0.5 * steps] },
+    }));
+    const responses = simulateResponses(items, simulateThetas(800, random), random);
+    const features = Object.fromEntries([1, 2, 3, 4, 5, 6].map((steps) => [`item${steps}`, { steps }]));
+    const model = lltm(responses, features, { model: "partial-credit" });
+    const [intercept, steps] = model.effects;
+    expect([defined(intercept).estimate, defined(intercept).standardError]).toEqual([
+      expect.closeTo(-1.01, 2),
+      expect.closeTo(0.07, 2),
+    ]);
+    expect([defined(steps).estimate, defined(steps).standardError]).toEqual([
+      expect.closeTo(0.51, 2),
+      expect.closeTo(0.02, 2),
+    ]);
+    expect(model.comparison.raschLogLikelihood).toBeCloseTo(-4236.6, 1);
+    expect(model.comparison).toMatchObject({ degreesOfFreedom: 4 });
+    expect(model.comparison.chiSquare).toBeCloseTo(7.13, 2);
+    expect(model.comparison.significance).toBeCloseTo(0.13, 2);
+    const [first, second] = defined(model.items[0]).parameters.b;
+    expect([defined(first), defined(second)]).toEqual([expect.closeTo(-1.04, 2), expect.closeTo(0.03, 2)]);
+  });
+
+  it("estimates the gain of six items answered twice as the effect of the later occasion on virtual items, as the recipe shows", () => {
+    const random = createRandom(9);
+    const thetas = simulateThetas(600, random);
+    const items = [-1, -0.5, 0, 0.5, 1, 1.5].map((b) => ({
+      model: twoParameterLogistic,
+      parameters: { a: 1, b, c: 0, d: 1 },
+    }));
+    const before = simulateResponses(items, thetas, random);
+    const after = simulateResponses(
+      items,
+      thetas.map((theta) => theta + 0.5),
+      random,
+    );
+    const ids = before.itemIds;
+    const stacked = responseMatrix(
+      before.responses.map((row, person) => [...row, ...(after.responses[person] ?? [])]),
+      { itemIds: [...ids.map((id) => `${id}.t1`), ...ids.map((id) => `${id}.t2`)] },
+    );
+    const features = Object.fromEntries(
+      stacked.itemIds.map((id, column) => [
+        id,
+        {
+          ...Object.fromEntries(ids.map((name, i) => [name, i === column % ids.length ? 1 : 0])),
+          time2: column >= ids.length ? 1 : 0,
+        },
+      ]),
+    );
+    const later = lltm(stacked, features, { intercept: false }).effects.at(-1);
+    expect(defined(later).name).toBe("time2");
+    expect(defined(later).estimate).toBeCloseTo(-0.44, 2);
+    expect(defined(later).standardError).toBeCloseTo(0.06, 2);
+  });
+
   it("runs the cold start of the guide: calibrate a bank, regress on features, predict a new item and calibrate it with the prior", () => {
     const rows = [
       { steps: 1, open: 0, noise: 0.2 },
@@ -1093,6 +1709,76 @@ describe("properties", () => {
         expect(Number.isFinite(regression.logLikelihood)).toBe(true);
       }),
       { numRuns: 60 },
+    );
+  });
+
+  /** Two occasions of 3 items for 40 persons in two groups, with a gain and a loss on every item in every group. */
+  const changes = fc
+    .record({
+      before: fc.array(fc.array(fc.integer({ min: 0, max: 1 }), { minLength: 3, maxLength: 3 }), {
+        minLength: 40,
+        maxLength: 40,
+      }),
+      after: fc.array(fc.array(fc.integer({ min: 0, max: 1 }), { minLength: 3, maxLength: 3 }), {
+        minLength: 40,
+        maxLength: 40,
+      }),
+    })
+    .filter(({ before, after }) =>
+      [0, 1, 2].every((item) =>
+        [0, 1].every((half) => {
+          const rows = before.map((row, person) => [defined(row[item]), defined(after[person]?.[item]), person]);
+          const inGroup = rows.filter(([, , person]) => Math.floor(defined(person) / 20) === half);
+          return (
+            inGroup.some(([first, second]) => first === 0 && second === 1) &&
+            inGroup.some(([first, second]) => first === 1 && second === 0)
+          );
+        }),
+      ),
+    );
+  const halves = Array.from({ length: 40 }, (_, person) => (person < 20 ? "first" : "second"));
+
+  it("the effects of change negate under a recoding of the responses and keep their order and count", () => {
+    fc.assert(
+      fc.property(changes, ({ before, after }) => {
+        const occasions = [before, after].map((rows) => responseMatrix(rows));
+        const recoded = [before, after].map((rows) =>
+          responseMatrix(rows.map((row) => row.map((response) => 1 - response))),
+        );
+        const base = linearChange(occasions, { groups: halves });
+        const flipped = linearChange(recoded, { groups: halves });
+        expect(base.converged).toBe(true);
+        expect(base.effects).toHaveLength(6);
+        base.effects.forEach((effect, i) => {
+          expectClose(defined(flipped.effects[i]).estimate, -effect.estimate, 1e-7, `effect ${i + 1}`);
+          expect(effect.standardError).toBeGreaterThan(0);
+        });
+        expectClose(flipped.logLikelihood, base.logLikelihood, 1e-7);
+      }),
+      { numRuns: 30 },
+    );
+  });
+
+  it("the effects of change do not depend on the order of the persons", () => {
+    fc.assert(
+      fc.property(changes, fc.integer({ min: 1, max: 39 }), ({ before, after }, turn) => {
+        const rotate = <T>(rows: readonly T[]): T[] => [...rows.slice(turn), ...rows.slice(0, turn)];
+        const base = linearChange(
+          [before, after].map((rows) => responseMatrix(rows)),
+          { groups: halves },
+        );
+        const turned = linearChange(
+          [before, after].map((rows) => responseMatrix(rotate(rows))),
+          {
+            groups: rotate(halves),
+            baseline: "first",
+          },
+        );
+        base.effects.forEach((effect, i) => {
+          expectClose(defined(turned.effects[i]).estimate, effect.estimate, 1e-7, `effect ${i + 1}`);
+        });
+      }),
+      { numRuns: 30 },
     );
   });
 });

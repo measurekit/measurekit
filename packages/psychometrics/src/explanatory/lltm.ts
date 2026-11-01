@@ -11,16 +11,31 @@ import type { ResponseRecords } from "../data/response-records.js";
 import { fitLinearRasch, type LinearRaschFit, type LocationRow } from "../irt/linear-rasch.js";
 import { type LogisticParameters, twoParameterLogistic } from "../irt/logistic.js";
 import type { TestItem } from "../irt/model.js";
+import { partialCredit } from "../irt/partial-credit.js";
 import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
 import { type CompressedResponses, categoryCounts, checkCategories, compressResponses } from "../irt/responses.js";
-
+import type { ThresholdParameters } from "../irt/thresholds.js";
 import { checkFullRank, type Design, designMatrix, type FeatureEffect, type ItemFeatures } from "./features.js";
 
 /** How the standard errors of the effects of an LLTM are computed. */
 export type LltmStandardErrors = "none" | "hessian";
 
+/**
+ * The responses an LLTM explains: `"dichotomous"`, items scored 0 or 1; `"partial-credit"`, items of any number of
+ * categories, each with thresholds of its own; `"rating-scale"`, items that share one number of categories and one set
+ * of thresholds.
+ */
+export type LltmModel = "dichotomous" | "partial-credit" | "rating-scale";
+
 /** Options of {@link lltm}. */
 export interface LltmOptions {
+  /**
+   * The model of the responses. With `"partial-credit"` and `"rating-scale"` the features explain the location of each
+   * item, the mean of its step difficulties, and the thresholds around it are estimated.
+   *
+   * @defaultValue `"dichotomous"`
+   */
+  readonly model?: LltmModel;
   /**
    * Whether the difficulties have an intercept: the difficulty of an item whose features are all 0.
    *
@@ -66,19 +81,31 @@ export interface RaschComparison {
   readonly significance: number;
 }
 
-/** A linear logistic test model estimated by marginal maximum likelihood. */
-export interface Lltm {
+/**
+ * A linear logistic test model estimated by marginal maximum likelihood.
+ *
+ * @typeParam TParameters - The parameters of its items: those of the 2PL for the dichotomous model, and of the partial
+ * credit model for the others.
+ */
+export interface Lltm<TParameters = LogisticParameters> {
   /** The effects on difficulty: the intercept, if any, then the features in order of their first appearance. */
   readonly effects: readonly FeatureEffect[];
   /** The standard deviation of theta, whose mean is 0 on the scale of the effects. */
   readonly sd: number;
-  /** The items with the difficulties the effects give them: a = 1, b = the intercept plus xᵀη, c = 0 and d = 1. */
-  readonly items: readonly TestItem<LogisticParameters>[];
-  /** The test of the features' difficulties against the Rasch model. */
+  /**
+   * The items with the difficulties the effects give them. For `"dichotomous"`, 2PL items with a = 1, b = the intercept
+   * plus xᵀη, c = 0 and d = 1. For the other models, partial credit items with a = 1 and the steps b_j = the intercept
+   * plus xᵀη plus the threshold τ_j of the item.
+   */
+  readonly items: readonly TestItem<TParameters>[];
+  /** The test of the features' difficulties against the Rasch model of the same thresholds. */
   readonly comparison: RaschComparison;
   /** The marginal log-likelihood at the estimates. */
   readonly logLikelihood: number;
-  /** Akaike's information criterion: -2 logLikelihood + 2p, with p the effects and the standard deviation of theta. */
+  /**
+   * Akaike's information criterion: -2 logLikelihood + 2p, with p the effects, the standard deviation of theta and the
+   * free thresholds.
+   */
   readonly aic: number;
   /** The Bayesian information criterion: -2 logLikelihood + p ln n, with n the number of persons with a response. */
   readonly bic: number;
@@ -91,6 +118,7 @@ export interface Lltm {
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
 const STANDARD_ERRORS: readonly LltmStandardErrors[] = ["none", "hessian"];
+const MODELS: readonly LltmModel[] = ["dichotomous", "partial-credit", "rating-scale"];
 
 /**
  * Estimates the linear logistic test model (LLTM): the difficulty of each dichotomous item is a sum of the effects of
@@ -154,21 +182,73 @@ const STANDARD_ERRORS: readonly LltmStandardErrors[] = ["none", "hessian"];
  * @see {@link https://doi.org/10.1016/0001-6918(73)90003-6 | Fischer (1973)}
  * @see {@link https://doi.org/10.1007/BF02293801 | Bock and Aitkin (1981)}
  */
-export function lltm(data: ResponseMatrix | ResponseRecords, features: ItemFeatures, options: LltmOptions = {}): Lltm {
+export function lltm(
+  data: ResponseMatrix | ResponseRecords,
+  features: ItemFeatures,
+  options?: LltmOptions & { readonly model?: "dichotomous" },
+): Lltm;
+/**
+ * Estimates the linear logistic test model of items with any number of categories, by the partial credit or the rating
+ * scale model: the features explain the location of each item and its thresholds are estimated.
+ *
+ * @remarks
+ * Item i gives a person at theta category k with probability P_k ∝ exp(Σ_(j ≤ k) (θ - b_i - τ_j)), with b_i = x_iᵀη the
+ * location of the item, plus an intercept if there is one, and τ the thresholds, which sum to 0: those of each item
+ * for `"partial-credit"`, and one set that all items share for `"rating-scale"`. Everything else is as for the
+ * dichotomous model, and the Rasch model of the comparison gives each item a location of its own with the same
+ * thresholds. Every item needs responses in every category from 0 to its highest, at least two; for the rating scale,
+ * every item has the same highest category.
+ *
+ * @param data - The responses: a response matrix or response records, scored from 0.
+ * @param features - The features of each item by item id, each a finite number by feature name.
+ * @param options - The model and how it is estimated.
+ * @returns The effects of the features on the locations, the standard deviation of theta, the items as partial credit
+ * items and the test against the Rasch model.
+ * @throws `DataError` as the dichotomous model does, and when an item has responses in fewer than two categories or
+ * skips one, or, for the rating scale, the items differ in their highest category.
+ * @see {@link https://doi.org/10.1007/978-1-4612-4230-7_19 | Fischer and Ponocny (1995)}
+ */
+export function lltm(
+  data: ResponseMatrix | ResponseRecords,
+  features: ItemFeatures,
+  options: LltmOptions & { readonly model: "partial-credit" | "rating-scale" },
+): Lltm<ThresholdParameters>;
+/**
+ * Estimates the linear logistic test model of the model that `options.model` names, when it is not known to the compiler
+ * which: the items are those of the dichotomous or the partial credit model.
+ *
+ * @param data - The responses: a response matrix or response records, scored from 0.
+ * @param features - The features of each item by item id, each a finite number by feature name.
+ * @param options - The model and how it is estimated.
+ * @returns As the call for the model that `options.model` names.
+ * @throws `DataError` as the call for that model does.
+ */
+export function lltm(
+  data: ResponseMatrix | ResponseRecords,
+  features: ItemFeatures,
+  options?: LltmOptions,
+): Lltm<LogisticParameters | ThresholdParameters>;
+export function lltm(
+  data: ResponseMatrix | ResponseRecords,
+  features: ItemFeatures,
+  options: LltmOptions = {},
+): Lltm<LogisticParameters | ThresholdParameters> {
   checkOptions(options);
   const {
+    model = "dichotomous",
     intercept = true,
     quadrature = {},
     standardErrors = "hessian",
     tolerance = DEFAULT_TOLERANCE,
     maxIterations = DEFAULT_MAX_ITERATIONS,
   } = options;
+  checkChoice(model, "The option model", MODELS);
   checkBoolean(intercept, "The option intercept");
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERRORS);
   checkStopping(tolerance, maxIterations);
   const rule = quadratureRule(quadrature);
   const responses = compressResponses(data);
-  checkDichotomous(responses);
+  const scale = scaleOf(responses, model);
   const itemIds = responses.itemIds;
   const design = designMatrix(itemIds, features, intercept);
   const effectCount = design.names.length;
@@ -178,7 +258,7 @@ export function lltm(data: ResponseMatrix | ResponseRecords, features: ItemFeatu
     );
   }
   checkFullRank(design);
-  const common = { data: responses, setOf: new Int32Array(itemIds.length), categoryCounts: Int32Array.of(2) };
+  const common = { data: responses, setOf: scale.setOf, categoryCounts: scale.categoryCounts };
   const featureCount = effectCount - (intercept ? 1 : 0);
   const fit = fitLinearRasch(
     {
@@ -194,7 +274,7 @@ export function lltm(data: ResponseMatrix | ResponseRecords, features: ItemFeatu
     { rule, tolerance, maxIterations, standardErrors: false },
   );
   const effects = effectsOf(fit, design.names, intercept);
-  const parameterCount = effectCount + 1;
+  const parameterCount = effectCount + 1 + scale.freeThresholds;
   const persons = responses.offsets.reduce(
     (count, end, p) => count + (end > (responses.offsets[p - 1] ?? 0) ? 1 : 0),
     0,
@@ -202,11 +282,9 @@ export function lltm(data: ResponseMatrix | ResponseRecords, features: ItemFeatu
   return {
     effects,
     sd: fit.sd,
-    items: itemIds.map((id, i) => ({
-      id,
-      model: twoParameterLogistic,
-      parameters: { a: 1, b: difficulty(design, effects, i), c: 0, d: 1 },
-    })),
+    items: itemIds.map((id, i) =>
+      itemOf(id, difficulty(design, effects, i), model, fit.thresholds[scale.setOf[i] ?? 0]),
+    ),
     comparison: comparison(fit.logLikelihood, rasch.logLikelihood, itemIds.length - effectCount),
     logLikelihood: fit.logLikelihood,
     aic: -2 * fit.logLikelihood + 2 * parameterCount,
@@ -216,15 +294,49 @@ export function lltm(data: ResponseMatrix | ResponseRecords, features: ItemFeatu
   };
 }
 
+/** How the categories of the items are grouped into sets of thresholds, as the engine takes them. */
+interface Scale {
+  /** The set of thresholds of each item. */
+  readonly setOf: Int32Array;
+  /** The number of categories of each set. */
+  readonly categoryCounts: Int32Array;
+  /** The thresholds the sets leave free: the sum of each set's categories less 2, as they sum to 0. */
+  readonly freeThresholds: number;
+}
+
 /**
- * Checks that every item has responses in both categories and none above 1.
+ * Checks the responses against the model and returns the sets of thresholds: one set of two categories for
+ * `"dichotomous"`, one of the items' common number of categories for `"rating-scale"`, and one for each item for
+ * `"partial-credit"`.
  *
- * @throws `DataError` naming the first item that does not.
+ * @throws `DataError` naming the first item that has a response above the model's categories, responses in fewer than
+ * two categories, or no response in a category below its highest; and, for the rating scale, the first item whose
+ * categories are not the first item's.
  */
-function checkDichotomous(responses: CompressedResponses): void {
-  categoryCounts(responses).forEach((counts, item) => {
-    checkCategories(responses.itemIds[item] ?? "", twoParameterLogistic, counts);
-  });
+function scaleOf(responses: CompressedResponses, model: LltmModel): Scale {
+  const items = responses.itemIds.length;
+  const counts = categoryCounts(responses).map((observed, item) =>
+    checkCategories(
+      responses.itemIds[item] ?? "",
+      model === "dichotomous" ? twoParameterLogistic : partialCredit,
+      observed,
+    ),
+  );
+  if (model === "partial-credit") {
+    return {
+      setOf: Int32Array.from({ length: items }, (_, i) => i),
+      categoryCounts: Int32Array.from(counts),
+      freeThresholds: counts.reduce((sum, categories) => sum + categories - 2, 0),
+    };
+  }
+  const shared = counts[0] ?? 2;
+  const odd = counts.findIndex((categories) => categories !== shared);
+  if (odd >= 0) {
+    throw new DataError(
+      `The rating scale needs the same number of categories for every item, found ${shared} for item "${responses.itemIds[0]}" and ${counts[odd]} for item "${responses.itemIds[odd]}".`,
+    );
+  }
+  return { setOf: new Int32Array(items), categoryCounts: Int32Array.of(shared), freeThresholds: shared - 2 };
 }
 
 /** Returns the location of each item as its row of the design, from column `first`: the feature effects. */
@@ -235,6 +347,22 @@ function featureRows({ names, matrix }: Design, first: number): LocationRow[] {
     indices,
     coefficients: Float64Array.from(indices, (j) => matrix[i * columns + first + j] ?? 0),
   }));
+}
+
+/**
+ * Returns the item with difficulty `difficulty`: a 2PL item for the dichotomous model, and otherwise a partial credit
+ * item whose steps are the difficulty plus the item's thresholds.
+ */
+function itemOf(
+  id: string,
+  difficulty: number,
+  model: LltmModel,
+  thresholds: Float64Array | undefined,
+): TestItem<LogisticParameters> | TestItem<ThresholdParameters> {
+  if (model === "dichotomous") {
+    return { id, model: twoParameterLogistic, parameters: { a: 1, b: difficulty, c: 0, d: 1 } };
+  }
+  return { id, model: partialCredit, parameters: { a: 1, b: Array.from(thresholds ?? [], (tau) => difficulty + tau) } };
 }
 
 /** Returns a location of its own for each of `count` items. */

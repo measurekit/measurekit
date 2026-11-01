@@ -1,7 +1,8 @@
 # Explanatory item response theory
 
 `@measurekit/psychometrics/explanatory` explains the parameters of items by their features, such as the number of steps
-of a task or whether its response is open, and predicts the parameters of items that nobody has answered yet.
+of a task or whether its response is open, predicts the parameters of items that nobody has answered yet, and estimates
+the change of persons between occasions, by item and group.
 
 ```mermaid
 flowchart LR
@@ -11,18 +12,22 @@ flowchart LR
   R -->|predictItemParameter| P["Mean and sd of its parameter"]
   P -->|"normalPrior or logNormalPrior in itemPriors"| N[Calibration of the new item on the bank's scale]
   D[Responses to the items] -.->|lltm| T[Do the features account for the difficulties?]
+  O[Responses of the same persons at 2 to 12 occasions] -->|linearChange| E[Trend and group effects on each set of items]
 ```
 
 | Function                | Estimates                                                                   | From                          |
 | ----------------------- | --------------------------------------------------------------------------- | ----------------------------- |
 | `lltm`                  | The effects of features on difficulty, and the test against the Rasch model | Responses, by marginal ML     |
+| `linearChange`          | The change of each set of items between occasions, for each group           | Responses, by conditional ML  |
 | `itemFeatureRegression` | The effects on a parameter and the residual between items                   | A calibration, by REML        |
 | `predictItemParameter`  | The parameter of a new item, its mean and sd                                | A regression and the features |
 
 The LLTM tests from the responses whether features account for the difficulties; the regression of a calibration's
 estimates predicts a new item with a standard deviation that includes the variation between items, which becomes the
-prior of the item's first calibration. The LLTM is validated against a base R maximum with mirt and eRm as cross-checks, the regression against
-base R and metafor ([validation](validation.md)).
+prior of the item's first calibration. `linearChange` measures how persons changed on each item with a trait of their
+own for every person and item. The LLTM is validated against a base R maximum with mirt, eRm and TAM as cross-checks, the
+regression against base R and metafor, the change against glm and base R with eRm as a cross-check
+([validation](validation.md)).
 
 ## The linear logistic test model
 
@@ -59,22 +64,23 @@ model.items[0]?.parameters; // { a: 1, b: -1.06, c: 0, d: 1 }
 `data` is a [response matrix or response records](data.md) of dichotomous responses; `features` are the
 [features by item id](#features) of every item in it.
 
-| Option           | Default        | Valid range             | Meaning                                                              |
-| ---------------- | -------------- | ----------------------- | -------------------------------------------------------------------- |
-| `intercept`      | `true`         | `true` or `false`       | Whether the difficulties have an intercept                           |
-| `quadrature`     | 61 rectangular | as `calibrate`          | The rule over theta                                                  |
-| `standardErrors` | `"hessian"`    | `"none"` or `"hessian"` | The Hessian of the marginal log-likelihood, by central differences   |
-| `tolerance`      | `1e-4`         | non-negative            | EM stops when no parameter changes by more than this in an iteration |
-| `maxIterations`  | `500`          | positive integer        | The most EM iterations                                               |
+| Option           | Default         | Valid range                                           | Meaning                                                                                      |
+| ---------------- | --------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `model`          | `"dichotomous"` | `"dichotomous"`, `"partial-credit"`, `"rating-scale"` | The responses explained: [items of 2 categories, or several](#items-with-several-categories) |
+| `intercept`      | `true`          | `true` or `false`                                     | Whether the difficulties have an intercept                                                   |
+| `quadrature`     | 61 rectangular  | as `calibrate`                                        | The rule over theta                                                                          |
+| `standardErrors` | `"hessian"`     | `"none"` or `"hessian"`                               | The Hessian of the marginal log-likelihood, by central differences                           |
+| `tolerance`      | `1e-4`          | non-negative                                          | EM stops when no parameter changes by more than this in an iteration                         |
+| `maxIterations`  | `500`           | positive integer                                      | The most EM iterations                                                                       |
 
-| Result                        | Meaning                                                                                                                |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `effects`                     | `{ name, estimate, standardError }` for the intercept, named `"(intercept)"`, and each feature, on difficulty          |
-| `sd`                          | σ, the standard deviation of theta, whose mean is 0                                                                    |
-| `items`                       | Each item with `a = 1`, `b` its difficulty from the effects, `c = 0` and `d = 1`, as a calibration's items             |
-| `comparison`                  | The likelihood-ratio test against the Rasch model                                                                      |
-| `logLikelihood`, `aic`, `bic` | The marginal log-likelihood; -2 ℓ + 2p and -2 ℓ + p ln n, p the effects and σ, n the persons with a response           |
-| `converged`, `iterations`     | Whether EM reached `tolerance` within `maxIterations` for the LLTM and for the Rasch model; the iterations of the LLTM |
+| Result                        | Meaning                                                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `effects`                     | `{ name, estimate, standardError }` for the intercept, named `"(intercept)"`, and each feature, on difficulty                                                                                    |
+| `sd`                          | σ, the standard deviation of theta, whose mean is 0                                                                                                                                              |
+| `items`                       | Each item with `a = 1`, `b` its difficulty from the effects, `c = 0` and `d = 1`, as a calibration's items; for the other models, partial credit items whose steps `b` add the item's thresholds |
+| `comparison`                  | The likelihood-ratio test against the Rasch model                                                                                                                                                |
+| `logLikelihood`, `aic`, `bic` | The marginal log-likelihood; -2 ℓ + 2p and -2 ℓ + p ln n, p the effects, σ and the free thresholds, n the persons with a response                                                                |
+| `converged`, `iterations`     | Whether EM reached `tolerance` within `maxIterations` for the LLTM and for the Rasch model; the iterations of the LLTM                                                                           |
 
 - **Scale.** Discrimination is 1 and theta is N(0, σ²), so effects are in logits on the Rasch scale. With an intercept,
   the effect of a feature is its change of the difficulty for one unit, and the intercept is the difficulty of an item
@@ -84,8 +90,9 @@ model.items[0]?.parameters; // { a: 1, b: -1.06, c: 0, d: 1 }
   the effects, and `significance` the probability of a chi-square at least that large if the features account for the
   difficulties. A small value says that items with the same features still differ. The test is of difficulty only: it
   assumes the model of responses holds for both, and a calibration with 2PL slopes is a different model.
-- **Items.** Every item needs responses in both categories and none above 1; a polytomous LLTM is not included. Persons
-  without responses change nothing and are not counted in the BIC.
+- **Items.** With the default model, every item needs responses in both categories and none above 1; the other models
+  [take more categories](#items-with-several-categories). Persons without responses change nothing and are not counted
+  in the BIC.
 - **Valid input.** More items than effects, and effects that no combination of the others reproduces: a constant
   feature with an intercept, or a feature that is a multiple of another, throws `DataError` naming the effect. A feature
   that is 0 or 1 for every item belongs to the design as any other.
@@ -99,6 +106,184 @@ model.items[0]?.parameters; // { a: 1, b: -1.06, c: 0, d: 1 }
 data needs a finite number for each feature that any item has. A categorical feature is one 0/1 column for each of its
 categories but one. The effects are ordered by their first appearance among the items, after the intercept, and
 features of ids that are not items are ignored.
+
+### Items with several categories
+
+`model: "partial-credit"` and `model: "rating-scale"` explain items scored from 0 to any highest category. The features
+explain the location of each item, the mean of its step difficulties, and the thresholds around it are estimated: item i
+gives a person at θ category k with probability P_k ∝ exp(Σ over j ≤ k of (θ - b_i - τ_j)), b_i = x_iᵀη, with the
+thresholds τ of a set summing to 0.
+
+```mermaid
+flowchart LR
+  F[Features of the item] -->|"effects η"| L["Location b: the mean of its steps"]
+  T["Thresholds τ, summing to 0"] --> S["Steps of the item: b + τ"]
+  L --> S
+  S --> P["Probability of each category"]
+```
+
+| `model`            | Thresholds                   | Categories of the items                    |
+| ------------------ | ---------------------------- | ------------------------------------------ |
+| `"dichotomous"`    | none: two categories         | 2                                          |
+| `"partial-credit"` | Each item has its own        | Any number from 2; they may differ by item |
+| `"rating-scale"`   | One set, shared by all items | The same for every item                    |
+
+```ts
+import { createRandom, lltm, partialCredit, simulateResponses, simulateThetas } from "@measurekit/psychometrics";
+
+// Six items of three categories: the mean step of item i is -1 + 0.5 per step, and its thresholds are -0.5 and 0.5.
+const random = createRandom(7);
+const items = [1, 2, 3, 4, 5, 6].map((steps) => ({
+  model: partialCredit,
+  parameters: { a: 1, b: [-1.5 + 0.5 * steps, -0.5 + 0.5 * steps] },
+}));
+const responses = simulateResponses(items, simulateThetas(800, random), random);
+const features = Object.fromEntries([1, 2, 3, 4, 5, 6].map((steps) => [`item${steps}`, { steps }]));
+const model = lltm(responses, features, { model: "partial-credit" });
+model.effects; // (intercept) -1.01 (SE 0.07), steps 0.51 (SE 0.02)
+model.comparison; // { raschLogLikelihood: -4236.6, chiSquare: 7.13, degreesOfFreedom: 4, significance: 0.13, ... }
+model.items[0]?.parameters; // { a: 1, b: [-1.04, 0.03] }
+```
+
+- **Result.** The effects, σ and the test are those of the dichotomous model, and `items` are partial credit items with
+  `a = 1`, each step the item's difficulty from the effects plus its threshold. The mean of an item's steps is its
+  difficulty. The Rasch model of the test gives each item a location of its own and the same thresholds, so the degrees
+  of freedom are still the items less the effects, and the information criteria count the free thresholds: the
+  categories of a set less 2.
+- **Items.** Each item needs responses in every category from 0 to its highest, and at least two categories, as in a
+  calibration. With the rating scale every item has the same highest category, as the thresholds are shared.
+- **Two categories.** Both models give the dichotomous model for items of two categories.
+- **Features of single steps.** The features explain an item's location. A step with features of its own, as in the
+  linear partial credit model of Fischer and Ponocny (1995) with a design for each step, is not included.
+
+## Linear change
+
+`linearChange(occasions, options)` estimates the linear logistic model for change (LLRA; Fischer, 1995) of the same
+persons answering the same items at 2 to 12 occasions. Each person has a trait of their own on each item, so the
+change of an item is measured without assuming that the items measure one trait.
+
+```mermaid
+flowchart LR
+  R["One person's responses to one item,<br/>0 or 1 at each occasion"] -->|"condition on the number correct"| C["The person's trait drops out"]
+  C --> L["Probability of the pattern<br/>among those with the same number correct"]
+  G["Effects of the item set,<br/>the occasion and the group"] --> L
+  L -->|"Newton's method"| E["Estimates and standard errors"]
+```
+
+```ts
+import {
+  createRandom,
+  linearChange,
+  simulateResponses,
+  simulateThetas,
+  twoParameterLogistic,
+} from "@measurekit/psychometrics";
+
+// 800 persons in two groups answer 4 items twice. At the second occasion the control group has gained 0.3 logits and the
+// treated group 0.8.
+const random = createRandom(5);
+const thetas = simulateThetas(800, random);
+const group = thetas.map((_, person) => (person < 400 ? "control" : "treated"));
+const items = [-0.5, 0, 0.5, 1].map((b) => ({ model: twoParameterLogistic, parameters: { a: 1, b, c: 0, d: 1 } }));
+const before = simulateResponses(items, thetas, random);
+const gain = (person: number) => (group[person] === "treated" ? 0.8 : 0.3);
+const after = simulateResponses(
+  items,
+  thetas.map((theta, person) => theta + gain(person)),
+  random,
+);
+
+const change = linearChange([before, after], {
+  groups: group,
+  baseline: "control",
+  itemGroups: Object.fromEntries(before.itemIds.map((id) => [id, "test"])),
+});
+change.effects;
+// test, occasion 2, control: 0.35 (SE 0.08), the trend
+// test, occasion 2, treated: 0.35 (SE 0.12), the gain beyond the trend
+```
+
+| Option          | Default                        | Valid range                           | Meaning                                                                        |
+| --------------- | ------------------------------ | ------------------------------------- | ------------------------------------------------------------------------------ |
+| `groups`        | One group of everyone, `"all"` | One non-empty name for each person    | The group of each person                                                       |
+| `baseline`      | The first person's group       | A name in `groups`                    | The group whose change is the trend; the others' effects are relative to it    |
+| `itemGroups`    | Each item alone, by its id     | A set name for every item, by item id | Items that share one effect for each occasion and group                        |
+| `tolerance`     | `1e-8`                         | non-negative                          | The estimation stops when no effect changes by more than this in a Newton step |
+| `maxIterations` | `100`                          | positive integer                      | The most Newton steps                                                          |
+
+`occasions` are response matrices of 0, 1 and `null`, in time order, with the same persons and items in the same order.
+
+| Result                    | Meaning                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `effects`                 | `{ itemGroup, occasion, group, estimate, standardError }`, by item set, then occasion from 2, then group, the baseline first |
+| `logLikelihood`           | The conditional log-likelihood at the estimates                                                                              |
+| `converged`, `iterations` | Whether no effect changed by more than `tolerance` within `maxIterations`, and the Newton steps taken                        |
+
+- **Model.** The logit of a correct response is the person's trait on the item plus, from the second occasion, the effect
+  of the item's set, the occasion and the person's group; the first occasion is the reference. The effect of the baseline
+  group is the trend, and that of another group is its change beyond the trend. The estimates are in logits.
+- **Conditioning.** The likelihood of a person's pattern on an item is taken among the patterns with the same number of
+  correct responses, which removes the trait. A person who answered an item correctly or wrongly at every occasion adds
+  nothing to it. With two occasions only the persons who changed inform an item, and the model is a logistic regression
+  of the direction of their change: `glm` on the changers gives the same estimates.
+- **Missing responses.** A person missing a response of an item at any occasion is left out of that item, and of no other.
+- **Item sets.** The items of a set share one effect for each occasion and group, so a test of many items is summarized
+  by a few effects. Each item alone has its own.
+- **No finite estimate.** Where every person who changed on an effect changed the same way, the maximum is at infinity:
+  the steps stop beyond 20 logits and `converged` is `false`. eRm's `LLRA` fails the same way.
+- **Valid input.** An effect that no person changed on, or that those who changed make a combination of the effects before
+  it, throws `DataError` naming the set, the occasion and the group. Responses are 0 or 1.
+- **Cost.** Each person and item adds its pattern to a stratum of its set, group and number correct, so the time grows with
+  the persons and items, and with the 2ᵀ patterns of each sum: 12 occasions is the limit.
+
+### Change on one trait
+
+When one trait underlies the items, as in a test of one skill, the LLTM on virtual items estimates the change with one
+estimate for all items: stack the occasions as items, one for each item and occasion, with one feature for each item and
+one, `time2`, for the later occasion. The effect of `time2` is a change of difficulty, so the negative of a gain.
+
+```ts
+import {
+  createRandom,
+  lltm,
+  responseMatrix,
+  simulateResponses,
+  simulateThetas,
+  twoParameterLogistic,
+} from "@measurekit/psychometrics";
+
+// 600 persons answer 6 items twice, and gain 0.5 logits.
+const random = createRandom(9);
+const thetas = simulateThetas(600, random);
+const items = [-1, -0.5, 0, 0.5, 1, 1.5].map((b) => ({
+  model: twoParameterLogistic,
+  parameters: { a: 1, b, c: 0, d: 1 },
+}));
+const before = simulateResponses(items, thetas, random);
+const after = simulateResponses(
+  items,
+  thetas.map((theta) => theta + 0.5),
+  random,
+);
+const ids = before.itemIds;
+const stacked = responseMatrix(
+  before.responses.map((row, person) => [...row, ...(after.responses[person] ?? [])]),
+  { itemIds: [...ids.map((id) => `${id}.t1`), ...ids.map((id) => `${id}.t2`)] },
+);
+const features = Object.fromEntries(
+  stacked.itemIds.map((id, column) => [
+    id,
+    {
+      ...Object.fromEntries(ids.map((name, i) => [name, i === column % ids.length ? 1 : 0])),
+      time2: column >= ids.length ? 1 : 0,
+    },
+  ]),
+);
+lltm(stacked, features, { intercept: false }).effects.at(-1); // { name: "time2", estimate: -0.44, standardError: 0.06 }
+```
+
+It assumes one trait across items and occasions, and treats the two responses of a person as independent given it. Use
+`linearChange` when the items differ in what they measure, or when persons differ in their change by item.
 
 ## The random-item model
 
@@ -257,16 +442,17 @@ prediction's sd is small against the item's own standard error. In the simulatio
 Every function throws `DataError`, with a sentence that names the value, for options and arguments of the wrong type
 and for these cases:
 
-| Function                | Cases                                                                                                                                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lltm`                  | A response above 1, or an item with responses in one category; an item without features, or lacking a feature another has; a feature named `"(intercept)"`; no more items than effects; an effect that other effects reproduce        |
-| `itemFeatureRegression` | No item with the parameter, or none with standard errors; a parameter shared by the items of a model; a standard error that is not positive; a slope that is not positive; repeated item ids; the cases of the features as for `lltm` |
-| `predictItemParameter`  | A regression that is not an object with effects, a covariance and a residual sd; a feature the regression uses that the item lacks or gives a value that is not finite                                                                |
+| Function                | Cases                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lltm`                  | A `model` that is not one of the three; a response above the model's highest category, or an item with responses in one category or none in a category below its highest; for the rating scale, items whose highest categories differ; an item without features, or lacking a feature another has; a feature named `"(intercept)"`; no more items than effects; an effect that other effects reproduce |
+| `linearChange`          | Fewer than 2 or more than 12 occasions; occasions that differ in persons or items; a response that is not 0, 1 or `null`; `groups` that do not name every person, a `baseline` that is no person's group, `itemGroups` that miss an item or name another; an effect that no person changed on, or that other effects determine                                                                         |
+| `itemFeatureRegression` | No item with the parameter, or none with standard errors; a parameter shared by the items of a model; a standard error that is not positive; a slope that is not positive; repeated item ids; the cases of the features as for `lltm`                                                                                                                                                                  |
+| `predictItemParameter`  | A regression that is not an object with effects, a covariance and a residual sd; a feature the regression uses that the item lacks or gives a value that is not finite                                                                                                                                                                                                                                 |
 
 ## Not included
 
-- The polytomous LLTM (the linear partial credit and rating scale models): the engine supports them, and no use needs
-  them yet.
+- **Polytomous linear change.** No reference: Fischer and Ponocny (1995) treat it, and eRm, the only package, warns that
+  it equates the two lowest categories.
 - Item features computed from text: finding the features is the caller's job.
 - Person covariates (latent regression), the one-stage random-item model estimated from the responses, and the 2PL
   model whose slopes are constrained by features: the two-stage regression of ln a gives the slopes' prior.
@@ -274,17 +460,22 @@ and for these cases:
 
 ## Differences from the references
 
-| Topic                       | This package                                                                            | Reference                                                                                                                                      |
-| --------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Quadrature of the LLTM      | Nodes μ + σ z on the standard rule, so they follow the distribution                     | mirt keeps its nodes on [-6, 6] when it frees the variance: its estimates differ by up to 2e-5 on the fixtures                                 |
-| Intercept of the LLTM       | The difficulty of an item with all features 0, theta having mean 0                      | mirt's `(Intercept)` is an easiness: its coefficients are minus these effects                                                                  |
-| Variance of theta           | Reported as the standard deviation σ                                                    | mirt's `COV_11` is σ²                                                                                                                          |
-| Standard errors of the LLTM | The Hessian of the marginal log-likelihood by central differences of its exact gradient | mirt supports only `SE.type = "Oakes"` or `"complete"` with an item design: the same covariance, to 1e-3                                       |
-| Estimation of the LLTM      | Marginal maximum likelihood, theta random                                               | eRm's `LLTM` is conditional maximum likelihood, on easiness: the estimates agree up to sign within 0.05 on its example                         |
-| Estimation of τ²            | Fisher scoring from 0, held at the boundary                                             | metafor's `rma(method = "REML")` agrees where it converges; for a design without an intercept it stopped at a lower likelihood on the fixtures |
-| Standard errors of η̂        | (XᵀWX)⁻¹ at τ̂²                                                                          | metafor's default `vcov`, the same; its `test = "knha"` adjustment is not included                                                             |
-| Model                       | Two stages: the calibration's estimates and standard errors are the data                | lme4's `glmer(y ~ 0 + X + (1 \| person) + (1 \| item))` estimates the effects from the responses at once, with Laplace                         |
-| Estimates of other items    | Independent given their standard errors                                                 | The covariance between items' estimates is a property of the calibration, not used here                                                        |
+| Topic                       | This package                                                                                | Reference                                                                                                                                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quadrature of the LLTM      | Nodes μ + σ z on the standard rule, so they follow the distribution                         | mirt keeps its nodes on [-6, 6] when it frees the variance: its estimates differ by up to 2e-5 on the fixtures                                                                                                                |
+| Intercept of the LLTM       | The difficulty of an item with all features 0, theta having mean 0                          | mirt's `(Intercept)` is an easiness: its coefficients are minus these effects                                                                                                                                                 |
+| Variance of theta           | Reported as the standard deviation σ                                                        | mirt's `COV_11` is σ²                                                                                                                                                                                                         |
+| Standard errors of the LLTM | The Hessian of the marginal log-likelihood by central differences of its exact gradient     | mirt supports only `SE.type = "Oakes"` or `"complete"` with an item design: the same covariance, to 1e-3                                                                                                                      |
+| Estimation of the LLTM      | Marginal maximum likelihood, theta random                                                   | eRm's `LLTM` is conditional maximum likelihood, on easiness: the estimates agree up to sign within 0.05 on its example                                                                                                        |
+| Estimation of τ²            | Fisher scoring from 0, held at the boundary                                                 | metafor's `rma(method = "REML")` agrees where it converges; for a design without an intercept it stopped at a lower likelihood on the fixtures                                                                                |
+| Standard errors of η̂        | (XᵀWX)⁻¹ at τ̂²                                                                              | metafor's default `vcov`, the same; its `test = "knha"` adjustment is not included                                                                                                                                            |
+| Model                       | Two stages: the calibration's estimates and standard errors are the data                    | lme4's `glmer(y ~ 0 + X + (1 \| person) + (1 \| item))` estimates the effects from the responses at once, with Laplace                                                                                                        |
+| Estimates of other items    | Independent given their standard errors                                                     | The covariance between items' estimates is a property of the calibration, not used here                                                                                                                                       |
+| Polytomous LLTM             | The features explain the location of each item; the thresholds of a set sum to 0            | TAM's `tam.mml` with a design array `A` gives the same model; its estimates agree to 1e-7 with an intercept. mirt's `itemdesign` takes dichotomous items only, and eRm's `LPCM` with a design matrix diverged on the fixtures |
+| Standard errors, TAM        | All parameters estimated together, as the Hessian of the marginal log-likelihood gives them | `tam.se` reports each as if the others were known: 1 / √(diagonal of the information), smaller, 0.56 times the package's on the first fixture for the intercept                                                               |
+| Linear change               | Conditional maximum likelihood by Newton's method with a line search                        | eRm's `LLRA`, through `LPCM` and `nlm`: the estimates agree to 1e-4                                                                                                                                                           |
+| Baseline group              | The group of the first person, or `baseline`                                                | eRm takes the group with the lowest name, and orders the others by name, decreasing                                                                                                                                           |
+| Sets of items               | `itemGroups`                                                                                | eRm's `itmgrps` is documented as not functional; `glm` on the persons who changed, with a column for each set, is the reference                                                                                               |
 
 ## References
 
@@ -293,6 +484,11 @@ and for these cases:
 - De Boeck, P. (2008). Random item IRT models. Psychometrika, 73(4), 533-559.
 - Fischer, G. H. (1973). The linear logistic test model as an instrument in educational research. Acta Psychologica,
   37(6), 359-374.
+- Fischer, G. H. (1995). Linear logistic models for change. In G. H. Fischer & I. W. Molenaar (Eds.), Rasch models:
+  Foundations, recent developments, and applications (pp. 157-180). Springer.
+- Fischer, G. H., & Ponocny, I. (1995). Extended rating scale and partial credit models for assessing change. In
+  G. H. Fischer & I. W. Molenaar (Eds.), Rasch models: Foundations, recent developments, and applications (pp. 353-370).
+  Springer.
 - Harville, D. A. (1977). Maximum likelihood approaches to variance component estimation and to related problems.
   Journal of the American Statistical Association, 72(358), 320-338.
 - Janssen, R., Schepers, J., & Peres, D. (2004). Models with item and item group predictors. In P. De Boeck & M. Wilson
