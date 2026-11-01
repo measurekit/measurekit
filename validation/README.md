@@ -38,6 +38,7 @@ Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDIN
 Rscript validation/psychometrics/cdm-item-comparison.R  # item-level model comparison: GDINA's modelcomp with the Wald test, and its covariance of the success probabilities
 Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mirt, GPArotation and base R; case names as arguments run only those cases
 Rscript validation/psychometrics/multidimensional-groups.R # multidimensional IRT in several groups, with fixed items: mirt's multipleGroup
+Rscript validation/psychometrics/bifactor.R           # bifactor and two-tier models: mirt's bfactor; case names as arguments run only those cases
 Rscript validation/psychometrics/change.R            # gains, reliability of a difference and reliable change: clinicalsignificance and base R
 Rscript validation/psychometrics/parameterization.R  # mirt's coefficient forms of every item type, multidimensional ones included
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
@@ -61,6 +62,11 @@ the base R maximum are slow, and `mhrm`, which runs mirt's MH-RM four times on f
 `multidimensional-items.R` holds the helper of `multidimensional.R` and `parameterization.R` that sets items in mirt.
 `multidimensional-groups.R` writes one fixture of five cases, two groups of correlated dimensions, the same data with fixed
 items, three groups with items missing by design, the graded model and three dimensions, and takes about a minute.
+
+`bifactor.R` takes the cases `m2pl`, `long`, `two-tier`, `m3pl`, `graded`, `incomplete` and `recovery` as arguments, and runs
+all of them without; it takes about half an hour, as mirt's EM at `TOL = 1e-10` runs to its limit of 5,000 cycles on the 3PL and
+on the data with missing responses, and each fixture records whether mirt stopped before it. `recovery` writes the data and
+the truth only.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in

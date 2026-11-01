@@ -197,7 +197,7 @@ function defaultMethod(dimensions: number): CalibrationMethod {
 }
 
 /** Builds the calibration from the solution of a method. */
-function assemble<TParameters>(
+export function assemble<TParameters>(
   design: Design,
   {
     items,

@@ -5,6 +5,7 @@
  * @module @measurekit/psychometrics/multidimensional
  */
 
+export { type BifactorOptions, calibrateBifactor } from "./bifactor.js";
 export {
   type CalibratedMultidimensionalItem,
   calibrateMultidimensional,

@@ -3,11 +3,11 @@
 `@measurekit/psychometrics/multidimensional` models a person by a vector of thetas, one per dimension, and an item by a
 slope on each dimension: a high theta on one dimension makes up for a low one on another (compensatory models). It
 calibrates items and the correlations between dimensions by marginal maximum likelihood, exploratory and confirmatory,
-with EM for up to three dimensions and with MH-RM for any number; computes standard errors; rotates exploratory
-solutions; calibrates several groups of persons on one scale, with fixed anchor items; estimates thetas by EAP and MAP in
-any number of dimensions; and computes information matrices. Every estimate is validated against mirt, GPArotation and
-base R ([validation](validation.md)). The dimensions have mean 0 and variance 1, in the first group of a calibration of
-several groups.
+with EM for up to three dimensions and with MH-RM for any number, and bifactor and two-tier models by dimension
+reduction; computes standard errors; rotates exploratory solutions; calibrates several groups of persons on one scale,
+with fixed anchor items; estimates thetas by EAP and MAP in any number of dimensions; and computes information matrices.
+Every estimate is validated against mirt, GPArotation and base R ([validation](validation.md)). The dimensions have mean
+0 and variance 1, in the first group of a calibration of several groups.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -287,6 +287,117 @@ the importance-sampled log-likelihood is part of every time. Use EM up to three 
 faster. The exploratory model of a weak second dimension converges slowly with EM; `maxIterations` bounds it.
 Calibration runs synchronously: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
 
+## Bifactor and two-tier models
+
+`calibrateBifactor(data, options)` calibrates models in which every item loads on the primary dimensions, one for a
+bifactor model and two, correlated, for a two-tier model, and on at most one specific dimension, such as a passage or a
+method factor. The specific dimensions are uncorrelated with everything. It is `calibrateMultidimensional` with the
+dimensions integrated one group of items at a time, so the cost follows the primary dimensions plus one, however many
+specific dimensions there are.
+
+```mermaid
+flowchart LR
+  P["Primary dimensions: 1, or 2 correlated"] --> A["Items of specific dimension A"]
+  P --> B["Items of specific dimension B"]
+  P --> N["Items without a specific dimension"]
+  SA["Specific dimension A"] --> A
+  SB["Specific dimension B"] --> B
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  calibrateBifactor,
+  multidimensionalEstimates,
+  multidimensionalPosteriorModeEstimate,
+  multidimensionalTwoParameterLogistic,
+} from "@measurekit/psychometrics/multidimensional";
+import { simulateMultidimensionalResponses } from "@measurekit/psychometrics/sim";
+
+// Twelve items in three passages of four: each loads on a general dimension and on its passage's own; 2,000 persons.
+const random = createRandom(5);
+const items = Array.from({ length: 12 }, (_, i) => {
+  const a = [1.2, 0, 0, 0];
+  a[1 + Math.floor(i / 4)] = 0.9;
+  return {
+    model: multidimensionalTwoParameterLogistic,
+    parameters: { a, intercept: ((i % 4) - 1.5) * 0.6, c: 0, d: 1 },
+  };
+});
+const thetas = Array.from({ length: 2000 }, () => [random.normal(), random.normal(), random.normal(), random.normal()]);
+const matrix = simulateMultidimensionalResponses(items, thetas, random);
+
+// The specific dimension of each item by id; `null` for an item without one.
+const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, `passage${1 + Math.floor(i / 4)}`]));
+const fit = calibrateBifactor(matrix, { specific, standardErrors: "hessian" });
+fit.dimensions; // ["general", "passage1", "passage2", "passage3"]
+fit.items[0]?.parameters; // { a: [1.19, 1.07, 0, 0], intercept: -0.96, c: 0, d: 1 }
+fit.items[0]?.standardErrors; // { a1: 0.11, a2: 0.17, intercept: 0.08 }
+fit.items[5]?.parameters.a; // [1.08, 0, 0.87, 0]
+fit.logLikelihood; // -14468.29
+fit.converged; // true
+
+// A person's thetas on all dimensions, with the calibration's correlations as the prior.
+const prior = { mean: [0, 0, 0, 0], covariance: fit.correlations };
+const scores = multidimensionalEstimates(matrix, fit.items, (calibrated, responses) =>
+  multidimensionalPosteriorModeEstimate(calibrated, responses, { prior }),
+);
+scores[0]?.estimate?.theta; // [0.63, 0.14, 0.14, 0.22]
+```
+
+| Option           | Default                                        | Meaning                                                                                                                                 |
+| ---------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `specific`       | required                                       | Each item's specific dimension by item id, every item of the data: a name, or `null` for an item with none                              |
+| `primary`        | one dimension, `"general"`, for every item     | Each item's primary dimensions by item id: one name for a bifactor model, up to two in all for a two-tier model                         |
+| `model`          | `multidimensionalTwoParameterLogistic`         | The model of every item: also the 3PL and the graded model                                                                              |
+| `priors`         | none                                           | Priors by parameter name, `"a"`, `"intercept"` and `"c"`: estimates are posterior modes, the usual way to estimate the 3PL's asymptotes |
+| `points`         | `31` with one primary dimension, `21` with two | Nodes per integrated dimension, at least 2, from -6 to 6 standard deviations                                                            |
+| `standardErrors` | `"none"`                                       | `"hessian"`, or `"cross-product"`, as in `calibrateMultidimensional`                                                                    |
+| `tolerance`      | `1e-4`                                         | Converged when no parameter changes by more than this in an EM iteration                                                                |
+| `maxIterations`  | `500`                                          | The most EM iterations                                                                                                                  |
+
+The result is that of `calibrateMultidimensional`. Its dimensions are the primary ones, then the specific ones in order
+of first appearance among the items, and an item has a slope of 0 on each specific dimension it does not load on. The
+correlations are the identity, except between two primary dimensions, which are estimated and have a standard error.
+The log-likelihood is exact on the grid, and the number of parameters of `aic` and `bic` counts the estimated slopes,
+intercepts and asymptotes, and that correlation. Scoring needs no new function: `multidimensionalEstimates` works on the
+result, on the grid of all dimensions. The posterior mean integrates over that grid, so it needs a small `points` with
+many specific dimensions; the posterior mode does not.
+
+| Rule                                | Definition                                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Models                              | The multidimensional 2PL, 3PL and graded models, one for all items                                   |
+| Two primary dimensions              | A two-tier model: the correlation of the two is estimated, the specific dimensions stay uncorrelated |
+| Missing responses                   | Skipped; a person without responses changes nothing                                                  |
+| An item in two specific dimensions  | `DataError`: `calibrateMultidimensional` with `loadings` fits it by MH-RM                            |
+| A specific dimension of one item    | `DataError`: one item does not identify a specific dimension                                         |
+| More than two primary dimensions    | `DataError`: `calibrateMultidimensional` with `loadings` fits them by MH-RM                          |
+| A name that is primary and specific | `DataError`                                                                                          |
+| A grid of more than 10⁶ nodes       | `DataError`: use fewer `points`                                                                      |
+
+**How it is fast.** Given the primary dimensions, the groups of items of the specific dimensions are independent, so a
+person's likelihood is a sum over the primary nodes of the weight times a product, over the groups, of a sum over each
+group's own nodes. The sum of a group depends only on the responses to its items. Three things make a calibration take
+a fraction of the time of the same model in full:
+
+| Part                                | Effect                                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Distinct response patterns          | Persons with one pattern are one row of the E-step                                                           |
+| Distinct sub-patterns of each group | A group's sum over its nodes is computed once for each pattern of the responses to its items, not per person |
+| SQUAREM                             | The acceleration of the other EM calibrations of the module                                                  |
+
+A group of items whose persons all have different sub-patterns is the worst case: the cost is then the persons times the
+nodes squared times the items of the group, as with any bfactor program.
+
+CPU time of one calibration at the default `tolerance`, on an Apple M5 with Node.js 26, against `mirt::bfactor` with
+31 nodes on the same simulated data of 2,000 persons, each item loading on the general dimension and on one specific
+dimension:
+
+| Data                            | measurekit | mirt  | Ratio |
+| ------------------------------- | ---------- | ----- | ----- |
+| 12 items, 3 specific dimensions | 0.08 s     | 1.4 s | 17    |
+| 40 items, 4 specific dimensions | 0.51 s     | 4.2 s | 8.3   |
+
 ## Rotation
 
 `rotateLoadings(calibration, options)` rotates the standardized loadings of a calibration of uncorrelated dimensions,
@@ -358,8 +469,9 @@ convert items to and from mirt.
 
 ## Not included
 
-- Noncompensatory models; multidimensional GPCM and nominal models; bifactor and two-tier reduction (the testlet model
-  of [IRT](irt.md#testlets) covers equal-slope testlets).
+- Noncompensatory models; multidimensional GPCM and nominal models.
+- Bifactor models with an item in two specific dimensions, correlated specific dimensions or more than two primary
+  dimensions: `calibrateMultidimensional` with `loadings` fits them by MH-RM.
 - Multidimensional linking of separate calibrations: groups are calibrated together, on one scale.
 - QMC-EM.
 - Standard errors of the means and covariances of the groups; the items' standard errors account for them.
@@ -376,6 +488,11 @@ convert items to and from mirt.
 - **Where EM stops.** The M-step takes one Fisher-scoring step, not a full optimization, and the correlations
   maximize the likelihood on the grid. The estimates agree with mirt's within the tolerances in
   [validation](validation.md); mirt's EM stops short on flat likelihoods whatever its `TOL`.
+- **Bifactor models.** `calibrateBifactor` is mirt's `bfactor` with `model2` for a two-tier model, on the same
+  rectangular grid, and its estimates, standard errors and log-likelihood agree within the tolerances in
+  [validation](validation.md). Without priors the asymptotes of the 3PL make the likelihood flat: on a simulation of 4,000
+  persons and 12 items mirt reached its limit of 5,000 cycles at `TOL = 1e-10` short of the maximum, which EM here reaches
+  (0.06 higher in log-likelihood), so the validation puts a prior on logit c.
 - **Communalities.** mirt's `summary` sums the squared loadings, which is the communality only for uncorrelated
   dimensions; the communality here is λᵀ Φ λ.
 - **MAP standard errors.** They come from the expected information, as `posteriorModeEstimate` does; mirt's come from the
