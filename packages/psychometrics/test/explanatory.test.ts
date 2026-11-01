@@ -1737,6 +1737,18 @@ describe("properties", () => {
       ),
     );
   const halves = Array.from({ length: 40 }, (_, person) => (person < 20 ? "first" : "second"));
+  /** The responses of persons to 3 items, one triple of 0 and 1 for each person. */
+  const triples = (text: string): number[][] => text.split(" ").map((person) => Array.from(person, Number));
+  // The Newton steps of this case fall below the digits of the log-likelihood while the estimates are 1e-7 from the
+  // maximum, so a line search without allowance for rounding stopped there.
+  const stalledSteps = {
+    before: triples(
+      "101 101 001 110 011 000 000 010 100 001 011 001 011 000 001 000 000 111 001 100 101 010 010 010 100 010 110 000 010 111 000 100 010 100 110 000 101 110 110 000",
+    ),
+    after: triples(
+      "000 000 100 001 110 101 000 001 000 011 011 001 100 110 010 110 101 010 011 001 001 100 010 100 000 100 110 000 000 010 000 100 010 100 011 111 000 001 101 001",
+    ),
+  };
 
   it("the effects of change negate under a recoding of the responses and keep their order and count", () => {
     fc.assert(
@@ -1755,7 +1767,7 @@ describe("properties", () => {
         });
         expectClose(flipped.logLikelihood, base.logLikelihood, 1e-7);
       }),
-      { numRuns: 30 },
+      { numRuns: 30, examples: [[stalledSteps]] },
     );
   });
 

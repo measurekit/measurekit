@@ -88,6 +88,13 @@ const EVERYONE = "all";
  * flat to its rounding, so an estimate beyond it is a maximum at infinity, which the Newton steps only approach.
  */
 const MAX_EFFECT = 20;
+/**
+ * The relative rise of the negative conditional log-likelihood that a step may have and still count as no rise: its
+ * rounding. A Newton step near the maximum, even one of 1e-7, changes the log-likelihood by less than its digits hold, so
+ * a search that rejects it halves the step, reports the shortened step as the change and stops with estimates off by the
+ * rest of it.
+ */
+const LIKELIHOOD_ROUNDING = 1e-12;
 
 /**
  * Estimates the linear logistic model for change (LLRA) of the same persons answering the same items at several
@@ -509,6 +516,7 @@ function step(problem: ConditionalLikelihood, effects: Float64Array): number {
     },
     -logLikelihood,
     slope,
+    { slack: LIKELIHOOD_ROUNDING * Math.abs(logLikelihood) },
   );
   if (length === null) return 0;
   effects.set(trial);
