@@ -88,7 +88,7 @@ bench_fixture("knowledge-tracing", "logistic-items", list(
 # Both tasks have one task text, so the note of the first covers both. The ratios are those of the header.
 note <- sprintf(paste("the time of the reference includes the features and the design from the events, as measurekit's does;",
                       "both stop at the gradient that LiblineaR reaches at epsilon %g (%.2g at 1,000 items, %.2g at 50,000),",
-                      "where measurekit takes 1.7 and 0.8 times as long: its solver is JavaScript, each Hessian-vector product",
+                      "where measurekit takes 1.6 and 0.75 times as long: its solver is JavaScript, each Hessian-vector product",
                       "taking 3.5 times as long as the same loop in C, and its features and design take 0.7 and 0.4 times as long",
                       "as the reference's; at its default gradient of 1e-8 it takes 1.7 times as long as at these"),
                 EPSILON, gradients[["small"]], gradients[["large"]])
