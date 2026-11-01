@@ -5,5 +5,6 @@
  * @module @measurekit/knowledge-tracing/bkt
  */
 export { type BktFit, type BktModel, type BktOptions, bkt, type OpportunitiesToMasteryOptions } from "./bkt.js";
+export type { BktBounds, BktFixedRates } from "./constraints.js";
 export type { BktGuessSlip, BktLearning, BktParameters, BktSkill } from "./parameters.js";
 export type { BktState } from "./state.js";

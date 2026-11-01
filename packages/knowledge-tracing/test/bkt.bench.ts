@@ -23,6 +23,10 @@ test("fits the 5 skills of 20,000 attempts, a fifth of them without an outcome, 
   await benchmark(context, "bkt.fitLessons", () => bkt().fit(withLessons), SLOW_OPTIONS);
 });
 
+test("fits the 5 skills of 20,000 attempts with the rates of pairs of items by EM from five starts", async (context) => {
+  await benchmark(context, "bkt.fitPairs", () => bkt({ pairLearning: true }).fit(log), SLOW_OPTIONS);
+});
+
 test("replays 20,000 attempts through the fitted model", async (context) => {
   const { model } = bkt().fit(log);
   await benchmark(context, "bkt.replay", () => online(model, log));

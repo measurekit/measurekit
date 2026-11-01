@@ -8,6 +8,14 @@ export function entry<T>(record: Readonly<Record<string, T>> | undefined, key: s
   return record !== undefined && Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
+/** Returns a record with `map` applied to each value, given the value and its key. */
+export function mapRecord<TValue, TResult>(
+  record: Readonly<Record<string, TValue>>,
+  map: (value: TValue, key: string) => TResult,
+): Record<string, TResult> {
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, map(value, key)]));
+}
+
 /**
  * Returns a model's parameters of a skill or an item.
  *

@@ -24,6 +24,7 @@ import { checkLearner, checkLearnerId } from "../data/learner.js";
 import { entry, parametersOf } from "../data/record.js";
 import { replay, type Steps } from "../data/replay.js";
 import type { LearnerModel, ModelFit } from "../model.js";
+import { type BktBounds, type BktFixedRates, checkConstraints, checkWithinBounds } from "./constraints.js";
 import {
   estimate,
   randomStarts,
@@ -58,6 +59,30 @@ export interface BktOptions {
    * @defaultValue `false`
    */
   readonly resourceLearning?: boolean;
+  /**
+   * Whether the learn and forget rates depend on the resource before an attempt and its own, as pyBKT's `multipair`: a
+   * rate for each pair that the log has, and the skill's own rates for a learner's first attempt at the skill. Not with
+   * `resourceLearning`.
+   *
+   * @defaultValue `false`
+   */
+  readonly pairLearning?: boolean;
+  /**
+   * The rates that EM holds at given values, by skill id: they are not estimated, and they are left out of the rates
+   * that `aic` and `bic` count. A skill's own rates are held; with `resourceLearning`, `resources` holds the rates of
+   * single resources, so that a lesson can be held while others are fitted.
+   *
+   * @defaultValue none: every rate is estimated
+   */
+  readonly fixed?: Readonly<Record<string, BktFixedRates>>;
+  /**
+   * The bounds of the rates that EM estimates: the estimate of a rate is the exact maximum within its bounds, as the
+   * expected log-likelihood of each rate is concave. Bounds guard against degenerate fits, such as a guess above 0.5.
+   * They apply to the rates of the skills, groups, resources, pairs and items alike.
+   *
+   * @defaultValue none: each rate may be anywhere from 0 to 1, a guess or slip off 0 and 1 by 2⁻⁵²
+   */
+  readonly bounds?: BktBounds;
   /**
    * The group of each learner, by learner id: the learners of a group share a prior for each skill (individualized
    * priors). Learners without a group have the skill's prior.
@@ -162,6 +187,7 @@ const DEFAULT_THRESHOLD = 0.95;
 /** The checked options. */
 interface Settings extends StructureOptions {
   readonly groups: Readonly<Record<string, string>> | undefined;
+  readonly constraints: { readonly fixed: Readonly<Record<string, BktFixedRates>>; readonly bounds: BktBounds };
   readonly restarts: number;
   readonly seed: number;
   readonly tolerance: number;
@@ -195,6 +221,7 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
   const settings = settingsOf(options);
   const { parameters = { skills: {} } } = options;
   checkParameters(parameters);
+  checkWithinBounds(parameters, settings.constraints.bounds);
   const skillOf = (skill: string): BktSkill => parametersOf(parameters.skills, "skill", skill);
   const masteryOf = (state: BktState, skill: string): number =>
     entry(state.skills, skill) ?? priorOf(skillOf(skill), entry(settings.groups, state.learner));
@@ -209,12 +236,14 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
     },
     update(state, event) {
       const updates: [string, number][] = [];
+      const resource = resourceOf(event);
       for (const skill of event.skills) {
+        const previous = entry(state.previous, skill);
         if (!isObserved(event)) {
           // Without parameters a skill has no prior to move, so a lesson leaves it alone.
           const known = entry(parameters.skills, skill);
           if (known !== undefined) {
-            updates.push([skill, learnedMastery(masteryOf(state, skill), learningOf(known, resourceOf(event)))]);
+            updates.push([skill, learnedMastery(masteryOf(state, skill), learningOf(known, resource, previous))]);
           }
           continue;
         }
@@ -223,7 +252,7 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
           masteryOf(state, skill),
           event.outcome,
           guessSlipOf(rates, event.item),
-          learningOf(rates, resourceOf(event)),
+          learningOf(rates, resource, previous),
         );
         if (next === null) {
           throw new DataError(
@@ -232,7 +261,10 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
         }
         updates.push([skill, next]);
       }
-      return { learner: state.learner, skills: { ...state.skills, ...Object.fromEntries(updates) } };
+      const skills = { ...state.skills, ...Object.fromEntries(updates) };
+      if (!settings.pairLearning) return { learner: state.learner, skills };
+      const latest = updates.map(([skill]) => [skill, resource]);
+      return { learner: state.learner, skills, previous: { ...state.previous, ...Object.fromEntries(latest) } };
     },
   };
 
@@ -246,14 +278,17 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
       });
       const estimates = new Map<string, SkillEstimate>();
       let parameterCount = 0;
-      for (const [skill, sequences] of sequencesBySkill(log, settings.groups)) {
-        const structure = structureOf(sequences, settings);
+      const { fixed, bounds } = settings.constraints;
+      const kind = settings.resourceLearning ? "resource" : settings.pairLearning ? "pair" : "none";
+      for (const [skill, sequences] of sequencesBySkill(log, settings.groups, kind)) {
+        const held = entry(fixed, skill);
+        const structure = structureOf(sequences, settings, held);
         const given = entry(parameters.skills, skill);
         const starts: readonly [BktSkill, ...BktSkill[]] =
           given === undefined
-            ? randomStarts(structure, settings.restarts, settings.seed)
-            : [startFrom(given, structure)];
-        estimates.set(skill, estimate(sequences, starts, settings.forgetting, settings));
+            ? randomStarts(structure, settings.restarts, settings.seed, held, bounds)
+            : [startFrom(given, structure, held, bounds)];
+        estimates.set(skill, estimate(sequences, starts, settings.forgetting, { fixed: held, bounds }, settings));
         parameterCount += structure.parameterCount;
       }
       const fitted = create({
@@ -325,21 +360,42 @@ function settingsOf(options: BktOptions): Settings {
     forgetting = false,
     itemGuessSlip = false,
     resourceLearning = false,
+    pairLearning = false,
+    fixed = {},
+    bounds = {},
     priorGroups,
     restarts = DEFAULT_RESTARTS,
     seed = DEFAULT_SEED,
     tolerance = DEFAULT_TOLERANCE,
     maxIterations = DEFAULT_MAX_ITERATIONS,
   } = options;
-  for (const [name, value] of Object.entries({ forgetting, itemGuessSlip, resourceLearning })) {
+  for (const [name, value] of Object.entries({ forgetting, itemGuessSlip, resourceLearning, pairLearning })) {
     checkBoolean(value, `The option ${name}`);
   }
+  if (pairLearning && resourceLearning) {
+    throw new DataError("The option pairLearning cannot be used with resourceLearning: a rate has one key.");
+  }
+  checkConstraints({ fixed, bounds }, { forgetting, resourceLearning, pairLearning });
   if (priorGroups !== undefined) checkPriorGroups(priorGroups);
   checkPositiveInteger(restarts, "The option restarts");
   checkSeed(seed);
   checkStopping(tolerance, maxIterations);
-  const structure = { forgetting, itemGuessSlip, resourceLearning, priorGroups: priorGroups !== undefined };
-  return { ...structure, groups: priorGroups, restarts, seed, tolerance, maxIterations };
+  const structure = {
+    forgetting,
+    itemGuessSlip,
+    resourceLearning,
+    pairLearning,
+    priorGroups: priorGroups !== undefined,
+  };
+  return {
+    ...structure,
+    groups: priorGroups,
+    constraints: { fixed, bounds },
+    restarts,
+    seed,
+    tolerance,
+    maxIterations,
+  };
 }
 
 function checkPriorGroups(priorGroups: Readonly<Record<string, string>>): void {

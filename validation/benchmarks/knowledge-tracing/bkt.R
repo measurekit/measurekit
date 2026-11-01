@@ -19,5 +19,7 @@ size <- sprintf("%s attempts of %d learners at %d skills", count(nrow(log)), lea
 bench_task("bkt.fit", "Fit of the skills of a log by EM from five starts", size, "pyBKT 1.4.3 `Model.fit`")
 bench_task("bkt.fitLessons", "Fit of the skills of a log by EM from five starts, a fifth of its attempts without an outcome",
            size, "pyBKT 1.4.3 `Model.fit`, correct = -1")
+bench_task("bkt.fitPairs", "Fit of the skills of a log by EM from five starts, learn and forget rates by pair of items",
+           size, "pyBKT 1.4.3 `Model.fit(multipair = True)`")
 bench_task("bkt.replay", "Replay of the log through the fitted model, a prediction and an update for each attempt", size,
            "pyBKT 1.4.3 `Model.predict`")

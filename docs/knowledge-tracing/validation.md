@@ -43,6 +43,8 @@ equal `EM_fit.EM_fit`'s. The options map to pyBKT as follows:
 | `forgetting: true`                               | `forgets = True`                                                                                                                                 |
 | `itemGuessSlip: true`                            | `multigs`, on the item column                                                                                                                    |
 | `resourceLearning: true`                         | `multilearn`, on the resource column                                                                                                             |
+| `pairLearning: true`                             | `multipair`, on the resource column: 17 resources for 4 items, `Default` first                                                                   |
+| `fixed`                                          | `fixed` of `EM_fit` and `M_step`: arrays of `learns`, or `guesses` with `slips`, a negative entry leaving a class free                           |
 | `priorGroups`                                    | `multiprior`, on a group column: pyBKT's prior is 0, and a group's prior is the learn rate of a phantom step before each learner's first attempt |
 | `restarts`, `seed`, `tolerance`, `maxIterations` | `num_fits`, `seed`, `tol`, `maxiter`                                                                                                             |
 
@@ -75,6 +77,18 @@ takes the same number of iterations as pyBKT's.
 | P(L) and P(correct) at fixed parameters with `correct = -1`              | `predict_onestep.run`                                                |
 | Parameters, log-likelihood and iterations of EM with `correct = -1`      | `EM_fit` from the same start, to a change of the log-likelihood 1e-9 |
 | The rates of a lesson and of practice recovered from a seeded simulation | The true rates, to 0.05, and P(L0) to 0.1                            |
+
+**Fixed rates, pairs and bounds.** `bkt.py` also fits with a skill's learn rate held, with its guess and slip held, and
+with the lesson's learn rate held while practice's is estimated, and fits and predicts a log with the 17 resources of
+`multipair`; each takes pyBKT's number of iterations. pyBKT has no bounds, so `bkt-bounds.R` maximizes the forward
+likelihood by `optim(method = "L-BFGS-B")` within the bounds of four cases, each with a bound that binds, and `bkt` runs EM
+to a change of 1e-10.
+
+| Quantity                                                   | Reference                                                                   |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Parameters, log-likelihood and iterations with fixed rates | `EM_fit` with `fixed`, from the same start                                  |
+| P(L) and P(correct) with pairs, and EM with pairs          | `predict_onestep.run` and `EM_fit` on `multipair` data                      |
+| The estimates within bounds, and the log-likelihood        | The maximum of the forward likelihood by L-BFGS-B, from a start inside them |
 
 pyBKT gives a lesson a guess and slip class of its own, which no count reaches; `bkt` gives a lesson none. A resource that
 no outcome follows in a sequence has no rate in `bkt`, where pyBKT keeps its start; the log avoids it.
@@ -287,6 +301,9 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | BKT parameters and log-likelihood fitted from a given start          | 1e-8 absolute                  | 6.8e-13                        |
 | BKT P(L) and P(correct) at fixed parameters, with `correct = -1`     | 1e-13 absolute                 | 9.3e-15                        |
 | BKT parameters and log-likelihood from a given start, `correct = -1` | 1e-8 absolute                  | 9.1e-13                        |
+| BKT with fixed rates or pairs, from a given start                    | 1e-8 absolute                  | 8e-13                          |
+| BKT rates within bounds, against L-BFGS-B                            | 1e-4 absolute                  | 9.8e-6                         |
+| BKT log-likelihood within bounds                                     | 1e-6 absolute                  | 2e-7                           |
 | Logistic features against LKT                                        | 1e-12 absolute                 | 9e-16                          |
 | Exposure features against base R                                     | 1e-12 absolute                 | 0                              |
 | Exposure coefficients and log-likelihood against glm                 | 1e-8 absolute                  | 1.8e-14                        |

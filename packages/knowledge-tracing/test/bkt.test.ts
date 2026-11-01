@@ -18,8 +18,11 @@ import {
   simulate,
   splitByLearner,
 } from "../src/index.js";
+import bounded from "./fixtures/bkt-bounds.json" with { type: "json" };
+import fixedFixture from "./fixtures/bkt-fixed.json" with { type: "json" };
 import lessons from "./fixtures/bkt-lessons.json" with { type: "json" };
 import opportunities from "./fixtures/bkt-opportunities.json" with { type: "json" };
+import pairFixture from "./fixtures/bkt-pairs.json" with { type: "json" };
 import practice from "./fixtures/bkt-practice.json" with { type: "json" };
 import recovery from "./fixtures/bkt-recovery.json" with { type: "json" };
 import { allPredicted, defined, expectClose, online } from "./helpers.js";
@@ -291,6 +294,246 @@ describe("bkt with events that have no outcome", () => {
         0.05,
       );
     }
+  });
+});
+
+interface FixedFit {
+  readonly name: string;
+  readonly options: BktOptions;
+  readonly log: "practice" | "lessons";
+  readonly fixed: NonNullable<BktOptions["fixed"]>;
+  readonly start: BktParameters;
+  readonly parameters: BktParameters;
+  readonly iterations: number;
+  readonly logLikelihood: number;
+}
+const fixedFits: readonly FixedFit[] = JSON.parse(JSON.stringify(fixedFixture.fits));
+const pairOptions: BktOptions = JSON.parse(JSON.stringify(pairFixture.options));
+const pairLog = eventLog(pairFixture.events);
+const pairInference: { parameters: BktParameters; predictions: number[]; mastery: number[] } = JSON.parse(
+  JSON.stringify(pairFixture.inference),
+);
+const pairFit: Omit<Fit, "name" | "options"> = JSON.parse(JSON.stringify(pairFixture.fit));
+
+describe("bkt with fixed rates and pairs against pyBKT", () => {
+  it.each(fixedFits)("holds rates as pyBKT's fixed does: $name", (reference) => {
+    const fit = bkt({
+      ...reference.options,
+      fixed: reference.fixed,
+      parameters: reference.start,
+      tolerance: fixedFixture.tolerance,
+      maxIterations: fixedFixture.maxIterations,
+    }).fit(reference.log === "practice" ? log : lessonLog);
+    for (const [skill, expected] of Object.entries(reference.parameters.skills)) {
+      expectSkill(fit.model.parameters.skills[skill], expected, FIT_TOLERANCE, skill);
+    }
+    expectClose(fit.logLikelihood, reference.logLikelihood, FIT_TOLERANCE, "log-likelihood");
+    expect(fit.iterations).toBe(reference.iterations);
+    expect(fit.converged).toBe(true);
+  });
+
+  it("tracks and predicts with pairs as pyBKT's multipair does, at fixed parameters", () => {
+    const model = bkt({ ...pairOptions, parameters: pairInference.parameters });
+    const states = new Map<string, BktState>();
+    pairLog.forEach((event, index) => {
+      const state = states.get(event.learner) ?? model.initialState(event.learner);
+      expectClose(
+        model.mastery(state, "p"),
+        defined(pairInference.mastery[index]),
+        INFERENCE_TOLERANCE,
+        `P(L) ${index}`,
+      );
+      expectClose(
+        model.predict(state, event),
+        defined(pairInference.predictions[index]),
+        INFERENCE_TOLERANCE,
+        `${index}`,
+      );
+      states.set(event.learner, model.update(state, event));
+    });
+  });
+
+  it("fits pairs from pyBKT's start to pyBKT's estimates, the 17 resources of multipair", () => {
+    const fit = bkt({
+      ...pairOptions,
+      parameters: pairFit.start,
+      tolerance: pairFixture.tolerance,
+      maxIterations: pairFixture.maxIterations,
+    }).fit(pairLog);
+    expectSkill(fit.model.parameters.skills.p, defined(pairFit.parameters.skills.p), FIT_TOLERANCE, "p");
+    expectClose(fit.logLikelihood, pairFit.logLikelihood, FIT_TOLERANCE, "log-likelihood");
+    expect(fit.iterations).toBe(pairFit.iterations);
+    // The skill's own rates, 16 pairs with their forget rates, and 4 items' guess and slip, and a prior: 1 + 2 + 32 + 8.
+    expectClose(fit.aic, 2 * 43 - 2 * fit.logLikelihood, 1e-9);
+  });
+});
+
+describe("bkt with bounds against base R", () => {
+  const boundedLog = eventLog(bounded.events);
+  interface Bounded {
+    readonly name: string;
+    readonly forgetting: boolean;
+    readonly bounds: NonNullable<BktOptions["bounds"]>;
+    readonly parameters: BktSkill;
+    readonly logLikelihood: number;
+  }
+  const cases: readonly Bounded[] = JSON.parse(JSON.stringify(bounded.fits));
+
+  it.each(cases)("reaches the maximum of the forward likelihood within the bounds: $name", (reference) => {
+    const start: BktParameters = { skills: { s: JSON.parse(JSON.stringify(bounded.start)) } };
+    const fit = bkt({
+      forgetting: reference.forgetting,
+      bounds: reference.bounds,
+      parameters: start,
+      tolerance: bounded.tolerance,
+      maxIterations: 20_000,
+    }).fit(boundedLog);
+    const estimates = defined(fit.model.parameters.skills.s);
+    for (const rate of ["prior", "learn", "forget", "guess", "slip"] as const) {
+      expectClose(estimates[rate], reference.parameters[rate], 1e-4, rate);
+      const [lower, upper] = reference.bounds[rate] ?? [0, 1];
+      expect(estimates[rate], rate).toBeGreaterThanOrEqual(lower);
+      expect(estimates[rate], rate).toBeLessThanOrEqual(upper);
+    }
+    expectClose(fit.logLikelihood, reference.logLikelihood, 1e-6, "log-likelihood");
+    expect(fit.converged).toBe(true);
+  });
+});
+
+describe("bkt constraints and pairs", () => {
+  const events = eventLog(
+    Array.from({ length: 40 }, (_, learner) =>
+      Array.from({ length: 6 }, (__, step) => ({
+        learner: `l${learner}`,
+        item: `q${1 + (step % 2)}`,
+        skills: ["s"],
+        time: step * 100 + learner,
+        outcome: (learner * 7 + step * 3 + (learner % 3)) % 5 < 2 + Math.floor(step / 2) ? 1 : 0,
+      })),
+    ).flat(),
+  );
+  const rates: BktSkill = { prior: 0.3, learn: 0.2, forget: 0.05, guess: 0.2, slip: 0.1 };
+
+  it("holds a fixed rate exactly, leaves it out of the rates that aic and bic count, and estimates the others", () => {
+    const free = bkt({ forgetting: true }).fit(events);
+    const held = bkt({ forgetting: true, fixed: { s: { learn: 0.17, slip: 0.05 } } }).fit(events);
+    expect(defined(held.model.parameters.skills.s).learn).toBe(0.17);
+    expect(defined(held.model.parameters.skills.s).slip).toBe(0.05);
+    expect(defined(held.model.parameters.skills.s).guess).not.toBe(defined(free.model.parameters.skills.s).guess);
+    // P(L0), P(F) and P(G) are estimated, of the 5 rates of the free fit.
+    expectClose(held.aic, 2 * 3 - 2 * held.logLikelihood, 1e-9);
+    expectClose(free.aic, 2 * 5 - 2 * free.logLikelihood, 1e-9);
+    expect(held.logLikelihood).toBeLessThanOrEqual(free.logLikelihood + 1e-9);
+  });
+
+  it("holds a rate that a skill's fixed rates do not name for every other skill, and fixes rates by skill id", () => {
+    const two = eventLog(events.map((event) => ({ ...event, skills: event.learner < "l2" ? ["t"] : ["s"] })));
+    const fit = bkt({ fixed: { t: { prior: 0.4 } } }).fit(two);
+    expect(defined(fit.model.parameters.skills.t).prior).toBe(0.4);
+    expect(defined(fit.model.parameters.skills.s).prior).not.toBe(0.4);
+  });
+
+  it("estimates the exact maximum within bounds: a rate that wants more than its bound sits on it", () => {
+    const free = defined(bkt().fit(events).model.parameters.skills.s);
+    const cap = free.guess / 2;
+    const capped = defined(bkt({ bounds: { guess: [0, cap] } }).fit(events).model.parameters.skills.s);
+    expect(capped.guess).toBe(cap);
+    const floor = (free.learn + 1) / 2;
+    expect(defined(bkt({ bounds: { learn: [floor, 1] } }).fit(events).model.parameters.skills.s).learn).toBe(floor);
+  });
+
+  it("keeps a guess and a slip off 0 and 1 when a bound allows them, and starts random starts within the bounds", () => {
+    const fit = bkt({ bounds: { guess: [0, 0.3], slip: [0, 0.1] }, restarts: 3 }).fit(
+      eventLog([
+        { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 1 },
+        { learner: "a", item: "q", skills: ["s"], time: 2, outcome: 1 },
+        { learner: "b", item: "q", skills: ["s"], time: 1, outcome: 1 },
+        { learner: "b", item: "q", skills: ["s"], time: 2, outcome: 1 },
+      ]),
+    );
+    const { guess, slip } = defined(fit.model.parameters.skills.s);
+    expect(slip).toBe(Number.EPSILON);
+    expect(guess).toBeLessThanOrEqual(0.3);
+    expect(guess).toBeGreaterThanOrEqual(Number.EPSILON);
+  });
+
+  it("holds the rates of single resources, and the others of the skill are estimated", () => {
+    const fit = bkt({
+      resourceLearning: true,
+      fixed: { s: { resources: { q1: { learn: 0.3 } } } },
+    }).fit(events);
+    const learning = defined(fit.model.parameters.skills.s?.resourceLearning);
+    expect(defined(learning.q1).learn).toBe(0.3);
+    expect(defined(learning.q2).learn).not.toBe(0.3);
+    // P(L0), P(T) of q2 and P(G), P(S).
+    expectClose(fit.aic, 2 * 4 - 2 * fit.logLikelihood, 1e-9);
+  });
+
+  it("uses the skill's rates for a first attempt and a pair that the fit has not seen, and the pair's otherwise", () => {
+    const skill: BktSkill = {
+      ...rates,
+      forget: 0,
+      pairLearning: { q1: { q2: { learn: 0.6, forget: 0 } } },
+    };
+    const model = bkt({ pairLearning: true, parameters: { skills: { s: skill } } });
+    const at = (item: string, time: number) => ({ learner: "ana", item, skills: ["s"], time, outcome: null });
+    const first = model.update(model.initialState("ana"), at("q1", 1));
+    expectClose(defined(first.skills.s), 0.3 + 0.7 * 0.2, 1e-15);
+    expect(first.previous).toEqual({ s: "q1" });
+    const paired = model.update(first, at("q2", 2));
+    expectClose(defined(paired.skills.s), defined(first.skills.s) + (1 - defined(first.skills.s)) * 0.6, 1e-15);
+    expect(paired.previous).toEqual({ s: "q2" });
+    const unseen = model.update(paired, at("q1", 3));
+    expectClose(defined(unseen.skills.s), defined(paired.skills.s) + (1 - defined(paired.skills.s)) * 0.2, 1e-15);
+    expect(JSON.parse(JSON.stringify(paired))).toEqual(paired);
+  });
+
+  it("reads a state stored without previous resources as one with none, and writes none without pairs", () => {
+    const skill: BktSkill = { ...rates, pairLearning: { q1: { q2: { learn: 0.6, forget: 0 } } } };
+    const model = bkt({ pairLearning: true, parameters: { skills: { s: skill } } });
+    const stored: BktState = { learner: "ana", skills: { s: 0.4 } };
+    const event = { learner: "ana", item: "q2", skills: ["s"], time: 1, outcome: null };
+    expectClose(defined(model.update(stored, event).skills.s), 0.4 * 0.95 + 0.6 * 0.2, 1e-15);
+    const plain = bkt({ parameters: { skills: { s: rates } } });
+    expect(plain.update({ ...stored, previous: { s: "q1" } }, event).previous).toBeUndefined();
+  });
+
+  it("rejects fixed rates and bounds that are malformed or contradict the options", () => {
+    const fail = (options: BktOptions, message: string): void => {
+      expect(() => bkt(options), message).toThrow(message);
+    };
+    fail(
+      { fixed: { s: { learn: 1.2 } } },
+      'The fixed rates of skill "s" have learn that is not a probability, found 1.2.',
+    );
+    fail({ fixed: { s: { forget: 0.1 } } }, 'The fixed rates of skill "s" have forget, which needs forgetting: true.');
+    fail({ bounds: { forget: [0, 0.1] } }, "The bounds of forget need forgetting: true.");
+    fail(
+      { fixed: { s: { resources: { q: { learn: 0.1 } } } } },
+      'The fixed rates of skill "s" have resources, which need resourceLearning: true.',
+    );
+    fail({ bounds: { guess: [0.5, 0.2] } }, "The lower bound of guess, 0.5, is above its upper bound, 0.2.");
+    fail(
+      { bounds: { guess: [0, 1.5] } },
+      "The bounds of guess must be a pair of probabilities [lower, upper], found an array.",
+    );
+    fail(
+      { bounds: { learn: [0, 0.5] }, fixed: { s: { learn: 0.7 } } },
+      'The fixed rates of skill "s" have learn 0.7, outside its bounds [0, 0.5].',
+    );
+    fail(
+      { bounds: { guess: [0, 0.3] }, parameters: { skills: { s: { ...rates, guess: 0.5 } } } },
+      'The BKT parameters of skill "s" have guess 0.5, outside the bounds [0, 0.3].',
+    );
+    fail(
+      { pairLearning: true, resourceLearning: true },
+      "The option pairLearning cannot be used with resourceLearning: a rate has one key.",
+    );
+    fail(
+      { bounds: JSON.parse('{"speed":[0,1]}') },
+      'The option bounds has no rate "speed"; its rates are prior, learn, forget, guess, slip.',
+    );
+    fail({ fixed: JSON.parse("[]") }, "The option fixed must be an object of fixed rates by skill id, found an array.");
   });
 });
 

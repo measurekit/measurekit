@@ -30,6 +30,11 @@ export interface BktSkill {
   readonly groupPriors?: Readonly<Record<string, number>>;
   /** The learn and forget rates of resources, by resource id; absent without resource learning. */
   readonly resourceLearning?: Readonly<Record<string, BktLearning>>;
+  /**
+   * The learn and forget rates of an attempt by the resource before it, then its own; absent without pair learning. A
+   * learner's first attempt at the skill uses the skill's own rates.
+   */
+  readonly pairLearning?: Readonly<Record<string, Readonly<Record<string, BktLearning>>>>;
   /** The guess and slip rates of items, by item id; absent without item guess and slip. */
   readonly itemGuessSlip?: Readonly<Record<string, BktGuessSlip>>;
 }
@@ -55,9 +60,13 @@ export function priorOf(skill: BktSkill, group: string | undefined): number {
   return (group === undefined ? undefined : entry(skill.groupPriors, group)) ?? skill.prior;
 }
 
-/** Returns the learn and forget rates that follow an attempt with a resource. */
-export function learningOf(skill: BktSkill, resource: string): BktLearning {
-  return entry(skill.resourceLearning, resource) ?? skill;
+/**
+ * Returns the learn and forget rates that follow an attempt with a resource: its pair with the resource before it, when
+ * there is one and the skill has it, then the resource's own and the skill's.
+ */
+export function learningOf(skill: BktSkill, resource: string, previous?: string): BktLearning {
+  const pair = previous === undefined ? undefined : entry(entry(skill.pairLearning, previous), resource);
+  return pair ?? entry(skill.resourceLearning, resource) ?? skill;
 }
 
 /** Returns the guess and slip rates of an item. */
@@ -72,7 +81,7 @@ export function checkParameters(parameters: BktParameters): void {
   for (const [id, skill] of Object.entries(parameters.skills)) {
     const label = `The BKT parameters of skill "${id}"`;
     checkRecord(skill, `${label} must be an object`);
-    const { prior, learn, forget, guess, slip, groupPriors, resourceLearning, itemGuessSlip } = skill;
+    const { prior, learn, forget, guess, slip, groupPriors, resourceLearning, pairLearning, itemGuessSlip } = skill;
     checkRates(label, { prior, learn, forget, guess, slip });
     for (const [group, groupPrior] of records(groupPriors, `${label} need groupPriors, an object of priors by group`)) {
       checkRates(`${label}, group "${group}",`, { prior: groupPrior });
@@ -83,6 +92,19 @@ export function checkParameters(parameters: BktParameters): void {
     )) {
       checkRecord(rates, `${label}, resource "${resource}", must be an object`);
       checkRates(`${label}, resource "${resource}",`, { learn: rates.learn, forget: rates.forget });
+    }
+    for (const [previous, pairs] of records(
+      pairLearning,
+      `${label} need pairLearning, an object of rates by the resource before and the resource`,
+    )) {
+      checkRecord(pairs, `${label}, after resource "${previous}", must be an object`);
+      for (const [resource, rates] of Object.entries(pairs)) {
+        checkRecord(rates, `${label}, resource "${resource}" after "${previous}", must be an object`);
+        checkRates(`${label}, resource "${resource}" after "${previous}",`, {
+          learn: rates.learn,
+          forget: rates.forget,
+        });
+      }
     }
     for (const [item, rates] of records(itemGuessSlip, `${label} need itemGuessSlip, an object of rates by item id`)) {
       checkRecord(rates, `${label}, item "${item}", must be an object`);

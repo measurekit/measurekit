@@ -6,6 +6,7 @@ Run from the repository root: validation/knowledge-tracing/.venv/bin/python vali
 
 import json
 import math
+import re
 
 import numpy as np
 import pandas as pd
@@ -38,14 +39,15 @@ COLUMNS = {
     "correct": "correct",
     "multigs": "item",
     "multilearn": "resource",
+    "multipair": "resource",
     "multiprior": "group",
 }
 
 
 def pybkt_data(rows, skill, options, gs_names=None, resource_names=None):
     """pyBKT's data of one skill: model_type is (multilearn, multiprior, multipair, multigs)."""
-    model_type = (options.get("resourceLearning", False), options.get("priorGroups", False), False,
-                  options.get("itemGuessSlip", False))
+    model_type = (options.get("resourceLearning", False), options.get("priorGroups", False),
+                  options.get("pairLearning", False), options.get("itemGuessSlip", False))
     return data_helper.convert_data(
         pd.DataFrame(rows), skill, defaults=dict(COLUMNS), model_type=model_type,
         gs_refs=None if gs_names is None else {skill: {"gs_names": gs_names}},
@@ -60,6 +62,11 @@ def pybkt_model(parameters, data, options):
     for name, _ in resources:
         if options.get("priorGroups") and name != "Default":
             learning.append((parameters["groupPriors"][name], 0.0))
+        elif options.get("pairLearning") and name != "Default":
+            # pyBKT names a pair "['current'] ['previous']".
+            current, previous = re.fullmatch(r"\['(.*)'\] \['(.*)'\]", name).groups()
+            rates = parameters["pairLearning"][previous][current]
+            learning.append((rates["learn"], rates["forget"]))
         elif options.get("resourceLearning"):
             rates = parameters["resourceLearning"][name]
             learning.append((rates["learn"], rates["forget"]))
@@ -90,13 +97,13 @@ def pybkt_predictions(model, data):
     return dict(zip(data["index"], zip(correct, known)))
 
 
-def expectation_maximization(model, data, tolerance=TOLERANCE):
+def expectation_maximization(model, data, tolerance=TOLERANCE, fixed=None):
     """pyBKT's EM_fit loop, keeping the expected counts of the last M-step. Returns the model, the log-likelihoods and
     the counts: transitions by resource, to, from; emissions by guess and slip class, state, outcome."""
     resources, classes = len(model["learns"]), len(model["guesses"])
     likelihoods, counts = [], None
     for i in range(MAX_ITERATIONS):
-        result = EM_fit.run(data, model, None, None, None, 1, parallel=False)
+        result = EM_fit.run(data, model, None, None, None, 1, parallel=False, fixed=fixed or {})
         for j in range(resources):
             result["all_trans_softcounts"][j] = result["all_trans_softcounts"][j].transpose()
         for j in range(classes):
@@ -106,7 +113,7 @@ def expectation_maximization(model, data, tolerance=TOLERANCE):
             break
         counts = (result["all_trans_softcounts"].copy(), result["all_emission_softcounts"].copy())
         model = M_step.run(model, result["all_trans_softcounts"], result["all_emission_softcounts"],
-                           result["all_initial_softcounts"])
+                           result["all_initial_softcounts"], fixed=fixed or {})
     return model, likelihoods, counts
 
 
@@ -129,7 +136,16 @@ def knowledge_tracing_parameters(model, data, options, counts):
         skill["learn"], skill["forget"] = float(model["learns"][default]), float(model["forgets"][default])
     else:
         skill["prior"] = float(model["prior"])
-        if options.get("resourceLearning"):
+        if options.get("pairLearning"):
+            default = names["Default"] - 1
+            skill["learn"], skill["forget"] = float(model["learns"][default]), float(model["forgets"][default])
+            skill["pairLearning"] = {}
+            for name, index in names.items():
+                if name != "Default":
+                    current, previous = re.fullmatch(r"\['(.*)'\] \['(.*)'\]", name).groups()
+                    skill["pairLearning"].setdefault(previous, {})[current] = {
+                        "learn": float(model["learns"][index - 1]), "forget": float(model["forgets"][index - 1])}
+        elif options.get("resourceLearning"):
             skill["resourceLearning"] = {name: {"learn": float(model["learns"][index - 1]),
                                             "forget": float(model["forgets"][index - 1])}
                                      for name, index in names.items()}
@@ -494,4 +510,149 @@ write_fixture("bkt-lessons", {
     "events": lesson_events,
     "inference": lesson_inference,
     "fits": lesson_fits,
+})
+
+
+# Fixed rates: pyBKT's `fixed`, where an array holds a value for each resource or item class and a negative one leaves
+# it free. Standard configurations hold a skill's learn rate, or its guess and slip, on the practice log; the lessons'
+# log holds the learn rate of the lesson while the practice's is estimated.
+fixed_fits = []
+FIXED_SKILL = {"learn": 0.12, "guess": 0.25, "slip": 0.08}
+for name, options, fixed_of in [
+    ("fixed learn", {}, lambda data: {"learns": np.full(len(data["resource_names"]), FIXED_SKILL["learn"])}),
+    ("fixed guess and slip", {}, lambda data: {"guesses": np.full(len(data["gs_names"]), FIXED_SKILL["guess"]),
+                                              "slips": np.full(len(data["gs_names"]), FIXED_SKILL["slip"])}),
+]:
+    start = parameters_for(options, STARTS)
+    fitted, iterations = {}, []
+    for skill in SKILLS:
+        skill_rows = [row for row in rows if row["skill"] == skill]
+        data = pybkt_data(skill_rows, skill, options)
+        fixed = fixed_of(data)
+        model = pybkt_model(start["skills"][skill], data, options)
+        reference, _ = EM_fit.EM_fit({key: np.copy(value) for key, value in model.items()}, data, tol=TOLERANCE,
+                                     maxiter=MAX_ITERATIONS, parallel=False, fixed=fixed)
+        model, lls, counts = expectation_maximization(model, data, fixed=fixed)
+        for key in ["learns", "forgets", "guesses", "slips"]:
+            assert np.array_equal(model[key], reference[key]), (name, skill, key)
+        fitted[skill] = knowledge_tracing_parameters(model, data, options, counts)
+        iterations.append(len(lls))
+    parameters = {"skills": fitted}
+    predictions, _ = predictions_of(options, parameters)
+    held = {"fixed learn": {"learn": FIXED_SKILL["learn"]},
+            "fixed guess and slip": {"guess": FIXED_SKILL["guess"], "slip": FIXED_SKILL["slip"]}}[name]
+    fixed_fits.append({
+        "name": name, "options": options, "log": "practice", "fixed": {skill: held for skill in SKILLS},
+        "start": start, "parameters": parameters, "iterations": max(iterations),
+        "logLikelihood": sum(outcome_log_likelihood(p, e["outcome"]) for p, e in zip(predictions, events)),
+    })
+
+# The lessons' log with the lesson's learn rate held at 0.3.
+HELD_LESSON = 0.3
+options = {"resourceLearning": True, "itemGuessSlip": True}
+start = lesson_parameters(options, 0.5, 0.3, 0.08, 0.3, 0.2, 0.03)
+data = pybkt_data(lesson_rows, "s", options)
+fixed = {"learns": np.array([HELD_LESSON if name == "lesson" else -1.0
+                            for name, _ in sorted(data["resource_names"].items(), key=lambda entry: entry[1])])}
+model = pybkt_model(start, data, options)
+reference, _ = EM_fit.EM_fit({key: np.copy(value) for key, value in model.items()}, data, tol=TOLERANCE,
+                             maxiter=MAX_ITERATIONS, parallel=False, fixed=fixed)
+model, lls, counts = expectation_maximization(model, data, fixed=fixed)
+for key in ["learns", "forgets", "guesses", "slips"]:
+    assert np.array_equal(model[key], reference[key]), ("held lesson", key)
+fitted = knowledge_tracing_parameters(model, data, options, counts)
+fitted["itemGuessSlip"] = {item: rates for item, rates in fitted["itemGuessSlip"].items() if item != LESSON_ITEM}
+start["itemGuessSlip"] = {item: rates for item, rates in start["itemGuessSlip"].items() if item != LESSON_ITEM}
+fitted_model = pybkt_model({**fitted, "itemGuessSlip": {**fitted["itemGuessSlip"], LESSON_ITEM: {"guess": 0.5, "slip": 0.5}}},
+                           data, options)
+by_row = pybkt_predictions(fitted_model, data)
+fixed_fits.append({
+    "name": "a lesson held, practice estimated", "options": options, "log": "lessons",
+    "fixed": {"s": {"resources": {"lesson": {"learn": HELD_LESSON}}}},
+    "start": {"skills": {"s": start}}, "parameters": {"skills": {"s": fitted}}, "iterations": len(lls),
+    "logLikelihood": sum(outcome_log_likelihood(by_row[order][0], row["correct"])
+                         for order, row in enumerate(lesson_rows) if row["correct"] != -1),
+})
+write_fixture("bkt-fixed", {
+    "source": "pyBKT 1.4.3: EM_fit from matched starts with `fixed`, M_step holding the rates of the classes it names.",
+    "tolerance": TOLERANCE,
+    "maxIterations": MAX_ITERATIONS,
+    "fits": fixed_fits,
+})
+
+# Pairs: 120 learners take 12 steps at one skill, each at one of 4 items; the rate after an attempt depends on the item
+# before it and its own. pyBKT's `multipair` has 17 resources: the 16 pairs and Default, a learner's first attempt.
+PAIR_ITEMS = ["i1", "i2", "i3", "i4"]
+pair_rng = np.random.default_rng(SEED + 2)
+PAIR_TRUE = {"prior": 0.25,
+             "pairs": {previous: {current: (0.05 + 0.04 * ((a + b) % 4), 0.01 * ((a * b) % 3))
+                                  for b, current in enumerate(PAIR_ITEMS)} for a, previous in enumerate(PAIR_ITEMS)},
+             "default": (0.2, 0.02), "items": {"i1": (0.25, 0.1), "i2": (0.15, 0.2), "i3": (0.2, 0.15),
+                                               "i4": (0.3, 0.1)}}
+pair_events = []
+for index in range(120):
+    known = pair_rng.random() < PAIR_TRUE["prior"]
+    previous = None
+    for step in range(12):
+        item = str(pair_rng.choice(PAIR_ITEMS))
+        guess, slip = PAIR_TRUE["items"][item]
+        pair_events.append({"learner": f"P{index:03d}", "item": item, "skills": ["p"], "time": step * 1000 + index,
+                            "outcome": int(pair_rng.random() < (1 - slip if known else guess))})
+        learn, forget = PAIR_TRUE["default"] if previous is None else PAIR_TRUE["pairs"][previous][item]
+        known = pair_rng.random() >= forget if known else pair_rng.random() < learn
+        previous = item
+pair_events.sort(key=lambda event: event["time"])
+pair_rows = [{"order": order, "learner": event["learner"], "skill": "p", "correct": event["outcome"],
+              "item": event["item"], "resource": event["item"], "group": ""} for order, event in enumerate(pair_events)]
+pair_options = {"pairLearning": True, "itemGuessSlip": True, "forgetting": True}
+pair_data = pybkt_data(pair_rows, "p", pair_options)
+assert len(pair_data["resource_names"]) == 17 and list(pair_data["resource_names"].items())[0] == ("Default", 1)
+# pyBKT rates every resource without a following attempt as learned for sure: each pair must be followed.
+last_of_learner = {}
+for row in pair_rows:
+    last_of_learner[row["learner"]] = row["order"]
+previous_item, seen_pairs = {}, set()
+for row in pair_rows:
+    if row["order"] != last_of_learner[row["learner"]]:
+        before = previous_item.get(row["learner"])
+        seen_pairs.add("Default" if before is None else (before, row["item"]))
+    previous_item[row["learner"]] = row["item"]
+assert len(seen_pairs) == 17, len(seen_pairs)
+
+
+def pair_parameters(prior, learn, forget, guess, slip, shift):
+    return {"prior": prior, "learn": learn, "forget": forget, "guess": guess, "slip": slip,
+            "pairLearning": {previous: {current: {"learn": learn + shift * ((a + b) % 4), "forget": forget + shift * (b % 2) / 4}
+                                        for b, current in enumerate(PAIR_ITEMS)}
+                             for a, previous in enumerate(PAIR_ITEMS)},
+            "itemGuessSlip": {item: {"guess": guess + shift * k, "slip": slip + shift * k / 2}
+                              for k, item in enumerate(PAIR_ITEMS)}}
+
+
+pair_start = pair_parameters(0.5, 0.25, 0.08, 0.3, 0.2, 0.01)
+pair_fixed_point = pair_parameters(0.3, 0.15, 0.03, 0.2, 0.1, 0.02)
+pair_model = pybkt_model(pair_fixed_point, pair_data, pair_options)
+pair_by_row = pybkt_predictions(pair_model, pair_data)
+model = pybkt_model(pair_start, pair_data, pair_options)
+reference, _ = EM_fit.EM_fit({key: np.copy(value) for key, value in model.items()}, pair_data, tol=TOLERANCE,
+                             maxiter=MAX_ITERATIONS, parallel=False)
+model, lls, counts = expectation_maximization(model, pair_data)
+for key in ["learns", "forgets", "guesses", "slips"]:
+    assert np.array_equal(model[key], reference[key]), ("pairs", key)
+pair_fitted = knowledge_tracing_parameters(model, pair_data, pair_options, counts)
+fitted_by_row = pybkt_predictions(pybkt_model(pair_fitted, pair_data, pair_options), pair_data)
+write_fixture("bkt-pairs", {
+    "source": "pyBKT 1.4.3: multipair, 17 resources on 4 items with Default first; predict_onestep at fixed parameters "
+              "and EM_fit from a matched start.",
+    "tolerance": TOLERANCE,
+    "maxIterations": MAX_ITERATIONS,
+    "options": pair_options,
+    "events": pair_events,
+    "inference": {"parameters": {"skills": {"p": pair_fixed_point}},
+                  "predictions": [float(pair_by_row[order][0]) for order in range(len(pair_rows))],
+                  "mastery": [float(pair_by_row[order][1]) for order in range(len(pair_rows))]},
+    "fit": {"start": {"skills": {"p": pair_start}}, "parameters": {"skills": {"p": pair_fitted}},
+            "iterations": len(lls),
+            "logLikelihood": sum(outcome_log_likelihood(fitted_by_row[order][0], row["correct"])
+                                 for order, row in enumerate(pair_rows))},
 })

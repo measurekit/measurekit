@@ -1,9 +1,10 @@
 import { createRandom, DataError, type Random, type Stopping } from "@measurekit/core";
 import { resourceOf } from "../data/event.js";
 import type { EventLog } from "../data/event-log.js";
-import { entry } from "../data/record.js";
+import { entry, mapRecord } from "../data/record.js";
 import { expectationMaximization } from "../math/expectation-maximization.js";
 import { forwardBackward } from "../math/hidden-markov.js";
+import { type BktBounds, type BktFixedRates, constrain } from "./constraints.js";
 import { type BktGuessSlip, type BktLearning, type BktSkill, guessSlipOf, learningOf, priorOf } from "./parameters.js";
 
 /** One learner's attempts at one skill, in time order. */
@@ -11,8 +12,12 @@ export interface Sequence {
   readonly learner: string;
   /** The learner's prior group, if they have one. */
   readonly group: string | undefined;
-  /** The attempts: the item, the resource and the outcome, `null` for an attempt with nothing observed. */
-  readonly steps: { readonly item: string; readonly resource: string; readonly outcome: number | null }[];
+  /**
+   * The attempts: the item, the key of the class of the learn and forget rates that follow it, and the outcome, `null` for
+   * an attempt with nothing observed. The key is the resource with resource learning, the resource before it and the
+   * resource with pair learning, and `undefined` for the skill's own rates.
+   */
+  readonly steps: { readonly item: string; readonly learning: string | undefined; readonly outcome: number | null }[];
 }
 
 /** Which rates of a skill have values by group or item, and how many rates the skill's events estimate. */
@@ -20,8 +25,10 @@ export interface Structure {
   readonly forgetting: boolean;
   /** The groups with a prior of their own: those of the skill's learners, with prior groups. */
   readonly groups: readonly string[];
-  /** The resources with learn and forget rates of their own: those followed by an outcome, with resource learning. */
-  readonly learningResources: readonly string[];
+  /** What the learn and forget rates are keyed by: the resource, the resource before it and the resource, or neither. */
+  readonly learningKind: "resource" | "pair" | "none";
+  /** The keys of the classes with learn and forget rates of their own: those followed by an outcome. */
+  readonly learningClasses: readonly string[];
   /** The items with guess and slip rates of their own: those with an outcome, with item guess and slip. */
   readonly guessSlipItems: readonly string[];
   /** The number of rates the events estimate: k of the information criteria. */
@@ -32,6 +39,7 @@ export interface Structure {
 export interface StructureOptions {
   readonly forgetting: boolean;
   readonly resourceLearning: boolean;
+  readonly pairLearning: boolean;
   readonly itemGuessSlip: boolean;
   readonly priorGroups: boolean;
 }
@@ -44,6 +52,19 @@ export interface SkillEstimate {
   readonly converged: boolean;
 }
 
+/** Returns the key of the class of the rates that follow an attempt with `resource` after one with `previous`. */
+function learningKey(
+  kind: Structure["learningKind"],
+  previous: string | undefined,
+  resource: string,
+): string | undefined {
+  if (kind === "resource") return resource;
+  return kind === "pair" && previous !== undefined ? `${previous}${PAIR_SEPARATOR}${resource}` : undefined;
+}
+
+/** Separates the resource before an attempt from its own in the key of a pair; no id has a null character. */
+const PAIR_SEPARATOR = "\u0000";
+
 /**
  * Returns the sequences of each skill, by skill id in the order the skills first appear in the log. A sequence without
  * an observed outcome has nothing to estimate from, so a skill met only through such sequences is left out.
@@ -51,16 +72,20 @@ export interface SkillEstimate {
 export function sequencesBySkill(
   log: EventLog,
   priorGroups: Readonly<Record<string, string>> | undefined,
+  kind: Structure["learningKind"],
 ): Map<string, Sequence[]> {
   const bySkill = new Map<string, Map<string, Sequence>>();
+  const latest = new Map<Sequence, string>();
   for (const event of log) {
     const { learner, item, skills, outcome } = event;
+    const resource = resourceOf(event);
     for (const skill of skills) {
       const learners = bySkill.get(skill) ?? new Map<string, Sequence>();
       bySkill.set(skill, learners);
       const sequence = learners.get(learner) ?? { learner, group: entry(priorGroups, learner), steps: [] };
       learners.set(learner, sequence);
-      sequence.steps.push({ item, resource: resourceOf(event), outcome });
+      sequence.steps.push({ item, learning: learningKey(kind, latest.get(sequence), resource), outcome });
+      latest.set(sequence, resource);
     }
   }
   const informative = [...bySkill].map(([skill, learners]): [string, Sequence[]] => [
@@ -70,61 +95,92 @@ export function sequencesBySkill(
   return new Map(informative.filter(([, sequences]) => sequences.length > 0));
 }
 
-/** Returns the structure of a skill's sequences. */
-export function structureOf(sequences: readonly Sequence[], options: StructureOptions): Structure {
+/** Returns the structure of a skill's sequences, with the rates that `fixed` holds left out of the count. */
+export function structureOf(
+  sequences: readonly Sequence[],
+  options: StructureOptions,
+  fixed: BktFixedRates | undefined,
+): Structure {
   const groups = options.priorGroups ? distinct(sequences.flatMap((sequence) => sequence.group ?? [])) : [];
   // A transition teaches something when an outcome follows it, so steps after the last outcome count for nothing.
   const followed = sequences.flatMap(({ steps }) =>
-    steps
-      .slice(
-        0,
-        steps.findLastIndex(({ outcome }) => outcome !== null),
-      )
-      .map((step) => step.resource),
+    steps.slice(
+      0,
+      steps.findLastIndex(({ outcome }) => outcome !== null),
+    ),
   );
-  const learningResources = options.resourceLearning ? distinct(followed) : [];
+  const learningKind = options.resourceLearning ? "resource" : options.pairLearning ? "pair" : "none";
+  const learningClasses = distinct(followed.flatMap(({ learning }) => learning ?? []));
   const answered = sequences.flatMap(({ steps }) =>
     steps.filter(({ outcome }) => outcome !== null).map(({ item }) => item),
   );
   const guessSlipItems = options.itemGuessSlip ? distinct(answered) : [];
-  // The skill's own rate counts when an event uses it: a learner without a group, or any event without the option.
-  const priors = groups.length + (sequences.some((sequence) => sequence.group === undefined) ? 1 : 0);
-  const learning = options.resourceLearning ? learningResources.length : Math.min(followed.length, 1);
-  const guessSlip = options.itemGuessSlip ? guessSlipItems.length : 1;
+  // The skill's own rate counts when an event uses it: a learner without a group, a first attempt with pairs, or any
+  // event without the option. A fixed rate is not estimated.
+  const free = (rate: number | undefined): number => (rate === undefined ? 1 : 0);
+  const priors = groups.length + (sequences.some((sequence) => sequence.group === undefined) ? free(fixed?.prior) : 0);
+  const forgets = (held: Partial<BktLearning> | undefined): number => (options.forgetting ? free(held?.forget) : 0);
+  const classRates = learningClasses.reduce((sum, key) => {
+    const held = learningKind === "resource" ? entry(fixed?.resources, key) : undefined;
+    return sum + free(held?.learn) + forgets(held);
+  }, 0);
+  const ownRates = followed.some(({ learning }) => learning === undefined) ? free(fixed?.learn) + forgets(fixed) : 0;
+  const guessSlip = options.itemGuessSlip ? 2 * guessSlipItems.length : free(fixed?.guess) + free(fixed?.slip);
   return {
     forgetting: options.forgetting,
     groups,
-    learningResources,
+    learningKind,
+    learningClasses,
     guessSlipItems,
-    parameterCount: priors + learning * (options.forgetting ? 2 : 1) + 2 * guessSlip,
+    parameterCount: priors + classRates + ownRates + guessSlip,
   };
 }
 
 /**
- * Returns a start from given parameters, with the structure's groups, resources and items starting at their own values
- * or, without them, at the skill's, and the forget rate at 0 without forgetting.
+ * Returns a start from given parameters, with the structure's groups, classes and items starting at their own values
+ * or, without them, at the skill's, and the forget rate at 0 without forgetting. The rates are held to the constraints.
  */
-export function startFrom(skill: BktSkill, structure: Structure): BktSkill {
+export function startFrom(
+  skill: BktSkill,
+  structure: Structure,
+  fixed: BktFixedRates | undefined,
+  bounds: BktBounds,
+): BktSkill {
   const forget = (rate: number): number => (structure.forgetting ? rate : 0);
-  return withRecords(
+  const start = withRecords(
     { prior: skill.prior, learn: skill.learn, forget: forget(skill.forget), guess: skill.guess, slip: skill.slip },
     structure,
     (group) => priorOf(skill, group),
-    (resource) => {
-      const { learn, forget: rate } = learningOf(skill, resource);
+    (key) => {
+      const [previous, resource] = structure.learningKind === "pair" ? splitPair(key) : [undefined, key];
+      const { learn, forget: rate } = learningOf(skill, resource, previous);
       return { learn, forget: forget(rate) };
     },
     (item) => guessSlipOf(skill, item),
   );
+  return constrain(start, fixed, bounds, false);
+}
+
+/** Returns the resource before and the resource that the key of a pair names. */
+function splitPair(key: string): [string, string] {
+  const [previous = "", resource = ""] = key.split(PAIR_SEPARATOR);
+  return [previous, resource];
 }
 
 /**
  * Returns `count` random starts from a generator seeded with `seed`, so that a skill's starts do not depend on the
  * other skills of a log.
  */
-export function randomStarts(structure: Structure, count: number, seed: number): [BktSkill, ...BktSkill[]] {
+export function randomStarts(
+  structure: Structure,
+  count: number,
+  seed: number,
+  fixed: BktFixedRates | undefined,
+  bounds: BktBounds,
+): [BktSkill, ...BktSkill[]] {
   const random = createRandom(seed);
-  return [randomStart(structure, random), ...Array.from({ length: count - 1 }, () => randomStart(structure, random))];
+  const start = (): BktSkill => constrain(randomStart(structure, random), fixed, bounds, false);
+  return [start(), ...Array.from({ length: count - 1 }, start)];
 }
 
 /**
@@ -134,7 +190,7 @@ export function randomStarts(structure: Structure, count: number, seed: number):
  */
 const START_BOUNDS = { prior: 1, learn: 0.4, forget: 0.2, guess: 0.4, slip: 0.3 };
 
-/** Returns a random start, drawn for the skill, then for each group, resource and item in sorted order. */
+/** Returns a random start, drawn for the skill, then for each group, class and item in sorted order. */
 function randomStart(structure: Structure, random: Random): BktSkill {
   const draw = (upper: number): number => upper * random.uniform();
   const learning = (): BktLearning => ({
@@ -155,16 +211,23 @@ function withRecords(
   skill: BktSkill,
   structure: Structure,
   prior: (group: string) => number,
-  learning: (resource: string) => BktLearning,
+  learning: (key: string) => BktLearning,
   guessSlip: (item: string) => BktGuessSlip,
 ): BktSkill {
-  const { groups, learningResources, guessSlipItems } = structure;
+  const { groups, learningKind, learningClasses, guessSlipItems } = structure;
+  const pairs: Record<string, Record<string, BktLearning>> = {};
+  for (const key of learningKind === "pair" ? learningClasses : []) {
+    const [previous, resource] = splitPair(key);
+    pairs[previous] = { ...pairs[previous], [resource]: learning(key) };
+  }
   return {
     ...skill,
     ...(groups.length > 0 && { groupPriors: Object.fromEntries(groups.map((group) => [group, prior(group)])) }),
-    ...(learningResources.length > 0 && {
-      resourceLearning: Object.fromEntries(learningResources.map((resource) => [resource, learning(resource)])),
-    }),
+    ...(learningKind === "resource" &&
+      learningClasses.length > 0 && {
+        resourceLearning: Object.fromEntries(learningClasses.map((key) => [key, learning(key)])),
+      }),
+    ...(learningKind === "pair" && learningClasses.length > 0 && { pairLearning: pairs }),
     ...(guessSlipItems.length > 0 && {
       itemGuessSlip: Object.fromEntries(guessSlipItems.map((item) => [item, guessSlip(item)])),
     }),
@@ -181,6 +244,7 @@ export function estimate(
   sequences: readonly Sequence[],
   starts: readonly [BktSkill, ...BktSkill[]],
   forgetting: boolean,
+  { fixed, bounds }: { readonly fixed: BktFixedRates | undefined; readonly bounds: BktBounds },
   options: Stopping,
 ): SkillEstimate {
   const fits = starts.map((start): SkillEstimate => {
@@ -188,7 +252,7 @@ export function estimate(
       start,
       (skill) => {
         const { logLikelihood, counts } = expectation(skill, sequences);
-        return { logLikelihood, parameters: maximization(skill, counts, forgetting) };
+        return { logLikelihood, parameters: constrain(maximization(skill, counts, forgetting), fixed, bounds, true) };
       },
       options,
     );
@@ -218,12 +282,19 @@ function expectation(skill: BktSkill, sequences: readonly Sequence[]): { logLike
   const counts: Expectation = { prior: new Map(), learning: new Map(), guessSlip: new Map() };
   const rates = {
     prior: classes((group) => entry(skill.groupPriors, group), skill.prior, counts.prior),
-    learning: classes((resource) => entry(skill.resourceLearning, resource), skill, counts.learning),
+    learning: classes((key) => ownLearning(skill, key), skill, counts.learning),
     guessSlip: classes((item) => entry(skill.itemGuessSlip, item), skill, counts.guessSlip),
   };
   let logLikelihood = 0;
   for (const sequence of sequences) logLikelihood += addSequence(sequence, rates);
   return { logLikelihood, counts };
+}
+
+/** Returns the learn and forget rates that the skill has for a class of resources or pairs, if it has any. */
+function ownLearning(skill: BktSkill, key: string): BktLearning | undefined {
+  if (skill.pairLearning === undefined) return entry(skill.resourceLearning, key);
+  const [previous, resource] = splitPair(key);
+  return entry(entry(skill.pairLearning, previous), resource);
 }
 
 /** A class of a rate: its value, and the sums of its expected counts. */
@@ -260,7 +331,7 @@ function classes<T>(
 /** The lookups of an E-step. */
 interface Rates {
   readonly prior: (group: string | undefined) => RateClass<number>;
-  readonly learning: (resource: string) => RateClass<BktLearning>;
+  readonly learning: (key: string | undefined) => RateClass<BktLearning>;
   readonly guessSlip: (item: string) => RateClass<BktGuessSlip>;
 }
 
@@ -269,7 +340,7 @@ function addSequence({ learner, group, steps }: Sequence, rates: Rates): number 
   const last = steps.length - 1;
   const transitions = new Float64Array(4 * last);
   const emissions = new Float64Array(2 * steps.length);
-  steps.forEach(({ item, resource, outcome }, t) => {
+  steps.forEach(({ item, learning, outcome }, t) => {
     if (outcome === null) {
       // An attempt with nothing observed has probability 1 in both states.
       emissions[2 * t] = 1;
@@ -280,7 +351,7 @@ function addSequence({ learner, group, steps }: Sequence, rates: Rates): number 
       emissions[2 * t + 1] = outcome === 1 ? 1 - slip : slip;
     }
     if (t === last) return;
-    const { learn, forget } = rates.learning(resource).rates;
+    const { learn, forget } = rates.learning(learning).rates;
     transitions[4 * t] = 1 - learn;
     transitions[4 * t + 1] = learn;
     transitions[4 * t + 2] = forget;
@@ -300,7 +371,7 @@ function addSequence({ learner, group, steps }: Sequence, rates: Rates): number 
     );
   }
   add(prior.sums, posteriors[1] ?? 0, 1);
-  steps.forEach(({ item, resource, outcome }, t) => {
+  steps.forEach(({ item, learning, outcome }, t) => {
     const unknown = posteriors[2 * t] ?? 0;
     const known = posteriors[2 * t + 1] ?? 0;
     if (outcome !== null) add(rates.guessSlip(item).sums, unknown, unknown * outcome, known, known * (1 - outcome));
@@ -309,7 +380,7 @@ function addSequence({ learner, group, steps }: Sequence, rates: Rates): number 
     const learned = transitionPosteriors[4 * t + 1] ?? 0;
     const forgot = transitionPosteriors[4 * t + 2] ?? 0;
     const kept = transitionPosteriors[4 * t + 3] ?? 0;
-    add(rates.learning(resource).sums, stay + learned, learned, forgot + kept, forgot);
+    add(rates.learning(learning).sums, stay + learned, learned, forgot + kept, forgot);
   });
   return logLikelihood;
 }
@@ -323,17 +394,11 @@ function add(sums: Float64Array, a: number, b: number, c = 0, d = 0): void {
 }
 
 /**
- * The least distance of a fitted P(G) or P(S) from 0 and 1, 2⁻⁵², so that a fitted model gives every outcome a positive
- * probability: data with every outcome correct would otherwise fit P(S) = 0, and an incorrect answer would
- * be impossible.
- */
-const MIN_GUESS_SLIP = Number.EPSILON;
-
-/**
- * The M-step: each rate is its expected count over its expected opportunities, P(G) and P(S) bounded by
- * {@link MIN_GUESS_SLIP}, which for a single rate maximizes the expected log-likelihood within the bounds. A rate
- * of the skill used by no event, when every group, resource or item has its own, is the ratio over all of them, the
- * value for groups, resources and items not fitted. A rate without expected opportunities keeps its value.
+ * The M-step: each rate is its expected count over its expected opportunities, which for a single rate maximizes the
+ * expected log-likelihood; the caller holds the rates to the fixed values and the bounds, which for a single rate is the
+ * exact constrained maximum. A rate of the skill used by no event, when every group, class or item has its own, is the
+ * ratio over all of them, the value for groups, classes and items not fitted. A rate without expected opportunities
+ * keeps its value.
  */
 function maximization(skill: BktSkill, counts: Expectation, forgetting: boolean): BktSkill {
   const ratio = (sums: Float64Array | undefined, numerator: number, denominator: number, current: number): number => {
@@ -341,29 +406,34 @@ function maximization(skill: BktSkill, counts: Expectation, forgetting: boolean)
     // A posterior summed from rounded forward and backward variables can exceed its total by an ulp.
     return total > 0 ? Math.min(1, (sums?.[numerator] ?? 0) / total) : current;
   };
-  const bounded = (rate: number): number => Math.min(Math.max(rate, MIN_GUESS_SLIP), 1 - MIN_GUESS_SLIP);
   const skillRatio = (classes: Counts, numerator: number, denominator: number, current: number): number =>
     ratio(classes.get(null) ?? pooled(classes), numerator, denominator, current);
   const forget = (rate: number): number => (forgetting ? rate : 0);
+  const learning = (rates: BktLearning, key: string): BktLearning => {
+    const sums = counts.learning.get(key);
+    return { learn: ratio(sums, 1, 0, rates.learn), forget: forget(ratio(sums, 3, 2, rates.forget)) };
+  };
   return {
     prior: skillRatio(counts.prior, 0, 1, skill.prior),
     learn: skillRatio(counts.learning, 1, 0, skill.learn),
     forget: forget(skillRatio(counts.learning, 3, 2, skill.forget)),
-    guess: bounded(skillRatio(counts.guessSlip, 1, 0, skill.guess)),
-    slip: bounded(skillRatio(counts.guessSlip, 3, 2, skill.slip)),
+    guess: skillRatio(counts.guessSlip, 1, 0, skill.guess),
+    slip: skillRatio(counts.guessSlip, 3, 2, skill.slip),
     ...(skill.groupPriors !== undefined && {
-      groupPriors: mapRecord(skill.groupPriors, (group, prior) => ratio(counts.prior.get(group), 0, 1, prior)),
+      groupPriors: mapRecord(skill.groupPriors, (prior, group) => ratio(counts.prior.get(group), 0, 1, prior)),
     }),
     ...(skill.resourceLearning !== undefined && {
-      resourceLearning: mapRecord(skill.resourceLearning, (resource, rates) => {
-        const sums = counts.learning.get(resource);
-        return { learn: ratio(sums, 1, 0, rates.learn), forget: forget(ratio(sums, 3, 2, rates.forget)) };
-      }),
+      resourceLearning: mapRecord(skill.resourceLearning, learning),
+    }),
+    ...(skill.pairLearning !== undefined && {
+      pairLearning: mapRecord(skill.pairLearning, (pairs, previous) =>
+        mapRecord(pairs, (rates, resource) => learning(rates, `${previous}${PAIR_SEPARATOR}${resource}`)),
+      ),
     }),
     ...(skill.itemGuessSlip !== undefined && {
-      itemGuessSlip: mapRecord(skill.itemGuessSlip, (item, rates) => {
+      itemGuessSlip: mapRecord(skill.itemGuessSlip, (rates, item) => {
         const sums = counts.guessSlip.get(item);
-        return { guess: bounded(ratio(sums, 1, 0, rates.guess)), slip: bounded(ratio(sums, 3, 2, rates.slip)) };
+        return { guess: ratio(sums, 1, 0, rates.guess), slip: ratio(sums, 3, 2, rates.slip) };
       }),
     }),
   };
@@ -377,13 +447,6 @@ function pooled(classes: Counts): Float64Array {
     });
   }
   return sums;
-}
-
-function mapRecord<TValue, TResult>(
-  record: Readonly<Record<string, TValue>>,
-  map: (key: string, value: TValue) => TResult,
-): Record<string, TResult> {
-  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, map(key, value)]));
 }
 
 function distinct(values: readonly string[]): string[] {

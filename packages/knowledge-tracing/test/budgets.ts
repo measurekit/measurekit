@@ -7,6 +7,7 @@ import { benchmarksOf } from "../../../bench/harness.js";
 const BUDGETS = {
   "bkt.fit": 700,
   "bkt.fitLessons": 1_000,
+  "bkt.fitPairs": 3_000,
   "bkt.replay": 80,
   "elo.replay": 200,
   "logistic.afm": 200,

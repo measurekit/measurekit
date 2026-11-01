@@ -13,3 +13,6 @@ outcomes that follow it, and logistic models count such events as exposures with
 events out of what they predict and count: a fit gives them a `null` prediction, and `observedPairs` aligns the others for
 the metrics. Events also carry `hints`, `duration` and `attemptNumber`, and `firstAttempts` keeps each learner's first
 try at an item.
+
+BKT holds rates at given values with `fixed`, keeps the rates it estimates within `bounds`, and takes the learn and forget
+rates by the pair of the resource before an attempt and its own with `pairLearning`, as pyBKT's `fixed` and `multipair`.

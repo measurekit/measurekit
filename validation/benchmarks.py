@@ -1,5 +1,5 @@
 """Times pyBKT, the reference of the Bayesian knowledge tracing benchmarks of measurekit, on the log of bench-bkt.json, and
-on the same log with a fifth of its attempts as lessons.
+on the same log with a fifth of its attempts as lessons, and with the rates of pairs of items.
 
     validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py
 
@@ -47,6 +47,7 @@ data = pd.DataFrame(
         "user_id": fixture["learner"],
         "skill_name": fixture["skill"],
         "correct": fixture["outcome"],
+        "item": fixture["item"],
     }
 )
 
@@ -66,10 +67,15 @@ def fit_lessons():
     Model(seed=1, parallel=False).fit(data=lessons)
 
 
+def fit_pairs():
+    Model(seed=1, parallel=False).fit(data=data, multipair=True, defaults={"multipair": "item"})
+
+
 model.fit(data=data)
 results = {
     "bkt.fit": time_calls(fit),
     "bkt.fitLessons": time_calls(fit_lessons),
+    "bkt.fitPairs": time_calls(fit_pairs),
     "bkt.replay": time_calls(lambda: model.predict(data=data)),
 }
 for key, result in results.items():

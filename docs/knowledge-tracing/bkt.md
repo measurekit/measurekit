@@ -2,8 +2,9 @@
 
 `@measurekit/knowledge-tracing/bkt` traces each skill with Bayesian knowledge tracing (Corbett and Anderson, 1994)
 and the extensions of pyBKT (Badrinath, Wang and Pardos, 2021): forgetting, item guess and slip, resource learning and
-prior groups. Inference at fixed parameters and EM fitting, with and without events that have no outcome, are validated
-against pyBKT ([validation](validation.md#bayesian-knowledge-tracing)).
+prior groups, pairs of resources, with fixed rates and bounds on the rates that EM estimates. Inference at fixed
+parameters and EM fitting, with and without events that have no outcome, are validated against pyBKT, and bounds against
+base R ([validation](validation.md#bayesian-knowledge-tracing)).
 
 ```mermaid
 flowchart LR
@@ -45,17 +46,20 @@ P(L) ← P(L | outcome) (1 - P(F)) + (1 - P(L | outcome)) P(T).
 
 ## Options
 
-| Option             | Default | Meaning                                                                                     | pyBKT        |
-| ------------------ | ------- | ------------------------------------------------------------------------------------------- | ------------ |
-| `forgetting`       | `false` | Estimate P(F); without it P(F) is 0                                                         | `forgets`    |
-| `itemGuessSlip`    | `false` | Each item has its own P(G) and P(S)                                                         | `multigs`    |
-| `resourceLearning` | `false` | Each resource has its own P(T), and P(F) with forgetting, applied after an attempt with it  | `multilearn` |
-| `priorGroups`      | none    | The group of each learner, by learner id; each group has its own P(L0) per skill            | `multiprior` |
-| `restarts`         | `5`     | Random starts of EM for a skill without parameters; the highest log-likelihood is kept      | `num_fits`   |
-| `seed`             | `0`     | The seed of the random starts; every skill draws its starts from a generator with this seed | `seed`       |
-| `tolerance`        | `1e-6`  | EM has converged when a skill's log-likelihood changes by at most this                      | `tol`        |
-| `maxIterations`    | `500`   | The most EM iterations of a start                                                           | `maxiter`    |
-| `parameters`       | none    | The parameters to predict with and to start EM from                                         | `coef_`      |
+| Option             | Default | Meaning                                                                                           | pyBKT        |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------- | ------------ |
+| `forgetting`       | `false` | Estimate P(F); without it P(F) is 0                                                               | `forgets`    |
+| `itemGuessSlip`    | `false` | Each item has its own P(G) and P(S)                                                               | `multigs`    |
+| `resourceLearning` | `false` | Each resource has its own P(T), and P(F) with forgetting, applied after an attempt with it        | `multilearn` |
+| `pairLearning`     | `false` | Learn and forget rates by the resource before an attempt and its own; not with `resourceLearning` | `multipair`  |
+| `fixed`            | none    | Rates held at given values, by skill id; the others are estimated                                 | `fixed`      |
+| `bounds`           | none    | A lower and an upper bound for each rate that EM estimates                                        | none         |
+| `priorGroups`      | none    | The group of each learner, by learner id; each group has its own P(L0) per skill                  | `multiprior` |
+| `restarts`         | `5`     | Random starts of EM for a skill without parameters; the highest log-likelihood is kept            | `num_fits`   |
+| `seed`             | `0`     | The seed of the random starts; every skill draws its starts from a generator with this seed       | `seed`       |
+| `tolerance`        | `1e-6`  | EM has converged when a skill's log-likelihood changes by at most this                            | `tol`        |
+| `maxIterations`    | `500`   | The most EM iterations of a start                                                                 | `maxiter`    |
+| `parameters`       | none    | The parameters to predict with and to start EM from                                               | `coef_`      |
 
 The options combine freely. Guess and slip use the event's `item`: to share them among items, such as those of one
 template, give their events the template's id as `item`. Learn and forget rates use the event's `resource`, which is its
@@ -64,12 +68,56 @@ item when it has none: a lesson, a video and an exercise can each have rates of 
 ## Parameters
 
 `model.parameters` is plain data, `{ skills: { [skill]: BktSkill } }`. A skill has the five rates above and, with the
-extensions, `groupPriors` by group, `resourceLearning` `{ learn, forget }` by resource and `itemGuessSlip`
-`{ guess, slip }` by item. An item uses its own guess and slip, and a resource its own learn and forget rates, when the
+extensions, `groupPriors` by group, `resourceLearning` `{ learn, forget }` by resource, `pairLearning` `{ learn, forget }`
+by the resource before an attempt and then its own, and `itemGuessSlip` `{ guess, slip }` by item. An item uses its own guess and slip, and a resource its own learn and forget rates, when the
 skill has them and the skill's otherwise; a learner uses their group's prior when the skill has one and the skill's
 otherwise. So items, resources and learners that a fit did not see, such as new items, use the skill's rates. Where
 every item, resource or group has its own, the skill's rate is their pooled estimate: the expected count over the
 expected opportunities of all of them.
+
+## Fixed rates and bounds
+
+```mermaid
+flowchart LR
+  E["E-step: expected counts"] --> R["each rate: expected count over expected opportunities"]
+  R --> F{"fixed?"}
+  F -->|yes| H["the given value"]
+  F -->|no| C["clamped to its bounds"]
+  H --> N["next iteration"]
+  C --> N
+```
+
+| Option          | Holds                                                                                                                                       | Default                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `fixed[skill]`  | `prior`, `learn`, `forget`, `guess` and `slip` of the skill's own rates; `resources` the rates of single resources, with `resourceLearning` | none: every rate is estimated                      |
+| `bounds.<rate>` | `[lower, upper]` for `prior`, `learn`, `forget`, `guess` or `slip`, of the skill's rate and of every group, resource, pair or item          | `[0, 1]`; a guess and a slip stay 2⁻⁵² off 0 and 1 |
+
+- **Fixed.** A fixed rate is not estimated: a lesson's learn rate known from design can be held while practice's is fit,
+  or a guess held at a chance level. `aic` and `bic` leave it out of k. With item or resource rates, a skill's own rate is
+  their pooled estimate, and holding it fixes that value alone; hold single resources through `resources`.
+- **Bounds.** Each rate's expected log-likelihood is a Bernoulli term, concave in the rate, so clamping the ratio of
+  expected counts to the bounds is the exact constrained maximum of each M-step. Random starts are clamped to the
+  bounds, and given parameters outside them are rejected.
+- **Errors.** `DataError` for a fixed rate outside its bounds or not a probability, a lower bound above its upper,
+  `forget` fixed or bounded without `forgetting`, `resources` without `resourceLearning`, `pairLearning` with
+  `resourceLearning` (pyBKT allows one resource handling), and `parameters` outside the bounds.
+
+## Pairs
+
+With `pairLearning`, the learn and forget rates after an attempt depend on the resource before it and its own, as
+pyBKT's `multipair`. A learner's first attempt at a skill uses the skill's own rates, pyBKT's `Default`; a pair the fit
+has not seen uses them too. Four items give 16 pairs and the skill's rates. The state's `previous` holds the resource of
+the latest attempt at each skill; a state without it, as a model without pairs writes, reads as one with no earlier
+attempt.
+
+## Degenerate fits
+
+BKT's likelihood is flat along some directions, so EM can end at rates that fit as well as sensible ones and mean
+something else: a guess above 0.5, or a slip and a guess that swap the meaning of knowing (Beck and Chang, 2007; Baker,
+Corbett and Gowda, 2008). Signs are a P(G) or P(S) at 0.5 or above, a P(T) near 0 with a prior near 1, or fits from
+different starts that agree in likelihood and differ in rates. `restarts` shows the second kind; `bounds` and `fixed` guard
+against all three: Baker et al. cap the guess at 0.3 and the slip at 0.1, `bounds: { guess: [0, 0.3], slip: [0, 0.1] }`. A
+fit that sits on a bound is a hint that the data want more than the bound allows, not a result to report as is.
 
 ## Fitting
 
@@ -152,6 +200,9 @@ the smallest double. It uses the skill's P(T) and P(F), as the items to come are
 
 ## References
 
+- Baker, R. S. J. d., Corbett, A. T., & Gowda, S. M. (2008). More accurate student modeling through contextual
+  estimation of slip and guess probabilities in Bayesian knowledge tracing. In Intelligent Tutoring Systems (ITS 2008).
+- Beck, J. E., & Chang, K. (2007). Identifiability: A fundamental problem of student modeling. In User Modeling (UM 2007).
 - Badrinath, A., Wang, F., & Pardos, Z. (2021). pyBKT: An accessible Python library of Bayesian knowledge tracing
   models. In Proceedings of the 14th International Conference on Educational Data Mining.
 - Corbett, A. T., & Anderson, J. R. (1994). Knowledge tracing: Modeling the acquisition of procedural knowledge. User
