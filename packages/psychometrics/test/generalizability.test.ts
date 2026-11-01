@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  createRandom,
   DataError,
   type DecisionStudy,
   type DecisionStudyOptions,
@@ -11,6 +12,7 @@ import {
   generalizabilityStudy,
 } from "../src/index.js";
 import fixture from "./fixtures/generalizability.json" with { type: "json" };
+import unbalancedFixture from "./fixtures/generalizability-unbalanced.json" with { type: "json" };
 import { defined, expectClose } from "./helpers.js";
 
 // Tolerances against R, explained in docs/validation.md.
@@ -20,6 +22,10 @@ const ANOVA_TOLERANCE = 1e-10;
 const REML_TOLERANCE = 1e-5;
 /** Variances and coefficients of decision studies against the textbook formulas, relative. */
 const DECISION_TOLERANCE = 1e-10;
+/** Method 1 against base R's computation of it: both solve the same linear system. */
+const UNBALANCED_TOLERANCE = 1e-8;
+/** The unbalanced estimates of balanced data against the balanced analysis. */
+const BALANCED_TOLERANCE = 1e-10;
 
 interface ReferenceComponent {
   readonly facets: string[];
@@ -50,10 +56,16 @@ interface ReferenceCase {
 
 // TypeScript types each case of the JSON with the keys of the others, so the cases are read back as one type.
 const cases: readonly ReferenceCase[] = JSON.parse(JSON.stringify(fixture.cases));
+const unbalancedCases: readonly ReferenceCase[] = JSON.parse(JSON.stringify(unbalancedFixture.cases));
 
 /** Returns the case with the name. */
 function caseNamed(name: string): ReferenceCase {
   return defined(cases.find((reference) => reference.name === name));
+}
+
+/** Returns the unbalanced case with the name. */
+function unbalancedCase(name: string): ReferenceCase {
+  return defined(unbalancedCases.find((reference) => reference.name === name));
 }
 
 /** Expects `actual` within `tolerance` times the larger of 1 and the expected value's size. */
@@ -98,6 +110,67 @@ describe("generalizabilityStudy", () => {
       });
     }
   }
+
+  for (const reference of unbalancedCases) {
+    it(`matches Method 1 in base R for ${reference.name} with empty cells`, () => {
+      const study = generalizabilityStudy(reference.scores, reference.design);
+      expect(study.components).toHaveLength(reference.components.length);
+      study.components.forEach((component, k) => {
+        const expected = defined(reference.components[k]);
+        expect(component.facets, `facets ${k}`).toEqual(expected.facets);
+        expect(component.nestedIn, `nestedIn ${k}`).toEqual(expected.nestedIn);
+        expect(component.degreesOfFreedom, `df ${k}`).toBe(expected.degreesOfFreedom);
+        expectRelative(component.sumOfSquares, expected.sumOfSquares, UNBALANCED_TOLERANCE, `sum of squares ${k}`);
+        expectRelative(component.meanSquare, expected.meanSquare, UNBALANCED_TOLERANCE, `mean square ${k}`);
+        expectRelative(component.variance, expected.variance, UNBALANCED_TOLERANCE, `variance ${k}`);
+      });
+    });
+  }
+
+  it("gives the estimates of the balanced analysis for balanced data", () => {
+    for (const reference of cases) {
+      const balanced = generalizabilityStudy(reference.scores, reference.design);
+      const study = generalizabilityStudy(reference.scores, { ...reference.design, unbalanced: true });
+      expect(study.balanced, reference.name).toBe(true);
+      expect(study.sampleSizes, reference.name).toEqual(balanced.sampleSizes);
+      study.components.forEach((component, k) => {
+        const expected = defined(balanced.components[k]);
+        expect(component.facets, `${reference.name} facets ${k}`).toEqual(expected.facets);
+        expect(component.degreesOfFreedom, `${reference.name} df ${k}`).toBe(expected.degreesOfFreedom);
+        expectRelative(component.sumOfSquares, expected.sumOfSquares, BALANCED_TOLERANCE, `${reference.name} SS ${k}`);
+        expectRelative(component.meanSquare, expected.meanSquare, BALANCED_TOLERANCE, `${reference.name} MS ${k}`);
+        expectRelative(component.variance, expected.variance, BALANCED_TOLERANCE, `${reference.name} variance ${k}`);
+      });
+    }
+  });
+
+  it("reports the most elements of each facet in an unbalanced study, and that it is not balanced", () => {
+    const { scores, design } = unbalancedCase("r:p");
+    const study = generalizabilityStudy(scores, design);
+    expect(study.balanced).toBe(false);
+    expect(study.sampleSizes).toEqual({ person: 200, rater: 4 });
+    expect(study.nested).toEqual({ rater: ["person"] });
+    expect(generalizabilityStudy(unbalancedCase("i:p").scores, unbalancedCase("i:p").design).sampleSizes).toEqual({
+      person: 250,
+      item: 12,
+    });
+  });
+
+  it("does not depend on the order of the scores of an unbalanced design", () => {
+    const { scores, design } = unbalancedCase("(r:p) x i");
+    const study = generalizabilityStudy(scores, design);
+    const reversed = generalizabilityStudy([...scores].reverse(), design);
+    reversed.components.forEach((component, k) => {
+      const expected = defined(study.components[k]);
+      expect(component.degreesOfFreedom).toBe(expected.degreesOfFreedom);
+      expectRelative(component.variance, expected.variance, 1e-9, `variance ${k}`);
+    });
+  });
+
+  it("reports a negative component of an unbalanced study as estimated", () => {
+    const study = generalizabilityStudy(unbalancedCase("p x r x i").scores, unbalancedCase("p x r x i").design);
+    expect(defined(study.components[1]).variance).toBeLessThan(0);
+  });
 
   it("reports the design, the sizes of the facets and the effects in order", () => {
     const study = generalizabilityStudy(caseNamed("(r:p) x i").scores, caseNamed("(r:p) x i").design);
@@ -336,12 +409,96 @@ describe("generalizabilityStudy", () => {
     expect(() => generalizabilityStudy(scores, { facets: many })).toThrow(
       "A design has at most 20 facets with the object of measurement, found 21.",
     );
+    expect(() => study({ facets: ["item"], unbalanced: "yes" })).toThrow(
+      'The option unbalanced of the design must be a boolean, found "yes".',
+    );
+    expect(() => study({ facets: ["item"], unbalanced: null })).toThrow(DataError);
+  });
+
+  describe("without the option unbalanced", () => {
+    const missing = crossed([
+      [1, 2, 3],
+      [4, 5, 6],
+      [7, 8, 9],
+    ]).filter((_, k) => k !== 4);
+
+    it("still throws for a missing score, which the option accepts", () => {
+      expect(() => generalizabilityStudy(missing, PERSON_BY_ITEM)).toThrow(
+        'The design is not balanced: there is no score for person "p1", item "i1".',
+      );
+      const study = generalizabilityStudy(missing, { ...PERSON_BY_ITEM, unbalanced: true });
+      expect(study.balanced).toBe(false);
+      expect(study.sampleSizes).toEqual({ person: 3, item: 3 });
+      expect(study.components.map(({ degreesOfFreedom }) => degreesOfFreedom)).toEqual([2, 2, 3]);
+    });
+  });
+
+  it("names the first combination that has two scores, in an unbalanced design", () => {
+    const scores = crossed([
+      [1, 2],
+      [3, 4],
+    ]);
+    const design = { ...PERSON_BY_ITEM, unbalanced: true };
+    expect(() =>
+      generalizabilityStudy([...scores, { levels: { person: "p1", item: "i1" }, score: 5 }], design),
+    ).toThrow(
+      'There is more than one score for person "p1", item "i1"; an unbalanced design allows at most one for each combination of elements.',
+    );
+  });
+
+  it("names an effect whose variance cannot be told apart from the rest", () => {
+    // Persons p0 to p2 and raters r0 to r2 linked in a chain: 5 scores for 3 + 3 - 1 effects of the additive model, so
+    // the person by rater effect has no degrees of freedom and is confounded with the error.
+    const chain = [
+      ["p0", "r0"],
+      ["p0", "r1"],
+      ["p1", "r1"],
+      ["p1", "r2"],
+      ["p2", "r2"],
+    ].map(([person, rater], k) => ({ levels: { person: person ?? "", rater: rater ?? "" }, score: k * k }));
+    expect(() => generalizabilityStudy(chain, { facets: ["rater"], unbalanced: true })).toThrow(
+      'The variance component of "person x rater" cannot be estimated from these scores: it is confounded with those of other effects, as when a facet has one element or two facets always occur together.',
+    );
+    const nested = [
+      ["p0", "a"],
+      ["p0", "b"],
+      ["p1", "a"],
+      ["p2", "a"],
+    ].map(([person, rater], k) => ({ levels: { person: person ?? "", rater: rater ?? "" }, score: k }));
+    const rated = { facets: ["rater"], nested: { rater: ["person"] }, unbalanced: true };
+    expect(generalizabilityStudy(nested, rated).components.map(({ degreesOfFreedom }) => degreesOfFreedom)).toEqual([
+      2, 1,
+    ]);
+    expect(() =>
+      generalizabilityStudy(
+        nested.filter((entry) => entry.levels.rater === "a"),
+        rated,
+      ),
+    ).toThrow(
+      'The facet "rater" needs at least 2 elements in each combination of the elements it is nested in, found 1.',
+    );
+  });
+
+  it("rejects an unbalanced design of more than 6 facets", () => {
+    const facets = Array.from({ length: 6 }, (_, k) => `facet${k}`);
+    const levels = (element: string): Record<string, string> =>
+      Object.fromEntries(["person", ...facets].map((name) => [name, element]));
+    expect(() =>
+      generalizabilityStudy(
+        [
+          { levels: levels("a"), score: 1 },
+          { levels: levels("b"), score: 2 },
+        ],
+        { facets, unbalanced: true },
+      ),
+    ).toThrow("An unbalanced design has at most 6 facets with the object of measurement, found 7.");
   });
 });
 
 describe("decisionStudy", () => {
-  for (const reference of cases) {
-    it(`matches the textbook formulas for ${reference.name}`, () => {
+  for (const reference of [...cases, ...unbalancedCases].filter(({ studies }) => studies.length > 0)) {
+    const unbalanced = reference.design.unbalanced === true;
+    it(`matches the textbook formulas for ${reference.name}${unbalanced ? " with empty cells" : ""}`, () => {
       const study = generalizabilityStudy(reference.scores, reference.design);
       for (const expected of reference.studies) {
         const label = JSON.stringify(expected.options);
@@ -475,6 +632,26 @@ describe("decisionStudy", () => {
     expect(result.dependability).toBe(1);
   });
 
+  it("needs the sizes of every facet of a study that is not balanced", () => {
+    const study = generalizabilityStudy(unbalancedCase("p x r x i").scores, unbalancedCase("p x r x i").design);
+    expect(() => decisionStudy(study)).toThrow(
+      'The study is not balanced, so its facets have no one number of elements: the option sampleSizes must give one for "rater".',
+    );
+    expect(() => decisionStudy(study, { sampleSizes: { rater: 3 } })).toThrow(
+      'The study is not balanced, so its facets have no one number of elements: the option sampleSizes must give one for "item".',
+    );
+    expect(decisionStudy(study, { sampleSizes: { rater: 3, item: 5 } }).generalizability).toBeGreaterThan(0);
+  });
+
+  it("takes the sizes of balanced data that went through the unbalanced analysis", () => {
+    const { scores, design } = caseNamed("p x r x i");
+    const balanced = generalizabilityStudy(scores, design);
+    const unbalanced = generalizabilityStudy(scores, { ...design, unbalanced: true });
+    const [expected, actual] = [decisionStudy(balanced), decisionStudy(unbalanced)];
+    expectRelative(actual.generalizability, expected.generalizability, BALANCED_TOLERANCE, "generalizability");
+    expectRelative(actual.dependability, expected.dependability, BALANCED_TOLERANCE, "dependability");
+  });
+
   it("works from a study that has been through JSON", () => {
     const study = generalizabilityStudy(caseNamed("(i:p) x (r:p)").scores, caseNamed("(i:p) x (r:p)").design);
     expect(decisionStudy(JSON.parse(JSON.stringify(study)), { sampleSizes: { item: 5 } })).toEqual(
@@ -545,6 +722,9 @@ describe("decisionStudy", () => {
       k === 0 ? { ...component, variance: Number.NaN } : component,
     );
     expect(() => decisionStudy(parsed({ components: infinite }))).toThrow(DataError);
+    expect(() => decisionStudy(parsed({ balanced: "yes" }))).toThrow(
+      'The field balanced of the study must be a boolean, found "yes".',
+    );
     const notRecord = JSON.parse(JSON.stringify({ ...raters, components: [...raters.components.slice(1), 5] }));
     expect(() => decisionStudy(notRecord)).toThrow(DataError);
   });
@@ -621,6 +801,81 @@ describe("properties", () => {
         });
       }),
     );
+  });
+
+  /** Persons by items as a matrix with at most one empty cell for each person, as the item to leave out or -1. */
+  const sparse = fc.tuple(fc.integer({ min: 3, max: 6 }), fc.integer({ min: 3, max: 5 })).chain(([persons, items]) =>
+    fc.tuple(
+      fc.array(fc.array(fc.integer({ min: 0, max: 20 }), { minLength: items, maxLength: items }), {
+        minLength: persons,
+        maxLength: persons,
+      }),
+      fc.array(fc.integer({ min: -1, max: items - 1 }), { minLength: persons, maxLength: persons }),
+    ),
+  );
+  const withoutCells = (values: readonly (readonly number[])[], left: readonly number[], map = (x: number) => x) =>
+    crossed(values.map((row) => row.map(map))).filter(
+      (_, k) => left[Math.floor(k / (values[0]?.length ?? 1))] !== k % (values[0]?.length ?? 1),
+    );
+  const Unbalanced: GeneralizabilityDesign = { ...PERSON_BY_ITEM, unbalanced: true };
+
+  it("unbalanced components scale with the square of a scale and do not change with a shift", () => {
+    fc.assert(
+      fc.property(
+        sparse,
+        fc.integer({ min: 1, max: 5 }),
+        fc.integer({ min: -50, max: 50 }),
+        ([values, left], scale, shift) => {
+          const study = generalizabilityStudy(withoutCells(values, left), Unbalanced);
+          const moved = generalizabilityStudy(
+            withoutCells(values, left, (x) => scale * x + shift),
+            Unbalanced,
+          );
+          moved.components.forEach((component, k) => {
+            const expected = defined(study.components[k]);
+            expectRelative(component.variance, scale ** 2 * expected.variance, 1e-8, `variance ${k}`);
+            expectRelative(component.sumOfSquares, scale ** 2 * expected.sumOfSquares, 1e-8, `sum of squares ${k}`);
+          });
+        },
+      ),
+    );
+  });
+
+  it("unbalanced degrees of freedom add up to those of the scores", () => {
+    fc.assert(
+      fc.property(sparse, ([values, left]) => {
+        const scores = withoutCells(values, left);
+        const { components } = generalizabilityStudy(scores, Unbalanced);
+        expect(components.reduce((sum, { degreesOfFreedom }) => sum + degreesOfFreedom, 0)).toBe(scores.length - 1);
+      }),
+    );
+  });
+
+  it("recovers the variance components from persons by raters with a quarter of the scores missing", () => {
+    // 200 seeded samples of 60 persons and 4 raters with components 1, 0.2 and 0.5. The thresholds were fixed before the
+    // first run: the mean of each estimate within 0.1 of its component, which Method 1, being unbiased, puts at about 5
+    // standard errors of the mean.
+    const random = createRandom(20261029);
+    const totals = [0, 0, 0];
+    const samples = 200;
+    for (let sample = 0; sample < samples; sample++) {
+      const persons = Array.from({ length: 60 }, () => random.normal());
+      const raters = Array.from({ length: 4 }, () => Math.sqrt(0.2) * random.normal());
+      const scores: FacetedScore[] = [];
+      for (const [p, person] of persons.entries()) {
+        for (const [r, rater] of raters.entries()) {
+          const score = 5 + person + rater + Math.sqrt(0.5) * random.normal();
+          if (random.uniform() < 0.75) scores.push({ levels: { person: `p${p}`, rater: `r${r}` }, score });
+        }
+      }
+      const { components } = generalizabilityStudy(scores, { facets: ["rater"], unbalanced: true });
+      components.forEach((component, k) => {
+        totals[k] = (totals[k] ?? 0) + component.variance / samples;
+      });
+    }
+    for (const [k, truth] of [1, 0.2, 0.5].entries()) {
+      expect(Math.abs((totals[k] ?? 0) - truth), `component ${k}`).toBeLessThan(0.1);
+    }
   });
 
   it("components do not depend on the order of persons and items", () => {

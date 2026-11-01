@@ -1,6 +1,7 @@
 import { DataError } from "@measurekit/core";
 import type { FacetedScore } from "../data/faceted-scores.js";
-import { facetsOf, type Structure } from "./structure.js";
+import { describeElements, facetSizes, numberScores } from "./numbering.js";
+import type { Structure } from "./structure.js";
 
 /** The scores of a balanced design as a table with one cell for each combination of the facets' elements. */
 export interface BalancedScores {
@@ -8,14 +9,6 @@ export interface BalancedScores {
   readonly sizes: readonly number[];
   /** The scores less their mean, by cell: the facets in the design's order, the last one varying fastest. */
   readonly cells: Float64Array;
-}
-
-/** How the elements of the facets are told apart: a facet's elements are numbered within the elements it is nested in. */
-interface Numbering {
-  /** For each facet, the element numbers by label, for each combination of the numbers of the facets it is nested in. */
-  readonly numbers: Map<string, Map<string, number>>[];
-  /** For each facet, the labels in the order of their numbers, for each such combination. */
-  readonly labels: Map<string, string[]>[];
 }
 
 /**
@@ -32,30 +25,18 @@ interface Numbering {
  * is not balanced, naming the first cell with more than one score or, failing that, the first with none.
  */
 export function balancedScores(scores: readonly FacetedScore[], structure: Structure): BalancedScores {
-  const { names, ancestors } = structure;
+  const { names } = structure;
   const needed = 2 ** names.length;
   if (scores.length < needed) {
     throw new DataError(
       `A design of ${names.length} facets needs at least ${needed} scores, two elements of every facet, found ${scores.length}.`,
     );
   }
-  const numbering: Numbering = { numbers: names.map(() => new Map()), labels: names.map(() => new Map()) };
-  const order = names
-    .map((_, facet) => facet)
-    .sort((a, b) => facetsOf(ancestors[a] ?? 0).length - facetsOf(ancestors[b] ?? 0).length);
-  const coordinates = scores.map((entry) => numberElements(entry, structure, order, numbering));
-  const sizes = names.map((name, facet) => {
-    const size = Math.max(...Array.from(numbering.labels[facet]?.values() ?? [], (list) => list.length));
-    if (size < 2) {
-      throw new DataError(
-        `The facet "${name}" needs at least 2 elements${(ancestors[facet] ?? 0) > 0 ? " in each combination of the elements it is nested in" : ""}, found ${size}.`,
-      );
-    }
-    return size;
-  });
+  const { coordinates, numbering } = numberScores(scores, structure);
+  const sizes = facetSizes(numbering, structure);
   const total = sizes.reduce((product, size) => product * size, 1);
   const cells = new Float64Array(total === scores.length ? total : 0);
-  const describeCell = (cell: readonly number[]): string => cellDescription(cell, structure, numbering);
+  const describeCell = (cell: readonly number[]): string => describeElements(cell, structure, numbering);
   if (total === scores.length) {
     const seen = new Uint8Array(total);
     coordinates.forEach((cell, index) => {
@@ -67,36 +48,6 @@ export function balancedScores(scores: readonly FacetedScore[], structure: Struc
     return { sizes, cells: centered(cells) };
   }
   throw unbalanced(coordinates, sizes, describeCell);
-}
-
-/** Numbers the elements of one score's facets, adding labels met for the first time, and returns the numbers. */
-function numberElements(
-  entry: FacetedScore,
-  structure: Structure,
-  order: readonly number[],
-  numbering: Numbering,
-): number[] {
-  const cell: number[] = Array.from({ length: structure.names.length }, () => 0);
-  for (const facet of order) {
-    const key = facetsOf(structure.ancestors[facet] ?? 0)
-      .map((parent) => cell[parent])
-      .join(",");
-    const label = entry.levels[structure.names[facet] ?? ""] ?? "";
-    const byKey = numbering.numbers[facet] ?? new Map();
-    const lists = numbering.labels[facet] ?? new Map();
-    const known = byKey.get(key) ?? new Map<string, number>();
-    const list = lists.get(key) ?? [];
-    byKey.set(key, known);
-    lists.set(key, list);
-    let number = known.get(label);
-    if (number === undefined) {
-      number = list.length;
-      known.set(label, number);
-      list.push(label);
-    }
-    cell[facet] = number;
-  }
-  return cell;
 }
 
 /** Returns the position of a cell in the table, the last facet varying fastest. */
@@ -112,19 +63,6 @@ function centered(cells: Float64Array): Float64Array {
   for (const value of cells) sum += value;
   const mean = sum / cells.length;
   return cells.map((value) => value - mean);
-}
-
-/** Describes a cell by the element of each facet, such as `person "p2", rater "r1"`. */
-function cellDescription(cell: readonly number[], structure: Structure, numbering: Numbering): string {
-  return structure.names
-    .map((name, facet) => {
-      const key = facetsOf(structure.ancestors[facet] ?? 0)
-        .map((parent) => cell[parent])
-        .join(",");
-      const label = numbering.labels[facet]?.get(key)?.[cell[facet] ?? 0];
-      return label === undefined ? `${name} number ${(cell[facet] ?? 0) + 1}` : `${name} "${label}"`;
-    })
-    .join(", ");
 }
 
 function repeated(cell: string): DataError {

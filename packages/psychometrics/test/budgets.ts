@@ -74,6 +74,7 @@ const BUDGETS = {
   "mokken.monotonicity": 20,
   "mokken.invariantItemOrdering": 80,
   "generalizability.generalizabilityStudy": 20,
+  "generalizability.generalizabilityStudyUnbalanced": 20,
   "rater.exactAgreement": 0.2,
   "rater.adjacentAgreement": 0.2,
   "rater.meanDifference": 2,

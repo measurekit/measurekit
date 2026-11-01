@@ -21,3 +21,7 @@ fall, for the exploratory two-dimensional 2PL from 442 to 100.
 
 Lord's chi-square can be purified: with `purify: true` the items it flags leave the anchors of the linking, which is
 repeated on the two calibrations until two rounds flag the same items.
+
+Generalizability studies accept designs with empty cells and unequal numbers of nested elements with
+`unbalanced: true`, estimating the variance components by Henderson's Method 1, as urGENOVA does. A study reports whether
+it is `balanced`, and a decision study of one that is not takes its sizes from the caller.

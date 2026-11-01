@@ -3,11 +3,11 @@
 `@measurekit/psychometrics/generalizability` separates the variance of scores into the effects of the objects of
 measurement, such as persons, and of the facets of the measurement, such as items and raters, and then asks how a
 procedure with other numbers of items and raters would measure. A **G study** estimates the variance components of a
-balanced design by the analysis of variance; a **D study** combines them into error variances and the generalizability
-and dependability coefficients of a procedure. Designs may cross and nest facets: p × i, p × r × i, (r:p) × i, i:p and
+balanced design by the analysis of variance, or of a design with empty cells by Henderson's Method 1; a **D study**
+combines them into error variances and the generalizability and dependability coefficients of a procedure. Designs may cross and nest facets: p × i, p × r × i, (r:p) × i, i:p and
 others. Components are validated against base R's `aov`, the expected mean squares solved as a linear system, and
-lme4's REML estimates, and decision studies against the textbook formulas of each design
-([validation](validation.md)).
+lme4's REML estimates, unbalanced designs against Method 1 written out in base R and against GeneralizIT, and decision
+studies against the textbook formulas of each design ([validation](validation.md)).
 
 ## Designs
 
@@ -25,7 +25,7 @@ a facet is nested in others.
 | i:r:p         | `["rater", "item"]` | `{ rater: ["person"], item: ["rater"] }`  |
 | (i:p) × (r:p) | `["item", "rater"]` | `{ item: ["person"], rater: ["person"] }` |
 
-The design must be balanced:
+The design must be balanced, unless the design has `unbalanced: true` ([unbalanced designs](#unbalanced-designs)):
 
 - every combination of elements has exactly one score;
 - every facet has the same number of elements, at least 2, in each combination of the elements it is nested in;
@@ -35,8 +35,9 @@ The design must be balanced:
 
 An element of a nested facet is identified within the elements it is nested in. Raters may be labeled `r1` and `r2` for
 every person, or each with a label of its own: the results are the same, and the first example below shows both.
-Designs that are not balanced throw a `DataError` that names the first combination with more than one score or, failing
-that, with none; incomplete rating designs are the case of the many-facet Rasch model (`rater` module).
+A design that is not balanced throws a `DataError` that names the first combination with more than one score or, failing
+that, with none. The option `unbalanced` is what lets a missing score through, so that a score lost from a design meant
+to be balanced is still found.
 
 ## G study
 
@@ -157,6 +158,74 @@ JSON.stringify(generalizabilityStudy(labeled, design)) === JSON.stringify(study)
 
 The sample size of a nested facet is its number of elements within each element it is nested in.
 
+## Unbalanced designs
+
+Rating data are rarely complete. With `unbalanced: true` (default `false`) the G study accepts empty cells and unequal
+numbers of nested elements, such as raters who each score some of the persons. The components are the analogous analysis
+of variance of Brennan (2001, chapters 7 and 8), which is Henderson's Method 1 and what urGENOVA and GeneralizIT compute.
+It is closed form.
+
+```mermaid
+flowchart LR
+  S["Scores, with empty cells"] --> T["T per effect: squared sums of its cells over their counts"]
+  S --> K["k per pair of effects: from the counts alone"]
+  T --> Y["Solve k σ² = T"]
+  K --> Y
+  Y --> C["Components, as a balanced study reports them"]
+  C --> D["decisionStudy, with sizes given"]
+```
+
+| Quantity           | Definition                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| T                  | T_α = Σ_c (sum of the scores of c)² / n_c over the cells c of effect α, and T₀ = (Σ y)² / N      |
+| Coefficients       | E[T_α] - E[T₀] = Σ_β (k_αβ - k_0β) σ²_β, with k_αβ = Σ_c Σ_d n_cd² / n_c and k_0β = Σ_d n_d² / N |
+| Sum of squares     | T_α - T₀ less the sums of squares of the effects within α                                        |
+| Degrees of freedom | The cells of α less 1 and less the degrees of freedom of the effects within α                    |
+| Components         | The system of one equation for each effect, solved; negative estimates are reported as estimated |
+
+```ts
+import { decisionStudy, generalizabilityStudy } from "@measurekit/psychometrics/generalizability";
+
+// Six persons rated by four raters; three ratings are missing.
+const persons = ["p1", "p2", "p3", "p4", "p5", "p6"];
+const raters = ["r1", "r2", "r3", "r4"];
+const ratings = [
+  [4, 5, 3, 4],
+  [2, 3, null, 2],
+  [5, 5, 4, 5],
+  [3, null, 3, 2],
+  [1, 2, 1, null],
+  [4, 4, 5, 4],
+];
+const scores = ratings.flatMap((row, p) =>
+  row.flatMap((score, r) =>
+    score === null ? [] : [{ levels: { person: persons[p] ?? "", rater: raters[r] ?? "" }, score }],
+  ),
+);
+const study = generalizabilityStudy(scores, { facets: ["rater"], unbalanced: true });
+study.balanced; // false
+study.sampleSizes; // { person: 6, rater: 4 }
+study.components.map(({ facets, degreesOfFreedom, variance }) => [
+  facets.join(" x "),
+  degreesOfFreedom,
+  Math.round(variance * 1000) / 1000,
+]);
+// [["person", 5, 1.576], ["rater", 3, -0.036], ["person x rater", 12, 0.403]]
+// A decision study has no one size to default to, so it needs the sizes of the procedure.
+decisionStudy(study, { sampleSizes: { rater: 3 } }).generalizability; // 0.922, with the negative rater component as 0
+```
+
+| Aspect             | Behavior                                                                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Balanced data      | The same estimates as the balanced analysis, and `balanced` is `true`                                                                                                               |
+| `sampleSizes`      | The most elements each facet has in any combination of those it is nested in; `balanced` is `false` when a cell is empty                                                            |
+| `decisionStudy`    | Needs `sampleSizes` for every facet but the object when the study is not balanced                                                                                                   |
+| Scores per cell    | At most 1; a second score for a combination throws a `DataError` naming it                                                                                                          |
+| Degrees of freedom | Every effect needs some. A design whose scores only chain its facets, as 5 scores of 3 persons and 3 raters, leaves the person by rater effect none: a `DataError` names the effect |
+| Facets             | At most 6 with the object, 63 effects; the scores are read once for each pair of effects, so 7 effects and a million scores make 49 passes                                          |
+
+The many-facet Rasch model of the [rater](rater.md) module remains the tool for measures of the raters themselves.
+
 ## D study
 
 `decisionStudy(study, options)` takes a study and returns the variances and coefficients of a measurement procedure that
@@ -167,6 +236,8 @@ averages over `sampleSizes` elements of each facet.
 | `sampleSizes` | the study's sizes | Positive integers, by facet name; for a nested facet, within each element it is nested in                             |
 | `fixed`       | `[]`              | Facets fixed in the universe of generalization; a fixed facet's size is the number of conditions of its universe      |
 | `nested`      | none              | Facets the decision study nests that the study crossed, such as `{ rater: ["person"] }`; added to the study's nesting |
+
+A study that is not balanced has no one size for a facet to default to: `sampleSizes` must name every facet but the object.
 
 Each effect of the decision study has a variance component, a divisor and a role:
 
@@ -283,8 +354,8 @@ every facet and one finite component for each effect.
 
 ## Not included
 
-- Designs that are not balanced, such as incomplete rating designs: Henderson's methods and REML are not implemented, and
-  the many-facet Rasch model of the `rater` module handles incomplete ratings.
+- Other estimators of the components of an unbalanced design: Henderson's Methods 2 and 3, REML and MIVQUE. Method 1 is
+  what urGENOVA and GeneralizIT compute; lme4 fits REML.
 - Multivariate generalizability theory, and standard errors and confidence intervals of the components.
 - Mixed-model G studies: fixed facets are handled in the D study, from the random-effects components.
 - Facets in the object of measurement: an object nested in another facet, such as persons within schools.
@@ -295,5 +366,6 @@ every facet and one finite component for each effect.
 | ----------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------- |
 | Estimation                    | The analysis of variance, in closed form, for balanced designs | lme4 fits REML, which equals it when no component is negative |
 | Negative components           | Reported as estimated; counted as 0 in a D study               | lme4's REML estimates are bounded at 0                        |
-| Unbalanced designs            | `DataError`                                                    | lme4 estimates them                                           |
+| Unbalanced designs            | `DataError`, or Method 1 with `unbalanced`                     | lme4 estimates them by REML, which differs from Method 1      |
+| GeneralizIT                   | The same Method 1, at full precision                           | Rounds its T values and components to 4 decimals              |
 | Coefficients with no variance | `DataError` when σ²(τ) and σ²(δ) are both 0                    | The quotient 0 / 0 is `NaN` in R                              |

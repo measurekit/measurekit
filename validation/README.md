@@ -22,6 +22,8 @@ Rscript validation/psychometrics/explanatory.R       # item parameters regressed
 Rscript validation/psychometrics/linear-change.R     # linear logistic change: glm on the persons who changed, base R and eRm's LLRA
 Rscript validation/psychometrics/lltm-polytomous.R   # the LLTM of partial credit and rating scale items: base R and TAM
 Rscript validation/psychometrics/generalizability.R  # variance components and decision studies of balanced designs: base R aov and lme4
+Rscript validation/psychometrics/generalizability-unbalanced.R  # variance components with empty cells: Henderson's Method 1 in base R
+validation/psychometrics/.venv/bin/python validation/psychometrics/generalizability-unbalanced.py  # the same components by GeneralizIT
 Rscript validation/psychometrics/mokken.R            # Mokken scale analysis: mokken's coefH, aisp, check.monotonicity and check.iio
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction: mirt, equate and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
@@ -37,6 +39,14 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
 sirt, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, GPArotation, polycor, mvtnorm, clinicalsignificance and jsonlite;
 `common.R` holds their shared helpers, and `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share.
+
+`generalizability-unbalanced.py` checks the fixture that `generalizability-unbalanced.R` writes against GeneralizIT 0.1.2. It
+runs in a Python 3.12 environment in `validation/psychometrics/.venv`, which git ignores, and writes nothing:
+
+```bash
+uv venv --python 3.12 validation/psychometrics/.venv
+uv pip install --python validation/psychometrics/.venv -r validation/psychometrics/requirements.txt
+```
 
 `multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`
 and `information` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and

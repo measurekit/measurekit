@@ -1,7 +1,9 @@
-import { checkRecord } from "@measurekit/core";
+import { checkBoolean, checkRecord } from "@measurekit/core";
 import { checkFacetedScores, type FacetedScore } from "../data/faceted-scores.js";
 import { type BalancedScores, balancedScores } from "./balanced-scores.js";
+import { describeElements, facetSizes, numberScores } from "./numbering.js";
 import { buildStructure, type Effect, effectsOf, facetsOf, namesOf, type Structure } from "./structure.js";
+import { type EffectEstimate, unbalancedEstimates } from "./unbalanced.js";
 
 /**
  * The design of a generalizability study: the facet of the objects of measurement, the other facets and which are
@@ -24,6 +26,13 @@ export interface GeneralizabilityDesign {
    * @defaultValue every facet crossed with every other
    */
   readonly nested?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Accepts empty cells and unequal numbers of nested elements, and estimates the components by the analogous analysis
+   * of variance. An option, so that a missing score in a design meant to be balanced still throws.
+   *
+   * @defaultValue `false`
+   */
+  readonly unbalanced?: boolean;
 }
 
 /** One effect of a study: its sums of squares, mean square and the estimate of its variance component. */
@@ -32,9 +41,12 @@ export interface VarianceComponent {
   readonly facets: readonly string[];
   /** The facets the effect is nested in, such as the person of r:p; none for a crossed effect. */
   readonly nestedIn: readonly string[];
-  /** The degrees of freedom: the product of the sizes less 1 of its own facets and the sizes of those it is nested in. */
+  /**
+   * The degrees of freedom: in a balanced study, the product of the sizes less 1 of its own facets and the sizes of those
+   * it is nested in; in an unbalanced one, the number of the effect's cells less 1 and less those of the effects within it.
+   */
   readonly degreesOfFreedom: number;
-  /** The sum of squares. */
+  /** The sum of squares, the analogous one in an unbalanced study. */
   readonly sumOfSquares: number;
   /** The sum of squares over the degrees of freedom. */
   readonly meanSquare: number;
@@ -42,7 +54,7 @@ export interface VarianceComponent {
   readonly variance: number;
 }
 
-/** The variance components of a balanced design, estimated by the analysis of variance. */
+/** The variance components of a design, estimated by the analysis of variance. */
 export interface GeneralizabilityStudy {
   /** The facet of the objects of measurement. */
   readonly object: string;
@@ -50,8 +62,16 @@ export interface GeneralizabilityStudy {
   readonly facets: readonly string[];
   /** The facets each nested facet is nested in, by facet name; crossed facets are absent. */
   readonly nested: Readonly<Record<string, readonly string[]>>;
-  /** The number of elements of each facet, the object's included: for a nested facet, within each element it is nested in. */
+  /**
+   * The number of elements of each facet, the object's included: for a nested facet, within each element it is nested
+   * in, and in an unbalanced study the most in any.
+   */
   readonly sampleSizes: Readonly<Record<string, number>>;
+  /**
+   * Whether every combination of the facets' elements has a score, so that each facet has one number of elements. A
+   * decision study of a study that is not balanced needs its sizes given.
+   */
+  readonly balanced: boolean;
   /**
    * The effects of the design, one component each, ordered by their number of facets and then by the design's order of
    * facets: for p x i, the person, the item, then the person by item effect.
@@ -60,46 +80,88 @@ export interface GeneralizabilityStudy {
 }
 
 /**
- * Estimates the variance components of a balanced crossed or nested design by the analysis of variance.
+ * Estimates the variance components of a crossed or nested design by the analysis of variance.
  *
  * @remarks
- * Every combination of the facets' elements has one score, and a nested facet has the same number of elements in each
- * element it is nested in; `scores` are in long format, one `FacetedScore` for each, with a string element of the
- * object and of every facet in `levels`, other entries of `levels` being ignored. Each facet needs at least 2 elements,
- * so a design of k facets has at least 2^k scores. Sums of squares come from the marginal means of each effect, and the
- * variance components from the expected mean squares of a random-effects model, solved from the highest-order effect
- * down: each mean square is a sum of the variance components of the effects that include its facets, each multiplied by
- * the product of the sizes of the facets it does not include. The highest-order effect is confounded with error. A
- * component is negative when its mean square is below that of the effects it is confounded with; it is reported as
- * estimated, and a decision study treats it as 0. Designs that are not balanced, such as incomplete rating designs, are
- * outside the study; the many-facet Rasch model of the rater module estimates them.
+ * By default the design is balanced: every combination of the facets' elements has one score, and a nested facet has
+ * the same number of elements in each element it is nested in. `scores` are in long format, one `FacetedScore` for each,
+ * with a string element of the object and of every facet in `levels`, other entries of `levels` being ignored. Each
+ * facet needs at least 2 elements, so a design of k facets has at least 2^k scores. Sums of squares come from the
+ * marginal means of each effect, and the variance components from the expected mean squares of a random-effects model,
+ * solved from the highest-order effect down: each mean square is a sum of the variance components of the effects that
+ * include its facets, each multiplied by the product of the sizes of the facets it does not include. The highest-order
+ * effect is confounded with error. A component is negative when its mean square is below that of the effects it is
+ * confounded with; it is reported as estimated, and a decision study treats it as 0.
+ *
+ * With `unbalanced` the design may have empty cells and unequal numbers of nested elements, up to 6 facets with the
+ * object. The components are Henderson's Method 1, the analogous analysis of variance of Brennan (2001, chapters 7 and
+ * 8) and the estimator of urGENOVA: each effect's T, the sum over its cells of the squared sum of the cell's scores over
+ * their count, has an expectation that is linear in the variance components with coefficients from the counts alone, and
+ * the system of one equation for each effect is solved. Data that are balanced give the estimates of the balanced
+ * analysis. The sums of squares and mean squares are the analogous ones, and a decision study needs the sizes given.
+ * Measures of raters from incomplete designs are the many-facet Rasch model's, of the rater module.
  *
  * @throws `DataError` when the design is not an object with distinct non-empty facet names and a nesting of the facets
- * that is acyclic and leaves the object crossed, the scores are not an array of objects with a finite `score` and the
- * elements of the design's facets, a facet has fewer than 2 elements, or the design is not balanced, naming the first
- * combination of elements with more than one score or with none.
+ * that is acyclic and leaves the object crossed, `unbalanced` is not a boolean, the scores are not an array of objects
+ * with a finite `score` and the elements of the design's facets, or a facet has fewer than 2 elements. Without
+ * `unbalanced` also when the design is not balanced, naming the first combination of elements with more than one score
+ * or with none. With it when the design has more than 6 facets, a combination has more than one score, or an effect has
+ * no degrees of freedom or a component cannot be told apart from the others, naming the effect.
  * @see {@link https://doi.org/10.1007/978-1-4757-3456-0 | Brennan (2001)}
+ * @see {@link https://doi.org/10.2307/3001853 | Henderson (1953)}
  */
 export function generalizabilityStudy(
   scores: readonly FacetedScore[],
   design: GeneralizabilityDesign,
 ): GeneralizabilityStudy {
   checkRecord(design, "The design must be an object { object, facets, nested }");
-  const { object = "person", facets, nested = {} } = design;
+  const { object = "person", facets, nested = {}, unbalanced = false } = design;
+  checkBoolean(unbalanced, "The option unbalanced of the design");
   const structure = buildStructure(object, facets, nested, "The option nested of the design");
   checkFacetedScores(scores, structure.names);
-  const table = balancedScores(scores, structure);
+  const { estimates, sizes } = unbalanced ? unbalancedStudy(scores, structure) : balancedStudy(scores, structure);
   return {
     object,
     facets: [...facets],
     nested: Object.fromEntries(Object.entries(nested).map(([facet, parents]) => [facet, [...parents]])),
-    sampleSizes: Object.fromEntries(structure.names.map((name, facet) => [name, table.sizes[facet] ?? 0])),
-    components: components(structure, table),
+    sampleSizes: Object.fromEntries(structure.names.map((name, facet) => [name, sizes[facet] ?? 0])),
+    balanced: sizes.reduce((product, size) => product * size, 1) === scores.length,
+    components: estimates.map(({ effect, ...rest }) => ({
+      facets: namesOf(structure, effect.own),
+      nestedIn: namesOf(structure, effect.nestedIn),
+      ...rest,
+    })),
   };
 }
 
-/** Returns the components of the design from its table of scores. */
-function components(structure: Structure, table: BalancedScores): VarianceComponent[] {
+/** Returns the estimates of a balanced design, and the number of elements of each facet. */
+function balancedStudy(
+  scores: readonly FacetedScore[],
+  structure: Structure,
+): { estimates: EffectEstimate[]; sizes: readonly number[] } {
+  const table = balancedScores(scores, structure);
+  return { estimates: balancedEstimates(structure, table), sizes: table.sizes };
+}
+
+/** Returns the estimates of a design with empty cells, and the most elements each facet has. */
+function unbalancedStudy(
+  scores: readonly FacetedScore[],
+  structure: Structure,
+): { estimates: EffectEstimate[]; sizes: readonly number[] } {
+  const { coordinates, numbering } = numberScores(scores, structure);
+  const sizes = facetSizes(numbering, structure);
+  const estimates = unbalancedEstimates(
+    scores.map(({ score }) => score),
+    coordinates,
+    sizes,
+    structure,
+    (cell) => describeElements(cell, structure, numbering),
+  );
+  return { estimates, sizes };
+}
+
+/** Returns the estimates of the effects of the design from its table of scores. */
+function balancedEstimates(structure: Structure, table: BalancedScores): EffectEstimate[] {
   const effects = effectsOf(structure);
   const total = table.cells.length;
   const sums = marginalSums(table, structure);
@@ -131,14 +193,7 @@ function components(structure: Structure, table: BalancedScores): VarianceCompon
     }
     variances[row] = expected / (total / size(mask));
   }
-  return rows.map(({ effect, degreesOfFreedom, sumOfSquares, meanSquare }, row) => ({
-    facets: namesOf(structure, effect.own),
-    nestedIn: namesOf(structure, effect.nestedIn),
-    degreesOfFreedom,
-    sumOfSquares,
-    meanSquare,
-    variance: variances[row] ?? 0,
-  }));
+  return rows.map((row, k) => ({ ...row, variance: variances[k] ?? 0 }));
 }
 
 /**

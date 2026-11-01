@@ -1,5 +1,6 @@
 import {
   checkArray,
+  checkBoolean,
   checkFinite,
   checkOptions,
   checkPositiveInteger,
@@ -15,7 +16,8 @@ import type { GeneralizabilityStudy } from "./study.js";
 export interface DecisionStudyOptions {
   /**
    * The number of elements of each facet in the decision study, by facet name: positive integers; for a nested facet,
-   * within each element it is nested in. A fixed facet's is the number of conditions its universe has.
+   * within each element it is nested in. A fixed facet's is the number of conditions its universe has. A study that is
+   * not balanced has no one size for a facet, so every facet other than the object needs one.
    *
    * @defaultValue the study's sizes
    */
@@ -89,8 +91,9 @@ export interface DecisionStudy {
  *
  * @throws `DataError` when the study is not the result of `generalizabilityStudy`, with its design and one finite
  * component for each effect of it; when an option is invalid, a size is not a positive integer, a facet named is not one
- * of the study's other than the object, or the added nesting is circular or nests the object; or when the universe score
- * and relative error variances are both 0, so that the coefficients are undefined.
+ * of the study's other than the object, or the added nesting is circular or nests the object; when the study is not
+ * balanced and `sampleSizes` lacks a facet other than the object; or when the universe score and relative error
+ * variances are both 0, so that the coefficients are undefined.
  * @see {@link https://doi.org/10.1007/978-1-4757-3456-0 | Brennan (2001)}
  */
 export function decisionStudy(study: GeneralizabilityStudy, options: DecisionStudyOptions = {}): DecisionStudy {
@@ -102,6 +105,12 @@ export function decisionStudy(study: GeneralizabilityStudy, options: DecisionStu
   const sizes = new Map(structure.names.map((name, facet) => [facet, study.sampleSizes[name] ?? 1]));
   for (const [name, size] of Object.entries(sampleSizes)) {
     sizes.set(facetIndex(structure, name, "sampleSizes"), checkedSize(size, `The option sampleSizes for "${name}"`));
+  }
+  const unsized = facets.find((name) => sampleSizes[name] === undefined);
+  if (!study.balanced && unsized !== undefined) {
+    throw new DataError(
+      `The study is not balanced, so its facets have no one number of elements: the option sampleSizes must give one for "${unsized}".`,
+    );
   }
   checkArray(fixed, "The option fixed must be an array of facet names");
   const fixedMask = fixed.reduce((mask, name) => mask | (1 << facetIndex(structure, name, "fixed")), 0);
@@ -212,6 +221,7 @@ function checkStudy(study: GeneralizabilityStudy): { structure: Structure; varia
   checkRecord(study.sampleSizes, "The sampleSizes of the study must be an object of numbers by facet");
   checkArray(study.facets, "The facets of the study must be an array of facet names");
   checkArray(study.components, "The components of the study must be an array");
+  checkBoolean(study.balanced, "The field balanced of the study");
   const structure = buildStructure(study.object, study.facets, study.nested, "The nested facets of the study");
   structure.names.forEach((name) => {
     checkPositiveInteger(study.sampleSizes[name], `The size of "${name}" in the study`);
