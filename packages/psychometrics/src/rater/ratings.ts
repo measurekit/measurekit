@@ -60,3 +60,30 @@ export function completeRatings(
   }
   return complete;
 }
+
+/**
+ * Checks ratings by two raters and returns their columns over the subjects both rated: the ratings of the first rater
+ * and of the second.
+ *
+ * @param statistic - Names the statistic in error messages.
+ * @throws `DataError` when the ratings do not have two raters, a rating is not a finite number or `null`, or fewer than
+ * two subjects were rated by both.
+ */
+export function pairOfRaters(
+  ratings: readonly (readonly (number | null)[])[],
+  statistic: string,
+): { readonly first: Float64Array; readonly second: Float64Array } {
+  const rows = completeRatings(ratings, statistic, { categories: false, minRaters: 2, maxRaters: 2, minSubjects: 2 });
+  return {
+    first: Float64Array.from(rows, ([rating = 0]) => rating),
+    second: Float64Array.from(rows, ([, rating = 0]) => rating),
+  };
+}
+
+/**
+ * Returns whether every rating equals the first. The variance of constant ratings is 0 only when the sums are exact,
+ * which they are for whole numbers but not for 0.7 repeated, so a constant rater is found by comparing the ratings.
+ */
+export function isConstant(ratings: Float64Array): boolean {
+  return ratings.every((rating) => rating === ratings[0]);
+}

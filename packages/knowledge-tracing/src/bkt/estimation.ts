@@ -20,6 +20,11 @@ export interface Sequence {
   readonly steps: { readonly item: string; readonly learning: string | undefined; readonly outcome: number | null }[];
 }
 
+/** Returns the number of steps with an observed outcome in the sequences. */
+export function observedSteps(sequences: readonly Sequence[]): number {
+  return sequences.reduce((total, { steps }) => total + steps.filter(({ outcome }) => outcome !== null).length, 0);
+}
+
 /** Which rates of a skill have values by group or item, and how many rates the skill's events estimate. */
 export interface Structure {
   readonly forgetting: boolean;

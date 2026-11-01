@@ -1,6 +1,6 @@
-import { DataError, mean } from "@measurekit/core";
-import { variance } from "../math/statistics.js";
-import { completeRatings } from "./ratings.js";
+import { mean } from "@measurekit/core";
+import { standardDeviation } from "../math/statistics.js";
+import { isConstant, pairOfRaters } from "./ratings.js";
 
 /**
  * Returns the standardized mean difference between two raters: the first rater's mean rating less the second's, over
@@ -11,24 +11,16 @@ import { completeRatings } from "./ratings.js";
  * deviations: positive when the first rater rates higher on average. With the subjects rated by both raters in the same
  * number for both, the pooled standard deviation is that of Cohen's d, so the value is effsize's `cohen.d` of the two
  * raters' ratings as independent samples. Uses the subjects both raters rated, with variances on n - 1. Ratings are
- * finite numbers, not only categories.
+ * finite numbers, not only categories. It is `null` when both raters' ratings are constant, which leaves the pooled
+ * standard deviation 0.
  *
- * @throws `DataError` when the ratings do not have two raters, a rating is not a finite number or `null`, fewer than
- * two subjects were rated by both, or both raters' ratings are constant, which leaves the pooled standard deviation 0.
+ * @throws `DataError` when the ratings do not have two raters, a rating is not a finite number or `null`, or fewer than
+ * two subjects were rated by both.
  * @see {@link https://doi.org/10.1111/j.1745-3992.2011.00223.x | Williamson, Xi and Breyer (2012)}
  */
-export function standardizedMeanDifference(ratings: readonly (readonly (number | null)[])[]): number {
-  const rows = completeRatings(ratings, "The standardized mean difference", {
-    categories: false,
-    minRaters: 2,
-    maxRaters: 2,
-    minSubjects: 2,
-  });
-  const first = Float64Array.from(rows, ([rating = 0]) => rating);
-  const second = Float64Array.from(rows, ([, rating = 0]) => rating);
-  const pooled = Math.sqrt((variance(first) + variance(second)) / 2);
-  if (pooled === 0) {
-    throw new DataError("The standardized mean difference is undefined when both raters' ratings are constant.");
-  }
+export function standardizedMeanDifference(ratings: readonly (readonly (number | null)[])[]): number | null {
+  const { first, second } = pairOfRaters(ratings, "The standardized mean difference");
+  if (isConstant(first) && isConstant(second)) return null;
+  const pooled = Math.sqrt((standardDeviation(first) ** 2 + standardDeviation(second) ** 2) / 2);
   return (mean(first) - mean(second)) / pooled;
 }

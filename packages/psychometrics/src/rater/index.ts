@@ -1,8 +1,8 @@
 /**
  * Rater agreement and rater effects: exact and adjacent agreement, Cohen's kappa, unweighted and weighted, Fleiss'
- * kappa, intraclass correlations and the standardized mean difference between raters; the many-facet Rasch model, with
- * the severity of raters and the difficulty of items, fair scores, element fit and the bias of each rater and item
- * pair.
+ * kappa, intraclass correlations, the correlation and the standardized mean difference between raters; the many-facet
+ * Rasch model, with the severity of raters and the difficulty of items, fair scores, element fit and the bias of each
+ * rater and item pair.
  *
  * @module @measurekit/psychometrics/rater
  */
@@ -22,3 +22,4 @@ export {
 } from "./many-facet-rasch.js";
 export type { FacetBias, RatingThresholds } from "./many-facet-result.js";
 export { standardizedMeanDifference } from "./mean-difference.js";
+export { ratingCorrelation } from "./rating-correlation.js";

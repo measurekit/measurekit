@@ -155,12 +155,17 @@ fit.states.l0; // { learner: "l0", skills: { fractions, decimals } }: the learne
 | `logLikelihood`           | The log-likelihood of those predictions: for events of one skill, the HMM log-likelihood                                                                                          |
 | `aic`, `bic`              | With k the rates the events estimate: of each skill, its priors, learn rates, forget rates with forgetting, guess and slip rates in use; n of `bic` is the events with an outcome |
 | `converged`, `iterations` | Whether every skill's chosen start converged, and the most iterations of any                                                                                                      |
+| `skills`                  | By skill id, each skill's `converged`, `iterations`, `events` with an outcome and `logLikelihood`; a skill met only through lessons is absent                                     |
 
 In EM, an event without an outcome has probability 1 in both states and adds no guess or slip count, while the learning
 step after it counts for its resource: a lesson's P(T) is estimated from the outcomes that follow it. A transition with
 no outcome after it in the sequence, such as a lesson at its end, teaches nothing and is not counted in `aic` and `bic`;
 a skill met only through events without an outcome gets no parameters, and a lesson gets no guess or slip. `fit` throws
 `DataError` for a log with no event with an outcome.
+
+The skills fit apart, so a skill's entry of `skills` is the fit of that skill's events alone, as pyBKT's EM for one skill at a
+time gives it. When every event has one skill, the log-likelihoods of `skills` add up to `logLikelihood`; an event with several
+skills is predicted by the mean of their predictions, which `logLikelihood` scores once and each skill's fit scores apart.
 
 A rate without expected opportunities in the data, such as P(T) of a skill whose learners each attempted it once, keeps
 its starting value. Skills of the model absent from the log keep their parameters. A log too large for memory can be

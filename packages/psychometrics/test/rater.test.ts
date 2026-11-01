@@ -17,18 +17,20 @@ import {
   manyFacetRasch,
   maximumLikelihoodEstimate,
   type PersonEstimate,
+  ratingCorrelation,
   standardizedMeanDifference,
 } from "../src/index.js";
 import { summarizeFacet } from "../src/rater/facet-summary.js";
 import fixture from "./fixtures/rater.json" with { type: "json" };
 import agreementFixture from "./fixtures/rater-agreement.json" with { type: "json" };
 import biasFixture from "./fixtures/rater-bias.json" with { type: "json" };
+import correlationFixture from "./fixtures/rater-correlation.json" with { type: "json" };
 import manyFacetFixture from "./fixtures/rater-many-facet.json" with { type: "json" };
-import { expectClose } from "./helpers.js";
+import { defined, expectClose } from "./helpers.js";
 
 /** Kappa and intraclass correlations against irr: closed forms of the same counts and sums. */
 const TOLERANCE = 1e-12;
-/** Agreement shares and standardized mean differences against irr and effsize: closed forms of the same counts and sums. */
+/** Agreement shares, standardized mean differences and correlations against irr, effsize and cor: closed forms of the same counts and sums. */
 const AGREEMENT_TOLERANCE = 1e-12;
 /** Measures, thresholds, the mean and SD of theta against the base R maximum of the marginal likelihood. */
 const ESTIMATE_TOLERANCE = 1e-8;
@@ -350,9 +352,14 @@ describe("standardizedMeanDifference", () => {
     ];
     // Means 3 and 3.25, variances 10/3 and 10.75/3: -0.25 / √(20.75 / 6).
     expect(standardizedMeanDifference(ratings)).toBeCloseTo(-0.25 / Math.sqrt(20.75 / 6), 14);
-    const value = standardizedMeanDifference(ratings);
+    const value = defined(standardizedMeanDifference(ratings));
     expectClose(standardizedMeanDifference(ratings.map(([x = 0, y = 0]) => [y, x])), -value, 1e-15);
     expectClose(standardizedMeanDifference(ratings.map(([x = 0, y = 0]) => [3 * x + 7, 3 * y + 7])), value, 1e-12);
+    expectClose(
+      standardizedMeanDifference(ratings.map(([x = 0, y = 0]) => [x + 1e6 + 0.1, y + 1e6 + 0.1])),
+      value,
+      1e-9,
+    );
     expect(
       standardizedMeanDifference([
         [1, 3],
@@ -371,19 +378,34 @@ describe("standardizedMeanDifference", () => {
     expect(standardizedMeanDifference([...rated, [null, 9], [8, null]])).toBe(standardizedMeanDifference(rated));
   });
 
-  it("rejects other numbers of raters, constant ratings, too few subjects and invalid ratings", () => {
+  it("is null when both raters' ratings are constant, whole or not, and defined when only one is", () => {
+    expect(
+      standardizedMeanDifference([
+        [2, 2],
+        [2, 2],
+      ]),
+    ).toBeNull();
+    // 0.7 repeated has a variance of -2.4e-16 by the sums, not 0.
+    const decimals = Array.from({ length: 10 }, () => [0.7, 0.3]);
+    expect(standardizedMeanDifference(decimals)).toBeNull();
+    expectClose(
+      standardizedMeanDifference([
+        [1, 3],
+        [2, 3],
+        [3, 3],
+      ]),
+      -Math.SQRT2,
+      1e-15,
+    );
+  });
+
+  it("rejects other numbers of raters, too few subjects and invalid ratings", () => {
     expect(() =>
       standardizedMeanDifference([
         [1, 2, 3],
         [2, 3, 4],
       ]),
     ).toThrow("The standardized mean difference needs 2 raters, found 3.");
-    expect(() =>
-      standardizedMeanDifference([
-        [2, 2],
-        [2, 2],
-      ]),
-    ).toThrow("The standardized mean difference is undefined when both raters' ratings are constant.");
     expect(() => standardizedMeanDifference([[1, 2]])).toThrow(
       "The standardized mean difference needs at least 2 subjects rated by every rater, found 1.",
     );
@@ -396,6 +418,97 @@ describe("standardizedMeanDifference", () => {
     expect(() => standardizedMeanDifference(JSON.parse("null"))).toThrow(
       "The standardized mean difference needs an array of ratings, one row per subject.",
     );
+  });
+});
+
+describe("ratingCorrelation", () => {
+  for (const reference of correlationFixture.cases) {
+    it(`matches base R's cor on ${reference.name}`, () => {
+      expectClose(ratingCorrelation(reference.ratings), reference.value, AGREEMENT_TOLERANCE);
+    });
+  }
+
+  it("is the covariance over the product of the standard deviations, derived by hand", () => {
+    // Means 2 and 4, deviations -1, 0, 1 for both: perfectly correlated.
+    expect(
+      ratingCorrelation([
+        [1, 3],
+        [2, 4],
+        [3, 5],
+      ]),
+    ).toBe(1);
+    expect(
+      ratingCorrelation([
+        [1, 5],
+        [2, 4],
+        [3, 3],
+      ]),
+    ).toBe(-1);
+    // Deviations -1, 0, 1 and 0, -1, 1: covariance 1 over (1)(1) is 1 / √2 of the variances 1 and 1: r = 1 / 2.
+    expect(
+      ratingCorrelation([
+        [1, 2],
+        [2, 1],
+        [3, 3],
+      ]),
+    ).toBeCloseTo(0.5, 15);
+  });
+
+  it("does not change with the order of the raters, and keeps its sign and size under shifts and positive scales", () => {
+    const ratings = [
+      [1, 2],
+      [4, 3],
+      [2, 2.5],
+      [5, 6],
+    ];
+    const value = defined(ratingCorrelation(ratings));
+    expectClose(ratingCorrelation(ratings.map(([x = 0, y = 0]) => [y, x])), value, 1e-15);
+    expectClose(ratingCorrelation(ratings.map(([x = 0, y = 0]) => [3 * x + 7, 0.5 * y - 2])), value, 1e-12);
+    expectClose(ratingCorrelation(ratings.map(([x = 0, y = 0]) => [-x, y])), -value, 1e-15);
+  });
+
+  it("uses the subjects both raters rated and accepts ratings that are not categories", () => {
+    const rated = [
+      [1.5, 2.25],
+      [3, 2.5],
+      [4.75, 4],
+    ];
+    expect(ratingCorrelation([...rated, [null, 9], [8, null]])).toBe(ratingCorrelation(rated));
+  });
+
+  it("is null when either rater's ratings are constant, whole or not", () => {
+    expect(
+      ratingCorrelation([
+        [1, 2],
+        [2, 2],
+        [3, 2],
+      ]),
+    ).toBeNull();
+    expect(ratingCorrelation(Array.from({ length: 10 }, (_, k) => [0.7, k]))).toBeNull();
+    expect(ratingCorrelation(Array.from({ length: 10 }, (_, k) => [k, 0.7]))).toBeNull();
+    expect(ratingCorrelation(Array.from({ length: 10 }, () => [0.7, 0.7]))).toBeNull();
+  });
+
+  it("rejects other numbers of raters, too few subjects and invalid ratings", () => {
+    expect(() =>
+      ratingCorrelation([
+        [1, 2, 3],
+        [2, 3, 4],
+      ]),
+    ).toThrow("The rating correlation needs 2 raters, found 3.");
+    expect(() => ratingCorrelation([[1, 2]])).toThrow(
+      "The rating correlation needs at least 2 subjects rated by every rater, found 1.",
+    );
+    expect(() =>
+      ratingCorrelation([
+        [1, Number.NaN],
+        [2, 3],
+      ]),
+    ).toThrow("The rating of subject 1 by rater 2 must be a finite number or null, found NaN.");
+    expect(() => ratingCorrelation(JSON.parse("null"))).toThrow(
+      "The rating correlation needs an array of ratings, one row per subject.",
+    );
+    expect(() => ratingCorrelation(JSON.parse('[[1, "2"], [2, 3]]'))).toThrow(DataError);
   });
 });
 
@@ -1244,10 +1357,24 @@ describe("properties", () => {
       fc.property(ratings(2), (rows) => {
         const reversed = [...rows].reverse();
         expect(adjacentAgreement(reversed)).toBe(adjacentAgreement(rows));
-        try {
-          expectClose(standardizedMeanDifference(reversed), standardizedMeanDifference(rows), 1e-12);
-        } catch (error) {
-          if (!(error instanceof DataError)) throw error;
+        expectClose(standardizedMeanDifference(reversed), standardizedMeanDifference(rows), 1e-12);
+        expectClose(ratingCorrelation(reversed), ratingCorrelation(rows), 1e-12);
+      }),
+    );
+  });
+
+  it("the correlation of two raters lies from -1 to 1, is null exactly for a constant rater and is the same for either order of the raters", () => {
+    const rating = fc.double({ min: -1000, max: 1000, noNaN: true });
+    fc.assert(
+      fc.property(fc.array(fc.tuple(rating, rating), { minLength: 2, maxLength: 30 }), (pairs) => {
+        const rows = pairs.map(([x, y]) => [x, y]);
+        const value = ratingCorrelation(rows);
+        const constant = (k: number) => rows.every((row) => row[k] === rows[0]?.[k]);
+        expect(value === null).toBe(constant(0) || constant(1));
+        if (value !== null) {
+          expect(value).toBeGreaterThanOrEqual(-1);
+          expect(value).toBeLessThanOrEqual(1);
+          expectClose(ratingCorrelation(rows.map(([x = 0, y = 0]) => [y, x])), value, 1e-12);
         }
       }),
     );

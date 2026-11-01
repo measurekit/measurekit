@@ -27,6 +27,7 @@ import type { LearnerModel, ModelFit } from "../model.js";
 import { type BktBounds, type BktFixedRates, checkConstraints, checkWithinBounds } from "./constraints.js";
 import {
   estimate,
+  observedSteps,
   randomStarts,
   type SkillEstimate,
   type StructureOptions,
@@ -172,10 +173,28 @@ export interface BktModel extends LearnerModel<BktState, BktParameters> {
   opportunitiesToMastery(state: BktState, skill: string, options?: OpportunitiesToMasteryOptions): number;
 }
 
+/** The fit of one skill, from the start with the highest log-likelihood. */
+export interface BktSkillFit {
+  /** Whether EM reached the tolerance within `maxIterations`. */
+  readonly converged: boolean;
+  /** The EM iterations run. */
+  readonly iterations: number;
+  /** The events with an outcome that practiced the skill, which the skill's rates are estimated from. */
+  readonly events: number;
+  /** The log-likelihood of those events at the skill's estimates. */
+  readonly logLikelihood: number;
+}
+
 /** The outcome of fitting a BKT model to a log. */
 export interface BktFit extends ModelFit<BktState, BktParameters> {
   /** The model with the estimated parameters. */
   readonly model: BktModel;
+  /**
+   * The fit of each skill the log estimated, by skill id: a skill met only through events without an outcome is not
+   * there. The skills fit apart, so the fit of a log equals that of the log's events at each skill alone; with one
+   * skill in every event, the skills' log-likelihoods add up to `logLikelihood`.
+   */
+  readonly skills: Readonly<Record<string, BktSkillFit>>;
 }
 
 const DEFAULT_RESTARTS = 5;
@@ -277,6 +296,7 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
         checkTraceable(event, `Event ${index + 1}`);
       });
       const estimates = new Map<string, SkillEstimate>();
+      const skillFits: [string, BktSkillFit][] = [];
       let parameterCount = 0;
       const { fixed, bounds } = settings.constraints;
       const kind = settings.resourceLearning ? "resource" : settings.pairLearning ? "pair" : "none";
@@ -288,7 +308,10 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
           given === undefined
             ? randomStarts(structure, settings.restarts, settings.seed, held, bounds)
             : [startFrom(given, structure, held, bounds)];
-        estimates.set(skill, estimate(sequences, starts, settings.forgetting, { fixed: held, bounds }, settings));
+        const found = estimate(sequences, starts, settings.forgetting, { fixed: held, bounds }, settings);
+        estimates.set(skill, found);
+        const { converged, iterations, logLikelihood } = found;
+        skillFits.push([skill, { converged, iterations, events: observedSteps(sequences), logLikelihood }]);
         parameterCount += structure.parameterCount;
       }
       const fitted = create({
@@ -308,6 +331,7 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
         bic: parameterCount * Math.log(log.filter(isObserved).length) - 2 * logLikelihood,
         converged: fits.every((fit) => fit.converged),
         iterations: fits.reduce((most, fit) => Math.max(most, fit.iterations), 0),
+        skills: Object.fromEntries(skillFits),
       };
     },
     initialState(learner) {

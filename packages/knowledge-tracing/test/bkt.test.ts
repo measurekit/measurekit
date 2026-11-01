@@ -25,6 +25,7 @@ import opportunities from "./fixtures/bkt-opportunities.json" with { type: "json
 import pairFixture from "./fixtures/bkt-pairs.json" with { type: "json" };
 import practice from "./fixtures/bkt-practice.json" with { type: "json" };
 import recovery from "./fixtures/bkt-recovery.json" with { type: "json" };
+import skillFixture from "./fixtures/bkt-skills.json" with { type: "json" };
 import { allPredicted, defined, expectClose, online } from "./helpers.js";
 
 /** Absolute tolerance of P(correct) and P(L) against pyBKT at fixed parameters. */
@@ -50,11 +51,17 @@ interface Fit extends Configuration {
   readonly iterations: number;
   readonly logLikelihood: number;
 }
+/** pyBKT's EM for each skill alone, in `bkt-skills.json`. */
+interface SkillFits {
+  readonly name: string;
+  readonly skills: Readonly<Record<string, { iterations: number; logLikelihood: number; events: number }>>;
+}
 
 // Parsed rather than imported as typed: TypeScript merges the configurations' parameters into one type with optional
 // keys.
 const inference: readonly Inference[] = JSON.parse(JSON.stringify(practice.inference));
 const fits: readonly Fit[] = JSON.parse(JSON.stringify(practice.fits));
+const skillFits: readonly SkillFits[] = JSON.parse(JSON.stringify(skillFixture.fits));
 const log = eventLog(practice.events);
 
 /** The options of a configuration, with the fixture's groups for prior groups. */
@@ -111,6 +118,28 @@ describe("bkt against pyBKT", () => {
     expectClose(fit.logLikelihood, reference.logLikelihood, FIT_TOLERANCE, "log-likelihood");
     expect(fit.iterations).toBe(reference.iterations);
     expect(fit.converged).toBe(true);
+  });
+
+  it.each(fits)("reports the fit of each skill as pyBKT's EM for the skill alone gives it: $name", (reference) => {
+    const options: BktOptions = {
+      ...optionsOf(reference),
+      parameters: reference.start,
+      tolerance: skillFixture.tolerance,
+      maxIterations: skillFixture.maxIterations,
+    };
+    const fit = bkt(options).fit(log);
+    const expected = defined(skillFits.find((each) => each.name === reference.name)).skills;
+    expect(Object.keys(fit.skills).toSorted()).toEqual(Object.keys(expected).toSorted());
+    for (const [skill, found] of Object.entries(fit.skills)) {
+      const wanted = defined(expected[skill]);
+      expect(found.iterations, `${skill} iterations`).toBe(wanted.iterations);
+      expect(found.events, `${skill} events`).toBe(wanted.events);
+      expect(found.converged, `${skill} converged`).toBe(true);
+      expectClose(found.logLikelihood, wanted.logLikelihood, FIT_TOLERANCE, `${skill} log-likelihood`);
+      // The skills fit apart: the log of the skill's events alone gives the same fit.
+      expect(bkt(options).fit(oneSkill(log, skill)).skills[skill], skill).toEqual(found);
+    }
+    expect(fit.iterations).toBe(Math.max(...Object.values(fit.skills).map(({ iterations }) => iterations)));
   });
 
   it("finds an optimum at least as high as pyBKT's random starts for every skill", () => {
@@ -242,6 +271,8 @@ describe("bkt with events that have no outcome", () => {
     ];
     const fit = bkt({ resourceLearning: true }).fit(eventLog(events));
     expect(Object.keys(fit.model.parameters.skills)).toEqual(["s"]);
+    expect(Object.keys(fit.skills)).toEqual(["s"]);
+    expect(fit.skills.s?.events).toBe(4);
     expect(Object.keys(defined(fit.model.parameters.skills.s?.resourceLearning))).toEqual(["q"]);
     expect(fit.predictions.map((prediction) => prediction === null)).toEqual([false, false, false, false, true, true]);
     // The taught skill has no parameters, so its events leave learners' states with s alone.
@@ -542,14 +573,28 @@ function oneSkill(events: EventLog, skill: string): EventLog {
   return events.filter((event) => event.skills.includes(skill)).map((event) => ({ ...event, skills: [skill] }));
 }
 
+/** The seeded simulation of two skills, one skill in every event. */
+function simulatedLog(): EventLog {
+  return eventLog(
+    recovery.outcomes.map((outcome, time) => {
+      const skill = `s${defined(recovery.skills[time]) + 1}`;
+      return { learner: `r${recovery.learners[time]}`, item: skill, skills: [skill], time, outcome };
+    }),
+  );
+}
+
 describe("bkt fitting", () => {
+  it("adds the log-likelihoods of the skills up to that of the fit when every event has one skill", () => {
+    const simulated = simulatedLog();
+    const fit = bkt().fit(simulated);
+    expect(Object.keys(fit.skills)).toEqual(["s1", "s2"]);
+    const total = Object.values(fit.skills).reduce((sum, skill) => sum + skill.logLikelihood, 0);
+    expectClose(total, fit.logLikelihood, 1e-9, "log-likelihood");
+    expect(Object.values(fit.skills).reduce((sum, skill) => sum + skill.events, 0)).toBe(simulated.length);
+  });
+
   it("recovers simulated parameters, with a log-likelihood at least that of the true parameters", () => {
-    const simulated = eventLog(
-      recovery.outcomes.map((outcome, time) => {
-        const skill = `s${defined(recovery.skills[time]) + 1}`;
-        return { learner: `r${recovery.learners[time]}`, item: skill, skills: [skill], time, outcome };
-      }),
-    );
+    const simulated = simulatedLog();
     const fit = bkt().fit(simulated);
     expect(fit.converged).toBe(true);
     for (const [skill, truth] of Object.entries(recovery.truth)) {

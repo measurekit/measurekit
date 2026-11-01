@@ -73,6 +73,10 @@ From the same start, the EM of `bkt` takes the same number of iterations as pyBK
 within 6e-16. From random starts, both reach the same optimum for every skill of the practice log as the given starts,
 within 1.4e-6 in log-likelihood, where EM stops at a change of 1e-6. No start reached another local optimum.
 
+The fit of each skill in `skills` has pyBKT's number of iterations and its log-likelihood within 7e-13, and the number of the
+skill's events with an outcome. The fit of a log equals the fit of each skill's events alone, and, with one skill in every
+event, the log-likelihoods of the skills add up to that of the log within 1e-9.
+
 **Events without an outcome.** `bkt.py` also runs pyBKT on a log in which an event of a lesson is `correct = -1`, pyBKT's
 no response, with `multilearn` on the resource column and `multigs` on the item column. A learner's P(L) before every
 event at fixed parameters, P(correct) before every event with an outcome, and EM from a given start are compared, in
@@ -440,6 +444,7 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `elo-holdout.json`              | 36 events of 6 learners on 4 items, times with ties; folds by learner, item and time                                                                | Training events before, between and after test events                                       |
 | `elo-recovery.json`             | The simulation above                                                                                                                                | Recovery, a replay of 24,000 events                                                         |
 | `bkt-practice.json`             | `default_rng(20261029)`: 40 learners in two prior groups, 20 attempts each at 9 items of 3 skills, one item with two skills                         | Every extension at fixed parameters and in EM; random starts                                |
+| `bkt-skills.json`               | pyBKT's EM_fit for each skill of `bkt-practice.json` alone: iterations and log-likelihood; the rows of the skill                                    | Every extension's configuration, three skills                                               |
 | `bkt-recovery.json`             | The simulation above                                                                                                                                | Recovery, 20,000 events                                                                     |
 | `bkt-opportunities.json`        | 14 cases of P(L), P(T), P(F) and threshold                                                                                                          | Forgetting, P(T) + P(F) ≥ 1, limits below the threshold                                     |
 | `logistic-lkt.json`             | LKT's `samplelkt`: 1941 attempts of 17 learners at 143 skills, times from the durations                                                             | Every feature; ridge fits of AFM and PFA                                                    |

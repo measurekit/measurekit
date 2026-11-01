@@ -299,7 +299,7 @@ for name, options in CONFIGURATIONS:
     inference.append({"name": name, "options": options, "parameters": parameters, "predictions": predictions,
                       "mastery": mastery})
 
-fits = []
+fits, skill_fits = [], []
 for name, options in CONFIGURATIONS[:-1]:
     start = parameters_for(options, STARTS)
     fitted, iterations, likelihoods = {}, [], []
@@ -315,6 +315,9 @@ for name, options in CONFIGURATIONS[:-1]:
         fitted[skill] = knowledge_tracing_parameters(model, data, options, counts)
         iterations.append(len(lls))
         likelihoods.append(lls[-1])
+    skill_fits.append({"name": name, "skills": {skill: {"iterations": count, "logLikelihood": likelihood,
+                                                        "events": sum(row["skill"] == skill for row in rows)}
+                                                for skill, count, likelihood in zip(SKILLS, iterations, likelihoods)}})
     parameters = {"skills": fitted}
     predictions, _ = predictions_of(options, parameters)
     fits.append({
@@ -345,6 +348,14 @@ write_fixture("bkt-practice", {
     "inference": inference,
     "fits": fits,
     "restarts": restarts,
+})
+
+write_fixture("bkt-skills", {
+    "source": "pyBKT 1.4.3: the iterations and the log-likelihood of EM_fit from matched starts for each skill alone, and "
+              "the rows of the skill.",
+    "tolerance": TOLERANCE,
+    "maxIterations": MAX_ITERATIONS,
+    "fits": skill_fits,
 })
 
 # Recovery: 1000 learners answer 10 items of each of two skills, interleaved, under the standard model.

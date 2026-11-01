@@ -1,5 +1,6 @@
 # Rater agreement fixtures. References: irr (kappa2, kappam.fleiss, icc, agree) and psych (cohen.kappa, ICC) as a check;
-# effsize's cohen.d for the standardized mean difference between two raters, checked against base R.
+# effsize's cohen.d for the standardized mean difference between two raters, checked against base R; base R's cor for the
+# correlation between two raters.
 # Data: irr's anxiety (20 subjects, 3 raters, ratings 1 to 6), recoded 0 to 5, and diagnoses (30 subjects, 6 raters,
 # 5 categories), coded 0 to 4; anxiety again with two ratings missing.
 
@@ -370,4 +371,26 @@ write_fixture("rater-agreement", list(
     list(name = "anxiety with missing ratings", x = sparse[, 1:2]),
     list(name = "continuous scores with missing", x = scores)
   ), function(case) list(name = case$name, ratings = ratings(case$x), value = mean_difference(case$x)))
+))
+
+# --- Correlation between two raters ----------------------------------------------------------------------------------
+# Pearson's r over the subjects both raters rated, by base R's cor on the complete cases: NA, written as null, when a
+# rater's ratings are constant.
+
+rating_correlation <- function(x) {
+  complete <- na.omit(x)
+  if (any(apply(complete, 2, function(column) length(unique(column)) == 1))) return(NA)
+  cor(complete[, 1], complete[, 2])
+}
+
+write_fixture("rater-correlation", list(
+  source = "The two-rater data of rater-agreement: irr's anxiety recoded 0 to 5, also with two ratings missing, and a simulation of continuous scores, set.seed(20261029); base R's cor, and a constant rater.",
+  cases = lapply(list(
+    list(name = "anxiety, raters 1 and 2", x = anxiety[, 1:2]),
+    list(name = "anxiety, raters 2 and 3", x = anxiety[, 2:3]),
+    list(name = "anxiety with missing ratings", x = sparse[, 1:2]),
+    list(name = "continuous scores with missing", x = scores),
+    list(name = "a constant rater", x = cbind(anxiety[, 1], 3)),
+    list(name = "decimal ratings with a large offset", x = scores * 0.1 + 1000)
+  ), function(case) list(name = case$name, ratings = ratings(case$x), value = rating_correlation(case$x)))
 ))

@@ -2,7 +2,8 @@
 
 `@measurekit/psychometrics/rater` measures how far raters agree: exact and adjacent agreement, Cohen's kappa for two
 raters, unweighted, linear or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of
-scores; and how far one rater is more lenient than another, by the standardized mean difference. It also estimates what
+scores; how far two raters order the subjects alike, by the correlation of their ratings; and how far one rater is more
+lenient than another, by the standardized mean difference. It also estimates what
 raters do to scores: the many-facet Rasch model puts persons, items and raters on one scale, so that a rater's severity
 is a number of logits and a person's score can be adjusted for the raters who gave it, and a bias analysis finds the
 raters who are harsher or milder than usual on one item. The agreement statistics are validated against irr, psych and
@@ -11,8 +12,8 @@ effsize, the model against base R and TAM ([validation](validation.md)).
 ## Ratings
 
 Every function takes ratings by subject: one row per rated subject, such as an essay, with one rating per rater,
-`null` when a rater did not rate the subject. Agreement and kappa take categories, integers from 0, as item responses; the standardized mean difference and the intraclass
-correlations take any finite numbers. Each statistic uses the subjects every rater rated.
+`null` when a rater did not rate the subject. Agreement and kappa take categories, integers from 0, as item responses; the
+correlation, the standardized mean difference and the intraclass correlations take any finite numbers. Each statistic uses the subjects every rater rated.
 
 ```ts
 import { cohenKappa, fleissKappa, intraclassCorrelation } from "@measurekit/psychometrics/rater";
@@ -125,6 +126,48 @@ Use the single-rater forms when one rater scores each subject in practice, the a
 is the raters' mean; absolute agreement when raters' leniency matters, consistency when only their ordering does. A
 coefficient whose denominator is 0, as when every rating is equal, is `null`.
 
+## Correlation between two raters
+
+`ratingCorrelation(ratings)` is the Pearson correlation between two raters' ratings: how far they order the subjects
+alike, whatever their leniency. It is the companion of the [standardized mean difference](#standardized-mean-difference)
+in the evaluation of automated scoring: a machine can correlate perfectly with a human rater and still rate everyone
+higher, and each statistic shows what the other does not.
+
+```mermaid
+flowchart LR
+  R[Ratings of two raters] --> C[Subjects both rated]
+  C --> D["Deviations from each rater's mean"]
+  D --> Q["r = Σ d₁ d₂ / √(Σ d₁² Σ d₂²)"]
+```
+
+It uses the subjects both raters rated, needs at least two, takes finite numbers, and is `null` when either rater's
+ratings are constant, as R's `cor` gives `NA`. The value lies from -1 to 1, does not change with the order of the raters,
+and is unchanged by a shift or a positive rescaling of either rater's ratings.
+
+```ts
+import { ratingCorrelation, standardizedMeanDifference } from "@measurekit/psychometrics/rater";
+
+// Raters 1 and 3 of the four essays above; rater 3 did not score essay 4.
+ratingCorrelation([
+  [3, 2],
+  [1, 1],
+  [4, 4],
+]); // 0.93
+
+// A rater who scores everything 3 higher correlates perfectly and is 2.3 standard deviations harsher.
+const shifted = [
+  [2, 5],
+  [3, 6],
+  [1, 4],
+  [4, 7],
+];
+ratingCorrelation(shifted); // 1
+standardizedMeanDifference(shifted); // -2.32
+```
+
+Not included: Spearman's rank correlation, which ranks the ratings first and is a different statistic, and the correlations
+among more than two raters, which pairs of raters give.
+
 ## Standardized mean difference
 
 `standardizedMeanDifference(ratings)` measures how much more lenient the first of two raters is than the second, in
@@ -147,7 +190,7 @@ The result is positive when the first rater rates higher on average, and 0 when 
 on the origin or the scale of the ratings. With the same subjects rated by both raters, the pooled standard deviation
 is that of Cohen's d, so the value equals effsize's `cohen.d` of the two raters' ratings as independent samples.
 Ratings are finite numbers, not only categories: automated scores are often continuous. It uses the subjects both
-raters rated, needs at least two, and is undefined when both raters' ratings are constant.
+raters rated, needs at least two, and is `null` when both raters' ratings are constant.
 
 ```ts
 import { standardizedMeanDifference } from "@measurekit/psychometrics/rater";

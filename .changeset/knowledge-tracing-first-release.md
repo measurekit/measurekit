@@ -23,6 +23,8 @@ drift reads the states of a model without it.
 
 BKT holds rates at given values with `fixed`, keeps the rates it estimates within `bounds`, and takes the learn and forget
 rates by the pair of the resource before an attempt and its own with `pairLearning`, as pyBKT's `fixed` and `multipair`.
+A BKT fit reports each skill's own fit in `skills`: whether its EM converged, its iterations, the events with an outcome and
+its log-likelihood.
 
 Logistic models take the features of LKT's other names (`proportion`, `netSuccesses`, `powerOpportunities`, `logit`,
 `decayedProportionFailed`, `recencySuccess`, `recencyFailure`, `base`, `basePractice`, `dash`, `ppe` and their success
