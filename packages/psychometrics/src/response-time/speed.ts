@@ -1,7 +1,7 @@
-import { checkOptions, checkPositive } from "@measurekit/core";
+import { checkOptions, checkPositive, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
-import { chiSquareUpperTail } from "../math/chi-square.js";
+
 import { posteriors } from "./lognormal.js";
 import { forEachTime, itemsOfData, type TimedResponses, type TimeItem, timedResponses } from "./timed-responses.js";
 

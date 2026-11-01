@@ -1,4 +1,11 @@
-import { checkBoolean, checkChoice, checkOptions, checkStopping, DataError } from "@measurekit/core";
+import {
+  checkBoolean,
+  checkChoice,
+  checkOptions,
+  checkStopping,
+  chiSquareUpperTail,
+  DataError,
+} from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { ResponseRecords } from "../data/response-records.js";
 import { fitLinearRasch, type LinearRaschFit, type LocationRow } from "../irt/linear-rasch.js";
@@ -6,7 +13,7 @@ import { type LogisticParameters, twoParameterLogistic } from "../irt/logistic.j
 import type { TestItem } from "../irt/model.js";
 import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
 import { type CompressedResponses, categoryCounts, checkCategories, compressResponses } from "../irt/responses.js";
-import { chiSquareUpperTail } from "../math/chi-square.js";
+
 import { checkFullRank, type Design, designMatrix, type FeatureEffect, type ItemFeatures } from "./features.js";
 
 /** How the standard errors of the effects of an LLTM are computed. */

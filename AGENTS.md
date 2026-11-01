@@ -85,13 +85,18 @@ packages/core/                the published package @measurekit/core
                         isUnitInterval; and checkRecord, checkArray, checkOptions, checkMethod, checkRandom,
                         checkBoolean, checkChoice, checkFinite, checkPositive, checkNonNegative,
                         checkPositiveInteger, checkIntegerFrom, checkUnitInterval, checkSeed, checkStopping
-  src/random.ts         Random and createRandom
+  src/random.ts         Random, createRandom and shuffle
   src/normal.ts         normalQuantile
   src/logistic.ts       logistic, logLogistic
   src/normalize-logs.ts normalizeLogs
   src/cholesky.ts       cholesky
   src/iteration.ts      Stopping, Convergence, iterateToConvergence
   src/line-search.ts    ARMIJO, backtrack
+  src/bfgs.ts           bfgs, GradientFunction, OptimizerOptions, OptimizationResult
+  src/continued-fraction.ts continuedFraction, for the two tails below; not exported
+  src/chi-square.ts     logGamma, chiSquareUpperTail
+  src/student-t.ts      studentLowerTail
+  src/kappa.ts          KappaWeights, kappaOfPairs
   src/vectors.ts        dot, largestChange, maxAbs, mean
   src/q-matrix.ts       QMatrix
   src/theta-distribution.ts ThetaDistribution

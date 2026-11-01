@@ -1,11 +1,11 @@
-import { checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkOptions, checkRecord, chiSquareUpperTail, DataError, describe } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { meanSigmaLinking, type ScaleTransformation, transformItem } from "../equating/linking.js";
 import { type Calibration, calibrateWithCovariance, type ParameterCovariance } from "../irt/calibration.js";
 import type { CalibrationOptions } from "../irt/calibration-options.js";
 import { isLogisticModel, type LogisticParameters } from "../irt/logistic.js";
 import type { IrtItem } from "../irt/model.js";
-import { chiSquareUpperTail } from "../math/chi-square.js";
+
 import { invert } from "../math/linear-algebra.js";
 import { checkGroups, type DifGroup } from "./groups.js";
 

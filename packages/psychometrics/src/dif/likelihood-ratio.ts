@@ -1,4 +1,4 @@
-import { chiSquareUpperTail } from "../math/chi-square.js";
+import { chiSquareUpperTail } from "@measurekit/core";
 
 /** A likelihood-ratio test between two nested regressions of an item. */
 export interface LikelihoodRatioTest {

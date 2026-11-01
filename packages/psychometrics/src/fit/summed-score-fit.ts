@@ -1,9 +1,9 @@
-import { DataError } from "@measurekit/core";
+import { chiSquareUpperTail, DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import type { IrtItem } from "../irt/model.js";
 import { quadratureRule } from "../irt/quadrature.js";
 import { itemTrace, summedScoreLikelihoods } from "../irt/summed-score.js";
-import { chiSquareUpperTail } from "../math/chi-square.js";
+
 import { collapseCells } from "./collapse.js";
 import { checkItems } from "./inputs.js";
 

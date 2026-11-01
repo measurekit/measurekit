@@ -1,8 +1,8 @@
-import { checkOptions } from "@measurekit/core";
+import { bfgs, checkOptions, type OptimizerOptions } from "@measurekit/core";
 import { largestCategoryCount } from "../irt/items.js";
 import type { IrtItem } from "../irt/model.js";
 import { type QuadratureOptions, quadratureRule } from "../irt/quadrature.js";
-import { bfgs, type OptimizerOptions } from "../math/optimize.js";
+
 import type { Quadrature } from "../math/quadrature.js";
 import { checkCommonItems, type ScaleTransformation } from "./linking.js";
 

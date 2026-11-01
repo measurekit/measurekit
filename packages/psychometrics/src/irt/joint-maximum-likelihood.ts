@@ -1,7 +1,7 @@
 import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/response-matrix.js";
 import { invert } from "../math/linear-algebra.js";
-import { newton, type OptimizerOptions } from "../math/optimize.js";
+import { type NewtonOptions, newton } from "../math/optimize.js";
 import { findIncreasingRoot } from "../math/root.js";
 import type { CalibratedItem } from "./calibration.js";
 import { type LogisticParameters, oneParameterLogistic } from "./logistic.js";
@@ -58,7 +58,7 @@ const DEFAULT_MAX_ITERATIONS = 500;
 /** The score points by which a total score of 0 or of the maximum moves inward: TAM's `adj` and Winsteps' default. */
 const EXTREME_SCORE_ADJUSTMENT = 0.3;
 /** Each iteration takes one Newton step with a line search on each item's thresholds. */
-const ITEM_STEP: OptimizerOptions = { tolerance: 0, maxIterations: 1 };
+const ITEM_STEP: NewtonOptions = { tolerance: 0, maxIterations: 1 };
 const NO_ITEMS = new Int32Array(0);
 const NO_VALUES = new Float64Array(0);
 

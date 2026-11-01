@@ -21,10 +21,3 @@ export function choleskySolve(a: Float64Array, size: number, b: Float64Array, ou
   }
   return true;
 }
-
-/** Returns the sum of squares of the values. */
-export function squares(values: Float64Array): number {
-  let sum = 0;
-  for (const value of values) sum += value * value;
-  return sum;
-}

@@ -1,4 +1,4 @@
-import { chiSquareUpperTail } from "../math/chi-square.js";
+import { chiSquareUpperTail } from "@measurekit/core";
 
 /** One element of a facet: a rater, an item, a task. */
 export interface FacetElement {

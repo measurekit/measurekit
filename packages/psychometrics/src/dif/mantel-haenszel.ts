@@ -1,6 +1,6 @@
-import { checkBoolean, checkOptions, normalQuantile } from "@measurekit/core";
+import { checkBoolean, checkOptions, chiSquareUpperTail, normalQuantile } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
-import { chiSquareUpperTail } from "../math/chi-square.js";
+
 import { type DifGroup, dichotomousData, type ItemCases, itemCases } from "./groups.js";
 import {
   type DifAnalysis,

@@ -1,3 +1,5 @@
+import { dot } from "@measurekit/core";
+
 /** The eigenvalues and eigenvectors of a symmetric matrix. */
 export interface SymmetricEigen {
   /** The eigenvalues, largest first. */
@@ -52,7 +54,7 @@ export function symmetricEigen(a: Float64Array, size: number, options: EigenOpti
   const work = Float64Array.from(a);
   const rotated = new Float64Array(size * size);
   for (let i = 0; i < size; i++) rotated[i * size + i] = 1;
-  const threshold = tolerance * Math.sqrt(sumOfSquares(work));
+  const threshold = tolerance * Math.sqrt(dot(work, work));
   let iterations = 0;
   while (offDiagonalNorm(work, size) > threshold && iterations < maxIterations) {
     for (let p = 0; p < size - 1; p++) {
@@ -69,12 +71,6 @@ export function symmetricEigen(a: Float64Array, size: number, options: EigenOpti
     vectors.set(rotated.subarray(k * size, (k + 1) * size), row * size);
   });
   return { values, vectors, iterations, converged: offDiagonalNorm(work, size) <= threshold };
-}
-
-function sumOfSquares(values: Float64Array): number {
-  let sum = 0;
-  for (const value of values) sum += value * value;
-  return sum;
 }
 
 /** Returns the Frobenius norm of the entries of `a` off the diagonal. */

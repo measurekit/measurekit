@@ -1,11 +1,10 @@
-import { DataError } from "@measurekit/core";
+import { DataError, studentLowerTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { normalCdf } from "../math/normal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
 import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
 import { itemScalability, scaleCoefficient, usableItems } from "./scalability.js";
 import { columnOf, covariances, type MokkenData, mokkenData, scoreOf } from "./scores.js";
-import { studentLowerTail } from "./student-t.js";
 
 /** The default smallest difference of means that counts as a violation for each step of the highest score. */
 const MINIMUM_VIOLATION_PER_STEP = 0.03;

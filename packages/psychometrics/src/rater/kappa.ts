@@ -1,11 +1,5 @@
-import { checkChoice, checkOptions, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, DataError, type KappaWeights, kappaOfPairs } from "@measurekit/core";
 import { completeRatings } from "./ratings.js";
-
-/**
- * The weights of Cohen's kappa: `"none"`, agreement only; `"linear"`, 1 - |i - j| / (K - 1); `"quadratic"`,
- * 1 - (i - j)² / (K - 1)², for ratings i and j over the range K - 1 of the categories used.
- */
-export type KappaWeights = "none" | "linear" | "quadratic";
 
 /** Options of {@link cohenKappa}. */
 export interface CohenKappaOptions {
@@ -42,35 +36,15 @@ export function cohenKappa(ratings: readonly (readonly (number | null)[])[], opt
     maxRaters: 2,
     minSubjects: 1,
   });
-  let lowest = Number.POSITIVE_INFINITY;
-  let highest = Number.NEGATIVE_INFINITY;
-  for (const row of rows) {
-    for (const rating of row) {
-      lowest = Math.min(lowest, rating);
-      highest = Math.max(highest, rating);
-    }
-  }
-  const range = highest - lowest;
-  const agreement = (x: number, y: number): number => {
-    if (weights === "none" || range === 0) return x === y ? 1 : 0;
-    const distance = Math.abs(x - y) / range;
-    return weights === "linear" ? 1 - distance : 1 - distance * distance;
-  };
-  const size = range + 1;
-  const first = new Float64Array(size);
-  const second = new Float64Array(size);
-  let observed = 0;
-  for (const [x = 0, y = 0] of rows) {
-    observed += agreement(x, y);
-    first[x - lowest] = (first[x - lowest] ?? 0) + 1;
-    second[y - lowest] = (second[y - lowest] ?? 0) + 1;
-  }
-  const n = rows.length;
-  let chance = 0;
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j < size; j++) chance += ((first[i] ?? 0) * (second[j] ?? 0) * agreement(i, j)) / (n * n);
-  }
-  return kappa(observed / n, chance, "Cohen's kappa");
+  const first = new Float64Array(rows.length);
+  const second = new Float64Array(rows.length);
+  rows.forEach(([x = 0, y = 0], subject) => {
+    first[subject] = x;
+    second[subject] = y;
+  });
+  const kappa = kappaOfPairs(first, second, weights);
+  if (kappa === null) throw undefinedKappa("Cohen's kappa");
+  return kappa;
 }
 
 /**
@@ -97,10 +71,10 @@ export function fleissKappa(ratings: readonly (readonly (number | null)[])[]): n
   }
   let chance = 0;
   for (const count of totals.values()) chance += (count / (rows.length * raters)) ** 2;
-  return kappa(agreement / rows.length, chance, "Fleiss' kappa");
+  if (!(chance < 1)) throw undefinedKappa("Fleiss' kappa");
+  return (agreement / rows.length - chance) / (1 - chance);
 }
 
-function kappa(observed: number, chance: number, statistic: string): number {
-  if (!(chance < 1)) throw new DataError(`${statistic} is undefined when the chance agreement is 1.`);
-  return (observed - chance) / (1 - chance);
+function undefinedKappa(statistic: string): DataError {
+  return new DataError(`${statistic} is undefined when the chance agreement is 1.`);
 }

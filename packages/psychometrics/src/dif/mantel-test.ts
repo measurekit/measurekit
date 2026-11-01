@@ -1,6 +1,6 @@
-import { checkOptions } from "@measurekit/core";
+import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
-import { chiSquareUpperTail } from "../math/chi-square.js";
+
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { type DifGroup, type ItemCases, itemCases, polytomousData } from "./groups.js";
 import {

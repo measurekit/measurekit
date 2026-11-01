@@ -1,13 +1,12 @@
-import { logistic, normalQuantile } from "@measurekit/core";
+import { chiSquareUpperTail, logistic, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { chiSquareUpperTail } from "../src/math/chi-square.js";
 import { symmetricEigen } from "../src/math/eigen.js";
 import { numericalHessian } from "../src/math/hessian.js";
 import { invert, invertPositiveDefinite } from "../src/math/linear-algebra.js";
 import { identity, multiply, multiplyVector, symmetrized, traceOfProduct, transpose } from "../src/math/matrix.js";
 import { normalCdf, normalDensity } from "../src/math/normal.js";
-import { bfgs, newton } from "../src/math/optimize.js";
+import { newton } from "../src/math/optimize.js";
 import { gaussHermite, rectangular } from "../src/math/quadrature.js";
 import { findIncreasingRoot, findRoot } from "../src/math/root.js";
 import eigen from "./fixtures/math-eigen.json" with { type: "json" };
@@ -309,17 +308,16 @@ function rosenbrock(x: Float64Array, gradient: Float64Array, hessian?: Float64Ar
   return (1 - a) ** 2 + 100 * (b - a * a) ** 2;
 }
 
-describe("optimizers", () => {
-  it("minimize the Rosenbrock function", () => {
-    for (const result of [newton(rosenbrock, [-1.2, 1]), bfgs(rosenbrock, [-1.2, 1])]) {
-      expect(result.converged).toBe(true);
-      expect(defined(result.x[0])).toBeCloseTo(1, 7);
-      expect(defined(result.x[1])).toBeCloseTo(1, 7);
-      expect(result.value).toBeLessThan(1e-14);
-    }
+describe("newton", () => {
+  it("minimizes the Rosenbrock function", () => {
+    const result = newton(rosenbrock, [-1.2, 1]);
+    expect(result.converged).toBe(true);
+    expect(defined(result.x[0])).toBeCloseTo(1, 7);
+    expect(defined(result.x[1])).toBeCloseTo(1, 7);
+    expect(result.value).toBeLessThan(1e-14);
   });
 
-  it("solve a quadratic in one Newton step", () => {
+  it("solves a quadratic in one step", () => {
     const result = newton(
       (x, gradient, hessian) => {
         const v = defined(x[0]);
@@ -348,9 +346,9 @@ describe("optimizers", () => {
     expect(defined(result.x[0])).toBeCloseTo(Math.SQRT1_2, 8);
   });
 
-  it("report non-convergence within the iteration limit", () => {
-    const result = bfgs(rosenbrock, [-1.2, 1], { maxIterations: 3 });
-    expect(result).toMatchObject({ iterations: 3, converged: false });
+  it("reports non-convergence within the iteration limit", () => {
+    const result = newton(rosenbrock, [-1.2, 1], { maxIterations: 2 });
+    expect(result).toMatchObject({ iterations: 2, converged: false });
   });
 });
 

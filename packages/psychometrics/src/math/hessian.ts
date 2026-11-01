@@ -1,4 +1,4 @@
-import type { GradientFunction } from "./optimize.js";
+import type { GradientFunction } from "@measurekit/core";
 
 /** The relative step of the central differences, about the cube root of the machine epsilon. */
 const STEP = 1e-5;

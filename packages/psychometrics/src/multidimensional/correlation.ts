@@ -1,7 +1,7 @@
-import { cholesky } from "@measurekit/core";
+import { bfgs, cholesky } from "@measurekit/core";
 import { invertPositiveDefinite } from "../math/linear-algebra.js";
 import { identity, multiply, traceOfProduct } from "../math/matrix.js";
-import { bfgs } from "../math/optimize.js";
+
 import { type Grid, normalLogWeights } from "./grid.js";
 
 /** The gradient norm, per person, at which the M-step of the correlations has converged. */

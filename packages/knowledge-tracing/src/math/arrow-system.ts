@@ -1,5 +1,5 @@
 import { backtrack, dot, logistic, logLogistic, maxAbs } from "@measurekit/core";
-import { choleskySolve, squares } from "./linear-algebra.js";
+import { choleskySolve } from "./linear-algebra.js";
 import type { SparseMatrix } from "./sparse-matrix.js";
 
 /**
@@ -244,7 +244,7 @@ function solveStep(
   stepIntercepts: Float64Array,
 ): boolean {
   const { gradientBeta, gradientIntercepts, diagonal, schur, reduced } = system;
-  for (const { coefficients } of flats) addOuter(schur, coefficients, 1 / squares(coefficients));
+  for (const { coefficients } of flats) addOuter(schur, coefficients, 1 / dot(coefficients, coefficients));
   const rhs = reduced.map((value, j) => value - (gradientBeta[j] ?? 0));
   if (!solveDamped(schur, stepBeta.length, rhs, stepBeta)) return false;
   const { touchedStarts, touchedColumns, touchedSums } = problem;
@@ -334,7 +334,7 @@ export function penalizedNewton(
   const system = createSystem(beta.length, intercepts.length);
   const step = { beta: new Float64Array(beta.length), intercepts: new Float64Array(intercepts.length) };
   const objective = (b: Float64Array, u: Float64Array): number =>
-    -logLikelihood(problem, b, u) + (ridge / 2) * squares(b) + (groupPenalty / 2) * squares(u);
+    -logLikelihood(problem, b, u) + (ridge / 2) * dot(b, b) + (groupPenalty / 2) * dot(u, u);
   let value = objective(beta, intercepts);
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     assemble(problem, beta, intercepts, ridge, groupPenalty, system);
@@ -346,7 +346,7 @@ export function penalizedNewton(
     if (!(slope < 0)) {
       step.beta.set(system.gradientBeta.map((g) => -g));
       step.intercepts.set(system.gradientIntercepts.map((g) => -g));
-      slope = -(squares(step.beta) + squares(step.intercepts));
+      slope = -(dot(step.beta, step.beta) + dot(step.intercepts, step.intercepts));
     }
     const trial = searchLine(beta, intercepts, step, value, slope, objective);
     if (trial === null) return { iterations: iteration, converged: false };

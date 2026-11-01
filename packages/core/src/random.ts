@@ -37,6 +37,22 @@ export function createRandom(seed: number): Random {
   };
 }
 
+/**
+ * Permutes the entries of `values` in place by Fisher-Yates, uniformly at random: one uniform draw for each entry but the
+ * first.
+ *
+ * @param values - The entries to permute.
+ * @param random - The source of the draws.
+ */
+export function shuffle(values: Int32Array | Uint32Array | Float64Array, random: Random): void {
+  for (let i = values.length - 1; i > 0; i--) {
+    const j = Math.floor(random.uniform() * (i + 1));
+    const held = values[i] ?? 0;
+    values[i] = values[j] ?? 0;
+    values[j] = held;
+  }
+}
+
 /** The MurmurHash3 32-bit finalizer, a bijection that spreads every input bit over the output. */
 function mix(value: number): number {
   let h = value >>> 0;

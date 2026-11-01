@@ -7,6 +7,7 @@ import {
   checkUnitInterval,
   DataError,
   type Random,
+  shuffle,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/response-matrix.js";
 import { type CodedItem, codeItems } from "./coded-items.js";
@@ -182,16 +183,6 @@ function checkedMatrix(correlations: Float64Array, items: readonly CodedItem[], 
     }
   }
   return correlations;
-}
-
-/** Permutes the entries of `values` in place by Fisher-Yates, uniformly at random. */
-function shuffle(values: Int32Array | Float64Array, random: Random): void {
-  for (let i = values.length - 1; i > 0; i--) {
-    const j = Math.floor(random.uniform() * (i + 1));
-    const held = values[i] ?? 0;
-    values[i] = values[j] ?? 0;
-    values[j] = held;
-  }
 }
 
 /** Returns the comparison of observed eigenvalues with `samples`, one row of `observed.length` per replication. */

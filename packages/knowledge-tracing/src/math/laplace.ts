@@ -1,6 +1,6 @@
 import { ARMIJO, backtrack, dot, logistic, maxAbs } from "@measurekit/core";
 import { assemble, createSystem, linear, type Problem, penalizedNewton, rowLoss, type System } from "./arrow-system.js";
-import { choleskySolve, squares } from "./linear-algebra.js";
+import { choleskySolve } from "./linear-algebra.js";
 
 /** Random group intercepts fitted by the Laplace approximation. */
 export interface RandomIntercepts {
@@ -194,7 +194,7 @@ function laplace(
     }
     logLikelihood -= (b * b) / (2 * variance) + Math.log1p(variance * h) / 2;
   }
-  const value = logLikelihood - (ridge / 2) * squares(beta);
+  const value = logLikelihood - (ridge / 2) * dot(beta, beta);
   if (system === null) return { value, logLikelihood, gradientBeta: new Float64Array(0), gradientTau: 0 };
   assemble(problem, beta, modes, ridge, 1 / variance, system);
   return { value, logLikelihood, ...gradients(problem, modes, variance, system) };

@@ -5,11 +5,12 @@
  *
  * @module @measurekit/psychometrics/rater
  */
+export type { KappaWeights } from "@measurekit/core";
 export { type AdjacentAgreementOptions, adjacentAgreement, exactAgreement } from "./agreement.js";
 export { expectedRating } from "./expected-rating.js";
 export type { FacetElement, FacetSummary, HomogeneityTest } from "./facet-summary.js";
 export { type IntraclassCorrelation, intraclassCorrelation } from "./intraclass-correlation.js";
-export { type CohenKappaOptions, cohenKappa, fleissKappa, type KappaWeights } from "./kappa.js";
+export { type CohenKappaOptions, cohenKappa, fleissKappa } from "./kappa.js";
 export { manyFacetEstimates } from "./many-facet-estimates.js";
 export { type FacetFit, manyFacetFit } from "./many-facet-fit.js";
 export {

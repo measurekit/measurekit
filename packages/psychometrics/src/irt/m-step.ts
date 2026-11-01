@@ -1,4 +1,4 @@
-import { newton, type OptimizerOptions } from "../math/optimize.js";
+import { type NewtonOptions, newton } from "../math/optimize.js";
 import { fromUnbounded, toUnbounded, unboundedDerivative } from "./bounds.js";
 import type { FreeParameter, ItemState, Setup } from "./calibration-setup.js";
 import { distributionObjective, normalWeights } from "./latent.js";
@@ -10,7 +10,7 @@ import { testletObjective, testletWeights } from "./testlets.js";
  * Each M-step takes one Fisher-scoring step with a line search: a generalized EM step, which never lowers the expected
  * log-posterior and, from the previous iteration's estimates, is close to exact.
  */
-const M_STEP: OptimizerOptions = { tolerance: 0, maxIterations: 1 };
+const M_STEP: NewtonOptions = { tolerance: 0, maxIterations: 1 };
 /** Items whose parameters the M-step estimates together because they share some, with those free parameters. */
 interface Block<TParameters> {
   readonly items: readonly ItemState<TParameters>[];

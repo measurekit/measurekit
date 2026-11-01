@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { createRandom, DataError } from "../src/index.js";
+import { createRandom, DataError, shuffle } from "../src/index.js";
 
 describe("createRandom", () => {
   it("reproduces a sequence from the same seed and differs between neighboring seeds", () => {
@@ -40,5 +40,59 @@ describe("createRandom", () => {
     expect(() => createRandom(1.5)).toThrow(DataError);
     expect(() => createRandom(2 ** 53)).toThrow("A seed must be a safe integer, found 9007199254740992.");
     expect(() => createRandom(JSON.parse('"5"'))).toThrow('A seed must be a safe integer, found "5".');
+  });
+});
+
+describe("shuffle", () => {
+  it("permutes the entries of any typed array in place and keeps them", () => {
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: -1000, max: 1000 }), { maxLength: 60 }), fc.integer(), (values, seed) => {
+        for (const array of [Int32Array.from(values), Uint32Array.from(values, Math.abs), Float64Array.from(values)]) {
+          const expected = Array.from(array).sort((a, b) => a - b);
+          shuffle(array, createRandom(seed));
+          expect(Array.from(array).sort((a, b) => a - b)).toEqual(expected);
+        }
+      }),
+    );
+  });
+
+  it("leaves nothing to permute in fewer than two entries, and draws once for each entry but the first", () => {
+    let draws = 0;
+    const counting = {
+      uniform: () => {
+        draws++;
+        return 0.5;
+      },
+      normal: () => 0,
+    };
+    shuffle(new Int32Array(0), counting);
+    shuffle(Int32Array.of(7), counting);
+    expect(draws).toBe(0);
+    shuffle(new Uint32Array(5), counting);
+    expect(draws).toBe(4);
+  });
+
+  it("reproduces the order from the same seed", () => {
+    const order = (seed: number): number[] => {
+      const values = Uint32Array.from({ length: 20 }, (_, index) => index);
+      shuffle(values, createRandom(seed));
+      return Array.from(values);
+    };
+    expect(order(11)).toEqual(order(11));
+    expect(order(11)).not.toEqual(order(12));
+  });
+
+  it("gives every order of three entries about the same share of 60,000 draws", () => {
+    const random = createRandom(20261030);
+    const counts = new Map<string, number>();
+    for (let draw = 0; draw < 60_000; draw++) {
+      const values = Int32Array.of(0, 1, 2);
+      shuffle(values, random);
+      const key = values.join("");
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    expect(counts.size).toBe(6);
+    // Each order has probability 1/6 and a binomial count with standard deviation √(60000 · 1/6 · 5/6) ≈ 91.
+    for (const count of counts.values()) expect(Math.abs(count - 10_000)).toBeLessThan(5 * 91);
   });
 });
