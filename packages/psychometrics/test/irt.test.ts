@@ -51,7 +51,15 @@ import {
   twoParameterLogistic,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
-import { compressResponses, type ExpectationItem, expectationStep, maximize, population } from "../src/irt/internal.js";
+import {
+  compressResponses,
+  type ExpectationItem,
+  expectationStep,
+  type Iteration,
+  maximize,
+  population,
+  squarem,
+} from "../src/irt/internal.js";
 import { rectangular } from "../src/math/quadrature.js";
 import { arbitraryItem, arbitraryLocation, arbitraryLocations, arbitrarySlope } from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
@@ -1808,6 +1816,57 @@ describe("latent regression", () => {
   });
 });
 
+describe("the M-step of the linear Rasch model", () => {
+  const target = Float64Array.of(0.25, -0.5);
+
+  /** A quadratic of curvature 1 around `target` on top of `offset`, and the number of times it was evaluated. */
+  function quadratic(offset: number, rounded?: Float64Array) {
+    let evaluations = 0;
+    const objective = (x: Float64Array, gradient: Float64Array, hessian: Float64Array): number => {
+      evaluations++;
+      hessian.fill(0);
+      let value = offset;
+      for (let j = 0; j < x.length; j++) {
+        const distance = (x[j] ?? 0) - (target[j] ?? 0);
+        value += 0.5 * distance * distance;
+        gradient[j] = distance;
+        hessian[j * x.length + j] = 1;
+      }
+      // The value at the point where the descent starts rounds lower than at every point near it, as the sum of
+      // thousands of terms does at some point: no step looks like a decrease, though the gradient still points at the minimum.
+      const lucky = rounded !== undefined && x.every((entry, j) => entry === rounded[j]);
+      return lucky ? value - 1e-6 : value;
+    };
+    return { objective, evaluations: () => evaluations };
+  }
+
+  it("reaches the minimum of a smooth objective in a few evaluations", () => {
+    const { objective, evaluations } = quadratic(0);
+    const x = maximize(objective, Float64Array.of(1, 2), null);
+    expectClose(defined(x[0]), 0.25, 1e-12);
+    expectClose(defined(x[1]), -0.5, 1e-12);
+    expect(evaluations()).toBeLessThanOrEqual(4);
+  });
+
+  it("keeps a held parameter at its value", () => {
+    const { objective } = quadratic(0);
+    const x = maximize(objective, Float64Array.of(1, 2), { index: 1, value: 3 });
+    expectClose(defined(x[0]), 0.25, 1e-12);
+    expect(x[1]).toBe(3);
+  });
+
+  it("stops at a step whose decrease the rounding of the objective hides, which would take all its iterations", () => {
+    // A step of 1e-5 is above the step tolerance, and 40 halvings bring it below the spacing of the numbers near 0.25.
+    const start = Float64Array.of(0.25 + 1e-5, -0.5 - 1e-5);
+    const { objective, evaluations } = quadratic(1e9, start);
+    const x = maximize(objective, start, null);
+    // One line search of 40 halvings, and not 50 of them.
+    expect(evaluations()).toBeLessThan(50);
+    expect(Math.abs((x[0] ?? 0) - 0.25)).toBeLessThanOrEqual(1.1e-5);
+    expect(Math.abs((x[1] ?? 0) + 0.5)).toBeLessThanOrEqual(1.1e-5);
+  });
+});
+
 describe("logistic models", () => {
   it("name their estimated parameters, with c and d bounded and a shared by 1PL items", () => {
     expect(oneParameterLogistic.parameters(2)).toEqual([{ name: "a", shared: true }, { name: "b" }]);
@@ -2060,6 +2119,72 @@ describe("reliability", () => {
     expect(() => empiricalReliability(JSON.parse("[null, null]"))).toThrow(
       "Estimate 1 must be an object { theta, standardError }, found null.",
     );
+  });
+});
+
+/** An iteration of x → x + (target - x) (1 - rate) on one number, whose log-likelihood rises toward the target. */
+function linear(target: number, rate: number, start: number): Iteration & { readonly state: () => number } {
+  let x = start;
+  return {
+    step() {
+      const next = x + (target - x) * (1 - rate);
+      const change = Math.abs(next - x);
+      const logLikelihood = -((target - x) ** 2);
+      x = next;
+      return { logLikelihood, change };
+    },
+    get: () => Float64Array.of(x),
+    set: (state) => {
+      x = state[0] ?? 0;
+    },
+    state: () => x,
+  };
+}
+
+describe("squarem", () => {
+  it("reaches the limit of a linearly convergent iteration in a few steps", () => {
+    const iteration = linear(3, 0.9, 0);
+    const { converged, iterations } = squarem(iteration, { tolerance: 1e-6, maxIterations: 500 });
+    expect(converged).toBe(true);
+    // The plain iteration needs about 130 steps for a change of 1e-6.
+    expect(iterations).toBeLessThanOrEqual(10);
+    expect(iteration.state()).toBeCloseTo(3, 4);
+  });
+
+  it("counts every EM iteration against maxIterations", () => {
+    for (const maxIterations of [1, 2, 3, 4, 5, 6, 7]) {
+      const { converged, iterations } = squarem(linear(3, 0.99, 0), { tolerance: 0, maxIterations });
+      expect({ converged, iterations }).toEqual({ converged: false, iterations: maxIterations });
+    }
+  });
+
+  it("falls back to the plain step when the jump lowers the log-likelihood", () => {
+    // The log-likelihood falls at the point of an extrapolation beyond the target, so that the cycle goes to x2.
+    let jumps = 0;
+    let x = 0;
+    const iteration: Iteration = {
+      step() {
+        const next = x + (3 - x) * 0.1;
+        const logLikelihood = x > 3 ? Number.NEGATIVE_INFINITY : -((3 - x) ** 2);
+        const change = Math.abs(next - x);
+        x = next;
+        return { logLikelihood, change };
+      },
+      get: () => Float64Array.of(x),
+      set: (state) => {
+        jumps++;
+        x = state[0] ?? 0;
+      },
+    };
+    const { converged } = squarem(iteration, { tolerance: 1e-6, maxIterations: 500 });
+    expect(converged).toBe(true);
+    expect(jumps).toBeGreaterThan(0);
+    expect(x).toBeCloseTo(3, 4);
+  });
+
+  it("stops when an iteration changes nothing", () => {
+    const { converged, iterations } = squarem(linear(0, 0.5, 0), { tolerance: 1e-6, maxIterations: 50 });
+    expect({ converged, iterations }).toEqual({ converged: true, iterations: 1 });
   });
 });
 
@@ -2612,56 +2737,5 @@ describe("properties", () => {
       }),
       { numRuns: 10 },
     );
-  });
-});
-
-describe("the M-step of the linear Rasch model", () => {
-  const target = Float64Array.of(0.25, -0.5);
-
-  /** A quadratic of curvature 1 around `target` on top of `offset`, and the number of times it was evaluated. */
-  function quadratic(offset: number, rounded?: Float64Array) {
-    let evaluations = 0;
-    const objective = (x: Float64Array, gradient: Float64Array, hessian: Float64Array): number => {
-      evaluations++;
-      hessian.fill(0);
-      let value = offset;
-      for (let j = 0; j < x.length; j++) {
-        const distance = (x[j] ?? 0) - (target[j] ?? 0);
-        value += 0.5 * distance * distance;
-        gradient[j] = distance;
-        hessian[j * x.length + j] = 1;
-      }
-      // The value at the point where the descent starts rounds lower than at every point near it, as the sum of
-      // thousands of terms does at some point: no step looks like a decrease, though the gradient still points at the minimum.
-      const lucky = rounded !== undefined && x.every((entry, j) => entry === rounded[j]);
-      return lucky ? value - 1e-6 : value;
-    };
-    return { objective, evaluations: () => evaluations };
-  }
-
-  it("reaches the minimum of a smooth objective in a few evaluations", () => {
-    const { objective, evaluations } = quadratic(0);
-    const x = maximize(objective, Float64Array.of(1, 2), null);
-    expectClose(defined(x[0]), 0.25, 1e-12);
-    expectClose(defined(x[1]), -0.5, 1e-12);
-    expect(evaluations()).toBeLessThanOrEqual(4);
-  });
-
-  it("keeps a held parameter at its value", () => {
-    const { objective } = quadratic(0);
-    const x = maximize(objective, Float64Array.of(1, 2), { index: 1, value: 3 });
-    expectClose(defined(x[0]), 0.25, 1e-12);
-    expect(x[1]).toBe(3);
-  });
-
-  it("stops at a step whose decrease the rounding of the objective hides, which would take all its iterations", () => {
-    // A step of 1e-5 is above the step tolerance, and 40 halvings bring it below the spacing of the numbers near 0.25.
-    const start = Float64Array.of(0.25 + 1e-5, -0.5 - 1e-5);
-    const { objective, evaluations } = quadratic(1e9, start);
-    const x = maximize(objective, start, null);
-    // One line search of 40 halvings, and not 50 of them.
-    expect(evaluations()).toBeLessThan(50);
-    expect(Math.abs((x[0] ?? 0) - 0.25)).toBeLessThanOrEqual(1.1e-5);
-    expect(Math.abs((x[1] ?? 0) + 0.5)).toBeLessThanOrEqual(1.1e-5);
   });
 });
