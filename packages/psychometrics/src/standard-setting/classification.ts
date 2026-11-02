@@ -44,13 +44,8 @@ export function classificationAccuracy(
   cuts: readonly number[],
 ): ClassificationAccuracy {
   checkArray(estimates, "Classification accuracy needs an array of estimates");
-  checkArray(cuts, "Classification accuracy needs an array of cuts");
   if (estimates.length === 0) throw new DataError("Classification accuracy needs at least one estimate.");
-  if (cuts.length === 0) throw new DataError("Classification accuracy needs at least one cut.");
-  cuts.forEach((cut, k) => {
-    checkFinite(cut, `Cut ${k + 1}`);
-    if (k > 0 && !(cut > (cuts[k - 1] ?? 0))) throw new DataError(`The cuts must increase; cut ${k + 1} is ${cut}.`);
-  });
+  checkCuts(cuts, "Classification accuracy needs");
   let accuracy = 0;
   let consistency = 0;
   const persons = estimates.map((estimate, index) => {
@@ -69,6 +64,21 @@ export function classificationAccuracy(
     return { category, probabilities };
   });
   return { accuracy: accuracy / estimates.length, consistency: consistency / estimates.length, persons };
+}
+
+/**
+ * Checks cuts: an array of at least one finite number, each above the one before.
+ *
+ * @param method - Opens the messages, such as `Classification accuracy needs`.
+ * @throws `DataError` when they are not.
+ */
+export function checkCuts(cuts: readonly number[], method: string): void {
+  checkArray(cuts, `${method} an array of cuts`);
+  if (cuts.length === 0) throw new DataError(`${method} at least one cut.`);
+  cuts.forEach((cut, k) => {
+    checkFinite(cut, `Cut ${k + 1}`);
+    if (k > 0 && !(cut > (cuts[k - 1] ?? 0))) throw new DataError(`The cuts must increase; cut ${k + 1} is ${cut}.`);
+  });
 }
 
 /** Returns Φ(upper) - Φ(lower), from the tail on the side of the interval so that no precision cancels. */

@@ -1,6 +1,7 @@
 import { checkArray, checkFinite, checkRecord, DataError, describe, logGamma } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 import { adaptiveIntegral } from "../math/internal.js";
+import { checkCuts } from "./classification.js";
 
 /** Options of {@link livingstonLewisClassification}. */
 export interface LivingstonLewisOptions {
@@ -110,7 +111,7 @@ export function livingstonLewisClassification(
     throw new DataError(`The option maximum must be above the minimum ${minimum}, found ${maximum}.`);
   }
   const proportions = checkScores(scores, minimum, maximum);
-  checkCuts(cuts);
+  checkCuts(cuts, "Livingston and Lewis need");
   const effectiveLength = lengthOf(scores, minimum, maximum, reliability);
   const trials = roundHalfToEven(effectiveLength);
   if (!(trials >= 1 && trials <= MAX_EFFECTIVE_LENGTH)) {
@@ -150,20 +151,6 @@ function checkScores(scores: readonly number[], minimum: number, maximum: number
     throw new DataError("Livingston and Lewis need scores that vary; every score is the same.");
   }
   return proportions;
-}
-
-/**
- * Checks that the cuts are finite and increasing.
- *
- * @throws `DataError` when there are none or they are not.
- */
-function checkCuts(cuts: readonly number[]): void {
-  checkArray(cuts, "Livingston and Lewis need an array of cuts");
-  if (cuts.length === 0) throw new DataError("Livingston and Lewis need at least one cut.");
-  cuts.forEach((cut, k) => {
-    checkFinite(cut, `Cut ${k + 1}`);
-    if (k > 0 && !(cut > (cuts[k - 1] ?? 0))) throw new DataError(`The cuts must increase; cut ${k + 1} is ${cut}.`);
-  });
 }
 
 /** Returns the effective test length of the scores, betafunctions' `ETL`, unrounded. */
