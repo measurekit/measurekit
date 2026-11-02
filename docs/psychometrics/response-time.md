@@ -272,6 +272,9 @@ Invalid input throws `DataError` naming the value found.
   found.
 - **Rapid-guessing models of the joint distribution of times and responses.** No reference: no package that fits them
   was found.
+- **Poisson and gamma models of reading speed.** Outside the sources: one chapter; the lognormal model is the practice.
+- **Diffusion-based models.** Outside the sources: one chapter, a cognitive model of each response.
+- **Reaction-time and span task summaries.** No fit: scoring of a behavioral task, not a model of response times.
 
 ## Differences from LNIRT
 

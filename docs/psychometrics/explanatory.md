@@ -461,6 +461,8 @@ and for these cases:
 - **Standard errors adjusted for few items (Knapp and Hartung).** Outside the sources: an adjustment of meta-analysis
   (`metafor`).
 - **The regression of several parameters at once.** Outside the sources: a technique of meta-analysis (`metafor`).
+- **The LLTM and its polytomous forms by conditional maximum likelihood.** Outside the sources: the same models by
+  marginal maximum likelihood are built, and `eRm::LPCM` failed to recover truth.
 
 ## Differences from the references
 

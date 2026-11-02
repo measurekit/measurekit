@@ -88,7 +88,7 @@ flowchart LR
 
 Both return a proportion from 0 to 1, where irr reports a percentage. Ratings are categories, integers from 0, from two
 raters or more; with more than two, every rating of a subject must lie within the width. They use the subjects every
-rater rated. Not included: agreement corrected for chance, which kappa gives.
+rater rated. [Kappa](#kappa) is the agreement corrected for chance.
 
 ```ts
 import { adjacentAgreement, exactAgreement } from "@measurekit/psychometrics/rater";
@@ -166,9 +166,6 @@ ratingCorrelation(shifted); // 1
 standardizedMeanDifference(shifted); // -2.32
 ```
 
-Not included: Spearman's rank correlation, which ranks the ratings first and is a different statistic, and the correlations
-among more than two raters, which pairs of raters give.
-
 ## Standardized mean difference
 
 `standardizedMeanDifference(ratings)` measures how much more lenient the first of two raters is than the second, in
@@ -213,8 +210,7 @@ Then the subgroups' SMDs share one scale, and a group whose ratings vary less is
 | ------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `population` | the pooled standard deviation of the subjects given | `{ first, second }`: each rater's standard deviation over the population, non-negative; `null` when both are 0 |
 
-Not included: the small-sample correction of Hedges' g, confidence intervals, and the differences among more than two
-raters, which pairs of raters give. Where effsize treats the two sets of ratings as independent samples, so does this
+Where effsize treats the two sets of ratings as independent samples, so does this
 function, though the same subjects were rated; it does not use the standard deviation of the differences, as a paired
 effect size would.
 
@@ -546,6 +542,24 @@ no cell.
 - **Confusion matrices, score distributions and descriptive statistics.** No fit: counts and general statistics.
 - **Scaling of machine scores to the human scores.** No fit: the scorer's transformation, one line.
 - **Evaluation reports, as RSMTool's HTML, `rsmcompare` and `rsmsummarize`.** No fit: input and output.
+- **Spearman's rank correlation.** Outside the sources: it ranks the ratings first, which makes it a different statistic
+  from the correlation of the ratings.
+- **The correlations among more than two raters.** No fit: pairs of raters give them.
+- **The small-sample correction of Hedges' g.** Outside the sources: an option of effsize's `cohen.d`.
+- **Confidence intervals of the standardized mean difference.** Outside the sources: effsize reports them.
+- **The standardized mean differences among more than two raters.** No fit: pairs of raters give them.
+- **Light's kappa.** Outside the sources: a function of irr, beside `cohenKappa` and `fleissKappa`.
+- **Kendall's W.** Outside the sources: a function of irr.
+- **Finn's coefficient.** Outside the sources: a function of irr.
+- **Robinson's A.** Outside the sources: a function of irr.
+- **Iota.** Outside the sources: a function of irr.
+- **Maxwell's RE.** Outside the sources: a function of irr.
+- **The Bhapkar test.** Outside the sources: a function of irr.
+- **The Stuart-Maxwell test.** Outside the sources: a function of irr.
+- **Sample size for kappa.** Outside the sources: a planning tool of irr.
+- **The latent class model for two raters.** Outside the sources: a function of sirt.
+- **Krippendorff's alpha.** Outside the sources: the method of Hayes and Krippendorff (2007), which no testing program's
+  technical report found uses; programs report agreement and kappa, which are built.
 
 ## References
 

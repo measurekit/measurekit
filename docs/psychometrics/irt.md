@@ -961,3 +961,54 @@ Validate a new model against an R reference before relying on it, as [validation
   item's expected score falls on both sides of its location, where true-score equating needs it to increase.
 - **Design-based standard errors with survey weights.** No fit: strata and clusters are survey design, the `survey`
   package's; `personWeights` are rescaled frequencies, and a replicate-weight variance is a loop over `calibrate`.
+- **Sequential models.** Outside the sources: a variant for ordered categories; the graded and partial credit models are
+  the practice, and recoded steps fit as 2PL items.
+- **Models for continuous responses.** No fit: a response is an integer category throughout the library.
+- **Multiple-choice and nested logit models.** Outside the sources: variants of `nominalResponse`, which fits
+  distractors.
+- **Graded rating scale and scoring matrices.** Outside the sources: options of mirt, beside `ratingScale` and
+  `generalizedPartialCredit`.
+- **Spline and monotone polynomial items.** Outside the sources: research models; `kernelItemCurves` shows the shape of
+  a curve.
+- **Generalized logistic and Ramsay quotient models.** Outside the sources: options of sirt.
+- **5PL, complementary log-log and unipolar links.** Outside the sources: options of mirt.
+- **Davidian and mixture latent densities.** Outside the sources: `"empirical-histogram"` covers a distribution that is
+  not normal.
+- **Mixture models and discrete latent classes.** Outside the sources: one chapter presents them as a variant;
+  `@measurekit/psychometrics/cdm` holds latent classes.
+- **Multilevel response models.** Outside the sources: `groups` and `covariates` cover the practice; lme4 and Mplus fit
+  the rest.
+- **Item-family models.** Outside the sources: a research model of cloned items.
+- **Randomized response models.** Outside the sources: a design of data collection for sensitive questions.
+- **Mixed-coefficients multinomial logit, generalized linear latent and mixed models.** No fit: a model language;
+  `IrtModel` and the options cover their named cases.
+- **Bayesian nonparametric models.** No fit: general Bayesian computation, another domain's tool: Stan and JAGS fit
+  them.
+- **Bayesian estimation by MCMC.** No fit: general Bayesian computation, another domain's tool: Stan, JAGS and NIMBLE
+  fit any model here; `priors` give posterior modes, and MH-RM serves high dimensions.
+- **Variational estimation.** Outside the sources: chapter 14 of Statistical Tools presents an approximation for the
+  models that EM and MH-RM fit, as QMC-EM is one for mirt.
+- **Amortized estimation.** No fit: a neural network, so a tensor runtime: `py-irt` fits one.
+- **Joint maximum likelihood of the 2PL and graded models.** Outside the sources: inconsistent without a Rasch form;
+  marginal maximum likelihood is the practice.
+- **Optimal design of a calibration.** Outside the sources: chapter 16 of Statistical Tools presents design theory;
+  optimal calibration designs (`optical` on CRAN) are a research method, and online calibration with `fixed` is the
+  practice.
+- **General equality constraints.** Outside the sources: shared parameters and `fixed` are the practice.
+- **Oakes and sandwich standard errors.** Outside the sources: options of mirt, beside `"hessian"` and
+  `"cross-product"`.
+- **Bootstrap standard errors and the bootstrap likelihood ratio.** No fit: a loop over `calibrate`, [a
+  recipe](#recipe-bootstrap-standard-errors).
+- **Profile-likelihood intervals.** Outside the sources: an option of mirt.
+- **Nested-model tests.** No fit: one line from `logLikelihood`, [a recipe](#recipe-nested-model-chi-square).
+- **Cross-validation of a fit.** No fit: a loop over `calibrate`.
+- **Thurstonian thresholds.** No fit: a root of the model's `probabilities`, one line.
+- **Observed information of an item.** Outside the sources: expected information is the practice of `itemInformation`
+  and `testInformation`.
+- **The distribution of an ability estimator.** Outside the sources: an option of catR.
+- **Draws of item parameters from their covariance.** No fit: one line with a Cholesky factor.
+- **IRT parameters from factor loadings.** No fit: one formula; `calibrate` takes the responses.
+- **Projective IRT.** Outside the sources: an option of mirt.
+- **Rasch copula, beta IRT, grade of membership, ISOP, probabilistic Guttman and least squares distance.** Outside the
+  sources: models of sirt with no source here.
+- **Bradley-Terry models.** Outside the sources: paired comparisons, not responses to items.

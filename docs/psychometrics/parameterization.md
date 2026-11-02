@@ -91,3 +91,7 @@ const items = [
 ];
 items[1]; // { model: generalizedPartialCredit, parameters: { a: 0.86, b: [-3.27, -2.89, 1.54] } }
 ```
+
+## Not included
+
+- **Conversions beyond mirt's forms.** No fit: the parameterization of one more program is a line.

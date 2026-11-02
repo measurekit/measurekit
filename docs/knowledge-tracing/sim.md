@@ -66,3 +66,7 @@ Invalid input throws `DataError` naming the value found.
 | The model is not a learner model                         | Pass a model made by `elo`, `bkt`, `logistic`, `irt` or `kst`             |
 | The attempts are not a non-empty array of attempts       | Give at least one attempt, with a learner, an item, skills and a time     |
 | The model rejects an attempt, or predicts outside 0 to 1 | Give attempts the model can predict, for example with the skills it knows |
+
+## Not included
+
+- **Simulated rows of DataShop or ASSISTments.** No fit: a map of column names.

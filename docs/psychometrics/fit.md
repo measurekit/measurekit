@@ -528,3 +528,13 @@ Invalid input throws `DataError` naming the value found.
   rule.
 - **Kernel curves by group, for DIF.** Outside the sources: an option of KernSmoothIRT; the methods of [dif](dif.md)
   are the practice.
+- **X2 and G2 on groups of estimated theta.** No reference: mirt's flag 79% of the items of a true model at 0.05 on 30
+  seeded sets, where S-X² flags 6.2%.
+- **PV-Q1 and its star form.** Outside the sources: options of mirt from 2017; PV-Q1 flagged 0% at 0.05 on the same
+  sets.
+- **X2 star and its degrees of freedom.** Outside the sources: options of mirt, beside S-X².
+- **Yen's Q1 with Monte Carlo p-values.** Outside the sources: S-X² replaced it.
+- **Wald tests of constraints.** No fit: the library has no constraint language.
+- **Lagrange tests.** No fit: the library has no constraint language.
+- **The second-order convergence test.** No fit: a check of an optimizer, not of a model.
+- **Bayesian model fit.** No fit: posterior predictive checks need the draws of a sampler: general Bayesian computation.

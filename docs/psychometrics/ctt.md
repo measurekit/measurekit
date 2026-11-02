@@ -282,7 +282,7 @@ data to `null`. A function that returns one statistic throws `DataError` with th
 - **Green-Yang and nonlinear SEM reliability.** Outside the sources: functions of sirt.
 - **Multilevel reliability.** No fit: `generalizabilityStudy` covers it.
 - **Test-retest reliability.** No fit: a correlation of two totals.
-- **Intervals of alpha and omega.** No fit: a bootstrap over the persons gives them.
+- **Intervals of alpha and omega.** No fit: a bootstrap over the persons gives them, [a recipe](#recipe-intervals-of-alpha-and-omega).
 - **The correction for attenuation.** No fit: one line.
 - **The correction for range restriction.** No fit: one line.
 - **Omega from given loadings.** No fit: one line of `mcdonaldOmega`'s formula.

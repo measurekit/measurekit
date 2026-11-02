@@ -132,3 +132,8 @@ Adaptive and multistage tests are simulated by `simulateAdaptiveTest` and `simul
 R's generator differs from `createRandom`, so no R reference reproduces a simulation. Seeded tests check
 the distributions instead ([validation](validation.md#simulation)): moments, category frequencies, the share of
 missing responses, exact reproduction, and the recovery of simulated 2PL items by calibration.
+
+## Not included
+
+- **Simulated DIF, misfit and aberrant responses.** No fit: `simulateResponses` with changed items or thetas composes
+  them.

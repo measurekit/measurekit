@@ -1245,6 +1245,10 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 - **Fixed and random initial thetas.** No fit: the estimator's prior sets them.
 - **The discrimination index of items of more than two categories.** No reference: catR's `GDI` and `GDIP` take items of
   two categories only.
+- **Restricted exposure control.** No fit: a live count across persons is the host's: it sets an over-exposed item's
+  `exposure` to 0 between tests, [a recipe](#recipe-restricted-exposure).
+- **Several tests sharing a corpus.** No fit: a host loop over `adaptiveTest`.
+- **Seeding of unscored items.** No fit: the host mixes them in; `fixed` in `calibrate` takes them on.
 
 ## Differences from catR
 

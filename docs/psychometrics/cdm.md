@@ -393,6 +393,23 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 - **S-X² and RMSEA of CDM items.** Outside the sources: functions of CDM, beside Chen, de la Torre and Zhang's statistics.
 - **MADcor and the other residual summaries of CDM.** No fit: one line over the residual correlations of `cdmItemFit`'s
   pairs.
+- **DIF in cognitive diagnosis models.** Outside the sources: chapter 18 is off the list, and `GDINA::dif` flags 15.5%
+  of clean items at 0.05 on 20 seeded sets.
+- **Q validation by MesaR, EPSA, MLR-B and stepwise Wald.** Outside the sources: options of `Qval`, beside PVAF;
+  `"MLR-B"` stops with an error in GDINA 2.13.2.
+- **Bootstrap standard errors.** No fit: a loop over `calibrateCdm`.
+- **The monotonicity check and `autoGDINA`.** No fit: a pipeline of what is built.
+- **Jackknife and delta utilities.** No fit: general statistics.
+- **Multiple-choice and multiple-strategy models.** Outside the sources: variants of the G-DINA.
+- **The general diagnostic model.** Outside the sources: a variant with polytomous skills.
+- **Structured and regularized latent classes.** Outside the sources: research models.
+- **Iterative latent-class analysis.** Outside the sources: a research model.
+- **Joint maximum likelihood and deterministic classification.** Outside the sources: `nonparametricClassification`
+  serves small samples.
+- **The generalized distance method.** Outside the sources: `nonparametricClassification` serves small samples.
+- **Person fit of diagnosis.** Outside the sources: not in the chapters on the list.
+- **KL-based indices and entropy of a test.** Outside the sources: `cat` has the selection rules.
+- **Neural, ranking and fuzzy diagnosis.** No fit: a tensor runtime.
 
 ## References
 

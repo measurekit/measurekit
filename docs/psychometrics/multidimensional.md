@@ -620,6 +620,9 @@ convert items to and from mirt.
   growth fitted to the estimated moments.
 - **Multidimensional person fit.** Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.
 - **Multidimensional DIF.** Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.
+- **Normal-ogive multidimensional models.** Outside the sources: the logistic form is the practice, and is built.
+- **Multicomponent models.** Outside the sources: a variant of the noncompensatory models.
+- **NOHARM.** Outside the sources: `calibrateMultidimensional` is full information.
 
 ## Differences from mirt
 

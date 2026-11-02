@@ -352,6 +352,8 @@ plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes tak
 - **Item mapping.** No reference: descriptive work on a calibrated bank with no statistic of its own.
 - **A copula other than the Gaussian.** Outside the sources: the correlation bounds of comonotonicity and independence
   hold for any copula, but the Gaussian one is the usual choice for separate posteriors and needs one matrix.
+- **Rubin's combining rules.** No fit: a few lines over the plausible values, [a recipe](#recipe-rubins-rules).
+- **Replicate weights.** No fit: a loop over `calibrate` that the program's design sets.
 
 ## Differences from the references
 

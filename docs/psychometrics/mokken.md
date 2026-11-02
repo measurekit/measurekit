@@ -475,6 +475,7 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
 - **The O+ outlier score.** Outside the sources: the tutorial uses G+.
 - **Polytomous U3 and normed G.** Outside the sources: variants of the dichotomous indices that `personScalability`
   builds.
+- **ZU3, the standardized U3.** Outside the sources: a variant of the U3 that `personScalability` builds.
 - **The caution index C, the modified caution index, NCI, A, D and E.** Outside the sources: beside G, U3 and Ht, which are the practice.
 - **Two-level scalability for clustered persons, such as raters.** Outside the sources: a multilevel option of mokken
   (`MLcoefH`).

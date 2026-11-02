@@ -148,3 +148,8 @@ Pass `optionLabels` to list options nobody chose in distractor analysis and to c
 Empty strings are rejected; convert blank cells to `null`. To score an omitted response as wrong instead of missing,
 replace its `null` with a label of its own, such as `"omit"`, and add that label to `optionLabels` if you pass them;
 distractor analysis then reports it as an option.
+
+## Not included
+
+- **Reading files.** No fit: the package does no I/O; the caller parses a file into rows.
+- **The formats of flexMIRT, IRTPRO and BILOG.** No fit: a map of columns, and the package does no I/O.
