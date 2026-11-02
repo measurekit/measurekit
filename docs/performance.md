@@ -7,13 +7,13 @@
 ### Where measurekit is slower
 
 ```mermaid
-%%{init: {"xyChart": {"height": 252, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 286, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Tasks that take more than 1.5 times as long as the reference"
-  x-axis ["cdm.attributeProfiles", "numerics.cholesky", "logistic.fitItems"]
+  x-axis ["cdm.attributeProfiles", "numerics.cholesky", "equating.linkCovariance", "logistic.fitItems"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 3
-  bar [2.7, 2.3, 1.6]
-  line [1, 1, 1]
+  bar [2.7, 2.3, 2.2, 1.6]
+  line [1, 1, 1, 1]
 ```
 
 A bar above the line takes longer than the reference, and md stands for multidimensional.
@@ -41,63 +41,73 @@ xychart-beta horizontal
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 728, "xAxis": {"labelFontSize": 11}}}}%%
-xychart-beta horizontal
-  title "Psychometrics: cdm, ctt, data"
-  x-axis ["calibrateGdina", "calibrateDina", "calibrateDino", "calibrateAcdm", "calibrateLlm", "calibrateRrum", "attributeProfiles", "accuracy", "validateQMatrix", "nonparametric", "compareItemModels", "calibrateGdinaStandardErrors", "itemStatistics", "cronbachAlpha", "mcdonaldOmega", "subscoreValue", "scoreResponses"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 3
-  bar [0.8, 0.48, 0.6, 0.2, 0.17, 0.31, 2.7, 0.45, 0.98, 0.062, 0.0065, 0.83, 0.2, 0.037, 0.62, 0.018, 0.91]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-```
-
-```mermaid
-%%{init: {"xyChart": {"height": 456, "xAxis": {"labelFontSize": 11}}}}%%
-xychart-beta horizontal
-  title "Psychometrics: dif, dimensionality"
-  x-axis ["mantelHaenszel", "logisticRegression", "lordChiSquare", "lordChiSquarePurified", "ordinalLogistic", "polychoricCorrelations", "parallelAnalysis", "exploratoryFactorAnalysis", "minimumAveragePartial"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.072, 0.49, 0.73, 0.72, 0.38, 0.0064, 0.0032, 0.33, 0.1]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1]
-```
-
-```mermaid
 %%{init: {"xyChart": {"height": 762, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: equating, explanatory, fit"
-  x-axis ["linear", "equipercentile", "presmoothing", "bootstrapLinear", "tucker", "frequencyEstimation", "chainedEquipercentile", "stockingLordLinking", "haebaraLinking", "trueScore", "irtObservedScore", "linearChange", "itemFeatureRegression", "lltm", "itemFit", "personFit", "summedScoreFit", "yenQ3"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.00083, 0.008, 0.031, 0.097, 0.0044, 0.0039, 0.015, 0.04, 0.032, 0.018, 0.13, 0.0031, 0.017, 0.24, 0.079, 0.23, 0.13, 0.044]
+  title "Psychometrics: cdm, ctt"
+  x-axis ["modelFit", "itemFit", "calibrateGdina", "calibrateDina", "calibrateDino", "calibrateAcdm", "calibrateLlm", "calibrateRrum", "attributeProfiles", "accuracy", "validateQMatrix", "nonparametric", "compareItemModels", "calibrateGdinaStandardErrors", "itemStatistics", "cronbachAlpha", "mcdonaldOmega", "subscoreValue"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 3
+  bar [0.58, 0.027, 0.8, 0.48, 0.6, 0.2, 0.17, 0.31, 2.7, 0.45, 0.98, 0.062, 0.0065, 0.83, 0.2, 0.037, 0.62, 0.018]
   line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
+%%{init: {"xyChart": {"height": 660, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: data, dif, dimensionality"
+  x-axis ["scoreResponses", "irtLikelihoodRatio", "rajuArea", "sibtest", "mantelHaenszel", "logisticRegression", "lordChiSquare", "lordChiSquarePurified", "ordinalLogistic", "maximumLikelihoodFactors", "omegaHierarchical", "polychoricCorrelations", "parallelAnalysis", "exploratoryFactorAnalysis", "minimumAveragePartial"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.91, 0.24, 0.67, 0.15, 0.072, 0.49, 0.73, 0.72, 0.38, 0.26, 0.48, 0.0064, 0.0032, 0.33, 0.1]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
 %%{init: {"xyChart": {"height": 728, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: generalizability, irt"
-  x-axis ["generalizabilityStudy", "generalizabilityStudyUnbalanced", "calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "testInformation", "calibrate2plLatentRegression"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.0026, 0.021, 0.74, 0.51, 0.5, 0.28, 0.012, 0.26, 0.19, 0.0031, 0.62, 0.064, 0.11, 0.015, 0.33, 0.41, 0.21]
+  title "Psychometrics: equating, explanatory"
+  x-axis ["kernel", "linkCovariance", "linkedErrors", "linear", "equipercentile", "presmoothing", "bootstrapLinear", "tucker", "frequencyEstimation", "chainedEquipercentile", "stockingLordLinking", "haebaraLinking", "trueScore", "irtObservedScore", "linearChange", "itemFeatureRegression", "lltm"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 3
+  bar [0.0098, 2.2, 1.2, 0.00083, 0.008, 0.031, 0.097, 0.0044, 0.0039, 0.015, 0.04, 0.032, 0.018, 0.13, 0.0031, 0.017, 0.24]
   line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 354, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: mokken, rater, responseTime, scaling"
-  x-axis ["scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering", "cohenKappa", "fleissKappa", "exactAgreement", "adjacentAgreement", "meanDifference", "intraclassCorrelation", "manyFacetRasch", "manyFacetRaschInteractions", "calibrateResponseTimes", "drawJointThetas"]
+  title "Psychometrics: fit, generalizability"
+  x-axis ["itemFit", "personFit", "summedScoreFit", "yenQ3", "generalizabilityStudy", "generalizabilityStudyUnbalanced"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.011, 0.03, 0.17, 0.19, 0.3, 0.0081, 0.061, 0.064, 1.3, 0.0029, 1.2, 0.64, 0.038, 0.97]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.079, 0.23, 0.13, 0.044, 0.0026, 0.021]
+  line [1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 184, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 796, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: sim"
-  x-axis ["simulateResponses"]
+  title "Psychometrics: irt"
+  x-axis ["conditionalRasch", "conditionalPartialCredit", "conditionalRatingScale", "calibrateUnfolding", "calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "testInformation", "calibrate2plLatentRegression"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.37]
-  line [1]
+  bar [0.042, 0.014, 0.071, 0.007, 0.74, 0.51, 0.5, 0.28, 0.012, 0.26, 0.19, 0.0031, 0.62, 0.064, 0.11, 0.015, 0.33, 0.41, 0.21]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 728, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: mokken, rater, responseTime, scaling"
+  x-axis ["guttmanErrors", "conditionalAssociation", "twoWayImputation", "scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering", "cohenKappa", "fleissKappa", "exactAgreement", "adjacentAgreement", "meanDifference", "intraclassCorrelation", "manyFacetRasch", "manyFacetRaschInteractions", "calibrateResponseTimes", "drawJointThetas"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.00054, 0.01, 0.14, 0.011, 0.03, 0.17, 0.19, 0.3, 0.0081, 0.061, 0.064, 1.3, 0.0029, 1.2, 0.64, 0.038, 0.97]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 218, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "Psychometrics: sim, standardSetting"
+  x-axis ["simulateResponses", "livingstonLewis"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.37, 1.3]
+  line [1, 1]
 ```
 
 ```mermaid
@@ -106,7 +116,7 @@ xychart-beta horizontal
   title "Knowledge tracing: bkt, elo, evaluate, irt, kst"
   x-axis ["fit", "fitLessons", "fitPairs", "replay", "replay", "auc", "metricsByOpportunity", "replay", "drift", "unionClosure", "structureBase", "clauseStructure", "blim", "iita", "mdml", "identifiability", "validity", "diffTest"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.013, 0.015, 0.014, 0.029, 0.59, 1.2, 0.59, 0.15, 0.035, 0.0078, 0.000037, 0.0011, 0.81, 0.000015, 0.51, 1.2, 0.008, 0.00026]
+  bar [0.013, 0.015, 0.014, 0.029, 0.59, 0.28, 0.27, 0.15, 0.035, 0.0078, 0.000037, 0.0011, 0.81, 0.000015, 0.51, 1.2, 0.008, 0.00026]
   line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
@@ -153,6 +163,8 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Routing cuts of a multistage panel by maximum information                                                        | a panel of 1-3-3-3 modules of 20 items, from a pool of 500 3PL items                                         |            1.81 | stats 4.6.1 `uniroot on the information curves`                                                           |           4.00 |    0.45× |
 | One item selection under content bounds, by the information at the estimate                                      | a pool of 1000 3PL items in 12 content areas, a test of 30 items after 12                                    |           0.128 | mirtCAT 1.14 `findNextItem(objective = computeCriteria(criteria = "MI"))` with lpSolve's `lp`             |           5.33 |   0.024× |
 | Assembly of parallel forms with enemies, by weighted deviations in rotation                                      | 4 forms of 40 items from a pool of 1000 3PL items in 5 content areas, with 30 pairs of enemies and 3 targets |            10.4 | highs 1.15.1.1 `highs_solve`                                                                              |         10,013 |   0.001× |
+| M2 with its RMSEA and SRMSR of a G-DINA calibration                                                              | 1,000 persons, 20 items, 4 attributes                                                                        |            9.44 | GDINA 2.13.2 `modelfit`                                                                                   |           16.4 |    0.58× |
+| The fit statistics of each item of a G-DINA calibration                                                          | 1,000 persons, 20 items, 4 attributes                                                                        |            2.19 | GDINA 2.13.2 `itemfit`                                                                                    |           80.0 |   0.027× |
 | Calibration of the G-DINA model by EM                                                                            | 1,000 persons, 20 items, 4 attributes                                                                        |            76.8 | GDINA 2.13.2 `GDINA(model = "GDINA")`                                                                     |           96.0 |     0.8× |
 | Calibration of the DINA model by EM                                                                              | 1,000 persons, 20 items, 4 attributes                                                                        |            18.5 | GDINA 2.13.2 `GDINA(model = "DINA")`                                                                      |           39.0 |    0.48× |
 | Calibration of the DINO model by EM                                                                              | 1,000 persons, 20 items, 4 attributes                                                                        |            80.8 | GDINA 2.13.2 `GDINA(model = "DINO")`                                                                      |            134 |     0.6× |
@@ -170,15 +182,23 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | McDonald's omega total of one factor                                                                             | 3,000 persons, 20 items                                                                                      |            4.96 | psych 2.6.9 `omega(nfactors = 1)`                                                                         |           8.00 |    0.62× |
 | The value of five subscores of ten items over the total score                                                    | 3,000 persons, 50 items                                                                                      |            2.08 | subscore 3.3 `CTTsub`                                                                                     |            113 |   0.018× |
 | Scoring of the choices of persons against a key                                                                  | 2,000 persons, 50 items of 4 options                                                                         |           0.656 | base 4.6.1 `t(t(choices) == key)`                                                                         |          0.718 |    0.91× |
+| The likelihood-ratio test of every item, against the model with all items equal                                  | 2,000 persons in two groups, 15 items                                                                        |           1,586 | mirt 1.48 `multipleGroup, DIF(scheme = "drop")`                                                           |          6,592 |    0.24× |
+| Raju's signed and unsigned areas of every item, with both groups calibrated by the 2PL                           | 2,000 persons in two groups, 15 items                                                                        |             319 | difR 6.1.0 `difRaju`                                                                                      |            474 |    0.67× |
+| SIBTEST of every item, matched on the other items                                                                | 2,000 persons in two groups, 15 items                                                                        |            10.3 | difR 6.1.0 `difSIBTEST`                                                                                   |           69.0 |    0.15× |
 | The Mantel-Haenszel test of every item                                                                           | 2,000 persons in two groups, 30 items                                                                        |            5.96 | difR 6.1.0 `difMH`                                                                                        |           83.0 |   0.072× |
 | Logistic regression for uniform and nonuniform DIF of every item                                                 | 2,000 persons in two groups, 30 items                                                                        |            40.5 | difR 6.1.0 `difLogistic`                                                                                  |           83.0 |    0.49× |
 | Lord's chi-square of every item, with both groups calibrated by the 2PL                                          | 2,000 persons in two groups, 30 items                                                                        |             676 | difR 6.1.0 `difLord`                                                                                      |            922 |    0.73× |
 | Lord's chi-square of every item, purified until two rounds flag the same items                                   | 2,000 persons in two groups, 30 items                                                                        |             676 | difR 6.1.0 `difLord, purify = TRUE`                                                                       |            938 |    0.72× |
 | Ordinal logistic regression of every item                                                                        | 1,000 persons in two groups, 10 items of 4 categories                                                        |            33.2 | rms 8.2.0 `lrm, three models for an item`                                                                 |           87.0 |    0.38× |
+| Five factors by maximum likelihood with oblimin rotation, and their fit                                          | 2,800 persons, 25 items of 6 categories                                                                      |            17.5 | psych 2.6.9 `fa(nfactors = 5, fm = "ml", rotate = "oblimin")`                                             |           67.0 |    0.26× |
+| Omega hierarchical and total from five group factors by minimum residuals                                        | 2,800 persons, 25 items of 6 categories                                                                      |            16.3 | psych 2.6.9 `omega(nfactors = 5, fm = "minres")`                                                          |           34.0 |    0.48× |
 | Polychoric correlations of every pair of items                                                                   | 2,800 persons, 25 items of 6 categories                                                                      |            9.53 | psych 2.6.9 `polychoric`                                                                                  |          1,490 |  0.0064× |
 | Parallel analysis of components and factors from polychoric correlations, 20 data sets                           | 2,800 persons, 25 items of 6 categories                                                                      |             100 | psych 2.6.9 `fa.parallel(cor = "poly")`                                                                   |         31,037 |  0.0032× |
 | Five factors by minimum residuals with oblimin rotation, from Pearson correlations                               | 2,800 persons, 25 items of 6 categories                                                                      |            10.6 | psych 2.6.9 `fa(nfactors = 5, fm = "minres", rotate = "oblimin")`                                         |           32.0 |    0.33× |
 | Velicer's minimum average partial test of 8 components, from Pearson correlations                                | 2,800 persons, 25 items of 6 categories                                                                      |            8.97 | psych 2.6.9 `VSS(n = 8)`                                                                                  |           90.0 |     0.1× |
+| Kernel equating with its standard errors, from log-linear fits of degree 3                                       | 41 scores, two forms                                                                                         |            1.59 | kequate 1.6.4 `kequate("EG")`                                                                             |            162 |  0.0098× |
+| **The link of a chain of three forms by Haebara's method, with its covariance**                                  | 3 forms of 20 items                                                                                          |            34.0 | equateIRT 2.5.2 `alldirec, chainec`                                                                       |           15.3 | **2.2×** |
+| The standard errors of true-score equating through a mean-mean link                                              | 2 forms of 20 items                                                                                          |            14.5 | equateIRT 2.5.2 `score(se = TRUE)`                                                                        |           12.0 |     1.2× |
 | Linear equating, random groups                                                                                   | 4,329 and 4,152 persons, 40 items                                                                            |           0.000 | equate 2.0.9 `equate(type = "linear")`                                                                    |          0.400 | 0.00083× |
 | Equipercentile equating, random groups                                                                           | 4,329 and 4,152 persons, 40 items                                                                            |           0.002 | equate 2.0.9 `equate(type = "equipercentile")`                                                            |          0.280 |   0.008× |
 | Log-linear presmoothing of a score distribution, degree 3                                                        | 41 scores                                                                                                    |           0.020 | equate 2.0.9 `presmoothing(smoothmethod = "loglinear")`                                                   |          0.660 |   0.031× |
@@ -199,6 +219,10 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Yen's Q3 of every pair of items                                                                                  | 2,000 persons, 40 items                                                                                      |            5.28 | mirt 1.48 `residuals(type = "Q3")`                                                                        |            121 |   0.044× |
 | Variance components of a fully crossed design of three facets                                                    | 200 persons, 10 items, 4 raters: 8,000 scores                                                                |            1.97 | lme4 2.1.0 `lmer, six random effects, REML`                                                               |            764 |  0.0026× |
 | Variance components of a design of three facets with a quarter of the scores missing, by Henderson's Method 1    | 200 persons, 10 items, 4 raters: 6,058 scores                                                                |            2.54 | base 4.6.1 `method_one, Henderson's Method 1`                                                             |            123 |   0.021× |
+| The Rasch model by conditional maximum likelihood                                                                | 2,000 persons, 15 items                                                                                      |            3.81 | eRm 1.0.10 `RM`                                                                                           |           91.0 |   0.042× |
+| The partial credit model by conditional maximum likelihood                                                       | 1,500 persons, 8 items of 4 categories                                                                       |            3.19 | eRm 1.0.10 `PCM`                                                                                          |            230 |   0.014× |
+| The rating scale model by conditional maximum likelihood                                                         | 1,500 persons, 8 items of 4 categories                                                                       |            3.61 | eRm 1.0.10 `RSM`                                                                                          |           50.5 |   0.071× |
+| Calibration of the generalized graded unfolding model                                                            | 2,000 persons, 15 items of 4 categories                                                                      |             274 | mirt 1.48 `mirt(itemtype = "ggum")`                                                                       |         39,232 |   0.007× |
 | Calibration of the one-parameter model by EM                                                                     | 2,000 persons, 40 dichotomous items                                                                          |            75.3 | mirt 1.48 `mirt(itemtype = "Rasch")`                                                                      |            102 |    0.74× |
 | Calibration of the two-parameter model by EM                                                                     | 2,000 persons, 40 dichotomous items                                                                          |            94.6 | mirt 1.48 `mirt(itemtype = "2PL")`                                                                        |            187 |    0.51× |
 | Calibration of the three-parameter model by EM                                                                   | 2,000 persons, 40 dichotomous items                                                                          |             570 | mirt 1.48 `mirt(itemtype = "3PL")`                                                                        |          1,145 |     0.5× |
@@ -215,6 +239,9 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | The posterior mean of the ability given each summed score                                                        | 40 items                                                                                                     |           0.178 | none                                                                                                      |                |          |
 | Information of a test at 121 values of theta                                                                     | 40 items                                                                                                     |           0.597 | mirt 1.48 `testinfo`                                                                                      |           1.44 |    0.41× |
 | Calibration of the two-parameter model with a latent regression by EM                                            | 2,000 persons, 40 dichotomous items                                                                          |             121 | mirt 1.48 `mirt(itemtype = "2PL", covdata, formula = ~ x)`                                                |            583 |    0.21× |
+| The Guttman errors of every person                                                                               | 433 persons, 20 items of 5 categories                                                                        |           0.468 | mokken 3.1.2 `check.errors`                                                                               |            860 | 0.00054× |
+| The W1, W2 and W3 indices of conditional association                                                             | 433 persons, 20 items of 5 categories                                                                        |            36.7 | mokken 3.1.2 `check.ca(Windex = TRUE)`                                                                    |          3,495 |    0.01× |
+| Two-way imputation of the missing responses                                                                      | 433 persons, 20 items of 5 categories, one in ten missing                                                    |           0.361 | mokken 3.1.2 `twoway`                                                                                     |           2.53 |    0.14× |
 | Scalability coefficients with standard errors                                                                    | 433 persons, 20 items of 5 categories                                                                        |            2.13 | mokken 3.1.2 `coefH(se = TRUE)`                                                                           |            192 |   0.011× |
 | Automated item selection into Mokken scales                                                                      | 433 persons, 20 items of 5 categories                                                                        |           0.923 | mokken 3.1.2 `aisp`                                                                                       |           31.0 |    0.03× |
 | The check of monotonicity of every item                                                                          | 433 persons, 20 items of 5 categories                                                                        |            1.89 | mokken 3.1.2 `check.monotonicity`                                                                         |           10.8 |    0.17× |
@@ -248,13 +275,24 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Conversion of 2PL items to mirt's slope-intercept form                                                           | 10,000 items                                                                                                 |            1.16 | none                                                                                                      |                |          |
 | Conversion of 2PL items to mirt's IRT form                                                                       | 10,000 items                                                                                                 |            1.21 | none                                                                                                      |                |          |
 | Simulation of the abilities of persons and their responses to 2PL items                                          | 2,000 persons, 40 items                                                                                      |            2.21 | mirt 1.48 `simdata(itemtype = "dich")`                                                                    |           6.00 |    0.37× |
+| Livingston and Lewis's accuracy and consistency by one cut                                                       | 3,000 scores of 40 items                                                                                     |           0.490 | betafunctions 2.0.0 `LL.CA`                                                                               |          0.364 |     1.3× |
 
 - Simulation of adaptive tests that select testlets as units, by their mean information: catR has no testlets, so no reference does this task.
 - Assembly of parallel forms with enemies, by weighted deviations in rotation: highs finds the forms whose largest gap from the target is smallest (minimax), to its limit of 10 seconds..
+- The fit statistics of each item of a G-DINA calibration: itemfit's expected values come from a simulation of persons, and measurekit's are exact sums over the profiles.
 - Posterior profiles of the persons of a calibration: personparm multiplies the log posterior that the fit stored by the profiles, which is work of the fit; measurekit's calibration holds no posterior, so it computes each person's from the responses, and returns the posterior, the probability of each attribute and the MAP and EAP profiles. The same computation in R, with matrix products, takes 0.69 ms.
 - Wald tests of the DINA, DINO, A-CDM, LLM and R-RUM against the G-DINA, for each item with two or more attributes: modelcomp computes the covariance of the success probabilities of the fit again for each item; measurekit's comes with its calibration, which cdm.calibrateGdinaStandardErrors times.
+- Raju's signed and unsigned areas of every item, with both groups calibrated by the 2PL: difRaju calibrates by ltm's marginal maximum likelihood, and measurekit by EM.
+- Five factors by maximum likelihood with oblimin rotation, and their fit: fa also computes factor scores' statistics and other fit indices, which measurekit leaves out.
+- Omega hierarchical and total from five group factors by minimum residuals: omega also computes the fit of the general factor and of the group factors, which measurekit leaves out.
 - Five factors by minimum residuals with oblimin rotation, from Pearson correlations: fa also computes fit statistics, and this task leaves them out.
 - Velicer's minimum average partial test of 8 components, from Pearson correlations: VSS also fits 8 factor solutions with their very simple structure and fit statistics, which this task leaves out.
+- The link of a chain of three forms by Haebara's method, with its covariance: alldirec links each pair of forms both ways, twice the links of the chain, as chainec takes no other list; equateIRT differentiates the links analytically, and measurekit, for items of any model, by central differences, which minimize a link twice for each parameter of a common item.
+- The Rasch model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
+- The partial credit model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
+- The rating scale model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
+- Calibration of the generalized graded unfolding model: measurekit fits in the GGUM package's three stages from its starts, and mirt from its own starts.
+- The W1, W2 and W3 indices of conditional association: check.ca removes the item with the most flags and runs again until none is flagged, and measurekit runs its first pass.
 - Calibration of a trait over three occasions by EM: the occasions are dimensions, and the items of each occasion are columns tied by constrain.
 - Calibration of an exploratory two-dimensional 2PL by EM: mirt stops at its limit of 500 cycles when it has not converged.
 - Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro: both draw the abilities, so the time depends on the seed; mirt runs with one.
@@ -270,9 +308,9 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Fit of the skills of a log by EM from five starts, learn and forget rates by pair of items                                            | 20,000 attempts of 200 learners at 5 skills      |             301 | pyBKT 1.4.3 `Model.fit(multipair = True)` |         20,991 |    0.014× |
 | Replay of the log through the fitted model, a prediction and an update for each attempt                                               | 20,000 attempts of 200 learners at 5 skills      |            8.32 | pyBKT 1.4.3 `Model.predict`               |            288 |    0.029× |
 | Replay of a log through the learner-item Elo model                                                                                    | 100,000 attempts of 2,000 learners at 400 items  |            17.9 | base R, a loop over the attempts          |           30.5 |     0.59× |
-| The area under the ROC curve                                                                                                          | 100,000 predictions                              |            20.3 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           16.3 |      1.2× |
-| The AUC, RMSE, log-loss and accuracy of the predictions                                                                               | 100,000 predictions                              |            26.1 | none                                      |                |           |
-| The metrics of predictions by opportunity, over all skills and for each skill                                                         | 50,000 events of 2,000 learners at 5 skills      |            24.1 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           41.0 |     0.59× |
+| The area under the ROC curve                                                                                                          | 100,000 predictions                              |            9.09 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           32.0 |     0.28× |
+| The AUC, RMSE, log-loss and accuracy of the predictions                                                                               | 100,000 predictions                              |            13.9 | none                                      |                |           |
+| The metrics of predictions by opportunity, over all skills and for each skill                                                         | 50,000 events of 2,000 learners at 5 skills      |            17.9 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           66.0 |     0.27× |
 | Replay of the responses of learners, the grid posterior of the ability updated after each                                             | 2,000 learners, 40 responses each                |             272 | mirt 1.48 `fscores(method = "EAP")`       |          1,777 |     0.15× |
 | Replay of the responses of learners, the posterior advanced by drift and updated after each                                           | 200 learners, 40 responses each, 241 points      |             199 | base R, the forward pass in logs          |          5,642 |    0.035× |
 | Closure under union of the 12 atoms of a space                                                                                        | 12 elements, 125 states                          |           0.090 | kst 0.5.6 `kspace`                        |           11.6 |   0.0078× |
@@ -356,6 +394,7 @@ the time of measurekit over the time of the reference, so a ratio above 1 means 
 | References | `validation/benchmarks/<package>/<module>.R`, run with one thread: `OPENBLAS_NUM_THREADS=1` and `OMP_NUM_THREADS=1` set R's BLAS. A task takes 15 samples under a second, 7 under 15 seconds, 3 under a minute and 2 above, after one call to warm up.                                                                                                                                                                                                                                                         |
 | pyBKT      | `validation/benchmarks.py`, on the log of `bench-bkt.json`, with its processes off. It times what R does not.                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Settings   | A reference runs with the settings that make its work that of measurekit: the same quadrature, convergence tolerance and starts. The notes under a table name where they differ.                                                                                                                                                                                                                                                                                                                               |
+| Order      | On a machine shared with other work, the runs of measurekit and of its reference alternate, three of each, so that the load falls on both; the times are the medians of the three.                                                                                                                                                                                                                                                                                                                             |
 | Ratio      | The median of measurekit over the median of the reference.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 An EM calibration stops when its estimates stop changing, so two programs that agree on the criterion can need different
@@ -373,7 +412,8 @@ pnpm bench                                                                      
 
 `Rscript validation/benchmarks.R irt mokken` runs the modules named, and `knowledge-tracing/irt` one module of a package.
 To refresh the charts and tables, run each package with the JSON reporter three times, with the run number in the name of the
-file, then `Rscript validation/benchmarks.R table`:
+file, after a run of the references each time, whose `results/r.json` is copied to `results/r-1.json` and so on, then
+`Rscript validation/benchmarks.R table`, which takes the median of the runs of each side:
 
 ```bash
 pnpm --filter @measurekit/core bench --reporter json --outputFile validation/benchmarks/results/measurekit-core-1.json
@@ -392,7 +432,9 @@ up to 6 times as long (`numerics.logistic`), so a budget holds on a machine up t
 and on a slower one only the ratios to the references apply. The factor allows for the noise of a shared runner, whose
 fastest samples of one benchmark differed by a median of 1.9 times and by up to 3.2 times between runs; every budget stands at
 least 2.9 times above the slowest of those samples. It is far below the cost of the changes that the budgets exist to catch.
-A budget changes only with the reason in the commit that changes it.
+A benchmark that the runner has not taken yet has five times its fastest sample on the laptop, times the median ratio of the
+runner's fastest samples to the laptop's for the other benchmarks of its module, rounded up to one significant digit. A budget
+changes only with the reason in the commit that changes it.
 
 ## Sizes
 
@@ -406,9 +448,9 @@ library holds only what that name needs: `cronbachAlpha` from `@measurekit/psych
 | Entry point                                  | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own                          |
 | -------------------------------------------- | ---------------: | -----------: | --------------------------------------------------------- |
 | `@measurekit/core`                           |           12,787 |        5,248 | nothing                                                   |
-| `@measurekit/psychometrics`                  |          498,568 |      166,183 | every module of the package, and core                     |
-| `@measurekit/psychometrics/cat`              |           67,960 |       22,554 | core, cdm, checks, data, irt, math, multidimensional, sim |
-| `@measurekit/psychometrics/cdm`              |           42,459 |       15,524 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics`                  |          507,268 |      169,201 | every module of the package, and core                     |
+| `@measurekit/psychometrics/cat`              |           69,853 |       23,249 | core, cdm, checks, data, irt, math, multidimensional, sim |
+| `@measurekit/psychometrics/cdm`              |           42,831 |       15,628 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/change`           |            5,281 |        2,257 | core, checks                                              |
 | `@measurekit/psychometrics/ctt`              |           21,428 |        8,203 | core, data, math                                          |
 | `@measurekit/psychometrics/data`             |            6,272 |        2,219 | core                                                      |
@@ -416,16 +458,16 @@ library holds only what that name needs: `cronbachAlpha` from `@measurekit/psych
 | `@measurekit/psychometrics/dimensionality`   |           37,903 |       14,058 | core, data, math                                          |
 | `@measurekit/psychometrics/equating`         |           58,620 |       19,917 | core, checks, irt, math                                   |
 | `@measurekit/psychometrics/explanatory`      |           48,842 |       17,086 | core, data, irt, math                                     |
-| `@measurekit/psychometrics/fit`              |           55,082 |       19,237 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/fit`              |           63,163 |       22,188 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/generalizability` |           14,695 |        5,440 | core, data, math                                          |
 | `@measurekit/psychometrics/irt`              |           80,271 |       27,117 | core, checks, data, math                                  |
-| `@measurekit/psychometrics/mokken`           |           29,895 |       11,140 | core, data, math                                          |
+| `@measurekit/psychometrics/mokken`           |           32,073 |       11,889 | core, data, math                                          |
 | `@measurekit/psychometrics/multidimensional` |          125,459 |       40,746 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/parameterization` |           18,215 |        5,933 | core, irt, multidimensional                               |
-| `@measurekit/psychometrics/rater`            |           52,291 |       17,971 | core, checks, data, fit, irt, math                        |
+| `@measurekit/psychometrics/rater`            |           52,620 |       18,078 | core, checks, data, fit, irt, math                        |
 | `@measurekit/psychometrics/response-time`    |           54,265 |       18,395 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/scaling`          |           30,799 |       11,439 | core, checks, equating, irt, math                         |
-| `@measurekit/psychometrics/sim`              |           20,347 |        6,814 | core, cdm, checks, data, irt, multidimensional            |
+| `@measurekit/psychometrics/sim`              |           20,369 |        6,826 | core, cdm, checks, data, irt, multidimensional            |
 | `@measurekit/psychometrics/standard-setting` |           28,233 |       10,711 | core, checks, equating, irt, math                         |
 | `@measurekit/knowledge-tracing`              |          136,189 |       46,040 | every module of the package, and core                     |
 | `@measurekit/knowledge-tracing/bkt`          |           22,982 |        8,198 | core, data, math                                          |

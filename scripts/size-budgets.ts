@@ -19,7 +19,7 @@ export interface EntryBudget {
 export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
   "@measurekit/core": { gzip: 7000, holds: [] },
   "@measurekit/psychometrics": {
-    gzip: 208_000,
+    gzip: 212_000,
     holds: [
       "core",
       "psychometrics/cat",
@@ -47,7 +47,7 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     ],
   },
   "@measurekit/psychometrics/cat": {
-    gzip: 28_500,
+    gzip: 29_500,
     holds: [
       "core",
       "psychometrics/cdm",
@@ -60,7 +60,7 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     ],
   },
   "@measurekit/psychometrics/cdm": {
-    gzip: 19_500,
+    gzip: 20_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/change": { gzip: 3000, holds: ["core", "psychometrics/checks"] },
@@ -83,7 +83,7 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     holds: ["core", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/fit": {
-    gzip: 24_500,
+    gzip: 28_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/generalizability": {
@@ -94,7 +94,7 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     gzip: 34_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/math"],
   },
-  "@measurekit/psychometrics/mokken": { gzip: 14_000, holds: ["core", "psychometrics/data", "psychometrics/math"] },
+  "@measurekit/psychometrics/mokken": { gzip: 15_000, holds: ["core", "psychometrics/data", "psychometrics/math"] },
   "@measurekit/psychometrics/multidimensional": {
     gzip: 51_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
@@ -104,7 +104,7 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     holds: ["core", "psychometrics/irt", "psychometrics/multidimensional"],
   },
   "@measurekit/psychometrics/rater": {
-    gzip: 22_500,
+    gzip: 23_000,
     holds: [
       "core",
       "psychometrics/checks",
