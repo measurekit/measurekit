@@ -4,8 +4,10 @@
 # 2PL calibrations of equateIRT's est2pl, forms T1 to T3, with the covariance of each.
 #
 # Where equateIRT cannot be the reference, the script writes the delta method out: numDeriv's Jacobian of direc's links,
-# or of the true-score equating through them, in each parameter of each form, times the forms' covariances. It
-# reproduces equateIRT where equateIRT is right:
+# or of the true-score or observed-score equating through them, in each parameter of each form, times the forms'
+# covariances. The observed-score equating takes Lord and Wingersky's recursion over 30 Gauss-Hermite points and Kolen
+# and Brennan's equipercentile equating, in the synthetic population of the two groups N(0, 1), the from group on its
+# own scale, moved by the link. It reproduces equateIRT where equateIRT is right:
 # - direc's derivatives of mean-sigma's A divide by the n common items where A's standard deviations divide by n - 1,
 #   which shrinks its variances by ((n - 1) / n)², 0.81 for 10 items; mean-mean, Haebara and Stocking-Lord agree;
 # - score links the form to equate to onto the scale of the form to equate, where this package links the form to equate
@@ -88,16 +90,18 @@ written_link <- function(forms, method) {
 
 true_score <- function(a, b, theta) sum(plogis(a * (theta - b)))
 
+# The slopes and difficulties of a form's items after `values` moved them.
+moved_items <- function(moved, form) {
+  coef <- moved[[form]]$coef
+  ids <- item_ids(form)
+  list(a = coef[paste0("Dscrmn.", ids)], b = coef[paste0("Dffclt.", ids)])
+}
+
 # The true-score equivalents on `to` of the scores 1 to n - 1 of `from`, its items moved by the link from `from` to `to`.
 linked_true_scores <- function(moved, from, to, method) {
   link <- chain_link(moved, c(from, to), method)
-  items <- function(form) {
-    coef <- moved[[form]]$coef
-    ids <- item_ids(form)
-    list(a = coef[paste0("Dscrmn.", ids)], b = coef[paste0("Dffclt.", ids)])
-  }
-  source <- items(from)
-  target <- items(to)
+  source <- moved_items(moved, from)
+  target <- moved_items(moved, to)
   a <- source$a / link[1]
   b <- link[1] * source$b + link[2]
   sapply(seq_len(length(a) - 1), function(x) {
@@ -109,6 +113,47 @@ linked_true_scores <- function(moved, from, to, method) {
 written_true_score_errors <- function(from, to, method) {
   forms <- c(from, to)
   sqrt(diag(delta_method(function(v) linked_true_scores(moved_mods(v, forms), from, to, method), forms)))
+}
+
+quadrature <- statmod::gauss.quad.prob(POINTS, dist = "normal")
+
+# The probability of each summed score of 2PL items in a population on its nodes, by Lord and Wingersky's recursion.
+score_distribution <- function(a, b, nodes, weights) {
+  Reduce(`+`, lapply(seq_along(nodes), function(q) {
+    distribution <- 1
+    for (p in plogis(a * (nodes[q] - b))) distribution <- c(distribution * (1 - p), 0) + c(0, distribution * p)
+    weights[q] * distribution
+  }))
+}
+
+# Kolen and Brennan's equipercentile equivalents of the scores of f on g, as equateIRT's score(method = "OSE").
+equipercentile <- function(f, g) {
+  ranks <- c(0, cumsum(f)[-length(f)]) + f / 2
+  G <- cumsum(g)
+  sapply(ranks, function(rank) {
+    upper <- min(which(G > rank)) - 1
+    (rank - if (upper == 0) 0 else G[upper]) / g[upper + 1] + upper - 0.5
+  })
+}
+
+# The IRT observed-score equivalents on `to` of the scores 0 to n of `from`, its items moved by the link from `from` to
+# `to`, in the synthetic population of equal weights of the two groups: the `from` group N(0, 1) on its own scale, which
+# moves with the link, and the `to` group N(0, 1) on the scale of `to`.
+linked_observed_scores <- function(moved, from, to, method) {
+  link <- chain_link(moved, c(from, to), method)
+  source <- moved_items(moved, from)
+  target <- moved_items(moved, to)
+  nodes <- quadrature$nodes
+  weights <- quadrature$weights
+  synthetic <- function(a, b) {
+    0.5 * score_distribution(a, b, link[1] * nodes + link[2], weights) + 0.5 * score_distribution(a, b, nodes, weights)
+  }
+  equipercentile(synthetic(source$a / link[1], link[1] * source$b + link[2]), synthetic(target$a, target$b))
+}
+
+written_observed_score_errors <- function(from, to, method) {
+  forms <- c(from, to)
+  sqrt(diag(delta_method(function(v) linked_observed_scores(moved_mods(v, forms), from, to, method), forms)))
 }
 
 score_errors <- function(from, to, method, type) {
@@ -160,7 +205,14 @@ true_score_cases <- lapply(METHODS, function(method) {
   list(scores = seq_len(length(item_ids("T1")) - 1), standardErrors = written_true_score_errors("T1", "T2", method))
 })
 
-quadrature <- statmod::gauss.quad.prob(POINTS, dist = "normal")
+# score is the reference for mean-mean, and the write-up reproduces it; it is the reference for the other methods.
+observed_mean_mean <- score_errors("T1", "T2", "mean-mean", "OSE")
+written_observed_mean_mean <- written_observed_score_errors("T1", "T2", "mean-mean")
+stopifnot(max(abs(written_observed_mean_mean - observed_mean_mean$standardErrors)) < 1e-4)
+observed_score_cases <- lapply(METHODS, function(method) {
+  if (method == "mean-mean") return(observed_mean_mean)
+  list(scores = 0:length(item_ids("T1")), standardErrors = written_observed_score_errors("T1", "T2", method))
+})
 
 write_fixture("equating-link-errors", list(
   source = paste("equateIRT's est2pl, forms T1 to T3 with their covariances: direc and chainec with 30 Gauss-Hermite",
@@ -171,5 +223,5 @@ write_fixture("equating-link-errors", list(
   links = links,
   chains = chains,
   trueScore = true_score_cases,
-  observedScore = list(meanMean = score_errors("T1", "T2", "mean-mean", "OSE"))
+  observedScore = observed_score_cases
 ))

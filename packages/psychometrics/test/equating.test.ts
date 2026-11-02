@@ -1753,18 +1753,20 @@ describe("linkCovariance and linkedEquatingErrors", () => {
     });
   }
 
-  it("gives the errors of observed-score equating through a link, the from group moving with it", () => {
-    const { nodes, weights } = linkErrors.quadrature;
-    const found = linkedEquatingErrors(form("T1"), form("T2"), {
-      linking: "mean-mean",
-      method: "observed-score",
-      populations: { from: { nodes, weights }, to: { nodes, weights } },
+  for (const [name, expected] of Object.entries(linkErrors.observedScore)) {
+    it(`gives the errors of observed-score equating through a link by ${Methods[name]}, the from group moving with it`, () => {
+      const { nodes, weights } = linkErrors.quadrature;
+      const found = linkedEquatingErrors(form("T1"), form("T2"), {
+        linking: Methods[name],
+        method: "observed-score",
+        populations: { from: { nodes, weights }, to: { nodes, weights } },
+      });
+      expect(found).toHaveLength(21);
+      expected.scores.forEach((x, i) => {
+        expectClose(defined(found[x]), defined(expected.standardErrors[i]), LINKED_ERROR_TOLERANCE, `score ${x}`);
+      });
     });
-    const expected = linkErrors.observedScore.meanMean;
-    expected.scores.forEach((x, i) => {
-      expectClose(defined(found[x]), defined(expected.standardErrors[i]), LINKED_ERROR_TOLERANCE, `score ${x}`);
-    });
-  });
+  }
 
   it("recovers the spread of a chain's slope and intercept over draws of the estimates from their covariances", () => {
     // Three forms of 20 2PL items, 10 common between neighbors, calibrated apart on groups N(0, 1), N(0.5, 1.1²) and
