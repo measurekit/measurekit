@@ -549,7 +549,7 @@ calibration, so the rotated `items` with the rotated `correlations` as the prior
 rotated dimensions. The sign of each rotated dimension is chosen so that its largest loading in absolute value is
 positive. The result also holds `rotation` (T), `converged` and `iterations`.
 
-```ts
+```ts continues
 import { calibrateMultidimensional, rotateLoadings } from "@measurekit/psychometrics/multidimensional";
 
 const exploratory = calibrateMultidimensional(matrix, { model: multidimensionalTwoParameterLogistic, dimensions: 2 });

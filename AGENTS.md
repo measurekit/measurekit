@@ -278,6 +278,9 @@ others. A new clone is merged into a helper of the module that owns the concept,
 - US English; short sentences, a table or list rather than prose; complete samples with their imports, and values
   shown in samples come from running them; a source's section is cited in words ("section 3.1"). No marketing, emojis or
   filler.
+- `examples/test/guides.test.ts` runs every `ts` sample of the guides and READMEs on the sources and fails when one throws;
+  it does not compare the values in comments. A fence `ts continues` runs after the sample before it and shares its
+  variables, and `ts no-run` marks code that needs a worker or a package the repository does not have.
 - One purpose for each document: a package's `README.md` for its users, `docs/<package>/` for its guides,
   `CONTRIBUTING.md` for the process, `AGENTS.md` for conventions, `validation/README.md` for running the reference scripts.
 

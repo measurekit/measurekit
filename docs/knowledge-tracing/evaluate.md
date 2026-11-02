@@ -169,7 +169,7 @@ A fit's `predictions` and a fold's have one entry per event, `null` where the ev
 take numbers only: `observedPairs(log, predictions)` returns `{ predictions, outcomes }` of the events with both an
 outcome and a prediction, in log order, for them.
 
-```ts
+```ts continues
 import { elo } from "@measurekit/knowledge-tracing/elo";
 import { metrics, observedPairs } from "@measurekit/knowledge-tracing/evaluate";
 
@@ -184,7 +184,7 @@ metrics(predictions, outcomes);
 metrics compare predictions of the same events. Options are those of `crossValidate`. Rows follow the order of
 `models`; each row is a cross-validation with the model's `name`.
 
-```ts
+```ts continues
 import { createRandom } from "@measurekit/knowledge-tracing";
 import { splitByLearner } from "@measurekit/knowledge-tracing/data";
 import { elo } from "@measurekit/knowledge-tracing/elo";
@@ -217,7 +217,7 @@ their losses on the test events, averaged per learner first.
 | ------ | ------------------------------------------------------------------------------- | ------- |
 | `loss` | `"log"`, -(y ln p + (1 - y) ln(1 - p)), or `"squared"`, (p - y)² per test event | `"log"` |
 
-```ts
+```ts continues
 import { createRandom } from "@measurekit/knowledge-tracing";
 import { splitByLearner } from "@measurekit/knowledge-tracing/data";
 import { elo } from "@measurekit/knowledge-tracing/elo";
@@ -253,7 +253,7 @@ learn; a flat or jagged curve suggests a skill to split or merge.
 | `predictions`      | The prediction of each event in log order, such as a fit's: a probability, or `null` for an event without one             | none    |
 | `minOpportunities` | Keeps only learner and skill pairs with at least this many opportunities in the log, so who left does not shape the curve | `1`     |
 
-```ts
+```ts continues
 import { elo } from "@measurekit/knowledge-tracing/elo";
 import { learningCurve } from "@measurekit/knowledge-tracing/evaluate";
 
@@ -283,7 +283,7 @@ opportunity in place of the rates. A model that ignores learning predicts the fi
 overrates it, the late ones. An opportunity whose events have no prediction has `metrics: null`, and its `auc` is `null`
 when its outcomes are all equal. The overall metrics count an event of two skills twice, as the curve does.
 
-```ts
+```ts continues
 import { elo } from "@measurekit/knowledge-tracing/elo";
 import { metricsByOpportunity } from "@measurekit/knowledge-tracing/evaluate";
 
@@ -322,7 +322,7 @@ points.
 
 The first four depend on the curriculum, so they are required. `slope` comes from a fit of AFM with the same Q-matrix.
 
-```ts
+```ts continues
 import { elo } from "@measurekit/knowledge-tracing/elo";
 import { categorizeCurve, learningCurve, powerLawFit } from "@measurekit/knowledge-tracing/evaluate";
 

@@ -184,7 +184,7 @@ covariance matrix of all the estimated item parameters, with the covariances bet
 standard errors leave out. A function of the parameters of several items, such as an equated score, has the variance
 gᵀ Σ g by the delta method, g its gradient and Σ this matrix.
 
-```ts
+```ts continues
 import { betaPrior, calibrateWithCovariance, logNormalPrior } from "@measurekit/psychometrics/irt";
 
 // `matrix` and `models` are those of the example above.
@@ -454,13 +454,19 @@ of a parameter of one item, by item id and then name, and replaces the `priors` 
 information about a new item from outside its responses, such as a regression of difficulty on its features.
 
 ```ts
+import { createRandom } from "@measurekit/psychometrics";
 import { calibrate, normalPrior, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
-// `responses` holds the anchor items, whose parameters `fixed` gives, and "new1", which few persons answered.
+// Five anchor items, whose parameters `fixed` gives, and a new one, with a prior on its difficulty.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 6, random);
+const responses = simulateResponses(items, simulateThetas(300, random), random);
+const fixed = Object.fromEntries(items.slice(0, 5).map((item, j) => [`item${j + 1}`, item.parameters]));
 calibrate(responses, {
   model: twoParameterLogistic,
   fixed,
-  itemPriors: { new1: { b: normalPrior(0.4, 0.8) } },
+  itemPriors: { item6: { b: normalPrior(0.4, 0.8) } },
 });
 ```
 
@@ -481,7 +487,7 @@ Calibration runs synchronously and can take seconds on large data. In a browser,
 page stays responsive: `@measurekit/psychometrics` uses no platform API, so the worker imports it as any module
 does, and the data and the result pass as plain objects.
 
-```ts
+```ts no-run
 // calibrate.worker.ts, started with new Worker(new URL("./calibrate.worker.ts", import.meta.url), { type: "module" })
 import type { ResponseMatrix } from "@measurekit/psychometrics/data";
 import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
@@ -588,7 +594,7 @@ summarizes, as a `ThetaDistribution`: `nodes`, the quadrature nodes placed on th
 probabilities, which sum to 1. `options` are the `prior` and the `quadrature` of the estimators; testlets are not
 taken. Without responses the posterior is the prior's quadrature.
 
-```ts
+```ts continues
 import { thetaPosterior } from "@measurekit/psychometrics/irt";
 
 const { nodes, weights } = thetaPosterior(items, [1, 0, null]);

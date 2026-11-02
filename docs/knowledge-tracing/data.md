@@ -111,7 +111,7 @@ have.
 | By item    | Is in the training log of every fold; a lesson is no item, so it is not counted among the items dealt. |
 | By time    | Is in the block that holds its time; blocks have about equal numbers of events with an outcome.        |
 
-```ts
+```ts continues
 import { createRandom } from "@measurekit/knowledge-tracing";
 import { splitByLearner, splitByTime } from "@measurekit/knowledge-tracing/data";
 

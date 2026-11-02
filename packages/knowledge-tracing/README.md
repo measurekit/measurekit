@@ -57,7 +57,7 @@ const next = model.update(ana, { ...attempt, outcome: 1 }); // a new state; JSON
 
 Bayesian knowledge tracing gives the probability that a learner has mastered each skill:
 
-```ts
+```ts continues
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
 
 // log: the log of the first sample
@@ -75,7 +75,7 @@ tracer.opportunitiesToMastery(budi, "fractions"); // further attempts until P(L)
 
 Models are compared by cross-validation on the same folds:
 
-```ts
+```ts continues
 import { createRandom } from "@measurekit/knowledge-tracing";
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
 import { splitByLearner } from "@measurekit/knowledge-tracing/data";

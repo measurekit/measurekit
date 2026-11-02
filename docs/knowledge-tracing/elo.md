@@ -85,7 +85,7 @@ events from a log changes no state, rating or prediction. A host skips the write
 
 An app keeps each learner's state and each item's rating as a row, and an answer needs only the two rows it touches:
 
-```ts
+```ts continues
 // The rows as stored, here from the fit above.
 const rows = JSON.parse(JSON.stringify({ q1: fit.model.parameters.items.q1, ana: fit.states.ana }));
 const model = elo({ skills: true, parameters: { items: { q1: rows.q1 } } });

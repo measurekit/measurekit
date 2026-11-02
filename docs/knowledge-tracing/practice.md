@@ -166,7 +166,7 @@ repetition scheduler, as [ts-fsrs](https://github.com/open-spaced-repetition/ts-
 was mastered. `@measurekit/knowledge-tracing` does not depend on it. Once a skill or fact is mastered, give it a
 card and grade each review by its outcome:
 
-```ts
+```ts no-run
 import { DefaultScheduler, Rating } from "ts-fsrs"; // ts-fsrs 6, Node.js 24 or later
 
 const scheduler = await DefaultScheduler({ desiredRetention: 0.9 });

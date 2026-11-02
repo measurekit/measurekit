@@ -3,6 +3,7 @@ dist/
 *.tsbuildinfo
 docs/api/
 coverage/
+examples/.samples/
 .DS_Store
 validation/knowledge-tracing/.venv/
 __pycache__/

@@ -65,7 +65,7 @@ with `null` for missing responses. Every function takes plain arrays and objects
 The same scores calibrate an IRT model, which then estimates abilities. With few persons, priors keep the estimates
 finite:
 
-```ts
+```ts continues
 import {
   betaPrior,
   calibrate,
@@ -85,7 +85,7 @@ weightedLikelihoodEstimate(irt.items, [1, 0, 1, 1, null]); // { theta: 0.64, sta
 
 The calibrated items then make an adaptive test, which selects each next item from the responses so far:
 
-```ts
+```ts continues
 import { createRandom } from "@measurekit/psychometrics";
 import { adaptiveTest, allOf, anyOf, standardErrorThreshold, testLength } from "@measurekit/psychometrics/cat";
 

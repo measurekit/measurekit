@@ -98,7 +98,7 @@ for every pair, so that every pair of items shares a person.
 
 Randomness comes from the `random` argument, so a seeded generator reproduces the result.
 
-```ts
+```ts continues
 const result = parallelAnalysis(matrix, createRandom(1));
 result.components.observed; // [3.671, 3.406, 0.647, 0.611, ...]: 12 eigenvalues of the correlation matrix
 result.components.randomQuantile; // [1.4, 1.274, 1.206, 1.153, ...]: of random data
@@ -165,7 +165,7 @@ between the factors.
 | `iterations`    | The iterations of the fit                                                          |
 | `smoothed`      | Whether the correlations of the items were not positive definite and were smoothed |
 
-```ts
+```ts continues
 import { exploratoryFactorAnalysis } from "@measurekit/psychometrics/dimensionality";
 
 // `matrix` is the response matrix of the example above: two independent traits, six items each.
@@ -220,7 +220,7 @@ items it rises, and the number of components at the minimum is the number of fac
 The result holds `map`, the mean squared partial correlation after 1, 2, ... components, `factors`, the number at the
 lowest value, the first when tied, and `smoothed`.
 
-```ts
+```ts continues
 import { minimumAveragePartial } from "@measurekit/psychometrics/dimensionality";
 
 const { map, factors } = minimumAveragePartial(matrix, { correlation: "polychoric" });

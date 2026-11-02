@@ -83,7 +83,7 @@ The items are those of a calibration, `calibrate(...).items`, or any [items](irt
 theta (Kolen, Zeng and Hanson, 1996). With P(x | θ) the probability of the total score x, from the recursion of Lord
 and Wingersky (1984), and c(x) its scale score, it is √(Σ c(x)² P(x | θ) - (Σ c(x) P(x | θ))²).
 
-```ts
+```ts continues
 import { conditionalScaleError } from "@measurekit/psychometrics/scaling";
 
 // `items` is the form of the previous example and 400, 470, 530, 610 its table's scale scores.
@@ -102,7 +102,7 @@ conversion, options)` reports it on Y's scale by linear interpolation between th
 (Kolen and Brennan, 2014), holding the end values for equivalents below 0 and above Y's highest score, and then rounds
 and bounds as `options` say, which are those of [a scale](#scales).
 
-```ts
+```ts continues
 import { linearEquating } from "@measurekit/psychometrics/equating";
 import { conversionTable, scaleConversion } from "@measurekit/psychometrics/scaling";
 
@@ -192,7 +192,7 @@ Where the posterior comes from:
 | A knowledge tracing learner | `model.posterior(state)` of [`@measurekit/knowledge-tracing/irt`](../knowledge-tracing/irt.md#online) |
 | No practice                 | A calibration's `groups[0]`, a `GroupDistribution`: the score of a person drawn from the population   |
 
-```ts
+```ts continues
 import { irt } from "@measurekit/knowledge-tracing/irt";
 import { predictFormScore } from "@measurekit/psychometrics/scaling";
 

@@ -87,7 +87,7 @@ such as chapters, with a structure each. Independent elements multiply the state
 `{ c: [["a"], ["b", "d"]] }` lets a learner who has a, or has both b and d, learn c. An element with no clauses, or
 with an empty clause, needs nothing.
 
-```ts
+```ts continues
 import { clauseStructure, isLearningSpace, learningPaths } from "@measurekit/knowledge-tracing/kst";
 
 const space = clauseStructure({ a: [], b: [], c: [["a"], ["b", "d"]], d: [["a"]] });
@@ -168,7 +168,7 @@ The fit's states and predictions are those of online inference with the fitted p
 | `fixed.guess`, `fixed.slip` | An item's rate stays at the given value, from 0 to 1 and including both, which an estimate cannot reach |
 | `equal.guess`, `equal.slip` | Groups of at least 2 items that share one estimate: the pooled expected errors over the pooled answers  |
 
-```ts
+```ts continues
 import { kst } from "@measurekit/knowledge-tracing/kst";
 
 kst({
@@ -271,7 +271,7 @@ a correct answer; `mastery(state, element)` the probability that the learner's s
 
 This is the stochastic assessment procedure of Falmagne and Doignon (1988), with Bayes' rule as the updating rule:
 
-```ts
+```ts continues
 import { fringes, kst, surmiseStructure } from "@measurekit/knowledge-tracing/kst";
 
 const structure = surmiseStructure({ add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] });
@@ -336,7 +336,7 @@ space.
 | `distanceAgreement`        | The discrepancy index over the mean distance of all 2^items patterns to the nearest state; `null` above 20 elements, or when every pattern is a state |
 | `solutionRates`            | The share of learners who solved each item, from 0 to 1 (`percent` of kvalidate over 100)                                                             |
 
-```ts
+```ts continues
 structureValidity(structure, log).gamma; // 0.862
 structureValidity(structure, log).distances; // { "0": 41, "1": 3 }
 ```
@@ -359,7 +359,7 @@ patterns, so `z`, the p-value and the interval are asymptotic.
 | `confidence`  | `0.95`        | The level of the interval, above 0 and below 1; one-sided for a `tail` of `"less"` or `"greater"`     |
 | `version`     | `"minimized"` | `"minimized"` or `"corrected"`, as `iita`'s versions of the same names                                |
 
-```ts
+```ts continues
 import { diffTest, iita } from "@measurekit/knowledge-tracing/kst";
 
 const found = iita(log);
