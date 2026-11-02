@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { pseudoInverse } from "../math/internal.js";
+import { addOuterProduct, mirror, pseudoInverse } from "../math/internal.js";
 import { type CdmState, type DichotomousRows, forEachPosterior } from "./expectation.js";
 import type { CdmDesign } from "./q-matrix.js";
 
@@ -51,9 +51,9 @@ export function incompleteCovariances(data: DichotomousRows, design: CdmDesign, 
         score[(starts[j] ?? 0) + group] = ((mass[group] ?? 0) * (response - p)) / (p * (1 - p));
       });
     });
-    addOuterProduct(information, score, total);
+    addOuterProduct(information, score);
   });
-  mirrorUpperTriangle(information, total);
+  mirror(information, total);
   const covariance = pseudoInverse(information, total);
   return sizes.map((size, j) => {
     const block = new Float64Array(size * size);
@@ -72,21 +72,4 @@ function groupMasses(posterior: Float64Array, groupOf: Int32Array | undefined, m
     const group = groupOf?.[profile] ?? 0;
     mass[group] = (mass[group] ?? 0) + probability;
   });
-}
-
-/** Adds the outer product of `score` with itself to the upper triangle of the `size` by `size` matrix `information`. */
-function addOuterProduct(information: Float64Array, score: Float64Array, size: number): void {
-  for (let a = 0; a < size; a++) {
-    const scoreA = score[a] ?? 0;
-    if (scoreA === 0) continue;
-    const row = a * size;
-    for (let b = a; b < size; b++) information[row + b] = (information[row + b] ?? 0) + scoreA * (score[b] ?? 0);
-  }
-}
-
-/** Copies the upper triangle of the `size` by `size` matrix `information` into its lower triangle. */
-function mirrorUpperTriangle(information: Float64Array, size: number): void {
-  for (let a = 0; a < size; a++) {
-    for (let b = a + 1; b < size; b++) information[b * size + a] = information[a * size + b] ?? 0;
-  }
 }

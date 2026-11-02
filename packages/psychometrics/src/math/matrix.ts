@@ -37,6 +37,19 @@ export function traceOfProduct(a: Float64Array, b: Float64Array, size: number): 
   return sum;
 }
 
+/**
+ * Adds `weight` times the outer product of a vector with itself to the upper triangle of a square matrix, by rows; an
+ * entry of 0 adds nothing, so a sparse vector costs its nonzero entries. {@link mirror} completes the matrix.
+ */
+export function addOuterProduct(matrix: Float64Array, vector: ArrayLike<number>, weight = 1): void {
+  const size = vector.length;
+  for (let i = 0; i < size; i++) {
+    const scaled = weight * (vector[i] ?? 0);
+    if (scaled === 0) continue;
+    for (let j = i; j < size; j++) matrix[i * size + j] = (matrix[i * size + j] ?? 0) + scaled * (vector[j] ?? 0);
+  }
+}
+
 /** Copies the upper triangle of a symmetric matrix onto its lower triangle where the lower entry was not written. */
 export function mirror(matrix: Float64Array, size: number): void {
   for (let i = 0; i < size; i++) {

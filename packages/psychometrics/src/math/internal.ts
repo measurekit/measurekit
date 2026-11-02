@@ -4,7 +4,16 @@ export { bivariateNormalCdf, bivariateNormalDensity, bivariateNormalLogDensitySl
 export { symmetricEigen } from "./eigen.js";
 export { numericalHessian } from "./hessian.js";
 export { invert, invertPositiveDefinite } from "./linear-algebra.js";
-export { identity, mirror, multiply, symmetrized, trace, traceOfProduct, transpose } from "./matrix.js";
+export {
+  addOuterProduct,
+  identity,
+  mirror,
+  multiply,
+  symmetrized,
+  trace,
+  traceOfProduct,
+  transpose,
+} from "./matrix.js";
 export { minres, minresLoadings } from "./minres.js";
 export { normalCdf, normalDensity } from "./normal.js";
 export { type HessianFunction, type NewtonOptions, newton } from "./optimize.js";

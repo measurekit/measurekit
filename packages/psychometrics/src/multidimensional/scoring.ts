@@ -2,7 +2,7 @@ import { checkIntegerFrom, checkOptions, DataError, normalizeLogs } from "@measu
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { estimatePersons } from "../irt/internal.js";
-import { invertPositiveDefinite } from "../math/internal.js";
+import { addOuterProduct, invertPositiveDefinite, mirror } from "../math/internal.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
 import { type GridLikelihood, gridLikelihood } from "./grid-likelihood.js";
 import { checkMultidimensionalPattern, indexMultidimensionalItems } from "./items.js";
@@ -191,21 +191,13 @@ function posteriorMoments(grid: Grid, posterior: Float64Array): Multidimensional
     for (let d = 0; d < dimensions; d++) centered[d] = (nodes[q * dimensions + d] ?? 0) - (mean[d] ?? 0);
     addOuterProduct(covariance, centered, posterior[q] ?? 0);
   }
+  mirror(covariance, dimensions);
   return estimateOf(mean, covariance, dimensions);
 }
 
 /** Adds `weight` times `values[from + d]` to `out[d]` for each d. */
 function addScaled(out: Float64Array, values: Float64Array, from: number, weight: number): void {
   for (let d = 0; d < out.length; d++) out[d] = (out[d] ?? 0) + weight * (values[from + d] ?? 0);
-}
-
-/** Adds `weight` times x xᵀ to the matrix `out`, by rows. */
-function addOuterProduct(out: Float64Array, x: Float64Array, weight: number): void {
-  const size = x.length;
-  for (let i = 0; i < size; i++) {
-    const row = weight * (x[i] ?? 0);
-    for (let j = 0; j < size; j++) out[i * size + j] = (out[i * size + j] ?? 0) + row * (x[j] ?? 0);
-  }
 }
 
 /**

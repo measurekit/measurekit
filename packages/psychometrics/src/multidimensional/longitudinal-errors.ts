@@ -5,7 +5,7 @@ import {
   unboundedCoordinates,
   unboundedScales,
 } from "../irt/internal.js";
-import { invert, invertPositiveDefinite, numericalHessian } from "../math/internal.js";
+import { addOuterProduct, invert, invertPositiveDefinite, mirror, numericalHessian } from "../math/internal.js";
 import type { LongitudinalFit } from "./longitudinal-em.js";
 
 /**
@@ -107,6 +107,7 @@ function crossProductCovariance<TParameters>(fit: LongitudinalFit<TParameters>):
     }
     addOuterProduct(information, score);
   });
+  mirror(information, size);
   const inverse = invertPositiveDefinite(information, size);
   return inverse === null ? null : rescale(inverse, reportScales(fit, false));
 }
@@ -133,15 +134,6 @@ function addItemScores<TParameters>(
       const start = (occasion.codes[r] ?? 0) * length + l;
       score[slot] = (score[slot] ?? 0) + expectation(marginal, table, start, item.categoryCount * length);
     });
-  }
-}
-
-/** Adds the outer product of a vector with itself to a matrix by rows. */
-function addOuterProduct(matrix: Float64Array, vector: Float64Array): void {
-  const size = vector.length;
-  for (let a = 0; a < size; a++) {
-    for (let b = 0; b < size; b++)
-      matrix[a * size + b] = (matrix[a * size + b] ?? 0) + (vector[a] ?? 0) * (vector[b] ?? 0);
   }
 }
 
