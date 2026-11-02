@@ -2,7 +2,7 @@ import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 
 import { invertPositiveDefinite, standardDeviation } from "../math/internal.js";
-import { type DifGroup, type ItemCases, itemCases, polytomousData, ranksOf } from "./groups.js";
+import { countByScore, type DifGroup, type ItemCases, itemCases, polytomousData, type ScoreGroups } from "./groups.js";
 import {
   type DifAnalysis,
   type PurificationOptions,
@@ -108,52 +108,6 @@ export function mantelTest(
   );
 }
 
-/**
- * An item's persons counted by matching score and group: the sums the statistics are made of. The score groups are the
- * matching scores that occur and the categories the responses that occur, each in ascending order, so that the tables
- * grow with the persons, not with the highest score.
- */
-interface ScoreGroups {
-  /** The number of categories that occur. */
-  readonly categories: number;
-  /** The number of score groups. */
-  readonly scoreCount: number;
-  /** The persons in score group s and group g (1 for focal), at `2 s + g`. */
-  readonly sizes: Float64Array;
-  /** The sums of their responses, at `2 s + g`. */
-  readonly totals: Float64Array;
-  /** The sums of squared responses of both groups, at `s`. */
-  readonly squares: Float64Array;
-  /** The persons in score group s and group g whose response is the category k, at `(2 s + g) categories + k`. */
-  readonly counts: Float64Array;
-}
-
-function countByScore({ responses, scores, focal }: ItemCases): ScoreGroups {
-  const groupOf = ranksOf(scores);
-  const categoryOf = ranksOf(responses);
-  const groupCount = groupOf.size;
-  const categories = categoryOf.size;
-  const counted: ScoreGroups = {
-    categories,
-    scoreCount: groupCount,
-    sizes: new Float64Array(2 * groupCount),
-    totals: new Float64Array(2 * groupCount),
-    squares: new Float64Array(groupCount),
-    counts: new Float64Array(2 * groupCount * categories),
-  };
-  for (let person = 0; person < scores.length; person++) {
-    const score = groupOf.get(scores[person] ?? 0) ?? 0;
-    const response = responses[person] ?? 0;
-    const cell = 2 * score + (focal[person] ?? 0);
-    counted.sizes[cell] = (counted.sizes[cell] ?? 0) + 1;
-    counted.totals[cell] = (counted.totals[cell] ?? 0) + response;
-    counted.squares[score] = (counted.squares[score] ?? 0) + response * response;
-    const category = cell * categories + (categoryOf.get(response) ?? 0);
-    counted.counts[category] = (counted.counts[category] ?? 0) + 1;
-  }
-  return counted;
-}
-
 function statistics(cases: ItemCases): Omit<MantelTest, "id"> {
   const groups = countByScore(cases);
   const { excess, variance } = mantelSums(groups);
@@ -186,8 +140,9 @@ function mantelSums({ scoreCount: groupCount, sizes, totals, squares }: ScoreGro
     const size = reference + focal;
     if (size <= 1) continue;
     const total = (totals[2 * s] ?? 0) + (totals[2 * s + 1] ?? 0);
+    const square = (squares[2 * s] ?? 0) + (squares[2 * s + 1] ?? 0);
     excess += (totals[2 * s + 1] ?? 0) - (focal * total) / size;
-    variance += (reference * focal * (size * (squares[s] ?? 0) - total * total)) / (size * size * (size - 1));
+    variance += (reference * focal * (size * square - total * total)) / (size * size * (size - 1));
   }
   return { excess, variance };
 }

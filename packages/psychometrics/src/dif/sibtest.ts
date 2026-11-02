@@ -13,17 +13,25 @@ import {
 import type { ResponseMatrix } from "../data/internal.js";
 
 import { variance } from "../math/internal.js";
-import { type DifData, type DifGroup, polytomousData, ranksOf } from "./groups.js";
+import {
+  countByScore,
+  type DifData,
+  type DifGroup,
+  polytomousData,
+  type ScoredCases,
+  type ScoreGroups,
+} from "./groups.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 
 /** Options of {@link sibtest}. */
 export interface SibtestOptions extends PurificationOptions {
   /**
-   * The persons of each group a score group must exceed to be used, mirt's `Jmin`.
+   * The size of a small cell, mirt's `Jmin`: a score group where the reference or the focal group has this many persons
+   * or fewer is left out, so a score group is used from one person more in each group.
    *
    * @defaultValue `5`
    */
-  readonly minimumCell?: number;
+  readonly smallCell?: number;
   /**
    * Whether to apply the regression correction of the matching score. Without it, β compares the raw means.
    *
@@ -57,6 +65,8 @@ export interface Sibtest {
   readonly chiSquare: number | null;
   /** The probability of a chi-square at least as large without DIF. */
   readonly significance: number | null;
+  /** The persons the analysis used: those who answered every studied and matching item. */
+  readonly persons: number;
 }
 
 /** SIBTEST statistics of every item and bundle, with the purification of their matching items. */
@@ -65,20 +75,20 @@ export interface SibtestDif extends DifAnalysis<Sibtest> {
   readonly bundles: readonly Sibtest[];
 }
 
-/** The default of `minimumCell`: mirt's `Jmin`. */
-const DEFAULT_MINIMUM_CELL = 5;
-/** The least `minimumCell`: mirt stops on a `Jmin` below it. */
-const LEAST_MINIMUM_CELL = 2;
-/** The fewest anchors purification goes on with, as the correction's coefficient alpha needs two matching items. */
-const MINIMUM_ANCHORS = 2;
+/** The default of `smallCell`: mirt's `Jmin`. */
+const DEFAULT_SMALL_CELL = 5;
+/** The least `smallCell`: mirt stops on a `Jmin` below it. */
+const LEAST_SMALL_CELL = 2;
+/** The fewest matching items coefficient alpha, and so the correction, needs. */
+const ALPHA_ITEMS = 2;
+/**
+ * The least sum of the highest scores of the matching items that leaves a score between the lowest and the highest
+ * possible ones, as only such a score group is used.
+ */
+const MIDDLE_SCORE_RANGE = 2;
 
 /** The statistics of an item or bundle where they are undefined. */
-const UNDEFINED_STATISTIC: Omit<Sibtest, "id"> = {
-  beta: null,
-  standardError: null,
-  chiSquare: null,
-  significance: null,
-};
+const UNDEFINED_STATISTIC = { beta: null, standardError: null, chiSquare: null, significance: null } as const;
 
 /**
  * Returns the SIBTEST statistics of every item and bundle, as mirt's `SIBTEST` and difR's `difSIBTEST(type = "udif")`,
@@ -97,7 +107,7 @@ const UNDEFINED_STATISTIC: Omit<Sibtest, "id"> = {
  * m*_G(k) = m_G(k) + M (V(k) - V_G(k)), M = (m_G(k + 1) - m_G(k - 1)) / (V_G(k + 1) - V_G(k - 1)). A neighbor without
  * persons of G has the mean 0, as in mirt.
  *
- * A score group is used when each group has more than `minimumCell` persons in it, with studied scores that vary; when
+ * A score group is used when each group has more than `smallCell` persons in it, with studied scores that vary; when
  * it is neither the lowest score nor the highest; and when k is at least `guessing` times the number of items. With
  * p(k) the share of k's persons among those of the score groups used, β = Σ p(k) (m*_R(k) - m*_F(k)) and
  * SE² = Σ p(k)² (s²_R(k) / n_R(k) + s²_F(k) / n_F(k)), s² the sample variance. In coefficient alpha, `guessing` replaces
@@ -105,15 +115,19 @@ const UNDEFINED_STATISTIC: Omit<Sibtest, "id"> = {
  * v = max((u - guessing) / (1 - guessing), 0) and u the item's mean above its lower response.
  *
  * The statistics are `null` without a score group to use, or where the correction is undefined, as for fewer than two
- * matching items. Purification flags items whose chi-square is significant at 0.05, never bundles, and stops before
- * fewer than two anchors are left; bundles are matched on the anchors of the final round.
+ * matching items. `persons` counts the analysis's persons, whatever its statistics.
+ *
+ * Purification flags items whose chi-square is significant at 0.05, never bundles; bundles are matched on the anchors of
+ * the final round. It stops, with `converged` false, before the anchors are too few for each anchor to be tested on the
+ * others: 3 with the correction, as coefficient alpha needs two matching items, and 3 without it when an item is
+ * dichotomous, as a score group needs a score between the lowest and the highest; otherwise 2.
  *
  * @param matrix - The responses of the persons.
  * @param groups - The group of each person, in the order of the matrix.
  * @param options - The score groups used, the correction, the bundles and whether to purify the matching items.
  * @returns The statistics of every item and bundle, and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, either group has no person with a response, `purify`
- * or `correction` is not a boolean, `minimumCell` is not an integer from 2, `guessing` is not a number from 0 to below
+ * or `correction` is not a boolean, `smallCell` is not an integer from 2, `guessing` is not a number from 0 to below
  * 1, `bundles` is not an object, or a bundle is not a list of at least one known item without repeats.
  * @see {@link https://doi.org/10.1007/BF02294572 | Shealy and Stout (1993)}
  * @see {@link https://doi.org/10.1111/j.1745-3984.1996.tb00502.x | Douglas, Roussos and Stout (1996)}
@@ -121,19 +135,19 @@ const UNDEFINED_STATISTIC: Omit<Sibtest, "id"> = {
  */
 export function sibtest(matrix: ResponseMatrix, groups: readonly DifGroup[], options: SibtestOptions = {}): SibtestDif {
   checkOptions(options);
-  const { purify = false, minimumCell = DEFAULT_MINIMUM_CELL, correction = true, guessing = 0, bundles = {} } = options;
-  checkIntegerFrom(minimumCell, "The option minimumCell", LEAST_MINIMUM_CELL);
+  const { purify = false, smallCell = DEFAULT_SMALL_CELL, correction = true, guessing = 0, bundles = {} } = options;
+  checkIntegerFrom(smallCell, "The option smallCell", LEAST_SMALL_CELL);
   checkBoolean(correction, "The option correction");
   checkGuessing(guessing);
   const data = polytomousData(matrix, groups, "SIBTEST");
   const studiedBundles = bundleItems(bundles, matrix.itemIds);
-  const settings: Settings = { minimumCell, correction, guessing };
+  const settings: Settings = { smallCell, correction, guessing };
   const analysis = purified(
     matrix.itemIds,
     purify,
     (anchors) => matrix.itemIds.map((id, item) => ({ id, ...statistic(data, [item], anchors, settings) })),
     (item) => significant(item.significance),
-    MINIMUM_ANCHORS,
+    minimumAnchors(data, correction),
   );
   const kept = new Set(analysis.purification?.anchors ?? matrix.itemIds);
   const anchors = Uint8Array.from(matrix.itemIds, (id) => (kept.has(id) ? 1 : 0));
@@ -143,9 +157,19 @@ export function sibtest(matrix: ResponseMatrix, groups: readonly DifGroup[], opt
   };
 }
 
+/**
+ * Returns the fewest anchors at which every anchor can be tested on the others: one, the studied anchor, more than the
+ * fewest matching items. The correction needs two for coefficient alpha; without it, a score group needs a score
+ * between the lowest and the highest, which two dichotomous items give and one item of three categories or more.
+ */
+function minimumAnchors({ maxScores }: DifData, correction: boolean): number {
+  const fewestMatching = correction || maxScores.some((score) => score < MIDDLE_SCORE_RANGE) ? ALPHA_ITEMS : 1;
+  return fewestMatching + 1;
+}
+
 /** The options of one analysis. */
 interface Settings {
-  readonly minimumCell: number;
+  readonly smallCell: number;
   readonly correction: boolean;
   readonly guessing: number;
 }
@@ -182,17 +206,15 @@ function bundleItems(
 }
 
 /** The persons of one analysis: those who answered every studied and matching item. */
-interface StudiedCases {
+interface StudiedCases extends ScoredCases {
   /** The matching items: the anchors less the studied items. */
   readonly matching: readonly number[];
   /** The persons, as positions in the matrix. */
   readonly persons: Int32Array;
-  /** Each person's total over the matching items: in 64-bit floats, as a sum of responses may pass 2³¹. */
-  readonly matchingScores: Float64Array;
-  /** Each person's total over the studied items. */
-  readonly studiedScores: Float64Array;
-  /** 1 for each person of the focal group. */
-  readonly focal: Uint8Array;
+  /** Each person's total over the studied items: in 64-bit floats, as a sum of responses may pass 2³¹. */
+  readonly responses: Float64Array;
+  /** Each person's total over the matching items. */
+  readonly scores: Float64Array;
 }
 
 function studiedCases(
@@ -224,40 +246,21 @@ function studiedCases(
   return {
     matching,
     persons: Int32Array.from(persons),
-    matchingScores: Float64Array.from(matchingScores),
-    studiedScores: Float64Array.from(studiedScores),
+    responses: Float64Array.from(studiedScores),
+    scores: Float64Array.from(matchingScores),
     focal: Uint8Array.from(persons, (person) => focal[person] ?? 0),
   };
 }
 
-/**
- * The studied scores by matching score and group. The score groups are the matching scores that occur, in ascending
- * order, so that the tables grow with the persons, not with the highest score.
- */
-interface ScoreGroups {
-  /** The matching score of each score group. */
-  readonly scores: Float64Array;
-  /** The persons in score group s and group g (1 for focal), at `2 s + g`. */
-  readonly sizes: Float64Array;
-  /** Their mean studied score, 0 without persons, at `2 s + g`. */
+/** The mean and the sample variance of the studied scores in each cell of {@link ScoreGroups}, at `2 s + g`. */
+interface CellMoments {
+  /** The mean, 0 without persons. */
   readonly means: Float64Array;
-  /** The sample variance of their studied scores, 0 for fewer than two persons, at `2 s + g`. */
+  /** The sample variance, 0 for fewer than two persons. */
   readonly variances: Float64Array;
 }
 
-function scoreGroups({ matchingScores, studiedScores, focal }: StudiedCases): ScoreGroups {
-  const ranks = ranksOf(matchingScores);
-  const cells = 2 * ranks.size;
-  const sizes = new Float64Array(cells);
-  const totals = new Float64Array(cells);
-  const squares = new Float64Array(cells);
-  for (let person = 0; person < matchingScores.length; person++) {
-    const cell = 2 * (ranks.get(matchingScores[person] ?? 0) ?? 0) + (focal[person] ?? 0);
-    const score = studiedScores[person] ?? 0;
-    sizes[cell] = (sizes[cell] ?? 0) + 1;
-    totals[cell] = (totals[cell] ?? 0) + score;
-    squares[cell] = (squares[cell] ?? 0) + score * score;
-  }
+function cellMoments({ sizes, totals, squares }: ScoreGroups): CellMoments {
   const means = totals.map((total, cell) => {
     const size = sizes[cell] ?? 0;
     return size === 0 ? 0 : total / size;
@@ -266,7 +269,7 @@ function scoreGroups({ matchingScores, studiedScores, focal }: StudiedCases): Sc
     const size = sizes[cell] ?? 0;
     return size < 2 ? 0 : (size * (squares[cell] ?? 0) - total * total) / (size * (size - 1));
   });
-  return { scores: Float64Array.from(ranks.keys()), sizes, means, variances };
+  return { means, variances };
 }
 
 /**
@@ -274,13 +277,14 @@ function scoreGroups({ matchingScores, studiedScores, focal }: StudiedCases): Sc
  * correction, and mirt leaves them out with it or without it.
  */
 function usedScoreGroups(
-  { scores, sizes, variances }: ScoreGroups,
-  minimumCell: number,
+  { scores, sizes }: ScoreGroups,
+  { variances }: CellMoments,
+  smallCell: number,
   lowestScore: number,
 ): readonly number[] {
   const used: number[] = [];
   for (let s = 1; s < scores.length - 1; s++) {
-    const enough = (sizes[2 * s] ?? 0) > minimumCell && (sizes[2 * s + 1] ?? 0) > minimumCell;
+    const enough = (sizes[2 * s] ?? 0) > smallCell && (sizes[2 * s + 1] ?? 0) > smallCell;
     const varied = variances[2 * s] !== 0 && variances[2 * s + 1] !== 0;
     if (enough && varied && (scores[s] ?? 0) >= lowestScore) used.push(s);
   }
@@ -322,7 +326,7 @@ function coefficientAlpha(
  */
 function trueScores(
   data: DifData,
-  { matching, persons, matchingScores, focal }: StudiedCases,
+  { matching, persons, scores: matchingScores, focal }: StudiedCases,
   scores: Float64Array,
   group: number,
   guessing: number,
@@ -345,7 +349,8 @@ function correctedMean(means: Float64Array, trueScore: Float64Array, s: number, 
 function correctedMeans(
   data: DifData,
   cases: StudiedCases,
-  { scores, means }: ScoreGroups,
+  { scores }: ScoreGroups,
+  { means }: CellMoments,
   guessing: number,
 ): Float64Array {
   const reference = trueScores(data, cases, scores, 0, guessing);
@@ -363,14 +368,17 @@ function statistic(
   data: DifData,
   studied: readonly number[],
   anchors: Uint8Array,
-  { minimumCell, correction, guessing }: Settings,
+  { smallCell, correction, guessing }: Settings,
 ): Omit<Sibtest, "id"> {
   const cases = studiedCases(data, studied, anchors);
-  const groups = scoreGroups(cases);
-  const used = usedScoreGroups(groups, minimumCell, guessing * data.itemCount);
-  if (used.length === 0) return UNDEFINED_STATISTIC;
-  const means = correction ? correctedMeans(data, cases, groups, guessing) : groups.means;
-  const { sizes, variances } = groups;
+  const persons = cases.persons.length;
+  const groups = countByScore(cases);
+  const moments = cellMoments(groups);
+  const used = usedScoreGroups(groups, moments, smallCell, guessing * data.itemCount);
+  if (used.length === 0) return { ...UNDEFINED_STATISTIC, persons };
+  const means = correction ? correctedMeans(data, cases, groups, moments, guessing) : moments.means;
+  const { sizes } = groups;
+  const { variances } = moments;
   let weight = 0;
   let difference = 0;
   let sampling = 0;
@@ -385,6 +393,6 @@ function statistic(
   const beta = difference / weight;
   const standardError = Math.sqrt(sampling) / weight;
   const chiSquare = (beta / standardError) ** 2;
-  if (!Number.isFinite(chiSquare)) return UNDEFINED_STATISTIC;
-  return { beta, standardError, chiSquare, significance: chiSquareUpperTail(chiSquare, 1) };
+  if (!Number.isFinite(chiSquare)) return { ...UNDEFINED_STATISTIC, persons };
+  return { beta, standardError, chiSquare, significance: chiSquareUpperTail(chiSquare, 1), persons };
 }

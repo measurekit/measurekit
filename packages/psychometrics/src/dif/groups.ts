@@ -143,11 +143,67 @@ export function itemCases(data: DifData, item: number, anchors: Uint8Array): Ite
   };
 }
 
+/** The responses and matching scores of the persons a statistic uses, which {@link countByScore} tabulates. */
+export interface ScoredCases {
+  /** Each person's response or studied score: an integer from 0. */
+  readonly responses: ArrayLike<number>;
+  /** Each person's matching score. */
+  readonly scores: ArrayLike<number>;
+  /** 1 for each person of the focal group. */
+  readonly focal: Uint8Array;
+}
+
 /**
- * Returns the rank of each distinct value among the distinct values in ascending order, from 0, so that a table of
- * scores or responses grows with the values that occur, not with the highest of them.
+ * Persons counted by matching score and group: the sums the statistics on a matching score are made of. The score groups
+ * are the matching scores that occur and the categories the responses that occur, each in ascending order, so that the
+ * tables grow with the persons, not with the highest score or response.
  */
-export function ranksOf(values: ArrayLike<number>): Map<number, number> {
+export interface ScoreGroups {
+  /** The number of categories that occur. */
+  readonly categories: number;
+  /** The number of score groups. */
+  readonly scoreCount: number;
+  /** The matching score of each score group. */
+  readonly scores: Float64Array;
+  /** The persons in score group s and group g (1 for focal), at `2 s + g`. */
+  readonly sizes: Float64Array;
+  /** The sums of their responses, at `2 s + g`. */
+  readonly totals: Float64Array;
+  /** The sums of their squared responses, at `2 s + g`. */
+  readonly squares: Float64Array;
+  /** The persons in score group s and group g whose response is the category k, at `(2 s + g) categories + k`. */
+  readonly counts: Float64Array;
+}
+
+/** Counts persons by matching score and group, with the sums of their responses and the categories they responded. */
+export function countByScore({ responses, scores, focal }: ScoredCases): ScoreGroups {
+  const groupOf = ranksOf(scores);
+  const categoryOf = ranksOf(responses);
+  const scoreCount = groupOf.size;
+  const categories = categoryOf.size;
+  const counted: ScoreGroups = {
+    categories,
+    scoreCount,
+    scores: Float64Array.from(groupOf.keys()),
+    sizes: new Float64Array(2 * scoreCount),
+    totals: new Float64Array(2 * scoreCount),
+    squares: new Float64Array(2 * scoreCount),
+    counts: new Float64Array(2 * scoreCount * categories),
+  };
+  for (let person = 0; person < scores.length; person++) {
+    const response = responses[person] ?? 0;
+    const cell = 2 * (groupOf.get(scores[person] ?? 0) ?? 0) + (focal[person] ?? 0);
+    counted.sizes[cell] = (counted.sizes[cell] ?? 0) + 1;
+    counted.totals[cell] = (counted.totals[cell] ?? 0) + response;
+    counted.squares[cell] = (counted.squares[cell] ?? 0) + response * response;
+    const category = cell * categories + (categoryOf.get(response) ?? 0);
+    counted.counts[category] = (counted.counts[category] ?? 0) + 1;
+  }
+  return counted;
+}
+
+/** Returns the rank of each distinct value among the distinct values in ascending order, from 0. */
+function ranksOf(values: ArrayLike<number>): Map<number, number> {
   const distinct = [...new Set(Array.from(values))].sort((a, b) => a - b);
   return new Map(distinct.map((value, rank) => [value, rank]));
 }

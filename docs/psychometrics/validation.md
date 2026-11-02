@@ -171,7 +171,7 @@ distance of its EM from the margins.
 | Ordinal logistic regression deviances, R² changes, slope change              | `rms::lrm`, lordif's engine, run to `eps = 1e-14`; `MASS::polr` agrees within 1e-8 in the deviance; lordif's `rundif` on the same matching scores          |
 | Polytomous sparse data and purification                                      | Base R: the matching score written out, `mantelhaen.test` and `lrm` on each item's persons; `rundif` agrees with the final criterion of each item          |
 | SIBTEST of items and bundles, every option                                   | mirt's `SIBTEST` with `match_set`, `suspect_set`, `guess_correction`, `Jmin`, `correction`, on each analysis's persons; `difSIBTEST(type = "udif")` agrees |
-| SIBTEST's purification                                                       | Base R's rounds on `SIBTEST`; `difSIBTEST(purify = TRUE)` agrees in β, rounds and convergence                                                              |
+| SIBTEST's purification                                                       | Base R's rounds on `SIBTEST`, with and without the correction; `difSIBTEST(purify = TRUE)` agrees where the floor does not stop them                       |
 | Recipes: STD P-DIF, DIF variance                                             | `difStd(stdWeight = "focal")`; sirt's `dif.variance` on the centered MH D-DIF, as its `eb.dif` shrinks towards the mean only then                          |
 
 | Linking and equating quantity                              | Reference                                                                                                      |

@@ -67,13 +67,13 @@ export const RULES: readonly Rule[] = [
     titles: "rejects bundles",
   },
   {
-    rule: "SIBTEST tables the matching scores that occur, so one far response costs no table up to it.",
-    file: "packages/psychometrics/src/dif/sibtest.ts",
-    find: "const ranks = ranksOf(matchingScores);",
+    rule: "The DIF statistics table the matching scores that occur, so one far response costs no table up to it.",
+    file: "packages/psychometrics/src/dif/groups.ts",
+    find: "const groupOf = ranksOf(scores);",
     replace:
-      "const ranks = new Map(Array.from({ length: Math.max(...matchingScores) + 1 }, (_, score) => [score, score]));",
+      "const groupOf = new Map(Array.from({ length: Math.max(...Array.from(scores)) + 1 }, (_, score) => [score, score]));",
     test: "packages/psychometrics/test/dif.test.ts",
-    titles: "tables only the matching scores",
+    titles: "tables only the",
   },
   {
     rule: "Every category below an item's highest response has a response.",

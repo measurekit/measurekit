@@ -82,12 +82,12 @@ are computed again on the items not flagged, until a round flags the items the p
 left, or 10 rounds have run, as difR's `purify` (Holland and Thayer, 1988). The anchors are the items that define the
 matching score or, for Lord's chi-square, the scale on which the groups are linked.
 
-| Statistic                                               | Flags an item when                                           | Fewest anchors                             |
-| ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
-| `mantelHaenszel`, `mantelTest`                          | The chi-square is significant                                | 1, the studied item's match                |
-| `logisticRegressionDif`, `ordinalLogisticRegressionDif` | The test of both terms is significant, difR's default `type` | 1                                          |
-| `lordChiSquare`                                         | The chi-square is significant                                | 2, as a transformation needs two locations |
-| `sibtest`                                               | An item's chi-square is significant; a bundle flags nothing  | 2, as coefficient alpha needs two items    |
+| Statistic                                               | Flags an item when                                           | Fewest anchors                                    |
+| ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------- |
+| `mantelHaenszel`, `mantelTest`                          | The chi-square is significant                                | 1, the studied item's match                       |
+| `logisticRegressionDif`, `ordinalLogisticRegressionDif` | The test of both terms is significant, difR's default `type` | 1                                                 |
+| `lordChiSquare`                                         | The chi-square is significant                                | 2, as a transformation needs two locations        |
+| `sibtest`                                               | An item's chi-square is significant; a bundle flags nothing  | 3, or 2 [without the correction](#fewest-anchors) |
 
 The result's `purification` holds the `anchors` of the final statistics, the `iterations` after the first statistics and
 whether they `converged`; it is `null` without `purify`. `converged` is `false` when the rounds ran out or too few anchors
@@ -320,11 +320,11 @@ const focal = simulateResponses(shifted, focalThetas, random);
 const matrix = responseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
-sibtest(matrix, groups).items[2]; // { id: "item3", beta: 0.092, standardError: 0.025, chiSquare: 13.5, significance: 0.00024 }
-sibtest(matrix, groups).items[10]; // { id: "item11", beta: 0.010, standardError: 0.027, chiSquare: 0.14, significance: 0.71 }
+sibtest(matrix, groups).items[2]; // { id: "item3", beta: 0.092, standardError: 0.025, chiSquare: 13.5, significance: 0.00024, persons: 1000 }
+sibtest(matrix, groups).items[10]; // { id: "item11", beta: 0.010, standardError: 0.027, chiSquare: 0.14, significance: 0.71, persons: 1000 }
 // The two items as one bundle, purified: each item alone has 16.0 and 14.2 on the same anchors.
 sibtest(matrix, groups, { bundles: { passage: ["item3", "item4"] }, purify: true }).bundles;
-// [{ id: "passage", beta: 0.210, standardError: 0.041, chiSquare: 26.9, significance: 2.1e-7 }]
+// [{ id: "passage", beta: 0.210, standardError: 0.041, chiSquare: 26.9, significance: 2.1e-7, persons: 1000 }]
 ```
 
 | Field           | Definition                                                                                                                   |
@@ -334,17 +334,18 @@ sibtest(matrix, groups, { bundles: { passage: ["item3", "item4"] }, purify: true
 | `standardError` | SE = √(Σ p(k)² (s²_R(k) / n_R(k) + s²_F(k) / n_F(k))), of the raw scores in each score group                                 |
 | `chiSquare`     | (β / SE)², with one degree of freedom                                                                                        |
 | `significance`  | The probability of a chi-square at least as large without DIF                                                                |
+| `persons`       | The persons the analysis used, whatever its statistics: those who answered every studied and matching item                   |
 
 The result holds `items`, `bundles` in the order of the option, and the [`purification`](#purification). A statistic is
 `null` without a score group to use, or where the correction is undefined, as for fewer than two matching items.
 
-| Option        | Default    | Meaning                                                                                                                     |
-| ------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `purify`      | `false`    | [Purification](#purification), with at least 2 anchors and 10 rounds. It flags items, never bundles                         |
-| `minimumCell` | `5`        | A score group is used when each group has more than this many persons in it, mirt's `Jmin`. An integer from 2               |
-| `correction`  | `true`     | The regression correction. `false` compares the raw means, which group differences in ability bias: see below               |
-| `guessing`    | `0`        | The guessing parameter of the correction, mirt's `guess_correction`, for all items: from 0 to below 1                       |
-| `bundles`     | No bundles | `{ name: [item ids] }`: each bundle's total is tested against the anchors outside it. A bundle of one item equals that item |
+| Option       | Default    | Meaning                                                                                                                     |
+| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `purify`     | `false`    | [Purification](#purification), with at least 2 anchors and 10 rounds. It flags items, never bundles                         |
+| `smallCell`  | `5`        | A cell of this many persons or fewer is small: a score group is used when each group has more, mirt's `Jmin`. From 2        |
+| `correction` | `true`     | The regression correction. `false` compares the raw means, which group differences in ability bias: see below               |
+| `guessing`   | `0`        | The guessing parameter of the correction, mirt's `guess_correction`, for all items: from 0 to below 1                       |
+| `bundles`    | No bundles | `{ name: [item ids] }`: each bundle's total is tested against the anchors outside it. A bundle of one item equals that item |
 
 ### Persons and score groups
 
@@ -352,11 +353,12 @@ Persons are matched on their total over the matching items: all items or, with `
 item or bundle. Each analysis uses the persons who answered every studied and matching item, as the correction needs
 one set of items for all of them. So a person with a missing response to an anchor leaves the analysis of every item,
 and [the scaled score](#matching-score) of the other statistics does not apply: with 2% of the responses missing at
-random over 30 items, 45% of the persons leave. Use `mantelHaenszel` or `mantelTest` on data missing by design.
+random over 30 items, 45% of the persons leave, and `persons` shows it. Use `mantelHaenszel` or `mantelTest` on data
+missing by design.
 
 The score groups k are the matching scores that occur. A score group is used when:
 
-- each group has more than `minimumCell` persons in it, and their studied scores vary;
+- each group has more than `smallCell` persons in it, and their studied scores vary;
 - it is neither the lowest score nor the highest, which lack a neighbor for the correction;
 - k is at least `guessing` times the number of items.
 
@@ -376,6 +378,21 @@ lower, the correction holds the false alarms of clean items at 5.6%; without it 
 
 With `guessing`, an item with two different responses in a group enters coefficient alpha with the variance v (1 - v)
 in place of its own, for v = max((u - guessing) / (1 - guessing), 0) and u its mean above its lower response.
+
+### Fewest anchors
+
+Purification flags items, never bundles, and matches the bundles on the anchors of its final round. It stops, with
+`converged` false, before the anchors are too few for each anchor to be tested on the others, as a statistic of an
+anchor is matched on the other anchors:
+
+| Correction | Items                           | Fewest anchors | Why                                                                    |
+| ---------- | ------------------------------- | -------------- | ---------------------------------------------------------------------- |
+| On         | Any                             | 3              | Coefficient alpha needs two matching items                             |
+| Off        | One of them dichotomous         | 3              | A score between the lowest and the highest needs two dichotomous items |
+| Off        | All of three categories or more | 2              | One such item gives a score between the lowest and the highest         |
+
+difR's `purify` has no floor: on bfi it goes on with 2 anchors, whose statistics are undefined, and reports
+convergence.
 
 ## Not included
 
@@ -561,7 +578,7 @@ Invalid input throws `DataError` naming the value found.
 | An item is not dichotomous, for the dichotomous statistics       | Use `mantelTest` or `ordinalLogisticRegressionDif` for items with more categories |
 | `purify` with `matching`                                         | Purify the total score, or give the matching score and leave `purify` off         |
 | A matching score is not a finite number                          | Give `null` for a person to leave out                                             |
-| `minimumCell` is below 2, or `guessing` is 1 or more             | Give an integer from 2, and a guessing parameter from 0 to below 1                |
+| `smallCell` is below 2, or `guessing` is 1 or more               | Give an integer from 2, and a guessing parameter from 0 to below 1                |
 | A bundle is empty, or names an unknown item or one item twice    | Give each bundle its distinct items, by their ids in the matrix                   |
 
 ## Differences from difR
@@ -583,7 +600,7 @@ Invalid input throws `DataError` naming the value found.
 | Undefined statistics | `null`                                                      | β and SE 0 with a chi-square of `NaN`, or `NaN` from the correction                                     |
 | Small significances  | The upper tail of the chi-square, which keeps its precision | `1 - pchisq`, which is 0 below about 1e-16                                                              |
 | Guessing             | One value for all items                                     | One for all items, or one per item                                                                      |
-| Purification         | `purify`, as difR's, stopping before fewer than 2 anchors   | None; difR's `purify` goes on without a floor                                                           |
+| Purification         | `purify`, as difR's, with [a floor](#fewest-anchors)        | None; difR's `purify` goes on without a floor                                                           |
 
 ## Differences from lordif
 
