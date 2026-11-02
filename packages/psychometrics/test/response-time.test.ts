@@ -177,6 +177,19 @@ describe("rapid guessing", () => {
       { id: "person1", effort: 1, rapidGuesses: 0 },
       { id: "person2", effort: 0.5, rapidGuesses: 1 },
     ]);
+    // An item named after a property of every object, without a threshold, has none, so its responses do not count.
+    const named = {
+      ...data,
+      itemIds: ["item1", "constructor"],
+      times: [
+        [2, 5],
+        [1, 8],
+      ],
+    };
+    expect(responseTimeEffort(named, { item1: 2 })).toEqual([
+      { id: "person1", effort: 1, rapidGuesses: 0 },
+      { id: "person2", effort: 0, rapidGuesses: 1 },
+    ]);
     expect(normativeThresholds(data, { percentage: 50, cap: 2 })).toEqual({ item1: 2, item2: 1.5 });
     expect(() => normativeThresholds(data, { cap: 0 })).toThrow("The option cap must be a positive number, found 0.");
     expect(() => responseTimeEffort(data, { item1: -1 })).toThrow(
@@ -729,10 +742,12 @@ describe("properties", () => {
   });
 
   it("the joint log-likelihood does not depend on the order of persons", () => {
+    // 200 persons and 6 items converge within milliseconds for every seed; 60 and 4 leave some seeds short of the
+    // tolerance after 50,000 iterations, which take half a minute.
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 1000 }), (seed) => {
-        const { matrix } = simulateJoint(twoParameterLogistic, seed, 60, 4, 2, 0.4);
-        const order = Array.from({ length: 60 }, (_, i) => (i * 13 + seed) % 60);
+        const { matrix } = simulateJoint(twoParameterLogistic, seed, 200, 6, 2, 0.4);
+        const order = Array.from({ length: 200 }, (_, i) => (i * 13 + seed) % 200);
         const pick = <T>(rows: readonly T[]): T[] => order.map((p) => defined(rows[p]));
         const shuffled = responseMatrix(pick(matrix.responses), { times: pick(matrix.times ?? []) });
         const options = { model: twoParameterLogistic, ...PRECISE };
