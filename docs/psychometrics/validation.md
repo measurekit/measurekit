@@ -1119,5 +1119,7 @@ Fixtures store 17 significant digits, so they reproduce R's doubles exactly.
 ## Regenerating fixtures
 
 [validation/README.md](../../validation/README.md) lists the scripts and the R packages they need. Update the versions
-above when they change. A new statistic needs a reference in an R script, a fixture, a test that loads it, and a row in
+above when they change. A regeneration writes every fixture again byte for byte, except two kinds of values that depend
+on the load of the machine: the seconds that `longitudinal-recovery.json` records for each fit of mirt, and the minimax
+gaps of `form-assembly.json`, which highs finds within a time limit. A new statistic needs a reference in an R script, a fixture, a test that loads it, and a row in
 the tables above.
