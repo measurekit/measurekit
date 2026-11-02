@@ -1,7 +1,7 @@
 /**
  * Cognitive diagnosis: the G-DINA, DINA, DINO, A-CDM, LLM and R-RUM models calibrated by marginal maximum likelihood,
  * persons' attribute mastery and profiles, classification accuracy and consistency, Wald tests of reduced models for
- * each item, Q-matrix validation, model and item fit, and nonparametric classification.
+ * each item, Q-matrix validation, model and item fit, the identifiability of the DINA, and nonparametric classification.
  *
  * @module @measurekit/psychometrics/cdm
  */
@@ -17,6 +17,7 @@ export {
   calibrateCdm,
   type ProfileProportion,
 } from "./calibration.js";
+export { type QMatrixIdentifiability, qMatrixIdentifiability } from "./identifiability.js";
 export {
   compareItemModels,
   type ItemComparisonOptions,

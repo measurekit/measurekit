@@ -73,27 +73,44 @@ export function checkItemAttributes(
 }
 
 /**
- * Checks a Q-matrix against item ids and returns its design.
+ * Checks a Q-matrix against item ids and returns its attributes, in order of first appearance, and each item's attribute
+ * indices, sorted.
  *
  * @throws `DataError` when the Q-matrix is not an object, an item has no entry, an entry names an item that is not an
- * item id, an item's attributes fail {@link checkItemAttributes}, or there are more than 20 attributes.
+ * item id, or an item's attributes fail {@link checkItemAttributes}.
  */
-export function cdmDesign(itemIds: readonly string[], qMatrix: QMatrix): CdmDesign {
+export function designAttributes(
+  itemIds: readonly string[],
+  qMatrix: QMatrix,
+): Pick<CdmDesign, "attributes" | "itemAttributes"> {
   // A Q-matrix shared with knowledge tracing or loaded from JSON may be another value.
   checkRecord(qMatrix, "A Q-matrix must be an object of attribute lists by item id");
   for (const id of Object.keys(qMatrix)) {
     if (!itemIds.includes(id)) throw new DataError(`The Q-matrix has item "${id}", which is not an item id.`);
   }
   const attributes: string[] = [];
+  const positions = new Map<string, number>();
   const itemAttributes = itemIds.map((id) => {
     const listed = Object.hasOwn(qMatrix, id) ? qMatrix[id] : undefined;
     checkItemAttributes(id, listed);
     const indices = listed.map((attribute) => {
-      if (!attributes.includes(attribute)) attributes.push(attribute);
-      return attributes.indexOf(attribute);
+      const known = positions.get(attribute);
+      if (known !== undefined) return known;
+      positions.set(attribute, attributes.length);
+      return attributes.push(attribute) - 1;
     });
     return indices.sort((a, b) => a - b);
   });
+  return { attributes, itemAttributes };
+}
+
+/**
+ * Checks a Q-matrix against item ids and returns its design.
+ *
+ * @throws `DataError` as {@link designAttributes} does, or when there are more than 20 attributes.
+ */
+export function cdmDesign(itemIds: readonly string[], qMatrix: QMatrix): CdmDesign {
+  const { attributes, itemAttributes } = designAttributes(itemIds, qMatrix);
   if (attributes.length > MAX_ATTRIBUTES) {
     throw new DataError(`A design has at most ${MAX_ATTRIBUTES} attributes, found ${attributes.length}.`);
   }

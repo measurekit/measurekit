@@ -14,6 +14,7 @@ import {
   createRandom,
   DataError,
   nonparametricClassification,
+  qMatrixIdentifiability,
   responseMatrix,
   simulateCdmResponses,
   validateQMatrix,
@@ -23,6 +24,7 @@ import { definedEntries } from "./fixture-items.js";
 import fixture from "./fixtures/cdm.json" with { type: "json" };
 import additiveFixture from "./fixtures/cdm-additive.json" with { type: "json" };
 import fitFixture from "./fixtures/cdm-fit.json" with { type: "json" };
+import identifiabilityFixture from "./fixtures/cdm-identifiability.json" with { type: "json" };
 import comparisonFixture from "./fixtures/cdm-item-comparison.json" with { type: "json" };
 import maximumFixture from "./fixtures/cdm-maximum.json" with { type: "json" };
 
@@ -1174,6 +1176,40 @@ describe("cdmItemFit", () => {
   });
 });
 
+describe("qMatrixIdentifiability", () => {
+  it("matches CDM's din_identifiability on random Q-matrices", () => {
+    for (const { qMatrix, singleItems, threeItems, distinctColumns, dinaIdentified } of identifiabilityFixture.cases) {
+      const result = qMatrixIdentifiability(definedEntries(qMatrix));
+      expect(result).toEqual({ singleItems, threeItems, distinctColumns, dinaIdentified });
+    }
+  });
+
+  it("compares the whole Q-matrix when no attribute has an item of its own", () => {
+    const result = qMatrixIdentifiability({ q1: ["a", "b"], q2: ["a", "c"], q3: ["b", "c"] });
+    expect(result.distinctColumns).toBe(true);
+    expect(result.dinaIdentified).toBe(false);
+    expect(qMatrixIdentifiability({ q1: ["a", "b"], q2: ["a", "b"] }).distinctColumns).toBe(false);
+  });
+
+  it("gives an empty remainder equal columns", () => {
+    expect(qMatrixIdentifiability({ q1: ["a"], q2: ["b"] }).distinctColumns).toBe(false);
+    expect(qMatrixIdentifiability({ q1: ["a"] }).distinctColumns).toBe(true);
+  });
+
+  it("takes a Q-matrix of many attributes in time with its entries", () => {
+    const qMatrix = Object.fromEntries(Array.from({ length: 20_000 }, (_, j) => [`q${j}`, [`a${j}`, `a${j + 1}`]]));
+    expect(qMatrixIdentifiability(qMatrix).distinctColumns).toBe(true);
+  });
+
+  it("refuses a Q-matrix that is not one", () => {
+    expect(() => qMatrixIdentifiability(JSON.parse("null"))).toThrow(/must be an object/);
+    expect(() => qMatrixIdentifiability(JSON.parse("[]"))).toThrow(DataError);
+    expect(() => qMatrixIdentifiability({})).toThrow(/at least one item/);
+    expect(() => qMatrixIdentifiability(JSON.parse('{ "q1": [] }'))).toThrow(/at least one attribute/);
+    expect(() => qMatrixIdentifiability(JSON.parse('{ "q1": ["a", "a"] }'))).toThrow(/twice/);
+  });
+});
+
 describe("properties", () => {
   it("model and item fit do not depend on the order of persons", () => {
     const qMatrix = definedEntries(fitFixture.qMatrix);
@@ -1195,6 +1231,21 @@ describe("properties", () => {
         close(cdmItemFit(reordered, calibration), cdmItemFit(original, calibration));
       }),
       { numRuns: 10 },
+    );
+  });
+
+  it("the identifiability of a Q-matrix does not depend on the order of items and of attributes", () => {
+    const attributes = ["a", "b", "c", "d"];
+    const entry = fc.subarray(attributes, { minLength: 1, maxLength: 3 });
+    fc.assert(
+      fc.property(fc.array(entry, { minLength: 1, maxLength: 10 }), fc.integer({ min: 0, max: 1000 }), (rows, seed) => {
+        const random = createRandom(seed);
+        const order = rows.map((_, j) => ({ j, key: random.uniform() }));
+        order.sort((x, y) => x.key - y.key);
+        const qMatrix = Object.fromEntries(rows.map((row, j) => [`q${j}`, row]));
+        const shuffled = Object.fromEntries(order.map(({ j }) => [`q${j}`, [...(rows[j] ?? [])].reverse()]));
+        expect(qMatrixIdentifiability(shuffled)).toEqual(qMatrixIdentifiability(qMatrix));
+      }),
     );
   });
 

@@ -3,7 +3,8 @@
 `@measurekit/psychometrics/cdm` tells which attributes, such as the skills a test measures, each person has
 mastered: the G-DINA, DINA, DINO, A-CDM, LLM and R-RUM models calibrated by marginal maximum likelihood, persons'
 mastery probabilities and profiles, classification accuracy and consistency, Wald tests that choose a model for each
-item, Q-matrix validation, model and item fit, and a nonparametric classification for small samples. Each is validated against GDINA, CDM or NPCD ([validation](validation.md)).
+item, Q-matrix validation, model and item fit, the identifiability of the DINA, and a nonparametric classification for
+small samples. Each is validated against GDINA, CDM or NPCD ([validation](validation.md)).
 
 ## Q-matrix
 
@@ -24,6 +25,28 @@ Every item of the response matrix needs at least one attribute. The attributes t
 appear over the items, which orders every profile in the results; K attributes give 2^K profiles, up to 20 attributes.
 A profile is an array of 0 and 1 per attribute, 1 when mastered. Profiles come in GDINA's order: by the number mastered,
 then those mastering earlier attributes first, 00, 10, 01, 11.
+
+### Identifiability
+
+`qMatrixIdentifiability(qMatrix)` checks Xu and Zhang's (2016) conditions under which a Q-matrix identifies the DINA,
+and so the DINO, as CDM's `din_identifiability`:
+
+| Field             | Condition                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| `singleItems`     | By attribute: an item measures it alone                                                          |
+| `threeItems`      | By attribute: at least three items measure it                                                    |
+| `distinctColumns` | With the first single-attribute item of each attribute set aside, the columns of the rest differ |
+| `dinaIdentified`  | All three hold                                                                                   |
+
+```ts
+import { qMatrixIdentifiability } from "@measurekit/psychometrics/cdm";
+
+qMatrixIdentifiability({ q1: ["a"], q2: ["a", "b"], q3: ["a", "b"], q4: ["b"] });
+// { singleItems: { a: true, b: true }, threeItems: { a: true, b: true }, distinctColumns: false, dinaIdentified: false }
+```
+
+Where no attribute has an item of its own, the whole Q-matrix is compared, and where nothing remains the columns are
+equal. The conditions are for the DINA and DINO; those of general models are under Not included.
 
 ## Models
 
@@ -358,6 +381,8 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 - **Higher-order attribute models.** Outside the sources: a variant, as GDINA's `att.dist` shows; the saturated
   distribution of the profiles is its default.
 - **Polytomous attributes.** Outside the sources: a variant of the models for attributes mastered or not.
+- **Identifiability of general CDMs (Xu, 2017).** No reference: chapter 16 treats it, and no package checks the
+  conditions; `qMatrixIdentifiability` covers the DINA and DINO.
 - **S-X² and RMSEA of CDM items.** Outside the sources: functions of CDM, beside Chen, de la Torre and Zhang's statistics.
 - **MADcor and the other residual summaries of CDM.** No fit: one line over the residual correlations of `cdmItemFit`'s
   pairs.
@@ -380,3 +405,4 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
   classification item response models. British Journal of Mathematical and Statistical Psychology, 69, 225-252.
 - Wang, W., Song, L., Chen, P., Meng, Y., & Ding, S. (2015). Attribute-level and pattern-level classification
   consistency and accuracy indices for cognitive diagnostic assessment. Journal of Educational Measurement, 52, 457-476.
+- Xu, G., & Zhang, S. (2016). Identifiability of diagnostic classification models. Psychometrika, 81, 625-649.
