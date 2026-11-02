@@ -7,6 +7,7 @@ import {
   checkFixedIds,
   checkPrior,
   modelsOf,
+  NO_RESPONSES,
   type ParameterPrior,
 } from "../irt/internal.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
@@ -89,13 +90,11 @@ export function setUp<TParameters>(
   const slopes = startingSlopes(design, responses);
   const items = models.map((model, column): ItemState<TParameters> => {
     const id = itemIds[column] ?? "";
-    const tally = tallies[column] ?? { highest: -1, counts: new Map() };
+    const tally = tallies[column] ?? NO_RESPONSES;
     const anchor = anchors.get(id);
     if (anchor !== undefined) return fixedItem(id, model, anchor, tally.highest + 1, dimensions, nodeCount);
-    const itemCounts = checkCategories(id, model, tally);
-    const categoryCount = itemCounts.length;
-    const answered = itemCounts.reduce((sum, count) => sum + count, 0);
-    const proportions = Float64Array.from(itemCounts, (count) => count / answered);
+    const proportions = checkCategories(id, model, tally);
+    const categoryCount = proportions.length;
     const vector = model.toVector(model.startingValues(proportions, slopes[column] ?? new Float64Array(dimensions)));
     const specifications = model.parameters(categoryCount, dimensions);
     const loads = design.loads[column] ?? [];

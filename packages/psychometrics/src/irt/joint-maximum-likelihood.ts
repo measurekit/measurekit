@@ -14,7 +14,7 @@ import type { CalibratedItem } from "./calibration.js";
 import { oneParameterLogistic } from "./logistic.js";
 import { partialCredit, partialCreditInformation, stepStarts } from "./partial-credit.js";
 import { logProbability } from "./probability.js";
-import { categoryTallies, checkCategories, compressResponses, responseCodes } from "./responses.js";
+import { categoryTallies, checkCategories, compressResponses, NO_RESPONSES, responseCodes } from "./responses.js";
 
 /** Options of {@link jointMaximumLikelihood}. */
 export interface JointMaximumLikelihoodOptions {
@@ -165,16 +165,9 @@ function setUp(matrix: ResponseMatrix): JointData {
   const itemCount = itemIds.length;
   const byItem = categoryTallies(compressResponses(matrix));
   const responses = responseCodes(matrix);
-  const counts = itemIds.map((id, item) =>
-    checkCategories(id, partialCredit, byItem[item] ?? { highest: -1, counts: new Map() }),
-  );
-  const categories = Int32Array.from(counts, (itemCounts) => itemCounts.length);
-  const thresholds = Float64Array.from(
-    counts.flatMap((itemCounts) => {
-      const answered = itemCounts.reduce((sum, count) => sum + count, 0);
-      return stepStarts(Float64Array.from(itemCounts, (count) => count / answered));
-    }),
-  );
+  const proportions = itemIds.map((id, item) => checkCategories(id, partialCredit, byItem[item] ?? NO_RESPONSES));
+  const categories = Int32Array.from(proportions, (shares) => shares.length);
+  const thresholds = Float64Array.from(proportions.flatMap((shares) => stepStarts(shares)));
   let end = 0;
   const itemThresholds = Array.from(categories, (count) => {
     end += count - 1;

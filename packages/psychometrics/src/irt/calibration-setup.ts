@@ -6,7 +6,7 @@ import { checkFixedCategories, checkFixedIds, checkItem, checkModel, modelsOf } 
 import { type Population, population } from "./latent.js";
 import type { IrtModel, ModelParameter } from "./model.js";
 import { checkPrior, type ParameterPrior } from "./prior.js";
-import { type CompressedResponses, categoryTallies, checkCategories } from "./responses.js";
+import { type CompressedResponses, categoryTallies, checkCategories, NO_RESPONSES } from "./responses.js";
 import { type TestletDesign, testletDesign, testletWeights } from "./testlets.js";
 
 /** An item during calibration. */
@@ -82,14 +82,13 @@ export function setUp<TParameters>(
   const sharing = new Map<IrtModel<TParameters>, SharedParameters>();
   const items = models.map((model, column): ItemState<TParameters> => {
     const id = itemIds[column] ?? "";
-    const tally = tallies[column] ?? { highest: -1, counts: new Map() };
+    const tally = tallies[column] ?? NO_RESPONSES;
     const parameters = fixed[id];
     const nodes = design !== null && (design.testletOf[column] ?? -1) >= 0 ? design.sums : rule.nodes;
     if (parameters !== undefined) return fixedItem(id, model, parameters, tally.highest + 1, nodes);
-    const counts = checkCategories(id, model, tally);
-    const categoryCount = counts.length;
-    const answered = counts.reduce((sum, count) => sum + count, 0);
-    const start = model.toVector(model.startingValues(Float64Array.from(counts, (count) => count / answered)));
+    const proportions = checkCategories(id, model, tally);
+    const categoryCount = proportions.length;
+    const start = model.toVector(model.startingValues(proportions));
     const specifications = model.parameters(categoryCount);
     const shared = sharedSlots(sharing, model, { id, categoryCount, specifications });
     const own = priorsOfItem.get(id);

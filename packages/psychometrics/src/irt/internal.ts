@@ -73,6 +73,7 @@ export {
   checkCategories,
   compressResponses,
   forEachRespondent,
+  NO_RESPONSES,
   personGroups,
   respondentsOf,
 } from "./responses.js";

@@ -94,6 +94,9 @@ export interface CategoryTally {
   readonly counts: ReadonlyMap<number, number>;
 }
 
+/** The tally of an item without responses. */
+export const NO_RESPONSES: CategoryTally = { highest: -1, counts: new Map() };
+
 /** Returns the responses to each item by category, in space that grows with the categories used, not with the highest. */
 export function categoryTallies({ itemIds, items, codes }: CompressedResponses): CategoryTally[] {
   const counts = itemIds.map(() => new Map<number, number>());
@@ -108,8 +111,8 @@ export function categoryTallies({ itemIds, items, codes }: CompressedResponses):
 }
 
 /**
- * Checks that an item's responses can be estimated with its model, of either kind, and returns the number of persons
- * in each category from 0 to the highest.
+ * Checks that an item's responses can be estimated with its model, of either kind, and returns the share of its
+ * responses in each category from 0 to the highest.
  *
  * @throws `DataError` when the item has a response above the model's categories, responses in fewer than two
  * categories, or no response in a category below its highest.
@@ -118,7 +121,7 @@ export function checkCategories(
   id: string,
   model: Pick<IrtModel, "name" | "maxCategories">,
   { highest, counts }: CategoryTally,
-): number[] {
+): Float64Array {
   if (highest >= model.maxCategories) {
     throw new DataError(
       `Item "${id}" has a response of ${highest}, but the ${model.name} model allows responses from 0 to ${model.maxCategories - 1}.`,
@@ -134,7 +137,9 @@ export function checkCategories(
       `Item "${id}" has no response in category ${empty}; calibration needs responses in every category up to the highest.`,
     );
   }
-  return Array.from({ length: highest + 1 }, (_, category) => counts.get(category) ?? 0);
+  let answered = 0;
+  for (const count of counts.values()) answered += count;
+  return Float64Array.from({ length: highest + 1 }, (_, category) => (counts.get(category) ?? 0) / answered);
 }
 
 /** The groups of persons in a calibration. */
