@@ -1,13 +1,15 @@
 /**
  * Item and person fit: Rasch infit and outfit, the S-X² item fit statistic, the lz person fit statistic, the RMSD of
  * items, Yen's Q3 and Chen and Thissen's chi-square for local dependence, the limited-information fit of a calibration:
- * M2, M2*, C2, RMSEA, SRMSR, TLI and CFI, and the Andersen, Martin-Löf and Wald tests of the Rasch family.
+ * M2, M2*, C2, RMSEA, SRMSR, TLI and CFI, the Andersen, Martin-Löf and Wald tests of the Rasch family, and
+ * kernel-smoothed item curves.
  *
  * @module @measurekit/psychometrics/fit
  */
 
 export type { ResidualFitOptions } from "./inputs.js";
 export { type ItemFit, itemFit } from "./item-fit.js";
+export { type KernelCurveOptions, type KernelItemCurve, kernelItemCurves } from "./kernel-curves.js";
 export {
   type LimitedInformationFit,
   type LimitedInformationOptions,

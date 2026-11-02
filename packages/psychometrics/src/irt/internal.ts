@@ -72,6 +72,7 @@ export { logProbability, MIN_PROBABILITY } from "./probability.js";
 export { type QuadratureOptions, quadratureRule } from "./quadrature.js";
 export { type RatingScaleParameters, ratingScale } from "./rating-scale.js";
 export {
+  type CategoryTally,
   type CompressedResponses,
   categoryTallies,
   checkCategories,

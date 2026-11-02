@@ -34,6 +34,7 @@ Rscript validation/psychometrics/multistage-cuts.R   # routing cuts of multistag
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
 Rscript validation/psychometrics/fit-global.R        # limited-information fit: mirt's M2, base R where mirt's Δ differs; the noncentral chi-square
 Rscript validation/psychometrics/fit-residuals.R     # RMSD and local dependence: TAM's IRT.RMSD, base R's mean deviation, mirt's residuals(type = "LD")
+Rscript validation/psychometrics/fit-curves.R        # kernel item curves: KernSmoothIRT's ksIRT, Ramsay's standard errors in base R; reads fit-rmsd.json
 Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif
 Rscript validation/psychometrics/dif-lord-purification.R # purified Lord's chi-square: difR's difLord(purify = TRUE); run dif.R first
 Rscript validation/psychometrics/dif-sibtest.R       # SIBTEST and the recipes of dif.md: mirt's SIBTEST, difR's difSIBTEST and difStd, sirt's dif.variance; run dif.R first
@@ -77,7 +78,7 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 ```
 
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
-sirt, kequate, betafunctions, nlme, LNIRT, numDeriv, lme4, metafor, statmod, Matrix, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, lpSolve, highs, GPArotation, polycor, mvtnorm, clinicalsignificance, GGUM and jsonlite;
+sirt, kequate, betafunctions, KernSmoothIRT, nlme, LNIRT, numDeriv, lme4, metafor, statmod, Matrix, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, lpSolve, highs, GPArotation, polycor, mvtnorm, clinicalsignificance, GGUM and jsonlite;
 `common.R` holds their shared helpers, `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share, `mokken-data.R` the data that `mokken.R`, `mokken-reliability.R` and `mokken-steps.R` share, and `many-facet-likelihood.R` the many-facet likelihood that `rater.R` and `rater-bias.R` share.
 
 `generalizability-unbalanced.py` checks the fixture that `generalizability-unbalanced.R` writes against GeneralizIT 0.1.2. It

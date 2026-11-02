@@ -180,6 +180,22 @@ export const RULES: readonly Rule[] = [
     titles: "rejects a regression, features or values",
   },
   {
+    rule: "Kernel curves need a response in every category up to an item's highest, so that one far response costs no curves up to it.",
+    file: "packages/psychometrics/src/fit/kernel-curves.ts",
+    find: "if (counts.size <= highest) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "rejects an item without responses, an empty category below the highest, and fewer than two persons",
+  },
+  {
+    rule: "A person without responses has no rank in kernel curves, so that an empty row moves no other person's normal score.",
+    file: "packages/psychometrics/src/fit/kernel-curves.ts",
+    find: "if (end === start) continue;",
+    replace: "",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "leaves out a missing response and ranks no person without any",
+  },
+  {
     rule: "A limited-information statistic stops at 60 items, before the moments, whose matrix grows with their fourth power.",
     file: "packages/psychometrics/src/fit/limited-information.ts",
     find: "if (items.length > MAX_MOMENT_ITEMS) {",

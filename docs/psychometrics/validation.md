@@ -18,7 +18,7 @@ flowchart LR
 Fixtures were generated with R 4.6.1, psych 2.6.9, mirt 1.48, ltm 1.2-0, catR 3.17, TAM 4.3-25, eRm 1.0.10, difR 6.1.0,
 lordif 0.4-2, MASS 7.3-65, rms 8.2.0, subscore 3.3, equate 2.0.9, equateIRT 2.5.2, kequate 1.6.4, irr 0.85, effsize 0.8.1, cacIRT 1.4, betafunctions 2.0.0, sirt 4.2-133, DFIT 1.1, nlme 3.1-169,
 LNIRT 0.5.1, numDeriv 2016.8-1.1, lme4 2.1.0, metafor 5.2.1, mokken 3.1.2, GDINA 2.13.2, alabama 2025.1.0, NPCD 1.0.11,
-CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2, clinicalsignificance 3.0.0, GGUM 0.5
+CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, KernSmoothIRT 6.6, GPArotation 2026.8.2, polycor 0.8.2, mvtnorm 1.4.2, clinicalsignificance 3.0.0, GGUM 0.5
 (with rJava 1.0.18 and xlsx 0.6.5 on OpenJDK 17, which its import of xlsx needs) and jsonlite 2.0.0. The cross-check of unbalanced generalizability runs in Python 3.12 with GeneralizIT 0.1.2 (`validation/psychometrics/requirements.txt`).
 
 | Statistic                                                                                                             | Reference                                                                                                                                             |
@@ -158,20 +158,22 @@ each case (0.441 and 0.135 at worst).
 | Item sequences                                                   | The replay in base R, selecting the highest score, the first on ties; mirtCAT's `DPrule` with MAP estimates from the item it starts with                                                      |
 | Standard error stopping decisions                                | Base R: every standard error at most the threshold                                                                                                                                            |
 
-| Fit statistic                                                    | Reference                                                                                                                                 |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Item infit and outfit mean squares and standardized values       | eRm's `itemfit` on its `RM` and `PCM` items and `person.parameter` thetas                                                                 |
-| Person infit and outfit                                          | eRm's `personfit`, the same inputs                                                                                                        |
-| lz                                                               | mirt's `personfit(Theta = )` `Zh`, at mirt's EAP thetas                                                                                   |
-| Q3                                                               | mirt's `residuals(type = "Q3", Theta = )`, the same thetas                                                                                |
-| Local-dependence chi-square, df, significance, signed Cramér's V | mirt's `residuals(type = "LD", df.p = TRUE)` at 61 nodes, and at 21 for a population, at mirt's coefficients                              |
-| RMSD                                                             | TAM's `IRT.RMSD` at TAM's 21 nodes, calibrations to 1e-10, with the normal density of TAM's mean and variance as the population           |
-| Mean deviation                                                   | Written out in base R from TAM's posterior counts; CDM's `IRT.RMSD` where every item has the same categories                              |
-| S-X², degrees of freedom, significance                           | mirt's `itemfit(fit_stats = "S_X2")`                                                                                                      |
-| M2, M2*, C2, df, RMSEA and its interval, SRMSR, TLI, CFI         | mirt's `M2(quadpts = 61)` at `TOL = 1e-8`; written out in base R below                                                                    |
-| Andersen's statistic, df, significance, items left out, persons  | eRm's `LRtest`; base R's conditional likelihood by every pattern on missing responses of polytomous items                                 |
-| Martin-Löf statistic, df, significance                           | eRm's `MLoef` on the persons who answered every item; base R's df for the rating scale model                                              |
-| Wald z and significance of each item                             | eRm's `Waldtest`, each item's first item-category parameter; base R's locations of eRm's `PCM` in each group for the partial credit model |
+| Fit statistic                                                    | Reference                                                                                                                                       |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Item infit and outfit mean squares and standardized values       | eRm's `itemfit` on its `RM` and `PCM` items and `person.parameter` thetas                                                                       |
+| Person infit and outfit                                          | eRm's `personfit`, the same inputs                                                                                                              |
+| lz                                                               | mirt's `personfit(Theta = )` `Zh`, at mirt's EAP thetas                                                                                         |
+| Q3                                                               | mirt's `residuals(type = "Q3", Theta = )`, the same thetas                                                                                      |
+| Local-dependence chi-square, df, significance, signed Cramér's V | mirt's `residuals(type = "LD", df.p = TRUE)` at 61 nodes, and at 21 for a population, at mirt's coefficients                                    |
+| RMSD                                                             | TAM's `IRT.RMSD` at TAM's 21 nodes, calibrations to 1e-10, with the normal density of TAM's mean and variance as the population                 |
+| Mean deviation                                                   | Written out in base R from TAM's posterior counts; CDM's `IRT.RMSD` where every item has the same categories                                    |
+| S-X², degrees of freedom, significance                           | mirt's `itemfit(fit_stats = "S_X2")`                                                                                                            |
+| M2, M2*, C2, df, RMSEA and its interval, SRMSR, TLI, CFI         | mirt's `M2(quadpts = 61)` at `TOL = 1e-8`; written out in base R below                                                                          |
+| Andersen's statistic, df, significance, items left out, persons  | eRm's `LRtest`; base R's conditional likelihood by every pattern on missing responses of polytomous items                                       |
+| Martin-Löf statistic, df, significance                           | eRm's `MLoef` on the persons who answered every item; base R's df for the rating scale model                                                    |
+| Wald z and significance of each item                             | eRm's `Waldtest`, each item's first item-category parameter; base R's locations of eRm's `PCM` in each group for the partial credit model       |
+| Kernel item curves and their nodes                               | KernSmoothIRT's `ksIRT(format = 2)` with a key, each category's curve over the sum of the item's; base R's kernel average for a bandwidth given |
+| Standard errors of kernel item curves                            | Ramsay's pointwise error written out in base R (below)                                                                                          |
 
 M2 reads mirt's `M2` on the 2PL, the 1PL with a common slope, anchors, the GRM and the RSM. On 60 sets of 400 persons
 from a true 2PL, both reject 4 at 0.05, and M2 agrees within 2e-4. `validation/psychometrics/fit-global.R` writes the
@@ -712,6 +714,12 @@ Several results of the reference packages are not references:
   item-category parameters; the fixtures take the first of each item, its location, for the Rasch and rating scale
   models, and base R's mean of the thresholds of eRm's `PCM`, moved to thresholds that sum to 0, for the partial credit
   model. `datcheck.LRtest` checks each group once, so on the tests' hand case it leaves out item1 alone.
+- **KernSmoothIRT's standard errors.** `ksIRT`'s compiled smoother adds w_j² P (1 - P) for each person j with P the
+  running sum of the weighted responses up to j, not the curve, so its errors depend on the order of the persons; the
+  script reproduces them that way within 1e-12, and the fixture holds Ramsay's √(Σ w_j² P (1 - P)) / Σ w_j with the
+  curve's P. `ksIRT` treats a missing response as an option of its own: the script divides each category's curve by
+  the sum of the item's, which is the average over the persons who answered, and checks it against base R's. It weighs
+  each response by its value only with a key, so it is given one; it refuses a numeric bandwidth.
 - **CDM's mean deviation.** `IRT.RMSD`, which TAM's models use, divides a matrix of nodes by items by the vector of the
   items' categories less 1, which R recycles down the nodes: with items of unequal categories each node takes another
   item's divisor, up to 0.0034 off on the fixtures. The script reproduces CDM's value that way, and checks that the mean
@@ -918,6 +926,9 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 - **Two-way imputation.** acl's first 10 adjectives with 10% of the responses missing at random: over 20 imputations
   from `createRandom(20261102)`, the items' variances average within 0.02 of the complete data's (0.011 below found;
   0.041 below without the error).
+- **Kernel curve recovery.** 20 2PL items with slopes from 0.5 to 2 and difficulties from -2 to 2, from 2,000 simulated
+  persons (`createRandom(20261102)`): the curves of the correct responses within an RMSE of 0.1 of the true curves at
+  the nodes, the threshold of the design (0.059 found).
 - **Omega hierarchical recovery.** 12 items of a general factor of loading 0.6 and three group factors of loading 0.4,
   four items each, scored in hundredths, from 2,000 persons (`set.seed(20261036)`): omega hierarchical within 0.03 of the
   population's 0.794 (0.787 found).
@@ -1008,6 +1019,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `fit-residuals.json`                     | SAT12 scored with omissions missing under the 2PL; Science under the GPCM                                                                                                                                                                                                                                                                   | Missing responses, polytomous lz and Q3                                                                                                                               |
 | `fit-rasch-tests.json`                   | eRm's `raschdat1`, complete and with 2% missing (`set.seed(20261103)`), and `pcmdat2`; simulations of 500 persons and 6 rating scale items of 4 categories, of 300 persons and 8 Rasch items with one no upper person misses, and of 600 persons and 5 items of 2 to 4 categories with 5% missing                                           | Splits at the median and the mean, by labels and by sets of items; items left out; missing responses; the three models                                                |
 | `fit-rmsd.json`                          | `set.seed(20261104)`: 1,000 persons, 10 2PL items with 3% missing, under the Rasch model and the 2PL; 800 persons, 5 PCM items and 5 GPCM items of 2 to 4 categories                                                                                                                                                                        | Missing responses, items of unequal categories                                                                                                                        |
+| `fit-kernel-curves.json`                 | The responses of `fit-rmsd.json`: the 2PL items with 3% missing, the GPCM items, and the PCM items at 21 nodes and a bandwidth of 0.3                                                                                                                                                                                                       | Missing responses, 2 to 4 categories, the options                                                                                                                     |
 | `fit-local-dependence.json`              | The same 2PL responses at 61 and at 21 nodes; `mirt::Science` recoded 0-3 under the GRM; 1,000 persons, 6 GPCM items of 2 to 4 categories                                                                                                                                                                                                   | Missing responses, a population, pairs of unequal categories                                                                                                          |
 | `fit-limited-information.json`           | mirt's `simdata`, `set.seed(20261102)`: 2,000 persons, 12 2PL items; `set.seed(20261103)`: 1,500 persons, 10 graded items of 4 categories; 60 sets of 400 persons from the first items                                                                                                                                                      | The 2PL, 1PL, Rasch model with free variance, anchors, an estimated normal group; GRM, GPCM, PCM and RSM by M2* and C2; the 0.95 interval; rejections of a true model |
 | `dif.json`                               | difR's `verbal`, Gender 1 focal; a 2PL simulation, `set.seed(20261029)`: 2 × 1000 persons, 20 items; both also with 2% of the responses missing                                                                                                                                                                                             | Known uniform DIF in items 1, 2 and nonuniform in item 3; purification; 39% and 33% of the persons incomplete                                                         |
@@ -1122,6 +1134,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Infit, outfit, lz, Q3, S-X² and its significance                                                  | 1e-12 absolute                                                  | 3e-14                    |
 | M2, M2*, C2, significance, RMSEA and its interval, SRMSR, TLI, CFI, each calibration its own      | 1e-3 absolute                                                   | 7.8e-4                   |
 | RMSD and mean deviation against TAM                                                               | 1e-8 absolute                                                   | 1.1e-10                  |
+| Kernel curves, their nodes and standard errors against KernSmoothIRT and base R                   | 1e-12 absolute                                                  | 1.9e-15                  |
 | Local-dependence chi-square, significance and Cramér's V against mirt                             | 1e-12 absolute                                                  | 2.3e-14                  |
 | Andersen and Martin-Löf statistics and significance against eRm                                   | 1e-6 absolute                                                   | 1.6e-7                   |
 | Andersen's statistic against base R's conditional likelihood                                      | 1e-8 absolute                                                   | 5.9e-12                  |

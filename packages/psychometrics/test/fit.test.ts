@@ -1,4 +1,4 @@
-import { chiSquareUpperTail } from "@measurekit/core";
+import { chiSquareUpperTail, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -13,6 +13,7 @@ import {
   type IrtModel,
   type ItemSplit,
   itemFit,
+  kernelItemCurves,
   type LimitedInformationFit,
   limitedInformationFit,
   localDependenceChiSquare,
@@ -35,6 +36,7 @@ import {
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
+import kernelCurves from "./fixtures/fit-kernel-curves.json" with { type: "json" };
 import limited from "./fixtures/fit-limited-information.json" with { type: "json" };
 import localDependence from "./fixtures/fit-local-dependence.json" with { type: "json" };
 import rasch from "./fixtures/fit-rasch.json" with { type: "json" };
@@ -60,6 +62,8 @@ const RASCH_STATISTIC_TOLERANCE = 1e-6;
 const RASCH_WALD_TOLERANCE = 1e-3;
 /** Andersen's statistic against base R's conditional likelihood, maximized by optim to 1e-15. */
 const RASCH_BASE_TOLERANCE = 1e-8;
+/** Kernel curves, their nodes and standard errors against KernSmoothIRT and base R: the same sums. */
+const KERNEL_TOLERANCE = 1e-12;
 
 /** Expects each named statistic of `actual` to be within `tolerance` of the fixture's list of that statistic. */
 function expectTable(
@@ -947,6 +951,175 @@ describe("Rasch tests", () => {
   });
 });
 
+describe("kernelItemCurves", () => {
+  for (const fixture of kernelCurves.cases) {
+    it(`matches KernSmoothIRT's ksIRT and Ramsay's errors in base R for ${fixture.name}`, () => {
+      const data = defined(rmsd.cases.find((candidate) => candidate.name === fixture.data));
+      const result = kernelItemCurves(responseMatrix(data.responses), fixture.options);
+      expect(result).toHaveLength(fixture.probabilities.length);
+      result.forEach((curve, i) => {
+        expect(curve.id).toBe(`item${i + 1}`);
+        curve.nodes.forEach((node, q) => {
+          expectClose(node, fixture.nodes[q] ?? null, KERNEL_TOLERANCE, `node ${q}`);
+        });
+        const probabilities = defined(fixture.probabilities[i]);
+        const errors = defined(fixture.standardErrors[i]);
+        expect(curve.probabilities).toHaveLength(probabilities.length);
+        curve.probabilities.forEach((row, k) => {
+          row.forEach((p, q) => {
+            expectClose(p, probabilities[k]?.[q] ?? null, KERNEL_TOLERANCE, `${curve.id} P${k} ${q}`);
+            expectClose(curve.standardErrors[k]?.[q] ?? null, errors[k]?.[q] ?? null, KERNEL_TOLERANCE, `SE${k} ${q}`);
+          });
+        });
+      });
+    });
+  }
+
+  it("recovers the curves of simulated 2PL items", () => {
+    // Threshold from the design, set before the first run: an RMSE below 0.1 against the true curves at the nodes.
+    const { matrix, items: pool } = simulated(20261102, 2000, 20);
+    const probabilities = new Float64Array(2);
+    let squares = 0;
+    let count = 0;
+    kernelItemCurves(matrix).forEach((curve, i) => {
+      const item = defined(pool[i]);
+      curve.nodes.forEach((node, q) => {
+        item.model.probabilities(item.parameters, node, probabilities);
+        squares += ((curve.probabilities[1]?.[q] ?? 0) - (probabilities[1] ?? 0)) ** 2;
+        count++;
+      });
+    });
+    expect(Math.sqrt(squares / count)).toBeLessThan(0.1);
+  });
+
+  it("ranks ties in the order of the persons and smooths with Silverman's bandwidth", () => {
+    // Totals 1, 1, 0, 2: the tied first two persons take ranks 2 and 3 in their order.
+    const [first] = kernelItemCurves(
+      responseMatrix([
+        [1, 0],
+        [0, 1],
+        [0, 0],
+        [1, 1],
+      ]),
+      { points: 3 },
+    );
+    const curve = defined(first);
+    const scores = [2, 3, 1, 4].map((rank) => normalQuantile(rank / 5));
+    const h = 1.06 * 4 ** -0.2;
+    const [from, to] = [normalQuantile(1 / 5), normalQuantile(4 / 5)];
+    const nodes = [from, from + (to - from) / 2, to];
+    expect(curve.nodes).toEqual(nodes);
+    nodes.forEach((node, q) => {
+      const weights = scores.map((score) => Math.exp(-(((node - score) / h) ** 2) / 2));
+      const total = weights.reduce((sum, w) => sum + w, 0);
+      const squares = weights.reduce((sum, w) => sum + w * w, 0);
+      const p = (defined(weights[0]) + defined(weights[3])) / total;
+      expectClose(curve.probabilities[1]?.[q] ?? null, p, 1e-15, `P1 ${q}`);
+      expectClose(curve.probabilities[0]?.[q] ?? null, 1 - p, 1e-15, `P0 ${q}`);
+      expectClose(curve.standardErrors[1]?.[q] ?? null, Math.sqrt(p * (1 - p) * squares) / total, 1e-15, `SE ${q}`);
+    });
+  });
+
+  it("leaves out a missing response and ranks no person without any", () => {
+    const rows = [
+      [1, 0, 2],
+      [0, null, 1],
+      [1, 1, 0],
+      [0, 1, 2],
+      [1, 1, 1],
+    ];
+    const curves = kernelItemCurves(responseMatrix(rows));
+    const empty = kernelItemCurves(responseMatrix([...rows, [null, null, null]]));
+    expectSameNumbers(empty, curves);
+    // The second item without the person who skipped it: the same weights as the others' at each node.
+    const scores = [3, 1, 2, 4, 5].map((rank) => normalQuantile(rank / 6));
+    const h = 1.06 * 5 ** -0.2;
+    const item = defined(curves[1]);
+    item.nodes.forEach((node, q) => {
+      const weights = scores.map((score) => Math.exp(-(((node - score) / h) ** 2) / 2));
+      const answered = defined(weights[0]) + defined(weights[2]) + defined(weights[3]) + defined(weights[4]);
+      const p = (answered - defined(weights[0])) / answered;
+      expectClose(item.probabilities[1]?.[q] ?? null, p, 1e-14, `P1 ${q}`);
+    });
+  });
+
+  it("takes the number of nodes and the bandwidth", () => {
+    const { matrix } = simulated(48, 300, 4);
+    const [curve] = kernelItemCurves(matrix, { points: 7, bandwidth: 0.5 });
+    expect(defined(curve).nodes).toHaveLength(7);
+    expect(defined(curve).probabilities[0]).toHaveLength(7);
+    const [wide] = kernelItemCurves(matrix, { points: 7, bandwidth: 1e6 });
+    // A bandwidth far wider than the scores weighs every person alike: each curve is the item's mean.
+    const shares = matrix.responses.filter((row) => row[0] === 1).length / matrix.responses.length;
+    for (const p of defined(wide).probabilities[1] ?? []) expectClose(p, shares, 1e-12);
+  });
+
+  it("keeps its curves defined at a bandwidth that underflows the weights, from the nearest persons", () => {
+    // At h = 1e-3 the weights of persons 0.1 apart underflow; each node takes its nearest person's response.
+    const rows = [
+      [0, null],
+      [0, 0],
+      [1, null],
+      [1, 1],
+      [1, 1],
+    ];
+    const [first, second] = kernelItemCurves(responseMatrix(rows), { points: 5, bandwidth: 1e-3 });
+    expect(defined(first).probabilities[1]).toEqual([0, 0, 1, 1, 1]);
+    // The second item's persons are ranked 2, 4 and 5: at the lowest node its nearest person is the second.
+    expect(defined(second).probabilities[1]?.[0]).toBe(0);
+    expect(defined(second).probabilities[1]?.[4]).toBe(1);
+    expect(defined(second).standardErrors.flat().every(Number.isFinite)).toBe(true);
+  });
+
+  it("gives a constant item one curve of 1", () => {
+    const [constant] = kernelItemCurves(
+      responseMatrix([
+        [0, 1],
+        [0, 0],
+        [0, 1],
+      ]),
+    );
+    expect(defined(constant).probabilities).toHaveLength(1);
+    expect(new Set(defined(constant).probabilities[0])).toEqual(new Set([1]));
+    expect(new Set(defined(constant).standardErrors[0])).toEqual(new Set([0]));
+  });
+
+  it("rejects an item without responses, an empty category below the highest, and fewer than two persons", () => {
+    expect(() =>
+      kernelItemCurves(
+        responseMatrix([
+          [1, null],
+          [0, null],
+        ]),
+      ),
+    ).toThrow('Item "item2" has no responses; kernel item curves need at least one.');
+    expect(() => kernelItemCurves(responseMatrix([[0], [3], [1]]))).toThrow(
+      'Item "item1" has no response in category 2; kernel item curves need responses in every category up to the highest.',
+    );
+    expect(() => kernelItemCurves(responseMatrix([[0], [null]]))).toThrow(
+      "Kernel item curves need at least two persons with a response, found 1.",
+    );
+  });
+
+  it("refuses arguments of other types", () => {
+    const matrix = responseMatrix([[0], [1], [1]]);
+    expect(() => kernelItemCurves(JSON.parse("{}"))).toThrow(DataError);
+    expect(() => kernelItemCurves(matrix, JSON.parse("null"))).toThrow(DataError);
+    expect(() => kernelItemCurves(matrix, { points: 1 })).toThrow(
+      "The option points must be an integer from 2, found 1.",
+    );
+    expect(() => kernelItemCurves(matrix, JSON.parse('{ "points": "51" }'))).toThrow(
+      'The option points must be an integer from 2, found "51".',
+    );
+    expect(() => kernelItemCurves(matrix, { bandwidth: 0 })).toThrow(
+      "The option bandwidth must be a positive number, found 0.",
+    );
+    expect(() => kernelItemCurves(matrix, JSON.parse('{ "bandwidth": null }'))).toThrow(
+      "The option bandwidth must be a positive number, found null.",
+    );
+  });
+});
+
 describe("properties", () => {
   const seeds = fc.integer({ min: 0, max: 2 ** 31 });
 
@@ -1038,6 +1211,31 @@ describe("properties", () => {
         expectSameNumbers(martinLofTest(reversed), martinLofTest(matrix));
       }),
       { numRuns: 20 },
+    );
+  });
+
+  it("kernel curves are probabilities from 0 to 1 that sum to 1 at each node, with errors from 0", () => {
+    fc.assert(
+      fc.property(
+        seeds,
+        fc.integer({ min: 2, max: 60 }),
+        fc.integer({ min: 1, max: 5 }),
+        fc.double({ min: 0.01, max: 5, noNaN: true }),
+        (seed, persons, count, bandwidth) => {
+          const { matrix } = simulated(seed, persons, count);
+          // A person with every item wrong and one with every item right give each item both categories.
+          const rows = [...matrix.responses, matrix.itemIds.map(() => 0), matrix.itemIds.map(() => 1)];
+          for (const curve of kernelItemCurves(responseMatrix(rows), { bandwidth })) {
+            curve.nodes.forEach((_, q) => {
+              const shares = curve.probabilities.map((row) => defined(row[q]));
+              expect(shares.every((p) => p >= 0 && p <= 1)).toBe(true);
+              expect(Math.abs(shares.reduce((sum, p) => sum + p, 0) - 1)).toBeLessThan(1e-12);
+              expect(curve.standardErrors.every((row) => defined(row[q]) >= 0)).toBe(true);
+            });
+          }
+        },
+      ),
+      { numRuns: 50 },
     );
   });
 

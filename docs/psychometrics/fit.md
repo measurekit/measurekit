@@ -2,8 +2,9 @@
 
 `@measurekit/psychometrics/fit` checks how well items and persons fit an [IRT model](irt.md): Rasch infit and
 outfit, the S-X² item fit statistic, the RMSD of items, the lz person fit statistic, Yen's Q3 and Chen and Thissen's
-chi-square for local dependence, the fit of a whole calibration by M2, M2* and C2 with RMSEA, SRMSR, TLI and CFI, and
-the Andersen, Martin-Löf and Wald tests of the Rasch family. Each is validated against eRm or mirt ([validation](validation.md)).
+chi-square for local dependence, the fit of a whole calibration by M2, M2* and C2 with RMSEA, SRMSR, TLI and CFI,
+the Andersen, Martin-Löf and Wald tests of the Rasch family, and kernel-smoothed item curves to inspect an item's shape.
+Each is validated against eRm, mirt, TAM or KernSmoothIRT ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
@@ -16,6 +17,7 @@ flowchart LR
   C --> L["limitedInformationFit: M2, RMSEA, SRMSR, TLI, CFI"]
   M --> T["Conditional maximum likelihood in parts of the matrix"]
   T --> E["andersenTest, martinLofTest, raschWaldTest"]
+  M --> K["kernelItemCurves: each category's curve, without a model"]
 ```
 
 ## Inputs
@@ -26,7 +28,7 @@ references use maximum likelihood estimates for Rasch items (eRm) and EAP estima
 `rootMeanSquareDeviation` and `localDependenceChiSquare` integrate over a population of theta, the option
 `population`, N(0, 1) on 61 rectangular points from -6 to 6 by default: give a calibration's group at its nodes when it
 is not standard normal. `limitedInformationFit` takes the calibration itself, whose group it integrates over. The Rasch tests take the matrix
-alone, as they estimate the items themselves.
+alone, as they estimate the items themselves, and so do the kernel curves, which assume no model.
 
 | Function                                        | Result per                    | Persons used                                                |
 | ----------------------------------------------- | ----------------------------- | ----------------------------------------------------------- |
@@ -40,6 +42,7 @@ alone, as they estimate the items themselves.
 | `andersenTest(matrix, options)`                 | test: `AndersenTest`          | Those of conditional maximum likelihood                     |
 | `raschWaldTest(matrix, options)`                | item: `RaschWaldItem`         | Those of conditional maximum likelihood                     |
 | `martinLofTest(matrix, options)`                | test: `RaschTest`             | Persons who answered every item                             |
+| `kernelItemCurves(matrix, options)`             | item: `KernelItemCurve`       | Persons with a response; for an item, those who answered it |
 
 An extreme score has every answered response in its item's lowest category, or every one in its highest; its maximum
 likelihood theta is infinite. A statistic undefined for the data is `null`.
@@ -351,27 +354,81 @@ On 100 seeded sets of 500 persons and 10 Rasch items, at 0.05, Andersen's test r
 test 1% and the Wald test 5.8% of the items; Andersen's test rejected 2PL responses with slopes from 0.4 to 2 at p
 below 1e-5 on each of 5 sets.
 
+## Kernel item curves
+
+`kernelItemCurves` estimates the curve of each category of each item without a model, as KernSmoothIRT's `ksIRT`
+(Ramsay, 1991): the shape a model's curve should have, where a 2PL may miss a dip, a plateau or a lower asymptote.
+
+```mermaid
+flowchart LR
+  T["Total scores of the persons with a response"] --> R["Ranks, ties in the order of the persons"]
+  R --> Z["Normal scores θ_j = Φ⁻¹(r / (n + 1))"]
+  Z --> W["At each node θ: Gaussian weights w_j = exp(-((θ - θ_j) / h)² / 2)"]
+  W --> P["P_k(θ) = Σ w_j [x_j = k] / Σ w_j over the item's persons"]
+  P --> E["Standard error √(Σ w_j² P_k (1 - P_k)) / Σ w_j"]
+```
+
+| Option      | Default                                                            | Meaning                                                                          |
+| ----------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `points`    | `51`                                                               | Nodes equally spaced from Φ⁻¹(1 / (n + 1)) to Φ⁻¹(n / (n + 1)), at least 2       |
+| `bandwidth` | 1.06 n^(-1/5), Silverman's rule for scores of standard deviation 1 | The kernel's width on the scale of the normal scores: wider is smoother, flatter |
+
+| Field            | Content                                                                                |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| `nodes`          | The evaluation points, the same for every item                                         |
+| `probabilities`  | By category, from 0 to the item's highest response, then node: the categories sum to 1 |
+| `standardErrors` | Ramsay's pointwise standard error of each probability, by category, then node          |
+
+n counts the persons with a response. A missing response adds nothing to the person's total and leaves the person
+out of that item's averages. Each category up to an item's highest response needs a response; an item answered in one
+category has one curve of 1. Where a narrow bandwidth would underflow every weight, the weights are taken relative to
+the nearest person's, so that a node takes its nearest persons' responses.
+
+```ts
+import { kernelItemCurves } from "@measurekit/psychometrics/fit";
+import {
+  createRandom,
+  simulateItems,
+  simulateResponses,
+  simulateThetas,
+  twoParameterLogistic,
+} from "@measurekit/psychometrics";
+
+const random = createRandom(13);
+const items = simulateItems(twoParameterLogistic, 10, random); // the first: a = 1.44, b = 1.28
+const matrix = simulateResponses(items, simulateThetas(1000, random), random);
+const [first] = kernelItemCurves(matrix, { points: 5 });
+first?.nodes; // [-3.09, -1.55, 0, 1.55, 3.09]
+first?.probabilities[1]; // [2.3e-13, 0.0060, 0.12, 0.65, 0.9994]: P(correct) rises through b
+first?.standardErrors[1]; // [2.3e-7, 0.0070, 0.017, 0.043, 0.011]
+```
+
+On 2,000 seeded persons and 20 2PL items with slopes from 0.5 to 2, the curves are 0.059 from the true curves at the
+nodes in RMSE, where the normal scores stand for theta.
+
 ## Errors
 
 Invalid input throws `DataError` naming the value found.
 
-| Error                                                    | What to do                                                                              |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| The items or the thetas do not match the matrix          | Give one item for each column and one finite theta for each person                      |
-| A response is not a category of its item                 | Calibrate the item on these data, or give it the categories the data use                |
-| `summedScoreFit` when no person answered every item      | Use `itemFit`, which works from the answered items of each person                       |
-| Several groups, covariates, testlets, or a histogram     | Calibrate one group of a normal distribution; each group alone is a fit                 |
-| More than 60 items                                       | Test a part of the form, or use `summedScoreFit` for each item                          |
-| `"m2"` with a polytomous item                            | Use `"m2-star"` or `"c2"`                                                               |
-| A nominal item                                           | Its categories have no order for the mean products to read                              |
-| Parameters that differ from the calibration's AIC        | Give the anchors' ids in `fixed`                                                        |
-| Fewer than two persons who answered every item           | Calibrate and test the persons with complete responses                                  |
-| A split into one group                                   | Give labels of at least two groups; `raschWaldTest` takes exactly two                   |
-| Fewer than two items left in a Rasch test                | Split into fewer groups, or test more persons                                           |
-| A set of the Martin-Löf test with one item               | Give sets of two or more items that hold every item once                                |
-| `martinLofTest` when no person answered every item       | Test the items that the same persons answered                                           |
-| A population that is not nodes with weights summing to 1 | Give finite nodes and non-negative weights that sum to 1, such as a calibration group's |
-| A conditional maximum likelihood error                   | As in [irt](irt.md#conditional-maximum-likelihood): a category no person used           |
+| Error                                                     | What to do                                                                              |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| The items or the thetas do not match the matrix           | Give one item for each column and one finite theta for each person                      |
+| A response is not a category of its item                  | Calibrate the item on these data, or give it the categories the data use                |
+| `summedScoreFit` when no person answered every item       | Use `itemFit`, which works from the answered items of each person                       |
+| Several groups, covariates, testlets, or a histogram      | Calibrate one group of a normal distribution; each group alone is a fit                 |
+| More than 60 items                                        | Test a part of the form, or use `summedScoreFit` for each item                          |
+| `"m2"` with a polytomous item                             | Use `"m2-star"` or `"c2"`                                                               |
+| A nominal item                                            | Its categories have no order for the mean products to read                              |
+| Parameters that differ from the calibration's AIC         | Give the anchors' ids in `fixed`                                                        |
+| Fewer than two persons who answered every item            | Calibrate and test the persons with complete responses                                  |
+| A split into one group                                    | Give labels of at least two groups; `raschWaldTest` takes exactly two                   |
+| Fewer than two items left in a Rasch test                 | Split into fewer groups, or test more persons                                           |
+| A set of the Martin-Löf test with one item                | Give sets of two or more items that hold every item once                                |
+| `martinLofTest` when no person answered every item        | Test the items that the same persons answered                                           |
+| A population that is not nodes with weights summing to 1  | Give finite nodes and non-negative weights that sum to 1, such as a calibration group's |
+| A conditional maximum likelihood error                    | As in [irt](irt.md#conditional-maximum-likelihood): a category no person used           |
+| Kernel curves of an item without a response in a category | Recode the item's categories so that each from 0 to the highest has a response          |
+| Kernel curves of fewer than two persons with a response   | Give the responses of two persons or more                                               |
 
 ## Differences from the references
 
@@ -398,6 +455,10 @@ Invalid input throws `DataError` naming the value found.
 | RMSD of an item with a category no person chose        | The deviations averaged over the item's categories                                               | CDM averages over the categories chosen                                                                                                                                                                                                            |
 | Persons without responses in the RMSD                  | Left out of f, the mean posterior                                                                | TAM's `pi.k` averages the prior of such a person too                                                                                                                                                                                               |
 | A pair whose observed gamma is undefined               | The chi-square, with `cramersV` `null`                                                           | mirt gives `NaN` for both                                                                                                                                                                                                                          |
+| Standard errors of kernel curves                       | Ramsay's √(Σ w² P (1 - P)) / Σ w, with the curve's P                                             | KernSmoothIRT's `ksIRT` takes for P the running sum of the weighted responses up to each person, so its errors depend on the order of the persons: from 0.006 to 60,000 times Ramsay's on the fixtures                                             |
+| A missing response in kernel curves                    | The person leaves the item's averages                                                            | `ksIRT` makes it an option of its own, of score 0, whose curve the others share the node with                                                                                                                                                      |
+| A bandwidth that underflows every weight               | The weights relative to the nearest person's                                                     | `ksIRT` gives the curve 0 at that node                                                                                                                                                                                                             |
+| A bandwidth given as a number                          | `bandwidth`                                                                                      | `ksIRT` 6.6 refuses one: its `match.arg` takes `"Silverman"` or `"CV"` alone                                                                                                                                                                       |
 
 ## Not included
 
@@ -413,3 +474,8 @@ Invalid input throws `DataError` naming the value found.
 - **M2 with covariates, testlets or an empirical histogram.** Outside the sources: options of mirt; the normal population
   is the practice.
 - **Fit on two- and three-way margins.** Outside the sources: `limitedInformationFit` is the practice.
+- **Quadratic and uniform kernels.** Outside the sources: options of KernSmoothIRT, whose default is the Gaussian.
+- **A bandwidth by cross-validation.** Outside the sources: an option of KernSmoothIRT, whose default is Silverman's
+  rule.
+- **Kernel curves by group, for DIF.** Outside the sources: an option of KernSmoothIRT; the methods of [dif](dif.md)
+  are the practice.
