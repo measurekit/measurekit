@@ -132,7 +132,7 @@ response patterns has no power: the table of patterns is too sparse for a chi-sq
 flowchart LR
   C["Calibration: items, one group"] --> M["Moments: e, Ξ, Δ"]
   D["Persons who answered every item"] --> M
-  M --> S["M2: N e′ (Ξ⁻¹ - Ξ⁻¹ Δ (Δ′ Ξ⁻¹ Δ)⁻¹ Δ′ Ξ⁻¹) e"]
+  M --> S["M2: N e′ (Ξ⁻¹ - Ξ⁻¹ Δ (Δ′ Ξ⁻¹ Δ)⁺ Δ′ Ξ⁻¹) e"]
   S --> R["RMSEA with its interval, SRMSR"]
   S --> I["TLI, CFI against the independence model"]
 ```
@@ -154,16 +154,16 @@ Each adds the mean product of the scores of each pair of items. On dichotomous i
 | `fixed`     | The ids of the calibration's anchors, which add no parameters | none        |
 | `level`     | The level of the RMSEA interval                               | `0.9`       |
 
-| Field              | Definition                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------- |
-| `statistic`        | M2, M2* or C2; `null` without degrees of freedom, or when Ξ or Δ′ Ξ⁻¹ Δ is not positive definite  |
-| `degreesOfFreedom` | The moments less the estimated parameters, those of the distribution of theta included            |
-| `significance`     | The upper tail of the chi-square                                                                  |
-| `rmsea`            | √(max(0, χ² / df - 1) / (N - 1))                                                                  |
-| `rmseaInterval`    | √(λ / (N df)) at the two noncentralities that place χ² at the tails of `level`; 0 where none does |
-| `srmsr`            | The root mean square over the pairs of the sample correlation less the model's                    |
-| `tli`              | (χ²₀/df₀ - χ²/df) / (χ²₀/df₀ - 1), which can pass 1                                               |
-| `cfi`              | 1 - (χ² - df) / (χ²₀ - df₀), held to [0, 1]                                                       |
+| Field              | Definition                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `statistic`        | M2, M2* or C2; `null` without degrees of freedom, or when Ξ is not positive definite                                                              |
+| `degreesOfFreedom` | The moments less the rank of Δ: the estimated parameters, those of the distribution of theta included, unless the margins leave some unidentified |
+| `significance`     | The upper tail of the chi-square                                                                                                                  |
+| `rmsea`            | √(max(0, χ² / df - 1) / (N - 1))                                                                                                                  |
+| `rmseaInterval`    | √(λ / (N df)) at the two noncentralities that place χ² at the tails of `level`; 0 where none does                                                 |
+| `srmsr`            | The root mean square over the pairs of the sample correlation less the model's                                                                    |
+| `tli`              | (χ²₀/df₀ - χ²/df) / (χ²₀/df₀ - 1), which can pass 1                                                                                               |
+| `cfi`              | 1 - (χ² - df) / (χ²₀ - df₀), held to [0, 1]                                                                                                       |
 
 TLI and CFI compare the model with the independence model, which holds each item at its observed shares and has no
 trait. Its χ²₀ is N Σ_(i<j) r_ij², the form the statistic takes there, on df₀ = J (J - 1) / 2. Both are `null` when
@@ -203,6 +203,10 @@ The estimated parameters must equal those in the calibration's AIC. A `Calibrati
 give their ids in `fixed`. The check catches a list of the wrong size; a list of the right size that swaps anchors for
 estimated items of the same model passes and gives a wrong Δ. The moments are unweighted: each person counts once.
 
+Where the first- and second-order margins do not identify every parameter, Δ's rank is below its columns. The statistic
+then uses the whole complement of Δ's span, a column that adds nothing to it is left out, and the degrees of freedom
+are the moments less the rank. No model of the fixtures has such a Δ.
+
 Ξ grows with the fourth power of the items, so the function takes 60 at most: 1,830 rows and 27 MB, and a call took 0.6
 s here for M2* and 0.9 s for C2. At 12 items and 2,000 persons a call takes about 5 ms, against 38 ms for mirt's `M2`.
 
@@ -224,17 +228,19 @@ Invalid input throws `DataError` naming the value found.
 
 ## Differences from the references
 
-| Topic                         | This package                                                | Reference                                                                                                |
-| ----------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Missing responses             | Infit and outfit skip them in every sum                     | eRm's infit sums W over every person                                                                     |
-| Small probabilities           | ln P of an observed category clamped at the smallest double | mirt's `personfit` counts an observed category with P below 2.2e-16 as P = 1                             |
-| Person mean squares           | As eRm                                                      | mirt's `personfit` raises W² below 1e-5 to 1e-5 and caps q at 1.4142                                     |
-| S-X² degrees of freedom       | Every parameter of the model                                | mirt: the freely estimated parameters                                                                    |
-| An empty S-X² table           | `null` for the item                                         | mirt stops collapsing the remaining items                                                                |
-| M2 of an estimated group      | Δ has the group's columns, which the df counts              | mirt's Δ leaves them out, while its df counts them, and its M2 is 0.1 higher on the fixtures' 12 items   |
-| M2 of a GPCM or PCM           | The derivative of the model                                 | mirt's derivative with respect to a `gpcm` slope is wrong, so its M2 and C2 of these models are off      |
-| M2* of the independence model | The closed form, on J (J - 1) / 2 df, on polytomous items   | mirt's Δ has rank J below its columns, so its value changes with the order of the items: 238.6 and 257.6 |
-| Missing responses in M2       | The persons who answered every item                         | mirt: each moment from the persons who answered its items                                                |
+| Topic                                      | This package                                                                                     | Reference                                                                                                                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing responses                          | Infit and outfit skip them in every sum                                                          | eRm's infit sums W over every person                                                                                                                                                    |
+| Small probabilities                        | ln P of an observed category clamped at the smallest double                                      | mirt's `personfit` counts an observed category with P below 2.2e-16 as P = 1                                                                                                            |
+| Person mean squares                        | As eRm                                                                                           | mirt's `personfit` raises W² below 1e-5 to 1e-5 and caps q at 1.4142                                                                                                                    |
+| S-X² degrees of freedom                    | Every parameter of the model                                                                     | mirt: the freely estimated parameters                                                                                                                                                   |
+| An empty S-X² table                        | `null` for the item                                                                              | mirt stops collapsing the remaining items                                                                                                                                               |
+| M2 of the Rasch model with a free variance | Δ has the column of the variance, which the df counts                                            | mirt's Δ leaves it out, while its df counts it: 242.156, against 242.051 with the column, which equals mirt's 1PL, the same model, at 242.052                                           |
+| M2 of an estimated normal group            | Δ has the columns of its mean and SD, which the df counts                                        | mirt's Δ leaves them out, while its df counts them: 72.176 on the fixtures' anchored 2PL, against 72.079 with the columns                                                               |
+| M2 and C2 of a GPCM or PCM                 | The model's derivative with respect to its slope                                                 | mirt's `dP` of a `gpcm` slope is wrong: at θ = 1, -0.62 against 0.79 by central differences of mirt's own probabilities; its PCM C2 is 224.87, against 228.77 with the right derivative |
+| M2* of the independence model              | N Σ r², on J (J - 1) / 2 df: the statistic on the whole complement of Δ, on polytomous items too | mirt's Δ has rank J below its columns, and `qr.Q` takes an arbitrary part of the complement: 238.6, and 257.6 with the items reversed                                                   |
+| A Δ whose rank is below its columns        | The whole complement of its span, with the moments less its rank as df                           | mirt and GDINA take nrow - ncol columns of `qr.Q`'s complement, which depend on the order of Δ's columns                                                                                |
+| Missing responses in M2                    | The persons who answered every item                                                              | mirt: each moment from the persons who answered its items                                                                                                                               |
 
 ## Not included
 

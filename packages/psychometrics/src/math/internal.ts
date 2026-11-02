@@ -18,6 +18,7 @@ export {
   rowCount,
   type SampleMoments,
   sampleMoments,
+  tableMoments,
 } from "./limited-information.js";
 export { invert, invertPositiveDefinite } from "./linear-algebra.js";
 export {

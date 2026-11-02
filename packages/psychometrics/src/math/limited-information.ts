@@ -49,14 +49,18 @@ export interface ModelMoments {
   readonly conditional: Float64Array;
 }
 
-/** The moments of a sample of complete persons. */
-export interface SampleMoments {
-  /** The number of persons. */
-  readonly persons: number;
+/** The first and second moments of the items' scores. */
+export interface ScoreMoments {
   /** The mean of each item's score. */
   readonly means: Float64Array;
-  /** The mean of x_i x_j, by item, then item. */
+  /** The mean of x_i x_j, by item, then item; E(x_i²) on the diagonal. */
   readonly products: Float64Array;
+}
+
+/** The moments of a sample of complete persons. */
+export interface SampleMoments extends ScoreMoments {
+  /** The number of persons. */
+  readonly persons: number;
 }
 
 /** Returns the number of rows of a statistic. */
@@ -267,11 +271,34 @@ export function addWeightDerivatives(
   }
 }
 
+/** A limited-information statistic with the rank of its Jacobian. */
+export interface QuadraticForm {
+  /** The statistic; `null` when Ξ is not positive definite. */
+  readonly statistic: number | null;
+  /** The rank of Δ: its columns less those that depend on the columns before them. */
+  readonly rank: number;
+}
+
 /**
- * Returns N e′ (Ξ⁻¹ - Ξ⁻¹ Δ (Δ′ Ξ⁻¹ Δ)⁻¹ Δ′ Ξ⁻¹) e, or `null` when Ξ or Δ′ Ξ⁻¹ Δ is not positive definite.
+ * The part of a whitened column of Δ outside the span of the columns before it, relative to its length, below which it
+ * depends on them. On the fixtures an exact dependence leaves 2e-16 to 2e-14, and the most nearly dependent column of
+ * an identified model keeps 7e-6, a GRM's for M2*.
+ */
+const DEPENDENCE = 1e-9;
+
+/** The share of a column's length below which Gram-Schmidt orthogonalizes it a second time: 1 / √2. */
+const REORTHOGONALIZE = Math.SQRT1_2;
+
+/**
+ * Returns N e′ (Ξ⁻¹ - Ξ⁻¹ Δ (Δ′ Ξ⁻¹ Δ)⁺ Δ′ Ξ⁻¹) e and the rank of Δ.
  *
  * @remarks
- * Both products come from solves on the Cholesky factor of Ξ, which is never inverted.
+ * The Cholesky factor L of Ξ whitens e and Δ, and Ξ is never inverted. The statistic is N times the squared length of
+ * L⁻¹ e outside the span of L⁻¹ Δ, whose columns Gram-Schmidt orthonormalizes, a second time where the first pass
+ * cancels more than 1 - 1 / √2 of a column. A column that adds nothing to
+ * the span is left out, so that a Δ whose rank is below its columns, as when first- and second-order margins do not
+ * identify every parameter, gives the statistic on the whole complement of its span, with as many degrees of freedom
+ * as the rows less its rank.
  *
  * @param residuals - e, the observed moments less the expected ones.
  * @param covariance - Ξ, by rows.
@@ -279,6 +306,7 @@ export function addWeightDerivatives(
  * @param columns - The number of columns of Δ.
  * @param persons - N.
  * @see {@link https://doi.org/10.1007/s11336-005-1295-9 | Maydeu-Olivares and Joe (2006)}
+ * @see {@link https://doi.org/10.1090/S0025-5718-1976-0431641-8 | Daniel, Gragg, Kaufman and Stewart (1976)}
  */
 export function limitedInformationStatistic(
   residuals: Float64Array,
@@ -286,28 +314,38 @@ export function limitedInformationStatistic(
   jacobian: Float64Array,
   columns: number,
   persons: number,
-): number | null {
+): QuadraticForm {
   const rows = residuals.length;
   const factor = cholesky(covariance, rows);
-  if (factor === null) return null;
+  if (factor === null) return { statistic: null, rank: columns };
   const whitened = residuals.slice();
   forwardSolve(factor, rows, whitened, 1);
   const directions = jacobian.slice();
   forwardSolve(factor, rows, directions, columns);
-  const gram = new Float64Array(columns * columns);
-  const projected = new Float64Array(columns);
-  for (let r = 0; r < rows; r++) {
-    const direction = directions.subarray(r * columns, (r + 1) * columns);
-    addOuterProduct(gram, direction);
-    const value = whitened[r] ?? 0;
-    for (let c = 0; c < columns; c++) projected[c] = (projected[c] ?? 0) + value * (direction[c] ?? 0);
+  const basis: Float64Array[] = [];
+  let projected = 0;
+  for (let c = 0; c < columns; c++) {
+    const vector = Float64Array.from({ length: rows }, (_, r) => directions[r * columns + c] ?? 0);
+    const length = Math.sqrt(dot(vector, vector));
+    for (const unit of basis) subtractMultiple(vector, unit, dot(unit, vector));
+    let rest = Math.sqrt(dot(vector, vector));
+    // A second pass restores the orthogonality the first loses when it cancels much of the column (Daniel et al.).
+    if (rest < REORTHOGONALIZE * length) {
+      for (const unit of basis) subtractMultiple(vector, unit, dot(unit, vector));
+      rest = Math.sqrt(dot(vector, vector));
+    }
+    if (!(rest > DEPENDENCE * length)) continue;
+    for (let r = 0; r < rows; r++) vector[r] = (vector[r] ?? 0) / rest;
+    basis.push(vector);
+    projected += dot(vector, whitened) ** 2;
   }
-  mirror(gram, columns);
-  const gramFactor = cholesky(gram, columns);
-  if (gramFactor === null) return null;
-  forwardSolve(gramFactor, columns, projected, 1);
   // At exact arithmetic the difference is at least 0; rounding can leave a small negative one, which mirt takes as abs.
-  return Math.abs(persons * (dot(whitened, whitened) - dot(projected, projected)));
+  return { statistic: Math.abs(persons * (dot(whitened, whitened) - projected)), rank: basis.length };
+}
+
+/** Subtracts `multiple` times `unit` from `vector`. */
+function subtractMultiple(vector: Float64Array, unit: Float64Array, multiple: number): void {
+  for (let r = 0; r < vector.length; r++) vector[r] = (vector[r] ?? 0) - multiple * (unit[r] ?? 0);
 }
 
 /** Returns the means and the mean products of the items over complete rows. */
@@ -325,10 +363,10 @@ export function sampleMoments(rows: readonly (readonly (number | null)[])[], ite
 }
 
 /**
- * Returns the sample correlation of each pair of items, as {@link pairRow} orders the pairs from 0, each `NaN` when an
- * item has no variance.
+ * Returns the correlation of each pair of items, as {@link pairRow} orders the pairs from 0, each `NaN` when an item has no
+ * variance.
  */
-function pairCorrelations(means: Float64Array, products: Float64Array, itemCount: number): Float64Array {
+function pairCorrelations({ means, products }: ScoreMoments, itemCount: number): Float64Array {
   const correlations = new Float64Array((itemCount * (itemCount - 1)) / 2);
   const deviations = means.map((mean, i) => Math.sqrt((products[i * itemCount + i] ?? 0) - mean * mean));
   let pair = 0;
@@ -342,28 +380,35 @@ function pairCorrelations(means: Float64Array, products: Float64Array, itemCount
   return correlations;
 }
 
-/**
- * Returns the root mean square of the residual correlations over the pairs of items, SRMSR, or `null` when an item has no
- * variance in the sample or under the model. It reads the tables alone, so that it costs the nodes times the pairs.
- */
-export function residualCorrelationRoot(sample: SampleMoments, tables: MomentTables): number | null {
-  const { weights, itemCount, means, squares } = tables;
+/** Returns the moments of the scores under a model, from its tables: the nodes times the pairs. */
+export function tableMoments({ weights, itemCount, means, squares }: MomentTables): ScoreMoments {
   const modelMeans = new Float64Array(itemCount);
-  const modelProducts = new Float64Array(itemCount * itemCount);
+  const products = new Float64Array(itemCount * itemCount);
   for (let q = 0; q < weights.length; q++) {
     const weight = weights[q] ?? 0;
     const start = q * itemCount;
     for (let i = 0; i < itemCount; i++) {
       const mean = weight * (means[start + i] ?? 0);
       modelMeans[i] = (modelMeans[i] ?? 0) + mean;
-      modelProducts[i * itemCount + i] = (modelProducts[i * itemCount + i] ?? 0) + weight * (squares[start + i] ?? 0);
+      products[i * itemCount + i] = (products[i * itemCount + i] ?? 0) + weight * (squares[start + i] ?? 0);
       for (let j = i + 1; j < itemCount; j++) {
-        modelProducts[i * itemCount + j] = (modelProducts[i * itemCount + j] ?? 0) + mean * (means[start + j] ?? 0);
+        products[i * itemCount + j] = (products[i * itemCount + j] ?? 0) + mean * (means[start + j] ?? 0);
       }
     }
   }
-  const observed = pairCorrelations(sample.means, sample.products, itemCount);
-  const implied = pairCorrelations(modelMeans, modelProducts, itemCount);
+  return { means: modelMeans, products };
+}
+
+/**
+ * Returns the root mean square of the residual correlations over the pairs of items, SRMSR, or `null` when an item has no
+ * variance in the sample or under the model.
+ *
+ * @param model - The model's moments, whose products need only the upper triangle.
+ */
+export function residualCorrelationRoot(sample: SampleMoments, model: ScoreMoments): number | null {
+  const itemCount = sample.means.length;
+  const observed = pairCorrelations(sample, itemCount);
+  const implied = pairCorrelations(model, itemCount);
   const total = sum(observed.map((correlation, pair) => (correlation - (implied[pair] ?? 0)) ** 2));
   return Number.isNaN(total) ? null : Math.sqrt(total / observed.length);
 }
@@ -378,7 +423,7 @@ export function residualCorrelationRoot(sample: SampleMoments, tables: MomentTab
  * J (J - 1) / 2 degrees of freedom, as first-order rows of any number add one row and one parameter each.
  */
 export function independenceStatistic(sample: SampleMoments, itemCount: number): number | null {
-  const correlations = pairCorrelations(sample.means, sample.products, itemCount);
+  const correlations = pairCorrelations(sample, itemCount);
   const total = dot(correlations, correlations);
   return Number.isNaN(total) ? null : sample.persons * total;
 }

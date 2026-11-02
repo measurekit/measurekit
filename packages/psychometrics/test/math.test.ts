@@ -1,4 +1,4 @@
-import { chiSquareUpperTail, logistic, normalQuantile } from "@measurekit/core";
+import { chiSquareUpperTail, createRandom, logistic, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,6 +8,7 @@ import {
   identity,
   invert,
   invertPositiveDefinite,
+  limitedInformationStatistic,
   mirror,
   multiply,
   newton,
@@ -66,6 +67,60 @@ describe("chiSquareUpperTail", () => {
       const label = `pchisq(${value}, ${df[i]})`;
       expectRelative(chiSquareUpperTail(value, defined(df[i])), expected, LARGE_CHI_SQUARE_TOLERANCE, label);
     });
+  });
+});
+
+describe("limitedInformationStatistic", () => {
+  // Ξ = A Aᵀ + I of a seeded A, and Δ of three columns, the third a combination of the first two.
+  const rows = 6;
+  const random = createRandom(31);
+  const a = Float64Array.from({ length: rows * rows }, () => random.uniform() - 0.5);
+  const covariance = new Float64Array(rows * rows);
+  multiply(a, transpose(a, rows, rows), rows, rows, rows, covariance);
+  for (let i = 0; i < rows; i++) covariance[i * rows + i] = (covariance[i * rows + i] ?? 0) + 1;
+  const residuals = Float64Array.from({ length: rows }, () => random.uniform() - 0.5);
+  const independent = Float64Array.from({ length: rows * 2 }, () => random.uniform() - 0.5);
+  const dependent = Float64Array.from({ length: rows * 3 }, (_, index) => {
+    const [r, c] = [Math.floor(index / 3), index % 3];
+    const first = independent[r * 2] ?? 0;
+    const second = independent[r * 2 + 1] ?? 0;
+    return c === 0 ? first : c === 1 ? second : 2 * first - 0.5 * second;
+  });
+
+  it("is N e′ (Ξ⁻¹ - Ξ⁻¹ Δ (Δ′ Ξ⁻¹ Δ)⁻¹ Δ′ Ξ⁻¹) e for a Δ of full rank", () => {
+    const inverse = defined(invertPositiveDefinite(covariance, rows));
+    const times = (m: Float64Array, v: Float64Array, columns: number) =>
+      Float64Array.from({ length: m.length / columns }, (_, r) =>
+        Array.from({ length: columns }, (__, c) => (m[r * columns + c] ?? 0) * (v[c] ?? 0)).reduce((x, y) => x + y, 0),
+      );
+    const solved = times(inverse, residuals, rows);
+    const directions = new Float64Array(rows * 2);
+    multiply(inverse, independent, rows, rows, 2, directions);
+    const gram = new Float64Array(4);
+    multiply(transpose(independent, rows, 2), directions, 2, rows, 2, gram);
+    const projected = times(transpose(independent, rows, 2), solved, rows);
+    const inner = times(defined(invert(gram, 2)), projected, 2);
+    const expected =
+      50 *
+      (residuals.reduce((sum, e, i) => sum + e * (solved[i] ?? 0), 0) -
+        (projected[0] ?? 0) * (inner[0] ?? 0) -
+        (projected[1] ?? 0) * (inner[1] ?? 0));
+    const { statistic, rank } = limitedInformationStatistic(residuals, covariance, independent, 2, 50);
+    expectClose(statistic, expected, 1e-10);
+    expect(rank).toBe(2);
+  });
+
+  it("leaves out a column that depends on the others, and counts it out of the rank", () => {
+    const full = limitedInformationStatistic(residuals, covariance, independent, 2, 50);
+    const deficient = limitedInformationStatistic(residuals, covariance, dependent, 3, 50);
+    expectClose(deficient.statistic, full.statistic, 1e-10);
+    expect(deficient.rank).toBe(2);
+  });
+
+  it("is null when Ξ is not positive definite", () => {
+    expect(
+      limitedInformationStatistic(residuals, new Float64Array(rows * rows), independent, 2, 50).statistic,
+    ).toBeNull();
   });
 });
 

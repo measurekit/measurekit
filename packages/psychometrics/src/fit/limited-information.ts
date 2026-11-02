@@ -34,6 +34,7 @@ import {
   rowCount,
   type SampleMoments,
   sampleMoments,
+  tableMoments,
 } from "../math/internal.js";
 import { checkItems } from "./inputs.js";
 
@@ -65,7 +66,10 @@ export interface LimitedInformationOptions {
 export interface LimitedInformationFit {
   /** The statistic; `null` without degrees of freedom or when its covariance matrix is singular. */
   readonly statistic: number | null;
-  /** The moments less the estimated parameters. */
+  /**
+   * The moments less the rank of Δ: the estimated parameters, unless the first- and second-order margins do not
+   * identify them all.
+   */
   readonly degreesOfFreedom: number;
   /** The probability of a chi-square at least as large when the model fits; `null` with `statistic`. */
   readonly significance: number | null;
@@ -97,8 +101,9 @@ const DEFAULT_LEVEL = 0.9;
  * covariance matrix and Δ their Jacobian. It integrates over the nodes and weights of the calibration's group, so it
  * takes one group of a normal distribution, and no covariates or testlets. Δ has a column per estimated parameter: the
  * parameter a model shares among items has one column, an anchor has none, and an estimated normal distribution has the
- * columns of its mean and standard deviation. The degrees of freedom are the moments less those parameters, which must
- * equal the count in the calibration's AIC.
+ * columns of its mean and standard deviation. Those parameters must equal the count in the calibration's AIC. The
+ * degrees of freedom are the moments less the rank of Δ, which is the number of parameters unless the margins leave
+ * some unidentified; the statistic then uses the whole complement of Δ's span.
  *
  * A `Calibration` does not record its anchors, and the check of the AIC catches a list of the wrong size, not a list of
  * the right size that swaps anchors for estimated items of the same model, which gives a wrong Δ.
@@ -141,10 +146,9 @@ export function limitedInformationFit<TParameters>(
   const moments = modelMoments(tables);
   const sample = sampleMoments(complete, items.length);
   const rows = rowCount(tables);
-  const degreesOfFreedom = rows - columns.count;
-  const srmsr = residualCorrelationRoot(sample, tables);
-  const chiSquare =
-    degreesOfFreedom > 0
+  const srmsr = residualCorrelationRoot(sample, tableMoments(tables));
+  const { statistic: chiSquare, rank } =
+    rows > columns.count
       ? limitedInformationStatistic(
           residuals(complete, items, tables, sample, moments.expected, statistic),
           moments.covariance,
@@ -152,7 +156,8 @@ export function limitedInformationFit<TParameters>(
           columns.count,
           sample.persons,
         )
-      : null;
+      : { statistic: null, rank: columns.count };
+  const degreesOfFreedom = rows - rank;
   return chiSquare === null
     ? { statistic: null, degreesOfFreedom, ...NO_INDICES, srmsr }
     : {
