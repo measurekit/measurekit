@@ -291,9 +291,12 @@ others. A new clone is merged into a helper of the module that owns the concept,
   distributions, and a calibration recovers the items it simulates. A knowledge tracing model without a package of
   record, such as Elo, has its equations written out in R and a seeded recovery study, with thresholds fixed before the
   simulation is first run.
-- One test file for each source folder, named after it. `test/assertions.ts` holds the shared assertions, such as
+- One test file for each source folder, named after it, and `model.test.ts` for knowledge tracing's `model.ts`. The
+  bifactor models of `multidimensional/`, whose tests take minutes, have `bifactor.test.ts` and `bifactor.bench.ts`, so
+  that they run beside the folder's other tests. `test/assertions.ts` holds the shared assertions, such as
   `expectClose`, which compares with a reference value; `test/logs.ts` of knowledge tracing holds `online`, which runs a
-  log through any model as an app would. A file's `describe` blocks follow the order of the folder's source files or the
+  log through any model as an app would; psychometrics' `test/arbitraries.ts` holds the fast-check generators of items
+  and `test/fixture-items.ts` reads the items of the fixtures. A file's `describe` blocks follow the order of the folder's source files or the
   guide's sections, with a closing `properties` block in psychometrics; within a block, the comparisons with the reference
   and the main behavior come first, then the options, then errors and edge cases. Titles are plain sentences about
   behavior: `it("shares the places at a tied boundary equally")`.
