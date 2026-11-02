@@ -1,7 +1,8 @@
 # The rates of logistic features estimated by maximum likelihood: a seeded log of four skills whose outcomes follow the
 # decayed proportion of successes (decay 0.6) and the recency of the last attempt (exponent 0.4). The features are written
 # out in base R for any decay and exponent, glm fits the intercepts and coefficients of each skill at a tight tolerance,
-# and optim maximizes the log-likelihood over the two rates.
+# and optim maximizes the log-likelihood over the two rates. A recovery study then measures how far the estimates spread
+# over 20 logs of the design of the recovery test, which bounds what that test can ask.
 
 source("validation/knowledge-tracing/common.R")
 
@@ -107,6 +108,38 @@ fit_at <- function(rates) {
 }
 stopifnot(!any(fitted(fit_at(rates)) < 1e-10 | fitted(fit_at(rates)) > 1 - 1e-10))
 
+# The spread of the estimates over logs of the recovery test's design: 50 learners of 40 attempts at 3 skills, gaps of
+# 5 units plus an exponential of mean 25, skill intercepts -0.3, -0.1 and 0.1, coefficients 2 and 1.2.
+recovery_estimates <- t(sapply(1:20, function(r) {
+  rows <- do.call(rbind, lapply(1:50, function(l) {
+    data.frame(learner = sprintf("l%02d", l), skill = sample(SKILLS[1:3], 40, replace = TRUE),
+               time = cumsum(5 + rexp(40, 1 / 25)))
+  }))
+  rows$outcome <- NA
+  state <- new.env()
+  for (i in seq_len(nrow(rows))) {
+    key <- paste(rows$learner[i], rows$skill[i], sep = "\r")
+    h <- state[[key]] %||% list(attempts = 0, successes = 0, failures = 0, last = NA)
+    prior <- TRUE_RATES[["decay"]]^h$attempts
+    proportion <- (prior + h$successes) / (prior + h$successes + prior + h$failures)
+    recency <- if (is.na(h$last)) 0 else (rows$time[i] - h$last)^-TRUE_RATES[["exponent"]]
+    intercept <- c(s1 = -0.3, s2 = -0.1, s3 = 0.1)[[rows$skill[i]]]
+    y <- rbinom(1, 1, plogis(intercept + 2 * proportion + 1.2 * recency))
+    rows$outcome[i] <- y
+    state[[key]] <- list(attempts = h$attempts + 1, successes = TRUE_RATES[["decay"]] * h$successes + y,
+                         failures = TRUE_RATES[["decay"]] * h$failures + 1 - y, last = rows$time[i])
+  }
+  rows_skill <- factor(rows$skill, levels = SKILLS[1:3])
+  negative_of <- function(rates) {
+    f <- features(rows$learner, rows$skill, rows$time, rows$outcome, rates[1], rates[2])
+    design <- cbind(model.matrix(~ 0 + rows_skill), model.matrix(~ 0 + rows_skill) * f$proportion,
+                    model.matrix(~ 0 + rows_skill) * f$recency)
+    -as.numeric(logLik(suppressWarnings(glm(rows$outcome ~ 0 + design, family = binomial,
+                                            control = glm.control(epsilon = 1e-12, maxit = 100)))))
+  }
+  optim(BOUNDS$start, negative_of, method = "L-BFGS-B", lower = BOUNDS$lower, upper = BOUNDS$upper)$par
+}))
+
 write_fixture("logistic-rates", list(
   source = "set.seed(20261102): 60 learners, 60 events each at 4 skills; decayedProportion and recency; glm and optim.",
   trueRates = unname(TRUE_RATES),
@@ -115,5 +148,7 @@ write_fixture("logistic-rates", list(
   rates = rates,
   logLikelihood = profile(rates),
   gradient = gradient(rates),
-  startLogLikelihood = profile(BOUNDS$start)
+  startLogLikelihood = profile(BOUNDS$start),
+  recovery = list(logs = nrow(recovery_estimates), mean = unname(colMeans(recovery_estimates)),
+                  sd = unname(apply(recovery_estimates, 2, sd)))
 ))

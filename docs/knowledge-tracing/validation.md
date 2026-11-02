@@ -154,18 +154,21 @@ intercepts (item intercepts alone, or one skill per event) is fitted with sum co
 base R: the decayed proportion of successes with decay 0.6 and the recency of the last attempt with exponent 0.4. It writes the
 features for any two rates, fits the intercepts and slopes of each skill by `glm` at a tight tolerance, and maximizes the
 log-likelihood over the rates with `optim(method = "L-BFGS-B")` on central differences, then Newton steps to a gradient
-below 1e-6; a search from another start and a grid of 340 points reach the same maximum. `LKT` with `seedpars` finds
-0.703 and 0.403 on the same log, in the second decimal of 0.705 and 0.425, as its fits are penalized and stop at epsilon 1e-4.
+below 1e-6; a search from another start and a grid of 340 points reach the same maximum. `LKT` with `seedpars`, which
+the benchmark of the search runs, finds 0.703 and 0.403 on the same log, in the second decimal of 0.705 and 0.425, as its
+fits are penalized and stop at epsilon 1e-4.
 
 | Quantity                      | Reference                    | Tolerance     | Largest difference |
 | ----------------------------- | ---------------------------- | ------------- | ------------------ |
 | Estimated decay and exponent  | `optim` over `glm`, as above | 1e-3 absolute | 9e-10              |
 | Log-likelihood at the maximum | The same                     | 1e-4 absolute | 1e-11              |
 
-Twelve logs are not in a fixture: a seeded recovery study simulates eight logs of 2,000 events from the model at decay 0.6 and
-exponent 0.4, with gaps of at least 5 units, and the mean of the estimates of each rate is within 0.12 of the truth. A
-simulation with gaps near 0 and a stronger recency leaves the exponent at the bound of 3 in some logs: the likelihood rises
-with the exponent as Δt⁻ᵉ grows for short gaps.
+A recovery test simulates eight logs of 2,000 events, 50 learners of 40 attempts, from the model at decay 0.6 and exponent
+0.4, with gaps of at least 5 units, and every search must converge. The script fits 20 logs of the same design with `optim`
+over `glm`: the decay spreads with an SD of 0.13 and the exponent with one of 0.90, often at a bound, so a log of this size
+identifies the decay and not the exponent of a recency. The test asks the mean of the eight decays to be within three
+standard errors of 0.6, and each exponent to stay within its bounds. A simulation with gaps near 0 and a stronger recency
+leaves the exponent at the bound of 3 in some logs: the likelihood rises with the exponent as Δt⁻ᵉ grows for short gaps.
 
 The seeded times give no age of 0 and no tie, where LKT returns infinity and NaN; the tests check measurekit's values at
 those edges by hand. The features map to LKT's names in [the logistic guide](logistic.md#features). With every event of one skill, glm
