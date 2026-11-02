@@ -229,7 +229,8 @@ factors; // 2
 ```
 
 `map` is the `map` of psych's `VSS`, which starts at one component, so the test never answers none; Velicer's original also
-scores zero components. With all the components but one removed, what is left of each pair is a correlation of 1 in
+scores zero components. An item whose correlations with the others are all 0 is a component by itself; once it is
+removed, the item's partial correlations are undefined, and the test throws `DataError`. With all the components but one removed, what is left of each pair is a correlation of 1 in
 absolute value, so the last value is 1.
 
 ## Smoothing
@@ -261,20 +262,21 @@ negative.
 
 ## Differences from psych
 
-| Topic                     | This package                                                                      | psych                                                                         |
-| ------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Maximum of the likelihood | Newton's method with derivatives, to 1e-13; the maximum of `optimize`             | `optimize` with its default tolerance, within about 2e-5 of the maximum       |
-| Correlation matrix        | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite          |
-| `correct`                 | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds    |
-| Thresholds                | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item   |
-| Random data               | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal |
-| Suggested numbers         | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations              |
-| Replications              | 100                                                                               | 20 (`n.iter`)                                                                 |
-| Factor eigenvalues        | One-factor minres by Newton's method from the centroid loadings, to 1e-8          | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations        |
-| Minres solution           | Newton steps on the communalities from the squared multiple correlations          | L-BFGS-B on the same objective, within about 1e-5 of its minimum              |
-| Varimax                   | Gradient projection to a gradient of 1e-10, with Kaiser's normalization           | `stats::varimax`, which stops at 1e-5 of its criterion: loadings within 1e-2  |
-| Smoothed correlations     | Of the items' correlations in the factors and the test; not in `parallelAnalysis` | Of every correlation matrix `tetrachoric` and `polychoric` return             |
-| Items without variance    | `null` in the correlations; an error in parallel analysis                         | Deleted with a message                                                        |
+| Topic                        | This package                                                                      | psych                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Maximum of the likelihood    | Newton's method with derivatives, to 1e-13; the maximum of `optimize`             | `optimize` with its default tolerance, within about 2e-5 of the maximum       |
+| Correlation matrix           | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite          |
+| `correct`                    | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds    |
+| Thresholds                   | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item   |
+| Random data                  | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal |
+| Suggested numbers            | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations              |
+| Replications                 | 100                                                                               | 20 (`n.iter`)                                                                 |
+| Factor eigenvalues           | One-factor minres by Newton's method from the centroid loadings, to 1e-8          | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations        |
+| Minres solution              | Newton steps on the communalities from the squared multiple correlations          | L-BFGS-B on the same objective, within about 1e-5 of its minimum              |
+| Varimax                      | Gradient projection to a gradient of 1e-10, with Kaiser's normalization           | `stats::varimax`, which stops at 1e-5 of its criterion: loadings within 1e-2  |
+| Smoothed correlations        | Of the items' correlations in the factors and the test; not in `parallelAnalysis` | Of every correlation matrix `tetrachoric` and `polychoric` return             |
+| Items without variance       | `null` in the correlations; an error in parallel analysis                         | Deleted with a message                                                        |
+| An item correlated with none | `minimumAveragePartial` throws once a component holds all of its variance         | `VSS` stops with an error in `principal`                                      |
 
 ## References
 

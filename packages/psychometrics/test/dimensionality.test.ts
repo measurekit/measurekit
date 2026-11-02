@@ -1148,6 +1148,20 @@ describe("minimumAveragePartial", () => {
     expect(minimumAveragePartial(FACTOR_DATA.sat12, { correlation: "polychoric" }).smoothed).toBe(true);
   });
 
+  it("refuses items whose correlations are all 0, which a component takes the whole variance of", () => {
+    // Each item correlates 0 with the others, so the first component is one item, whose partial variance is then 0;
+    // psych's VSS stops with an error on the same correlations.
+    const uncorrelated = responses([
+      [0, 1, 1],
+      [1, 0, 1],
+      [1, 1, 0],
+      [0, 0, 0],
+    ]);
+    expect(() => minimumAveragePartial(uncorrelated)).toThrow(
+      "The minimum average partial test is undefined after 1 components: they leave an item no variance, as when it is uncorrelated with every other item.",
+    );
+  });
+
   it("rejects what it cannot use", () => {
     const data = FACTOR_DATA.simulated;
     expect(() => minimumAveragePartial(data, { maxFactors: 0 })).toThrow("The option maxFactors");

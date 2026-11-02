@@ -47,7 +47,8 @@ export interface MinimumAveragePartial {
  * @returns The average squared partial correlation for each number of factors, the number of factors that minimizes it
  *   and whether the correlations were smoothed.
  * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
- * categories, a pair of items has too few persons for a correlation, or an option is invalid.
+ * categories, a pair of items has too few persons for a correlation, an option is invalid, or the components leave an
+ * item no variance, so that its partial correlations are undefined, as for an item uncorrelated with every other.
  * @see {@link https://doi.org/10.1007/BF02293557 | Velicer (1976)}
  */
 export function minimumAveragePartial(
@@ -72,15 +73,22 @@ export function minimumAveragePartial(
       `The option maxFactors must be at most the number of items less 1, ${size - 1}, found ${maxFactors}.`,
     );
   }
-  const map = averagePartials(correlations, size, maxFactors);
+  const partials = averagePartials(correlations, size, maxFactors);
+  const map = partials.filter((value) => value !== null);
+  if (map.length < partials.length) {
+    throw new DataError(
+      `The minimum average partial test is undefined after ${partials.indexOf(null) + 1} components: they leave an item no variance, as when it is uncorrelated with every other item.`,
+    );
+  }
   return { map, factors: map.indexOf(Math.min(...map)) + 1, smoothed };
 }
 
 /**
  * Returns, for 1 to `count` principal components removed from the correlation matrix `r` (`size` rows, by rows, positive
- * definite), the mean over the pairs of items of the squared partial correlation.
+ * definite), the mean over the pairs of items of the squared partial correlation; `null` once the components leave an
+ * item no variance.
  */
-export function averagePartials(r: Float64Array, size: number, count: number): number[] {
+export function averagePartials(r: Float64Array, size: number, count: number): (number | null)[] {
   const { values, vectors } = symmetricEigen(r, size);
   const partial = Float64Array.from(r);
   return Array.from({ length: count }, (_, k) => {
@@ -95,8 +103,12 @@ export function averagePartials(r: Float64Array, size: number, count: number): n
   });
 }
 
-/** Returns the mean squared off-diagonal entry of a covariance matrix scaled to unit variances. */
-function meanSquaredPartial(covariance: Float64Array, size: number): number {
+/**
+ * Returns the mean squared off-diagonal entry of a covariance matrix scaled to unit variances; `null` when a variance is
+ * 0, which leaves the correlations of its variable undefined.
+ */
+function meanSquaredPartial(covariance: Float64Array, size: number): number | null {
+  for (let i = 0; i < size; i++) if (!((covariance[i * size + i] ?? 0) > 0)) return null;
   let sum = 0;
   for (let i = 0; i < size; i++) {
     for (let j = 0; j < size; j++) {
