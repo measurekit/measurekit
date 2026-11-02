@@ -1,4 +1,5 @@
-import { DataError } from "@measurekit/core";
+import { DataError, multiplyVector } from "@measurekit/core";
+import { invert } from "../math/internal.js";
 import { type Effect, effectsOf, facetsOf, namesOf, type Structure } from "./structure.js";
 
 /**
@@ -65,7 +66,16 @@ export function unbalancedEstimates(
   });
   const centered = centeredValues(values);
   const totals = cells.map((own) => squaredSums(own, centered));
-  const solution = solve(expectedValues(effects, cells, values.length), totals, effects.length);
+  // Every effect has degrees of freedom, so the expected values of the sums of squares are independent equations,
+  // singular only to rounding.
+  const inverse = invert(expectedValues(effects, cells, values.length), effects.length);
+  if (inverse === null) {
+    throw new DataError(
+      "The variance components of these scores cannot be solved: their equations are singular to rounding.",
+    );
+  }
+  const solution = new Float64Array(effects.length);
+  multiplyVector(inverse, Float64Array.from(totals), solution);
   const sums = new Float64Array(effects.length);
   return effects.map((effect, k) => {
     sums[k] = (totals[k] ?? 0) - (within[k] ?? []).reduce((total, other) => total + (sums[other] ?? 0), 0);
@@ -204,57 +214,4 @@ function pairSum(cells: readonly Cells[], effects: readonly Effect[], a: number,
     total += (union.counts[union.ids[score] ?? 0] ?? 0) / (first.counts[first.ids[score] ?? 0] ?? 1);
   }
   return total;
-}
-
-/**
- * Solves a system of `size` equations, by rows, by Gaussian elimination with partial pivoting. Every effect having
- * degrees of freedom, the system has a solution: an effect without them is rejected before.
- */
-function solve(matrix: Float64Array, right: ArrayLike<number>, size: number): Float64Array {
-  const a = Float64Array.from(matrix);
-  const x = Float64Array.from(right);
-  for (let column = 0; column < size; column++) {
-    swapRows(a, x, size, pivotRow(a, size, column), column);
-    eliminateBelow(a, x, size, column);
-  }
-  for (let row = size - 1; row >= 0; row--) {
-    let rest = x[row] ?? 0;
-    for (let k = row + 1; k < size; k++) rest -= (a[row * size + k] ?? 0) * (x[k] ?? 0);
-    x[row] = rest / (a[row * size + row] ?? 1);
-  }
-  return x;
-}
-
-/** Subtracts multiples of the pivot row `column` from the rows below it, to clear their coefficients in `column`. */
-function eliminateBelow(a: Float64Array, x: Float64Array, size: number, column: number): void {
-  const pivotValue = a[column * size + column] ?? 1;
-  for (let row = column + 1; row < size; row++) {
-    const factor = (a[row * size + column] ?? 0) / pivotValue;
-    for (let k = column; k < size; k++) {
-      a[row * size + k] = (a[row * size + k] ?? 0) - factor * (a[column * size + k] ?? 0);
-    }
-    x[row] = (x[row] ?? 0) - factor * (x[column] ?? 0);
-  }
-}
-
-/** Returns the row, from `column` down, with the largest coefficient in `column`. */
-function pivotRow(a: Float64Array, size: number, column: number): number {
-  let best = column;
-  for (let row = column + 1; row < size; row++) {
-    if (Math.abs(a[row * size + column] ?? 0) > Math.abs(a[best * size + column] ?? 0)) best = row;
-  }
-  return best;
-}
-
-/** Swaps two rows of the coefficients and of the right-hand side. */
-function swapRows(a: Float64Array, x: Float64Array, size: number, first: number, second: number): void {
-  if (first === second) return;
-  for (let k = 0; k < size; k++) {
-    const value = a[first * size + k] ?? 0;
-    a[first * size + k] = a[second * size + k] ?? 0;
-    a[second * size + k] = value;
-  }
-  const value = x[first] ?? 0;
-  x[first] = x[second] ?? 0;
-  x[second] = value;
 }
