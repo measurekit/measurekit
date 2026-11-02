@@ -79,6 +79,11 @@ the machine epsilon. Responses are 0 or 1; missing ones are skipped.
 | `converged`     | Whether EM reached `tolerance`                                                                                                                                                   |
 | `iterations`    | EM iterations run                                                                                                                                                                |
 
+| Limit                                       | Value                | Why                                                                                                     |
+| ------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
+| Attributes of a Q-matrix                    | 20                   | K attributes give 2^K profiles, and a fit's memory and time grow with them: about 1 GB at 20 attributes |
+| Success probabilities with `standardErrors` | 3,162 over all items | An item of k attributes has 2^k, and their information matrix has p² cells: 80 MB at the limit          |
+
 `coefficients` are GDINA's `coef(what = "delta")`:
 
 | Model                       | `coefficients`                                                                                                                                                           |

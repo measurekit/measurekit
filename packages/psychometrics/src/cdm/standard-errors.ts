@@ -1,6 +1,27 @@
+import { DataError } from "@measurekit/core";
 import { pseudoInverse } from "../math/pseudo-inverse.js";
 import { type CdmState, type DichotomousRows, forEachPosterior } from "./expectation.js";
 import type { CdmDesign } from "./q-matrix.js";
+
+/**
+ * The most success probabilities, over all items, that the incomplete information holds: its p² cells stay within 1e7,
+ * 80 MB, as an item of k attributes has 2^k of them.
+ */
+const MAX_INCOMPLETE_PROBABILITIES = 3162;
+
+/**
+ * Checks that the incomplete information of a design's items fits the limit of its size.
+ *
+ * @throws `DataError` when the items have more than {@link MAX_INCOMPLETE_PROBABILITIES} success probabilities.
+ */
+export function checkIncompleteSize(design: CdmDesign): void {
+  const probabilities = design.itemAttributes.reduce((sum, indices) => sum + 2 ** indices.length, 0);
+  if (probabilities > MAX_INCOMPLETE_PROBABILITIES) {
+    throw new DataError(
+      `The option standardErrors "incomplete" takes at most ${MAX_INCOMPLETE_PROBABILITIES} success probabilities over all items, 2^k for an item of k attributes, found ${probabilities}.`,
+    );
+  }
+}
 
 /**
  * Returns the covariance matrix of each item's success probabilities, each stored by rows, from the outer product of

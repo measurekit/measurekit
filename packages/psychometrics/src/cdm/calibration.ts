@@ -15,7 +15,7 @@ import { checkDichotomous, checkResponseMatrix, type ResponseMatrix } from "../d
 import { type AdditiveMaximizer, additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
 import { type CdmState, type DichotomousRows, type ExpectedCounts, expectedCounts } from "./expectation.js";
 import { type CdmDesign, cdmDesign, profilesOf } from "./q-matrix.js";
-import { incompleteCovariances } from "./standard-errors.js";
+import { checkIncompleteSize, incompleteCovariances } from "./standard-errors.js";
 
 /**
  * A cognitive diagnosis model of an item's success probabilities: `"gdina"`, one per latent group of its attributes;
@@ -166,7 +166,8 @@ const MIN_PROPORTION = Number.EPSILON;
  * @returns The attributes, the items with their parameters, the proportion of each profile, the log-likelihood, AIC,
  *   BIC, whether the EM converged and the iterations run.
  * @throws `DataError` when the matrix, the Q-matrix or an option is invalid, a response is neither 0 nor 1, there is
- * no response, or `standardErrors` is `"incomplete"` and an item is not G-DINA.
+ * no response, or `standardErrors` is `"incomplete"` and an item is not G-DINA or the items have more than 3,162
+ * success probabilities.
  */
 export function calibrateCdm(
   matrix: ResponseMatrix,
@@ -180,7 +181,10 @@ export function calibrateCdm(
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERRORS);
   const design = cdmDesign(matrix.itemIds, qMatrix);
   const models = itemModels(options.model, matrix.itemIds.length);
-  if (standardErrors === "incomplete") checkSaturated(models, matrix.itemIds);
+  if (standardErrors === "incomplete") {
+    checkSaturated(models, matrix.itemIds);
+    checkIncompleteSize(design);
+  }
   const data = dichotomousRows(matrix);
   if (data.respondents === 0) throw new DataError("Cognitive diagnosis needs at least one response.");
   const state = startingValues(design);

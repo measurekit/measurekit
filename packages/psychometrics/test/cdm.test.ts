@@ -537,6 +537,23 @@ describe("calibrateCdm", () => {
     expect(() => calibrateCdm(matrix, qMatrix, { standardErrors: JSON.parse("null") })).toThrow(DataError);
   });
 
+  it("refuses incomplete standard errors past 3,162 success probabilities, before it calibrates", () => {
+    // One item of 12 attributes has 4,096 success probabilities and 12 items of one attribute 2 each: 4,120.
+    const attributes = Array.from({ length: 12 }, (_, k) => `a${k}`);
+    const qMatrix = {
+      wide: attributes,
+      ...Object.fromEntries(attributes.map((attribute) => [attribute, [attribute]])),
+    };
+    const itemIds = Object.keys(qMatrix);
+    const matrix = responseMatrix(
+      Array.from({ length: 30 }, (_, person) => itemIds.map((_, item) => ((person * 7 + item * 3) % 5 < 2 ? 1 : 0))),
+      { itemIds },
+    );
+    expect(() => calibrateCdm(matrix, qMatrix, { standardErrors: "incomplete" })).toThrow(
+      'The option standardErrors "incomplete" takes at most 3162 success probabilities over all items, 2^k for an item of k attributes, found 4120.',
+    );
+  }, 5_000);
+
   it("rejects polytomous responses, a Q-matrix that does not fit the items and unknown models", () => {
     const matrix = responseMatrix([
       [1, 0],
