@@ -121,8 +121,10 @@ pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumente
 ```
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before
-finishing a change. Development needs Node.js 22.18+ and pnpm 12. Every push runs every job of CI, and a newer push to the same
-ref cancels the run in progress; a cancelled run is not a failure.
+finishing a change. Development needs Node.js 22.18+ and pnpm 12. Every push runs every job of CI but `rules`, and a newer
+push to the same ref cancels the run in progress; a cancelled run is not a failure. `rules.yml` runs `rules` each week and on
+`workflow_dispatch`: a builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`), and the release
+gate needs a green `rules` run on the commit being released.
 
 ## Releases
 
