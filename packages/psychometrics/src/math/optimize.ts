@@ -19,12 +19,13 @@ export type HessianFunction = (x: Float64Array, gradient: Float64Array, hessian:
 /** Stopping rules of Newton's method. */
 export interface NewtonOptions extends OptimizerOptions {
   /**
-   * When the search direction changes no coordinate by more than this, the minimization takes it in full, without the
-   * line search, and has converged.
+   * When the search direction changes no coordinate by more than this, or the decrease it predicts is below the
+   * rounding of the value, the minimization takes it in full, without the line search, and has converged.
    *
    * @remarks
    * Newton's method converges quadratically, so that its next step would be below the rounding of the coordinates, and
-   * rounding of the value hides the decrease of a small step.
+   * rounding of the value hides the decrease of a small step. Along a direction of low curvature, a step above the
+   * tolerance can predict a decrease that rounding hides as well, which the line search could never confirm.
    *
    * @defaultValue none: every step goes through the line search
    */
@@ -33,6 +34,11 @@ export interface NewtonOptions extends OptimizerOptions {
 
 const DEFAULT_TOLERANCE = 1e-8;
 const DEFAULT_MAX_ITERATIONS = 100;
+/**
+ * The decrease -gᵀs of a step, relative to the value, below which rounding of the sums that give the value hides it: a
+ * few dozen units of rounding.
+ */
+const HIDDEN_DECREASE = 64 * Number.EPSILON;
 
 /**
  * Minimizes a twice-differentiable function with Newton's method and a backtracking line search. Where the Hessian
@@ -52,7 +58,10 @@ export function newton(f: HessianFunction, start: ArrayLike<number>, options: Ne
       return { x: point.x, value: point.value, iterations: iteration, converged: true };
     }
     direction(hessian, point.gradient, search);
-    if (stepTolerance !== undefined && maxAbs(search) <= stepTolerance) {
+    if (
+      stepTolerance !== undefined &&
+      (maxAbs(search) <= stepTolerance || -dot(point.gradient, search) <= HIDDEN_DECREASE * Math.abs(point.value))
+    ) {
       return fullStep(objective, point, search, iteration);
     }
     if (!stepAlong(objective, point, search, trial)) {

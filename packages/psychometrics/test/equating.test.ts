@@ -779,6 +779,28 @@ describe("bivariateLogLinearPresmoothing", () => {
     );
   });
 
+  it("converges on tables where rounding of the likelihood hides the decrease of its last steps", () => {
+    // Groups of 1,000 persons on 10 anchor and 10 other Rasch items; these seeds stalled at 200 iterations.
+    for (const seed of [2, 8, 27, 28, 36]) {
+      const random = createRandom(seed);
+      const table = Array.from({ length: 21 }, () => new Array<number>(11).fill(0));
+      const score = (theta: number): number => {
+        let sum = 0;
+        for (let i = 0; i < 10; i++) if (random.uniform() < 1 / (1 + Math.exp((i - 4.5) / 3 - theta))) sum++;
+        return sum;
+      };
+      for (let person = 0; person < 1000; person++) {
+        const theta = random.normal();
+        const anchor = score(theta);
+        const row = defined(table[anchor + score(theta)]);
+        row[anchor] = (row[anchor] ?? 0) + 1;
+      }
+      const fit = bivariateLogLinearPresmoothing(table, { degrees: [3, 3], crossDegree: 1 });
+      expect(fit.converged, `seed ${seed}`).toBe(true);
+      expect(fit.iterations, `seed ${seed}`).toBeLessThan(20);
+    }
+  });
+
   it("gives every cell a positive count, including those without persons", () => {
     const { distribution } = bivariateLogLinearPresmoothing(
       [

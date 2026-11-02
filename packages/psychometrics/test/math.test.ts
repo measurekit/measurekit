@@ -526,6 +526,24 @@ describe("newton", () => {
     expect(defined(result.x[0])).toBeCloseTo(Math.SQRT1_2, 8);
   });
 
+  it("takes in full a step whose decrease rounding hides, though the step is above the step tolerance", () => {
+    // f = 1000 + 0.005 x² from x = 2e-6: the Newton step of 2e-6 lowers f by 2e-14, and a rounding error of one unit
+    // at every other point, as the long sums of a likelihood make, hides that decrease from the line search.
+    const start = 2e-6;
+    const result = newton(
+      (x, gradient, hessian) => {
+        const v = defined(x[0]);
+        gradient[0] = 0.01 * v;
+        hessian[0] = 0.01;
+        return 1000 + 0.005 * v * v + (v === start ? 0 : 1000 * Number.EPSILON);
+      },
+      [start],
+      { tolerance: 0, stepTolerance: 1e-6, maxIterations: 50 },
+    );
+    expect(result).toMatchObject({ iterations: 1, converged: true });
+    expect(result.x[0]).toBe(0);
+  });
+
   it("reports non-convergence within the iteration limit", () => {
     const result = newton(rosenbrock, [-1.2, 1], { maxIterations: 2 });
     expect(result).toMatchObject({ iterations: 2, converged: false });
