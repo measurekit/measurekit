@@ -306,7 +306,7 @@ others. A new clone is merged into a helper of the module that owns the concept,
   a string for a number, an object for an array, passed with `JSON.parse`, not a cast.
 - Properties that hold for any input (alpha at most 1, probabilities from 0 to 1, invariance to the order of persons,
   states left unchanged by `update`, states that continue identically after a JSON round trip, reproducible seeds) are
-  tested with fast-check. A generator of distinct doubles is `fc.uniqueArray(..., { comparator: "SameValueZero" })`, as
+  tested with fast-check, from the fixed seed that `test/setup.ts` of each package gives every property. A generator of distinct doubles is `fc.uniqueArray(..., { comparator: "SameValueZero" })`, as
   the default comparison draws -0 and 0 as two values; the GritQL plugin `biome/unique-doubles-same-value-zero.grit`
   makes `pnpm lint` fail otherwise.
 - Edge cases are tested for every function: constant items, persons and items without responses, one item, two persons;

@@ -49,17 +49,30 @@ export default defineConfig({
   test: {
     projects: [
       {
-        test: { name: "core", include: ["packages/core/test/**/*.test.ts"] },
+        test: {
+          name: "core",
+          include: ["packages/core/test/**/*.test.ts"],
+          setupFiles: ["packages/core/test/setup.ts"],
+        },
       },
       {
         resolve: { alias: CORE_SOURCE },
         // Calibrations to a tolerance of 1e-8 take seconds, the testlet, diagnosis and multidimensional models many
         // times more, on a machine under load longer still.
-        test: { name: "psychometrics", include: ["packages/psychometrics/test/**/*.test.ts"], testTimeout: 120_000 },
+        test: {
+          name: "psychometrics",
+          include: ["packages/psychometrics/test/**/*.test.ts"],
+          setupFiles: ["packages/psychometrics/test/setup.ts"],
+          testTimeout: 120_000,
+        },
       },
       {
         resolve: { alias: CORE_SOURCE },
-        test: { name: "knowledge-tracing", include: ["packages/knowledge-tracing/test/**/*.test.ts"] },
+        test: {
+          name: "knowledge-tracing",
+          include: ["packages/knowledge-tracing/test/**/*.test.ts"],
+          setupFiles: ["packages/knowledge-tracing/test/setup.ts"],
+        },
       },
       { test: { name: "scripts", include: ["scripts/test/**/*.test.ts"] } },
       {
