@@ -523,7 +523,9 @@ The same script builds 85 blueprints on two banks of 300 items, of two and three
 target. highs confirms that four forms with no item in common meet the bounds, and for six blueprints finds the four forms whose
 largest relative gap from the target is smallest, within 30 seconds: 0.2% to 0.3%. The test assembles four forms for each
 blueprint: every bound of all 340 forms is met; the largest gap from the target is 7.3% and 3 forms are beyond 5%, the median 1.4%.
-The estimates of the rotation are those of a heuristic with default weights; the solver's are minimax.
+The estimates of the rotation are those of a heuristic with default weights; the solver's are minimax. The limit of 30
+seconds is the one thing that a regeneration does not reproduce: on a loaded machine highs stops at other forms, and six
+of these gaps moved by up to 0.0016. No test reads the gaps; they are the comparison above.
 
 `validation/psychometrics/fit.R`, `dif.R` and `equating.R` store the inputs each reference used: the items, the
 thetas, the calibrations. The tests compute the statistics from those inputs, so a difference is the statistic's alone.
