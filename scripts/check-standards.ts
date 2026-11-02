@@ -350,6 +350,28 @@ export function checkNotIncluded(files: Files): Violation[] {
   );
 }
 
+/**
+ * Every guide of a module, `docs/<package>/<module>.md` for a folder `packages/<package>/src/<module>/` with an
+ * `index.ts`, has a `## Not included` section: what a module leaves out is part of what it is complete for.
+ */
+export function checkModuleGuides(files: Files): Violation[] {
+  return [...files].flatMap(([file, text]) => {
+    const [, library, module] = /^docs\/([^/]+)\/([^/]+)\.md$/.exec(file) ?? [];
+    const isModuleGuide = library !== undefined && files.has(`packages/${library}/src/${module}/index.ts`);
+    const hasSection = proseLines(text).some(([, line]) => line.trimEnd() === "## Not included");
+    return isModuleGuide && !hasSection
+      ? [
+          {
+            file,
+            line: 0,
+            rule: "module-guide",
+            message: `The guide of the ${module} module has no "## Not included" section; list each method the module leaves out, with its reason.`,
+          },
+        ]
+      : [];
+  });
+}
+
 /** Every check, in the order of the standards. */
 export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkSectionSigns,
@@ -362,6 +384,7 @@ export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkEntries,
   checkConsole,
   checkNotIncluded,
+  checkModuleGuides,
 ];
 
 /** Runs every check over the files. */

@@ -7,6 +7,7 @@ import {
   checkFamilies,
   checkFileNames,
   checkHistory,
+  checkModuleGuides,
   checkNotIncluded,
   checkSectionSigns,
   checkStandards,
@@ -257,6 +258,69 @@ describe("not included", () => {
       "README.md": "## Not included\n\n- Anything.\n",
     });
     expect(checkNotIncluded(files)).toStrictEqual([]);
+  });
+});
+
+describe("module guides", () => {
+  const source = {
+    "packages/a/src/index.ts": 'export * from "./one/index.js";\n',
+    "packages/a/src/one/index.ts": "export const one = 1;\n",
+    "packages/a/src/two/index.ts": "export const two = 2;\n",
+    "packages/a/src/math/internal.ts": "export const three = 3;\n",
+  };
+  const section = "## Not included\n\n- **Kernel equating.** No fit: it is rare.\n";
+
+  it("reports the guide of a module without a Not included section, with the guide and the module in the message", () => {
+    const files = repository({
+      ...source,
+      "docs/a/one.md": `# One\n\n${DIAGRAM}`,
+      "docs/a/two.md": `# Two\n\n${section}`,
+    });
+    expect(checkModuleGuides(files)).toStrictEqual([
+      {
+        file: "docs/a/one.md",
+        line: 0,
+        rule: "module-guide",
+        message:
+          'The guide of the one module has no "## Not included" section; list each method the module leaves out, with its reason.',
+      },
+    ]);
+  });
+
+  it("accepts the section at the end of a guide, whatever the sections around it", () => {
+    const files = repository({
+      ...source,
+      "docs/a/one.md": `# One\n\n## Options\n\n${section}\n## References\n`,
+      "docs/a/two.md": `# Two\n\n## Options\n\n${section.trimEnd()}`,
+    });
+    expect(checkModuleGuides(files)).toStrictEqual([]);
+  });
+
+  it("does not take a heading of another level, a fenced heading or a similar title for the section", () => {
+    const files = repository({
+      ...source,
+      "docs/a/one.md": "# One\n\n### Not included\n\n- **A.** No fit: b.\n",
+      "docs/a/two.md": "# Two\n\n```md\n## Not included\n```\n\n## Not included here\n",
+    });
+    expect(checkModuleGuides(files).map(({ file }) => file)).toStrictEqual(["docs/a/one.md", "docs/a/two.md"]);
+  });
+
+  it("asks nothing of the other documents of a package, nor of a guide of another package", () => {
+    const files = repository({
+      ...source,
+      "docs/a/architecture.md": "# Architecture\n",
+      "docs/a/validation.md": "# Validation\n",
+      "docs/a/math.md": "# Math\n",
+      "docs/b/one.md": "# One\n",
+      "docs/a/one/extra.md": "# Extra\n",
+      "README.md": "# A\n",
+    });
+    expect(checkModuleGuides(files)).toStrictEqual([]);
+  });
+
+  it("is one of the checks of the repository", () => {
+    const files = repository({ ...source, "docs/a/one.md": `# One\n\n${DIAGRAM}` });
+    expect(checkStandards(files).map(({ rule }) => rule)).toStrictEqual(["module-guide"]);
   });
 });
 
