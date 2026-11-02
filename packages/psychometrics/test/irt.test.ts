@@ -918,6 +918,19 @@ describe("calibrate", () => {
       'Item "item2" has responses in fewer than two categories; calibration needs at least two.',
     );
   });
+
+  it("finds an empty category below a response far above the others without a table up to it", () => {
+    const highest = 2 ** 31 - 1;
+    const matrix = responseMatrix([[0], [1], [highest], [1]]);
+    for (const model of [gradedResponse, generalizedPartialCredit]) {
+      expect(() => calibrate(matrix, { model })).toThrow(
+        'Item "item1" has no response in category 2; calibration needs responses in every category up to the highest.',
+      );
+    }
+    expect(() => calibrate(matrix, { model: twoParameterLogistic })).toThrow(
+      `Item "item1" has a response of ${highest}, but the 2PL model allows responses from 0 to 1.`,
+    );
+  }, 5_000);
 });
 
 describe("calibrateWithCovariance", () => {

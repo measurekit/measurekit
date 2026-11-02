@@ -6,7 +6,7 @@ import { checkFixedCategories, checkFixedIds, checkItem, checkModel, modelsOf } 
 import { type Population, population } from "./latent.js";
 import type { IrtModel, ModelParameter } from "./model.js";
 import { checkPrior, type ParameterPrior } from "./prior.js";
-import { type CompressedResponses, categoryCounts, checkCategories } from "./responses.js";
+import { type CompressedResponses, categoryTallies, checkCategories } from "./responses.js";
 import { type TestletDesign, testletDesign, testletWeights } from "./testlets.js";
 
 /** An item during calibration. */
@@ -60,7 +60,7 @@ export function setUp<TParameters>(
   rule: Quadrature,
 ): Setup<TParameters> {
   const { itemIds } = responses;
-  const itemCounts = categoryCounts(responses);
+  const tallies = categoryTallies(responses);
   const models = modelsOf(options.model, itemIds.length, (each) =>
     checkModel(each, "The option model must be an IRT model such as twoParameterLogistic"),
   );
@@ -82,11 +82,12 @@ export function setUp<TParameters>(
   const sharing = new Map<IrtModel<TParameters>, SharedParameters>();
   const items = models.map((model, column): ItemState<TParameters> => {
     const id = itemIds[column] ?? "";
-    const counts = itemCounts[column] ?? [];
+    const tally = tallies[column] ?? { highest: -1, counts: new Map() };
     const parameters = fixed[id];
     const nodes = design !== null && (design.testletOf[column] ?? -1) >= 0 ? design.sums : rule.nodes;
-    if (parameters !== undefined) return fixedItem(id, model, parameters, counts.length, nodes);
-    const categoryCount = checkCategories(id, model, counts);
+    if (parameters !== undefined) return fixedItem(id, model, parameters, tally.highest + 1, nodes);
+    const counts = checkCategories(id, model, tally);
+    const categoryCount = counts.length;
     const answered = counts.reduce((sum, count) => sum + count, 0);
     const start = model.toVector(model.startingValues(Float64Array.from(counts, (count) => count / answered)));
     const specifications = model.parameters(categoryCount);

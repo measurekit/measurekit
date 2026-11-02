@@ -86,21 +86,30 @@ export function responseCodes(matrix: ResponseMatrix): Int32Array {
   return codes;
 }
 
-/** Returns the number of persons in each category of each item, up to the item's highest response. */
-export function categoryCounts({ itemIds, items, codes }: CompressedResponses): number[][] {
-  const counts = itemIds.map((): number[] => []);
+/** An item's responses by category. */
+export interface CategoryTally {
+  /** The highest response to the item; -1 when it has none. */
+  readonly highest: number;
+  /** The number of responses in each category that has one. */
+  readonly counts: ReadonlyMap<number, number>;
+}
+
+/** Returns the responses to each item by category, in space that grows with the categories used, not with the highest. */
+export function categoryTallies({ itemIds, items, codes }: CompressedResponses): CategoryTally[] {
+  const counts = itemIds.map(() => new Map<number, number>());
+  const highest = new Int32Array(itemIds.length).fill(-1);
   items.forEach((item, r) => {
     const response = codes[r] ?? 0;
-    const itemCounts = counts[item] ?? [];
-    while (itemCounts.length <= response) itemCounts.push(0);
-    itemCounts[response] = (itemCounts[response] ?? 0) + 1;
+    const itemCounts = counts[item];
+    itemCounts?.set(response, (itemCounts.get(response) ?? 0) + 1);
+    highest[item] = Math.max(highest[item] ?? -1, response);
   });
-  return counts;
+  return counts.map((itemCounts, item) => ({ highest: highest[item] ?? -1, counts: itemCounts }));
 }
 
 /**
- * Checks that an item's responses can be estimated with its model, of either kind, and returns its number of
- * categories.
+ * Checks that an item's responses can be estimated with its model, of either kind, and returns the number of persons
+ * in each category from 0 to the highest.
  *
  * @throws `DataError` when the item has a response above the model's categories, responses in fewer than two
  * categories, or no response in a category below its highest.
@@ -108,23 +117,24 @@ export function categoryCounts({ itemIds, items, codes }: CompressedResponses): 
 export function checkCategories(
   id: string,
   model: Pick<IrtModel, "name" | "maxCategories">,
-  counts: readonly number[],
-): number {
-  if (counts.length > model.maxCategories) {
+  { highest, counts }: CategoryTally,
+): number[] {
+  if (highest >= model.maxCategories) {
     throw new DataError(
-      `Item "${id}" has a response of ${counts.length - 1}, but the ${model.name} model allows responses from 0 to ${model.maxCategories - 1}.`,
+      `Item "${id}" has a response of ${highest}, but the ${model.name} model allows responses from 0 to ${model.maxCategories - 1}.`,
     );
   }
-  if (counts.length < 2) {
+  if (highest < 1) {
     throw new DataError(`Item "${id}" has responses in fewer than two categories; calibration needs at least two.`);
   }
-  const empty = counts.indexOf(0);
-  if (empty >= 0) {
+  if (counts.size <= highest) {
+    let empty = 0;
+    while (counts.has(empty)) empty++;
     throw new DataError(
       `Item "${id}" has no response in category ${empty}; calibration needs responses in every category up to the highest.`,
     );
   }
-  return counts.length;
+  return Array.from({ length: highest + 1 }, (_, category) => counts.get(category) ?? 0);
 }
 
 /** The groups of persons in a calibration. */

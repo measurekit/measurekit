@@ -11,7 +11,7 @@ import {
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import {
   type CompressedResponses,
-  categoryCounts,
+  categoryTallies,
   checkCategories,
   compressResponses,
   fitLinearRasch,
@@ -323,12 +323,13 @@ interface Scale {
  */
 function scaleOf(responses: CompressedResponses, model: LltmModel): Scale {
   const items = responses.itemIds.length;
-  const counts = categoryCounts(responses).map((observed, item) =>
-    checkCategories(
-      responses.itemIds[item] ?? "",
-      model === "dichotomous" ? twoParameterLogistic : partialCredit,
-      observed,
-    ),
+  const counts = categoryTallies(responses).map(
+    (tally, item) =>
+      checkCategories(
+        responses.itemIds[item] ?? "",
+        model === "dichotomous" ? twoParameterLogistic : partialCredit,
+        tally,
+      ).length,
   );
   if (model === "partial-credit") {
     return {

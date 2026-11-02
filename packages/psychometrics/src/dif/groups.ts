@@ -42,8 +42,8 @@ export interface DifData {
 export interface ItemCases {
   /** Each person's response to the item, from 0 to the item's highest possible score. */
   readonly responses: Int32Array;
-  /** Each person's matching score, from 0 to `maxScore`. */
-  readonly scores: Int32Array;
+  /** Each person's matching score, from 0 to `maxScore`: in 64-bit floats, as a sum of responses may pass 2³¹. */
+  readonly scores: Float64Array;
   /** 1 for each person of the focal group. */
   readonly focal: Uint8Array;
   /** The highest matching score: the highest possible scores of the matching items, the studied item's included. */
@@ -137,7 +137,7 @@ export function itemCases(data: DifData, item: number, anchors: Uint8Array): Ite
   }
   return {
     responses: Int32Array.from(persons, (person) => responses[person * itemCount + item] ?? 0),
-    scores: Int32Array.from(scores),
+    scores: Float64Array.from(scores),
     focal: Uint8Array.from(persons, (person) => focal[person] ?? 0),
     maxScore: others + (maxScores[item] ?? 1),
   };

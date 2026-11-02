@@ -1,7 +1,7 @@
 import { checkRecord, DataError } from "@measurekit/core";
 import {
   type CompressedResponses,
-  categoryCounts,
+  categoryTallies,
   checkCategories,
   checkFixedCategories,
   checkFixedIds,
@@ -72,7 +72,7 @@ export function setUp<TParameters>(
 ): ItemState<TParameters>[] {
   const { itemIds } = responses;
   const dimensions = design.dimensionNames.length;
-  const counts = categoryCounts(responses);
+  const tallies = categoryTallies(responses);
   const models = modelsOf(options.model, itemIds.length, (each) =>
     checkMultidimensionalModel(
       each,
@@ -89,10 +89,11 @@ export function setUp<TParameters>(
   const slopes = startingSlopes(design, responses);
   const items = models.map((model, column): ItemState<TParameters> => {
     const id = itemIds[column] ?? "";
-    const itemCounts = counts[column] ?? [];
+    const tally = tallies[column] ?? { highest: -1, counts: new Map() };
     const anchor = anchors.get(id);
-    if (anchor !== undefined) return fixedItem(id, model, anchor, itemCounts.length, dimensions, nodeCount);
-    const categoryCount = checkCategories(id, model, itemCounts);
+    if (anchor !== undefined) return fixedItem(id, model, anchor, tally.highest + 1, dimensions, nodeCount);
+    const itemCounts = checkCategories(id, model, tally);
+    const categoryCount = itemCounts.length;
     const answered = itemCounts.reduce((sum, count) => sum + count, 0);
     const proportions = Float64Array.from(itemCounts, (count) => count / answered);
     const vector = model.toVector(model.startingValues(proportions, slopes[column] ?? new Float64Array(dimensions)));

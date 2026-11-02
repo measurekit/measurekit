@@ -461,6 +461,17 @@ describe("mantelTest", () => {
     expect(items[0]?.standardizedMeanDifference).toBeCloseTo(1, 14);
   });
 
+  it("tables only the scores and responses that occur, so responses far apart cost no more than close ones", () => {
+    // Scaling every response by c scales F - E(F) by c and Var(F) by c², so the chi-square and the effect size stay.
+    const scale = 2 ** 20;
+    const scaled = DISJOINT_ROWS.map((row) => row.map((response) => response * scale));
+    const { items } = mantelTest(responseMatrix(scaled), ["reference", "focal", "reference", "focal"]);
+    expect(items[0]?.chiSquare).toBeCloseTo(2, 12);
+    expect(items[0]?.standardizedMeanDifference).toBeCloseTo(scale, 6);
+    expect(items[0]?.effectSize).toBeCloseTo(Math.sqrt(3 / 5), 12);
+    expect(items[0]?.generalized).toEqual({ chiSquare: null, degreesOfFreedom: 3, significance: null });
+  });
+
   it("gives null statistics for an item every person answered alike", () => {
     const result = mantelTest(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items[0];
     expect(result).toEqual({

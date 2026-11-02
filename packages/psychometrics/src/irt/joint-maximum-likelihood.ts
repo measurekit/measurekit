@@ -16,7 +16,7 @@ import type { CalibratedItem } from "./calibration.js";
 import { oneParameterLogistic } from "./logistic.js";
 import { partialCredit, partialCreditInformation, stepStarts } from "./partial-credit.js";
 import { logProbability } from "./probability.js";
-import { categoryCounts, checkCategories, compressResponses, responseCodes } from "./responses.js";
+import { categoryTallies, checkCategories, compressResponses, responseCodes } from "./responses.js";
 
 /** Options of {@link jointMaximumLikelihood}. */
 export interface JointMaximumLikelihoodOptions {
@@ -165,13 +165,11 @@ interface JointData {
 function setUp(matrix: ResponseMatrix): JointData {
   const { itemIds } = matrix;
   const itemCount = itemIds.length;
+  const byItem = categoryTallies(compressResponses(matrix));
   const responses = responseCodes(matrix);
-  const byItem = categoryCounts(compressResponses(matrix));
-  const counts = itemIds.map((id, item) => {
-    const itemCounts = byItem[item] ?? [];
-    checkCategories(id, partialCredit, itemCounts);
-    return itemCounts;
-  });
+  const counts = itemIds.map((id, item) =>
+    checkCategories(id, partialCredit, byItem[item] ?? { highest: -1, counts: new Map() }),
+  );
   const categories = Int32Array.from(counts, (itemCounts) => itemCounts.length);
   const thresholds = Float64Array.from(
     counts.flatMap((itemCounts) => {

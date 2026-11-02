@@ -111,7 +111,7 @@ function ordinalCases(
 ): OrdinalCases {
   if (matching === undefined) {
     const cases = itemCases(data, item, anchors);
-    return { responses: cases.responses, scores: Float64Array.from(cases.scores), focal: cases.focal };
+    return { responses: cases.responses, scores: cases.scores, focal: cases.focal };
   }
   const persons: number[] = [];
   matching.forEach((score, person) => {

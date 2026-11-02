@@ -103,17 +103,21 @@ export function mantelTest(
     (anchors) =>
       matrix.itemIds.map((id, item) => ({
         id,
-        ...statistics(itemCases(data, item, anchors), (data.maxScores[item] ?? 1) + 1),
+        ...statistics(itemCases(data, item, anchors)),
       })),
     (item) => significant(item.significance),
   );
 }
 
-/** An item's persons counted by matching score and group: the sums the statistics are made of. */
+/**
+ * An item's persons counted by matching score and group: the sums the statistics are made of. The score groups are the
+ * matching scores that occur and the categories the responses that occur, each in ascending order, so that the tables
+ * grow with the persons, not with the highest score.
+ */
 interface ScoreGroups {
-  /** The number of response categories, from 0. */
+  /** The number of categories that occur. */
   readonly categories: number;
-  /** The number of score groups: the matching scores from 0 to the highest. */
+  /** The number of score groups. */
   readonly scoreCount: number;
   /** The persons in score group s and group g (1 for focal), at `2 s + g`. */
   readonly sizes: Float64Array;
@@ -121,12 +125,15 @@ interface ScoreGroups {
   readonly totals: Float64Array;
   /** The sums of squared responses of both groups, at `s`. */
   readonly squares: Float64Array;
-  /** The persons in score group s and group g who responded k, at `(2 s + g) categories + k`. */
+  /** The persons in score group s and group g whose response is the category k, at `(2 s + g) categories + k`. */
   readonly counts: Float64Array;
 }
 
-function countByScore({ responses, scores, focal, maxScore }: ItemCases, categories: number): ScoreGroups {
-  const groupCount = maxScore + 1;
+function countByScore({ responses, scores, focal }: ItemCases): ScoreGroups {
+  const groupOf = ranksOf(scores);
+  const categoryOf = ranksOf(responses);
+  const groupCount = groupOf.size;
+  const categories = categoryOf.size;
   const counted: ScoreGroups = {
     categories,
     scoreCount: groupCount,
@@ -136,20 +143,26 @@ function countByScore({ responses, scores, focal, maxScore }: ItemCases, categor
     counts: new Float64Array(2 * groupCount * categories),
   };
   for (let person = 0; person < scores.length; person++) {
-    const score = scores[person] ?? 0;
+    const score = groupOf.get(scores[person] ?? 0) ?? 0;
     const response = responses[person] ?? 0;
     const cell = 2 * score + (focal[person] ?? 0);
     counted.sizes[cell] = (counted.sizes[cell] ?? 0) + 1;
     counted.totals[cell] = (counted.totals[cell] ?? 0) + response;
     counted.squares[score] = (counted.squares[score] ?? 0) + response * response;
-    const category = cell * categories + response;
+    const category = cell * categories + (categoryOf.get(response) ?? 0);
     counted.counts[category] = (counted.counts[category] ?? 0) + 1;
   }
   return counted;
 }
 
-function statistics(cases: ItemCases, categories: number): Omit<MantelTest, "id"> {
-  const groups = countByScore(cases, categories);
+/** Returns the rank of each distinct value among the distinct values in ascending order, from 0. */
+function ranksOf(values: ArrayLike<number>): Map<number, number> {
+  const distinct = [...new Set(Array.from(values))].sort((a, b) => a - b);
+  return new Map(distinct.map((value, rank) => [value, rank]));
+}
+
+function statistics(cases: ItemCases): Omit<MantelTest, "id"> {
+  const groups = countByScore(cases);
   const { excess, variance } = mantelSums(groups);
   const chiSquare = variance > 0 ? (excess * excess) / variance : null;
   const significance = chiSquare === null ? null : chiSquareUpperTail(chiSquare, 1);
@@ -205,7 +218,7 @@ function responseSpread(responses: Int32Array): number | null {
   return responses.length < 2 ? null : standardDeviation(Float64Array.from(responses));
 }
 
-/** Returns the persons in score group s and group g (1 for focal) who responded k. */
+/** Returns the persons in score group s and group g (1 for focal) whose response is the category k. */
 function cell({ categories, counts }: ScoreGroups, s: number, g: number, k: number): number {
   return counts[(2 * s + g) * categories + k] ?? 0;
 }
