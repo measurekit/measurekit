@@ -1,4 +1,4 @@
-import { mean, shuffle } from "@measurekit/core";
+import { chiSquareUpperTail, mean, shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -25,6 +25,7 @@ import {
   assembleForms,
   type ContentConstraint,
   calibrateExposure,
+  closestDifficulty,
   contentBounds,
   contentMinimumsMet,
   createRandom,
@@ -34,14 +35,19 @@ import {
   type DiagnosticPoolItem,
   diagnosticAdaptiveTest,
   diagnosticKullbackLeibler,
+  discriminationIndex,
+  expectedInformation,
+  expectedPosteriorVariance,
   type FormAssemblyOptions,
   gdinaDiscriminationIndex,
   generalizedPartialCredit,
   gradedResponse,
+  type IrtItem,
   type ItemSelectionRule,
   informationThreshold,
   itemInformation,
   kullbackLeibler,
+  likelihoodWeightedInformation,
   type MultidimensionalAdaptiveTest,
   type MultidimensionalAdaptiveTestState,
   type MultidimensionalEstimate,
@@ -65,14 +71,21 @@ import {
   multidimensionalTwoParameterLogistic,
   multistageCuts,
   multistageTest,
+  nominalResponse,
   type PoolItem,
   type ProfileEstimate,
+  posteriorDiscriminationIndex,
+  posteriorKullbackLeibler,
   posteriorMeanEstimate,
   posteriorModeEstimate,
   posteriorThreshold,
+  posteriorWeightedInformation,
   posteriorWeightedKullbackLeibler,
+  progressive,
+  proportional,
   type Random,
   randomesque,
+  ratingScale,
   type SelectionContext,
   type StoppingRule,
   shannonEntropy,
@@ -83,6 +96,7 @@ import {
   simulateMultidimensionalAdaptiveTest,
   simulateMultistageTest,
   standardErrorThreshold,
+  startingItems,
   type TestItem,
   testInformation,
   testLength,
@@ -103,6 +117,7 @@ import catContent from "./fixtures/cat-content.json" with { type: "json" };
 import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
 import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
 import cutsFixture from "./fixtures/cat-multistage-cuts.json" with { type: "json" };
+import catSelection from "./fixtures/cat-selection.json" with { type: "json" };
 import catTestlets from "./fixtures/cat-testlets.json" with { type: "json" };
 import catForms from "./fixtures/form-assembly.json" with { type: "json" };
 
@@ -114,7 +129,7 @@ const CATR_MODAL_TOLERANCE = 1e-4;
  * `posteriorMeanEstimate`.
  */
 const CATR_EAP_TOLERANCE = 1e-6;
-/** Information and Kullback-Leibler scores, relative to max(1, |score|). */
+/** Scores of the deterministic selection rules, relative to max(1, |score|). */
 const SCORE_TOLERANCE = 1e-12;
 /** EAP theta and standard error against the written-out testlet replay, which sums over the same 61 points. */
 const REPLAY_TOLERANCE = 1e-12;
@@ -155,6 +170,9 @@ interface CatRun {
 const LENGTH = 15;
 /** The seed of the simulations that compare the content bounds with the shadow test. */
 const SEED_BOUNDS = 20261029;
+/** The seed and the number of the draws that compare the random selection rules with their probabilities. */
+const SEED_DRAWS = 20261102;
+const DRAWS = 20_000;
 /** The estimate at which the rules of content bounds are scored directly. */
 const BOUNDS_ESTIMATE: AbilityEstimate = { theta: 0, standardError: 1 };
 // By catR's names.
@@ -2751,6 +2769,375 @@ describe("maximumInformation", () => {
   }
 });
 
+describe("selection rules of catR beyond MFI and KL", () => {
+  const Pools: Readonly<Record<string, readonly PoolItem[]>> = { "cat-3pl": POOL_3PL, "cat-gpcm": POOL_GPCM };
+  const Runs: Readonly<Record<string, readonly CatRun[]>> = { "cat-3pl": cat3pl.runs, "cat-gpcm": catGpcm.runs };
+  interface RuleOptions {
+    readonly prior?: { readonly mean: number; readonly sd: number };
+    readonly information?: string;
+  }
+  /** The rule of catR's criterion, with the fixture's options. */
+  const ruleOf = (criterion: string, options: RuleOptions): ItemSelectionRule => {
+    const prior = options.prior === undefined ? {} : { prior: options.prior };
+    switch (criterion) {
+      case "MLWI":
+        return likelihoodWeightedInformation;
+      case "MPWI":
+        return posteriorWeightedInformation(prior);
+      case "KLP":
+        return posteriorKullbackLeibler(prior);
+      case "GDI":
+        return discriminationIndex;
+      case "GDIP":
+        return posteriorDiscriminationIndex(prior);
+      case "MEPV":
+        return expectedPosteriorVariance(prior);
+      case "MEI":
+        return expectedInformation(options.information === "fisher" ? { information: "fisher" } : {});
+      default:
+        return closestDifficulty;
+    }
+  };
+  const casesOf = (criterion: string) => Object.values(catSelection.scores).filter(({ rule }) => rule === criterion);
+
+  for (const criterion of ["MLWI", "MPWI", "KLP", "GDI", "GDIP", "MEPV", "MEI", "bOpt"]) {
+    it(`matches catR's ${criterion} of every eligible item after 0 to 10 responses of a run`, () => {
+      for (const { name, fixture, run, step, options, theta, scores } of casesOf(criterion)) {
+        const pool = defined(Pools[fixture]);
+        const { steps } = defined(defined(Runs[fixture]).find((candidate) => candidate.name === run));
+        const out = new Float64Array(pool.length);
+        ruleOf(criterion, options).scores(contextAfter(pool, steps, step, { theta, standardError: 1 }), out);
+        scores.forEach((expected, i) => {
+          if (expected === null) return;
+          expectClose(
+            out[i] ?? 0,
+            expected,
+            SCORE_TOLERANCE * Math.max(1, Math.abs(expected)),
+            `${name}, item ${i + 1}`,
+          );
+        });
+      }
+    });
+  }
+
+  for (const { name, fixture, rule, starting, items, responses } of Object.values(catSelection.replays)) {
+    it(`administers the starting items, then the items of nextItem at the MAP estimate: ${name}`, () => {
+      const pool = defined(Pools[fixture]);
+      const test = adaptiveTest({
+        pool,
+        selection: startingItems(starting, ruleOf(rule, {})),
+        estimator: posteriorModeEstimate,
+        stopping: testLength(items.length),
+      });
+      const state = administer(test, (id) => defined(responses[items.indexOf(id)]));
+      expect(state.items).toEqual(items);
+    });
+  }
+
+  /** A source of random numbers that returns the given uniform draws in order. */
+  const draws = (uniforms: readonly number[]): Random => {
+    let next = 0;
+    return {
+      uniform: () => defined(uniforms[next++]),
+      normal: () => {
+        throw new Error("No normal draws.");
+      },
+    };
+  };
+
+  it("scores progressive and proportional selection with catR's weights for given uniform draws", () => {
+    for (const random of Object.values(catSelection.random)) {
+      const { name, fixture, run, step, length, acceleration, theta, uniforms } = random;
+      const pool = defined(Pools[fixture]);
+      const { steps } = defined(defined(Runs[fixture]).find((candidate) => candidate.name === run));
+      const rules = {
+        progressive: progressive({ length, acceleration }),
+        race: proportional({ length, acceleration }),
+      };
+      for (const [kind, rule] of Object.entries(rules)) {
+        const out = new Float64Array(pool.length);
+        rule.scores(contextAfter(pool, steps, step, { theta, standardError: 1 }, draws(uniforms)), out);
+        random[kind === "progressive" ? "progressive" : "race"].forEach((expected, i) => {
+          if (expected === null) return;
+          expectClose(
+            out[i] ?? 0,
+            expected,
+            SCORE_TOLERANCE * Math.max(1, Math.abs(expected)),
+            `${name}, ${kind} ${i}`,
+          );
+        });
+      }
+    }
+  });
+
+  it("selects each item with the probability of the progressive and proportional methods, by chi-square", () => {
+    const { items, administered, responses, theta, length, progressive: expectedProgressive } = catSelection.draws;
+    const pool = POOL_3PL.slice(0, 10);
+    const eligible = Uint8Array.from(pool, (_, i) => (administered.includes(i) ? 0 : 1));
+    const estimate = { theta, standardError: 1 };
+    const random = createRandom(SEED_DRAWS);
+    const context = { pool, administered, responses, estimate, eligible, random };
+    for (const [rule, probabilities] of [
+      [progressive({ length }), expectedProgressive],
+      [proportional({ length }), catSelection.draws.proportional],
+    ] as const) {
+      const counts = new Float64Array(pool.length);
+      const out = new Float64Array(pool.length);
+      for (let draw = 0; draw < DRAWS; draw++) {
+        rule.scores(context, out);
+        const chosen = highestScore(out, eligible);
+        counts[chosen] = (counts[chosen] ?? 0) + 1;
+      }
+      let statistic = 0;
+      items.forEach((item, j) => {
+        const expected = DRAWS * defined(probabilities[j]);
+        statistic += ((counts[item] ?? 0) - expected) ** 2 / expected;
+      });
+      expect((counts[0] ?? 0) + (counts[1] ?? 0)).toBe(0);
+      expect(chiSquareUpperTail(statistic, items.length - 1)).toBeGreaterThan(0.001);
+    }
+  });
+
+  describe("the weighted rules", () => {
+    const context = (pool: readonly PoolItem[], count: number, theta = 0): SelectionContext => ({
+      ...contextOf(pool, count, { theta, standardError: 1 }),
+      random: createRandom(1),
+    });
+
+    it("weight by the likelihood alone before a prior, and the prior moves MPWI toward items near its mean", () => {
+      const pool = [item2pl("low", 1.5, -2), item2pl("mid", 1.5, 0), item2pl("high", 1.5, 2)];
+      const scores = (rule: ItemSelectionRule): Float64Array => {
+        const out = new Float64Array(pool.length);
+        rule.scores(context(pool, 0), out);
+        return out;
+      };
+      const flat = scores(likelihoodWeightedInformation);
+      expectClose(defined(flat[0]), defined(flat[2]), 1e-12, "a symmetric grid scores mirrored items alike");
+      const high = scores(posteriorWeightedInformation({ prior: { mean: 2, sd: 0.5 } }));
+      expect(highestScore(high, Uint8Array.from([1, 1, 1]))).toBe(2);
+      expect(highestScore(scores(posteriorWeightedInformation()), Uint8Array.from([1, 1, 1]))).toBe(1);
+    });
+
+    it("keep the posterior defined where the prior's density underflows at every node", () => {
+      const pool = POOL_3PL.slice(0, 6);
+      const far = { prior: { mean: 60, sd: 0.5 } };
+      for (const rule of [
+        posteriorWeightedInformation(far),
+        posteriorKullbackLeibler(far),
+        posteriorDiscriminationIndex(far),
+        expectedPosteriorVariance(far),
+      ]) {
+        const out = new Float64Array(pool.length);
+        rule.scores(context(pool, 2, 1), out);
+        for (const score of out.subarray(2)) expect(Number.isFinite(score)).toBe(true);
+      }
+    });
+
+    it("score the expected posterior variance below 0, the most informative item highest", () => {
+      const pool = [item2pl("flat", 0.3, 0), item2pl("steep", 2.5, 0)];
+      const out = new Float64Array(2);
+      expectedPosteriorVariance().scores(context(pool, 0), out);
+      expect(Math.max(...out)).toBeLessThan(0);
+      expect(highestScore(out, Uint8Array.from([1, 1]))).toBe(1);
+    });
+
+    it("throw for a discrimination index of an item that does not have two categories", () => {
+      const out = new Float64Array(POOL_GPCM.length);
+      const gpcm = context(POOL_GPCM, 0);
+      const first = defined(POOL_GPCM[0]);
+      expect(() => discriminationIndex.scores(gpcm, out)).toThrow(
+        `The discrimination index takes items of two categories; item "${first.id}" has ${first.model.categoryCount(first.parameters)}.`,
+      );
+      expect(() => posteriorDiscriminationIndex().scores(gpcm, out)).toThrow(DataError);
+    });
+
+    it("reject options and priors of other types", () => {
+      for (const rule of [
+        posteriorWeightedInformation,
+        posteriorKullbackLeibler,
+        posteriorDiscriminationIndex,
+        expectedPosteriorVariance,
+      ]) {
+        expect(() => rule(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+        expect(() => rule({ prior: JSON.parse('"normal"') })).toThrow(
+          'The option prior must be an object { mean, sd }, found "normal".',
+        );
+        expect(() => rule({ prior: { mean: 0, sd: 0 } })).toThrow(
+          "The sd of the prior must be a positive number, found 0.",
+        );
+        expect(() => rule({ prior: { mean: Number.NaN, sd: 1 } })).toThrow(DataError);
+      }
+    });
+  });
+
+  describe("expectedInformation", () => {
+    it("estimates once for each category of each eligible item, from the responses so far and that category", () => {
+      const pool = POOL_GPCM.slice(0, 4);
+      const calls: string[] = [];
+      const estimator: AbilityEstimator = (items, responses) => {
+        calls.push(`${items.length}:${responses.join("")}`);
+        return { theta: 0.1 * responses.length, standardError: 1 };
+      };
+      const out = new Float64Array(pool.length);
+      const counts = pool.map((item) => item.model.categoryCount(item.parameters));
+      expectedInformation({ estimator, information: "fisher" }).scores(
+        { ...contextOf(pool, 1, { theta: 0, standardError: 1 }), random: createRandom(1) },
+        out,
+      );
+      expect(calls).toHaveLength(counts.slice(1).reduce((sum, count) => sum + count, 0));
+      expect(calls.every((call) => call.startsWith("2:1"))).toBe(true);
+      pool.slice(1).forEach((item, j) => {
+        const atEstimate = new Float64Array(defined(counts[j + 1]));
+        item.model.probabilities(item.parameters, 0, atEstimate);
+        const information = item.model.information(item.parameters, 0.2);
+        expectClose(defined(out[j + 1]), information, 1e-12, item.id);
+      });
+    });
+
+    it("rejects options, estimators and kinds of information of other types", () => {
+      expect(() => expectedInformation(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      expect(() => expectedInformation({ estimator: JSON.parse('"MAP"') })).toThrow(
+        'The option estimator must be a function of items and responses, such as posteriorModeEstimate, found "MAP".',
+      );
+      expect(() => expectedInformation({ information: JSON.parse('"expected"') })).toThrow(
+        'The option information must be "observed" or "fisher", found "expected".',
+      );
+    });
+  });
+
+  describe("closestDifficulty", () => {
+    it("scores by the distance to the mean threshold, for rating scale items with their steps", () => {
+      const pool: PoolItem[] = [
+        item2pl("q1", 1, 0.8),
+        { id: "g1", model: gradedResponse, parameters: { a: 1, b: [-1, 0.5, 2] } },
+        { id: "r1", model: ratingScale, parameters: { a: 1, b: 0.2, steps: [-1, 0, 1.6] } },
+      ];
+      const out = new Float64Array(pool.length);
+      const context = { ...contextOf(pool, 0, { theta: 0.1, standardError: 1 }), random: createRandom(1) };
+      closestDifficulty.scores(context, out);
+      expectClose(defined(out[0]), -0.7, 1e-12, "2PL");
+      expectClose(defined(out[1]), -0.4, 1e-12, "GRM");
+      expectClose(defined(out[2]), -0.3, 1e-12, "RSM: b plus the mean step, 0.4");
+    });
+
+    it("throws for an item without a difficulty, such as one of the nominal model", () => {
+      const pool: PoolItem[] = [{ id: "n1", model: nominalResponse, parameters: { a: [0, 1, 2], c: [0, 0.5, -0.5] } }];
+      const context = { ...contextOf(pool, 0, { theta: 0, standardError: 1 }), random: createRandom(1) };
+      expect(() => closestDifficulty.scores(context, new Float64Array(1))).toThrow(
+        'Selection by the closest difficulty needs items with a difficulty b; item "n1" of the NRM has none.',
+      );
+    });
+  });
+
+  describe("progressive and proportional", () => {
+    const pool = POOL_3PL.slice(0, 8);
+    const scoresAfter = (rule: ItemSelectionRule, count: number, random: Random): Float64Array => {
+      const out = new Float64Array(pool.length);
+      rule.scores({ ...contextOf(pool, count, { theta: 0.4, standardError: 1 }), random }, out);
+      return out;
+    };
+    const information = pool.map((item) => itemInformation(item, 0.4));
+
+    it("selects at random first and by information from the last planned item on", () => {
+      const half = draws(new Array<number>(8).fill(0.5));
+      const first = scoresAfter(progressive({ length: 5 }), 0, half);
+      const largest = Math.max(...information);
+      for (const score of first) expectClose(score, 0.5 * largest, 1e-15, "chance only");
+      for (const count of [4, 6]) {
+        const late = scoresAfter(progressive({ length: 5 }), count, draws(new Array<number>(8).fill(0.9)));
+        late.forEach((score, i) => {
+          if (i >= count) expectClose(score, defined(information[i]), 1e-15, `after ${count} items`);
+        });
+      }
+      const race = scoresAfter(proportional({ length: 5 }), 0, draws(new Array<number>(8).fill(0.5)));
+      for (const score of race) expectClose(score, -Math.log(Math.log(2)), 1e-15, "every item as likely");
+    });
+
+    it("weights linearly with acceleration 0 and gives a test of one planned item its weight at once", () => {
+      const out = scoresAfter(progressive({ length: 5, acceleration: 0 }), 2, draws(new Array<number>(8).fill(0)));
+      expectClose(defined(out[3]), 0.5 * defined(information[3]), 1e-15, "w = 2 / 4");
+      const single = scoresAfter(progressive({ length: 1 }), 1, draws(new Array<number>(8).fill(0.3)));
+      expectClose(defined(single[2]), defined(information[2]), 1e-15, "w = 1 after the planned length");
+    });
+
+    it("never draws an item without information once the power is above 0", () => {
+      const items = [item2pl("given", 1, 0), item2pl("none", 0, 0), item2pl("some", 1, 0)];
+      const out = new Float64Array(items.length);
+      proportional({ length: 3 }).scores(
+        { ...contextOf(items, 1, { theta: 0, standardError: 1 }), random: createRandom(3) },
+        out,
+      );
+      expect(out[1]).toBe(Number.NEGATIVE_INFINITY);
+      expect(Number.isFinite(out[2])).toBe(true);
+    });
+
+    it("rejects options of other types and invalid lengths and accelerations", () => {
+      for (const rule of [progressive, proportional]) {
+        expect(() => rule(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+        expect(() => rule(JSON.parse("{}"))).toThrow("The option length must be a positive integer, found undefined.");
+        expect(() => rule({ length: 0 })).toThrow("The option length must be a positive integer, found 0.");
+        expect(() => rule({ length: 2.5 })).toThrow(DataError);
+        expect(() => rule({ length: 10, acceleration: -1 })).toThrow(
+          "The option acceleration must be a non-negative number, found -1.",
+        );
+        expect(() => rule({ length: 10, acceleration: JSON.parse('"1"') })).toThrow(DataError);
+      }
+    });
+  });
+
+  describe("startingItems", () => {
+    const pool = POOL_3PL.slice(0, 6);
+    const stopping = testLength(5);
+
+    it("administers the starting items in order, then follows the rule", () => {
+      const ids = ["item004", "item002", "item006"];
+      const test = adaptiveTest({ pool, stopping, selection: startingItems(ids, maximumInformation) });
+      const state = administer(test, () => 1);
+      expect(state.items.slice(0, 3)).toEqual(ids);
+      expect(state.items.slice(3).filter((id) => ids.includes(id))).toEqual([]);
+      expect(new Set(state.items).size).toBe(5);
+    });
+
+    it("skips a starting item that is not eligible and follows the rule when none is", () => {
+      const ids = ["item001", "item002"];
+      const enemies = [["item001", "item002"]];
+      const test = adaptiveTest({ pool, stopping, enemies, selection: startingItems(ids, maximumInformation) });
+      const state = administer(test, () => 0);
+      expect(state.items[0]).toBe("item001");
+      expect(state.items).not.toContain("item002");
+      const withheld = adaptiveTest({
+        pool: pool.map((item) => (item.id === "item001" ? { ...item, exposure: 0 } : item)),
+        stopping: testLength(1),
+        selection: startingItems(["item001", "item003"], maximumInformation),
+      });
+      expect(administer(withheld, () => 0).items).toEqual(["item003"]);
+    });
+
+    it("throws at the first selection for a starting item the pool does not have", () => {
+      const test = adaptiveTest({
+        pool,
+        stopping,
+        selection: startingItems(["item001", "item999"], maximumInformation),
+      });
+      expect(() => test.start(createRandom(1))).toThrow('The starting item "item999" is not in the pool.');
+    });
+
+    it("rejects ids that are not distinct non-empty strings and a rule of another kind", () => {
+      expect(() => startingItems(JSON.parse("null"), maximumInformation)).toThrow(
+        "The starting items must be an array of item ids, found null.",
+      );
+      expect(() => startingItems(["q1", JSON.parse("3")], maximumInformation)).toThrow(
+        "Starting item 2 must be a non-empty item id, found 3.",
+      );
+      expect(() => startingItems(["q1", ""], maximumInformation)).toThrow(DataError);
+      expect(() => startingItems(["q1", "q1"], maximumInformation)).toThrow('The starting items name item "q1" twice.');
+      expect(() => startingItems(["q1"], JSON.parse("{}"))).toThrow(
+        "Starting items need a selection rule to follow them, such as maximumInformation, found an object.",
+      );
+    });
+  });
+});
+
 describe("simulation", () => {
   const random = createRandom(20261029);
   const thetas = Array.from({ length: 300 }, () => random.normal());
@@ -4459,6 +4846,54 @@ describe("properties", () => {
         },
       ),
       { numRuns: 60 },
+    );
+  });
+
+  it("the rules beyond MFI and KL score every eligible item finite or -Infinity and select an eligible item", () => {
+    const dichotomous = (item: IrtItem): boolean => item.model.categoryCount(item.parameters) === 2;
+    const rules: readonly (readonly [ItemSelectionRule, (item: IrtItem) => boolean])[] = [
+      [likelihoodWeightedInformation, () => true],
+      [posteriorWeightedInformation({ prior: { mean: 0.5, sd: 1.5 } }), () => true],
+      [posteriorKullbackLeibler(), () => true],
+      [expectedPosteriorVariance(), () => true],
+      [expectedInformation(), () => true],
+      [expectedInformation({ information: "fisher" }), () => true],
+      [progressive({ length: 6 }), () => true],
+      [proportional({ length: 6, acceleration: 2 }), () => true],
+      [startingItems(["q0"], maximumInformation), () => true],
+      [discriminationIndex, dichotomous],
+      [posteriorDiscriminationIndex(), dichotomous],
+      [closestDifficulty, (item) => item.model !== nominalResponse],
+    ];
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...rules),
+        fc.array(arbitraryItem, { minLength: 1, maxLength: 8 }),
+        fc.array(fc.nat(), { maxLength: 8 }),
+        fc.array(fc.boolean(), { minLength: 8, maxLength: 8 }),
+        fc.double({ min: -3, max: 3, noNaN: true }),
+        fc.integer(),
+        ([rule, accepts], items, answers, mask, theta, seed) => {
+          const pool = items.filter(accepts).map((item, i) => ({ ...item, id: `q${i}` }));
+          fc.pre(pool.length > 0);
+          const administered = answers.slice(0, Math.max(0, pool.length - 1)).map((_, j) => j);
+          const responses = administered.map((j) => {
+            const item = defined(pool[j]);
+            return defined(answers[j]) % item.model.categoryCount(item.parameters);
+          });
+          const eligible = Uint8Array.from(pool, (_, i) => (i >= administered.length && (mask[i] ?? true) ? 1 : 0));
+          const out = new Float64Array(pool.length).fill(Number.NaN);
+          const estimate = { theta, standardError: 1 };
+          rule.scores({ pool, administered, responses, estimate, eligible, random: createRandom(seed) }, out);
+          eligible.forEach((flag, i) => {
+            const score = out[i] ?? Number.NaN;
+            if (flag === 1) expect(Number.isFinite(score) || score === Number.NEGATIVE_INFINITY, `${score}`).toBe(true);
+          });
+          const chosen = highestScore(out, eligible);
+          if (chosen >= 0) expect(eligible[chosen]).toBe(1);
+        },
+      ),
+      { numRuns: 300 },
     );
   });
   it("testlets are administered whole in one block, and the test ends only between them", () => {

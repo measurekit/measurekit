@@ -38,6 +38,11 @@ of them, from each form's covariance, counting a form between two links once, as
 the score, which gives the contrasting-groups and Body of Work methods, and `beukCutScore` the Beuk compromise, which
 crosses the observed failure rate as `hofsteeCutScore` does.
 
+Adaptive tests select by catR's other rules: `closestDifficulty` (bOpt), `expectedInformation` (MEI),
+`likelihoodWeightedInformation` and `posteriorWeightedInformation` (MLWI, MPWI), `posteriorKullbackLeibler` (KLP),
+`discriminationIndex` and `posteriorDiscriminationIndex` (GDI, GDIP), `expectedPosteriorVariance` (MEPV), and the
+progressive and proportional methods of exposure control, and `startingItems` administers fixed items before any rule.
+
 Lord's chi-square can be purified: with `purify: true` the items it flags leave the anchors of the linking, which is
 repeated on the two calibrations until two rounds flag the same items.
 

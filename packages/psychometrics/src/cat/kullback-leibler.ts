@@ -1,13 +1,48 @@
-import { largestCategoryCount, logProbability, MIN_PROBABILITY } from "../irt/internal.js";
-import type { PoolItem } from "./items.js";
+import { type IrtItem, largestCategoryCount, MIN_PROBABILITY } from "../irt/internal.js";
 import type { ItemSelectionRule } from "./selection.js";
+import { GRID_NODES, GRID_POINTS, gridWeights, priorOnGrid, type WeightedRuleOptions } from "./weighted-rules.js";
 
-// catR's default integration grid for KL, parInt = c(-4, 4, 33): equally spaced nodes, trapezoid weights.
-const KL_LOWER = -4;
-const KL_UPPER = 4;
-const KL_POINTS = 33;
-const KL_STEP = (KL_UPPER - KL_LOWER) / (KL_POINTS - 1);
-const KL_NODES = Float64Array.from({ length: KL_POINTS }, (_, q) => KL_LOWER + q * KL_STEP);
+/** Builds the KL rule, whose weights are the likelihood alone or, with a prior's log-density, the posterior. */
+function divergenceRule(prior: Float64Array | null): ItemSelectionRule {
+  return {
+    scores(context, out) {
+      const { pool, estimate, eligible } = context;
+      const size = largestCategoryCount(pool);
+      const atEstimate = new Float64Array(size);
+      const atNode = new Float64Array(size);
+      const weights = gridWeights(context, { prior, trapezoid: true }, atNode);
+      pool.forEach((item, index) => {
+        if (eligible[index] === 1) out[index] = divergence(item, estimate.theta, weights, atEstimate, atNode);
+      });
+    },
+  };
+}
+
+/**
+ * Returns Σ_q w_q Σ_k P_k(θ̂) ln(P_k(θ̂) / P_k(θ_q)) of an item over the grid. `atEstimate` and `atNode` are scratch
+ * space.
+ */
+function divergence(
+  { model, parameters }: IrtItem,
+  theta: number,
+  weights: Float64Array,
+  atEstimate: Float64Array,
+  atNode: Float64Array,
+): number {
+  const count = model.categoryCount(parameters);
+  model.probabilities(parameters, theta, atEstimate);
+  let score = 0;
+  for (let q = 0; q < GRID_POINTS; q++) {
+    model.probabilities(parameters, GRID_NODES[q] ?? 0, atNode);
+    let sum = 0;
+    for (let k = 0; k < count; k++) {
+      const p = atEstimate[k] ?? 0;
+      if (p > 0) sum += p * Math.log(p / Math.max(atNode[k] ?? 0, MIN_PROBABILITY));
+    }
+    score += (weights[q] ?? 0) * sum;
+  }
+  return score;
+}
 
 /**
  * Kullback-Leibler information (KL), catR's `KL`.
@@ -18,55 +53,22 @@ const KL_NODES = Float64Array.from({ length: KL_POINTS }, (_, q) => KL_LOWER + q
  * rule on 33 equally spaced points from -4 to 4, catR's default, with the likelihood scaled to a maximum of 1 on them,
  * which leaves the order of the items unchanged.
  */
-export const kullbackLeibler: ItemSelectionRule = {
-  scores({ pool, administered, responses, estimate, eligible }, out) {
-    const size = largestCategoryCount(pool);
-    const atEstimate = new Float64Array(size);
-    const atNode = new Float64Array(size);
-    const weights = likelihoodWeights(pool, administered, responses, atNode);
-    pool.forEach((item, index) => {
-      if (eligible[index] !== 1) return;
-      const { model, parameters } = item;
-      const count = model.categoryCount(parameters);
-      model.probabilities(parameters, estimate.theta, atEstimate);
-      let score = 0;
-      for (let q = 0; q < KL_POINTS; q++) {
-        model.probabilities(parameters, KL_NODES[q] ?? 0, atNode);
-        let divergence = 0;
-        for (let k = 0; k < count; k++) {
-          const p = atEstimate[k] ?? 0;
-          if (p > 0) divergence += p * Math.log(p / Math.max(atNode[k] ?? 0, MIN_PROBABILITY));
-        }
-        score += (weights[q] ?? 0) * divergence;
-      }
-      out[index] = score;
-    });
-  },
-};
+export const kullbackLeibler: ItemSelectionRule = divergenceRule(null);
 
 /**
- * Returns the trapezoid weight of each node times the likelihood of the responses there, scaled to a maximum
- * likelihood of 1. `probabilities` is scratch space.
+ * Returns posterior Kullback-Leibler information (KLP), catR's `KLP`: each item scored by its Kullback-Leibler
+ * divergence between the current estimate and theta, integrated over theta weighted by the posterior.
+ *
+ * @remarks
+ * As {@link kullbackLeibler}, with the likelihood times the density of the normal prior as the weight, scaled to a
+ * maximum of 1 on the grid.
+ *
+ * @param options - The prior.
+ * @returns The selection rule.
+ * @throws `DataError` when the options are not an object or the prior is not `{ mean, sd }` with a finite mean and a
+ * positive sd.
+ * @see {@link https://doi.org/10.1177/014662169602000303 | Chang and Ying (1996)}
  */
-function likelihoodWeights(
-  pool: readonly PoolItem[],
-  administered: readonly number[],
-  responses: readonly number[],
-  probabilities: Float64Array,
-): Float64Array {
-  const logLikelihood = new Float64Array(KL_POINTS);
-  administered.forEach((index, j) => {
-    const item = pool[index];
-    const response = responses[j] ?? 0;
-    if (item === undefined) return;
-    for (let q = 0; q < KL_POINTS; q++) {
-      item.model.probabilities(item.parameters, KL_NODES[q] ?? 0, probabilities);
-      logLikelihood[q] = (logLikelihood[q] ?? 0) + logProbability(probabilities[response] ?? 0);
-    }
-  });
-  const largest = logLikelihood.reduce((most, value) => Math.max(most, value), Number.NEGATIVE_INFINITY);
-  return logLikelihood.map((value, q) => {
-    const end = q === 0 || q === KL_POINTS - 1;
-    return (end ? KL_STEP / 2 : KL_STEP) * Math.exp(value - largest);
-  });
+export function posteriorKullbackLeibler(options: WeightedRuleOptions = {}): ItemSelectionRule {
+  return divergenceRule(priorOnGrid(options));
 }

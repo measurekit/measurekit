@@ -121,19 +121,95 @@ first response too, where ML and WLE throw, so they need `untilMixed`.
 
 ### Item selection
 
-A rule scores every eligible item; the test selects the highest score.
+A rule scores every eligible item; the test selects the highest score. Rules that take options are functions that
+return the rule; the others are rules.
 
-| Rule                       | Score                                                                                  | catR                            |
-| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------- |
-| `maximumInformation`       | Fisher information at θ̂                                                                | `MFI`                           |
-| `kullbackLeibler`          | ∫ L(θ) Σ_k P_k(θ̂) ln(P_k(θ̂) / P_k(θ)) dθ, L the likelihood of the responses so far     | `KL`                            |
-| `aStratified(lengths)`     | -\|θ_max - θ̂\| in the scheduled stratum, θ_max where the item's information is largest | `thOpt` in `aStratified` strata |
-| `randomesque(rule, count)` | A uniform draw for the `count` items `rule` scores highest, `-Infinity` for the others | the `randomesque` count         |
+```mermaid
+flowchart LR
+  S{"Starting items left?"} -->|"yes"| F["startingItems: the next fixed id"]
+  S -->|"no"| R{"Rule"}
+  R --> P["At the estimate: MFI, bOpt, MEI"]
+  R --> W["Over theta, by the likelihood or posterior: MLWI, MPWI, KL, KLP, GDI, GDIP, MEPV"]
+  R --> X["Exposure by chance: progressive, proportional, randomesque"]
+  R --> T["By strata: aStratified"]
+```
 
-Every rule works for items of any model, through the model's methods.
+| Rule                                    | Score                                                                                    | catR                            |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------- |
+| `maximumInformation`                    | Fisher information at θ̂                                                                  | `MFI`                           |
+| `closestDifficulty`                     | -\|b - θ̂\|, b the item's difficulty or mean threshold                                    | `bOpt`                          |
+| `expectedInformation(options)`          | Σ_k P_k(θ̂) I_k(θ̂_k), θ̂_k the estimate after the response k                               | `MEI`                           |
+| `likelihoodWeightedInformation`         | ∫ L(θ) I(θ) dθ, L the likelihood of the responses so far                                 | `MLWI`                          |
+| `posteriorWeightedInformation(options)` | ∫ L(θ) π(θ) I(θ) dθ, π the prior's density                                               | `MPWI`                          |
+| `kullbackLeibler`                       | ∫ L(θ) Σ_k P_k(θ̂) ln(P_k(θ̂) / P_k(θ)) dθ                                                 | `KL`                            |
+| `posteriorKullbackLeibler(options)`     | ∫ L(θ) π(θ) Σ_k P_k(θ̂) ln(P_k(θ̂) / P_k(θ)) dθ                                            | `KLP`                           |
+| `discriminationIndex`                   | The variance of P(θ) over theta, weighted by L; items of two categories                  | `GDI`                           |
+| `posteriorDiscriminationIndex(options)` | The variance of P(θ) over theta, weighted by L π; items of two categories                | `GDIP`                          |
+| `expectedPosteriorVariance(options)`    | -Σ_k P_k(θ̂) Var(θ \| the responses and k)                                                | `MEPV`                          |
+| `progressive(options)`                  | w I(θ̂) + (1 - w) U max I, U uniform, w from 0 at the first item to 1 at the last planned | `progressive`                   |
+| `proportional(options)`                 | Drawn with probability ∝ I(θ̂)^(Q w)                                                      | `proportional`                  |
+| `aStratified(lengths)`                  | -\|θ_max - θ̂\| in the scheduled stratum, θ_max where the item's information is largest   | `thOpt` in `aStratified` strata |
+| `randomesque(rule, count)`              | A uniform draw for the `count` items `rule` scores highest, `-Infinity` for the others   | the `randomesque` count         |
+| `startingItems(ids, rule)`              | The first eligible of `ids` for the first `ids.length` selections, then `rule`           | `startItems(fixItems)`          |
 
-- **KL** integrates by the trapezoid rule on 33 points from -4 to 4, catR's default `parInt`, with L scaled to a
-  maximum of 1 on them.
+Every rule works for items of any model, through the model's methods, but `closestDifficulty`, which needs a `b`, and the
+discrimination indices, which take items of two categories as catR does; each throws `DataError` at the first selection
+that scores such an item.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  adaptiveTest,
+  expectedInformation,
+  posteriorWeightedInformation,
+  progressive,
+  startingItems,
+  testLength,
+} from "@measurekit/psychometrics/cat";
+import { posteriorModeEstimate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+
+const pool = Array.from({ length: 12 }, (_, i) => ({
+  id: `q${i + 1}`,
+  model: twoParameterLogistic,
+  parameters: { a: 0.8 + (i % 4) * 0.3, b: -1.5 + (i * 3) / 11, c: 0, d: 1 },
+}));
+const stopping = testLength(6);
+const fixed = adaptiveTest({ pool, stopping, selection: startingItems(["q6", "q7"], posteriorWeightedInformation()) });
+const expected = adaptiveTest({ pool, stopping, selection: expectedInformation(), estimator: posteriorModeEstimate });
+const random = adaptiveTest({ pool, stopping, selection: progressive({ length: 6 }) });
+fixed.start(createRandom(1)).next; // "q6"
+expected.start(createRandom(1)).next; // "q8": the most information expected after its response
+random.start(createRandom(1)).next; // "q12", at random: the weight of information is 0 at the first item
+```
+
+| Option of the rules                       | Default                 | Meaning                                                                     |
+| ----------------------------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| `prior` of the posterior rules            | `{ mean: 0, sd: 1 }`    | The normal prior π of MPWI, KLP, GDIP and MEPV                              |
+| `estimator` of `expectedInformation`      | `posteriorModeEstimate` | The estimate θ̂_k after each possible response; it must estimate any pattern |
+| `information` of `expectedInformation`    | `"observed"`            | `"observed"`, (P'_k / P_k)² - P''_k / P_k of the response k, or `"fisher"`  |
+| `length` of `progressive`, `proportional` | required                | The planned length Q of the test                                            |
+| `acceleration`                            | `1`                     | t of the weight w = Σ_(i ≤ k) i^t / Σ_(i < Q) i^t after k items             |
+
+- **The grid.** MLWI, MPWI, KL, KLP and MEPV integrate by the trapezoid rule on 33 points from -4 to 4, catR's default
+  `parInt`; GDI and GDIP take a weighted sum on the same points, as catR does. The likelihood, times the prior's density
+  for the posterior rules, is scaled to a maximum of 1 on them, which leaves the order of the items unchanged and keeps
+  the weights from underflowing.
+- **MEI** calls the estimator once for each category of each eligible item, so a pool of 300 items of four categories
+  costs 1,200 estimates per selection. Its default, the MAP estimate, exists for every pattern; an ML estimator needs
+  `untilMixed`.
+- **MEPV** scores minus the expected variance, so the highest score is the smallest variance. The variance of the
+  posterior after each response is that of catR's `eapEst` and `eapSem` on the grid.
+- **bOpt** takes `b` of a logistic item, the mean of the thresholds `b` of a graded or partial credit item, and `b` plus
+  the mean of the `steps` of a rating scale item. For the 1PL and 2PL it selects as maximum information does.
+- **Progressive and proportional** (Revuelta and Ponsoda, 1998; Barrada et al., 2008) spread the early items over the
+  pool and select by information late in the test. The weight w is 0 at the first item, Σ_(i ≤ k) i^t / Σ_(i < Q) i^t
+  after k items, and 1 from the last planned item on. Progressive draws one uniform number per eligible item;
+  proportional draws an item with probability ∝ I(θ̂)^(Q w) by an exponential race, each eligible item scored Q w ln I -
+  ln(-ln(1 - U)), so that a score is still all a rule writes. Both draw from `context.random`, in pool order.
+- **Starting items** replace catR's `startItems(fixItems)`: the first `ids.length` selections each take the first id
+  that is eligible, scored 0 with every other item `-Infinity`; an id administered, withheld or an enemy of an
+  administered item is skipped, and a selection with none eligible follows the rule. An id the pool does not have throws
+  at the first selection.
 - **a-stratified** (Chang and Ying, 1999) splits the pool into `lengths.length` strata of equal size by each item's
   maximum information: the first `lengths[0]` items come from the least informative stratum, the next `lengths[1]`
   from the next, and the last stratum after them. For the 1PL and 2PL, the maximum information is a² / 4 at θ = b, so
@@ -1061,6 +1137,16 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
   accuracy of classification is a variant of the two rules that are built.
 - **Cuts that differ with the route that led to a module.** Outside the sources: the cuts of a stage are the same for
   every route, except through the items on the scale `"number-correct"`.
+- **b-blocking.** Outside the sources: a variant of `aStratified`.
+- **b-stratified and maximum-information stratified selection.** Outside the sources: variants of `aStratified`.
+- **5-4-3-2-1 selection.** Outside the sources: `randomesque` covers the control.
+- **Interval-information selection.** Outside the sources: a variant of Fisher information, in catsim.
+- **Cluster selection.** Outside the sources: an option of catsim.
+- **The precision form of progressive and proportional weights.** Outside the sources: an option of catR; `length` is
+  the form built.
+- **Fixed and random initial thetas.** No fit: the estimator's prior sets them.
+- **The discrimination index of items of more than two categories.** No reference: catR's `GDI` and `GDIP` take items of
+  two categories only.
 
 ## Differences from catR
 
@@ -1071,6 +1157,12 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | Constant patterns | `untilMixed`                                                               | `constantPatt`, a fixed step or another estimator                        |
 | Ties              | The first item in pool order                                               | At random                                                                |
 | KL                | The likelihood scaled to a maximum of 1                                    | The likelihood as is: the same order                                     |
+| bOpt              | The mean threshold of polytomous items                                     | Dichotomous items only                                                   |
+| MEI               | The estimator's estimate after each response; roots to 1e-12               | `thetaEst`, roots by `uniroot` to about 1e-4                             |
+| MLWI, MPWI, KLP   | The likelihood, times the prior's density, scaled to a maximum of 1        | Unscaled: the same order                                                 |
+| Weights after Q   | Progressive and proportional keep w = 1 after the planned length           | w grows on, above 1                                                      |
+| Random draws      | One uniform per eligible item; proportional by an exponential race         | `runif` per pool item; `sample` with the probabilities                   |
+| Starting items    | `startingItems(ids, rule)`, skipping ids not eligible                      | `startItems`: fixed items, or items by information at chosen thetas      |
 | a-stratification  | Strata in turn from the least informative, by maximum information; `thOpt` | `randomCAT(a.stratified)`: strata by a, balanced as content areas        |
 | Content balancing | Only areas with eligible items                                             | Fails when the area picked has no item left                              |
 | Exposure control  | Sympson-Hetter, calibrated by `calibrateExposure`                          | `simulateRespondents(rmax)`: the restricted and item eligibility methods |
