@@ -17,11 +17,14 @@ import {
   exploratoryFactorAnalysis,
   mcdonaldOmega,
   minimumAveragePartial,
+  omegaHierarchical,
   type ParallelAnalysis,
   type ParallelAnalysisOptions,
   parallelAnalysis,
   polychoricCorrelations,
   responseMatrix,
+  type SchmidLeiman,
+  schmidLeiman,
   simulateItems,
   simulateResponses,
   simulateThetas,
@@ -40,6 +43,7 @@ import { defined, expectClose } from "./assertions.js";
 import bivariate from "./fixtures/dimensionality-bivariate-normal.json" with { type: "json" };
 import factorFixture from "./fixtures/dimensionality-factors.json" with { type: "json" };
 import fitFixture from "./fixtures/dimensionality-fit.json" with { type: "json" };
+import hierarchyFixture from "./fixtures/dimensionality-hierarchy.json" with { type: "json" };
 import parallel from "./fixtures/dimensionality-parallel.json" with { type: "json" };
 import polychoric from "./fixtures/dimensionality-polychoric.json" with { type: "json" };
 
@@ -66,6 +70,10 @@ const PSYCH_VARIMAX_TOLERANCE = 2e-2;
 const FIT_TOLERANCE = 1e-7;
 /** The fit against psych's fa on the responses, whose L-BFGS-B stops short of the optimum. */
 const PSYCH_FIT_TOLERANCE = 1e-2;
+/** The Schmid-Leiman loadings and the omegas against psych, whose minres and oblimin stop at about 1e-5. */
+const PSYCH_HIERARCHY_TOLERANCE = 1e-4;
+/** Omega hierarchical of the simulated structure against its population value. */
+const OMEGA_RECOVERY_TOLERANCE = 0.03;
 /** The mean loading of each factor of a simulation against its truth, at 1,000 persons. */
 const RECOVERY_TOLERANCE = 0.03;
 /** Factors and partial correlations of this package's polychoric correlations against psych's, which differ by 1e-4. */
@@ -1223,6 +1231,178 @@ describe("exploratoryFactorAnalysis", () => {
   });
 });
 
+describe("schmidLeiman", () => {
+  /** Expects the transformation to match a reference's general and group loadings and communalities. */
+  function expectTransformation(
+    actual: SchmidLeiman,
+    expected: { general: number[]; specific: number[][]; communalities: number[] },
+    tolerance: number,
+    label: string,
+  ): void {
+    expected.general.forEach((value, i) => {
+      expectClose(defined(actual.general[i]), value, tolerance, `${label} general ${i + 1}`);
+    });
+    expectMatrix(actual.specific, expected.specific, tolerance, `${label} specific`);
+    expected.communalities.forEach((value, i) => {
+      expectClose(defined(actual.communalities[i]), value, tolerance, `${label} communality ${i + 1}`);
+    });
+  }
+
+  for (const c of hierarchyFixture.matrices) {
+    it(`transforms the oblimin solution of ${c.name} as base R and psych's schmid do`, () => {
+      const factors: ExploratoryFactors = {
+        itemIds: c.matrix.map((_, i) => `test${i + 1}`),
+        loadings: c.base.loadings,
+        communalities: c.base.communalities,
+        correlations: c.base.phi,
+        converged: true,
+        iterations: 1,
+        smoothed: false,
+        fit: null,
+      };
+      const result = schmidLeiman(factors);
+      expect(result.converged).toBe(true);
+      expectTransformation(result, c.base, FACTOR_TOLERANCE, "base");
+      expectTransformation(result, c.psych, PSYCH_HIERARCHY_TOLERANCE, "psych");
+    });
+  }
+
+  for (const c of hierarchyFixture.data) {
+    it(`transforms the factors of the responses of ${c.name} as base R and psych's schmid do`, () => {
+      const matrix = responseMatrix(c.responses, { itemIds: c.itemIds });
+      const result = schmidLeiman(exploratoryFactorAnalysis(matrix, { factors: c.factors, tolerance: 1e-10 }));
+      expect(result.itemIds).toEqual(c.itemIds);
+      expectTransformation(result, c.base, FACTOR_TOLERANCE, "base");
+      expectTransformation(result, c.psych, PSYCH_HIERARCHY_TOLERANCE, "psych");
+    });
+  }
+
+  it("derives the loadings of a structure whose factors share one general factor, as by hand", () => {
+    // Factors correlated g_j g_k with g = (0.8, 0.6, 0.5), each with two items of loading 0.7: an item of factor k loads
+    // 0.7 g_k on the general factor and 0.7 √(1 - g_k²) on its own.
+    const g = [0.8, 0.6, 0.5];
+    const loadings = [0, 0, 1, 1, 2, 2].map((k) => g.map((_, j) => (j === k ? 0.7 : 0)));
+    const result = schmidLeiman({
+      itemIds: ["a", "b", "c", "d", "e", "f"],
+      loadings,
+      communalities: loadings.map(() => 0.49),
+      correlations: g.map((gj, j) => g.map((gk, k) => (j === k ? 1 : gj * gk))),
+      converged: true,
+      iterations: 1,
+      smoothed: false,
+      fit: null,
+    });
+    [0, 0, 1, 1, 2, 2].forEach((k, i) => {
+      expectClose(defined(result.general[i]), 0.7 * defined(g[k]), 1e-10, `general ${i + 1}`);
+      expectClose(
+        defined(result.specific[i]?.[k]),
+        0.7 * Math.sqrt(1 - defined(g[k]) ** 2),
+        1e-10,
+        `specific ${i + 1}`,
+      );
+    });
+  });
+
+  it("gives no general factor for an orthogonal solution, and keeps its loadings as the group loadings", () => {
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3, rotation: "varimax" });
+    const result = schmidLeiman(fit);
+    expect(result.general.every((loading) => Math.abs(loading) < 1e-12)).toBe(true);
+    expectMatrix(result.specific, fit.loadings, 1e-12, "group");
+  });
+
+  it("rejects solutions of fewer than three factors and values that are not a solution", () => {
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3 });
+    expect(() => schmidLeiman(exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 2 }))).toThrow(
+      "The Schmid-Leiman transformation needs at least 3 group factors, as two do not identify the general factor, found 2.",
+    );
+    expect(() => schmidLeiman(JSON.parse("null"))).toThrow("The factors must be an object");
+    expect(() => schmidLeiman({ ...fit, itemIds: JSON.parse("[1]") })).toThrow("The factors' itemIds");
+    expect(() => schmidLeiman({ ...fit, loadings: fit.loadings.slice(1) })).toThrow(
+      "The factors' loadings must have 25 rows, found 24.",
+    );
+    expect(() => schmidLeiman({ ...fit, loadings: JSON.parse("{}") })).toThrow(
+      "The factors' loadings must be an array",
+    );
+    expect(() =>
+      schmidLeiman({ ...fit, loadings: fit.loadings.map((row, i) => (i === 3 ? [...row.slice(1), Number.NaN] : row)) }),
+    ).toThrow("Row 4 of the factors' loadings must be 3 finite numbers");
+    expect(() =>
+      schmidLeiman({ ...fit, loadings: fit.loadings.map((row, i) => (i === 3 ? row.slice(1) : row)) }),
+    ).toThrow("Row 4 of the factors' loadings must be 3 finite numbers");
+    expect(() =>
+      schmidLeiman({
+        ...fit,
+        correlations: [
+          [1, 0.2, 0],
+          [0.3, 1, 0],
+          [0, 0, 1],
+        ],
+      }),
+    ).toThrow("found 0.2 at row 1, column 2");
+    expect(() =>
+      schmidLeiman({
+        ...fit,
+        correlations: [
+          [2, 0, 0],
+          [0, 1, 0],
+          [0, 0, 1],
+        ],
+      }),
+    ).toThrow("with 1 on the diagonal, found 2 at row 1, column 1");
+    expect(() => schmidLeiman({ ...fit, communalities: [0.5] })).toThrow(
+      "The factors' communalities must be 25 finite numbers",
+    );
+  });
+});
+
+describe("omegaHierarchical", () => {
+  for (const c of hierarchyFixture.data) {
+    it(`matches psych's omega and base R on ${c.name}`, () => {
+      const matrix = responseMatrix(c.responses, { itemIds: c.itemIds });
+      const result = omegaHierarchical(matrix, { factors: c.factors, tolerance: 1e-10 });
+      expect(result.converged).toBe(true);
+      expectClose(result.hierarchical, c.base.hierarchical, FACTOR_TOLERANCE, "base hierarchical");
+      expectClose(result.total, c.base.total, FACTOR_TOLERANCE, "base total");
+      expectClose(result.hierarchical, c.psych.hierarchical, PSYCH_HIERARCHY_TOLERANCE, "psych hierarchical");
+      expectClose(result.total, c.psych.total, PSYCH_HIERARCHY_TOLERANCE, "psych total");
+    });
+  }
+
+  const known = defined(hierarchyFixture.data.find(({ truth }) => truth !== null));
+  const matrix = responseMatrix(known.responses, { itemIds: known.itemIds });
+
+  it("recovers the omega hierarchical of a general factor and three group factors at 2,000 persons", () => {
+    expectClose(omegaHierarchical(matrix).hierarchical, defined(known.truth), OMEGA_RECOVERY_TOLERANCE);
+  });
+
+  it("takes 3 group factors, minres and Pearson correlations by default, and the options of the factor analysis", () => {
+    const explicit = omegaHierarchical(matrix, { factors: 3, extraction: "minres", correlation: "pearson" });
+    expect(omegaHierarchical(matrix)).toEqual(explicit);
+    const likelihood = omegaHierarchical(matrix, { extraction: "maximum-likelihood" });
+    expect(likelihood.hierarchical).not.toBe(explicit.hierarchical);
+    expectClose(likelihood.hierarchical, explicit.hierarchical, 0.01);
+  });
+
+  it("is McDonald's omega in total, with the communalities of the group factors", () => {
+    const { total, loadings } = omegaHierarchical(matrix);
+    const fit = exploratoryFactorAnalysis(matrix, { factors: 3 });
+    expect(loadings.communalities).toEqual(fit.communalities);
+    expect(total).toBeGreaterThan(mcdonaldOmega(matrix).omega);
+  });
+
+  it("rejects fewer than three group factors, options of other types and too few items", () => {
+    expect(() => omegaHierarchical(matrix, { factors: 2 })).toThrow(
+      "Omega hierarchical needs at least 3 group factors, as two do not identify the general factor, found 2.",
+    );
+    expect(() => omegaHierarchical(matrix, { factors: JSON.parse('"3"') })).toThrow("The option factors");
+    expect(() => omegaHierarchical(matrix, JSON.parse("null"))).toThrow("The options must be an object");
+    expect(() => omegaHierarchical(matrix, JSON.parse('{"extraction": "ml"}'))).toThrow("The option extraction");
+    const five = responseMatrix(known.responses.map((row) => row.slice(0, 5)));
+    expect(() => omegaHierarchical(five)).toThrow("5 items identify at most 2 factors");
+    expect(() => omegaHierarchical(JSON.parse("null"))).toThrow(DataError);
+  });
+});
+
 describe("minimumAveragePartial", () => {
   const withMap = factorFixture.cases.filter(({ map }) => map !== null && map !== undefined);
 
@@ -1417,6 +1597,33 @@ describe("properties", () => {
         expect(defined(backward.fit).chiSquare).toBeCloseTo(defined(forward.fit).chiSquare, 6);
       }),
       { numRuns: 15 },
+    );
+  });
+
+  it("omega hierarchical is at most omega total", () => {
+    const loadings = fc.record({
+      general: fc.double({ min: 0.3, max: 0.7, noNaN: true }),
+      group: fc.double({ min: 0.2, max: 0.5, noNaN: true }),
+      seed: fc.integer({ min: 0, max: 1_000_000 }),
+    });
+    fc.assert(
+      fc.property(loadings, ({ general, group, seed }) => {
+        const random = createRandom(seed);
+        const unique = Math.sqrt(Math.max(1 - general ** 2 - group ** 2, 0.05));
+        const rows = Array.from({ length: 400 }, () => {
+          const common = random.normal();
+          const groups = [random.normal(), random.normal(), random.normal()];
+          return Array.from(
+            { length: 9 },
+            (_, item) =>
+              Math.round(100 * (general * common + group * defined(groups[item % 3]) + unique * random.normal())) +
+              1000,
+          );
+        });
+        const { hierarchical, total } = omegaHierarchical(responseMatrix(rows));
+        expect(hierarchical).toBeLessThanOrEqual(total + 1e-12);
+      }),
+      { numRuns: 20 },
     );
   });
 

@@ -316,6 +316,14 @@ export const RULES: readonly Rule[] = [
     titles: "rejects options of other types",
   },
   {
+    rule: "Every row of a factor solution's loadings has as many factors as the first, so that no loading is read as missing.",
+    file: "packages/psychometrics/src/dimensionality/schmid-leiman.ts",
+    find: "row.length !== width || ",
+    replace: "",
+    test: "packages/psychometrics/test/dimensionality.test.ts",
+    titles: "rejects solutions of fewer than three factors",
+  },
+  {
     rule: "A component that leaves an item no variance ends the test, and gives no NaN.",
     file: "packages/psychometrics/src/dimensionality/minimum-average-partial.ts",
     find: "for (let i = 0; i < size; i++) if (!((covariance[i * size + i] ?? 0) > 0)) return null;",

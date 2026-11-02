@@ -77,7 +77,8 @@ loadings. Omega is 1 - Σ (1 - λ_i²) / Σ_ij r_ij, the diagonal included: psyc
 standardized item scores. It returns `omega`, the `loadings`, whose sum is positive, `converged` and `iterations`. It
 needs three items and correlations whose sum Σ_ij r_ij, the variance of the standardized total, is above 0; a loading
 above 1 (a Heywood case) shows that one factor does not fit. Alpha equals omega when the loadings are equal, and is
-lower otherwise.
+lower otherwise. A test of several group factors under a general one has omega hierarchical and omega total from
+[`omegaHierarchical`](dimensionality.md#omega-hierarchical).
 
 ## Subscore value
 
@@ -129,11 +130,6 @@ stands.
 A section needs at least two items for alpha, and there must be at least two sections: with one, the total is the
 subscore. A section whose subscore has no variance or whose alpha is not above 0 has no true-score variance to predict:
 both PRMSEs are `null` and `addedValue` is `false`.
-
-### Not included
-
-- **The significance of differences between PRMSEs (Olkin, Williams).** Outside the sources: `subscore` has no such
-  test, and `addedValue` is the plain comparison, as CTTsub's `added.value.s`.
 
 ### Differences from the subscore package
 
@@ -272,6 +268,28 @@ data to `null`. A function that returns one statistic throws `DataError` with th
 | A section with a constant or negative-alpha subscore | `subscoreValue` gives `null` PRMSEs and `addedValue` `false`                                                    |
 | Fewer than two sections or a section of one item     | `subscoreValue` throws                                                                                          |
 
+## Not included
+
+- **The significance of differences between PRMSEs (Olkin, Williams).** Outside the sources: `subscore` has no such
+  test, and `addedValue` is the plain comparison, as CTTsub's `added.value.s`.
+- **Guttman's λ1, λ2, λ4, λ5 and λ6, and Revelle's β.** Outside the sources: not confirmed in McDonald (1999) or
+  Thissen and Wainer (2001), and no testing program's technical report was found to use them. Omega total and omega
+  hierarchical, which reviews favor (Revelle and Zinbarg, 2009; McNeish, 2018), are built from McDonald (1999).
+- **The greatest lower bound.** Outside the sources: as above; the sample bound overestimates reliability, the more so
+  in small samples (Ten Berge and Sočan, 2004).
+- **Ten Berge and Zegers' μ bounds.** Outside the sources: as above.
+- **Stratified alpha.** Outside the sources: not confirmed in them; `cronbachAlpha` per section composes it.
+- **Green-Yang and nonlinear SEM reliability.** Outside the sources: functions of sirt.
+- **Multilevel reliability.** No fit: `generalizabilityStudy` covers it.
+- **Test-retest reliability.** No fit: a correlation of two totals.
+- **Intervals of alpha and omega.** No fit: a bootstrap over the persons gives them.
+- **The correction for attenuation.** No fit: one line.
+- **The correction for range restriction.** No fit: one line.
+- **Omega from given loadings.** No fit: one line of `mcdonaldOmega`'s formula.
+- **Reverse scoring, prorating and composites.** No fit: scoring rules of a questionnaire, which the caller holds.
+- **psych's `reliability()` table.** No fit: a table of coefficients that are built.
+- **The AUC and d prime of an item.** No fit: general statistics.
+
 ## References
 
 - Cronbach, L. J. (1951). Coefficient alpha and the internal structure of tests. Psychometrika, 16, 297-334.
@@ -285,3 +303,8 @@ data to `null`. A function that returns one statistic throws `DataError` with th
   204-229.
 - Lord, F. M., & Novick, M. R. (1968). Statistical theories of mental test scores. Addison-Wesley.
 - McDonald, R. P. (1999). Test theory: A unified treatment. Lawrence Erlbaum.
+- McNeish, D. (2018). Thanks coefficient alpha, we'll take it from here. Psychological Methods, 23, 412-433.
+- Revelle, W., and Zinbarg, R. E. (2009). Coefficients alpha, beta, omega, and the glb: Comments on Sijtsma.
+  Psychometrika, 74, 145-154.
+- Ten Berge, J. M. F., and Sočan, G. (2004). The greatest lower bound to the reliability of a test and the hypothesis
+  of unidimensionality. Psychometrika, 69, 613-625.

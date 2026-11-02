@@ -3,8 +3,8 @@
 `@measurekit/psychometrics/dimensionality` estimates the correlations of the normal variables behind item responses,
 polychoric for items with several categories and tetrachoric for dichotomous items, and asks how many dimensions a test
 has: by Horn's parallel analysis and by Velicer's minimum average partial test. It fits that many factors to the items by
-the minimum residual method or maximum likelihood, rotated to a simple structure, with the fit of the factors, and
-smooths correlation matrices that are not positive definite. The correlations are validated against psych and polycor,
+the minimum residual method or maximum likelihood, rotated to a simple structure, with the fit of the factors, finds a
+general factor behind them with omega hierarchical, and smooths correlation matrices that are not positive definite. The correlations are validated against psych and polycor,
 the bivariate normal distribution against mvtnorm, and the eigenvalues, the factors, their fit and the partial
 correlations against base R and psych ([validation](validation.md)).
 
@@ -16,6 +16,7 @@ flowchart LR
   S --> MAP["minimumAveragePartial: how many, by partial correlations"]
   S --> F["exploratoryFactorAnalysis: minres or maximum likelihood, rotation"]
   F --> L["Loadings, communalities, correlations of the factors, fit"]
+  L --> SL["schmidLeiman, omegaHierarchical: a general factor"]
 ```
 
 ## Correlations
@@ -240,6 +241,73 @@ factor average 0.710 here and 0.724 by full information after `rotateLoadings`, 
 the correlation of the factors 0.316 and 0.306, for the truth of 0.7, 0.6 and 0.3. Use the factors to explore and to
 choose the number of dimensions, and the calibration when the item parameters matter.
 
+## Omega hierarchical
+
+A test whose items share a general trait and, within groups, narrower ones has a total score that the general trait
+dominates to the degree omega hierarchical measures: the share of the total's variance that the general factor accounts
+for. Omega total is the share that all the factors account for. `schmidLeiman(factors)` takes the oblique solution of
+`exploratoryFactorAnalysis` and gives each item a loading on a general factor and on group factors orthogonal to it;
+`omegaHierarchical(matrix, options)` runs both and returns the omegas, as `psych::omega`.
+
+```mermaid
+flowchart LR
+  E["exploratoryFactorAnalysis, oblimin: loadings Λ, correlations Φ"] --> G["One factor of Φ by minres: g"]
+  G --> S["schmidLeiman: general Λ g, group λ √(1 - g²)"]
+  S --> O["omegaHierarchical: (Σ general)² / Σ R; omega total"]
+```
+
+| Quantity           | Definition, with R the correlations of the items                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------- |
+| General loading    | Σ_k λ_ik g_k, with g the one-factor minres loadings of Φ                                          |
+| Group loading      | λ_ik √(1 - g_k²), with the sign of λ_ik; 0 where g_k² exceeds 1                                   |
+| Omega hierarchical | (Σ_i general loading)² / Σ R                                                                      |
+| Omega total        | 1 - Σ (1 - h_i²) / Σ R, with the communalities h² of the group factors: `mcdonaldOmega`'s formula |
+
+The options are those of [`exploratoryFactorAnalysis`](#exploratory-factor-analysis) but `rotation`, which is
+always oblimin, as the general factor comes from the correlations of oblique factors:
+
+| Option    | Default | Meaning                                                                          |
+| --------- | ------- | -------------------------------------------------------------------------------- |
+| `factors` | `3`     | The group factors, at least 3: two do not identify the general factor's loadings |
+
+| Field          | Meaning                                                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `hierarchical` | Omega hierarchical                                                                                                   |
+| `total`        | Omega total                                                                                                          |
+| `loadings`     | The `SchmidLeiman` loadings: `itemIds`, `general`, `specific` by item and group factor, `communalities`, `converged` |
+| `converged`    | Whether the factor analysis, its rotation and the general factor's fit converged                                     |
+
+```ts
+import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
+import { omegaHierarchical } from "@measurekit/psychometrics/dimensionality";
+
+// 1,000 persons answer 9 items scored 0 to 4: a general trait, and three group traits of three items each.
+const random = createRandom(7);
+const rows = Array.from({ length: 1000 }, () => {
+  const general = random.normal();
+  const groups = [random.normal(), random.normal(), random.normal()];
+  return Array.from({ length: 9 }, (_, j) => {
+    const latent = 0.6 * general + 0.45 * (groups[Math.floor(j / 3)] ?? 0) + 0.66 * random.normal();
+    return Math.min(4, Math.max(0, Math.round(latent + 2)));
+  });
+});
+const matrix = responseMatrix(rows);
+
+const omega = omegaHierarchical(matrix);
+omega.hierarchical; // 0.717: the general trait's share of the total's variance
+omega.total; // 0.87
+omega.loadings.general.slice(0, 3); // [0.606, 0.566, 0.606]
+omega.loadings.specific[0]; // [0.016, 0.386, -0.008]: item 1 on the second group factor
+cronbachAlpha(matrix); // 0.832
+```
+
+Items count as scored: a reversed item lowers both omegas, as it lowers alpha, so reverse-score it first. An orthogonal
+solution has no general factor: `schmidLeiman` of varimax factors gives general loadings of 0. Fewer than three group
+factors throw `DataError`, as two leave the general factor's loadings to a constraint. Omega hierarchical is at most
+omega total; Revelle and Zinbarg (2009) and McNeish (2018) prefer the omegas to the greatest lower bound, which is not
+built ([classical test theory](ctt.md#not-included)).
+
 ## Minimum average partial test
 
 `minimumAveragePartial(matrix, options)` is Velicer's test for the number of factors. It removes the principal
@@ -285,6 +353,8 @@ negative.
 
 - **Rotations other than varimax and oblimin, such as promax.** Outside the sources: Fabrigar et al. (1999) prefer no
   oblique rotation, as their results are alike; oblimin, `psych::fa`'s default, and varimax are built.
+- **The asymptotic omega hierarchical, ECV and the omegas of the group factors.** No fit: each is one line over the
+  Schmid-Leiman loadings, as psych's `omega` reports them.
 - **WLS and WLSMV extraction.** Outside the sources: options of psych and lavaan.
 - **Standard errors of loadings.** Outside the sources: a bootstrap over the persons gives them.
 - **Factor scores.** Outside the sources: not confirmed in them; `multidimensionalEstimates` scores persons on the
@@ -318,26 +388,29 @@ negative.
 
 ## Differences from psych
 
-| Topic                              | This package                                                                      | psych                                                                                                                    |
-| ---------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Maximum of the likelihood          | Newton's method with derivatives, to 1e-13; the maximum of `optimize`             | `optimize` with its default tolerance, within about 2e-5 of the maximum                                                  |
-| Correlation matrix                 | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite                                                     |
-| `correct`                          | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds                                               |
-| Thresholds                         | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item                                              |
-| Random data                        | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal                                            |
-| Suggested numbers                  | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations                                                         |
-| Replications                       | 100                                                                               | 20 (`n.iter`)                                                                                                            |
-| Factor eigenvalues                 | One-factor minres by Newton's method from the centroid loadings, to 1e-8          | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations                                                   |
-| Minres solution                    | Newton steps on the communalities from the squared multiple correlations          | L-BFGS-B on the same objective, within about 1e-5 of its minimum                                                         |
-| Maximum likelihood                 | The same Newton steps, with the likelihood's Hessian at a perfect fit, to 1e-6    | L-BFGS-B on the uniquenesses from 0.005 to 1: loadings within 2e-5                                                       |
-| Unweighted least squares           | Minres is the solution                                                            | `fm = "uls"` gives the minres solution: within 9e-6 on `bfi`                                                             |
-| Principal axis factoring           | Minres is its limit                                                               | `fm = "pa"` run to `min.err = 1e-12` is within 4e-6 of minres on `bfi`; its default `min.err` of 0.001 stops 0.0017 away |
-| Interval of the RMSEA              | Roots in [0, χ²] and [0, max(N - 1, 5 χ²)]                                        | `uniroot` in [0, max(N, χ²) + 2N], to its default tolerance                                                              |
-| Residuals of smoothed correlations | Of the smoothed correlations that the factors fit                                 | Of the correlations before smoothing; the same for a matrix that needs none                                              |
-| Varimax                            | Gradient projection to a gradient of 1e-10, with Kaiser's normalization           | `stats::varimax`, which stops at 1e-5 of its criterion: loadings within 1e-2                                             |
-| Smoothed correlations              | Of the items' correlations in the factors and the test; not in `parallelAnalysis` | Of every correlation matrix `tetrachoric` and `polychoric` return                                                        |
-| Items without variance             | `null` in the correlations; an error in parallel analysis                         | Deleted with a message                                                                                                   |
-| An item correlated with none       | `minimumAveragePartial` throws once a component holds all of its variance         | `VSS` stops with an error in `principal`                                                                                 |
+| Topic                                   | This package                                                                      | psych                                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Maximum of the likelihood               | Newton's method with derivatives, to 1e-13; the maximum of `optimize`             | `optimize` with its default tolerance, within about 2e-5 of the maximum                                                  |
+| Correlation matrix                      | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite                                                     |
+| `correct`                               | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds                                               |
+| Thresholds                              | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item                                              |
+| Random data                             | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal                                            |
+| Suggested numbers                       | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations                                                         |
+| Replications                            | 100                                                                               | 20 (`n.iter`)                                                                                                            |
+| Factor eigenvalues                      | One-factor minres by Newton's method from the centroid loadings, to 1e-8          | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations                                                   |
+| Minres solution                         | Newton steps on the communalities from the squared multiple correlations          | L-BFGS-B on the same objective, within about 1e-5 of its minimum                                                         |
+| Maximum likelihood                      | The same Newton steps, with the likelihood's Hessian at a perfect fit, to 1e-6    | L-BFGS-B on the uniquenesses from 0.005 to 1: loadings within 2e-5                                                       |
+| Unweighted least squares                | Minres is the solution                                                            | `fm = "uls"` gives the minres solution: within 9e-6 on `bfi`                                                             |
+| Principal axis factoring                | Minres is its limit                                                               | `fm = "pa"` run to `min.err = 1e-12` is within 4e-6 of minres on `bfi`; its default `min.err` of 0.001 stops 0.0017 away |
+| Interval of the RMSEA                   | Roots in [0, χ²] and [0, max(N - 1, 5 χ²)]                                        | `uniroot` in [0, max(N, χ²) + 2N], to its default tolerance                                                              |
+| Reversed items in the omegas            | Taken as scored                                                                   | `omega` reverses the items whose general loading is negative (`flip = TRUE`); the references run with `flip = FALSE`     |
+| The general factor of the group factors | Minres, whatever the extraction of the items                                      | `schmid` uses the items' extraction; the same with 3 group factors, which the general factor fits exactly                |
+| Two group factors                       | Throws                                                                            | `schmid` sets the two general loadings equal (`option = "equal"`) and warns                                              |
+| Residuals of smoothed correlations      | Of the smoothed correlations that the factors fit                                 | Of the correlations before smoothing; the same for a matrix that needs none                                              |
+| Varimax                                 | Gradient projection to a gradient of 1e-10, with Kaiser's normalization           | `stats::varimax`, which stops at 1e-5 of its criterion: loadings within 1e-2                                             |
+| Smoothed correlations                   | Of the items' correlations in the factors and the test; not in `parallelAnalysis` | Of every correlation matrix `tetrachoric` and `polychoric` return                                                        |
+| Items without variance                  | `null` in the correlations; an error in parallel analysis                         | Deleted with a message                                                                                                   |
+| An item correlated with none            | `minimumAveragePartial` throws once a component holds all of its variance         | `VSS` stops with an error in `principal`                                                                                 |
 
 ## References
 
@@ -351,8 +424,13 @@ negative.
   factors to retain. Educational and Psychological Measurement, 55, 377-393.
 - Horn, J. L. (1965). A rationale and test for the number of factors in factor analysis. Psychometrika, 30, 179-185.
 - Jöreskog, K. G. (1967). Some contributions to maximum likelihood factor analysis. Psychometrika, 32, 443-482.
+- McDonald, R. P. (1999). Test theory: A unified treatment. Lawrence Erlbaum.
+- McNeish, D. (2018). Thanks coefficient alpha, we'll take it from here. Psychological Methods, 23, 412-433.
 - Olsson, U. (1979). Maximum likelihood estimation of the polychoric correlation coefficient. Psychometrika, 44,
   443-460.
+- Revelle, W., and Zinbarg, R. E. (2009). Coefficients alpha, beta, omega, and the glb: Comments on Sijtsma.
+  Psychometrika, 74, 145-154.
+- Schmid, J., and Leiman, J. M. (1957). The development of hierarchical factor solutions. Psychometrika, 22, 53-61.
 - Velicer, W. F. (1976). Determining the number of components from the matrix of partial correlations. Psychometrika, 41,
   321-327.
 - Wothke, W. (1993). Nonpositive definite matrices in structural modeling. In K. A. Bollen and J. S. Long (Eds.), Testing

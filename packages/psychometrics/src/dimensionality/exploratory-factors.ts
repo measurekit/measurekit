@@ -124,6 +124,27 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * @see {@link https://doi.org/10.1007/BF02289658 | Jöreskog (1967)}
  */
 export function exploratoryFactorAnalysis(data: ResponseMatrix, options: ExploratoryFactorOptions): ExploratoryFactors {
+  return exploratoryFactors(data, options, "Exploratory factor analysis").factors;
+}
+
+/** The factors of a response matrix, with the correlations of the items that they fit. */
+interface FactorsOfData {
+  readonly factors: ExploratoryFactors;
+  /** The correlations of the items by rows, smoothed if they were not positive definite. */
+  readonly correlations: Float64Array;
+}
+
+/**
+ * Returns the factors of {@link exploratoryFactorAnalysis} with the correlations of the items, for the analyses built on
+ * them; `analysis` names the caller in the errors of the data.
+ *
+ * @throws `DataError` as `exploratoryFactorAnalysis` does.
+ */
+export function exploratoryFactors(
+  data: ResponseMatrix,
+  options: ExploratoryFactorOptions,
+  analysis: string,
+): FactorsOfData {
   checkOptions(options);
   const {
     factors,
@@ -140,12 +161,7 @@ export function exploratoryFactorAnalysis(data: ResponseMatrix, options: Explora
   checkChoice(rotation, "The option rotation", ROTATIONS);
   checkStopping(tolerance, maxIterations);
   checkNonNegative(correction, "The option correction");
-  const { items, correlations, smoothed } = positiveDefiniteCorrelations(
-    data,
-    correlation,
-    correction,
-    "Exploratory factor analysis",
-  );
+  const { items, correlations, smoothed } = positiveDefiniteCorrelations(data, correlation, correction, analysis);
   const size = items.length;
   checkIdentified(size, factors);
   const solution = factorSolution(correlations, size, factors, rotation, { tolerance, maxIterations }, extraction);
@@ -153,7 +169,7 @@ export function exploratoryFactorAnalysis(data: ResponseMatrix, options: Explora
     correlation === "pearson"
       ? factorFit(correlations, size, modelOf(solution), factors, data.responses.length, pairCounts(items))
       : null;
-  return { itemIds: data.itemIds, ...solution, smoothed, fit };
+  return { factors: { itemIds: data.itemIds, ...solution, smoothed, fit }, correlations };
 }
 
 /** The factors of a correlation matrix. */
