@@ -4,6 +4,7 @@ import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
   exploratoryFactorAnalysis,
   minimumAveragePartial,
+  omegaHierarchical,
   parallelAnalysis,
   polychoricCorrelations,
   responseMatrix,
@@ -30,4 +31,11 @@ test("fits five factors to 25 items answered by 2,800 persons and tests how many
   await benchmark(context, "dimensionality.minimumAveragePartial", () =>
     minimumAveragePartial(matrix, { maxFactors: 8 }),
   );
+});
+
+test("fits five factors to 25 items answered by 2,800 persons by maximum likelihood, and a general factor above them", async (context) => {
+  await benchmark(context, "dimensionality.maximumLikelihoodFactors", () =>
+    exploratoryFactorAnalysis(matrix, { factors: 5, extraction: "maximum-likelihood" }),
+  );
+  await benchmark(context, "dimensionality.omegaHierarchical", () => omegaHierarchical(matrix, { factors: 5 }));
 });

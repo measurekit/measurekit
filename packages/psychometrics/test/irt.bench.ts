@@ -3,6 +3,8 @@ import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
   abilityEstimates,
   calibrate,
+  calibrateUnfolding,
+  conditionalMaximumLikelihood,
   generalizedPartialCredit,
   gradedResponse,
   jointMaximumLikelihood,
@@ -21,7 +23,9 @@ import {
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
+import conditionalFixture from "./fixtures/bench-irt-conditional.json" with { type: "json" };
 import regressionFixture from "./fixtures/bench-irt-latent-regression.json" with { type: "json" };
+import unfoldingFixture from "./fixtures/bench-irt-unfolding.json" with { type: "json" };
 
 const binary = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
 const three = responseMatrix(fixture.three.responses, { itemIds: fixture.three.itemIds });
@@ -127,4 +131,24 @@ test("sums the information of 40 items at 121 values of theta", async (context) 
     for (const theta of thetas) sum += testInformation(items, theta);
     return sum;
   });
+});
+
+test("calibrates the Rasch model of 2,000 persons and 15 items, and the partial credit and rating scale models of 1,500 persons and 8 items, by conditional maximum likelihood", async (context) => {
+  const rasch = responseMatrix(conditionalFixture.rasch.responses, { itemIds: conditionalFixture.rasch.itemIds });
+  const credit = responseMatrix(conditionalFixture.partialCredit.responses, {
+    itemIds: conditionalFixture.partialCredit.itemIds,
+  });
+  await benchmark(context, "irt.conditionalRasch", () => conditionalMaximumLikelihood(rasch));
+  await benchmark(context, "irt.conditionalPartialCredit", () =>
+    conditionalMaximumLikelihood(credit, { model: "partial-credit" }),
+  );
+  await benchmark(context, "irt.conditionalRatingScale", () =>
+    conditionalMaximumLikelihood(credit, { model: "rating-scale" }),
+  );
+});
+
+test("calibrates the generalized graded unfolding model of 2,000 persons and 15 items of 4 categories", async (context) => {
+  const unfolding = responseMatrix(unfoldingFixture.responses, { itemIds: unfoldingFixture.itemIds });
+  expect(calibrateUnfolding(unfolding).converged).toBe(true);
+  await benchmark(context, "irt.calibrateUnfolding", () => calibrateUnfolding(unfolding), SLOW_OPTIONS);
 });

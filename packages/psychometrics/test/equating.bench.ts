@@ -2,23 +2,29 @@ import { createRandom } from "@measurekit/core";
 import { test } from "vitest";
 import {
   bootstrapEquating,
+  type CalibratedForm,
   chainedEquipercentileEquating,
   equipercentileEquating,
   frequencyEstimationEquating,
   haebaraLinking,
   type IrtItem,
   irtObservedScoreEquating,
+  kernelEquating,
   linearEquating,
+  linkCovariance,
+  linkedEquatingErrors,
   logLinearPresmoothing,
   stockingLordLinking,
   threeParameterLogistic,
   transformItem,
   trueScoreEquating,
   tuckerEquating,
+  twoParameterLogistic,
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-equating.json" with { type: "json" };
+import linksFixture from "./fixtures/bench-equating-links.json" with { type: "json" };
 
 const SEED = 20261029;
 /** The replications of the bootstrap of the standard errors. */
@@ -64,4 +70,28 @@ test("links and equates two forms of 3PL items that share 10 items", async (cont
   const linked = from.map((item) => transformItem(item, linking));
   await benchmark(context, "equating.trueScore", () => trueScoreEquating(linked, to));
   await benchmark(context, "equating.irtObservedScore", () => irtObservedScoreEquating(linked, to));
+});
+
+test("equates two forms of 40 items in random groups by kernel equating, with its standard errors", async (context) => {
+  await benchmark(context, "equating.kernel", () =>
+    kernelEquating({ design: "equivalent-groups", from: randomGroups.from, to: randomGroups.to, degrees: [3, 3] }),
+  );
+});
+
+test("finds the standard errors of links between separate calibrations of forms of 20 items", async (context) => {
+  const form = (name: "T1" | "T2" | "T3"): CalibratedForm => {
+    const { items, covariance } = linksFixture.forms[name];
+    return {
+      items: items.map(({ id, a, b }) => ({ id, model: twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } })),
+      covariance,
+    };
+  };
+  const forms = [form("T3"), form("T2"), form("T1")];
+  const linkQuadrature = { method: "gauss-hermite", points: linksFixture.points } as const;
+  await benchmark(context, "equating.linkCovariance", () =>
+    linkCovariance(forms, { linking: "haebara", quadrature: linkQuadrature }),
+  );
+  await benchmark(context, "equating.linkedErrors", () =>
+    linkedEquatingErrors(form("T1"), form("T2"), { linking: "mean-mean", quadrature: linkQuadrature }),
+  );
 });

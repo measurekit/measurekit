@@ -5,6 +5,8 @@ import {
   type CdmModel,
   calibrateCdm,
   cdmClassificationAccuracy,
+  cdmItemFit,
+  cdmModelFit,
   compareItemModels,
   nonparametricClassification,
   responseMatrix,
@@ -55,4 +57,10 @@ test("calibrates the G-DINA model of 1,000 persons, 20 items and 4 attributes wi
 test("compares the reduced models of every item of a calibration with two or more attributes", async (context) => {
   const calibration = calibrateCdm(matrix, qMatrix, { standardErrors: "incomplete" });
   await benchmark(context, "cdm.compareItemModels", () => compareItemModels(calibration));
+});
+
+test("measures the fit of a G-DINA calibration of 1,000 persons, 20 items and 4 attributes", async (context) => {
+  const calibration = calibrateCdm(matrix, qMatrix, { model: "gdina" });
+  await benchmark(context, "cdm.modelFit", () => cdmModelFit(matrix, calibration));
+  await benchmark(context, "cdm.itemFit", () => cdmItemFit(matrix, calibration));
 });

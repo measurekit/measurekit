@@ -1,8 +1,15 @@
 import { test } from "vitest";
-import { bookmarkCutScore, classificationAccuracy, type TestItem, twoParameterLogistic } from "../src/index.js";
+import {
+  bookmarkCutScore,
+  classificationAccuracy,
+  livingstonLewisClassification,
+  type TestItem,
+  twoParameterLogistic,
+} from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-irt.json" with { type: "json" };
+import classificationFixture from "./fixtures/bench-standard-setting.json" with { type: "json" };
 
 const items: TestItem[] = fixture.items.a.map((a, i) => ({
   id: defined(fixture.binary.itemIds[i]),
@@ -19,5 +26,12 @@ test("finds the cut score of a bookmark in a booklet of 40 items", async (contex
 test("measures the accuracy and consistency of the classification of 2,000 persons by two cuts", async (context) => {
   await benchmark(context, "standardSetting.classificationAccuracy", () =>
     classificationAccuracy(estimates, [-0.5, 0.8]),
+  );
+});
+
+test("measures the accuracy and consistency of the classification of 3,000 total scores of 40 items by one cut", async (context) => {
+  const { scores, reliability, maximum, cut } = classificationFixture;
+  await benchmark(context, "standardSetting.livingstonLewis", () =>
+    livingstonLewisClassification(scores, [cut], { reliability, maximum }),
   );
 });

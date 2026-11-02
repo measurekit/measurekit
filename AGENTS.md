@@ -323,7 +323,7 @@ others. A new clone is merged into a helper of the module that owns the concept,
   each model's limits, such as BKT parameters at their bounds or a posterior mode beyond the IRT grid.
 - A module has benchmarks of its hot path in `test/<module>.bench.ts`, the size of the input in the title of each, a budget
   in `test/budgets.ts` and, where a reference does the task, the same task timed in
-  `validation/benchmarks/<package>/<module>.R` on the same data. `docs/performance.md` explains the method and the budgets.
+  `validation/benchmarks/<package>/<module>.R`, or a `<module>-<topic>.R` beside it, on the same data. `docs/performance.md` explains the method and the budgets.
 - A bug fix comes with a test that fails without it, in the test file of the fixed folder. A rule that keeps untrusted
   input from being misread, or from costing what its size does not, has an entry in `scripts/check-rules.ts`.
 
