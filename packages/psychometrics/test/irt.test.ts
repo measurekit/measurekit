@@ -1,3 +1,4 @@
+import { normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -6,8 +7,10 @@ import {
   adaptiveTest,
   betaPrior,
   type CalibrationOptions,
+  type ConditionalCalibration,
   calibrate,
   calibrateWithCovariance,
+  conditionalMaximumLikelihood,
   conditionalStandardError,
   createRandom,
   DataError,
@@ -17,6 +20,7 @@ import {
   gradedResponse,
   type IrtItem,
   type IrtModel,
+  itemFit,
   itemInformation,
   jointMaximumLikelihood,
   type LatentDistribution,
@@ -33,6 +37,7 @@ import {
   partialCredit,
   posteriorMeanEstimate,
   posteriorModeEstimate,
+  type RatingScaleParameters,
   ratingScale,
   responseMatrix,
   responseRecords,
@@ -52,11 +57,15 @@ import {
   weightedLikelihoodEstimate,
 } from "../src/index.js";
 import {
+  combine,
   compressResponses,
   type ExpectationItem,
   expectationStep,
   type Iteration,
+  itemFunctions,
+  logFunction,
   maximize,
+  NO_ITEMS,
   population,
   squarem,
 } from "../src/irt/internal.js";
@@ -64,6 +73,7 @@ import { rectangular } from "../src/math/internal.js";
 import { arbitraryItem, arbitraryLocation, arbitraryLocations, arbitrarySlope } from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { definedEntries, type FixtureErrors, type FixtureParameters, MODELS } from "./fixture-items.js";
+import conditional from "./fixtures/irt-conditional.json" with { type: "json" };
 import covariance from "./fixtures/irt-covariance.json" with { type: "json" };
 import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json" };
 import latent from "./fixtures/irt-latent.json" with { type: "json" };
@@ -98,6 +108,10 @@ const MODAL_TOLERANCE = 1e-5;
 const EXACT_ABILITY_TOLERANCE = 1e-10;
 /** Information against mirt; absolute, as mirt's 1 - P loses relative precision in the tails. */
 const INFORMATION_TOLERANCE = 1e-12;
+/** CML estimates, standard errors and log-likelihood against eRm, whose nlm stops short of the maximum. */
+const ERM_TOLERANCE = 2e-4;
+/** CML against base R's conditional likelihood by every pattern, maximized by optim to 1e-15. */
+const CONDITIONAL_TOLERANCE = 1e-6;
 /** JML estimates, standard errors and log-likelihood against the base R solution of TAM's steps. */
 const JOINT_TOLERANCE = 1e-10;
 /** EM tolerance of the fixture comparisons, mirt's TOL in validation/psychometrics/irt.R. */
@@ -1147,6 +1161,195 @@ describe("item priors", () => {
     expect(() => calibrate(matrix, { ...options, itemPriors: JSON.parse('{ "constructor": {} }') })).toThrow(
       'Priors are given for "constructor", which is not an item id.',
     );
+  });
+});
+
+describe("conditionalMaximumLikelihood", () => {
+  /** A case of the fixture: its expected parameters by item, one threshold or a list. */
+  type ConditionalCase = (typeof conditional.cases)[number];
+  const listed = (value: number | readonly number[] | undefined): readonly number[] =>
+    value === undefined ? [] : typeof value === "number" ? [value] : value;
+
+  function expectConditional(result: ConditionalCalibration, expected: ConditionalCase, tolerance: number): void {
+    expect(result.converged).toBe(true);
+    expect(result.parameters).toBe(expected.parameters);
+    expectClose(result.logLikelihood, expected.logLikelihood, tolerance);
+    result.items.forEach((item, i) => {
+      const errors = defined(item.standardErrors);
+      if (expected.locations !== undefined) {
+        const parameters = item.parameters as RatingScaleParameters;
+        const steps = defined(expected.steps);
+        const stepErrors = defined(expected.stepErrors);
+        expect(item.model).toBe(ratingScale);
+        expectClose(parameters.b, expected.locations[i] ?? null, tolerance, `location ${i + 1}`);
+        parameters.steps.forEach((step, k) => {
+          expectClose(step, steps[k] ?? null, tolerance, `step ${k + 1}`);
+        });
+        expectClose(errors.b ?? null, defined(expected.locationErrors)[i] ?? null, tolerance, `location SE ${i + 1}`);
+        Object.entries(errors)
+          .filter(([name]) => name.startsWith("step"))
+          .forEach(([, error], k) => {
+            expectClose(error, stepErrors[k] ?? null, tolerance, `step SE ${k + 1}`);
+          });
+        return;
+      }
+      const thresholds = listed(expected.thresholds[i]);
+      const parameters = item.parameters as LogisticItem | ThresholdItem;
+      expect(listed(parameters.b).length).toBe(thresholds.length);
+      listed(parameters.b).forEach((b, k) => {
+        expectClose(b, thresholds[k] ?? null, tolerance, `${item.id} b${k + 1}`);
+      });
+      const expectedErrors = listed(expected.standardErrors[i]);
+      Object.values(errors).forEach((error, k) => {
+        expectClose(error, expectedErrors[k] ?? null, tolerance, `${item.id} SE ${k + 1}`);
+      });
+    });
+  }
+
+  for (const expected of conditional.cases) {
+    const reference = expected.erm === undefined ? "eRm" : "base R's conditional likelihood";
+    it(`matches ${reference} on ${expected.name}`, () => {
+      const model =
+        expected.model === "rating-scale" ? "rating-scale" : expected.model === "rasch" ? "rasch" : "partial-credit";
+      const result = conditionalMaximumLikelihood(responseMatrix(expected.responses), { model });
+      expectConditional(result, expected, expected.erm === undefined ? ERM_TOLERANCE : CONDITIONAL_TOLERANCE);
+    });
+  }
+
+  it("maximizes the conditional likelihood of each person's answered items, where eRm's PCM does not on missing ones", () => {
+    const expected = defined(conditional.cases.find((candidate) => candidate.erm !== undefined));
+    const erm = defined(expected.erm);
+    const { logLikelihood } = conditionalMaximumLikelihood(responseMatrix(expected.responses));
+    expect(logLikelihood).toBeGreaterThan(erm.atItsEstimates + 1);
+    expect(Math.abs(erm.logLikelihood - erm.atItsEstimates)).toBeGreaterThan(1);
+  });
+
+  it("gives the values of the guide's sample, where item 3's thresholds are -ln 2 and ln 2", () => {
+    const result = conditionalMaximumLikelihood(
+      responseMatrix([
+        [1, 0, 2],
+        [0, 0, 1],
+        [1, 1, 2],
+        [0, 1, 0],
+        [1, 1, 1],
+        [0, 0, 0],
+      ]),
+    );
+    const item3 = defined(result.items[2]);
+    expect(item3.model).toBe(partialCredit);
+    const [lower = 0, upper = 0] = (item3.parameters as ThresholdItem).b;
+    expect([lower + Math.LN2, upper - Math.LN2].map((value) => Math.abs(value) < 1e-9)).toEqual([true, true]);
+    expect(Object.values(defined(item3.standardErrors)).map((error) => Number(error.toPrecision(3)))).toEqual([
+      1.12, 1.12,
+    ]);
+    expect(result.persons).toBe(4);
+  });
+
+  it("chooses the Rasch model for 0/1 responses and the partial credit model otherwise, as 1PL and PCM items", () => {
+    const rasch = conditionalMaximumLikelihood(responseMatrix(defined(conditional.cases[0]).responses));
+    expect(rasch.items.every((item) => item.model === oneParameterLogistic && item.parameters.a === 1)).toBe(true);
+    const mixed = conditionalMaximumLikelihood(responseMatrix(defined(conditional.cases.at(-1)).responses));
+    expect(mixed.items.map((item) => item.model.name)).toEqual(["1PL", "1PL", "1PL", "PCM", "PCM"]);
+    const sum = mixed.items.flatMap((item) => listed((item.parameters as LogisticItem | ThresholdItem).b));
+    expectClose(
+      sum.reduce((total, b) => total + b, 0),
+      0,
+      1e-12,
+    );
+  });
+
+  it("recovers the difficulties of 2,000 persons, with 95% intervals that cover them", () => {
+    // Thresholds fixed before the first run: RMSE at most 0.06, coverage from 0.92 to 0.98 over 40 sets of 15 items.
+    const random = createRandom(2026);
+    let squares = 0;
+    let covered = 0;
+    let count = 0;
+    for (let set = 0; set < 40; set++) {
+      const difficulties = Array.from({ length: 15 }, (_, i) => -2 + (4 * i) / 14);
+      const items = difficulties.map((b) => ({ model: oneParameterLogistic, parameters: { a: 1, b, c: 0, d: 1 } }));
+      const { items: estimates } = conditionalMaximumLikelihood(
+        simulateResponses(items, simulateThetas(2000, random), random),
+      );
+      estimates.forEach((item, i) => {
+        const error = (item.parameters as LogisticItem).b - (difficulties[i] ?? 0);
+        squares += error ** 2;
+        if (Math.abs(error) <= normalQuantile(0.975) * (item.standardErrors?.b ?? 0)) covered++;
+        count++;
+      });
+    }
+    expect(Math.sqrt(squares / count)).toBeLessThanOrEqual(0.06);
+    expect(covered / count).toBeGreaterThanOrEqual(0.92);
+    expect(covered / count).toBeLessThanOrEqual(0.98);
+  });
+
+  it("leaves out persons with an extreme score or one answered item, and gives items that itemFit reads", () => {
+    const rows = [
+      [1, 0, 1],
+      [0, 1, 0],
+      [1, 1, 0],
+      [0, 0, 1],
+      [1, 1, 1],
+      [0, 0, 0],
+      [1, null, null],
+      [1, 0, null],
+    ];
+    const matrix = responseMatrix(rows);
+    const result = conditionalMaximumLikelihood(matrix);
+    // Persons 5 and 6 are extreme, person 7 answered one item: 5 persons remain.
+    expect(result.persons).toBe(5);
+    const thetas = rows.map(() => 0);
+    expect(itemFit(matrix, result.items, thetas)).toHaveLength(3);
+  });
+
+  it("reports a fit that ran out of steps, and the rating scale model of dichotomous items as the Rasch model", () => {
+    const expected = defined(conditional.cases[0]);
+    const stopped = conditionalMaximumLikelihood(responseMatrix(expected.responses), { maxIterations: 1 });
+    expect([stopped.converged, stopped.iterations]).toEqual([false, 1]);
+    const rasch = conditionalMaximumLikelihood(responseMatrix(expected.responses));
+    const rating = conditionalMaximumLikelihood(responseMatrix(expected.responses), { model: "rating-scale" });
+    rating.items.forEach((item, i) => {
+      const parameters = item.parameters as RatingScaleParameters;
+      expect(parameters.steps).toEqual([0]);
+      expectClose(parameters.b, (defined(rasch.items[i]).parameters as LogisticItem).b, 1e-10);
+    });
+  });
+
+  it("rejects an item every used person answered alike, too few items, and responses its model cannot take", () => {
+    const allRight = responseMatrix([
+      [1, 0, 1],
+      [1, 1, 0],
+      [1, 0, 0],
+    ]);
+    expect(() => conditionalMaximumLikelihood(allRight)).toThrow('Item "item1" has no response in category 0');
+    expect(() => conditionalMaximumLikelihood(responseMatrix([[0], [1]]))).toThrow(
+      "Conditional maximum likelihood needs at least two items, found 1.",
+    );
+    const polytomous = responseMatrix([
+      [0, 1, 2],
+      [1, 2, 0],
+      [2, 0, 1],
+      [1, 1, 1],
+    ]);
+    expect(() => conditionalMaximumLikelihood(polytomous, { model: "rasch" })).toThrow(DataError);
+    const unequal = responseMatrix([
+      [0, 1, 2],
+      [1, 0, 0],
+      [1, 1, 1],
+      [0, 0, 2],
+    ]);
+    expect(() => conditionalMaximumLikelihood(unequal, { model: "rating-scale" })).toThrow(
+      'The rating scale model needs items with the same number of categories; item "item1" has 2 and item "item3" has 3.',
+    );
+  });
+
+  it("rejects options of other types", () => {
+    const matrix = responseMatrix(defined(conditional.cases[0]).responses);
+    expect(() => conditionalMaximumLikelihood(matrix, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => conditionalMaximumLikelihood(matrix, { model: JSON.parse('"RSM"') })).toThrow(DataError);
+    expect(() => conditionalMaximumLikelihood(matrix, { tolerance: JSON.parse('"small"') })).toThrow(DataError);
+    expect(() => conditionalMaximumLikelihood(JSON.parse("[]"))).toThrow(DataError);
   });
 });
 
@@ -2541,6 +2744,61 @@ describe("testlets", () => {
 });
 
 describe("properties", () => {
+  it("a shift of every threshold leaves the conditional probability of a response pattern unchanged", () => {
+    const item = fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: 1, maxLength: 3 });
+    fc.assert(
+      fc.property(
+        fc.array(item, { minLength: 2, maxLength: 4 }),
+        fc.double({ min: -2, max: 2, noNaN: true }),
+        fc.array(fc.nat(), { minLength: 4, maxLength: 4 }),
+        (thresholds, shift, draws) => {
+          const pattern = thresholds.map((tau, i) => (draws[i] ?? 0) % (tau.length + 1));
+          const logProbability = (offset: number): number => {
+            const eta = thresholds.map((tau) => {
+              let sum = 0;
+              return tau.map((value) => (sum += value + offset));
+            });
+            const functions = eta.map((item) => itemFunctions(item)).reduce(combine, NO_ITEMS);
+            const total = pattern.reduce((sum, response) => sum + response, 0);
+            const weight = pattern.reduce(
+              (sum, response, i) => sum - (response === 0 ? 0 : (eta[i]?.[response - 1] ?? 0)),
+              0,
+            );
+            return weight - logFunction(functions, total);
+          };
+          expectClose(logProbability(shift), logProbability(0), 1e-9);
+        },
+      ),
+    );
+  });
+
+  it("conditional maximum likelihood does not depend on the order of persons", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 1_000_000 }), (seed) => {
+        const random = createRandom(seed);
+        const items = simulateItems(partialCredit, 4, random, { categoryCount: 3 });
+        const { responses } = simulateResponses(items, simulateThetas(150, random), random);
+        let forward: ConditionalCalibration;
+        try {
+          forward = conditionalMaximumLikelihood(responseMatrix(responses));
+        } catch (error) {
+          if (error instanceof DataError) return;
+          throw error;
+        }
+        const backward = conditionalMaximumLikelihood(responseMatrix([...responses].reverse()));
+        expectClose(backward.logLikelihood, forward.logLikelihood, 1e-9 * Math.abs(forward.logLikelihood));
+        backward.items.forEach((item, i) => {
+          const b = (item.parameters as ThresholdItem).b;
+          const expected = (defined(forward.items[i]).parameters as ThresholdItem).b;
+          b.forEach((value, k) => {
+            expectClose(value, expected[k] ?? null, 1e-9);
+          });
+        });
+      }),
+      { numRuns: 20 },
+    );
+  });
+
   it("category probabilities lie in [0, 1] and sum to 1", () => {
     fc.assert(
       fc.property(arbitraryItem, arbitraryTheta, (item, theta) => {

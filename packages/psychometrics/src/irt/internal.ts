@@ -80,5 +80,6 @@ export {
 } from "./responses.js";
 export { type Iteration, squarem } from "./squarem.js";
 export { itemTrace, scoreLikelihoods, summedScoreLikelihoods, summedScoreTable } from "./summed-score.js";
+export { combine, itemFunctions, logFunction, NO_ITEMS } from "./symmetric-functions.js";
 export { type CheckedThetaDistribution, checkThetaDistribution } from "./theta-distribution.js";
 export { formatList, sharesAbove } from "./thresholds.js";

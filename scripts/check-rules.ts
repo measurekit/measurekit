@@ -108,6 +108,14 @@ export const RULES: readonly Rule[] = [
     titles: "Liu and Agresti's standard error",
   },
   {
+    rule: "Conditional maximum likelihood needs a response from the persons it uses in every category of each item, as an empty category has an infinite threshold.",
+    file: "packages/psychometrics/src/irt/conditional-likelihood.ts",
+    find: "checkItems(matrix.itemIds, highest, model, tallies);",
+    replace: "",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "rejects an item every used person answered alike",
+  },
+  {
     rule: "Every category below an item's highest response has a response.",
     file: "packages/psychometrics/src/irt/responses.ts",
     find: "if (counts.size <= highest) {",

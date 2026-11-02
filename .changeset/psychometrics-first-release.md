@@ -3,7 +3,7 @@
 ---
 
 Psychometrics for JavaScript and TypeScript, validated against R: classical test theory with the value of subscores,
-item response theory, including multidimensional models with exploratory and confirmatory calibration by EM and MH-RM,
+item response theory, including conditional maximum likelihood of the Rasch family and multidimensional models with exploratory and confirmatory calibration by EM and MH-RM,
 rotation and scoring, cognitive diagnosis (G-DINA, DINA, DINO, A-CDM, LLM and R-RUM), adaptive, diagnostic adaptive, multidimensional
 adaptive and multistage testing with testlets and the derivation of routing cuts, item and person fit, differential item functioning for dichotomous and
 polytomous items, with SIBTEST of items and bundles, IRT likelihood-ratio tests, Raju's areas, DFIT, the Liu-Agresti odds ratio and the logistic discriminant function, linking and equating, including equating through common items, IRT observed-score equating and

@@ -11,9 +11,9 @@ import {
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { findIncreasingRoot, invert, type NewtonOptions, newton } from "../math/internal.js";
 import type { CalibratedItem } from "./calibration.js";
-import { oneParameterLogistic } from "./logistic.js";
 import { partialCredit, partialCreditInformation, stepStarts } from "./partial-credit.js";
 import { logProbability } from "./probability.js";
+import { raschScaleItem } from "./rasch-scale.js";
 import { categoryTallies, checkCategories, compressResponses, NO_RESPONSES, responseCodes } from "./responses.js";
 
 /** Options of {@link jointMaximumLikelihood}. */
@@ -390,20 +390,9 @@ function correctedItem(
   errors: Float64Array | null,
   correction: number,
 ): CalibratedItem<LogisticItem | ThresholdItem> {
-  const b = Array.from(thresholds, (threshold) => threshold * correction);
-  const corrected = errors === null ? null : Array.from(errors, (error) => error * correction);
-  if (b.length === 1) {
-    return {
-      id,
-      model: oneParameterLogistic,
-      parameters: { a: 1, b: b[0] ?? 0, c: 0, d: 1 },
-      standardErrors: corrected === null ? null : { b: corrected[0] ?? 0 },
-    };
-  }
-  return {
+  return raschScaleItem(
     id,
-    model: partialCredit,
-    parameters: { a: 1, b },
-    standardErrors: corrected === null ? null : Object.fromEntries(corrected.map((error, j) => [`b${j + 1}`, error])),
-  };
+    Array.from(thresholds, (threshold) => threshold * correction),
+    errors === null ? null : Array.from(errors, (error) => error * correction),
+  );
 }

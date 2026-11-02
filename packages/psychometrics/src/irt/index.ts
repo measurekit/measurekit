@@ -1,6 +1,7 @@
 /**
  * Item response theory: dichotomous and polytomous models, calibration by marginal and joint maximum likelihood with
- * groups and distributions of theta, ability estimation, summed-score tables, information and reliability.
+ * groups and distributions of theta, conditional maximum likelihood of the Rasch family, ability estimation,
+ * summed-score tables, information and reliability.
  *
  * @module @measurekit/psychometrics/irt
  */
@@ -31,6 +32,12 @@ export {
   type ParameterCovariance,
 } from "./calibration.js";
 export type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
+export {
+  type ConditionalCalibration,
+  type ConditionalCalibrationOptions,
+  type ConditionalModel,
+  conditionalMaximumLikelihood,
+} from "./conditional-likelihood.js";
 export { gradedResponse } from "./graded.js";
 export { conditionalStandardError, itemInformation, testInformation } from "./information.js";
 export {

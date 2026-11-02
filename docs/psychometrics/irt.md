@@ -1,8 +1,8 @@
 # Item response theory
 
 `@measurekit/psychometrics/irt` calibrates items by marginal maximum likelihood, in one or several groups of
-persons, with the distribution of theta fixed or estimated, and Rasch and partial credit items also by joint
-maximum likelihood. It estimates abilities, converts summed scores to theta, and computes information and
+persons, with the distribution of theta fixed or estimated, and Rasch, partial credit and rating scale items also by
+joint or conditional maximum likelihood. It estimates abilities, converts summed scores to theta, and computes information and
 reliability. Every estimate is validated against mirt, ltm, TAM and base R ([validation](validation.md)). Theta is
 on the N(0, 1) scale unless a calibration estimates its distribution.
 
@@ -537,10 +537,83 @@ result.persons[5]; // { id: "person6", theta, standardError }
 - **Standard errors.** An item's: the square roots of the diagonal of the inverse of its threshold information matrix,
   given the thetas. A person's: 1 / √I(θ). Persons without responses have `null` for both.
 
-Conditional maximum likelihood (CML, eRm's `RM` and `PCM`) is a different estimator. It conditions on the total scores,
-so it needs neither the correction nor the extreme-score adjustment, and it estimates no persons. eRm's `betapar` are
-easiness parameters, -(b1 + ... + bk) for category k, normalized to sum to 0; its `thresholds()` gives the thresholds.
-They differ from corrected JML thresholds ([validation](validation.md)).
+[Conditional maximum likelihood](#conditional-maximum-likelihood) is a different estimator. It conditions on the total
+scores, so it needs neither the correction nor the extreme-score adjustment, and it estimates no persons. Its thresholds
+differ from corrected JML thresholds ([validation](validation.md)).
+
+## Conditional maximum likelihood
+
+`conditionalMaximumLikelihood` estimates the Rasch, partial credit or rating scale model by conditional maximum
+likelihood (CML), as eRm's `RM`, `PCM` and `RSM`. Given a person's total score on the items the person answered, the
+responses do not depend on theta, so CML needs no distribution of theta and is consistent where JML is not.
+
+```mermaid
+flowchart LR
+  P["Persons, grouped by<br/>the items they answered"] --> X["Leave out extreme scores<br/>and single items"]
+  X --> G["Elementary symmetric functions<br/>of each group, by summation"]
+  G --> N["Newton step on the<br/>conditional log-likelihood"]
+  N -- "until no parameter changes<br/>by more than tolerance" --> G
+  N --> R["Items on the Rasch scale,<br/>thresholds summing to 0"]
+```
+
+```ts
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { conditionalMaximumLikelihood } from "@measurekit/psychometrics/irt";
+
+const result = conditionalMaximumLikelihood(
+  responseMatrix([
+    [1, 0, 2],
+    [0, 0, 1],
+    [1, 1, 2],
+    [0, 1, 0],
+    [1, 1, 1],
+    [0, 0, 0],
+  ]),
+);
+result.items[2]; // { id: "item3", model: partialCredit, parameters: { a: 1, b: [-0.693, 0.693] }, standardErrors: { b1: 1.12, b2: 1.12 } }
+result.persons; // 4: persons 3 and 6 have extreme scores
+```
+
+With γ_r(A) the elementary symmetric function of total r over the items A a person answered, the sum over every response
+pattern of total r of Π_i e^(-η_(i x_i)), and η_ik the sum of item i's thresholds up to category k:
+
+P(x | r) = Π_i e^(-η_(i x_i)) / γ_r(A).
+
+| Model              | Items                                            | Thresholds of item i          | Parameters                         |
+| ------------------ | ------------------------------------------------ | ----------------------------- | ---------------------------------- |
+| `"rasch"`          | 0/1, as 1PL items with a = 1                     | b_i                           | The items less 1                   |
+| `"partial-credit"` | Any; a 0/1 item as a 1PL item, the others as PCM | b_i1 to b_im, each its own    | The thresholds less 1              |
+| `"rating-scale"`   | The same number of categories each, as RSM items | b_i + τ_k, the steps τ shared | The items less 1, the steps less 1 |
+
+- **Scale.** CML identifies the thresholds up to a common shift. The thresholds of all items sum to 0, as eRm's
+  `sum0 = TRUE` does for its easiness parameters; the steps of the rating scale model sum to 0 too.
+- **Persons used.** A person who answered fewer than two items, or whose total is 0 or the highest possible on the items
+  answered, adds nothing to the conditional likelihood: `persons` counts the others. Persons are grouped by the items they
+  answered, each group with its own functions, so missing responses need no imputation.
+- **Categories.** An item's categories run from 0 to its highest response in the matrix, and the persons used need a
+  response in each: an item they all answered right or all wrong throws `DataError`, as its estimate would be infinite.
+- **Estimation.** The functions come from the summation algorithm, one item at a time, kept as values times a common
+  factor so that long tests stay finite; those with one or two items left out give the gradient and the Hessian.
+  Newton's method starts from thresholds of 0, halves a step that lowers the log-likelihood, and stops when no parameter
+  changes by more than `tolerance`. The standard errors come from the inverse of the Hessian at the estimates.
+
+| Option          | Default                                                          | Meaning                |
+| --------------- | ---------------------------------------------------------------- | ---------------------- |
+| `model`         | `"rasch"` when every response is 0 or 1, else `"partial-credit"` | The model              |
+| `tolerance`     | `1e-6`                                                           | Newton's stopping rule |
+| `maxIterations` | `100`                                                            | The most Newton steps  |
+
+The result holds `items`, `logLikelihood` (conditional), `parameters`, `persons`, `converged` and `iterations`. The items
+take theta on the Rasch scale, and `itemFit` reads them. On 40 seeded sets of 2,000 persons and 15 items,
+the difficulties have an RMSE of 0.052 and their 95% intervals cover them in 96.3% of cases.
+
+### Differences from eRm
+
+| Topic                                 | This package                                                      | eRm                                                                                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Normalization                         | The thresholds sum to 0                                           | `sum0 = TRUE`: the easiness parameters, -(b1 + ... + bk) for category k, sum to 0, which shifts every threshold of a polytomous test by a constant |
+| Optimizer                             | Newton's method on the exact gradient and Hessian, to `tolerance` | `nlm` with numerical derivatives, which stops up to 1e-4 short in the thresholds                                                                   |
+| Missing responses of polytomous items | The conditional likelihood of each person's answered items        | `PCM` maximizes another function: on a seeded test that likelihood is -780.5 at its estimates, 3.4 below its maximum, and eRm reports -812.1       |
 
 ## Ability estimation
 
@@ -724,3 +797,8 @@ calibrate(
 ```
 
 Validate a new model against an R reference before relying on it, as [validation](validation.md) describes.
+
+## Not included
+
+- **Pairwise, PML, PROX and eigenvector Rasch estimators.** Outside the sources: CML, MML and JML are the practice, and
+  are built.

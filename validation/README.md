@@ -33,6 +33,7 @@ Rscript validation/psychometrics/dif-lord-purification.R # purified Lord's chi-s
 Rscript validation/psychometrics/dif-sibtest.R       # SIBTEST and the recipes of dif.md: mirt's SIBTEST, difR's difSIBTEST and difStd, sirt's dif.variance; run dif.R first
 Rscript validation/psychometrics/dif-irt.R          # IRT DIF: mirt's multipleGroup likelihood ratios, difR's difRaju, DFIT's Ncdif, Cdif and Dtf; run dif.R first
 Rscript validation/psychometrics/dif-polytomous-tests.R # Liu-Agresti odds ratio and logistic discriminant function: difR's liu_agresti_ccor, base R's equation 3 and glm; run dif.R first
+Rscript validation/psychometrics/rasch-cml.R         # conditional maximum likelihood: eRm's RM, PCM, RSM; base R's conditional likelihood by every pattern
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/vertical-scaling.R  # chains of links and growth between grades: equateIRT's chainec, mirt's multipleGroup and base R
 Rscript validation/psychometrics/explanatory.R       # item parameters regressed on item features: mirt, metafor and base R
