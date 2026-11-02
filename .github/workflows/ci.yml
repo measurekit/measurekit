@@ -32,6 +32,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm knip
       - run: pnpm check:packages
+      - run: pnpm check:licenses
+      - run: pnpm check:audit
       - run: pnpm docs:api
       # Version and Dependabot pull requests change package files without a changeset of their own.
       - if: >-

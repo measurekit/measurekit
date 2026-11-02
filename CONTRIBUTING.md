@@ -7,7 +7,7 @@ Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT
 flowchart LR
   C["Change in packages/ or docs/"] --> V["Reference script and fixture in validation/ for a new statistic"]
   C --> T["Tests, docs and TSDoc"]
-  V --> G["Gates: lint, check:standards, typecheck, knip, check:packages, docs:api, tests, benchmarks"]
+  V --> G["Gates: lint, check:standards, typecheck, knip, check:packages, check:licenses, check:audit, docs:api, tests, benchmarks"]
   T --> G
   G --> X["Changeset of the package"] --> M["Pull request and merge"]
 ```
@@ -29,7 +29,7 @@ the reference function or the formula in the pull request, and add the reference
 ## Before opening a pull request
 
 Run `pnpm lint`, `pnpm check:standards`, `pnpm typecheck`, `pnpm test` and `pnpm knip`, then `pnpm build`,
-`pnpm check:packages` and `pnpm docs:api`. A bug fix comes with a test that fails without it. A change to a package goes into the pending
+`pnpm check:packages`, `pnpm check:licenses`, `pnpm check:audit` and `pnpm docs:api`. A bug fix comes with a test that fails without it. A change to a package goes into the pending
 release's changeset for that package in `.changeset/`, or a new one made with `pnpm changeset` when none is pending
 ([AGENTS.md](AGENTS.md#releases)).
 

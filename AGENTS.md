@@ -113,6 +113,8 @@ pnpm bench            # builds, then the benchmarks of every package against the
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package, from a clean dist/
 pnpm check:packages   # builds, then publint and Are the Types Wrong on each packed package
+pnpm check:licenses   # fails on a production dependency whose license is not MIT, Apache-2.0, BSD or ISC
+pnpm check:audit      # pnpm audit of the production dependencies at any severity and of all at high; needs the network
 pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumented exports
 ```
 
