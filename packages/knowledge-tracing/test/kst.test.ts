@@ -818,6 +818,8 @@ describe("local identifiability against pks", () => {
         identifiable: reference.rank === reference.parameters,
       });
     },
+    // Chess has 16 items: the rank of 65,536 patterns by 88 parameters takes a second, several on a loaded machine.
+    30_000,
   );
 });
 
