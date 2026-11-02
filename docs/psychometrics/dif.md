@@ -1,12 +1,13 @@
 # Differential item functioning
 
 `@measurekit/psychometrics/dif` tests whether an item functions differently for two groups of persons of equal
-ability. For dichotomous items it has the Mantel-Haenszel statistics with the ETS categories, logistic regression and
-Lord's chi-square; for items with any number of categories, the Mantel test, ordinal logistic regression and SIBTEST,
-which also tests bundles of items. The statistics on the matching score work on sparse data, and all purify their
-matching criterion or their link on request. The dichotomous statistics are validated against difR, the polytomous ones
-against base R, rms, MASS and lordif, SIBTEST against mirt and difR, and the sparse-data rule against base R
-([validation](validation.md)).
+ability. For dichotomous items it has the Mantel-Haenszel statistics with the ETS categories, logistic regression,
+Lord's chi-square and Raju's areas; for items with any number of categories, the Mantel test, ordinal logistic
+regression, SIBTEST, which also tests bundles of items, and IRT likelihood-ratio tests; and for items of any model on one
+scale, the differential functioning of items and tests. The statistics on the matching score work on sparse data, and
+all purify their matching criterion or their link on request. The dichotomous statistics are validated against difR, the
+polytomous ones against base R, rms, MASS and lordif, SIBTEST against mirt and difR, the likelihood-ratio tests against
+mirt, the differential functioning against DFIT, and the sparse-data rule against base R ([validation](validation.md)).
 
 ## Groups
 
@@ -21,6 +22,9 @@ whose items are studied. Both groups need persons.
 | `mantelTest(matrix, groups, options)`                   | Any             | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
 | `ordinalLogisticRegressionDif(matrix, groups, options)` | Any             | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
 | `sibtest(matrix, groups, options)`                      | Any, or bundles | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
+| `rajuAreaDif(matrix, groups, options)`                  | 2PL             | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
+| `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model       | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
+| `differentialFunctioning(reference, focal, options)`    | Any model       | Theta of the focal group's population                           | None: it takes items                                                    |
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -82,12 +86,13 @@ are computed again on the items not flagged, until a round flags the items the p
 left, or 10 rounds have run, as difR's `purify` (Holland and Thayer, 1988). The anchors are the items that define the
 matching score or, for Lord's chi-square, the scale on which the groups are linked.
 
-| Statistic                                               | Flags an item when                                           | Fewest anchors                                    |
-| ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------- |
-| `mantelHaenszel`, `mantelTest`                          | The chi-square is significant                                | 1, the studied item's match                       |
-| `logisticRegressionDif`, `ordinalLogisticRegressionDif` | The test of both terms is significant, difR's default `type` | 1                                                 |
-| `lordChiSquare`                                         | The chi-square is significant                                | 2, as a transformation needs two locations        |
-| `sibtest`                                               | An item's chi-square is significant; a bundle flags nothing  | 3, or 2 [without the correction](#fewest-anchors) |
+| Statistic                                               | Flags an item when                                           | Fewest anchors                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| `mantelHaenszel`, `mantelTest`                          | The chi-square is significant                                | 1, the studied item's match                             |
+| `logisticRegressionDif`, `ordinalLogisticRegressionDif` | The test of both terms is significant, difR's default `type` | 1                                                       |
+| `lordChiSquare`, `rajuAreaDif`                          | The chi-square, or the unsigned area's z, is significant     | 2, as a transformation needs two locations              |
+| `irtLikelihoodRatioDif`                                 | The chi-square is significant                                | 2, as [a free item](#irt-likelihood-ratio) needs a link |
+| `sibtest`                                               | An item's chi-square is significant; a bundle flags nothing  | 3, or 2 [without the correction](#fewest-anchors)       |
 
 The result's `purification` holds the `anchors` of the final statistics, the `iterations` after the first statistics and
 whether they `converged`; it is `null` without `purify`. `converged` is `false` when the rounds ran out or too few anchors
@@ -185,6 +190,24 @@ The result holds `items`, `{ id, chiSquare, degreesOfFreedom, significance }` ea
 Gauss-Hermite points: `{ quadrature: { method: "gauss-hermite", points: 21 } }` reproduces it. lordif's defaults for
 `maxIter`, 10, and difR's for `nrIter` are the 10 rounds; its `minCell`, 5, collapses sparse categories of polytomous
 items, which a dichotomous model has none of.
+
+## Raju's areas
+
+`rajuAreaDif` measures the area between an item's curves in the two groups (Raju, 1988, 1990), as difR's `difRaju`. It
+calibrates and links the groups as [Lord's chi-square](#lords-chi-square) does, with the same options, for the 2PL alone:
+a 3PL item with unequal lower asymptotes has an infinite unsigned area. With Δb = b_F - b_R and the focal estimates on
+the reference scale:
+
+| Field          | Definition                                                                                                        |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `signedArea`   | Δb: positive when the item is harder for the focal group                                                          |
+| `unsignedArea` | \|2 (a_F - a_R) ln(1 + e^Y) / (a_F a_R) - Δb\|, Y = a_F a_R Δb / (a_F - a_R); \|Δb\| when the slopes are equal    |
+| `signedZ`      | The signed area over its standard error, √(SE²(b_F) + SE²(b_R))                                                   |
+| `unsignedZ`    | The unsigned area over its standard error, by the delta method on the covariance matrices of (a, b) in each group |
+| `significance` | The two-sided probability of an unsigned z at least as large without DIF; purification flags by it                |
+
+The areas are `null` where a group's information matrix cannot be inverted, and the z tests where a standard error is 0.
+The signed test's probability is `chiSquareUpperTail(signedZ ** 2, 1)` of `@measurekit/core`.
 
 ## Polytomous items
 
@@ -394,6 +417,122 @@ anchor is matched on the other anchors:
 difR's `purify` has no floor: on bfi it goes on with 2 anchors, whose statistics are undefined, and reports
 convergence.
 
+## IRT likelihood ratio
+
+`irtLikelihoodRatioDif` tests each item by the likelihood ratio of two calibrations of both groups on one scale (Thissen,
+Steinberg and Wainer, 1993; Kim and Cohen, 1998), as mirt's `DIF(scheme = "drop")` on a multiple-group model. It takes
+items of any model, so it is the IRT test for polytomous items.
+
+```mermaid
+flowchart LR
+  M["Matrix and groups"] --> C["Constrained: every item equal,<br/>reference N(0, 1), focal normal"]
+  M --> S["Item j as two items,<br/>one answered by each group"]
+  S --> F["Calibrate the same way"]
+  C --> X["χ² = 2 (ln L₁ - ln L₀)"]
+  F --> X
+  X -- "purify" --> P["Flagged items stay free in both models"]
+  P --> S
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { type DifGroup, differentialFunctioning, irtLikelihoodRatioDif } from "@measurekit/psychometrics/dif";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 500 persons per group answer 10 items; item 3 is one point harder for the focal group.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 10, random);
+const shifted = items.map((item, j) =>
+  j === 2 ? { ...item, parameters: { ...item.parameters, b: item.parameters.b + 1 } } : item,
+);
+const reference = simulateResponses(items, simulateThetas(500, random), random);
+const focal = simulateResponses(shifted, simulateThetas(500, random), random);
+const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+
+const dif = irtLikelihoodRatioDif(matrix, groups, { model: twoParameterLogistic, purify: true });
+dif.items[2]; // { id: "item3", chiSquare: 34.0, degreesOfFreedom: 2, significance: 4.2e-8 }
+dif.purification; // { anchors: [8 items], iterations: 1, converged: true }: item3 and item4 are flagged
+dif.constrained.items.map((item) => item.id); // ["item1", "item2", "item3:reference", "item3:focal", "item4:reference", ...]
+```
+
+The constrained model calibrates both groups with every item equal across them, the reference group N(0, 1) and the focal
+group normal, its mean and standard deviation estimated with the items. An item is tested by replacing it with two items,
+`<id>:reference` answered by the reference group and `<id>:focal` by the focal group, and calibrating again. χ² is twice
+the difference of the log-likelihoods, with as many degrees of freedom as the item has parameters its model does not
+share: 2 for the 2PL, K for a graded or generalized partial credit item of K categories, 1 for the 1PL, whose slope is
+shared. Missing responses are skipped, as in calibration.
+
+| Field              | Definition                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `chiSquare`        | 2 (ln L with the item free in each group - ln L with it equal); `null` when a group lacks one of its categories, or a fit did not converge |
+| `degreesOfFreedom` | The entries of the item's parameter vector its model does not share                                                                        |
+| `significance`     | The probability of a chi-square at least as large without DIF                                                                              |
+
+The result holds `items`, the [`purification`](#purification) and `constrained`, the calibration of the last round, whose
+`converged` reports its EM and whose items include the free items of the flagged ones. With `purify`, the items flagged at
+0.05 stay free in both models of the next round: an item not flagged is tested by freeing it, a flagged one by
+constraining it. It stops before fewer than two items are constrained, as the free item of a test is linked to the
+reference scale through the others. Each round runs one calibration more than there are items.
+
+| Option          | Default        | Meaning                                                                               |
+| --------------- | -------------- | ------------------------------------------------------------------------------------- |
+| `model`         | Required       | One model for every item, or one per item                                             |
+| `quadrature`    | 61 rectangular | The rule over theta; the focal group's normal distribution needs the rectangular rule |
+| `tolerance`     | `1e-4`         | EM's tolerance in each calibration                                                    |
+| `maxIterations` | `500`          | EM's most iterations in each calibration                                              |
+| `purify`        | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                  |
+
+Priors, fixed items, covariates, testlets and the choice of groups and distributions are not options: priors would turn
+the ratio of likelihoods into one of posteriors, and the rest are the test's own.
+
+## Differential functioning
+
+`differentialFunctioning` gives DFIT's noncompensatory and compensatory DIF of every item and the differential functioning
+of the test (Raju, van der Linden and Fleer, 1995), as DFIT's `Ncdif`, `Cdif` and `Dtf`, for items of any model, polytomous
+ones by their expected scores (Flowers, Oshima and Raju, 1999). It takes the items with each group's parameters on one
+scale and the focal group's distribution of theta. At each node θ, d_i(θ) is item i's expected score under its focal
+parameters less that under its reference parameters, and D(θ) = Σ d_i(θ):
+
+| Field   | Definition                                                                               |
+| ------- | ---------------------------------------------------------------------------------------- |
+| `ncdif` | NCDIF_i = E[d_i²], the item's DIF as if every other item were free of it                 |
+| `cdif`  | CDIF_i = E[d_i D], the item's share of the test's DIF, which other items' DIF may cancel |
+| `dtf`   | DTF = E[D²] = Σ CDIF_i                                                                   |
+
+The expectations are over the nodes of `population`, weighted. The population is required, as N(0, 1) is rarely the focal
+group's: a calibration group's `nodes` and `weights`, or the focal persons' estimates with equal weights. The two lists hold
+the same items in the same order. The free items of `irtLikelihoodRatioDif`'s constrained calibration give the parameters
+on one scale, the anchors the same in both lists:
+
+```ts continues
+const freeOf = (group: string) =>
+  dif.constrained.items
+    .filter((item) => !item.id.includes(":") || item.id.endsWith(`:${group}`))
+    .map((item) => ({ ...item, id: item.id.replace(`:${group}`, "") }));
+const focalGroup = dif.constrained.groups.find((distribution) => distribution.group === "focal");
+const functioning = differentialFunctioning(freeOf("reference"), freeOf("focal"), {
+  population: { nodes: focalGroup?.nodes ?? [], weights: focalGroup?.weights ?? [] },
+});
+functioning.items[2]; // { id: "item3", ncdif: 0.0276, cdif: 0.0219 }
+functioning.dtf; // 0.0263
+```
+
+A bundle's differential functioning, DBF (Oshima et al., 1998), is the `dtf` of its items alone, such as those of a
+reading passage:
+
+```ts continues
+const inPassage = (item: { id: string }) => ["item3", "item4"].includes(item.id);
+differentialFunctioning(freeOf("reference").filter(inPassage), freeOf("focal").filter(inPassage), {
+  population: { nodes: focalGroup?.nodes ?? [], weights: focalGroup?.weights ?? [] },
+}).dtf; // 0.0263: the free items hold all of the test's DIF, as the anchors are equal in both lists
+```
+
+Raju et al. flag an item whose NCDIF is above 0.006 for a dichotomous item, a cutoff the caller applies; their item
+parameter replication for the cutoffs is not included.
+
 ## Not included
 
 - **The exact Mantel-Haenszel test.** Outside the sources: an option of `difR::difMH`, off by default.
@@ -401,10 +540,8 @@ convergence.
   likelihood ratio, is built.
 - **Matching on a score other than the total for the Mantel-Haenszel and logistic regression statistics.** Outside the
   sources: an option of difR, off by default.
-- **Polytomous IRT likelihood-ratio tests.** Outside the sources: they need multiple-group IRT, and ordinal logistic
-  regression and the Mantel test are the practice for polytomous items.
-- **Lord's test for polytomous items.** Outside the sources: it needs multiple-group IRT, and ordinal logistic
-  regression and the Mantel test are the practice.
+- **Lord's test for polytomous items.** Outside the sources: the likelihood ratio, the cited practice for polytomous items
+  (Kim and Cohen, 1998), is built.
 - **The iterated theta of lordif with group-specific item parameters.** Outside the sources: one pass of lordif is the
   composition above, and ordinal logistic regression is the practice.
 - **lordif's `minCell` collapsing of sparse categories.** Outside the sources: ordinal logistic regression and the
@@ -429,6 +566,9 @@ convergence.
   practice.
 - **Transformed item difficulties.** Outside the sources: not cited, and it matches no ability.
 - **Wald tests with a full covariance of groups.** Outside the sources: `lordChiSquare` is the Wald test of the sources.
+- **DRF, DTF, `RMSD_DIF` and the empirical effect sizes of mirt.** Outside the sources: beside DFIT, which is built.
+- **Item parameter replication for DFIT's cutoffs.** No fit: a loop over draws from a covariance; the guide gives the
+  usual 0.006.
 - **DIF between calibrations (`dif.test`).** Outside the sources: `lordChiSquare` is the same test.
 - **Lasso DIF.** Outside the sources: a research method of difR.
 - **Item-level heterogeneous mixed-model DIF.** Outside the sources: a research method of difR.
@@ -590,6 +730,8 @@ Invalid input throws `DataError` naming the value found.
 | Lord's calibrations   | EM to `tolerance`                                                   | ltm's default control, 40 EM cycles then BFGS, stops short: up to 2% in χ²                                    |
 | Lord's 1PL            | Not supported: `oneParameterLogistic` estimates a common a          | a fixed at 1                                                                                                  |
 | Lord's purification   | Stops before fewer than 2 anchors are left, and `converged` says so | Rescales on the items not flagged, whose spread is undefined for fewer than two                               |
+| Raju's unsigned area  | The area between the curves, at least 0                             | Negative where the focal slope is the lower: the expression inside the absolute value, `integrate` shows      |
+| Raju's p-value        | Two-sided, 2 (1 - Φ(\|z\|))                                         | 2 (1 - Φ(z)), above 1 for a negative z; its flags and adjusted p-values use \|z\|                             |
 | Missing responses     | The scaled matching score of each item's persons                    | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect |
 
 ## Differences from mirt
@@ -601,6 +743,16 @@ Invalid input throws `DataError` naming the value found.
 | Small significances  | The upper tail of the chi-square, which keeps its precision | `1 - pchisq`, which is 0 below about 1e-16                                                              |
 | Guessing             | One value for all items                                     | One for all items, or one per item                                                                      |
 | Purification         | `purify`, as difR's, with [a floor](#fewest-anchors)        | None; difR's `purify` goes on without a floor                                                           |
+| Likelihood-ratio DIF | Every parameter of the item is freed; `purify` as difR's    | `which.par` chooses the parameters; `scheme = "drop_sequential"` purifies by dropping anchors in rounds |
+| Likelihood-ratio DIF | One calibration per test, from the starting values          | `DIF` refits from the constrained model's estimates; both reach the same maximum within 3e-7 in χ²      |
+
+## Differences from DFIT
+
+| Topic      | This package                                | DFIT                                                                                   |
+| ---------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Population | Nodes with weights, such as a calibration's | `focalAbilities` with equal weights, or `integrate` over a normal density without them |
+| Models     | Any model, by its expected score            | The 1PL to the 4PL, the graded and the partial credit models, by name                  |
+| Cutoffs    | None: the numbers are in the result         | `Ipr` and `CutoffIpr` draw item parameters from their covariance for cutoffs           |
 
 ## Differences from lordif
 

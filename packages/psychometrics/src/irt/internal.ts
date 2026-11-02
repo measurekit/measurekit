@@ -16,6 +16,7 @@ export { fromUnbounded, toUnbounded, unboundedDerivative } from "./bounds.js";
 export {
   type CalibratedItem,
   type Calibration,
+  calibrate,
   calibrateWithCovariance,
   type ParameterCovariance,
 } from "./calibration.js";

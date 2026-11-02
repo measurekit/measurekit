@@ -7,6 +7,13 @@ import {
   DataError,
   type DifGroup,
   type DifPurification,
+  differentialFunctioning,
+  generalizedPartialCredit,
+  gradedResponse,
+  type IrtDifTest,
+  type IrtModel,
+  irtLikelihoodRatioDif,
+  type LogisticItem,
   type LogisticRegressionDif,
   logisticRegressionDif,
   lordChiSquare,
@@ -18,17 +25,23 @@ import {
   oneParameterLogistic,
   ordinalLogisticRegressionDif,
   type PurificationOptions,
+  type RajuArea,
   type ResponseMatrix,
+  rajuAreaDif,
   responseMatrix,
   type Sibtest,
   sibtest,
   simulateItems,
   simulateResponses,
   simulateThetas,
+  type TestItem,
+  threeParameterLogistic,
   twoParameterLogistic,
 } from "../src/index.js";
+import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/dif.json" with { type: "json" };
+import irtFixture from "./fixtures/dif-irt.json" with { type: "json" };
 import lordPurification from "./fixtures/dif-lord-purification.json" with { type: "json" };
 import polytomous from "./fixtures/dif-polytomous.json" with { type: "json" };
 import sibtestFixture from "./fixtures/dif-sibtest.json" with { type: "json" };
@@ -52,6 +65,16 @@ const LORDIF_TOLERANCE = 5e-5 + 1e-9;
 const SIBTEST_TOLERANCE = 1e-10;
 /** The recipes for standardization and DIF variance against difR's difStd and sirt's dif.variance. */
 const RECIPE_TOLERANCE = 1e-10;
+/** Raju's areas against difR on converged ltm calibrations: the same estimates and closed forms. */
+const RAJU_AREA_TOLERANCE = 1e-8;
+/** Raju's z and significance, which carry the standard errors of the observed information. */
+const RAJU_Z_TOLERANCE = 1e-5;
+/** IRT likelihood-ratio chi-squares, significances and log-likelihoods against mirt, both run to 1e-7. */
+const LIKELIHOOD_RATIO_TOLERANCE = 1e-5;
+/** The focal group's mean and standard deviation in the constrained model against mirt's, which stop at 1e-7. */
+const LATENT_TOLERANCE = 1e-4;
+/** NCDIF, CDIF and DTF against DFIT: the same sums over the same nodes. */
+const FUNCTIONING_TOLERANCE = 1e-12;
 
 /** Item 1 everyone answered correctly; items 2 and 3 vary. */
 const CONSTANT_ROWS = [
@@ -400,6 +423,309 @@ describe("lordChiSquare", () => {
     expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, { model: custom })).toThrow(DataError);
     const references: DifGroup[] = CONSTANT_GROUPS.map(() => "reference");
     expect(() => lordChiSquare(matrix, references, { model: twoParameterLogistic })).toThrow(DataError);
+  });
+});
+
+/** The cases of dif.json and dif-polytomous.json that the fixtures of the other units key by name. */
+interface FixtureInput {
+  readonly fixture: string;
+  readonly case: string;
+  readonly sparse: boolean;
+}
+
+/** The responses and groups of a case of dif.json or dif-polytomous.json. */
+function fixtureCase(input: FixtureInput): { matrix: ResponseMatrix; groups: DifGroup[] } {
+  const cases: readonly {
+    name: string;
+    responses: (number | null)[][];
+    focal: number[];
+    sparse: { responses: (number | null)[][] };
+  }[] = input.fixture === "dif" ? fixture.cases : polytomous.cases;
+  const dataset = defined(cases.find((candidate) => candidate.name === input.case));
+  return {
+    matrix: responseMatrix(input.sparse ? dataset.sparse.responses : dataset.responses),
+    groups: groups(dataset.focal),
+  };
+}
+
+/** Raju's statistics of a fixture, by statistic, then item. */
+type RajuFixture = Readonly<
+  Record<"signedArea" | "unsignedArea" | "signedZ" | "unsignedZ" | "significance", readonly (number | null)[]>
+>;
+
+function expectRaju(actual: readonly RajuArea[], expected: RajuFixture): void {
+  actual.forEach((item, i) => {
+    expectClose(item.signedArea, expected.signedArea[i] ?? null, RAJU_AREA_TOLERANCE, `signed area ${i + 1}`);
+    expectClose(item.unsignedArea, expected.unsignedArea[i] ?? null, RAJU_AREA_TOLERANCE, `unsigned area ${i + 1}`);
+    expectClose(item.signedZ, expected.signedZ[i] ?? null, RAJU_Z_TOLERANCE, `signed z ${i + 1}`);
+    expectClose(item.unsignedZ, expected.unsignedZ[i] ?? null, RAJU_Z_TOLERANCE, `unsigned z ${i + 1}`);
+    expectClose(item.significance, expected.significance[i] ?? null, RAJU_Z_TOLERANCE, `significance ${i + 1}`);
+  });
+}
+
+describe("rajuAreaDif", () => {
+  for (const [name, expected] of Object.entries(irtFixture.raju)) {
+    const { matrix, groups: caseGroups } = fixtureCase(expected.input);
+
+    it(`matches difR's difRaju on ${name} data`, () => {
+      const result = rajuAreaDif(matrix, caseGroups, LORD_CALIBRATION);
+      expect(result.purification).toBeNull();
+      expectRaju(result.items, expected.default);
+    });
+
+    it(`matches difR's purified difRaju on ${name} data`, () => {
+      const result = rajuAreaDif(matrix, caseGroups, { ...LORD_CALIBRATION, purify: true });
+      expectRaju(result.items, expected.purified);
+      expectPurification(result.purification, expected.purified);
+    });
+  }
+
+  it("gives the area between the curves where difR's unsigned area is negative, and a significance below 1", () => {
+    const expected = irtFixture.raju.verbal.default;
+    const below = expected.difrUnsignedArea.flatMap((area, i) => (area < 0 ? [i] : []));
+    expect(below.length).toBeGreaterThan(0);
+    const { matrix, groups: caseGroups } = fixtureCase(irtFixture.raju.verbal.input);
+    const { items } = rajuAreaDif(matrix, caseGroups, LORD_CALIBRATION);
+    for (const i of below) {
+      expectClose(items[i]?.unsignedArea ?? null, -(expected.difrUnsignedArea[i] ?? 0), RAJU_AREA_TOLERANCE);
+      expect(expected.difrSignificance[i]).toBeGreaterThan(1);
+      expect(items[i]?.significance).toBeLessThan(1);
+    }
+  });
+
+  it("rejects models other than the 2PL, and a group without persons", () => {
+    const matrix = responseMatrix(CONSTANT_ROWS);
+    for (const model of [oneParameterLogistic, threeParameterLogistic, { ...twoParameterLogistic, name: "copy" }]) {
+      expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, { model })).toThrow(DataError);
+    }
+    expect(() =>
+      rajuAreaDif(matrix, CONSTANT_GROUPS, { model: [twoParameterLogistic, threeParameterLogistic] }),
+    ).toThrow('Raju\'s area needs the 2PL model, found the "3PL" model.');
+    const focal: DifGroup[] = CONSTANT_GROUPS.map(() => "focal");
+    expect(() => rajuAreaDif(matrix, focal, { model: twoParameterLogistic })).toThrow(
+      "Raju's area needs persons in the reference group.",
+    );
+  });
+
+  it("rejects options of other types", () => {
+    const matrix = responseMatrix(CONSTANT_ROWS);
+    expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, { model: JSON.parse('"2PL"') })).toThrow(
+      'The option model must be the 2PL model, found "2PL".',
+    );
+    expect(() =>
+      rajuAreaDif(matrix, CONSTANT_GROUPS, { model: twoParameterLogistic, purify: JSON.parse('"yes"') }),
+    ).toThrow('The option purify must be a boolean, found "yes".');
+    expect(() => rajuAreaDif(matrix, JSON.parse("null"), { model: twoParameterLogistic })).toThrow(
+      "The groups must be an array, found null.",
+    );
+  });
+});
+
+/** The models of the likelihood-ratio fixture by its names for them. */
+const LR_MODELS: Readonly<Record<string, IrtModel<unknown>>> = {
+  "2pl": twoParameterLogistic,
+  grm: gradedResponse,
+  gpcm: generalizedPartialCredit,
+};
+
+/** The likelihood-ratio tests of a fixture, by statistic, then item. */
+type LikelihoodRatioFixture = Readonly<
+  Record<"chiSquare" | "degreesOfFreedom" | "significance", readonly (number | null)[]>
+>;
+
+function expectLikelihoodRatio(actual: readonly IrtDifTest[], expected: LikelihoodRatioFixture): void {
+  actual.forEach((item, i) => {
+    expectClose(item.chiSquare, expected.chiSquare[i] ?? null, LIKELIHOOD_RATIO_TOLERANCE, `chi-square ${i + 1}`);
+    expect(item.degreesOfFreedom).toBe(expected.degreesOfFreedom[i]);
+    expectClose(item.significance, expected.significance[i] ?? null, LIKELIHOOD_RATIO_TOLERANCE, `p ${i + 1}`);
+  });
+}
+
+describe("irtLikelihoodRatioDif", () => {
+  const options = { tolerance: irtFixture.tolerance, maxIterations: 20_000 };
+
+  for (const [name, expected] of Object.entries(irtFixture.likelihoodRatio)) {
+    it(`matches mirt's multiple-group likelihood ratios on ${name}`, () => {
+      const { matrix, groups: caseGroups } = fixtureCase(expected.input);
+      const model = defined(LR_MODELS[expected.model]);
+      const result = irtLikelihoodRatioDif(matrix, caseGroups, { ...options, model });
+      expect(result.purification).toBeNull();
+      expectLikelihoodRatio(result.items, expected.default);
+      const { constrained } = result;
+      expect(constrained.converged).toBe(true);
+      expectClose(constrained.logLikelihood, expected.logLikelihood, LIKELIHOOD_RATIO_TOLERANCE);
+      const focal = constrained.groups.find((group) => group.group === "focal");
+      expectClose(focal?.mean ?? null, expected.focal.mean, LATENT_TOLERANCE);
+      expectClose(focal?.sd ?? null, expected.focal.sd, LATENT_TOLERANCE);
+      expect(constrained.items.map((item) => item.id)).toEqual(matrix.itemIds);
+    });
+  }
+
+  for (const name of ["verbal, 2PL", "bfi, graded"] as const) {
+    it(`matches the purification of mirt's likelihood ratios on ${name}`, () => {
+      const expected = irtFixture.likelihoodRatio[name];
+      const { matrix, groups: caseGroups } = fixtureCase(expected.input);
+      const model = defined(LR_MODELS[expected.model]);
+      const result = irtLikelihoodRatioDif(matrix, caseGroups, { ...options, model, purify: true });
+      const pure = defined(expected.purified);
+      expectLikelihoodRatio(result.items, pure);
+      expectPurification(result.purification, pure);
+      expectClose(result.constrained.logLikelihood, pure.logLikelihood, LIKELIHOOD_RATIO_TOLERANCE);
+      const free = matrix.itemIds.filter((_, i) => !pure.anchors.includes(i + 1));
+      expect(result.constrained.items.map((item) => item.id)).toEqual(
+        matrix.itemIds.flatMap((id) => (free.includes(id) ? [`${id}:reference`, `${id}:focal`] : [id])),
+      );
+    });
+  }
+
+  it("gives the values of the guide's sample, and the differential functioning of its free items", () => {
+    const { matrix, personGroups } = guideSample(10, { 2: 1 }, 0);
+    const dif = irtLikelihoodRatioDif(matrix, personGroups, { model: twoParameterLogistic, purify: true });
+    const item3 = defined(dif.items[2]);
+    expect([shown(item3.chiSquare, 3), item3.degreesOfFreedom, shown(item3.significance, 2)]).toEqual([34, 2, 4.2e-8]);
+    expect(dif.purification).toEqual({
+      anchors: matrix.itemIds.filter((id) => id !== "item3" && id !== "item4"),
+      iterations: 1,
+      converged: true,
+    });
+    expect(dif.constrained.items.slice(0, 5).map((item) => item.id)).toEqual([
+      "item1",
+      "item2",
+      "item3:reference",
+      "item3:focal",
+      "item4:reference",
+    ]);
+    const freeOf = (group: string): TestItem[] =>
+      dif.constrained.items
+        .filter((item) => !item.id.includes(":") || item.id.endsWith(`:${group}`))
+        .map((item) => ({ ...item, id: item.id.replace(`:${group}`, "") }));
+    const population = defined(dif.constrained.groups.find((distribution) => distribution.group === "focal"));
+    const functioning = differentialFunctioning(freeOf("reference"), freeOf("focal"), { population });
+    const functioned = defined(functioning.items[2]);
+    expect([shown(functioned.ncdif, 3), shown(functioned.cdif, 3), shown(functioning.dtf, 3)]).toEqual([
+      0.0276, 0.0219, 0.0263,
+    ]);
+    const inPassage = (item: TestItem): boolean => ["item3", "item4"].includes(item.id);
+    const passage = differentialFunctioning(freeOf("reference").filter(inPassage), freeOf("focal").filter(inPassage), {
+      population,
+    });
+    expect(shown(passage.dtf, 3)).toBe(0.0263);
+  });
+
+  it("gives the same tests for one model and a list of it", () => {
+    const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
+    const subset = responseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
+    const single = irtLikelihoodRatioDif(subset, caseGroups, { model: twoParameterLogistic });
+    const list = irtLikelihoodRatioDif(subset, caseGroups, { model: subset.itemIds.map(() => twoParameterLogistic) });
+    expect(list).toEqual(single);
+  });
+
+  it("gives a null test for an item a group lacks a category of, and goes on with the others", () => {
+    const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["bfi, graded"].input);
+    const highest = Math.max(...matrix.responses.map((row) => row[0] ?? 0));
+    const rows = matrix.responses.map((row, person) =>
+      caseGroups[person] === "focal" && row[0] === highest ? [highest - 1, ...row.slice(1)] : row,
+    );
+    const { items } = irtLikelihoodRatioDif(responseMatrix(rows), caseGroups, { model: gradedResponse });
+    expect(items[0]).toEqual({ id: "item1", chiSquare: null, degreesOfFreedom: highest + 1, significance: null });
+    expect(items.slice(1).every((item) => item.chiSquare !== null)).toBe(true);
+  });
+
+  it("gives null tests where the fits do not converge, and reports it in the constrained calibration", () => {
+    const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
+    const { items, constrained } = irtLikelihoodRatioDif(matrix, caseGroups, {
+      model: twoParameterLogistic,
+      maxIterations: 1,
+    });
+    expect(constrained.converged).toBe(false);
+    expect(items.every((item) => item.chiSquare === null && item.degreesOfFreedom === 2)).toBe(true);
+  });
+
+  it("rejects fewer than two items, the Gauss-Hermite rule and options of other types", () => {
+    const matrix = responseMatrix(CONSTANT_ROWS);
+    const one = responseMatrix(CONSTANT_ROWS.map((row) => row.slice(1, 2)));
+    expect(() => irtLikelihoodRatioDif(one, CONSTANT_GROUPS, { model: twoParameterLogistic })).toThrow(
+      "IRT likelihood-ratio DIF needs at least 2 items, found 1.",
+    );
+    expect(() =>
+      irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, {
+        model: twoParameterLogistic,
+        quadrature: { method: "gauss-hermite" },
+      }),
+    ).toThrow(DataError);
+    expect(() => irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, { model: JSON.parse('"2PL"') })).toThrow(DataError);
+    expect(() =>
+      irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, { model: twoParameterLogistic, purify: JSON.parse("1") }),
+    ).toThrow("The option purify must be a boolean, found 1.");
+    expect(() => irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS.slice(1), { model: twoParameterLogistic })).toThrow(
+      DataError,
+    );
+  });
+});
+
+describe("differentialFunctioning", () => {
+  const { population } = irtFixture;
+
+  for (const [name, expected] of Object.entries(irtFixture.functioning)) {
+    const model: IrtModel<unknown> = expected.model === "2pl" ? twoParameterLogistic : gradedResponse;
+    const items = (parameters: readonly unknown[]): TestItem[] =>
+      parameters.map((each, i) => ({ id: `item${i + 1}`, model, parameters: each }));
+
+    it(`matches DFIT's Ncdif, Cdif and Dtf on ${name} items`, () => {
+      const result = differentialFunctioning(items(expected.reference), items(expected.focal), { population });
+      result.items.forEach((item, i) => {
+        expectClose(item.ncdif, expected.ncdif[i] ?? 0, FUNCTIONING_TOLERANCE, `NCDIF ${i + 1}`);
+        expectClose(item.cdif, expected.cdif[i] ?? 0, FUNCTIONING_TOLERANCE, `CDIF ${i + 1}`);
+      });
+      expectClose(result.dtf, expected.dtf, FUNCTIONING_TOLERANCE);
+    });
+  }
+
+  it("gives a bundle's functioning over its items alone, its DTF the sum of their CDIF", () => {
+    const expected = irtFixture.functioning["2PL"];
+    // Items 1 and 3: item 3 is equal in both groups, so the bundle's DBF is item 1's NCDIF.
+    const items = (parameters: readonly LogisticItem[]): TestItem<LogisticItem>[] =>
+      [0, 2].map((i) => ({ id: `item${i + 1}`, model: twoParameterLogistic, parameters: defined(parameters[i]) }));
+    const bundle = differentialFunctioning(items(expected.reference), items(expected.focal), { population });
+    expectClose(
+      bundle.dtf,
+      bundle.items.reduce((sum, item) => sum + item.cdif, 0),
+      1e-15,
+    );
+    expectClose(bundle.dtf, expected.ncdif[0] ?? 0, FUNCTIONING_TOLERANCE);
+    // In the whole test, item 2's DIF cancels part of item 1's.
+    expect(expected.dtf).toBeLessThan(bundle.dtf);
+  });
+
+  it("rejects lists that differ in their items or order, and a population that is not a distribution", () => {
+    const item = (id: string, b: number): TestItem<LogisticItem> => ({
+      id,
+      model: twoParameterLogistic,
+      parameters: { a: 1, b, c: 0, d: 1 },
+    });
+    const reference = [item("x", 0), item("y", 1)];
+    const options = { population: { nodes: [0], weights: [1] } };
+    expect(() => differentialFunctioning(reference, [item("x", 0)], options)).toThrow(
+      "Found 1 focal items for 2 reference items.",
+    );
+    expect(() => differentialFunctioning(reference, [item("y", 1), item("x", 0)], options)).toThrow(
+      'The focal items must be the reference items in the same order; item 1 is "x" in the reference list and "y" in the focal list.',
+    );
+    expect(() => differentialFunctioning(reference, reference, { population: { nodes: [0], weights: [0.5] } })).toThrow(
+      "The weights of the population must sum to 1, found 0.5.",
+    );
+    expect(() => differentialFunctioning(reference, reference, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => differentialFunctioning(reference, reference, JSON.parse("{}"))).toThrow(DataError);
+    expect(() => differentialFunctioning(JSON.parse('"x"'), reference, options)).toThrow(DataError);
+    expect(differentialFunctioning([], [], options)).toEqual({ items: [], dtf: 0 });
   });
 });
 
@@ -1215,6 +1541,37 @@ describe("the recipe for DIF variance", () => {
 });
 
 describe("properties", () => {
+  it("IRT likelihood-ratio chi-squares do not change when the groups swap", () => {
+    const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
+    const subset = responseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
+    const swapped = caseGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
+    const options = { model: twoParameterLogistic, tolerance: 1e-8, maxIterations: 20_000 };
+    const forward = irtLikelihoodRatioDif(subset, caseGroups, options).items;
+    irtLikelihoodRatioDif(subset, swapped, options).items.forEach((item, i) => {
+      expectClose(item.chiSquare, forward[i]?.chiSquare ?? null, LIKELIHOOD_RATIO_TOLERANCE);
+    });
+  });
+
+  it("identical items have no differential functioning", () => {
+    const population = fc
+      .array(fc.tuple(fc.double({ min: -4, max: 4, noNaN: true }), fc.double({ min: 0.01, max: 1, noNaN: true })), {
+        minLength: 1,
+        maxLength: 8,
+      })
+      .map((pairs) => {
+        const total = pairs.reduce((sum, [, weight]) => sum + weight, 0);
+        return { nodes: pairs.map(([node]) => node), weights: pairs.map(([, weight]) => weight / total) };
+      });
+    fc.assert(
+      fc.property(fc.array(arbitraryItem, { minLength: 1, maxLength: 5 }), population, (items, distribution) => {
+        const tested = items.map((item, i) => ({ ...item, id: `item${i + 1}` }));
+        const result = differentialFunctioning(tested, tested, { population: distribution });
+        expect(result.dtf).toBe(0);
+        for (const item of result.items) expect([item.ncdif, item.cdif]).toEqual([0, 0]);
+      }),
+    );
+  });
+
   /** Response matrices of 0 and 1: 2 to 30 persons, 1 to 6 items. */
   const binaryRows = fc
     .tuple(fc.integer({ min: 2, max: 30 }), fc.integer({ min: 1, max: 6 }))

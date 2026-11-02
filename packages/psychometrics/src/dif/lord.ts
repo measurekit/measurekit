@@ -8,22 +8,13 @@ import {
   type LogisticItem,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { meanSigmaLinking, type ScaleTransformation, transformItem } from "../equating/internal.js";
-import {
-  type Calibration,
-  type CalibrationOptions,
-  calibrateWithCovariance,
-  type IrtItem,
-  isLogisticModel,
-  type ParameterCovariance,
-} from "../irt/internal.js";
+import type { ScaleTransformation } from "../equating/internal.js";
+import { type Calibration, type CalibrationOptions, isLogisticModel } from "../irt/internal.js";
 
 import { invert } from "../math/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
+import { type LinkedCalibrations, linkedCalibrations, MINIMUM_LINK_ANCHORS } from "./linked-calibrations.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
-
-/** The fewest anchors that link two scales: the mean-sigma transformation needs two locations to have a spread. */
-const MINIMUM_ANCHORS = 2;
 
 /**
  * Options of {@link lordChiSquare}: the calibration of each group, without fixed items, groups, distributions of theta,
@@ -86,22 +77,12 @@ export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[
   checkModels(options.model);
   const { purify = false, ...calibration } = options;
   checkBoolean(purify, "The option purify");
-  const groupOptions = { ...calibration, standardErrors: "hessian" } as const;
-  const reference = calibrateWithCovariance(groupMatrix(matrix, groups, "reference"), groupOptions);
-  const focal = calibrateWithCovariance(groupMatrix(matrix, groups, "focal"), groupOptions);
-  const referenceBlocks = itemBlocks(reference.covariance);
-  const focalBlocks = itemBlocks(focal.covariance);
-  const link = (anchors: Uint8Array): ScaleTransformation =>
-    meanSigmaLinking(anchored(focal.calibration.items, anchors), anchored(reference.calibration.items, anchors));
+  const calibrations = linkedCalibrations(matrix, groups, calibration, "Lord's chi-square");
   const statistics = (anchors: Uint8Array): LordChiSquare[] => {
-    const transformation = link(anchors);
-    return matrix.itemIds.map((id, i) => ({
+    const transformation = calibrations.link(anchors);
+    return matrix.itemIds.map((id, item) => ({
       id,
-      ...statistic(
-        { item: reference.calibration.items[i], covariance: referenceBlocks.get(id) ?? null },
-        { item: focal.calibration.items[i], covariance: focalBlocks.get(id) ?? null },
-        transformation,
-      ),
+      ...statistic(calibrations, item, transformation),
     }));
   };
   const analysis = purified(
@@ -109,11 +90,11 @@ export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[
     purify,
     statistics,
     (item) => significant(item.significance),
-    MINIMUM_ANCHORS,
+    MINIMUM_LINK_ANCHORS,
   );
   const kept = new Set(analysis.purification?.anchors ?? matrix.itemIds);
-  const transformation = link(Uint8Array.from(matrix.itemIds, (id) => (kept.has(id) ? 1 : 0)));
-  return { ...analysis, reference: reference.calibration, focal: focal.calibration, transformation };
+  const transformation = calibrations.link(Uint8Array.from(matrix.itemIds, (id) => (kept.has(id) ? 1 : 0)));
+  return { ...analysis, reference: calibrations.reference, focal: calibrations.focal, transformation };
 }
 
 /** Checks that every model is the 2PL, 3PL or 4PL. */
@@ -128,59 +109,20 @@ function checkModels(models: LordOptions["model"]): void {
   }
 }
 
-/** Returns the items marked 1 in `anchors`. */
-function anchored<TItem>(items: readonly TItem[], anchors: Uint8Array): TItem[] {
-  return items.filter((_, i) => anchors[i] === 1);
-}
-
-/** An item's estimates in one group, with their covariance matrix. */
-interface GroupEstimate {
-  readonly item: IrtItem<LogisticItem> | undefined;
-  readonly covariance: Float64Array | null;
-}
-
-/** Returns the covariance matrix of each item's estimated parameters by rows, in the order of its parameter names. */
-function itemBlocks(covariance: ParameterCovariance | null): Map<string, Float64Array> {
-  const rows = new Map<string, number[]>();
-  covariance?.parameters.forEach(({ item }, row) => {
-    const own = rows.get(item);
-    if (own === undefined) rows.set(item, [row]);
-    else own.push(row);
-  });
-  return new Map(
-    [...rows].map(([item, own]) => [
-      item,
-      Float64Array.from({ length: own.length ** 2 }, (_, index) => {
-        const row = own[Math.floor(index / own.length)] ?? 0;
-        return covariance?.matrix[row]?.[own[index % own.length] ?? 0] ?? 0;
-      }),
-    ]),
-  );
-}
-
 function statistic(
-  reference: GroupEstimate,
-  focal: GroupEstimate,
+  calibrations: LinkedCalibrations,
+  item: number,
   transformation: ScaleTransformation,
 ): Omit<LordChiSquare, "id"> {
-  const model = reference.item?.model;
-  const size = model?.parameters(2).length ?? 0;
+  const size = calibrations.reference.items[item]?.model.parameters(2).length ?? 0;
   const undefinedStatistic = { chiSquare: null, degreesOfFreedom: size, significance: null };
-  if (model === undefined || reference.item === undefined || focal.item === undefined) return undefinedStatistic;
-  if (reference.covariance === null || focal.covariance === null) return undefinedStatistic;
-  const { slope } = transformation;
-  // a / A and A b + B scale the covariances of a and b by 1 / A and A; c and d do not change.
-  const scales = [1 / slope, slope, 1, 1];
-  const sum = Float64Array.from(
-    reference.covariance,
-    (value, index) =>
-      value + (focal.covariance?.[index] ?? 0) * (scales[Math.floor(index / size)] ?? 1) * (scales[index % size] ?? 1),
-  );
+  const estimates = calibrations.estimates(item, transformation);
+  if (estimates === null) return undefinedStatistic;
+  const { reference, focal, referenceCovariance, focalCovariance } = estimates;
+  const sum = referenceCovariance.map((value, index) => value + (focalCovariance[index] ?? 0));
   const inverse = invert(sum, size);
   if (inverse === null) return undefinedStatistic;
-  const referenceVector = model.toVector(reference.item.parameters);
-  const focalVector = model.toVector(transformItem(focal.item, transformation).parameters);
-  const difference = referenceVector.map((value, j) => value - (focalVector[j] ?? 0));
+  const difference = reference.map((value, j) => value - (focal[j] ?? 0));
   let chiSquare = 0;
   for (let j = 0; j < size; j++) {
     for (let k = 0; k < size; k++) {
@@ -188,19 +130,4 @@ function statistic(
     }
   }
   return { chiSquare, degreesOfFreedom: size, significance: chiSquareUpperTail(chiSquare, size) };
-}
-
-/**
- * Returns the response matrix of one group's persons.
- *
- * @throws `DataError` when the group has no person.
- */
-function groupMatrix(matrix: ResponseMatrix, groups: readonly DifGroup[], group: DifGroup): ResponseMatrix {
-  const persons = matrix.personIds.flatMap((_, person) => (groups[person] === group ? [person] : []));
-  if (persons.length === 0) throw new DataError(`Lord's chi-square needs persons in the ${group} group.`);
-  return {
-    personIds: persons.map((person) => matrix.personIds[person] ?? ""),
-    itemIds: matrix.itemIds,
-    responses: persons.map((person) => matrix.responses[person] ?? []),
-  };
 }
