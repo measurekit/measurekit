@@ -1,11 +1,20 @@
 # Mokken scale analysis
 
 `@measurekit/psychometrics/mokken` analyses a set of items with nonparametric item response theory, without a model of
-the items' curves: it measures how well items scale together, selects items into scales, and checks the two
-assumptions that make the total score a good measure. It suits questionnaires and attitude scales, and screens
-achievement items for response curves that fall with ability. The coefficients and their standard errors, the
-item selection, the monotonicity check, the invariant item ordering check and the reliability of the total score are
-validated against the mokken package ([validation](validation.md)).
+the items' curves: it finds persons whose responses contradict the order of the items, measures how well items scale
+together, selects items into scales, checks the local independence of the items and the two assumptions that make the
+total score a good measure. It suits questionnaires and attitude scales, and screens achievement items for response
+curves that fall with ability. The Guttman errors, the coefficients and their standard errors, the item selection, the
+conditional association, the monotonicity check, the invariant item ordering check and the reliability of the total
+score are validated against the mokken package ([validation](validation.md)).
+
+```mermaid
+flowchart LR
+  E["guttmanErrors: outlying persons"] --> H["scalability, automatedItemSelection: scales"]
+  H --> C["conditionalAssociation: local independence"]
+  C --> M["monotonicity, invariantItemOrdering"]
+  M --> R["molenaarSijtsmaReliability"]
+```
 
 Items may be dichotomous or polytomous: scores are integers, and the lowest score of all items is taken as 0, so scores
 from 1 to 5 work as scores from 0 to 4. Scores may span at most 10 categories, as in mokken. Every function uses the
@@ -13,11 +22,54 @@ persons who answered every item, and needs at least two of them. The functions t
 
 | Function                                  | Result                                                                |
 | ----------------------------------------- | --------------------------------------------------------------------- |
+| `guttmanErrors(matrix)`                   | G+ of each person, Tukey's upper fence, and the persons above it      |
 | `scalability(matrix)`                     | H, H_i and H_ij with standard errors                                  |
 | `automatedItemSelection(matrix, options)` | Scales of items, and the items in none                                |
+| `conditionalAssociation(matrix, options)` | The indices W1, W2 and W3, and the items and pairs they flag          |
 | `monotonicity(matrix, options)`           | Violations of monotone response curves, by item                       |
 | `invariantItemOrdering(matrix, options)`  | Violations of the order of items, by item, the items removed, and H^T |
 | `molenaarSijtsmaReliability(matrix)`      | The reliability of the total score, MS                                |
+
+## Guttman errors
+
+A person whose responses contradict the order of the items, passing hard steps and failing easy ones, may have answered
+carelessly or misread the questions. `guttmanErrors(matrix)` counts each person's Guttman errors and marks the outliers,
+step 3 of the analysis of Sijtsma and van der Ark (2017):
+
+1. Each item has a step for every score above the lowest, which a person passes by scoring at least that high. The steps
+   of all items are ordered by how many persons pass them, the most first.
+2. A person's G+ counts the pairs of a step passed and a step failed that comes before it. On dichotomous items it is G,
+   the pairs of an easier item failed and a harder one passed.
+3. Steps that as many persons pass take every order with equal weight, so that such a pair counts 1/2.
+4. A person whose G+ is above Tukey's upper fence, Q3 + 1.5 (Q3 - Q1), is an outlier.
+
+| Field        | Meaning                                                                               |
+| ------------ | ------------------------------------------------------------------------------------- |
+| `errors`     | G+ of each person, in the matrix's order; `null` for a person with a missing response |
+| `upperFence` | Q3 + 1.5 IQR of G+, with quartiles by linear interpolation, R's default               |
+| `outliers`   | The indices of the persons above the fence                                            |
+
+```ts
+import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { guttmanErrors } from "@measurekit/psychometrics/mokken";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// The 8 items of the 2PL simulation of the sections below, for 400 persons.
+const random = createRandom(11);
+const items = simulateItems(twoParameterLogistic, 8, random);
+const simulated = simulateResponses(items, simulateThetas(400, random), random);
+const matrix = responseMatrix(simulated.responses, { itemIds: simulated.itemIds });
+
+const { errors, upperFence, outliers } = guttmanErrors(matrix);
+errors.slice(0, 8); // [1, 3, 5, 0, 2, 0, 0, 4]
+upperFence; // 10
+outliers; // [217]: one person with more than 10 errors
+```
+
+The order of the steps and the fence come from the persons who answered every item: a person with fewer responses has
+fewer steps to err on, and has no count. The tutorial inspects the outliers' responses and repeats the analysis without
+them, to see whether its conclusions change.
 
 ## Scalability
 
@@ -99,6 +151,64 @@ const matrix = responseMatrix(
 automatedItemSelection(matrix);
 // { scales: [["item2", "item4", "item5", "item6"], ["item3", "item8"]], unscalable: ["item1", "item7", "reversed"] }
 ```
+
+## Conditional association
+
+Items of one scale are associated positively within every group of persons who agree on the other items; a negative
+association there points to local dependence, such as two items that ask the same thing or one that contradicts another.
+`conditionalAssociation(matrix, options)` computes the three indices of Straat, van der Ark and Sijtsma (2016), step 5
+of the analysis, as the first pass of mokken's `check.ca`.
+
+| Index      | Sums over                                                                                   | High when                                                             |
+| ---------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `w1[a][c]` | The groups of persons with each score on item c, the covariances of a with every other item | a and c are positively locally dependent, or a runs against the scale |
+| `w2[a]`    | The groups of the rest score of each pair of a and another item, their covariances          | a is negatively locally dependent on another                          |
+| `w3[a][b]` | The groups of the rest score of a and b, their covariance                                   | a and b are negatively locally dependent                              |
+
+A rest score is the sum of the items other than the pair, and its groups hold at least `minimumSize` persons, cut as in
+the [monotonicity check](#monotonicity). A group's covariance enters as Φ(-z √(n - 3)), with z Fisher's transformation
+of the two items' correlation in the group: 1/2 for no correlation, near 1 for a clearly negative one, near 0 for a
+positive one, and 0 for a group below 4 persons or with an item that is constant in it. W2[a] is the sum of W3[a][b] over
+b. An index flags each value above Q3 + 3 (Q3 - median) of all of its values.
+
+| Option        | Default | Meaning                                                                                |
+| ------------- | ------- | -------------------------------------------------------------------------------------- |
+| `minimumSize` | `4`     | The fewest persons in a group of a rest score, mokken's `MINSIZE`; at most the persons |
+
+| Field        | Meaning                                                                            |
+| ------------ | ---------------------------------------------------------------------------------- |
+| `items`      | The item ids, which index the rows and columns                                     |
+| `w1`, `w3`   | By item, then item; `null` on the diagonal. W1's column is the item conditioned on |
+| `w2`         | By item                                                                            |
+| `flagged.w1` | The pairs [a, c] whose W1 is flagged                                               |
+| `flagged.w2` | The items whose W2 is flagged                                                      |
+| `flagged.w3` | The pairs [a, b], a before b in the matrix, whose W3 is flagged                    |
+
+```ts
+import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { conditionalAssociation } from "@measurekit/psychometrics/mokken";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// The simulation of the sections above, with the reverse of item 5.
+const random = createRandom(11);
+const items = simulateItems(twoParameterLogistic, 8, random);
+const simulated = simulateResponses(items, simulateThetas(400, random), random);
+const matrix = responseMatrix(
+  simulated.responses.map((row) => [...row, 1 - (row[4] ?? 0)]),
+  { itemIds: [...simulated.itemIds, "reversed"] },
+);
+
+const { flagged } = conditionalAssociation(matrix);
+flagged.w1; // [["reversed", "item1"], ["reversed", "item2"], ..., ["reversed", "item8"]]: all but item 5
+flagged.w2; // ["reversed"]
+flagged.w3; // [["item5", "reversed"]]: the pair that contradicts itself
+```
+
+`check.ca` then removes the item with the most flags, the one with the lowest H_i among ties and a random one among
+those, and runs again until nothing is flagged or fewer than four items remain: to do the same, drop that item from the
+matrix and call the function again. W1 sums over every item, conditioning item and third item, so the time grows with
+the cube of the items times the persons: 0.26 s for 40 items and 433 persons.
 
 ## Monotonicity
 
@@ -289,6 +399,10 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
   manifest invariant item ordering (MIIO) is the practice, and is built.
 - **Clustered items with a fixed item order.** Outside the sources: the method of manifest invariant item ordering
   (MIIO) is the practice, and is built.
+- **`check.bounds`.** Outside the sources: not a step of the tutorial of Sijtsma and van der Ark (2017).
+- **The adjusted boxplot of G+.** Outside the sources: Tukey's fence is the tutorial's rule, which mentions the adjusted
+  boxplot for skewed counts.
+- **The O+ outlier score.** Outside the sources: the tutorial uses G+.
 - **Two-level scalability for clustered persons, such as raters.** Outside the sources: a multilevel option of mokken
   (`MLcoefH`).
 - **The imputation of missing responses.** Outside the sources: an option of mokken, beside the pairwise treatment that
@@ -298,13 +412,14 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
 
 Invalid input throws `DataError` naming the value found.
 
-| Error                                                           | What to do                                                                           |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Fewer than two items, or fewer than three for the item ordering | Give the items the method compares: two for the coefficients, three for the ordering |
-| Fewer than two persons answered every item                      | Keep the persons who answered every item, or the items they all answered             |
-| The scores span more than 10 categories                         | Group the scores into at most 10 categories                                          |
-| The minimum group size is more than half of the persons         | Lower `minimumGroupSize`, or give more persons                                       |
-| The total scores have no variance, for the reliability          | The coefficient is undefined for persons who all score alike                         |
+| Error                                                                                           | What to do                                                                                               |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Fewer than two items, or fewer than three for the item ordering and the conditional association | Give the items the method compares: two for the coefficients, three for the ordering and the association |
+| Fewer than two persons answered every item                                                      | Keep the persons who answered every item, or the items they all answered                                 |
+| The scores span more than 10 categories                                                         | Group the scores into at most 10 categories                                                              |
+| The minimum group size is more than half of the persons                                         | Lower `minimumGroupSize`, or give more persons                                                           |
+| `minimumSize` is above the persons who answered every item                                      | Lower `minimumSize`                                                                                      |
+| The total scores have no variance, for the reliability                                          | The coefficient is undefined for persons who all score alike                                             |
 
 ## Differences from the references
 
@@ -320,3 +435,6 @@ Invalid input throws `DataError` naming the value found.
 | Groups with equal paired differences    | Significant, without a statistic                                             | `t.test` stops                                                                                                                                                                                                                                 |
 | Order of the results                    | The order of the matrix's items                                              | `check.iio` lists items from the highest mean to the lowest                                                                                                                                                                                    |
 | Item steps passed by equal numbers      | Tied exactly, by their counts                                                | Tied when the proportions from `mean()` agree to the last bit, which depends on the order of the persons; the references run mokken's own code with exact proportions, and differ from `check.reliability` by up to 0.021 where it splits ties |
+| G+ of tied item steps                   | The mean over the orders of the tied steps, a multiple of 1/2                | `check.errors` takes the mean over 1,000 random orders, rounded to an integer: up to 1/2 away                                                                                                                                                  |
+| The steps of `check.ca`                 | One pass; the caller removes an item and calls again                         | Removes items until nothing is flagged, breaking the last ties at random                                                                                                                                                                       |
+| Conditional association of three items  | Computed: each pair's rest score is the third item                           | `check.ca` stops, as `apply` needs at least two rest items                                                                                                                                                                                     |

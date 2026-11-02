@@ -2,7 +2,9 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   automatedItemSelection,
+  conditionalAssociation,
   DataError,
+  guttmanErrors,
   type ItemCheck,
   invariantItemOrdering,
   molenaarSijtsmaReliability,
@@ -14,6 +16,7 @@ import {
 import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/mokken.json" with { type: "json" };
 import reliability from "./fixtures/mokken-reliability.json" with { type: "json" };
+import steps from "./fixtures/mokken-steps.json" with { type: "json" };
 
 // Tolerances against R, explained in docs/validation.md.
 /** Coefficients and their standard errors against coefH, and H^T against coefHT. */
@@ -28,6 +31,10 @@ const ROUNDING_TOLERANCE = 1e-12;
 const SPLIT_TIES_GAP = 0.03;
 /** How far the mean of MS may lie from the mean reliability of parallel forms in the study: it was 0.014 in the fixture. */
 const STUDY_BIAS = 0.03;
+/** The indices of conditional association against check.ca: sums of normal probabilities of the same correlations. */
+const ASSOCIATION_TOLERANCE = 1e-10;
+/** G+ against check.errors where steps tie, as it rounds a mean over 1,000 random orders of them. */
+const RANDOM_ORDER_GAP = 0.5;
 
 interface ReferenceCheck {
   readonly id: string;
@@ -120,6 +127,113 @@ function guttman(items: number, personsPerScore: number): number[][] {
     return Array.from({ length: items }, (__, item) => (item < passed ? 1 : 0));
   });
 }
+
+describe("guttmanErrors", () => {
+  for (const reference of steps.errors) {
+    it(`gives G+ and Tukey's fence as the mean over the orders of tied steps for ${reference.name}`, () => {
+      const result = guttmanErrors(responseMatrix(reference.responses, { itemIds: reference.itemIds }));
+      expect(result.errors).toEqual(reference.errors);
+      expectClose(result.upperFence, reference.upperFence, 1e-12, "fence");
+      expect(result.outliers).toEqual(reference.outliers);
+    });
+  }
+
+  it("equals check.errors where no steps tie, and stays within 1/2 of its rounded mean of random orders where they do", () => {
+    for (const reference of steps.errors) {
+      const counted = guttmanErrors(responseMatrix(reference.responses)).errors.filter((count) => count !== null);
+      counted.forEach((count, person) => {
+        const gap = Math.abs(count - defined(reference.mokken.errors[person]));
+        expect(gap, `${reference.name} ${person}`).toBeLessThanOrEqual(reference.mokken.ties ? RANDOM_ORDER_GAP : 0);
+      });
+      if (!reference.mokken.ties) expect(reference.upperFence, reference.name).toBe(reference.mokken.upperFence);
+    }
+  });
+
+  it("counts G of dichotomous items, the easier items failed before the harder passed, as derived by hand", () => {
+    // Items passed by 5, 3 and 2 persons: the last person fails the first two and passes the third, two errors. The
+    // quartiles of six 0s and a 2 are 0, so the fence is 0 and that person is the outlier.
+    const rows = [
+      [1, 1, 1],
+      [1, 1, 0],
+      [1, 1, 0],
+      [1, 0, 0],
+      [1, 0, 0],
+      [0, 0, 0],
+      [0, 0, 1],
+    ];
+    expect(guttmanErrors(responseMatrix(rows))).toEqual({
+      errors: [0, 0, 0, 0, 0, 0, 2],
+      upperFence: 0,
+      outliers: [6],
+    });
+  });
+
+  it("counts half an error for a step failed that as many persons pass as the step passed", () => {
+    const rows = [
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ];
+    expect(guttmanErrors(responseMatrix(rows)).errors).toEqual([0.5, 0.5, 0]);
+  });
+
+  it("counts the errors over the steps of polytomous items", () => {
+    // Steps by persons passing: item 2 at 1 (3), item 1 at 1 (2), item 1 at 2 (1), item 2 at 2 (0). Scores 2 and 0 pass
+    // the second and third steps and fail the first: two errors.
+    const rows = [
+      [2, 0],
+      [0, 1],
+      [1, 1],
+      [0, 1],
+    ];
+    expect(guttmanErrors(responseMatrix(rows)).errors).toEqual([2, 0, 0, 0]);
+  });
+
+  it("gives no count to a person with a missing response, and indexes outliers by the matrix's rows", () => {
+    const reference = defined(steps.errors.find(({ name }) => name === "transitive reasoning, missing"));
+    const result = guttmanErrors(responseMatrix(reference.responses));
+    reference.responses.forEach((row, person) => {
+      expect(result.errors[person] === null, `person ${person}`).toBe(row.includes(null));
+    });
+    expect(result.outliers.length).toBeGreaterThan(0);
+    for (const person of result.outliers) expect(defined(result.errors[person])).toBeGreaterThan(result.upperFence);
+  });
+
+  it("is the same for scores shifted to start above 0", () => {
+    const rows = [
+      [0, 1, 2],
+      [1, 2, 0],
+      [2, 2, 1],
+      [0, 0, 1],
+      [1, 1, 1],
+    ];
+    expect(guttmanErrors(responseMatrix(rows.map((row) => row.map((score) => score + 3))))).toEqual(
+      guttmanErrors(responseMatrix(rows)),
+    );
+  });
+
+  it("rejects matrices that cannot be analyzed", () => {
+    expect(() => guttmanErrors(responseMatrix([[1], [0]]))).toThrow("Guttman errors needs at least 2 items, found 1.");
+    expect(() =>
+      guttmanErrors(
+        responseMatrix([
+          [1, 0],
+          [null, 1],
+        ]),
+      ),
+    ).toThrow("Guttman errors needs at least 2 persons who answered every item, found 1.");
+    expect(() =>
+      guttmanErrors(
+        responseMatrix([
+          [0, 0],
+          [10, 0],
+        ]),
+      ),
+    ).toThrow("needs scores from at most 10 categories");
+    expect(() => guttmanErrors(JSON.parse("null"))).toThrow(DataError);
+    expect(() => guttmanErrors(JSON.parse('{"itemIds": ["a"], "responses": {}}'))).toThrow(DataError);
+  });
+});
 
 describe("scalability", () => {
   for (const reference of cases) {
@@ -332,6 +446,108 @@ describe("automatedItemSelection", () => {
     );
     expect(() => automatedItemSelection(matrix, { alpha: JSON.parse("null") })).toThrow(DataError);
     expect(() => automatedItemSelection(responseMatrix([[0], [1]]))).toThrow(DataError);
+  });
+});
+
+describe("conditionalAssociation", () => {
+  for (const reference of steps.association) {
+    it(`matches W1, W2, W3 and the flags of the first pass of check.ca for ${reference.name}`, () => {
+      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const result = conditionalAssociation(matrix, { minimumSize: reference.minimumSize });
+      expect(result.items).toEqual(reference.itemIds);
+      const expectIndex = (
+        actual: readonly (readonly (number | null)[])[],
+        expected: readonly (number | null)[][],
+        name: string,
+      ) => {
+        expected.forEach((row, a) => {
+          row.forEach((value, b) => {
+            expectClose(actual[a]?.[b] ?? null, value, ASSOCIATION_TOLERANCE, `${name} ${a + 1},${b + 1}`);
+          });
+        });
+      };
+      expectIndex(result.w1, reference.w1, "W1");
+      expectIndex(result.w3, reference.w3, "W3");
+      reference.w2.forEach((value, a) => {
+        expectClose(defined(result.w2[a]), value, ASSOCIATION_TOLERANCE, `W2 ${a + 1}`);
+      });
+      expect(result.flagged).toEqual(reference.flagged);
+    });
+  }
+
+  const dependent = defined(steps.association.find(({ name }) => name === "a dependent pair"));
+  const matrix = responseMatrix(dependent.responses, { itemIds: dependent.itemIds });
+
+  it("flags the planted pair of positively dependent items by W1, and one of them by W2", () => {
+    const { flagged } = conditionalAssociation(matrix);
+    expect(flagged.w1).toContainEqual(["d9", "d10"]);
+    expect(flagged.w2).toContain("d9");
+  });
+
+  it("gives W2 as the sums of the rows of W3, which is symmetric", () => {
+    const result = conditionalAssociation(matrix);
+    result.w3.forEach((row, a) => {
+      row.forEach((value, b) => {
+        expect(value).toBe(result.w3[b]?.[a]);
+      });
+      const sum = row.reduce<number>((total, value) => total + (value ?? 0), 0);
+      expectClose(defined(result.w2[a]), sum, 1e-12, `W2 ${a + 1}`);
+    });
+  });
+
+  it("takes rest score groups of at least 4 persons by default, and larger groups when asked", () => {
+    expect(conditionalAssociation(matrix, { minimumSize: 4 })).toEqual(conditionalAssociation(matrix));
+    expect(conditionalAssociation(matrix, { minimumSize: 30 }).w3).not.toEqual(conditionalAssociation(matrix).w3);
+  });
+
+  it("gives 0 to every index of copies of one item, which are constant within every group, and flags none", () => {
+    const column = [0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1];
+    const result = conditionalAssociation(responseMatrix(column.map((score) => [score, score, score])));
+    expect(result.w1).toEqual([
+      [null, 0, 0],
+      [0, null, 0],
+      [0, 0, null],
+    ]);
+    expect(result.w2).toEqual([0, 0, 0]);
+    expect(result.flagged).toEqual({ w1: [], w2: [], w3: [] });
+  });
+
+  it("gives a weight of 1/2 to each group in which two items are uncorrelated", () => {
+    // Given item 3, each of its two groups holds 4 persons whose first two items are uncorrelated, a weight of 1/2:
+    // W1 of item 1 given item 3 is 1/2 + 1/2.
+    const rows = [
+      [0, 0, 0],
+      [0, 1, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [0, 0, 1],
+      [0, 1, 1],
+      [1, 0, 1],
+      [1, 1, 1],
+    ];
+    expect(conditionalAssociation(responseMatrix(rows)).w1[0]?.[2]).toBe(1);
+  });
+
+  it("rejects options of other types, fewer than three items and groups larger than the persons", () => {
+    expect(() => conditionalAssociation(matrix, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => conditionalAssociation(matrix, { minimumSize: JSON.parse('"4"') })).toThrow(
+      'The option minimumSize must be a positive integer, found "4".',
+    );
+    expect(() => conditionalAssociation(matrix, { minimumSize: 0 })).toThrow("The option minimumSize");
+    expect(() => conditionalAssociation(matrix, { minimumSize: 601 })).toThrow(
+      "The option minimumSize must be at most the 600 persons who answered every item, found 601.",
+    );
+    expect(() =>
+      conditionalAssociation(
+        responseMatrix([
+          [0, 1],
+          [1, 0],
+        ]),
+      ),
+    ).toThrow("Conditional association needs at least 3 items, found 2.");
+    expect(() => conditionalAssociation(JSON.parse("null"))).toThrow(DataError);
   });
 });
 
@@ -639,6 +855,36 @@ describe("properties", () => {
       }),
     )
     .filter((rows) => (rows[0] ?? []).every((_, item) => new Set(rows.map((row) => row[item])).size === 2));
+
+  it("G+ is 0 for every person of a perfect Guttman scale, and is a multiple of 1/2", () => {
+    expect(guttmanErrors(responseMatrix(guttman(5, 3))).errors.every((count) => count === 0)).toBe(true);
+    fc.assert(
+      fc.property(matrix, (rows) => {
+        for (const count of guttmanErrors(responseMatrix(rows)).errors) {
+          expect(Number.isInteger(2 * defined(count))).toBe(true);
+          expect(defined(count)).toBeGreaterThanOrEqual(0);
+        }
+      }),
+      { numRuns: 30 },
+    );
+  });
+
+  it("the indices of conditional association and their flags do not depend on the order of the persons", () => {
+    fc.assert(
+      fc.property(matrix, (rows) => {
+        const forward = conditionalAssociation(responseMatrix(rows));
+        const backward = conditionalAssociation(responseMatrix([...rows].reverse()));
+        expect(backward.flagged).toEqual(forward.flagged);
+        forward.w1.flat().forEach((value, entry) => {
+          expect(backward.w1.flat()[entry] ?? null).toBeCloseTo(value ?? 0, 12);
+        });
+        forward.w2.forEach((value, item) => {
+          expect(backward.w2[item]).toBeCloseTo(value, 12);
+        });
+      }),
+      { numRuns: 20 },
+    );
+  });
 
   it("pair coefficients are at most 1 and standard errors are not negative", () => {
     fc.assert(

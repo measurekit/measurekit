@@ -1,5 +1,5 @@
 # The data sets of the Mokken scale analysis fixtures: mokken's example data and seeded simulations. Sourced by
-# mokken.R and mokken-reliability.R, which run their references on the complete cases of each.
+# mokken.R, mokken-reliability.R and mokken-steps.R, which run their references on the complete cases of each.
 
 suppressPackageStartupMessages(library(mokken))
 

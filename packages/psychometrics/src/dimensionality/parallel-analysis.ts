@@ -10,7 +10,7 @@ import {
   shuffle,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { pearsonMatrix } from "../math/internal.js";
+import { pearsonMatrix, sampleQuantile } from "../math/internal.js";
 import { codeItems } from "./coded-items.js";
 import { correlationEigenvalues } from "./eigenvalues.js";
 import { checkedMatrix, checkItems, correlateItems, ITEM_CORRELATIONS } from "./item-correlations.js";
@@ -164,7 +164,7 @@ function compare(
       (_, replication) => samples[replication * size + k] ?? 0,
     );
     randomMean.push(column.reduce((sum, value) => sum + value, 0) / replications);
-    randomQuantile.push(quantileOf(column.sort(), quantile));
+    randomQuantile.push(sampleQuantile(column.sort(), quantile));
   }
   const exceeded = observed.findIndex((value, k) => !(value > (randomQuantile[k] ?? Number.POSITIVE_INFINITY)));
   return {
@@ -173,13 +173,4 @@ function compare(
     randomQuantile,
     suggested: exceeded < 0 ? size : exceeded,
   };
-}
-
-/** Returns the quantile of sorted values by linear interpolation between order statistics, R's default type 7. */
-function quantileOf(sorted: Float64Array, probability: number): number {
-  const position = (sorted.length - 1) * probability;
-  const below = Math.floor(position);
-  const lower = sorted[below] ?? 0;
-  const upper = sorted[Math.min(below + 1, sorted.length - 1)] ?? lower;
-  return lower + (position - below) * (upper - lower);
 }

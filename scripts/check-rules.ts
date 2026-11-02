@@ -292,6 +292,22 @@ export const RULES: readonly Rule[] = [
     titles: "refuses incomplete standard errors",
   },
   {
+    rule: "A person with a missing response has no count of Guttman errors, and the counts of the others stay with their rows.",
+    file: "packages/psychometrics/src/mokken/guttman-errors.ts",
+    find: "(row.includes(null) ? null : (totals[complete++] ?? 0))",
+    replace: "(totals[complete++] ?? 0)",
+    test: "packages/psychometrics/test/mokken.test.ts",
+    titles: "gives no count to a person with a missing response",
+  },
+  {
+    rule: "The groups of a rest score are at most as many persons as answered every item, so that no group is read beyond them.",
+    file: "packages/psychometrics/src/mokken/conditional-association.ts",
+    find: "if (minimumSize > data.persons) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/mokken.test.ts",
+    titles: "groups larger than the persons",
+  },
+  {
     rule: "A component that leaves an item no variance ends the test, and gives no NaN.",
     file: "packages/psychometrics/src/dimensionality/minimum-average-partial.ts",
     find: "for (let i = 0; i < size; i++) if (!((covariance[i * size + i] ?? 0) > 0)) return null;",

@@ -1,9 +1,17 @@
 /**
- * Mokken scale analysis: scalability coefficients with standard errors, automated item selection into scales, checks of
- * monotonicity and invariant item ordering, and the reliability of the total score.
+ * Mokken scale analysis: scalability coefficients with standard errors, automated item selection into scales, Guttman
+ * errors of persons, conditional association of items, checks of monotonicity and invariant item ordering, and the
+ * reliability of the total score.
  *
  * @module @measurekit/psychometrics/mokken
  */
+export {
+  type ConditionalAssociation,
+  type ConditionalAssociationFlags,
+  type ConditionalAssociationOptions,
+  conditionalAssociation,
+} from "./conditional-association.js";
+export { type GuttmanErrors, guttmanErrors } from "./guttman-errors.js";
 export {
   type InvariantItemOrdering,
   type InvariantOrderingOptions,

@@ -9,7 +9,7 @@ adaptive and multistage testing with testlets and the derivation of routing cuts
 polytomous items, with SIBTEST of items and bundles, IRT likelihood-ratio tests, Raju's areas, DFIT, the Liu-Agresti odds ratio and the logistic discriminant function, linking and equating, including equating through common items, IRT observed-score equating and
 standard errors by bootstrap and the delta method, score scaling and prediction, dimensionality by polychoric
 correlations and parallel analysis, explanatory item response models, including the linear logistic test model of
-partial credit and rating scale items and the linear logistic model of change, generalizability theory, Mokken scale analysis,
+partial credit and rating scale items and the linear logistic model of change, generalizability theory, Mokken scale analysis with Guttman errors and conditional association,
 simulation, standard setting, rater agreement and rater effects, including the many-facet Rasch model, response
 times with the joint model of speed and accuracy, and change between two occasions: gains, the reliability of a
 difference and reliable change.

@@ -43,3 +43,15 @@ export function correlation(x: Float64Array, y: Float64Array): number | null {
   if (varianceX === 0 || varianceY === 0) return null;
   return covariance(x, y) / Math.sqrt(varianceX * varianceY);
 }
+
+/**
+ * Returns the `probability` quantile of values sorted in ascending order, by linear interpolation between order
+ * statistics: R's default, type 7. The values are at least one, and `probability` is from 0 to 1.
+ */
+export function sampleQuantile(sorted: Float64Array, probability: number): number {
+  const position = (sorted.length - 1) * probability;
+  const below = Math.floor(position);
+  const lower = sorted[below] ?? 0;
+  const upper = sorted[Math.min(below + 1, sorted.length - 1)] ?? lower;
+  return lower + (position - below) * (upper - lower);
+}

@@ -65,7 +65,7 @@ function precedes(first: Float64Array, second: Float64Array, s: number, t: numbe
  * @param countsFirst - The persons at each score of the first item.
  * @param countsSecond - The persons at each score of the second item.
  */
-export function guttmanErrors(countsFirst: Float64Array, countsSecond: Float64Array): Float64Array {
+export function stepPairErrors(countsFirst: Float64Array, countsSecond: Float64Array): Float64Array {
   const categories = countsFirst.length;
   const first = cumulativeCounts(countsFirst);
   const second = cumulativeCounts(countsSecond);

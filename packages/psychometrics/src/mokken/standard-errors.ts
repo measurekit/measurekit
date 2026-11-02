@@ -1,5 +1,5 @@
 import { type MokkenData, scoreOf } from "./scores.js";
-import { guttmanErrors } from "./weights.js";
+import { stepPairErrors } from "./weights.js";
 
 /** The distinct response patterns of the persons and how many persons have each. */
 interface Patterns {
@@ -176,7 +176,7 @@ function pairContribution(
 ): ErrorRatio {
   const countsI = counts[i] ?? new Float64Array(categories);
   const countsJ = counts[j] ?? new Float64Array(categories);
-  const errors = guttmanErrors(countsI, countsJ);
+  const errors = stepPairErrors(countsI, countsJ);
   const { expected, forFirst, forSecond } = expectedErrors(errors, countsI, countsJ, total);
   const pair = new ErrorRatio(patterns.count);
   pair.expected = expected;

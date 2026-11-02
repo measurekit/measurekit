@@ -1,5 +1,6 @@
 import { DataError, mean } from "@measurekit/core";
 import type { IrtItem } from "../irt/internal.js";
+import { sampleQuantile } from "../math/internal.js";
 import { checkCommonItems } from "./linking.js";
 import { itemMoments } from "./models.js";
 
@@ -46,8 +47,8 @@ export function robustZ(from: readonly IrtItem[], to: readonly IrtItem[]): Ancho
   const before = locations(from, "from");
   const differences = Float64Array.from(locations(to, "to"), (location, j) => location - (before[j] ?? 0));
   const sorted = Float64Array.from(differences).sort();
-  const median = quantile(sorted, 0.5);
-  const interquartileRange = quantile(sorted, 0.75) - quantile(sorted, 0.25);
+  const median = sampleQuantile(sorted, 0.5);
+  const interquartileRange = sampleQuantile(sorted, 0.75) - sampleQuantile(sorted, 0.25);
   if (!(interquartileRange > 0)) {
     throw new DataError("Robust z needs common items whose differences have an interquartile range above 0.");
   }
@@ -55,13 +56,4 @@ export function robustZ(from: readonly IrtItem[], to: readonly IrtItem[]): Ancho
     const z = (difference - median) / (IQR_TO_SD * interquartileRange);
     return { difference, z, flagged: Math.abs(z) > ROBUST_Z_CRITERION };
   });
-}
-
-/** Returns the p quantile of sorted values by linear interpolation between order statistics, R's type 7. */
-function quantile(sorted: Float64Array, p: number): number {
-  const position = (sorted.length - 1) * p;
-  const lower = Math.floor(position);
-  const low = sorted[lower] ?? 0;
-  const high = sorted[Math.min(lower + 1, sorted.length - 1)] ?? low;
-  return low + (position - lower) * (high - low);
 }
