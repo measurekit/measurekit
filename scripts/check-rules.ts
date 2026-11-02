@@ -132,6 +132,22 @@ export const RULES: readonly Rule[] = [
     titles: "uses the persons who answered every item",
   },
   {
+    rule: "The fit of a diagnosis model stops at 60 items, before the moments, whose matrix grows with their fourth power.",
+    file: "packages/psychometrics/src/cdm/model-fit.ts",
+    find: "if (models.length > MAX_MOMENT_ITEMS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/cdm.test.ts",
+    titles: "refuses more than 60 items",
+  },
+  {
+    rule: "The fit of a diagnosis model leaves out a person with a missing response, who is not read as a score of 0.",
+    file: "packages/psychometrics/src/cdm/model-fit.ts",
+    find: "matrix.responses.filter((row) => !row.includes(null))",
+    replace: "matrix.responses",
+    test: "packages/psychometrics/test/cdm.test.ts",
+    titles: "uses the persons who answered every item",
+  },
+  {
     rule: "The incomplete standard errors stop at their limit of success probabilities, before the calibration.",
     file: "packages/psychometrics/src/cdm/standard-errors.ts",
     find: "if (probabilities > MAX_INCOMPLETE_PROBABILITIES) {",

@@ -276,18 +276,20 @@ repeated within their parents and empty cells.
 | Joint EAP of theta, posterior mean and SD of speed                                                       | Base R, from the same parameters; numerical integration over theta and speed checks the closed forms                                                                                                                                |
 | ρ and the time parameters                                                                                | LNIRT's `LNIRT` (Gibbs): the time parameters and σ_τ on both datasets; ρ where the items are well determined                                                                                                                        |
 
-| Cognitive diagnosis quantity                                               | Reference                                                                                                                              |
-| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| G-DINA, DINA and DINO probabilities, proportions, log-likelihood, AIC, BIC | GDINA's `GDINA` with `conv.crit = 1e-9`; for the DINA on 8 attributes, the proportions summed over profiles with equal ideal responses |
-| Mastery, posteriors, MAP and EAP profiles                                  | GDINA's `personparm`; the MAP where GDINA's has a single mode                                                                          |
-| Classification accuracy and consistency                                    | GDINA's `CA` by MAP; by EAP, `CA`'s computation in base R                                                                              |
-| Q-matrix validation                                                        | GDINA's `Qval(method = "PVAF")`                                                                                                        |
-| Nonparametric classification                                               | NPCD's `AlphaNP(method = "Hamming")`: distances and ties; the profile where NPCD has no tie                                            |
-| Additive-model probabilities, coefficients, log-likelihood, AIC, BIC       | GDINA's `GDINA(model = "ACDM", "LLM", "RRUM")` at `conv.crit = 1e-8`, also with a model per item                                       |
-| Standard errors of the success probabilities of the G-DINA                 | GDINA's `extract(catprob.cov, SE.type = 2)`: the covariance from the outer product of the gradient over persons                        |
-| Item-level Wald statistics, degrees of freedom, p-values, selected models  | GDINA's `modelcomp(method = "Wald", Wald.args = list(SE.type = 2))` on G-DINA fits at `conv.crit = 1e-9`                               |
-| One additive M-step on fixed expected counts                               | Base R: Newton's method on the bounds the maximum meets, certified by the KKT conditions                                               |
-| Simulation of cognitive diagnosis responses                                | Properties: frequencies, reproduction, recovery by calibration                                                                         |
+| Cognitive diagnosis quantity                                                           | Reference                                                                                                                                                              |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G-DINA, DINA and DINO probabilities, proportions, log-likelihood, AIC, BIC             | GDINA's `GDINA` with `conv.crit = 1e-9`; for the DINA on 8 attributes, the proportions summed over profiles with equal ideal responses                                 |
+| Mastery, posteriors, MAP and EAP profiles                                              | GDINA's `personparm`; the MAP where GDINA's has a single mode                                                                                                          |
+| Classification accuracy and consistency                                                | GDINA's `CA` by MAP; by EAP, `CA`'s computation in base R                                                                                                              |
+| Q-matrix validation                                                                    | GDINA's `Qval(method = "PVAF")`                                                                                                                                        |
+| Nonparametric classification                                                           | NPCD's `AlphaNP(method = "Hamming")`: distances and ties; the profile where NPCD has no tie                                                                            |
+| Additive-model probabilities, coefficients, log-likelihood, AIC, BIC                   | GDINA's `GDINA(model = "ACDM", "LLM", "RRUM")` at `conv.crit = 1e-8`, also with a model per item                                                                       |
+| Standard errors of the success probabilities of the G-DINA                             | GDINA's `extract(catprob.cov, SE.type = 2)`: the covariance from the outer product of the gradient over persons                                                        |
+| Item-level Wald statistics, degrees of freedom, p-values, selected models              | GDINA's `modelcomp(method = "Wald", Wald.args = list(SE.type = 2))` on G-DINA fits at `conv.crit = 1e-9`                                                               |
+| M2, degrees of freedom, RMSEA and its interval, SRMSR                                  | GDINA's `modelfit` at `conv.crit = 1e-9`, 1e-8 for additive models; where Δ's rank is below its columns, the statistic on the whole complement from GDINA's Δ, Ξ and e |
+| Item fit: shares correct, z of the correlations and log odds ratios, adjusted p-values | Base R with GDINA's estimates and exact expected values; GDINA's `itemfit(N.resampling = 1e6)`; CDM's `modelfit.cor.din` for the DINA                                  |
+| One additive M-step on fixed expected counts                                           | Base R: Newton's method on the bounds the maximum meets, certified by the KKT conditions                                                                               |
+| Simulation of cognitive diagnosis responses                                            | Properties: frequencies, reproduction, recovery by calibration                                                                                                         |
 
 The scripts also check the references against each other: KR-20 equals alpha for 0/1 items, the base R item-total
 correlations equal psych's, and the base R Guttman coefficient equals psych's for every split psych enumerates.
@@ -584,6 +586,15 @@ Several results of the reference packages are not references:
   of 140 items and selected in 60.7%, by GDINA and by `compareItemModels` alike: the selections of all 147 items are
   identical, and the statistics agree to 3.3e-6 relative, which is the difference between GDINA's `conv.crit = 1e-9` and
   `calibrateCdm` at `tolerance: 1e-10`.
+- **GDINA's M2 where Δ's rank is below its columns.** `modelfit` takes nrow - ncol columns of `qr.Q`'s complement of Δ,
+  which then depend on the order of Δ's columns. On `sim10GDINA`, Δ of the G-DINA has rank 44 of 45 and that of the
+  A-CDM 31 of 35: GDINA gives 6.87 on 10 df and 36.36 on 20, and with the columns reversed 5.43 and 35.56. The fixture's
+  statistic is the whole complement from GDINA's own Δ, Ξ and e, 7.68 on 11 df and 51.59 on 24; for the other models the
+  same code reproduces GDINA within 1e-6. Its 60 rejection sets of a true G-DINA use the whole complement too, 11 df.
+- **GDINA's item fit.** `itemfit` simulates the expected values from `N.resampling` persons, so its z carry a Monte Carlo
+  error of about 0.03 at 1e6 persons; the largest difference from the exact z is 0.091. The exact z written out in base
+  R equal those of CDM's `modelfit.cor.din`, which computes its expected correlations exactly, within 1.8e-9 on the DINA.
+  An empty cell of an observed table counts as 0.5, as in GDINA's `fitstats`.
 - **GDINA's additive models.** GDINA maximizes their M-steps with `constrOptim`'s barrier method, which stops near
   1e-6, so its EM never reaches a change below about 5e-9 and misses `conv.crit = 1e-10`; the fixtures use `1e-8`.
   `calibrateCdm` maximizes each M-step exactly and runs to `tolerance: 1e-10` for the comparison, where its
@@ -889,6 +900,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `cdm-additive.json`                      | GDINA's `realdata_ECPE` (2922 persons, 28 items, 3 attributes) and `sim30GDINA` (1000 persons, 30 items, 5 attributes)                                                                                                                                                                                                                      | A-CDM, LLM, R-RUM and a mix of all six models per item                                                                                                                |
 | `cdm-maximum.json`                       | 59 sets of expected counts of one item, `set.seed(20261029)`: 3 links, 2 to 4 attributes                                                                                                                                                                                                                                                    | DINA-like, DINO-like, non-monotone and extreme; 16 meet a bound                                                                                                       |
 | `cdm-item-comparison.json`               | GDINA's `sim10GDINA` (1,000 persons, 10 items, 3 attributes), and 20 simulations, `set.seed(20261029)`: 600 persons, 3 attributes, 10 items of which 7 have two or three attributes, each following one of the DINA, DINO, A-CDM, LLM and R-RUM; GDINA's G-DINA fit, covariances and `modelcomp`                                            |
+| `cdm-fit.json`                           | GDINA's `sim10GDINA` (1,000 persons, 10 items, 3 attributes) under each model and a model per item; 60 sets of 400 persons from a G-DINA model, `set.seed(20261104)`                                                                                                                                                                        | A Δ of rank below its columns (G-DINA, A-CDM), the 0.95 interval, exact and resampled item statistics, CDM's exact correlations                                       |
 
 The upper and lower groups use 27% of the persons. Edge cases (constant items, persons and items without responses,
 one item, two persons) are tested against values derived by hand in `test/ctt.test.ts`.
@@ -1057,6 +1069,9 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Item-level Wald p-values                                                                          | 1e-5 absolute                                      | 1.0e-6                   |
 | Persons and accuracy at GDINA's additive estimates                                                | 1e-6 absolute                                      | 6.7e-8                   |
 | One additive M-step on fixed counts                                                               | 1e-8 absolute                                      | 1.0e-12                  |
+| Cognitive diagnosis M2, significance, RMSEA and its interval, SRMSR                               | 1e-3 absolute                                      | 6.0e-6                   |
+| Item fit against its exact sums and against CDM's correlations                                    | 1e-3 absolute                                      | 7.5e-6                   |
+| Item fit z against GDINA's resampling of 1e6 persons                                              | 0.15 absolute                                      | 0.091                    |
 | Multidimensional 2PL parameters, correlations, loadings, communalities                            | 1e-5 absolute                                      | 1.3e-6                   |
 | Multidimensional 2PL standard errors                                                              | 1e-4 relative                                      | 1.5e-6                   |
 | Multidimensional 2PL log-likelihood, AIC, BIC                                                     | 1e-6 absolute                                      | 4.4e-11                  |

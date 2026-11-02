@@ -205,7 +205,8 @@ estimated items of the same model passes and gives a wrong Δ. The moments are u
 
 Where the first- and second-order margins do not identify every parameter, Δ's rank is below its columns. The statistic
 then uses the whole complement of Δ's span, a column that adds nothing to it is left out, and the degrees of freedom
-are the moments less the rank. No model of the fixtures has such a Δ.
+are the moments less the rank. No model of the fixtures has such a Δ; the diagnosis models of [cdm](cdm.md#model-and-item-fit)
+can.
 
 Ξ grows with the fourth power of the items, so the function takes 60 at most: 1,830 rows and 27 MB, and a call took 0.6
 s here for M2* and 0.9 s for C2. At 12 items and 2,000 persons a call takes about 5 ms, against 38 ms for mirt's `M2`.

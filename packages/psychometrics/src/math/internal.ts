@@ -13,10 +13,12 @@ export {
   type MomentTables,
   modelMoments,
   pairRow,
+  type QuadraticForm,
   residualCorrelationRoot,
   rmseaInterval,
   rowCount,
   type SampleMoments,
+  type ScoreMoments,
   sampleMoments,
   tableMoments,
 } from "./limited-information.js";

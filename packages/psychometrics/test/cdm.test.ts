@@ -1,3 +1,4 @@
+import { chiSquareUpperTail } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { additiveMaximizer, type CdmLink, profilesOf, saturatedCoefficients } from "../src/cdm/internal.js";
@@ -7,6 +8,8 @@ import {
   type CdmModel,
   calibrateCdm,
   cdmClassificationAccuracy,
+  cdmItemFit,
+  cdmModelFit,
   compareItemModels,
   createRandom,
   DataError,
@@ -19,6 +22,7 @@ import { defined, expectClose } from "./assertions.js";
 import { definedEntries } from "./fixture-items.js";
 import fixture from "./fixtures/cdm.json" with { type: "json" };
 import additiveFixture from "./fixtures/cdm-additive.json" with { type: "json" };
+import fitFixture from "./fixtures/cdm-fit.json" with { type: "json" };
 import comparisonFixture from "./fixtures/cdm-item-comparison.json" with { type: "json" };
 import maximumFixture from "./fixtures/cdm-maximum.json" with { type: "json" };
 
@@ -39,6 +43,16 @@ const COVARIANCE_TOLERANCE = 1e-5;
 const STATISTIC_TOLERANCE = 1e-4;
 /** The p-values of the Wald statistics. */
 const P_VALUE_TOLERANCE = 1e-5;
+/** The EM tolerance of the fits whose model and item fit are compared. */
+const FIT_EM_TOLERANCE = 1e-10;
+/** M2, its significance, RMSEA, its interval and SRMSR against GDINA, each from its own calibration. */
+const M2_TOLERANCE = 1e-3;
+/** M2 of the rejection sets, whose calibrations stop at 1e-6. */
+const REJECTION_TOLERANCE = 2e-2;
+/** The item statistics against their exact sums at GDINA's estimates, and against CDM's exact correlations. */
+const ITEM_TOLERANCE = 1e-3;
+/** The z statistics against GDINA's, whose expected values simulate 1e6 persons: their Monte Carlo SE is about 0.03. */
+const RESAMPLED_TOLERANCE = 0.15;
 
 const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
 const LINKS: readonly CdmLink[] = ["identity", "logit", "log"];
@@ -994,7 +1008,196 @@ describe("validateQMatrix", () => {
   });
 });
 
+describe("cdmModelFit", () => {
+  const matrix = responseMatrix(fitFixture.responses, { itemIds: fitFixture.items });
+  const qMatrix = definedEntries(fitFixture.qMatrix);
+  const calibrated = (model: readonly string[]) =>
+    calibrateCdm(matrix, qMatrix, {
+      model: model.map(cdmModel),
+      tolerance: FIT_EM_TOLERANCE,
+      maxIterations: 100_000,
+    });
+
+  for (const fit of fitFixture.cases) {
+    it(`matches GDINA's modelfit for ${fit.name}`, () => {
+      const result = cdmModelFit(matrix, calibrated(fit.model));
+      expectClose(result.m2, fit.m2, M2_TOLERANCE, "M2");
+      expect(result.degreesOfFreedom).toBe(fit.degreesOfFreedom);
+      expectClose(result.significance, fit.significance, M2_TOLERANCE, "significance");
+      expectClose(result.rmsea, fit.rmsea, M2_TOLERANCE, "RMSEA");
+      fit.rmseaInterval.forEach((bound, i) => {
+        expectClose(result.rmseaInterval?.[i] ?? null, bound, M2_TOLERANCE, `RMSEA interval ${i}`);
+      });
+      expectClose(result.srmsr, fit.srmsr, M2_TOLERANCE, "SRMSR");
+      const wide = cdmModelFit(matrix, calibrated(fit.model), { level: 0.95 });
+      fit.wideInterval.forEach((bound, i) => {
+        expectClose(wide.rmseaInterval?.[i] ?? null, bound, M2_TOLERANCE, `0.95 interval ${i}`);
+      });
+    });
+  }
+
+  it("uses the whole complement of a Δ whose rank is below its columns, where GDINA's M2 depends on their order", () => {
+    for (const fit of fitFixture.cases) {
+      const { gdina } = fit;
+      if (gdina === null) continue;
+      const result = cdmModelFit(matrix, calibrated(fit.model));
+      expect(result.degreesOfFreedom).toBeGreaterThan(gdina.degreesOfFreedom);
+      expect(Math.abs(gdina.m2 - gdina.reversed)).toBeGreaterThan(0.1);
+    }
+  });
+
+  it("has CDM's SRMSR for the DINA", () => {
+    const dina = defined(fitFixture.cases.find(({ name }) => name === "DINA"));
+    expectClose(cdmModelFit(matrix, calibrated(dina.model)).srmsr, fitFixture.din.srmsr, M2_TOLERANCE, "SRMSR");
+  });
+
+  it("rejects a true G-DINA model as often as GDINA on the same sets", () => {
+    const { sets, alpha } = fitFixture.rejections;
+    let rejected = 0;
+    let rejectedByGdina = 0;
+    for (const { responses, statistic, degreesOfFreedom } of sets) {
+      const data = responseMatrix(
+        responses.map((row) => Array.from(row, Number)),
+        { itemIds: fitFixture.items },
+      );
+      const result = cdmModelFit(data, calibrateCdm(data, qMatrix, { tolerance: 1e-6, maxIterations: 5000 }));
+      expect(result.degreesOfFreedom).toBe(degreesOfFreedom);
+      expectClose(result.m2, statistic, REJECTION_TOLERANCE, "M2 of a set");
+      if (defined(result.significance) < alpha) rejected++;
+      if (chiSquareUpperTail(statistic, degreesOfFreedom) < alpha) rejectedByGdina++;
+    }
+    expect(Math.abs(rejected - rejectedByGdina) / sets.length).toBeLessThanOrEqual(0.02);
+  });
+
+  it("leaves M2 null without degrees of freedom, and still gives SRMSR", () => {
+    const small = { item1: ["a", "b"], item2: ["a"], item3: ["b"] };
+    const data = responseMatrix(fitFixture.responses.map((row) => row.slice(0, 3)));
+    const result = cdmModelFit(data, calibrateCdm(data, small));
+    expect(result.degreesOfFreedom).toBeLessThanOrEqual(0);
+    expect(result).toMatchObject({ m2: null, significance: null, rmsea: null, rmseaInterval: null });
+    expect(result.srmsr).toBeGreaterThanOrEqual(0);
+  });
+
+  it("uses the persons who answered every item", () => {
+    const calibration = calibrated(defined(fitFixture.cases[0]).model);
+    const missing = responseMatrix([...fitFixture.responses, [null, ...(fitFixture.responses[0]?.slice(1) ?? [])]], {
+      itemIds: fitFixture.items,
+    });
+    expect(cdmModelFit(missing, calibration)).toEqual(cdmModelFit(matrix, calibration));
+  });
+
+  it("refuses more than 60 items and fewer than two persons who answered every item", () => {
+    const wide = Object.fromEntries(Array.from({ length: 61 }, (_, j) => [`item${j + 1}`, ["a"]]));
+    const rows = [0, 1, 0, 1].map((start) => Array.from({ length: 61 }, (_, j) => (start + j) % 2));
+    const many = responseMatrix(rows);
+    const calibration = calibrateCdm(many, wide, { maxIterations: 2 });
+    expect(() => cdmModelFit(many, calibration)).toThrow(/at most 60 items, found 61/);
+    const few = responseMatrix([
+      [1, 0],
+      [0, null],
+      [null, 1],
+    ]);
+    const pair = calibrateCdm(few, { item1: ["a"], item2: ["a"] }, { maxIterations: 2 });
+    expect(() => cdmModelFit(few, pair)).toThrow(/at least two persons who answered every item, found 1/);
+  });
+
+  it("refuses arguments of other types", () => {
+    const calibration = calibrated(defined(fitFixture.cases[0]).model);
+    expect(() => cdmModelFit(JSON.parse("null"), calibration)).toThrow(DataError);
+    expect(() => cdmModelFit(matrix, JSON.parse("null"))).toThrow(DataError);
+    expect(() => cdmModelFit(matrix, calibration, JSON.parse("null"))).toThrow(DataError);
+    expect(() => cdmModelFit(matrix, calibration, JSON.parse('{ "level": 1 }'))).toThrow(/The option level/);
+    expect(() => cdmModelFit(matrix, calibration, JSON.parse('{ "level": "0.9" }'))).toThrow(/The option level/);
+    const unknown = {
+      ...calibration,
+      items: calibration.items.map((item) => ({ ...item, model: JSON.parse('"gdm"') })),
+    };
+    expect(() => cdmModelFit(matrix, unknown)).toThrow(/The model of item "item1"/);
+  });
+});
+
+describe("cdmItemFit", () => {
+  const matrix = responseMatrix(fitFixture.responses, { itemIds: fitFixture.items });
+  const qMatrix = definedEntries(fitFixture.qMatrix);
+
+  for (const fit of fitFixture.cases) {
+    it(`matches the exact item statistics and GDINA's itemfit for ${fit.name}`, () => {
+      const model = fit.model.map(cdmModel);
+      const calibration = calibrateCdm(matrix, qMatrix, { model, tolerance: FIT_EM_TOLERANCE, maxIterations: 100_000 });
+      const { exact, resampled } = fit;
+      cdmItemFit(matrix, calibration).forEach((item, j) => {
+        expect(item.id).toBe(fitFixture.items[j]);
+        expectClose(item.proportion.observed, defined(exact.observed[j]), 1e-12, "observed");
+        expectClose(item.proportion.expected, defined(exact.expected[j]), ITEM_TOLERANCE, "expected");
+        expectClose(item.proportion.z, defined(exact.proportionZ[j]), ITEM_TOLERANCE, "z of the proportion");
+        expectClose(item.correlationZ, defined(exact.correlationZ[j]), ITEM_TOLERANCE, "z of the correlation");
+        expectClose(item.logOddsZ, defined(exact.logOddsZ[j]), ITEM_TOLERANCE, "z of the log odds");
+        expectClose(item.significance, defined(exact.significance[j]), ITEM_TOLERANCE, "significance");
+        expectClose(item.proportion.z, defined(resampled.proportionZ[j]), RESAMPLED_TOLERANCE, "GDINA's z.prop");
+        expectClose(item.correlationZ, defined(resampled.correlationZ[j]), RESAMPLED_TOLERANCE, "GDINA's max[z.r]");
+        expectClose(item.logOddsZ, defined(resampled.logOddsZ[j]), RESAMPLED_TOLERANCE, "GDINA's max[z.logOR]");
+      });
+    });
+  }
+
+  it("has CDM's exact z of the residual correlations for the DINA", () => {
+    const calibration = calibrateCdm(matrix, qMatrix, {
+      model: "dina",
+      tolerance: FIT_EM_TOLERANCE,
+      maxIterations: 100_000,
+    });
+    cdmItemFit(matrix, calibration).forEach((item, j) => {
+      expectClose(item.correlationZ, defined(fitFixture.din.correlationZ[j]), ITEM_TOLERANCE, item.id);
+    });
+  });
+
+  it("counts an empty cell of an observed table as one half, and leaves a constant item's correlations out", () => {
+    const rows = fitFixture.responses.map((row) => [1, ...row.slice(1)]);
+    const data = responseMatrix(rows, { itemIds: fitFixture.items });
+    const [constant, ...others] = cdmItemFit(data, calibrateCdm(data, qMatrix));
+    expect(constant?.correlationZ).toBeNull();
+    expect(Number.isFinite(defined(constant?.logOddsZ))).toBe(true);
+    for (const item of others) expect(Number.isFinite(defined(item.correlationZ))).toBe(true);
+  });
+
+  it("gives no pair z to a single item", () => {
+    const data = responseMatrix([[1], [0], [1], [1]]);
+    const [item] = cdmItemFit(data, calibrateCdm(data, { item1: ["a"] }));
+    expect(item).toMatchObject({ correlationZ: null, logOddsZ: null, significance: null });
+    expect(item?.proportion.z).not.toBeNull();
+  });
+
+  it("refuses arguments of other types", () => {
+    const calibration = calibrateCdm(matrix, qMatrix, { maxIterations: 2 });
+    expect(() => cdmItemFit(JSON.parse("null"), calibration)).toThrow(DataError);
+    expect(() => cdmItemFit(matrix, JSON.parse("[]"))).toThrow(DataError);
+  });
+});
+
 describe("properties", () => {
+  it("model and item fit do not depend on the order of persons", () => {
+    const qMatrix = definedEntries(fitFixture.qMatrix);
+    const rows = fitFixture.responses.slice(0, 300);
+    const calibration = calibrateCdm(responseMatrix(rows, { itemIds: fitFixture.items }), qMatrix, {
+      model: "dina",
+      maxIterations: 200,
+    });
+    fc.assert(
+      fc.property(fc.shuffledSubarray(rows, { minLength: rows.length, maxLength: rows.length }), (shuffled) => {
+        const original = responseMatrix(rows, { itemIds: fitFixture.items });
+        const reordered = responseMatrix(shuffled, { itemIds: fitFixture.items });
+        const close = (actual: unknown, expected: unknown): void => {
+          expect(
+            JSON.stringify(actual, (_, value) => (typeof value === "number" ? value.toPrecision(10) : value)),
+          ).toBe(JSON.stringify(expected, (_, value) => (typeof value === "number" ? value.toPrecision(10) : value)));
+        };
+        close(cdmModelFit(reordered, calibration), cdmModelFit(original, calibration));
+        close(cdmItemFit(reordered, calibration), cdmItemFit(original, calibration));
+      }),
+      { numRuns: 10 },
+    );
+  });
+
   it("profile proportions and each person's posterior sum to 1, and probabilities stay within GDINA's bounds", () => {
     const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"], item4: ["a"], item5: ["b"] };
     const rows = fc.array(

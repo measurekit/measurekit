@@ -126,10 +126,10 @@ export interface CdmCalibration {
   readonly iterations: number;
 }
 
-const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
+export const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
 const STANDARD_ERRORS: readonly CdmStandardErrors[] = ["none", "incomplete"];
 /** The link of each additive model (de la Torre, 2011): the identity for the A-CDM, the logit for the LLM, the log for the R-RUM. */
-const LINKS: Readonly<Partial<Record<CdmModel, CdmLink>>> = { acdm: "identity", llm: "logit", rrum: "log" };
+export const LINKS: Readonly<Partial<Record<CdmModel, CdmLink>>> = { acdm: "identity", llm: "logit", rrum: "log" };
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 2000;
 /** The starting success probability of a group mastering none of an item's attributes, and the rise to all mastered. */
@@ -252,7 +252,7 @@ function itemErrors(
 }
 
 /** Returns the number of parameters of an item with `attributeCount` attributes: its success probabilities. */
-function parameterCount(model: CdmModel | undefined, attributeCount: number): number {
+export function parameterCount(model: CdmModel | undefined, attributeCount: number): number {
   if (model === "dina" || model === "dino") return 2;
   return model === undefined || model === "gdina" ? 2 ** attributeCount : attributeCount + 1;
 }

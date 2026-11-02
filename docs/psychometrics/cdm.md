@@ -3,8 +3,7 @@
 `@measurekit/psychometrics/cdm` tells which attributes, such as the skills a test measures, each person has
 mastered: the G-DINA, DINA, DINO, A-CDM, LLM and R-RUM models calibrated by marginal maximum likelihood, persons'
 mastery probabilities and profiles, classification accuracy and consistency, Wald tests that choose a model for each
-item, Q-matrix validation, and a nonparametric classification for small samples. Each is validated against GDINA or
-NPCD ([validation](validation.md)).
+item, Q-matrix validation, model and item fit, and a nonparametric classification for small samples. Each is validated against GDINA, CDM or NPCD ([validation](validation.md)).
 
 ## Q-matrix
 
@@ -246,6 +245,72 @@ tests: on the 20 simulated sets of the validation, 600 persons each with items o
 the true model of an item at 0.05 in 14% of the items, where 5% is the level, and selects it in 61%. Choose a model for
 an item with this evidence and the content of the item, not with a p-value alone.
 
+## Model and item fit
+
+`cdmModelFit(matrix, calibration, { level })` tests a calibration on the items' shares correct and the shares of each
+pair correct, as GDINA's `modelfit`; `cdmItemFit(matrix, calibration)` gives each item's statistics, as its `itemfit`.
+Both take every model and the persons who answered every item, and use the exact expected shares, sums over the
+profiles. M2 is the limited-information statistic of [fit](fit.md#limited-information-fit), with a column of Δ for each
+item parameter on its model's scale and one for each proportion of a profile but the last.
+
+```ts
+import { calibrateCdm, cdmItemFit, cdmModelFit } from "@measurekit/psychometrics/cdm";
+import { createRandom } from "@measurekit/psychometrics";
+import { simulateCdmResponses } from "@measurekit/psychometrics/sim";
+
+// 1,000 persons on three attributes, from a DINA model with guessing 0.15 and slip 0.15.
+const random = createRandom(7);
+const attributes = ["a", "b", "c"];
+const qMatrix = {
+  q1: ["a"],
+  q2: ["b"],
+  q3: ["c"],
+  q4: ["a", "b"],
+  q5: ["a", "c"],
+  q6: ["b", "c"],
+  q7: ["a"],
+  q8: ["b"],
+  q9: ["c"],
+  q10: ["a", "b", "c"],
+};
+const items = Object.entries(qMatrix).map(([id, measured]) => ({
+  id,
+  attributes: measured,
+  probabilities: Array.from({ length: 2 ** measured.length }, (_, group) =>
+    group === 2 ** measured.length - 1 ? 0.85 : 0.15,
+  ),
+}));
+const profiles = Array.from({ length: 1000 }, () => attributes.map(() => (random.uniform() < 0.5 ? 1 : 0)));
+const matrix = simulateCdmResponses({ attributes, items }, profiles, random);
+
+const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
+cdmModelFit(matrix, calibration); // { m2: 27.27, degreesOfFreedom: 28, significance: 0.50, rmsea: 0, srmsr: 0.025, ... }
+cdmItemFit(matrix, calibration)[0]; // { id: "q1", proportion: { observed: 0.519, expected: 0.519, z: 0 }, correlationZ: 1.46, ... }
+```
+
+| `CdmModelFit` field | Definition                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `m2`                | N e′ (Ξ⁻¹ - Ξ⁻¹ Δ (Δ′ Ξ⁻¹ Δ)⁺ Δ′ Ξ⁻¹) e; `null` without degrees of freedom                                     |
+| `degreesOfFreedom`  | The moments less the rank of Δ: the parameters, unless the margins leave some unidentified                     |
+| `significance`      | The upper tail of the chi-square                                                                               |
+| `rmsea`             | √(max(0, (M2 - df) / (N df))), as GDINA's `RMSEA2`                                                             |
+| `rmseaInterval`     | At `level`, default `0.9`, as GDINA's                                                                          |
+| `srmsr`             | The root mean square over the pairs of the sample correlation less the model's; given even without a statistic |
+
+| `CdmItemFit` field | Definition                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| `proportion`       | The share correct, observed and expected, with z = \|o - e\| / √(e (1 - e) / N)                          |
+| `correlationZ`     | The largest over the item's pairs of \|atanh r - atanh ρ\| √(N - 3), the Fisher-transformed correlation  |
+| `logOddsZ`         | The largest over its pairs of \|ln OR - ln ω\| / √(Σ 1 / (N π_ab)); an empty observed cell counts as 0.5 |
+| `significance`     | The smaller of the Holm-adjusted p-values of the two, min(1, (J - 1) p) for the largest of J - 1 pairs   |
+
+The first- and second-order margins do not always identify every parameter: on GDINA's `sim10GDINA`, Δ of the G-DINA
+has rank 44 of its 45 columns, and that of the A-CDM 31 of 35. M2 then uses the whole complement of Δ's span, with as
+many degrees of freedom as the moments less its rank. Above 10 attributes a model has more parameters than 60 items
+have moments, so M2 is `null`; the limit of 60 items is that of [fit](fit.md#limited-information-fit). On 2,000
+persons, a call took 5 ms for 10 items on 3 attributes, 40 ms for 30 on 5, and 5 s for 60 on 10, whose Δ has 1,143
+columns; `cdmItemFit` took at most 23 ms.
+
 ## Small samples
 
 `nonparametricClassification(matrix, qMatrix, { rule })` classifies persons without calibration (Chiu and Douglas,
@@ -267,13 +332,16 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 
 ## Differences from the references
 
-| Reference | Difference                                                                                                                                                                                                                                                                                                                                                   |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| GDINA     | An additive M-step is maximized exactly. GDINA's solvers stop near 1e-6, so its estimates and log-likelihood fall slightly short: the two agree within 1e-5, and the log-likelihood here is at least GDINA's.                                                                                                                                                |
-| GDINA     | The small-group correction, which GDINA applies to the G-DINA, DINA and DINO, applies to every model. It changes only groups with fewer than 0.001 expected persons.                                                                                                                                                                                         |
-| GDINA     | GDINA starts from the best of three random starts; `calibrateCdm` is deterministic, starting at P = 0.2 + 0.6 m / K_j for m of K_j attributes mastered, and for an additive item at the least squares fit of that on the link scale. The likelihood of a model with several attributes can have several maxima: compare the log-likelihoods of calibrations. |
-| GDINA     | No monotonicity constraint (`mono.constraint`). The standard errors are those of `SE.type = 2`, and `compareItemModels` is `modelcomp(method = "Wald")` with it, for every model of `models` at once.                                                                                                                                                        |
-| CDM       | The `gdina(rule = "ACDM")` of the CDM package uses another M-step and is not a reference.                                                                                                                                                                                                                                                                    |
+| Reference | Difference                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GDINA     | An additive M-step is maximized exactly. GDINA's solvers stop near 1e-6, so its estimates and log-likelihood fall slightly short: the two agree within 1e-5, and the log-likelihood here is at least GDINA's.                                                                                                                                                                                                         |
+| GDINA     | The small-group correction, which GDINA applies to the G-DINA, DINA and DINO, applies to every model. It changes only groups with fewer than 0.001 expected persons.                                                                                                                                                                                                                                                  |
+| GDINA     | GDINA starts from the best of three random starts; `calibrateCdm` is deterministic, starting at P = 0.2 + 0.6 m / K_j for m of K_j attributes mastered, and for an additive item at the least squares fit of that on the link scale. The likelihood of a model with several attributes can have several maxima: compare the log-likelihoods of calibrations.                                                          |
+| GDINA     | No monotonicity constraint (`mono.constraint`). The standard errors are those of `SE.type = 2`, and `compareItemModels` is `modelcomp(method = "Wald")` with it, for every model of `models` at once.                                                                                                                                                                                                                 |
+| CDM       | The `gdina(rule = "ACDM")` of the CDM package uses another M-step and is not a reference.                                                                                                                                                                                                                                                                                                                             |
+| GDINA     | Where Δ's rank is below its columns, `modelfit` takes nrow - ncol columns of `qr.Q`'s complement, which depend on the order of Δ's columns: on `sim10GDINA` its G-DINA M2 is 6.87 on 10 df, and 5.43 with the columns reversed. `cdmModelFit` uses the whole complement: 7.68 on 11 df. For the A-CDM, GDINA gives 36.36 on 20 df, 35.56 reversed; `cdmModelFit` 51.59 on 24 df. Where Δ has full rank the two agree. |
+| GDINA     | `itemfit` simulates the expected values from `N.resampling` persons; `cdmItemFit` sums over the profiles, as CDM's `modelfit.cor.din`, which it equals within 1e-5 on the DINA from its own calibration. GDINA's z differ from the exact ones by up to 0.09 at 1e6 persons.                                                                                                                                           |
+| GDINA     | Model and item fit use the persons who answered every item; GDINA's use each pair's persons. A constant item's correlations are left out of the other items' largest z; GDINA gives every item `NA` then.                                                                                                                                                                                                             |
 
 ## Not included
 
@@ -290,9 +358,14 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 - **Higher-order attribute models.** Outside the sources: a variant, as GDINA's `att.dist` shows; the saturated
   distribution of the profiles is its default.
 - **Polytomous attributes.** Outside the sources: a variant of the models for attributes mastered or not.
+- **S-X² and RMSEA of CDM items.** Outside the sources: functions of CDM, beside Chen, de la Torre and Zhang's statistics.
+- **MADcor and the other residual summaries of CDM.** No fit: one line over the residual correlations of `cdmItemFit`'s
+  pairs.
 
 ## References
 
+- Chen, J., de la Torre, J., & Zhang, Z. (2013). Relative and absolute fit evaluation in cognitive diagnosis modeling.
+  Journal of Educational Measurement, 50, 123-140.
 - Chiu, C.-Y., & Douglas, J. (2013). A nonparametric approach to cognitive diagnosis by proximity to ideal response
   patterns. Journal of Classification, 30, 225-250.
 - de la Torre, J. (2011). The generalized DINA model framework. Psychometrika, 76, 179-199.
@@ -303,5 +376,7 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
   cognitive diagnosis models. Rutgers University.
 - Ma, W., Iaconangelo, C., & de la Torre, J. (2016). Model similarity, model selection, and attribute classification.
   Applied Psychological Measurement, 40, 200-217.
+- Hansen, M., Cai, L., Monroe, S., & Li, Z. (2016). Limited-information goodness-of-fit testing of diagnostic
+  classification item response models. British Journal of Mathematical and Statistical Psychology, 69, 225-252.
 - Wang, W., Song, L., Chen, P., Meng, Y., & Ding, S. (2015). Attribute-level and pattern-level classification
   consistency and accuracy indices for cognitive diagnostic assessment. Journal of Educational Measurement, 52, 457-476.

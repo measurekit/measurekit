@@ -58,6 +58,8 @@ standard error and Wald statistic, from the same marginal likelihood as the meas
 
 Cognitive diagnosis compares each item's G-DINA estimates with the DINA, DINO, A-CDM, LLM and R-RUM by Wald tests, and
 selects a model for each item; the calibration gives the covariance of the success probabilities for them.
+`cdmModelFit` and `cdmItemFit` give M2 with RMSEA and SRMSR, and each item's z statistics, as GDINA's `modelfit` and
+`itemfit`, from exact sums over the profiles.
 
 `calibrateMultidimensional` calibrates several groups of persons on one scale, with the option `groups` and, for anchor
 items, `fixed`, up to three dimensions by EM. Items have the same parameters in every group, and the result reports each
