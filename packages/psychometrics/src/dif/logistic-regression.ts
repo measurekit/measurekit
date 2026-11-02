@@ -1,7 +1,7 @@
 import { checkOptions, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/internal.js";
-import { type DifGroup, dichotomousData, type ItemCases, itemCases } from "./groups.js";
+import { type DifGroup, dichotomousData, itemCases } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 
@@ -58,18 +58,35 @@ export function logisticRegressionDif(
   return purified(
     matrix.itemIds,
     purify,
-    (anchors) => matrix.itemIds.map((id, item) => ({ id, ...itemTests(itemCases(data, item, anchors)) })),
+    (anchors) =>
+      matrix.itemIds.map((id, item) => {
+        const { responses, scores, focal } = itemCases(data, item, anchors);
+        return { id, ...logisticTests({ outcomes: responses, scores, predictors: focal }) };
+      }),
     (item) => significant(item.both.significance),
   );
 }
 
-/** Returns the three likelihood-ratio tests of an item, `null` where the item's persons cannot show DIF. */
-function itemTests(cases: ItemCases): Omit<LogisticRegressionDif, "id"> {
+/** The persons of three nested logistic regressions of a 0/1 outcome on 1, S, P and S P. */
+export interface LogisticCases {
+  /** Each person's outcome, 0 or 1. */
+  readonly outcomes: ArrayLike<number>;
+  /** Each person's matching score S. */
+  readonly scores: ArrayLike<number>;
+  /** Each person's predictor P: the group in logistic regression DIF, the response in the discriminant analysis. */
+  readonly predictors: ArrayLike<number>;
+}
+
+/** The likelihood-ratio tests of P (1 vs 0), of S P (2 vs 1) and of both (2 vs 0). */
+type LogisticTests = Omit<LogisticRegressionDif, "id">;
+
+/**
+ * Returns the three likelihood-ratio tests of the regressions on S, then P, then S P: `null` all where the outcomes,
+ * the scores or the predictors do not vary, and `null` where a model's terms are collinear.
+ */
+export function logisticTests(cases: LogisticCases): LogisticTests {
   const count = cases.scores.length;
-  const correct = cases.responses.reduce((sum, response) => sum + response, 0);
-  const focal = cases.focal.reduce((sum, flag) => sum + flag, 0);
-  const varies = cases.scores.some((score) => score !== cases.scores[0]);
-  const defined = correct > 0 && correct < count && focal > 0 && focal < count && varies;
+  const defined = varies(cases.outcomes) && varies(cases.scores) && varies(cases.predictors);
   const [none = null, score = null, group = null, interaction = null] = defined
     ? [1, 2, 3, 4].map((terms) => deviance(cases, terms))
     : [];
@@ -80,12 +97,18 @@ function itemTests(cases: ItemCases): Omit<LogisticRegressionDif, "id"> {
   return { uniform: test(score, group, 1), nonuniform: test(group, interaction, 1), both: test(score, interaction, 2) };
 }
 
+/** Returns whether the values are not all equal. */
+function varies(values: ArrayLike<number>): boolean {
+  for (let i = 1; i < values.length; i++) if (values[i] !== values[0]) return true;
+  return false;
+}
+
 /**
- * Returns the deviance, -2 ln L, of the logistic regression of an item's responses on the first `terms` of 1, S, G and
- * S G, fitted by Newton's method from 0, or `null` when the Hessian is singular at the start: the terms are collinear.
+ * Returns the deviance, -2 ln L, of the logistic regression of the outcomes on the first `terms` of 1, S, P and S P,
+ * fitted by Newton's method from 0, or `null` when the Hessian is singular at the start: the terms are collinear.
  * A Hessian that turns singular later comes from separation, where the deviance has reached its infimum.
  */
-function deviance(cases: ItemCases, terms: number): number | null {
+function deviance(cases: LogisticCases, terms: number): number | null {
   const fit: LogisticFit = {
     terms,
     covariates: new Float64Array(4),
@@ -106,7 +129,7 @@ function deviance(cases: ItemCases, terms: number): number | null {
   return 2 * value;
 }
 
-/** A logistic regression during fitting, with scratch space for one person's covariates 1, S, G and S G. */
+/** A logistic regression during fitting, with scratch space for one person's covariates 1, S, P and S P. */
 interface LogisticFit {
   readonly terms: number;
   readonly covariates: Float64Array;
@@ -116,20 +139,20 @@ interface LogisticFit {
 }
 
 /** Writes the gradient and Hessian of -ln L at the fit's coefficients and returns -ln L. */
-function evaluate(cases: ItemCases, fit: LogisticFit): number {
-  const { responses, scores, focal } = cases;
+function evaluate(cases: LogisticCases, fit: LogisticFit): number {
+  const { outcomes, scores, predictors } = cases;
   const { covariates } = fit;
   fit.gradient.fill(0);
   fit.hessian.fill(0);
   let value = 0;
   for (let person = 0; person < scores.length; person++) {
     const score = scores[person] ?? 0;
-    const group = focal[person] ?? 0;
+    const predictor = predictors[person] ?? 0;
     covariates[0] = 1;
     covariates[1] = score;
-    covariates[2] = group;
-    covariates[3] = score * group;
-    value += addObservation(fit, responses[person] ?? 0);
+    covariates[2] = predictor;
+    covariates[3] = score * predictor;
+    value += addObservation(fit, outcomes[person] ?? 0);
   }
   return value;
 }

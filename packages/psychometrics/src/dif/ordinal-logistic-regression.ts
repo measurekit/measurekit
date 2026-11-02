@@ -1,21 +1,11 @@
-import { backtrack, checkArray, checkOptions, DataError, describe, logistic, logLogistic } from "@measurekit/core";
+import { backtrack, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/internal.js";
-import { type DifData, type DifGroup, itemCases, polytomousData } from "./groups.js";
+import type { DifGroup } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
 import { type LogisticRegressionDif, MAX_ITERATIONS, STEP_TOLERANCE } from "./logistic-regression.js";
-import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
-
-/** Options of {@link ordinalLogisticRegressionDif}. */
-export interface MatchingOptions extends PurificationOptions {
-  /**
-   * One matching score per person, such as θ from a graded response calibration, or `null` to leave a person out. It
-   * replaces the total score as the criterion and cannot be purified, so it cannot be used with `purify`.
-   *
-   * @defaultValue the total score over the matching items
-   */
-  readonly matching?: readonly (number | null)[];
-}
+import { type MatchedCases, type MatchingOptions, matchedAnalysis } from "./matching.js";
+import { type DifAnalysis, significant } from "./purification.js";
 
 /** Ordinal logistic regression DIF tests of one polytomous item. */
 export interface OrdinalLogisticDif extends LogisticRegressionDif {
@@ -61,67 +51,9 @@ export function ordinalLogisticRegressionDif(
   groups: readonly DifGroup[],
   options: MatchingOptions = {},
 ): DifAnalysis<OrdinalLogisticDif> {
-  checkOptions(options);
-  const { purify = false, matching } = options;
-  const data = polytomousData(matrix, groups, "Ordinal logistic regression DIF");
-  if (matching !== undefined) {
-    checkMatching(matrix, matching);
-    if (purify === true) {
-      throw new DataError("The option purify purifies the total score, so it cannot be used with the option matching.");
-    }
-  }
-  return purified(
-    matrix.itemIds,
-    purify,
-    (anchors) => matrix.itemIds.map((id, item) => ({ id, ...itemTests(ordinalCases(data, item, anchors, matching)) })),
-    (item) => significant(item.both.significance),
+  return matchedAnalysis(matrix, groups, options, "Ordinal logistic regression DIF", itemTests, (item) =>
+    significant(item.both.significance),
   );
-}
-
-function checkMatching(matrix: ResponseMatrix, matching: readonly (number | null)[]): void {
-  checkArray(matching, "The option matching must be an array");
-  if (matching.length !== matrix.personIds.length) {
-    throw new DataError(`Found ${matching.length} matching scores for ${matrix.personIds.length} persons.`);
-  }
-  matching.forEach((score, person) => {
-    if (score !== null && !Number.isFinite(score)) {
-      throw new DataError(
-        `The matching score of person "${matrix.personIds[person]}" must be a finite number or null, found ${describe(score)}.`,
-      );
-    }
-  });
-}
-
-/** The persons an item's regressions use. */
-interface OrdinalCases {
-  /** Each person's response to the item. */
-  readonly responses: Int32Array;
-  /** Each person's matching score. */
-  readonly scores: Float64Array;
-  /** 1 for each person of the focal group. */
-  readonly focal: Uint8Array;
-}
-
-/** Returns the persons who answered an item and have a matching score: the given one, or the scaled total score. */
-function ordinalCases(
-  data: DifData,
-  item: number,
-  anchors: Uint8Array,
-  matching: readonly (number | null)[] | undefined,
-): OrdinalCases {
-  if (matching === undefined) {
-    const cases = itemCases(data, item, anchors);
-    return { responses: cases.responses, scores: cases.scores, focal: cases.focal };
-  }
-  const persons: number[] = [];
-  matching.forEach((score, person) => {
-    if (score !== null && (data.responses[person * data.itemCount + item] ?? -1) >= 0) persons.push(person);
-  });
-  return {
-    responses: Int32Array.from(persons, (person) => data.responses[person * data.itemCount + item] ?? 0),
-    scores: Float64Array.from(persons, (person) => matching[person] ?? 0),
-    focal: Uint8Array.from(persons, (person) => data.focal[person] ?? 0),
-  };
 }
 
 /** The categories an item's persons used, with the persons' responses as ranks among them. */
@@ -142,7 +74,7 @@ function usedCategories(responses: Int32Array): UsedCategories {
 }
 
 /** Returns the three likelihood-ratio tests of an item, `null` where the item's persons cannot show DIF. */
-function itemTests(cases: OrdinalCases): Omit<OrdinalLogisticDif, "id"> {
+function itemTests(cases: MatchedCases): Omit<OrdinalLogisticDif, "id"> {
   const { ranks, counts } = usedCategories(cases.responses);
   const count = ranks.length;
   const focal = cases.focal.reduce((sum, flag) => sum + flag, 0);

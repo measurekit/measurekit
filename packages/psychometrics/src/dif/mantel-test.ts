@@ -3,6 +3,7 @@ import type { ResponseMatrix } from "../data/internal.js";
 
 import { invertPositiveDefinite, standardDeviation } from "../math/internal.js";
 import { countByScore, type DifGroup, type ItemCases, itemCases, polytomousData, type ScoreGroups } from "./groups.js";
+import { type LiuAgresti, liuAgresti } from "./liu-agresti.js";
 import {
   type DifAnalysis,
   type PurificationOptions,
@@ -43,6 +44,11 @@ export interface MantelTest {
   readonly effectSize: number | null;
   /** The ETS category by `effectSize` and `significance`. */
   readonly etsCategory: PolytomousEtsCategory | null;
+  /**
+   * Liu and Agresti's cumulative common odds ratio of the categories, as Penfield and Algina test it; `null` where it is
+   * undefined, as when no score group holds both groups.
+   */
+  readonly liuAgresti: LiuAgresti | null;
 }
 
 /**
@@ -54,7 +60,7 @@ const POLYTOMOUS_ETS_THRESHOLDS = { moderate: 0.17, large: 0.25 } as const;
 
 /**
  * Returns the Mantel DIF statistics of every polytomous item: Mantel's chi-square, the generalized Mantel-Haenszel
- * chi-square, the standardized mean difference and the ETS category.
+ * chi-square, the standardized mean difference, the ETS category and Liu and Agresti's cumulative common odds ratio.
  *
  * @remarks
  * Persons are matched on their score over the matching items, all items or, with `purify`, the anchors, and the studied
@@ -124,6 +130,7 @@ function statistics(cases: ItemCases): Omit<MantelTest, "id"> {
     standardizedMeanDifference,
     effectSize,
     etsCategory: etsCategory(effectSize, significance),
+    liuAgresti: liuAgresti(groups),
   };
 }
 

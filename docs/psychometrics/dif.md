@@ -2,8 +2,9 @@
 
 `@measurekit/psychometrics/dif` tests whether an item functions differently for two groups of persons of equal
 ability. For dichotomous items it has the Mantel-Haenszel statistics with the ETS categories, logistic regression,
-Lord's chi-square and Raju's areas; for items with any number of categories, the Mantel test, ordinal logistic
-regression, SIBTEST, which also tests bundles of items, and IRT likelihood-ratio tests; and for items of any model on one
+Lord's chi-square and Raju's areas; for items with any number of categories, the Mantel test with Liu and Agresti's
+cumulative common odds ratio, ordinal logistic regression, the logistic discriminant function, SIBTEST, which also tests
+bundles of items, and IRT likelihood-ratio tests; and for items of any model on one
 scale, the differential functioning of items and tests. The statistics on the matching score work on sparse data, and
 all purify their matching criterion or their link on request. The dichotomous statistics are validated against difR, the
 polytomous ones against base R, rms, MASS and lordif, SIBTEST against mirt and difR, the likelihood-ratio tests against
@@ -21,6 +22,7 @@ whose items are studied. Both groups need persons.
 | `lordChiSquare(matrix, groups, options)`                | 2PL, 3PL or 4PL | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
 | `mantelTest(matrix, groups, options)`                   | Any             | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
 | `ordinalLogisticRegressionDif(matrix, groups, options)` | Any             | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
+| `logisticDiscriminantDif(matrix, groups, options)`      | Any             | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
 | `sibtest(matrix, groups, options)`                      | Any, or bundles | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
 | `rajuAreaDif(matrix, groups, options)`                  | 2PL             | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
 | `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model       | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
@@ -86,13 +88,13 @@ are computed again on the items not flagged, until a round flags the items the p
 left, or 10 rounds have run, as difR's `purify` (Holland and Thayer, 1988). The anchors are the items that define the
 matching score or, for Lord's chi-square, the scale on which the groups are linked.
 
-| Statistic                                               | Flags an item when                                           | Fewest anchors                                          |
-| ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
-| `mantelHaenszel`, `mantelTest`                          | The chi-square is significant                                | 1, the studied item's match                             |
-| `logisticRegressionDif`, `ordinalLogisticRegressionDif` | The test of both terms is significant, difR's default `type` | 1                                                       |
-| `lordChiSquare`, `rajuAreaDif`                          | The chi-square, or the unsigned area's z, is significant     | 2, as a transformation needs two locations              |
-| `irtLikelihoodRatioDif`                                 | The chi-square is significant                                | 2, as [a free item](#irt-likelihood-ratio) needs a link |
-| `sibtest`                                               | An item's chi-square is significant; a bundle flags nothing  | 3, or 2 [without the correction](#fewest-anchors)       |
+| Statistic                                                                          | Flags an item when                                           | Fewest anchors                                          |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| `mantelHaenszel`, `mantelTest`                                                     | The chi-square is significant                                | 1, the studied item's match                             |
+| `logisticRegressionDif`, `ordinalLogisticRegressionDif`, `logisticDiscriminantDif` | The test of both terms is significant, difR's default `type` | 1                                                       |
+| `lordChiSquare`, `rajuAreaDif`                                                     | The chi-square, or the unsigned area's z, is significant     | 2, as a transformation needs two locations              |
+| `irtLikelihoodRatioDif`                                                            | The chi-square is significant                                | 2, as [a free item](#irt-likelihood-ratio) needs a link |
+| `sibtest`                                                                          | An item's chi-square is significant; a bundle flags nothing  | 3, or 2 [without the correction](#fewest-anchors)       |
 
 The result's `purification` holds the `anchors` of the final statistics, the `iterations` after the first statistics and
 whether they `converged`; it is `null` without `purify`. `converged` is `false` when the rounds ran out or too few anchors
@@ -215,7 +217,12 @@ The signed test's probability is `chiSquareUpperTail(signedZ ** 2, 1)` of `@meas
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
 import { responseMatrix } from "@measurekit/psychometrics/data";
-import { type DifGroup, mantelTest, ordinalLogisticRegressionDif } from "@measurekit/psychometrics/dif";
+import {
+  type DifGroup,
+  logisticDiscriminantDif,
+  mantelTest,
+  ordinalLogisticRegressionDif,
+} from "@measurekit/psychometrics/dif";
 import { abilityEstimates, calibrate, gradedResponse } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
@@ -230,12 +237,14 @@ const focal = simulateResponses(shifted, simulateThetas(500, random), random);
 const matrix = responseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
-mantelTest(matrix, groups).items[2]; // { id: "item3", chiSquare: 94.3, ..., standardizedMeanDifference: -0.62, effectSize: -0.52, etsCategory: "CC" }
+mantelTest(matrix, groups).items[2]; // { id: "item3", chiSquare: 94.3, ..., standardizedMeanDifference: -0.62, effectSize: -0.52, etsCategory: "CC", liuAgresti }
+mantelTest(matrix, groups).items[2]?.liuAgresti; // { oddsRatio: 3.89, logStandardError: 0.144, z: 9.47, significance: 2.8e-21 }
 ordinalLogisticRegressionDif(matrix, groups).items[2]?.uniform; // { chiSquare: 99.4, degreesOfFreedom: 1, significance: 2.0e-23, rSquaredChange: 0.075 }
 // Matched on theta from a graded response calibration, as lordif does in one pass.
 const calibration = calibrate(matrix, { model: gradedResponse });
 const matching = abilityEstimates(matrix, calibration.items).map((estimate) => estimate.theta);
 ordinalLogisticRegressionDif(matrix, groups, { matching }).items[2]?.uniform.chiSquare; // 99.5
+logisticDiscriminantDif(matrix, groups).items[2]?.uniform; // { chiSquare: 98.1, degreesOfFreedom: 1, significance: 4.0e-23, rSquaredChange: 0.124 }
 ```
 
 ### Mantel test
@@ -256,6 +265,7 @@ Score groups of one person are left out.
 | `standardizedMeanDifference` | SMD = Σ (n_Fs / n_F) (m_Fs - m_Rs) over the score groups s with persons of both groups, m the mean response: negative when the item is harder for the focal group |
 | `effectSize`                 | SMD over the sample standard deviation of the item's responses in both groups                                                                                     |
 | `etsCategory`                | `"AA"`, `"BB"` or `"CC"`, below                                                                                                                                   |
+| `liuAgresti`                 | Liu and Agresti's [cumulative common odds ratio](#liu-agresti-cumulative-common-odds-ratio), or `null` where no score group holds both groups                     |
 
 The generalized test is the Cochran-Mantel-Haenszel statistic of general association of the 2 × K tables of group by
 response, for the K categories used in score groups of more than one person. It takes the focal group's counts in the
@@ -273,6 +283,28 @@ ETS's rule for polytomous items (Zwick, 2012), with p the significance of Mantel
 | `"AA"`   | Negligible         | p ≥ 0.05, or \|effect size\| ≤ 0.17 |
 | `"CC"`   | Moderate to large  | p < 0.05 and \|effect size\| > 0.25 |
 | `"BB"`   | Slight to moderate | Otherwise                           |
+
+#### Liu-Agresti cumulative common odds ratio
+
+`liuAgresti` estimates one odds ratio of the item's categories across the score groups (Liu and Agresti, 1996), as
+Penfield and Algina (2003) test DIF with it. In score group k, with n_F and n_R the persons of each group, N their sum,
+and F_j and R_j the persons of each group at or below category j:
+
+ψ̂ = Σ_k Σ_j F_j (n_R - R_j) / N / Σ_k Σ_j (n_F - F_j) R_j / N,
+
+over the categories j but the highest that the item's persons used. ψ̂ is the odds of a response above a category in the
+reference group over those in the focal group, common to the categories: above 1 when the item favors the reference
+group, as the Mantel-Haenszel odds ratio, which it equals for a 0/1 item.
+
+| Field              | Definition                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `oddsRatio`        | ψ̂                                                                                                                                          |
+| `logStandardError` | The standard error of ln ψ̂ by equation 3 of Liu and Agresti, consistent with many small score groups or few large ones; `null` when ψ̂ is 0 |
+| `z`                | ln ψ̂ over its standard error                                                                                                               |
+| `significance`     | The two-sided probability of a z at least as large in size without DIF                                                                     |
+
+Swapping the groups inverts ψ̂ and keeps its standard error. Reversing the categories inverts ψ̂; its standard error
+changes slightly, as Liu and Agresti note.
 
 ### Ordinal logistic regression
 
@@ -306,6 +338,24 @@ criterion is 0.1.
 With `matching` each item uses the persons who answered it and have a score. lordif's workflow, in one pass, is a
 composition: `calibrate` a graded response model, `abilityEstimates` for theta, and pass theta as `matching`, as in the
 example above. A matching score that is not a sum of items cannot lose items to purification.
+
+### Logistic discriminant function
+
+`logisticDiscriminantDif` turns the regression around (Miller and Spray, 1993): it predicts the group, G = 1 for the
+focal group, from the matching score S and the item's response Y, its integer score, so an item of any number of
+categories enters as one predictor.
+
+| Model | Log odds of the focal group |
+| ----- | --------------------------- |
+| 0     | β0 + β1 S                   |
+| 1     | β0 + β1 S + β2 Y            |
+| 2     | β0 + β1 S + β2 Y + β3 S Y   |
+
+The tests are the `LikelihoodRatioTest`s of [logistic regression](#logistic-regression): `uniform` (1 vs 0) and
+`nonuniform` (2 vs 1) with 1 degree of freedom and `both` (2 vs 0) with 2, whatever the number of categories, and
+Nagelkerke's R² change with the intercept alone as D0. The regressions are fitted by `logisticRegressionDif`'s Newton
+method. Its options, persons and `null` tests are those of [ordinal logistic regression](#ordinal-logistic-regression),
+`matching` included; a test whose model has collinear terms is `null` too.
 
 ## SIBTEST
 
@@ -713,27 +763,31 @@ when d̄ is 0, so the test passes it centered values and adds d̄ back.
 
 Invalid input throws `DataError` naming the value found.
 
-| Error                                                            | What to do                                                                        |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| A group is not `"reference"` or `"focal"`, or one has no persons | Give one group for each person, and persons to both groups                        |
-| An item is not dichotomous, for the dichotomous statistics       | Use `mantelTest` or `ordinalLogisticRegressionDif` for items with more categories |
-| `purify` with `matching`                                         | Purify the total score, or give the matching score and leave `purify` off         |
-| A matching score is not a finite number                          | Give `null` for a person to leave out                                             |
-| `smallCell` is below 2, or `guessing` is 1 or more               | Give an integer from 2, and a guessing parameter from 0 to below 1                |
-| A bundle is empty, or names an unknown item or one item twice    | Give each bundle its distinct items, by their ids in the matrix                   |
+| Error                                                                                                      | What to do                                                                                           |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| A group is not `"reference"` or `"focal"`, or one has no persons                                           | Give one group for each person, and persons to both groups                                           |
+| An item is not dichotomous, for the dichotomous statistics                                                 | Use `mantelTest` or `ordinalLogisticRegressionDif` for items with more categories                    |
+| `purify` with `matching`                                                                                   | Purify the total score, or give the matching score and leave `purify` off                            |
+| A matching score is not a finite number                                                                    | Give `null` for a person to leave out                                                                |
+| `smallCell` is below 2, or `guessing` is 1 or more                                                         | Give an integer from 2, and a guessing parameter from 0 to below 1                                   |
+| A bundle is empty, or names an unknown item or one item twice                                              | Give each bundle its distinct items, by their ids in the matrix                                      |
+| Raju's area with a model other than the 2PL                                                                | Use `lordChiSquare` for the 3PL and 4PL, or `irtLikelihoodRatioDif` for any model                    |
+| IRT likelihood-ratio DIF with fewer than two items, or the Gauss-Hermite rule                              | Give at least two items, and the rectangular rule, which the focal group's normal distribution needs |
+| Differential functioning with lists of other items or order, or a population whose weights do not sum to 1 | Give the same items in the same order in both lists, and a distribution of theta                     |
 
 ## Differences from difR
 
-| Topic                 | This package                                                        | difR                                                                                                          |
-| --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Continuity correction | Subtracted when \|Σ (A - E(A))\| ≥ 0.5, as `mantelhaen.test`        | Always subtracted: identical groups get (0.5)² / Σ Var(A), not 0                                              |
-| ETS categories        | ETS's rule with its significance tests                              | `print` codes \|MH D-DIF\| alone: below 1 A, below 1.5 B, else C                                              |
-| Lord's calibrations   | EM to `tolerance`                                                   | ltm's default control, 40 EM cycles then BFGS, stops short: up to 2% in χ²                                    |
-| Lord's 1PL            | Not supported: `oneParameterLogistic` estimates a common a          | a fixed at 1                                                                                                  |
-| Lord's purification   | Stops before fewer than 2 anchors are left, and `converged` says so | Rescales on the items not flagged, whose spread is undefined for fewer than two                               |
-| Raju's unsigned area  | The area between the curves, at least 0                             | Negative where the focal slope is the lower: the expression inside the absolute value, `integrate` shows      |
-| Raju's p-value        | Two-sided, 2 (1 - Φ(\|z\|))                                         | 2 (1 - Φ(z)), above 1 for a negative z; its flags and adjusted p-values use \|z\|                             |
-| Missing responses     | The scaled matching score of each item's persons                    | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect |
+| Topic                      | This package                                                                                                                   | difR                                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Continuity correction      | Subtracted when \|Σ (A - E(A))\| ≥ 0.5, as `mantelhaen.test`                                                                   | Always subtracted: identical groups get (0.5)² / Σ Var(A), not 0                                                                                           |
+| ETS categories             | ETS's rule with its significance tests                                                                                         | `print` codes \|MH D-DIF\| alone: below 1 A, below 1.5 B, else C                                                                                           |
+| Lord's calibrations        | EM to `tolerance`                                                                                                              | ltm's default control, 40 EM cycles then BFGS, stops short: up to 2% in χ²                                                                                 |
+| Lord's 1PL                 | Not supported: `oneParameterLogistic` estimates a common a                                                                     | a fixed at 1                                                                                                                                               |
+| Liu-Agresti standard error | Equation 3 of Liu and Agresti: on 1,000 seeded sets its mean is the spread of ln ψ̂ within 5%, the same with the groups swapped | `liu_agresti_ccor(se = "liu_agresti")` is another estimate, 1.69 times the spread with the focal group first and 0.37 times with the reference group first |
+| Lord's purification        | Stops before fewer than 2 anchors are left, and `converged` says so                                                            | Rescales on the items not flagged, whose spread is undefined for fewer than two                                                                            |
+| Raju's unsigned area       | The area between the curves, at least 0                                                                                        | Negative where the focal slope is the lower: the expression inside the absolute value, `integrate` shows                                                   |
+| Raju's p-value             | Two-sided, 2 (1 - Φ(\|z\|))                                                                                                    | 2 (1 - Φ(z)), above 1 for a negative z; its flags and adjusted p-values use \|z\|                                                                          |
+| Missing responses          | The scaled matching score of each item's persons                                                                               | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect                                              |
 
 ## Differences from mirt
 

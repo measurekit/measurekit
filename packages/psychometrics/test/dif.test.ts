@@ -15,6 +15,7 @@ import {
   irtLikelihoodRatioDif,
   type LogisticItem,
   type LogisticRegressionDif,
+  logisticDiscriminantDif,
   logisticRegressionDif,
   lordChiSquare,
   type MantelHaenszel,
@@ -44,6 +45,7 @@ import fixture from "./fixtures/dif.json" with { type: "json" };
 import irtFixture from "./fixtures/dif-irt.json" with { type: "json" };
 import lordPurification from "./fixtures/dif-lord-purification.json" with { type: "json" };
 import polytomous from "./fixtures/dif-polytomous.json" with { type: "json" };
+import polytomousTests from "./fixtures/dif-polytomous-tests.json" with { type: "json" };
 import sibtestFixture from "./fixtures/dif-sibtest.json" with { type: "json" };
 
 // Tolerances against R, explained in docs/validation.md.
@@ -75,6 +77,10 @@ const LIKELIHOOD_RATIO_TOLERANCE = 1e-5;
 const LATENT_TOLERANCE = 1e-4;
 /** NCDIF, CDIF and DTF against DFIT: the same sums over the same nodes. */
 const FUNCTIONING_TOLERANCE = 1e-12;
+/** The logistic discriminant function's chi-squares, significances and R² changes against glm. */
+const DISCRIMINANT_TOLERANCE = 1e-8;
+/** Liu and Agresti's odds ratio, relative, its standard error, z and significance against difR and base R. */
+const LIU_AGRESTI_TOLERANCE = 1e-10;
 
 /** Item 1 everyone answered correctly; items 2 and 3 vary. */
 const CONSTANT_ROWS = [
@@ -878,6 +884,21 @@ describe("mantelHaenszel", () => {
   });
 });
 
+/** Liu and Agresti's statistics of a fixture, by statistic, then item. */
+type LiuAgrestiFixture = Readonly<
+  Record<"oddsRatio" | "logStandardError" | "z" | "significance", readonly (number | null)[]>
+>;
+
+function expectLiuAgresti(actual: readonly MantelTest[], expected: LiuAgrestiFixture): void {
+  actual.forEach(({ liuAgresti }, i) => {
+    const oddsRatio = expected.oddsRatio[i] ?? null;
+    expectClose(liuAgresti?.oddsRatio ?? null, oddsRatio, LIU_AGRESTI_TOLERANCE * (oddsRatio ?? 1), `ψ ${i + 1}`);
+    expectClose(liuAgresti?.logStandardError ?? null, expected.logStandardError[i] ?? null, LIU_AGRESTI_TOLERANCE);
+    expectClose(liuAgresti?.z ?? null, expected.z[i] ?? null, LIU_AGRESTI_TOLERANCE, `z ${i + 1}`);
+    expectClose(liuAgresti?.significance ?? null, expected.significance[i] ?? null, LIU_AGRESTI_TOLERANCE);
+  });
+}
+
 describe("mantelTest", () => {
   for (const dataset of polytomous.cases) {
     it(`matches base R's Mantel and generalized Mantel-Haenszel statistics on ${dataset.name} data`, () => {
@@ -902,6 +923,55 @@ describe("mantelTest", () => {
       expectPurification(purified.purification, sparse.purifiedMantel);
     });
   }
+
+  for (const [name, expected] of Object.entries(polytomousTests.cases)) {
+    it(`matches difR's Liu-Agresti odds ratio and Liu and Agresti's standard error on ${name} data`, () => {
+      const { matrix, groups: caseGroups } = fixtureCase(expected.input);
+      expectLiuAgresti(mantelTest(matrix, caseGroups).items, expected.liuAgresti);
+      const purifiedLiuAgresti = "purifiedLiuAgresti" in expected ? expected.purifiedLiuAgresti : undefined;
+      if (purifiedLiuAgresti === undefined) return;
+      const purified = mantelTest(matrix, caseGroups, { purify: true });
+      expectLiuAgresti(purified.items, purifiedLiuAgresti);
+      expect(purified.purification?.anchors).toEqual(purifiedLiuAgresti.anchors.map((index) => `item${index}`));
+    });
+  }
+
+  it("gives the Mantel-Haenszel odds ratio as the Liu-Agresti odds ratio of dichotomous items", () => {
+    for (const dataset of fixture.cases) {
+      const matrix = responseMatrix(dataset.sparse.responses);
+      const mantel = mantelTest(matrix, groups(dataset.focal)).items;
+      mantelHaenszel(matrix, groups(dataset.focal)).items.forEach((item, i) => {
+        expectClose(mantel[i]?.liuAgresti?.oddsRatio ?? null, item.oddsRatio, 1e-12 * (item.oddsRatio ?? 1));
+      });
+    }
+  });
+
+  it("keeps the standard error when the groups swap, where difR's depends on their order", () => {
+    const expected = polytomousTests.cases.bfi;
+    const { matrix, groups: caseGroups } = fixtureCase(expected.input);
+    const swapped = caseGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
+    const forward = mantelTest(matrix, caseGroups).items;
+    mantelTest(matrix, swapped).items.forEach((item, i) => {
+      const { oddsRatio = 0, logStandardError = null } = forward[i]?.liuAgresti ?? {};
+      expectClose(item.liuAgresti?.oddsRatio ?? null, 1 / oddsRatio, 1e-12 / oddsRatio);
+      expectClose(item.liuAgresti?.logStandardError ?? null, logStandardError, 1e-12);
+      const difr = expected.liuAgresti.difrStandardError[i] ?? 0;
+      const reversed = expected.liuAgresti.difrReversedStandardError[i] ?? 0;
+      expect(Math.abs(difr - reversed)).toBeGreaterThan(0.01);
+    });
+    // On 1,000 seeded sets, the standard error of equation 3 is the spread of ln ψ̂ within 5%; difR's is not.
+    const { spread, equation, difr, difrReversed } = polytomousTests.monteCarlo;
+    expect(Math.abs(equation / spread - 1)).toBeLessThan(0.05);
+    expect([difr / spread, difrReversed / spread].map((ratio) => Math.abs(ratio - 1) > 0.5)).toEqual([true, true]);
+  });
+
+  it("gives no Liu-Agresti odds ratio without a score group of both groups, nor a test of a ratio of 0", () => {
+    const apart = mantelTest(responseMatrix(DISJOINT_ROWS), ["reference", "reference", "focal", "focal"]).items;
+    expect(apart[0]?.liuAgresti).toBeNull();
+    // In both score groups of DISJOINT_ROWS the focal response to item 1 is above the reference response: ψ̂ = 0.
+    const { items } = mantelTest(responseMatrix(DISJOINT_ROWS), ["reference", "focal", "reference", "focal"]);
+    expect(items[0]?.liuAgresti).toEqual({ oddsRatio: 0, logStandardError: null, z: null, significance: null });
+  });
 
   it("gives the Mantel-Haenszel chi-square without the continuity correction for dichotomous items", () => {
     const { responses, focal } = fixture.cases[0] ?? { responses: [], focal: [] };
@@ -962,6 +1032,7 @@ describe("mantelTest", () => {
       standardizedMeanDifference: 0,
       effectSize: null,
       etsCategory: null,
+      liuAgresti: null,
     });
   });
 
@@ -1138,6 +1209,94 @@ describe("ordinalLogisticRegressionDif", () => {
     ]);
     expect(() => ordinalLogisticRegressionDif(missing, ["reference", "focal"])).toThrow(
       "Ordinal logistic regression DIF needs persons with responses in both groups.",
+    );
+  });
+});
+
+describe("logisticDiscriminantDif", () => {
+  it("gives the values of the guide's polytomous sample, with the Mantel test's Liu-Agresti odds ratio", () => {
+    const random = createRandom(2026);
+    const items = simulateItems(gradedResponse, 10, random, { categoryCount: 4 });
+    const shifted = items.map((item, j) =>
+      j === 2 ? { ...item, parameters: { ...item.parameters, b: item.parameters.b.map((b) => b + 1) } } : item,
+    );
+    const reference = simulateResponses(items, simulateThetas(500, random), random);
+    const focal = simulateResponses(shifted, simulateThetas(500, random), random);
+    const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+    const sampleGroups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+    const odds = defined(mantelTest(matrix, sampleGroups).items[2]?.liuAgresti);
+    expect([odds.oddsRatio, odds.logStandardError, odds.z].map((value) => shown(value, 3))).toEqual([
+      3.89, 0.144, 9.47,
+    ]);
+    expect(shown(odds.significance, 2)).toBe(2.8e-21);
+    const { uniform } = defined(logisticDiscriminantDif(matrix, sampleGroups).items[2]);
+    expect([shown(uniform.chiSquare, 3), shown(uniform.significance, 2), shown(uniform.rSquaredChange, 3)]).toEqual([
+      98.1, 4e-23, 0.124,
+    ]);
+  });
+
+  for (const [name, expected] of Object.entries(polytomousTests.cases)) {
+    it(`matches base R's glm on ${name} data, purified and not`, () => {
+      const { matrix, groups: caseGroups } = fixtureCase(expected.input);
+      const result = logisticDiscriminantDif(matrix, caseGroups);
+      expect(result.purification).toBeNull();
+      expectLogistic(result.items, expected.discriminant, DISCRIMINANT_TOLERANCE);
+      const purified = logisticDiscriminantDif(matrix, caseGroups, { purify: true });
+      expectLogistic(purified.items, expected.purifiedDiscriminant, DISCRIMINANT_TOLERANCE);
+      expectPurification(purified.purification, expected.purifiedDiscriminant);
+    });
+  }
+
+  for (const [name, expected] of Object.entries(polytomousTests.cases)) {
+    if (!("discriminantTheta" in expected)) continue;
+    it(`matches base R's glm on ${name} data matched on theta`, () => {
+      const dataset = defined(polytomous.cases.find((candidate) => candidate.name === expected.input.case));
+      const matching = expected.input.sparse ? dataset.sparse.theta : dataset.theta;
+      const { matrix, groups: caseGroups } = fixtureCase(expected.input);
+      const { items } = logisticDiscriminantDif(matrix, caseGroups, { matching });
+      expectLogistic(items, expected.discriminantTheta, DISCRIMINANT_TOLERANCE);
+    });
+  }
+
+  it("enters the response as one numeric predictor, so its tests have 1, 1 and 2 degrees of freedom", () => {
+    const { matrix, groups: caseGroups } = fixtureCase(polytomousTests.cases.bfi.input);
+    const item = defined(logisticDiscriminantDif(matrix, caseGroups).items[0]);
+    expect([item.uniform, item.nonuniform, item.both].map((test) => test.degreesOfFreedom)).toEqual([1, 1, 2]);
+  });
+
+  it("gives null tests for an item answered alike, by one group, or with one matching score", () => {
+    const { items } = logisticDiscriminantDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS);
+    expect(items[0]?.both).toEqual({ chiSquare: null, degreesOfFreedom: 2, significance: null, rSquaredChange: null });
+    expect(items[1]?.uniform.chiSquare).not.toBeNull();
+    const matching = CONSTANT_ROWS.map(() => 1);
+    for (const item of logisticDiscriminantDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS, { matching }).items) {
+      expect(item.both.chiSquare).toBeNull();
+    }
+    const rows = CONSTANT_ROWS.map((row, person) => [
+      row[0] ?? null,
+      person < 3 ? (row[1] ?? null) : null,
+      row[2] ?? null,
+    ]);
+    expect(logisticDiscriminantDif(responseMatrix(rows), CONSTANT_GROUPS).items[1]?.uniform.chiSquare).toBeNull();
+  });
+
+  it("rejects purify with matching, a matching score that is not finite, and options of other types", () => {
+    const matrix = responseMatrix(CONSTANT_ROWS);
+    const matching = CONSTANT_ROWS.map(() => 0);
+    expect(() => logisticDiscriminantDif(matrix, CONSTANT_GROUPS, { matching, purify: true })).toThrow(
+      "The option purify purifies the total score, so it cannot be used with the option matching.",
+    );
+    expect(() =>
+      logisticDiscriminantDif(matrix, CONSTANT_GROUPS, { matching: [...matching.slice(1), Number.NaN] }),
+    ).toThrow('The matching score of person "person6" must be a finite number or null, found NaN.');
+    expect(() => logisticDiscriminantDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => logisticDiscriminantDif(matrix, CONSTANT_GROUPS, { matching: JSON.parse("{}") })).toThrow(
+      "The option matching must be an array",
+    );
+    expect(() => logisticDiscriminantDif(matrix, JSON.parse('"focal"'))).toThrow(
+      'The groups must be an array, found "focal".',
     );
   });
 });
@@ -1592,6 +1751,34 @@ describe("properties", () => {
     irtLikelihoodRatioDif(subset, swapped, options).items.forEach((item, i) => {
       expectClose(item.chiSquare, forward[i]?.chiSquare ?? null, LIKELIHOOD_RATIO_TOLERANCE);
     });
+  });
+
+  it("swapping the groups inverts the Liu-Agresti odds ratio, and so does reversing the categories", () => {
+    const rows = fc.tuple(fc.integer({ min: 4, max: 30 }), fc.integer({ min: 1, max: 4 })).chain(([persons, items]) =>
+      fc.array(fc.array(fc.integer({ min: 0, max: 3 }), { minLength: items, maxLength: items }), {
+        minLength: persons,
+        maxLength: persons,
+      }),
+    );
+    fc.assert(
+      fc.property(rows, fc.array(fc.boolean(), { minLength: 30, maxLength: 30 }), (matrixRows, focal) => {
+        const rowGroups = matrixRows.map((_, i): DifGroup => (focal[i] === true ? "focal" : "reference"));
+        const swapped = rowGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
+        const reversed = matrixRows.map((row) => row.map((response) => 3 - response));
+        const forward = mantelTest(responseMatrix(matrixRows), rowGroups).items;
+        const others = [
+          mantelTest(responseMatrix(matrixRows), swapped).items,
+          mantelTest(responseMatrix(reversed), rowGroups).items,
+        ];
+        forward.forEach(({ liuAgresti }, i) => {
+          for (const other of others) {
+            const inverse = other[i]?.liuAgresti;
+            if (!liuAgresti || !inverse || liuAgresti.oddsRatio === 0 || inverse.oddsRatio === 0) continue;
+            expect(liuAgresti.oddsRatio * inverse.oddsRatio).toBeCloseTo(1, 10);
+          }
+        });
+      }),
+    );
   });
 
   it("identical items have no differential functioning", () => {

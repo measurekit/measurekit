@@ -100,6 +100,14 @@ export const RULES: readonly Rule[] = [
     titles: "differ in their items or order",
   },
   {
+    rule: "A score group with persons of one group adds nothing to the standard error of Liu and Agresti, which divides by each group's persons.",
+    file: "packages/psychometrics/src/dif/liu-agresti.ts",
+    find: "if (reference === 0 || focal === 0) continue;",
+    replace: "",
+    test: "packages/psychometrics/test/dif.test.ts",
+    titles: "Liu and Agresti's standard error",
+  },
+  {
     rule: "Every category below an item's highest response has a response.",
     file: "packages/psychometrics/src/irt/responses.ts",
     find: "if (counts.size <= highest) {",
