@@ -1,10 +1,10 @@
 # Item and person fit
 
 `@measurekit/psychometrics/fit` checks how well items and persons fit an [IRT model](irt.md): Rasch infit and
-outfit, the S-X² item fit statistic, the RMSD of items, the lz person fit statistic, Yen's Q3 and Chen and Thissen's
+outfit, the S-X² item fit statistic, the RMSD of items, the lz person fit statistic and Snijders' lz*, Yen's Q3 and Chen and Thissen's
 chi-square for local dependence, the fit of a whole calibration by M2, M2* and C2 with RMSEA, SRMSR, TLI and CFI,
 the Andersen, Martin-Löf and Wald tests of the Rasch family, and kernel-smoothed item curves to inspect an item's shape.
-Each is validated against eRm, mirt, TAM or KernSmoothIRT ([validation](validation.md)).
+Each is validated against eRm, mirt, TAM, PerFit or KernSmoothIRT ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
@@ -12,7 +12,7 @@ flowchart LR
   I --> S["summedScoreFit: S-X²"]
   I --> D["Over a population of theta: rootMeanSquareDeviation, localDependenceChiSquare"]
   I --> R["With one theta per person: itemFit, personFit, yenQ3"]
-  R --> A["Infit and outfit, lz, Q3"]
+  R --> A["Infit and outfit, lz, lz*, Q3"]
   M --> C["A calibration of the matrix"]
   C --> L["limitedInformationFit: M2, RMSEA, SRMSR, TLI, CFI"]
   M --> T["Conditional maximum likelihood in parts of the matrix"]
@@ -34,6 +34,7 @@ alone, as they estimate the items themselves, and so do the kernel curves, which
 | ----------------------------------------------- | ----------------------------- | ----------------------------------------------------------- |
 | `itemFit(matrix, items, thetas)`                | item: `ItemFit`               | Persons without an extreme score; missing responses skipped |
 | `personFit(matrix, items, thetas)`              | person: `PersonFit`           | Each person's answered items                                |
+| `correctedPersonFit(matrix, items, thetas, …)`  | person: `CorrectedPersonFit`  | Each person's answered items; none of an extreme score      |
 | `summedScoreFit(matrix, items)`                 | item: `SummedScoreFit`        | Persons who answered every item                             |
 | `yenQ3(matrix, items, thetas)`                  | pair of items: a matrix entry | For each pair, the persons who answered both                |
 | `rootMeanSquareDeviation(matrix, items, …)`     | item: `ItemDeviation`         | Persons with a response                                     |
@@ -172,6 +173,51 @@ mirt's `personfit` computes `Zh`. With l0 = Σ ln P(x) over the answered items:
 - lz = (l0 - E(l0)) / √Var(l0), `null` when the variance is 0.
 
 lz is about N(0, 1) under fit at the true theta; large negative values flag unexpected patterns.
+
+### lz*
+
+At an estimated theta lz is not N(0, 1): its variance shrinks, to 0.91 on the simulation below. `correctedPersonFit`
+gives Snijders' (2001) lz* of dichotomous items, which corrects for the estimate, as PerFit's `lzstar`. The Smarter
+Balanced technical reports of South Dakota and Connecticut flag students by lz in data forensics, citing Snijders for
+its null distribution.
+
+| Option      | Default                | Meaning                                                                                                  |
+| ----------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `estimator` | `"maximum-likelihood"` | The estimator of the thetas given: `"maximum-likelihood"`, `"weighted-likelihood"` or `"posterior-mode"` |
+| `prior`     | N(0, 1)                | The prior of `"posterior-mode"`, `{ mean, sd }`, as the estimator took it                                |
+
+With P the probability of a correct response at the person's theta, Q = 1 - P, P' and P'' its derivatives,
+w = ln(P / Q) and r = P' / (P Q), over the answered items:
+
+- W = Σ (x - P) w, c = Σ P' w / Σ P' r, and w̃ = w - c r;
+- r₀ = 0 for maximum likelihood, Σ P' P'' / (P Q) over 2 Σ P'² / (P Q) for Warm's weighted likelihood, and (μ - θ) / σ²
+  for the posterior mode under N(μ, σ²);
+- lz* = (W + c r₀) / √(Σ w̃² P Q), `null` for an extreme score or without variance.
+
+```ts
+import { correctedPersonFit } from "@measurekit/psychometrics/fit";
+import {
+  createRandom,
+  simulateItems,
+  simulateResponses,
+  simulateThetas,
+  twoParameterLogistic,
+  weightedLikelihoodEstimate,
+} from "@measurekit/psychometrics";
+
+// The simulation of the Mokken guide's Guttman errors: 8 2PL items, 400 persons, at Warm's estimates.
+const random = createRandom(11);
+const items = simulateItems(twoParameterLogistic, 8, random);
+const matrix = simulateResponses(items, simulateThetas(400, random), random);
+const thetas = matrix.responses.map((row) => weightedLikelihoodEstimate(items, row).theta);
+const fit = correctedPersonFit(matrix, items, thetas, { estimator: "weighted-likelihood" });
+fit[0]; // { id: "person1", standardized: 1.20 }
+fit[217]; // { id: "person218", standardized: -2.66 }: that guide's outlier
+```
+
+On 5,000 seeded persons and 30 2PL items that fit, at their maximum likelihood estimates, lz* has a standard deviation of
+0.998 where lz has 0.914; its mean is 0.098, falling as items are added, to 0.073 at 60 and 0.045 at 100, as the
+correction is of the first order. The nonparametric indices normed G, U3 and Ht are in [mokken](mokken.md#person-fit).
 
 ## Local dependence
 
@@ -429,6 +475,7 @@ Invalid input throws `DataError` naming the value found.
 | A conditional maximum likelihood error                    | As in [irt](irt.md#conditional-maximum-likelihood): a category no person used           |
 | Kernel curves of an item without a response in a category | Recode the item's categories so that each from 0 to the highest has a response          |
 | Kernel curves of fewer than two persons with a response   | Give the responses of two persons or more                                               |
+| lz* of an item of more than two categories                | lz* is for dichotomous items; `personFit`'s lz takes any model                          |
 
 ## Differences from the references
 
@@ -455,6 +502,7 @@ Invalid input throws `DataError` naming the value found.
 | RMSD of an item with a category no person chose        | The deviations averaged over the item's categories                                               | CDM averages over the categories chosen                                                                                                                                                                                                            |
 | Persons without responses in the RMSD                  | Left out of f, the mean posterior                                                                | TAM's `pi.k` averages the prior of such a person too                                                                                                                                                                                               |
 | A pair whose observed gamma is undefined               | The chi-square, with `cramersV` `null`                                                           | mirt gives `NaN` for both                                                                                                                                                                                                                          |
+| lz* with missing responses                             | Every sum over the answered items                                                                | PerFit's `lzstar` sums W over the answered items but the variance and the correction over every item; it rounds to 4 decimals                                                                                                                      |
 | Standard errors of kernel curves                       | Ramsay's √(Σ w² P (1 - P)) / Σ w, with the curve's P                                             | KernSmoothIRT's `ksIRT` takes for P the running sum of the weighted responses up to each person, so its errors depend on the order of the persons: from 0.006 to 60,000 times Ramsay's on the fixtures                                             |
 | A missing response in kernel curves                    | The person leaves the item's averages                                                            | `ksIRT` makes it an option of its own, of score 0, whose curve the others share the node with                                                                                                                                                      |
 | A bandwidth that underflows every weight               | The weights relative to the nearest person's                                                     | `ksIRT` gives the curve 0 at that node                                                                                                                                                                                                             |
@@ -474,6 +522,7 @@ Invalid input throws `DataError` naming the value found.
 - **M2 with covariates, testlets or an empirical histogram.** Outside the sources: options of mirt; the normal population
   is the practice.
 - **Fit on two- and three-way margins.** Outside the sources: `limitedInformationFit` is the practice.
+- **Person-fit cutoffs by simulation.** No fit: a loop over `simulateResponses` and `correctedPersonFit`.
 - **Quadratic and uniform kernels.** Outside the sources: options of KernSmoothIRT, whose default is the Gaussian.
 - **A bandwidth by cross-validation.** Outside the sources: an option of KernSmoothIRT, whose default is Silverman's
   rule.

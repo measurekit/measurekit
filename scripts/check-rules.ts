@@ -212,6 +212,22 @@ export const RULES: readonly Rule[] = [
     titles: "reject cuts that do not increase, and invalid levels and rates",
   },
   {
+    rule: "lz* takes dichotomous items alone, so that a third category is not read as a wrong response.",
+    file: "packages/psychometrics/src/fit/corrected-person-fit.ts",
+    find: "if (count !== 2) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "rejects polytomous items, unknown estimators and invalid priors, and arguments of other types",
+  },
+  {
+    rule: "The person fit indices of Mokken take 0/1 responses alone, so that a score of 2 is not read as a pass.",
+    file: "packages/psychometrics/src/mokken/person-scalability.ts",
+    find: 'checkDichotomous(matrix, "Person scalability");',
+    replace: "",
+    test: "packages/psychometrics/test/mokken.test.ts",
+    titles: "rejects responses other than 0 and 1, and arguments of other types",
+  },
+  {
     rule: "A limited-information statistic stops at 60 items, before the moments, whose matrix grows with their fourth power.",
     file: "packages/psychometrics/src/fit/limited-information.ts",
     find: "if (items.length > MAX_MOMENT_ITEMS) {",

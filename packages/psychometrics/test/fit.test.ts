@@ -7,8 +7,10 @@ import {
   type Calibration,
   type ConditionalModel,
   calibrate,
+  correctedPersonFit,
   createRandom,
   DataError,
+  generalizedPartialCredit,
   type IrtItem,
   type IrtModel,
   type ItemSplit,
@@ -18,6 +20,7 @@ import {
   limitedInformationFit,
   localDependenceChiSquare,
   martinLofTest,
+  maximumLikelihoodEstimate,
   nominalResponse,
   oneParameterLogistic,
   personFit,
@@ -30,12 +33,15 @@ import {
   simulateResponses,
   simulateThetas,
   summedScoreFit,
+  threeParameterLogistic,
   twoParameterLogistic,
   uniformDistribution,
   yenQ3,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
+import cat3pl from "./fixtures/cat-3pl.json" with { type: "json" };
+import correctedFit from "./fixtures/fit-corrected-person-fit.json" with { type: "json" };
 import kernelCurves from "./fixtures/fit-kernel-curves.json" with { type: "json" };
 import limited from "./fixtures/fit-limited-information.json" with { type: "json" };
 import localDependence from "./fixtures/fit-local-dependence.json" with { type: "json" };
@@ -62,6 +68,8 @@ const RASCH_STATISTIC_TOLERANCE = 1e-6;
 const RASCH_WALD_TOLERANCE = 1e-3;
 /** Andersen's statistic against base R's conditional likelihood, maximized by optim to 1e-15. */
 const RASCH_BASE_TOLERANCE = 1e-8;
+/** lz* against the base R write-up of PerFit's lzstar, unrounded: the same sums in another order. */
+const CORRECTED_TOLERANCE = 1e-12;
 /** Kernel curves, their nodes and standard errors against KernSmoothIRT and base R: the same sums. */
 const KERNEL_TOLERANCE = 1e-12;
 
@@ -324,6 +332,107 @@ describe("personFit", () => {
     expect(result[0]).toMatchObject({ infitMeanSquare: null, outfitMeanSquare: null });
     expectClose(result[0]?.standardizedLogLikelihood ?? null, Math.sqrt((2 * (1 - p)) / p), 1e-15);
     expect(result[1]).toMatchObject({ infitMeanSquare: null, standardizedLogLikelihood: null });
+  });
+});
+
+describe("correctedPersonFit", () => {
+  const sat12 = defined(residuals.cases.find((candidate) => candidate.name === "SAT12 2PL"));
+  const threePl: IrtItem[] = cat3pl.items.slice(0, 25).map(({ id: _, ...parameters }) => ({
+    model: threeParameterLogistic,
+    parameters,
+  }));
+
+  for (const fixture of correctedFit.cases) {
+    it(`matches PerFit's lzstar, unrounded, for ${fixture.name}`, () => {
+      const three = fixture.name.startsWith("3PL");
+      const matrix = responseMatrix(three ? correctedFit.threePl.responses : sat12.responses);
+      const estimator = defined(
+        (["maximum-likelihood", "weighted-likelihood", "posterior-mode"] as const).find(
+          (name) => name === fixture.estimator,
+        ),
+      );
+      const result = correctedPersonFit(matrix, three ? threePl : fixtureItems(sat12.items), fixture.thetas, {
+        estimator,
+        prior: fixture.prior,
+      });
+      result.forEach((person, i) => {
+        expectClose(person.standardized, fixture.standardized[i] ?? null, CORRECTED_TOLERANCE, `person ${i + 1}`);
+      });
+    });
+  }
+
+  it("is about N(0, 1) at estimated thetas where the items fit", () => {
+    // From the design, set before the first run: a standard deviation within 0.05 of 1 on 5,000 persons. The mean is
+    // 0.098 on 30 items, 0.073 on 60 and 0.045 on 100, as Snijders' correction is of the first order: held below 0.15.
+    const { matrix, items: pool } = simulated(20261103, 5000, 30);
+    const thetas = matrix.responses.map((row) => maximumLikelihoodEstimate(pool, row).theta);
+    const values = correctedPersonFit(matrix, pool, thetas).flatMap(({ standardized }) =>
+      standardized === null ? [] : [standardized],
+    );
+    const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+    const variance = values.reduce((sum, value) => sum + (value - average) ** 2, 0) / (values.length - 1);
+    expect(Math.abs(Math.sqrt(variance) - 1)).toBeLessThan(0.05);
+    expect(Math.abs(average)).toBeLessThan(0.15);
+  });
+
+  it("skips missing responses, as if the item had not been given", () => {
+    const { matrix, items: pool } = simulated(49, 40, 6);
+    const thetas = matrix.personIds.map((_, person) => Math.sin(person));
+    const sparse = responseMatrix(matrix.responses.map((row) => [null, ...row.slice(1)]));
+    const shorter = responseMatrix(matrix.responses.map((row) => row.slice(1)));
+    expectSameNumbers(
+      correctedPersonFit(sparse, pool, thetas, { estimator: "weighted-likelihood" }),
+      correctedPersonFit(shorter, pool.slice(1), thetas, { estimator: "weighted-likelihood" }),
+    );
+  });
+
+  it("gives nothing to an extreme score, a person without responses, or a pattern without variance", () => {
+    const result = correctedPersonFit(
+      responseMatrix([
+        [1, 1],
+        [0, null],
+        [null, null],
+        [1, 0],
+      ]),
+      HALVES,
+      [1, -1, 0, 0],
+    );
+    // At θ = 0 both items have P = 1/2, so w = ln(P / Q) = 0 and the variance is 0.
+    expect(result.map(({ standardized }) => standardized)).toEqual([null, null, null, null]);
+  });
+
+  it("corrects by the prior of the posterior mode", () => {
+    const { matrix, items: pool } = simulated(50, 30, 8);
+    const thetas = matrix.personIds.map((_, person) => Math.cos(person));
+    const standard = correctedPersonFit(matrix, pool, thetas, { estimator: "posterior-mode" });
+    const given = correctedPersonFit(matrix, pool, thetas, { estimator: "posterior-mode", prior: { mean: 0, sd: 1 } });
+    expectSameNumbers(given, standard);
+    const shifted = correctedPersonFit(matrix, pool, thetas, {
+      estimator: "posterior-mode",
+      prior: { mean: 1, sd: 2 },
+    });
+    expect(shifted.some((person, i) => person.standardized !== standard[i]?.standardized)).toBe(true);
+  });
+
+  it("rejects polytomous items, unknown estimators and invalid priors, and arguments of other types", () => {
+    const { matrix, items: pool } = simulated(51, 10, 2);
+    const thetas = matrix.personIds.map(() => 0);
+    const polytomous: IrtItem = { model: generalizedPartialCredit, parameters: { a: 1, b: [0, 1] } };
+    expect(() => correctedPersonFit(matrix, [defined(pool[0]), polytomous], thetas)).toThrow(
+      'lz* needs dichotomous items, but item "item2" has 3 categories.',
+    );
+    expect(() => correctedPersonFit(matrix, pool, thetas, JSON.parse('{ "estimator": "eap" }'))).toThrow(
+      'The option estimator must be "maximum-likelihood", "weighted-likelihood" or "posterior-mode", found "eap".',
+    );
+    expect(() => correctedPersonFit(matrix, pool, thetas, { prior: { mean: 0, sd: 0 } })).toThrow(
+      "The sd of the prior must be a positive number, found 0.",
+    );
+    expect(() => correctedPersonFit(matrix, pool, thetas, JSON.parse('{ "prior": null }'))).toThrow(
+      "The option prior must be an object { mean, sd }, found null.",
+    );
+    expect(() => correctedPersonFit(matrix, pool, thetas, JSON.parse("null"))).toThrow(DataError);
+    expect(() => correctedPersonFit(matrix, pool, JSON.parse('"0"'))).toThrow("The thetas must be an array");
+    expect(() => correctedPersonFit(JSON.parse("{}"), pool, thetas)).toThrow(DataError);
   });
 });
 

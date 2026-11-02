@@ -6,11 +6,11 @@ together, selects items into scales, checks the local independence of the items 
 total score a good measure. It suits questionnaires and attitude scales, and screens achievement items for response
 curves that fall with ability. The imputation, the Guttman errors, the coefficients and their standard errors, the item selection, the
 conditional association, the monotonicity check, the invariant item ordering check and the reliability of the total
-score are validated against the mokken package ([validation](validation.md)).
+score are validated against the mokken package, and the person fit indices against PerFit ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
-  I["twoWayImputation: missing responses"] --> E["guttmanErrors: outlying persons"]
+  I["twoWayImputation: missing responses"] --> E["guttmanErrors, personScalability: outlying persons"]
   E --> H["scalability, automatedItemSelection: scales"]
   H --> C["conditionalAssociation: local independence"]
   C --> M["monotonicity, invariantItemOrdering"]
@@ -22,13 +22,15 @@ The steps follow Sijtsma and van der Ark's (2017) ten, whose ninth, norms of the
 [`normStatistics`](scaling.md#norms) of the scaling module.
 
 Items may be dichotomous or polytomous: scores are integers, and the lowest score of all items is taken as 0, so scores
-from 1 to 5 work as scores from 0 to 4. Scores may span at most 10 categories, as in mokken. Every function uses the
-persons who answered every item, and needs at least two of them. The functions take a `ResponseMatrix`.
+from 1 to 5 work as scores from 0 to 4. Scores may span at most 10 categories, as in mokken. Every function but
+`personScalability` uses the persons who answered every item, and needs at least two of them. The functions take a
+`ResponseMatrix`.
 
 | Function                                    | Result                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------- |
 | `twoWayImputation(matrix, random, options)` | A copy of the matrix with each missing response imputed               |
 | `guttmanErrors(matrix)`                     | G+ of each person, Tukey's upper fence, and the persons above it      |
+| `personScalability(matrix)`                 | Normed G, U3 and Ht of each person, for 0/1 items                     |
 | `scalability(matrix)`                       | H, H_i and H_ij with standard errors                                  |
 | `automatedItemSelection(matrix, options)`   | Scales of items, and the items in none                                |
 | `conditionalAssociation(matrix, options)`   | The indices W1, W2 and W3, and the items and pairs they flag          |
@@ -110,6 +112,34 @@ outliers; // [217]: one person with more than 10 errors
 The order of the steps and the fence come from the persons who answered every item: a person with fewer responses has
 fewer steps to err on, and has no count. The tutorial inspects the outliers' responses and repeats the analysis without
 them, to see whether its conclusions change.
+
+## Person fit
+
+`personScalability(matrix)` gives three nonparametric person fit indices of 0/1 items, as PerFit's `Gnormed`, `U3` and
+`Ht`: the Guttman structure of the items, and H of the transposed matrix. Of the 36 statistics Karabatsos (2003)
+compared, Ht detected aberrant patterns best.
+
+| Field                 | Definition, over the person's n answered items and NC correct                                                           | Range                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `normedGuttmanErrors` | G / (NC (n - NC)): G counts the pairs of an item failed and a harder one passed, a half for a pair of equal proportions | 0, a Guttman pattern, to 1, its reverse   |
+| `u3`                  | (Σ_(first NC) λ - Σ x λ) / (Σ_(first NC) λ - Σ_(last NC) λ), λ = ln(p / (1 - p)) of the items, ordered from the largest | 0 to 1, as G                              |
+| `ht`                  | Cov(x_n, Σ_(m ≠ n) x_m) over the items, against Σ_(m ≠ n) min(p_n, p_m) - p_n p_m, p the persons' proportions correct   | At most 1; low or negative flags a misfit |
+
+Items are ordered by their proportions correct over the persons who answered them, PerFit's `"Pairwise"`, and each
+person's indices use the items the person answered; Ht's other persons are those of a score between the extremes. An
+item that every person who answered it passed, or failed, has λ = 0, as in PerFit. A person of an extreme score, every
+answered item wrong or right, has none of the three, and Ht has none without another such person. On complete data G
+is `guttmanErrors`' G+ over its largest value.
+
+```ts continues
+import { personScalability } from "@measurekit/psychometrics/mokken";
+
+const fit = personScalability(matrix);
+fit[0]; // { id: "person1", normedGuttmanErrors: 0.067, u3: 0.025, ht: 0.53 }
+fit[217]; // { id: "person218", normedGuttmanErrors: 0.75, u3: 0.66, ht: -0.19 }: the outlier above
+```
+
+The parametric lz and lz*, which need calibrated items, are in [fit](fit.md#lz).
 
 ## Scalability
 
@@ -443,6 +473,9 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
 - **The adjusted boxplot of G+.** Outside the sources: Tukey's fence is the tutorial's rule, which mentions the adjusted
   boxplot for skewed counts.
 - **The O+ outlier score.** Outside the sources: the tutorial uses G+.
+- **Polytomous U3 and normed G.** Outside the sources: variants of the dichotomous indices that `personScalability`
+  builds.
+- **The caution index C, the modified caution index, NCI, A, D and E.** Outside the sources: beside G, U3 and Ht, which are the practice.
 - **Two-level scalability for clustered persons, such as raters.** Outside the sources: a multilevel option of mokken
   (`MLcoefH`).
 
@@ -458,6 +491,7 @@ Invalid input throws `DataError` naming the value found.
 | The minimum group size is more than half of the persons                                         | Lower `minimumGroupSize`, or give more persons                                                           |
 | `minimumSize` is above the persons who answered every item                                      | Lower `minimumSize`                                                                                      |
 | The total scores have no variance, for the reliability                                          | The coefficient is undefined for persons who all score alike                                             |
+| A response other than 0 and 1, for the person fit indices                                       | Dichotomize the items, or use `guttmanErrors`, whose G+ takes polytomous items                           |
 
 ## Differences from the references
 
@@ -479,3 +513,10 @@ Invalid input throws `DataError` naming the value found.
 | G+ of tied item steps                   | The mean over the orders of the tied steps, a multiple of 1/2                  | `check.errors` takes the mean over 1,000 random orders, rounded to an integer: up to 1/2 away                                                                                                                                                  |
 | The steps of `check.ca`                 | One pass; the caller removes an item and calls again                           | Removes items until nothing is flagged, breaking the last ties at random                                                                                                                                                                       |
 | Conditional association of three items  | Computed: each pair's rest score is the third item                             | `check.ca` stops, as `apply` needs at least two rest items                                                                                                                                                                                     |
+
+| Topic                                  | This package                                                         | PerFit                                                                                                                        |
+| -------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Rounding                               | None                                                                 | `Gnormed`, `U3` and `Ht` round to 4 decimals                                                                                  |
+| Normed G of items of equal proportions | The mean over their orders, a half for each pair, as `guttmanErrors` | `Gnormed` orders them by their columns                                                                                        |
+| Normed G of an extreme score           | None                                                                 | 0                                                                                                                             |
+| U3 with missing responses              | Over the person's answered items                                     | Takes the sorted log-odds at the positions of the person's answered columns, so its value changes with the order of the items |

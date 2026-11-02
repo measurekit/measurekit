@@ -10,14 +10,17 @@ import {
   invariantItemOrdering,
   molenaarSijtsmaReliability,
   monotonicity,
+  personScalability,
   type ResponseMatrix,
   responseMatrix,
   scalability,
   twoWayImputation,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
+import residuals from "./fixtures/fit-residuals.json" with { type: "json" };
 import fixture from "./fixtures/mokken.json" with { type: "json" };
 import imputation from "./fixtures/mokken-imputation.json" with { type: "json" };
+import personFixture from "./fixtures/mokken-person-scalability.json" with { type: "json" };
 import reliability from "./fixtures/mokken-reliability.json" with { type: "json" };
 import steps from "./fixtures/mokken-steps.json" with { type: "json" };
 
@@ -40,6 +43,8 @@ const ASSOCIATION_TOLERANCE = 1e-10;
 const IMPUTED_VARIANCE_TOLERANCE = 0.02;
 /** G+ against check.errors where steps tie, as it rounds a mean over 1,000 random orders of them. */
 const RANDOM_ORDER_GAP = 0.5;
+/** Normed G, U3 and Ht against PerFit and the base R write-ups: the same sums in another order. */
+const PERSON_FIT_TOLERANCE = 1e-12;
 
 interface ReferenceCheck {
   readonly id: string;
@@ -361,6 +366,108 @@ describe("guttmanErrors", () => {
     ).toThrow("needs scores from at most 10 categories");
     expect(() => guttmanErrors(JSON.parse("null"))).toThrow(DataError);
     expect(() => guttmanErrors(JSON.parse('{"itemIds": ["a"], "responses": {}}'))).toThrow(DataError);
+  });
+});
+
+describe("personScalability", () => {
+  /** The responses of a case of the fixture, from the fixture that holds them. */
+  const responsesOf = (name: string): (number | null)[][] => {
+    if (name === "SAT12 with missing responses") {
+      return defined(residuals.cases.find((candidate) => candidate.name === "SAT12 2PL")).responses;
+    }
+    return defined(fixture.cases.find((candidate) => candidate.name === name)).responses;
+  };
+
+  for (const reference of personFixture.cases) {
+    it(`gives PerFit's normed G, U3 and Ht, with tied p-values averaged, for ${reference.name}`, () => {
+      const result = personScalability(responseMatrix(responsesOf(reference.name)));
+      result.forEach((person, i) => {
+        expectClose(
+          person.normedGuttmanErrors,
+          reference.normedGuttmanErrors[i] ?? null,
+          PERSON_FIT_TOLERANCE,
+          `G ${i}`,
+        );
+        expectClose(person.u3, reference.u3[i] ?? null, PERSON_FIT_TOLERANCE, `U3 ${i}`);
+        expectClose(person.ht, reference.ht[i] ?? null, PERSON_FIT_TOLERANCE, `Ht ${i}`);
+      });
+    });
+  }
+
+  it("gives G of complete persons as guttmanErrors over its largest value", () => {
+    const rows = responsesOf("tied item steps");
+    const counts = guttmanErrors(responseMatrix(rows)).errors;
+    personScalability(responseMatrix(rows)).forEach((person, i) => {
+      const row = defined(rows[i]);
+      const correct = row.reduce<number>((sum, x) => sum + (x ?? 0), 0);
+      const largest = correct * (row.length - correct);
+      expectClose(person.normedGuttmanErrors, largest === 0 ? null : defined(counts[i]) / largest, 1e-15, `${i}`);
+    });
+  });
+
+  it("gives a Guttman pattern 0 and its reverse 1, as derived by hand", () => {
+    // Items passed by 4, 3, 2 and 2 of the persons: the fifth person's pattern reverses the second's.
+    const rows = [
+      [1, 1, 1, 0],
+      [1, 1, 0, 0],
+      [1, 0, 0, 0],
+      [1, 1, 0, 1],
+      [0, 0, 1, 1],
+      [0, 0, 0, 0],
+    ];
+    const [, guttman, , , reverse] = personScalability(responseMatrix(rows));
+    expect(guttman?.normedGuttmanErrors).toBe(0);
+    expect(guttman?.u3).toBe(0);
+    expect(reverse?.normedGuttmanErrors).toBe(1);
+    expect(reverse?.u3).toBe(1);
+  });
+
+  it("uses each person's answered items and the proportions over whoever answered", () => {
+    // Item 3's proportion is 1/2 over its two answers; the first person's items 1 and 2 hold one error in one pair.
+    const rows = [
+      [0, 1, null],
+      [1, 0, 1],
+      [1, 1, 0],
+      [1, 0, null],
+    ];
+    const [first] = personScalability(responseMatrix(rows));
+    expect(first?.normedGuttmanErrors).toBe(1);
+    expect(first?.u3).toBe(1);
+  });
+
+  it("gives nothing to an extreme score or a person without responses", () => {
+    const rows = [
+      [1, 1, 1],
+      [0, 0, null],
+      [null, null, null],
+      [1, 0, 0],
+      [0, 1, 1],
+    ];
+    const result = personScalability(responseMatrix(rows));
+    for (const person of [0, 1, 2]) {
+      expect(result[person]).toEqual({ id: `person${person + 1}`, normedGuttmanErrors: null, u3: null, ht: null });
+    }
+  });
+
+  it("gives Ht no value without another person of a score between the extremes", () => {
+    const result = personScalability(
+      responseMatrix([
+        [1, 0],
+        [1, 1],
+        [0, 0],
+      ]),
+    );
+    expect(result[0]?.ht).toBeNull();
+  });
+
+  it("rejects responses other than 0 and 1, and arguments of other types", () => {
+    expect(() => personScalability(responseMatrix([[0, 2]]))).toThrow(
+      'Person scalability needs dichotomous items, but person "person1" scored 2 on item "item2".',
+    );
+    expect(() => personScalability(JSON.parse("null"))).toThrow(DataError);
+    expect(() => personScalability(JSON.parse('{"personIds": ["a"], "itemIds": ["b"], "responses": {}}'))).toThrow(
+      DataError,
+    );
   });
 });
 
@@ -984,6 +1091,34 @@ describe("properties", () => {
       }),
     )
     .filter((rows) => (rows[0] ?? []).every((_, item) => new Set(rows.map((row) => row[item])).size === 2));
+
+  it("person fit indices lie from 0 to 1, and are 0 for every person of a Guttman matrix", () => {
+    fc.assert(
+      fc.property(matrix, (rows) => {
+        for (const { normedGuttmanErrors, u3 } of personScalability(responseMatrix(rows))) {
+          for (const value of [normedGuttmanErrors, u3]) {
+            if (value !== null) expect(value >= 0 && value <= 1).toBe(true);
+          }
+        }
+      }),
+      { numRuns: 30 },
+    );
+    const guttman = fc
+      .tuple(fc.integer({ min: 2, max: 8 }), fc.array(fc.integer({ min: 0, max: 8 }), { minLength: 3, maxLength: 40 }))
+      // A person who fails every item and one who passes every one keep each item's proportion between 0 and 1, where
+      // the log-odds that order U3 are finite.
+      .map(([items, passed]) =>
+        [0, items, ...passed].map((count) => Array.from({ length: items }, (_, item) => (item < count ? 1 : 0))),
+      );
+    fc.assert(
+      fc.property(guttman, (rows) => {
+        for (const { normedGuttmanErrors, u3 } of personScalability(responseMatrix(rows))) {
+          expect(normedGuttmanErrors ?? 0).toBe(0);
+          expect(u3 ?? 0).toBe(0);
+        }
+      }),
+    );
+  });
 
   it("imputation leaves the observed responses as they are and imputes within the bounds", () => {
     const withMissing = matrix.chain((rows) =>
