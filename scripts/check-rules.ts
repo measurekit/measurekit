@@ -284,6 +284,22 @@ export const RULES: readonly Rule[] = [
     titles: "rejects invalid scores, categories and options",
   },
   {
+    rule: "A score outside its range is refused, so that no proportion outside [0, 1] enters the true-score moments.",
+    file: "packages/psychometrics/src/standard-setting/livingston-lewis.ts",
+    find: "score >= minimum && score <= maximum",
+    replace: "true",
+    test: "packages/psychometrics/test/standard-setting.test.ts",
+    titles: "rejects invalid scores, cuts and options",
+  },
+  {
+    rule: "The rounded effective length is at most 10,000 trials, so that a reliability near 1 does not cost minutes.",
+    file: "packages/psychometrics/src/standard-setting/livingston-lewis.ts",
+    find: "trials >= 1 && trials <= MAX_EFFECTIVE_LENGTH",
+    replace: "trials >= 1",
+    test: "packages/psychometrics/test/standard-setting.test.ts",
+    titles: "effective length outside its limits",
+  },
+  {
     rule: "A starting item the pool does not have is refused, so that a misspelled id is not skipped as an ineligible one.",
     file: "packages/psychometrics/src/cat/starting-items.ts",
     find: "if (index === undefined) throw new DataError(",

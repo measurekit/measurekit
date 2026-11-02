@@ -43,6 +43,10 @@ Adaptive tests select by catR's other rules: `closestDifficulty` (bOpt), `expect
 `discriminationIndex` and `posteriorDiscriminationIndex` (GDI, GDIP), `expectedPosteriorVariance` (MEPV), and the
 progressive and proportional methods of exposure control, and `startingItems` administers fixed items before any rule.
 
+`livingstonLewisClassification` gives Livingston and Lewis's accuracy and consistency of classifications by cuts on a
+total score, from a four-parameter beta distribution of true scores and a binomial error at the effective test length,
+as `betafunctions::LL.CA` and `LL.CA.MC`.
+
 Lord's chi-square can be purified: with `purify: true` the items it flags leave the anchors of the linking, which is
 repeated on the two calibrations until two rounds flag the same items.
 

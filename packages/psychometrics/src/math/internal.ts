@@ -47,7 +47,7 @@ export { normalCdf, normalDensity } from "./normal.js";
 export { type HessianFunction, type NewtonOptions, newton } from "./optimize.js";
 export { pearsonMatrix } from "./pearson.js";
 export { pseudoInverse } from "./pseudo-inverse.js";
-export { gaussHermite, type Quadrature, rectangular } from "./quadrature.js";
+export { adaptiveIntegral, gaussHermite, type Quadrature, rectangular } from "./quadrature.js";
 export { findIncreasingRoot, findRoot } from "./root.js";
 export { type RotationMethod, type RotationOptions, resolveRotation, rotateLoadingMatrix } from "./rotation.js";
 export { correlation, covariance, sampleQuantile, standardDeviation, variance } from "./statistics.js";

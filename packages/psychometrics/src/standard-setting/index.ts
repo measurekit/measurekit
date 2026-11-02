@@ -1,6 +1,7 @@
 /**
  * Standard setting: cut scores by the modified Angoff, Bookmark, Hofstee and Beuk methods, by contrasting groups and
- * Body of Work, and the accuracy and consistency of the classifications they give.
+ * Body of Work, and the accuracy and consistency of the classifications they give, by Rudner's method on theta and by
+ * Livingston and Lewis's on total scores.
  *
  * @module @measurekit/psychometrics/standard-setting
  */
@@ -24,3 +25,10 @@ export {
   contrastingGroupsCutScores,
 } from "./contrasting-groups.js";
 export { type HofsteeBounds, type HofsteeCutScore, hofsteeCutScore } from "./hofstee.js";
+export {
+  type BetaTrueScore,
+  type CutClassification,
+  type LivingstonLewisOptions,
+  livingstonLewisClassification,
+  type ScoreClassification,
+} from "./livingston-lewis.js";

@@ -2,9 +2,11 @@
 
 `@measurekit/psychometrics/standard-setting` turns a panel's judgments into cut scores by the modified Angoff,
 Bookmark, Hofstee and Beuk methods, and the judgments of persons or of their work into cut scores by contrasting groups
-and Body of Work, and reports how accurately and consistently cuts on theta classify persons. No R package among the
-references implements them; each is validated against its definition written out in base R, with mirt's probabilities
-and expected test scores for the Bookmark method and R's `glm` for contrasting groups ([validation](validation.md)).
+and Body of Work, and reports how accurately and consistently cuts classify persons: on theta by Rudner's method, and on
+total scores by Livingston and Lewis's. No R package among the references implements the cut-score methods; each is
+validated against its definition written out in base R, with mirt's probabilities and expected test scores for the
+Bookmark method and R's `glm` for contrasting groups. The classification indices are validated against cacIRT and
+betafunctions ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
@@ -19,6 +21,7 @@ flowchart LR
   KC --> C
   GC --> C
   E["Estimates of theta and cuts on theta"] --> Q["classificationAccuracy"]
+  T["Total scores, their reliability and cuts on them"] --> L["livingstonLewisClassification"]
 ```
 
 Cut scores on the total score scale are not rounded: a person meets the standard with a total score at or above it.
@@ -195,6 +198,87 @@ const result = classificationAccuracy(
 result.persons[1]; // { category: 1, probabilities: [0.37, 0.63] }: 0.63 = Φ((0.6 - 0.5) / 0.3)
 ```
 
+## Livingston and Lewis
+
+`livingstonLewisClassification(scores, cuts, options)` takes total scores of any items, their reliability and cuts on
+the score scale, and returns Livingston and Lewis's (1995) accuracy and consistency, as betafunctions' `LL.CA` for one
+cut and `LL.CA.MC` for several. Testing programs report it with BB-CLASS, which implements it; Rudner's indices above
+suit cuts on theta with estimates and their standard errors, these suit cuts on a total score, which may sum
+polytomous items or weighted parts.
+
+```mermaid
+flowchart LR
+  S["Scores, reliability r"] --> N["Effective length N = ((μ - min)(max - μ) - r σ²) / (σ² (1 - r))"]
+  N --> M["True-score moments by Lord's binomial relation"]
+  M --> B{"Four-parameter beta permissible?"}
+  B -->|"yes"| F["Beta on [lower, upper]"]
+  B -->|"no"| T["Two-parameter beta on [0, 1]"]
+  F --> I["Integrals over the beta of binomial(round(N), p) categories"]
+  T --> I
+  I --> A["Accuracy and consistency, per cut and over all"]
+```
+
+```ts
+import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { livingstonLewisClassification } from "@measurekit/psychometrics/standard-setting";
+
+// Eight persons' answers to eight items, and their total scores.
+const answers = [
+  [1, 1, 1, 0, 1, 1, 0, 1],
+  [0, 1, 0, 0, 0, 1, 0, 0],
+  [1, 1, 1, 1, 1, 1, 1, 0],
+  [1, 0, 1, 0, 0, 1, 0, 0],
+  [0, 0, 0, 0, 1, 0, 0, 0],
+  [1, 1, 1, 1, 0, 1, 1, 1],
+  [1, 1, 0, 1, 1, 0, 1, 0],
+  [0, 1, 0, 0, 1, 1, 0, 0],
+];
+const reliability = cronbachAlpha(responseMatrix(answers)); // 0.716
+const scores = answers.map((row) => row.reduce((sum, x) => sum + x, 0));
+const result = livingstonLewisClassification(scores, [4], { reliability, maximum: 8 });
+result.accuracy; // 0.811
+result.consistency; // 0.757
+result.trueScore; // { alpha: 2.226, beta: 1.964, lower: 0, upper: 1, effectiveLength: 7.959 }: the fail-safe beta
+```
+
+| Option        | Default  | Meaning                                            |
+| ------------- | -------- | -------------------------------------------------- |
+| `reliability` | required | The reliability of the scores, above 0 and below 1 |
+| `maximum`     | required | The highest possible score                         |
+| `minimum`     | `0`      | The lowest possible score                          |
+
+| Field         | Meaning                                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `cuts`        | Per cut: `cut`, and the `accuracy` and `consistency` of the classification below it and at or above it   |
+| `accuracy`    | Over all categories: the probability that the observed category is the true one; with one cut, the cut's |
+| `consistency` | Over all categories: the probability that two independent administrations give one category              |
+| `trueScore`   | The beta's shapes `alpha`, `beta`, its bounds `lower`, `upper`, and the unrounded `effectiveLength`      |
+
+| Step        | Rule                                                                                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Proportions | Each score as (x - min) / (max - min)                                                                                                                                                      |
+| Length      | N from the mean, the variance (denominator n - 1) and the reliability, betafunctions' `ETL`; the number of items as reliable                                                               |
+| Moments     | x′ = N times the proportion; m₁ = mean(x′) / N and m_i = mean(x′₍ᵢ₎) / N₍ᵢ₎ for i = 2 to 4, descending factorials                                                                          |
+| True scores | The four-parameter beta of their mean, variance, skewness and kurtosis (Hanson, 1991)                                                                                                      |
+| Fail-safe   | Where that beta has a bound outside [0, 1], a shape at most 0 or a value not finite, the two-parameter beta on [0, 1] of the mean and variance; `lower` 0 and `upper` 1 show it            |
+| Rounding    | N to the nearest integer, halves to even, as R's `round`; only the binomial uses it                                                                                                        |
+| Cuts        | A cut c is the true cut at p = (c - min) / (max - min) and the observed cut at ⌈N p⌉: a score at or above it is above; a cut within 1e-9 of a whole number of trials counts as that number |
+| Indices     | Integrals over the beta of the binomial probability of each observed category, by adaptive Gauss-Kronrod quadrature to a relative 1e-12                                                    |
+
+A shape below 1 makes the beta's density infinite at that end, as for two separate groups of persons; the integral there
+is taken in t^α or (1 - t)^β, an exact change of variables, so that it converges. The time grows with the rounded
+effective length, which may be at most 10,000: 2 ms for 3,000 scores of 40 items, 0.2 s at 4,639 trials.
+
+| Error                                                                               | Meaning and remedy                                                                                                 |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `Livingston and Lewis need an effective test length from 1 to 10000 after rounding` | The reliability does not fit the scores' variance: check it, and the range of the scores                           |
+| `Livingston and Lewis find no true-score beta for these scores`                     | The true-score variance is at most 0, or not below m(1 - m): the reliability is too low or too high for the scores |
+| `Livingston and Lewis need scores that vary`                                        | The variance is 0, so there is no effective length                                                                 |
+
+Accuracy need not rise with the reliability: the observed cut ⌈N p⌉ moves with N, and the beta with the moments, so a
+step up in the reliability can lower it by a few ten-thousandths, in betafunctions as here.
+
 ## Recipes
 
 Three methods are one line over the functions above.
@@ -243,6 +327,21 @@ angoffCutScore([ratings]).cutScore; // 14.35
 - **The analytic judgment and other holistic methods.** Outside the sources: variants of Body of Work.
 - **Vertically moderated standards.** No fit: a policy across grades, not a statistic.
 - **Standards for alternate assessments.** No fit: a policy, not a statistic.
+- **Lee's IRT classification indices.** Outside the sources: no technical report found uses them; programs use
+  Livingston-Lewis and Rudner's, both built. cacIRT and irtQ have them.
+- **The compound multinomial method (Lee, Brennan and Wan, 2009).** Outside the sources: a research extension of
+  Livingston-Lewis for mixed formats.
+- **Nonparametric classification (Lathrop and Cheng).** Outside the sources: a research method beside Rudner's and
+  Livingston-Lewis.
+
+## Differences from betafunctions
+
+| Topic               | This package                                                                                    | betafunctions                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Integrals           | Adaptive Gauss-Kronrod to a relative 1e-12, with a change of variables where a shape is below 1 | `integrate` at R's default tolerance, 1.2e-4: up to 7e-5 off where a shape is below 1 |
+| One or several cuts | One function; each cut's indices and those over all categories                                  | `LL.CA` for one cut, `LL.CA.MC` for several                                           |
+| Fail-safe           | Always, as `failsafe = TRUE`; `lower` 0 and `upper` 1 show it                                   | A warning, and an option                                                              |
+| Specific rates      | Accuracy and consistency                                                                        | Also sensitivity, specificity, predictive values, Youden's J and kappa                |
 
 ## References
 
@@ -257,8 +356,12 @@ angoffCutScore([ratings]).cutScore; // 14.35
   criterion-referenced interpretation. Journal of Educational and Behavioral Statistics, 23, 35-56.
 - Huynh, H. (2006). A clarification on the response probability criterion RP67 for standard settings based on
   bookmark and item mapping. Educational Measurement: Issues and Practice, 25(2), 19-20.
+- Hanson, B. A. (1991). Method of moments estimates for the four-parameter beta compound binomial model and the
+  calculation of classification consistency indexes. American College Testing.
 - Kingston, N. M., Kahl, S. R., Sweeney, K. P., & Bay, L. (2001). Setting performance standards using the body of work
   method. In G. J. Cizek (Ed.), Setting performance standards (pp. 219-248). Lawrence Erlbaum.
+- Livingston, S. A., & Lewis, C. (1995). Estimating the consistency and accuracy of classifications based on test
+  scores. Journal of Educational Measurement, 32(2), 179-197.
 - Livingston, S. A., & Zieky, M. J. (1982). Passing scores. Educational Testing Service.
 - Mitzel, H. C., Lewis, D. M., Patz, R. J., & Green, D. R. (2001). The Bookmark procedure: Psychological perspectives.
   In G. J. Cizek (Ed.), Setting performance standards (pp. 249-281). Lawrence Erlbaum.
