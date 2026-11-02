@@ -26,9 +26,9 @@ const BUDGETS = {
   "kst.unionClosure": 1,
   "kst.structureBase": 0.6,
   "kst.clauseStructure": 5,
-  "evaluate.auc": 200,
-  "evaluate.metrics": 300,
-  "evaluate.metricsByOpportunity": 300,
+  "evaluate.auc": 80,
+  "evaluate.metrics": 200,
+  "evaluate.metricsByOpportunity": 200,
   "practice.recommend": 0.6,
   "data.eventLog": 200,
 } as const;

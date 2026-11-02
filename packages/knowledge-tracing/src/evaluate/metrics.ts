@@ -161,38 +161,57 @@ export function metrics(predictions: readonly number[], outcomes: readonly numbe
 
 /** Returns the AUC of 0/1 outcomes from the ranks of the predictions, midranks for ties, or `null` for one class. */
 function areaUnderCurve(predictions: readonly number[], outcomes: readonly number[]): number | null {
-  const order = Array.from(predictions.keys()).sort((a, b) => (predictions[a] ?? 0) - (predictions[b] ?? 0));
   let correct = 0;
-  let rankSum = 0;
-  for (let start = 0; start < order.length; ) {
-    const value = predictions[order[start] ?? 0];
-    let end = start + 1;
-    while (end < order.length && predictions[order[end] ?? 0] === value) end++;
-    // Ranks start + 1 to end share their mean.
-    const rank = (start + end + 1) / 2;
-    for (let k = start; k < end; k++) {
-      if (outcomes[order[k] ?? 0] === 1) {
-        correct++;
-        rankSum += rank;
-      }
-    }
-    start = end;
-  }
-  const incorrect = order.length - correct;
+  for (const outcome of outcomes) if (outcome === 1) correct++;
+  const incorrect = outcomes.length - correct;
   if (correct === 0 || incorrect === 0) return null;
-  return (rankSum - (correct * (correct + 1)) / 2) / (correct * incorrect);
+  // The predictions of correct and of incorrect outcomes sort apart by the engine's numeric sort of a typed array, and a
+  // merge of the two walks the ranks in order: several times as fast as sorting the indices through a comparator.
+  const right = new Float64Array(correct);
+  const wrong = new Float64Array(incorrect);
+  for (let k = 0, r = 0, w = 0; k < outcomes.length; k++) {
+    if (outcomes[k] === 1) right[r++] = predictions[k] ?? 0;
+    else wrong[w++] = predictions[k] ?? 0;
+  }
+  return (correctRankSum(right.sort(), wrong.sort()) - (correct * (correct + 1)) / 2) / (correct * incorrect);
 }
 
+/** Returns the sum of the ranks of the sorted predictions `right` among both lists, midranks for ties. */
+function correctRankSum(right: Float64Array, wrong: Float64Array): number {
+  let rankSum = 0;
+  for (let start = 0, r = 0, w = 0; r < right.length || w < wrong.length; ) {
+    // Predictions are probabilities, so Infinity marks a list that is used up.
+    const value = Math.min(right[r] ?? Number.POSITIVE_INFINITY, wrong[w] ?? Number.POSITIVE_INFINITY);
+    const first = r;
+    while (r < right.length && right[r] === value) r++;
+    while (w < wrong.length && wrong[w] === value) w++;
+    // Ranks start + 1 to end share their mean.
+    const end = r + w;
+    const rank = (start + end + 1) / 2;
+    for (let k = first; k < r; k++) rankSum += rank;
+    start = end;
+  }
+  return rankSum;
+}
+
+// The means below sum in order, as `mean` does, without an array of the terms.
+
 function rootMeanSquareError(predictions: readonly number[], outcomes: readonly number[]): number {
-  return Math.sqrt(mean(predictions.map((prediction, index) => (prediction - (outcomes[index] ?? 0)) ** 2)));
+  let sum = 0;
+  for (let k = 0; k < predictions.length; k++) sum += ((predictions[k] ?? 0) - (outcomes[k] ?? 0)) ** 2;
+  return Math.sqrt(sum / predictions.length);
 }
 
 function meanLogLoss(predictions: readonly number[], outcomes: readonly number[]): number {
-  return mean(predictions.map((prediction, index) => -outcomeLogLikelihood(prediction, outcomes[index] ?? 0)));
+  let sum = 0;
+  for (let k = 0; k < predictions.length; k++) sum += -outcomeLogLikelihood(predictions[k] ?? 0, outcomes[k] ?? 0);
+  return sum / predictions.length;
 }
 
 function shareRight(predictions: readonly number[], outcomes: readonly number[]): number {
-  return mean(predictions.map((prediction, index) => (prediction > 0.5 === (outcomes[index] === 1) ? 1 : 0)));
+  let right = 0;
+  for (let k = 0; k < predictions.length; k++) right += (predictions[k] ?? 0) > 0.5 === (outcomes[k] === 1) ? 1 : 0;
+  return right / predictions.length;
 }
 
 function coefficientOfDetermination(predictions: readonly number[], outcomes: readonly number[]): number | null {

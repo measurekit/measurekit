@@ -104,9 +104,8 @@ export function linkCovariance(forms: readonly CalibratedForm[], options: LinkEr
     .slice(1)
     .map((form, k) => commonPositions(form, checked[k] ?? form, `forms ${k + 1} and ${k + 2}`));
   const items = checked.map((form) => form.items);
-  const chain = (current: readonly (readonly IrtItem[])[]): ScaleTransformation =>
-    chainTransformations(pairs.map((pair, k) => linkOf(current[k + 1] ?? [], current[k] ?? [], pair, link)).reverse());
-  const transformation = chain(items);
+  const links = pairs.map((pair, k) => linkOf(items[k + 1] ?? [], items[k] ?? [], pair, link));
+  const transformation = chainTransformations([...links].reverse());
   const covariance = [0, 0, 0];
   let parameters = 0;
   checked.forEach((form, f) => {
@@ -115,7 +114,16 @@ export function linkCovariance(forms: readonly CalibratedForm[], options: LinkEr
     const used = targets.flatMap((found, k) => (found.some(({ item }) => shared.has(item)) ? [k] : []));
     parameters += used.length;
     const gradient = differenceGradient([form.items], targets, used, 2, (found, step) => {
-      const { slope, intercept } = chain(movedForm(items, f, found, step));
+      // A link depends only on the common items of its two forms, so a step that moves none of them leaves it as it
+      // was: only the links of form f whose common items it moves are minimized again, one for most steps.
+      const current = movedForm(items, f, found, step);
+      const moves = (positions: readonly number[] = []) => found.some(({ item }) => positions.includes(item));
+      const moved = links.map((base, k) => {
+        const pair = pairs[k];
+        const changed = pair !== undefined && ((k === f - 1 && moves(pair.from)) || (k === f && moves(pair.to)));
+        return changed ? linkOf(current[k + 1] ?? [], current[k] ?? [], pair, link) : base;
+      });
+      const { slope, intercept } = chainTransformations(moved.reverse());
       return [slope, intercept];
     });
     const slopes = gradient.subarray(0, used.length);

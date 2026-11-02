@@ -82,7 +82,7 @@ const BUDGETS = {
   "equating.trueScore": 0.8,
   "equating.irtObservedScore": 3,
   "equating.kernel": 20,
-  "equating.linkCovariance": 700,
+  "equating.linkCovariance": 500,
   "equating.linkedErrors": 200,
   "ctt.itemStatistics": 50,
   "ctt.cronbachAlpha": 9,
