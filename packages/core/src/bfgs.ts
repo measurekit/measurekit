@@ -27,7 +27,8 @@ export interface OptimizationResult {
   readonly iterations: number;
   /**
    * Whether the minimization converged: the gradient at `x` is within the tolerance or, for BFGS, no step from steepest
-   * descent makes progress, so that `x` is a minimum to the precision of the function.
+   * descent makes progress, so that `x` is a minimum to the precision of the function. Never where the value or the
+   * gradient is not finite.
    */
   readonly converged: boolean;
 }
@@ -42,7 +43,7 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * The inverse Hessian approximation starts as the identity, is scaled before its first update, and restarts from the
  * identity when it stops giving a descent direction or a step that makes progress. When steepest descent makes no
  * progress either, the point is a minimum to the precision of the function and the minimization has converged, as in
- * R's `optim`.
+ * R's `optim`, unless the value or the gradient there is not finite.
  *
  * @param f - The function to minimize.
  * @param start - The point to start from.
@@ -70,7 +71,9 @@ export function bfgs(
     // Near a minimum, rounding of the value hides the decrease a gradient above the tolerance promises, and the Armijo
     // condition accepts steps that change nothing.
     if (!(stepAlong(f, point, direction, trial) && progressed(point, trial))) {
-      if (approximation.fresh()) return { x: point.x, value: point.value, iterations: iteration, converged: true };
+      if (approximation.fresh()) {
+        return { x: point.x, value: point.value, iterations: iteration, converged: isFinitePoint(point) };
+      }
       approximation.reset();
       continue;
     }
@@ -135,6 +138,11 @@ function inverseHessianOf(size: number): InverseHessian {
     reset,
     fresh: () => isFresh,
   };
+}
+
+/** Returns whether the value and every gradient component at a point are finite. */
+function isFinitePoint(point: DescentPoint): boolean {
+  return Number.isFinite(point.value) && Number.isFinite(maxAbs(point.gradient));
 }
 
 /** Returns whether a step lowered the value or the largest gradient component. */

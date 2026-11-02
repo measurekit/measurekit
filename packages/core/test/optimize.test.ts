@@ -42,6 +42,19 @@ describe("bfgs", () => {
     expect(loose.iterations).toBeLessThan(tight.iterations);
   });
 
+  it("does not report convergence at a point where the value or the gradient is not finite", () => {
+    const undefinedAtStart: GradientFunction = (_, gradient) => {
+      gradient[0] = Number.NaN;
+      return Number.NaN;
+    };
+    expect(bfgs(undefinedAtStart, [1])).toMatchObject({ iterations: 0, converged: false });
+    const infiniteSlope: GradientFunction = (_, gradient) => {
+      gradient[0] = Number.POSITIVE_INFINITY;
+      return 0;
+    };
+    expect(bfgs(infiniteSlope, [1]).converged).toBe(false);
+  });
+
   it("does not change its start", () => {
     const start = [-1.2, 1];
     bfgs(rosenbrock, start);
