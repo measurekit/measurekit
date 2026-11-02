@@ -370,7 +370,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../data/**", "!../irt/**", "!../math/**"],
+                    "group": ["../*", "../*/**", "!../checks.js", "!../data/**", "!../irt/**", "!../math/**"],
                     "message": "fit/ builds on data/, irt/ and math/ only."
                   }
                 ]

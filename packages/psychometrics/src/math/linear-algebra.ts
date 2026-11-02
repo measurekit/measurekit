@@ -56,6 +56,17 @@ function subtractRow(m: Float64Array, size: number, target: number, source: numb
 }
 
 /**
+ * Solves L X = B in place for the `columns` columns of B, by rows, given the lower triangular `size` by `size` L: each
+ * row needs the rows above it, so that the columns of B are worked on in one pass over its memory.
+ */
+export function forwardSolve(factor: Float64Array, size: number, right: Float64Array, columns: number): void {
+  for (let i = 0; i < size; i++) {
+    for (let k = 0; k < i; k++) subtractRow(right, columns, i, k, factor[i * size + k] ?? 0);
+    scaleRow(right, columns, i, 1 / (factor[i * size + i] ?? 1));
+  }
+}
+
+/**
  * Returns the inverse of the symmetric positive definite `size` by `size` matrix `a`, stored by rows, or `null` when it
  * is not positive definite to working precision. Uses the Cholesky factor L of a: the inverse is L⁻ᵀ L⁻¹, about half
  * the work of {@link invert}.

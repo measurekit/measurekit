@@ -148,8 +148,8 @@ pull requests, and Dependabot version updates are off. Changesets, docs and TSDo
 - A module imports another only through its `index.ts` or its `internal.ts`, which lists what the modules and tests of
   the package share and is never exported from the package. `pnpm check:standards` fails on a deep path.
 
-Psychometrics: every module of `cat/`, `change/`, `equating/`, `irt/`, `multidimensional/`, `rater/`, `scaling/` and
-`sim/` may also import `checks.ts`.
+Psychometrics: every module of `cat/`, `change/`, `equating/`, `fit/`, `irt/`, `multidimensional/`, `rater/`, `scaling/`
+and `sim/` may also import `checks.ts`.
 
 | Module              | Imports                                               |
 | ------------------- | ----------------------------------------------------- |

@@ -139,6 +139,22 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | lz                                                         | mirt's `personfit(Theta = )` `Zh`, at mirt's EAP thetas                   |
 | Q3                                                         | mirt's `residuals(type = "Q3", Theta = )`, the same thetas                |
 | S-X², degrees of freedom, significance                     | mirt's `itemfit(fit_stats = "S_X2")`                                      |
+| M2, M2*, C2, df, RMSEA and its interval, SRMSR, TLI, CFI   | mirt's `M2(quadpts = 61)` at `TOL = 1e-8`; written out in base R below    |
+
+M2 reads mirt's `M2` on the 2PL, the 1PL with a common slope, anchors, the GRM and the RSM. On 60 sets of 400 persons
+from a true 2PL, both reject 4 at 0.05, and M2 agrees within 2e-4. `validation/psychometrics/fit-global.R` writes the
+statistic out in base R, which reproduces mirt on the 2PL within 1e-5, for the three cases where mirt's value is not the
+statistic:
+
+| Case                                            | What mirt does                                                                                     | Measured on the fixtures                                  | Reference                                                  |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
+| The Rasch model with a free variance            | Δ leaves out the variance, while the df counts it. It is one model with the 1PL, whose M2 mirt has | mirt 242.156; with the column 242.051; the 1PL 242.052    | Base R with the column, against this package's 1PL         |
+| An estimated normal distribution                | Δ leaves out the mean and the variance, while the df counts them                                   | mirt 72.176; with the columns 72.079                      | Base R with the columns                                    |
+| The GPCM and the PCM                            | `dP` of a `gpcm` slope is wrong: -0.62 against central differences' 0.79 at θ = 1                  | PCM C2: mirt 224.87, written out 228.77                   | Base R with the derivative, checked by central differences |
+| M2* of the independence model, polytomous items | Δ has rank J below its columns, and `qr.Q` takes an arbitrary part of the complement               | 238.6, and 257.6 with the items reversed; the whole 2,738 | N Σ r², which the whole complement equals within 1e-6      |
+
+For dichotomous items and C2, TLI and CFI are mirt's: its independence model equals N Σ r² within 1e-3 relative, the
+distance of its EM from the margins.
 
 | DIF statistic                                                                | Reference                                                                                                                                                  |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -910,6 +926,8 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Category probabilities against `probtrace`                                                        | 1e-15 absolute                                     | 4e-16                    |
 | Chi-square upper tail                                                                             | 1e-12 relative                                     | 2e-14                    |
 | Infit, outfit, lz, Q3, S-X² and its significance                                                  | 1e-12 absolute                                     | 3e-14                    |
+| M2, M2*, C2, significance, RMSEA and its interval, SRMSR, TLI, CFI, each calibration its own      | 1e-3 absolute                                      | 7.8e-4                   |
+| The noncentral chi-square distribution                                                            | 1e-9 absolute                                      | 5.7e-12                  |
 | Mantel-Haenszel statistics                                                                        | 1e-12 absolute                                     | 1e-15                    |
 | Logistic regression chi-squares and R² changes                                                    | 1e-9 absolute                                      | 7e-11                    |
 | Lord's chi-square                                                                                 | 1e-5 relative                                      | 3e-7                     |

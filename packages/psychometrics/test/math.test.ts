@@ -11,6 +11,7 @@ import {
   mirror,
   multiply,
   newton,
+  noncentralChiSquareCdf,
   normalCdf,
   normalDensity,
   numericalHessian,
@@ -29,6 +30,7 @@ import factors from "./fixtures/dimensionality-factors.json" with { type: "json"
 import eigen from "./fixtures/math-eigen.json" with { type: "json" };
 import functions from "./fixtures/math-functions.json" with { type: "json" };
 import hermite from "./fixtures/math-gauss-hermite.json" with { type: "json" };
+import noncentral from "./fixtures/math-noncentral-chi-square.json" with { type: "json" };
 
 /** Relative tolerance of the normal and logistic functions against R. */
 const FUNCTION_TOLERANCE = 1e-14;
@@ -36,6 +38,8 @@ const FUNCTION_TOLERANCE = 1e-14;
 const CHI_SQUARE_TOLERANCE = 1e-12;
 /** The same with up to 10⁷ degrees of freedom, where the scale ln Γ(df / 2) has about 8 digits left. */
 const LARGE_CHI_SQUARE_TOLERANCE = 1e-7;
+/** Absolute tolerance of the noncentral chi-square distribution against R's pchisq. */
+const NONCENTRAL_TOLERANCE = 1e-9;
 /** Absolute tolerance of Gauss-Hermite nodes and weights against R's eigenvalue method. */
 const QUADRATURE_TOLERANCE = 1e-12;
 /** Absolute tolerance of eigenvalues and, up to sign, eigenvectors against R's eigen. */
@@ -62,6 +66,36 @@ describe("chiSquareUpperTail", () => {
       const label = `pchisq(${value}, ${df[i]})`;
       expectRelative(chiSquareUpperTail(value, defined(df[i])), expected, LARGE_CHI_SQUARE_TOLERANCE, label);
     });
+  });
+});
+
+describe("noncentralChiSquareCdf", () => {
+  it("matches R's pchisq with a noncentrality", () => {
+    const { x, df, noncentrality, cdf } = noncentral;
+    x.forEach((value, i) => {
+      const expected = defined(cdf[i]);
+      const actual = noncentralChiSquareCdf(value, defined(df[i]), defined(noncentrality[i]));
+      const label = `pchisq(${value}, ${df[i]}, ncp = ${noncentrality[i]})`;
+      expectClose(actual, expected, NONCENTRAL_TOLERANCE, label);
+    });
+  });
+
+  it("is 0 at 0 and below, and falls as the noncentrality grows", () => {
+    expect(noncentralChiSquareCdf(0, 3, 2)).toBe(0);
+    expect(noncentralChiSquareCdf(-1, 3, 2)).toBe(0);
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0.1, max: 500, noNaN: true }),
+        fc.integer({ min: 1, max: 100 }),
+        fc.double({ min: 0, max: 300, noNaN: true }),
+        (x, df, lambda) => {
+          const lower = noncentralChiSquareCdf(x, df, lambda);
+          expect(lower).toBeGreaterThanOrEqual(0);
+          expect(lower).toBeLessThanOrEqual(1);
+          expect(noncentralChiSquareCdf(x, df, lambda + 1)).toBeLessThanOrEqual(lower + 1e-12);
+        },
+      ),
+    );
   });
 });
 

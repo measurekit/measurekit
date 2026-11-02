@@ -25,6 +25,7 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   | A response, or the score of a faceted score                 | An integer from 0 to 2³¹ - 1               | [data](docs/psychometrics/data.md)                                            |
   | Attributes of a Q-matrix; of a diagnostic adaptive test     | 20: a fit holds 2^K profiles, about 1 GB   | [cdm](docs/psychometrics/cdm.md#calibration)                                  |
   | Success probabilities with incomplete standard errors       | 3,162 over all items: 80 MB of information | [cdm](docs/psychometrics/cdm.md#calibration)                                  |
+  | Items of a limited-information statistic                    | 60: its covariance matrix has 27 MB        | [fit](docs/psychometrics/fit.md#limited-information-fit)                      |
   | Categories of a Mokken scale                                | 10                                         | [mokken](docs/psychometrics/mokken.md)                                        |
   | Facets of an unbalanced G study, with the object            | 6                                          | [generalizability](docs/psychometrics/generalizability.md#unbalanced-designs) |
   | Coefficients of a logistic fit without a ridge, or random θ | 5,000: a dense matrix of 200 MB            | [logistic](docs/knowledge-tracing/logistic.md)                                |

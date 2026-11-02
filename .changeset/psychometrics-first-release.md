@@ -19,6 +19,10 @@ accelerate EM with SQUAREM, and the posterior means of a data set tabulate the l
 default tolerance the estimates stop closer to the maximum than plain EM would, by up to about 1e-3, and the iterations
 fall, for the exploratory two-dimensional 2PL from 442 to 100.
 
+`limitedInformationFit` tests a calibration on the margins of its test, by M2, M2* or C2 with RMSEA and its interval,
+SRMSR, TLI and CFI, as mirt's `M2`. It reads Δ from the calibration, with one column for a parameter that items share and
+those of an estimated normal distribution, and checks the parameters against the calibration's AIC.
+
 Lord's chi-square can be purified: with `purify: true` the items it flags leave the anchors of the linking, which is
 repeated on the two calibrations until two rounds flag the same items.
 

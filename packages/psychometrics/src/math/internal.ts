@@ -3,6 +3,22 @@
 export { bivariateNormalCdf, bivariateNormalDensity, bivariateNormalLogDensitySlope } from "./bivariate-normal.js";
 export { symmetricEigen } from "./eigen.js";
 export { numericalHessian } from "./hessian.js";
+export {
+  addPairDerivatives,
+  addWeightDerivatives,
+  type FirstOrderRows,
+  independenceStatistic,
+  limitedInformationStatistic,
+  MAX_MOMENT_ITEMS,
+  type MomentTables,
+  modelMoments,
+  pairRow,
+  residualCorrelationRoot,
+  rmseaInterval,
+  rowCount,
+  type SampleMoments,
+  sampleMoments,
+} from "./limited-information.js";
 export { invert, invertPositiveDefinite } from "./linear-algebra.js";
 export {
   addOuterProduct,
@@ -15,6 +31,7 @@ export {
   transpose,
 } from "./matrix.js";
 export { minres, minresLoadings } from "./minres.js";
+export { noncentralChiSquareCdf } from "./noncentral-chi-square.js";
 export { normalCdf, normalDensity } from "./normal.js";
 export { type HessianFunction, type NewtonOptions, newton } from "./optimize.js";
 export { pearsonMatrix } from "./pearson.js";
