@@ -83,7 +83,8 @@ export function setUp<TParameters>(
   const items = models.map((model, column): ItemState<TParameters> => {
     const id = itemIds[column] ?? "";
     const tally = tallies[column] ?? NO_RESPONSES;
-    const parameters = fixed[id];
+    // An own entry only, so that an item id such as "constructor" is not taken for a fixed item.
+    const parameters = Object.hasOwn(fixed, id) ? fixed[id] : undefined;
     const nodes = design !== null && (design.testletOf[column] ?? -1) >= 0 ? design.sums : rule.nodes;
     if (parameters !== undefined) return fixedItem(id, model, parameters, tally.highest + 1, nodes);
     const proportions = checkCategories(id, model, tally);

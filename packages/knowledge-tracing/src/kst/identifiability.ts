@@ -1,4 +1,5 @@
 import { DataError } from "@measurekit/core";
+import { entry } from "../data/internal.js";
 import { rank } from "../math/internal.js";
 import { constraintsOf, type Restrictions, sharesRates } from "./constraints.js";
 import type { Blim } from "./estimation.js";
@@ -63,8 +64,8 @@ export function localIdentifiability(
   const items = domain.length;
   const blim: Blim = {
     probabilities: Float64Array.from(parameters.probabilities),
-    guess: Float64Array.from(domain, (id) => parameters.items[id]?.guess ?? START_RATE),
-    slip: Float64Array.from(domain, (id) => parameters.items[id]?.slip ?? START_RATE),
+    guess: Float64Array.from(domain, (id) => entry(parameters.items, id)?.guess ?? START_RATE),
+    slip: Float64Array.from(domain, (id) => entry(parameters.items, id)?.slip ?? START_RATE),
   };
   const { guess, slip } = constraintsOf(restrictions, domain, blim, "is not an element of the structure");
   let width = compiled.count - 1;

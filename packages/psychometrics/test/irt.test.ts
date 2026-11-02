@@ -909,6 +909,18 @@ describe("calibrate", () => {
     );
   });
 
+  it("calibrates items whose ids are names of the properties of every object, none of them fixed", () => {
+    const named = responseMatrix(
+      simulate(20261029, 300, ITEMS_2PL).map((row) => row.slice(0, 4)),
+      {
+        itemIds: ["__proto__", "constructor", "toString", "valueOf"],
+      },
+    );
+    const result = calibrate(named, { model: twoParameterLogistic });
+    expect(result.items.map(({ id }) => id)).toEqual(["__proto__", "constructor", "toString", "valueOf"]);
+    expect(result.items.every(({ parameters }) => Number.isFinite(parameters.a) && parameters.a > 0)).toBe(true);
+  });
+
   it("rejects an item without responses or without a response in a lower category", () => {
     const matrix = responseMatrix([
       [1, null],

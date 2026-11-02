@@ -58,7 +58,8 @@ export function predictItemParameter(
         `Effect ${j + 1} of the regression needs a name and a finite estimate, found ${describe(effect)}.`,
       );
     }
-    const value: unknown = effect.name === INTERCEPT ? 1 : features[effect.name];
+    const own = Object.hasOwn(features, effect.name) ? features[effect.name] : undefined;
+    const value: unknown = effect.name === INTERCEPT ? 1 : own;
     if (!(typeof value === "number" && Number.isFinite(value))) {
       throw new DataError(
         `The features of the item need a finite number for "${effect.name}", found ${describe(value)}.`,

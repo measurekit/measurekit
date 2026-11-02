@@ -1413,6 +1413,10 @@ describe("predictItemParameter", () => {
     expect(() => predictItemParameter(REGRESSION, {})).toThrow(
       'The features of the item need a finite number for "x", found undefined.',
     );
+    const constructorEffect = { ...defined(REGRESSION.effects[1]), name: "constructor" };
+    expect(() =>
+      predictItemParameter({ ...REGRESSION, effects: [defined(REGRESSION.effects[0]), constructorEffect] }, {}),
+    ).toThrow('The features of the item need a finite number for "constructor", found undefined.');
     expect(() => predictItemParameter(REGRESSION, { x: Number.NaN })).toThrow(DataError);
     expect(() => predictItemParameter(REGRESSION, { x: JSON.parse('"1"') })).toThrow(
       'The features of the item need a finite number for "x", found "1".',

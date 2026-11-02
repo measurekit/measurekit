@@ -152,5 +152,5 @@ function thresholdsOf(itemIds: readonly string[], thresholds: Readonly<Record<st
   for (const [id, threshold] of Object.entries(thresholds)) {
     checkPositive(threshold, `The threshold of item "${id}"`);
   }
-  return itemIds.map((id) => thresholds[id] ?? Number.NaN);
+  return itemIds.map((id) => (Object.hasOwn(thresholds, id) ? (thresholds[id] ?? Number.NaN) : Number.NaN));
 }

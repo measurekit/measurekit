@@ -86,7 +86,7 @@ export function cdmDesign(itemIds: readonly string[], qMatrix: QMatrix): CdmDesi
   }
   const attributes: string[] = [];
   const itemAttributes = itemIds.map((id) => {
-    const listed = qMatrix[id];
+    const listed = Object.hasOwn(qMatrix, id) ? qMatrix[id] : undefined;
     checkItemAttributes(id, listed);
     const indices = listed.map((attribute) => {
       if (!attributes.includes(attribute)) attributes.push(attribute);
