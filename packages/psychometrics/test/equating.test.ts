@@ -15,6 +15,7 @@ import {
   equipercentileEquating,
   fourParameterLogistic,
   frequencyEstimationEquating,
+  generalizedGradedUnfolding,
   generalizedPartialCredit,
   gradedResponse,
   haebaraLinking,
@@ -178,7 +179,7 @@ describe("transformItem and transformTheta", () => {
   it("move an item and theta together: the item gives A θ + B the probabilities it gave θ, for every model", () => {
     fc.assert(
       fc.property(
-        arbitraryItem,
+        arbitraryItem.filter(({ model }) => model !== generalizedGradedUnfolding),
         fc.double({ min: 0.2, max: 5, noNaN: true }),
         fc.double({ min: -3, max: 3, noNaN: true }),
         fc.double({ min: -4, max: 4, noNaN: true }),

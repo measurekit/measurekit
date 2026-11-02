@@ -1,12 +1,14 @@
 import fc from "fast-check";
 import {
   fourParameterLogistic,
+  generalizedGradedUnfolding,
   generalizedPartialCredit,
   gradedResponse,
   type IrtItem,
   nominalResponse,
   partialCredit,
   ratingScale,
+  type UnfoldingParameters,
 } from "../src/index.js";
 
 /** A slope of any sign, including 0. */
@@ -18,7 +20,16 @@ export const arbitraryLocation = fc.double({ min: -4, max: 4, noNaN: true });
 /** One to four thresholds in any order. */
 export const arbitraryLocations = fc.array(arbitraryLocation, { minLength: 1, maxLength: 4 });
 
-/** Items of every model, with parameters in range: the 4PL, GRM, GPCM, PCM, RSM and NRM. */
+/** A generalized graded unfolding item: a above 0, a location and one to four thresholds. */
+export const arbitraryUnfoldingItem: fc.Arbitrary<IrtItem<UnfoldingParameters>> = fc
+  .record({
+    a: fc.double({ min: 0.2, max: 3, noNaN: true }),
+    b: arbitraryLocation,
+    t: fc.array(fc.double({ min: -3, max: 1, noNaN: true }), { minLength: 1, maxLength: 4 }),
+  })
+  .map((parameters) => ({ model: generalizedGradedUnfolding, parameters }));
+
+/** Items of every model, with parameters in range: the 4PL, GRM, GPCM, PCM, RSM, NRM and GGUM. */
 export const arbitraryItem: fc.Arbitrary<IrtItem> = fc.oneof(
   fc
     .record({
@@ -56,4 +67,5 @@ export const arbitraryItem: fc.Arbitrary<IrtItem> = fc.oneof(
       }),
     )
     .map((parameters) => ({ model: nominalResponse, parameters })),
+  arbitraryUnfoldingItem,
 );

@@ -9,6 +9,7 @@ import {
   type CalibrationOptions,
   type ConditionalCalibration,
   calibrate,
+  calibrateUnfolding,
   calibrateWithCovariance,
   conditionalMaximumLikelihood,
   conditionalStandardError,
@@ -16,6 +17,7 @@ import {
   DataError,
   empiricalReliability,
   fourParameterLogistic,
+  generalizedGradedUnfolding,
   generalizedPartialCredit,
   gradedResponse,
   type IrtItem,
@@ -54,9 +56,13 @@ import {
   thetaPosterior,
   threeParameterLogistic,
   twoParameterLogistic,
+  type UnfoldingCalibration,
+  type UnfoldingParameters,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
 import {
+  categoryTallies,
+  checkCategories,
   combine,
   compressResponses,
   type ExpectationItem,
@@ -66,11 +72,19 @@ import {
   logFunction,
   maximize,
   NO_ITEMS,
+  NO_RESPONSES,
   population,
   squarem,
+  unfoldingStarts,
 } from "../src/irt/internal.js";
 import { rectangular } from "../src/math/internal.js";
-import { arbitraryItem, arbitraryLocation, arbitraryLocations, arbitrarySlope } from "./arbitraries.js";
+import {
+  arbitraryItem,
+  arbitraryLocation,
+  arbitraryLocations,
+  arbitrarySlope,
+  arbitraryUnfoldingItem,
+} from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { definedEntries, type FixtureErrors, type FixtureParameters, MODELS } from "./fixture-items.js";
 import conditional from "./fixtures/irt-conditional.json" with { type: "json" };
@@ -88,6 +102,7 @@ import simulatedMixed from "./fixtures/irt-simulated-mixed.json" with { type: "j
 import simulatedPcm from "./fixtures/irt-simulated-pcm.json" with { type: "json" };
 import testlet from "./fixtures/irt-testlet.json" with { type: "json" };
 import testletGroups from "./fixtures/irt-testlet-groups.json" with { type: "json" };
+import unfolding from "./fixtures/irt-unfolding.json" with { type: "json" };
 
 // Tolerances against R, explained in docs/validation.md.
 /** Item parameters against mirt, ltm and the base R posterior mode. */
@@ -143,6 +158,18 @@ const COVARIANCE_TOLERANCE = 1e-4;
 const FLAT_COVARIANCE_TOLERANCE = 1e-3;
 /** Posteriors of theta against the base R weights. */
 const POSTERIOR_TOLERANCE = 1e-12;
+
+/**
+ * Unfolding calibrations against the GGUM package at tol = 1e-6, which integrates over 30 nodes from -4 to 4: they differ
+ * by up to 3e-3 on an item far from the persons.
+ */
+const UNFOLDING_PARAMETER_TOLERANCE = 1e-2;
+/** Their log-likelihood against base R at the GGUM package's estimates and measurekit's nodes. */
+const UNFOLDING_LOG_LIKELIHOOD_TOLERANCE = 1e-2;
+/** Their cross-product standard errors, relative, against base R at the GGUM package's estimates. */
+const UNFOLDING_STANDARD_ERROR_TOLERANCE = 1e-2;
+/** The 97.5% quantile of the standard normal distribution. */
+const NORMAL_95 = 1.959963984540054;
 
 /** Models whose calibrations mirt stops short of the optimum. */
 const FLAT_MODELS = new Set(["4pl", "grm", "gpcm", "pcm", "rsm", "nrm"]);
@@ -2263,6 +2290,19 @@ describe("ratingScale", () => {
 
 const arbitraryTheta = fc.double({ min: -8, max: 8, noNaN: true });
 
+/** Returns the response matrix of persons whose responses are written as one string of digits each. */
+function unfoldingMatrix(rows: readonly string[]): ReturnType<typeof responseMatrix> {
+  return responseMatrix(rows.map((row) => Array.from(row, Number)));
+}
+
+/** Returns 1 when calibrated locations have the signs of the true ones, -1 when the calibration reflects them. */
+function orientation(
+  items: readonly { readonly parameters: UnfoldingParameters }[],
+  truth: readonly { readonly b: number }[],
+): number {
+  return items.reduce((sum, item, i) => sum + item.parameters.b * defined(truth[i]).b, 0) < 0 ? -1 : 1;
+}
+
 /** Returns an item's category probabilities, their theta derivatives and its information at theta. */
 function evaluate({ model: itemModel, parameters }: IrtItem, theta: number): number[][] {
   const count = itemModel.categoryCount(parameters);
@@ -2743,6 +2783,264 @@ describe("testlets", () => {
   });
 });
 
+describe("generalizedGradedUnfolding", () => {
+  it("is the partial credit model of 2C + 2 categories with thresholds b + τ, each category joined with its mirror", () => {
+    fc.assert(
+      fc.property(arbitraryUnfoldingItem, arbitraryTheta, ({ parameters: { a, b, t } }, theta) => {
+        const top = 2 * t.length + 1;
+        const thresholds = [...t, 0, ...t.map((threshold) => -threshold).reverse()].map((threshold) => b + threshold);
+        const subjective = new Float64Array(top + 1);
+        generalizedPartialCredit.probabilities({ a, b: thresholds }, theta, subjective);
+        const [probabilities = []] = evaluate({ model: generalizedGradedUnfolding, parameters: { a, b, t } }, theta);
+        probabilities.forEach((probability, z) => {
+          expectClose(probability, defined(subjective[z]) + defined(subjective[top - z]), 1e-12);
+        });
+      }),
+    );
+  });
+
+  it("gives the same probabilities when theta and b are reflected", () => {
+    fc.assert(
+      fc.property(arbitraryUnfoldingItem, arbitraryTheta, (item, theta) => {
+        const reflected = { ...item, parameters: { ...item.parameters, b: -item.parameters.b } };
+        const [probabilities = []] = evaluate(item, theta);
+        const [mirrored = []] = evaluate(reflected, -theta);
+        probabilities.forEach((probability, z) => {
+          expectClose(probability, defined(mirrored[z]), 1e-14);
+        });
+      }),
+    );
+  });
+
+  it("names a and b, bounded as the GGUM package bounds them, and the thresholds", () => {
+    expect(generalizedGradedUnfolding.parameters(4)).toEqual([
+      { name: "a", lower: 0.1, upper: 10 },
+      { name: "b", lower: -10, upper: 10 },
+      { name: "t1" },
+      { name: "t2" },
+      { name: "t3" },
+    ]);
+    expect(generalizedGradedUnfolding.fromVector(Float64Array.of(1.5, -0.5, -1, -0.4))).toEqual({
+      a: 1.5,
+      b: -0.5,
+      t: [-1, -0.4],
+    });
+  });
+
+  it("rejects a slope that is not above 0, a location that is not finite and an item without thresholds", () => {
+    const message = (found: string): string =>
+      `A GGUM item needs a finite a above 0, a finite b and at least one finite threshold t, found ${found}.`;
+    expect(() => generalizedGradedUnfolding.toVector({ a: 0, b: 0, t: [-1] })).toThrow(
+      message("a = 0, b = 0, t = [-1]"),
+    );
+    expect(() => generalizedGradedUnfolding.toVector({ a: 1, b: Number.NaN, t: [-1] })).toThrow(
+      message("a = 1, b = NaN, t = [-1]"),
+    );
+    expect(() => generalizedGradedUnfolding.toVector({ a: 1, b: 0, t: [] })).toThrow(message("a = 1, b = 0, t = []"));
+    expect(() => generalizedGradedUnfolding.toVector(JSON.parse('{ "a": "1", "b": 0, "t": {} }'))).toThrow(
+      message('a = "1", b = 0, t = an object'),
+    );
+  });
+});
+
+describe("calibrateUnfolding", () => {
+  const cases = Object.entries(unfolding.cases);
+  /** The cross-product calibration of each case, made once for the tests that read it. */
+  const fits = new Map<string, UnfoldingCalibration>();
+  const fitOf = (name: string, responses: readonly string[]): UnfoldingCalibration => {
+    const found = fits.get(name) ?? calibrateUnfolding(unfoldingMatrix(responses), { standardErrors: "cross-product" });
+    fits.set(name, found);
+    return found;
+  };
+
+  it("starts from the GGUM package's starts by Roberts and Laughlin's procedure", () => {
+    for (const [name, expected] of Object.entries(unfolding.starts)) {
+      const responses = compressResponses(
+        unfoldingMatrix(defined(unfolding.cases[name as keyof typeof unfolding.cases]).responses),
+      );
+      const tallies = categoryTallies(responses);
+      const proportions = responses.itemIds.map((id, i) =>
+        checkCategories(id, generalizedGradedUnfolding, tallies[i] ?? NO_RESPONSES),
+      );
+      unfoldingStarts(responses, proportions).forEach((start, i) => {
+        expectParameters(start, { a: 1, b: expected.b[i], t: expected.t[i] }, 1e-12, `${name} item ${i + 1}`);
+      });
+    }
+  });
+
+  for (const [name, reference] of cases) {
+    it(`matches the GGUM package and the base R cross-product errors on ${name}`, () => {
+      const result = fitOf(name, reference.responses);
+      expect(result.converged).toBe(true);
+      expect(result.persons).toBe(reference.persons);
+      expectClose(result.logLikelihood, reference.expected.logLikelihood, UNFOLDING_LOG_LIKELIHOOD_TOLERANCE);
+      result.items.forEach((item, i) => {
+        const { a, b, t } = defined(reference.expected.items[i]);
+        expect(item.model).toBe(generalizedGradedUnfolding);
+        expectParameters(item.parameters, { a, b, t }, UNFOLDING_PARAMETER_TOLERANCE, `${name} ${item.id}`);
+        expectParameters(
+          item.standardErrors,
+          reference.expected.crossProductErrors[i],
+          UNFOLDING_STANDARD_ERROR_TOLERANCE,
+          `${name} ${item.id} errors`,
+          Math.abs,
+        );
+      });
+    });
+  }
+
+  it("recovers every location within 0.75 and their RMSE within 0.2 in each case, up to the reflection", () => {
+    for (const [name, reference] of cases) {
+      const { items } = fitOf(name, reference.responses);
+      const sign = orientation(items, reference.truth);
+      const errors = items.map((item, i) => item.parameters.b - sign * defined(reference.truth[i]).b);
+      expect(Math.max(...errors.map(Math.abs)), name).toBeLessThanOrEqual(0.75);
+      expect(
+        Math.sqrt(errors.reduce((sum, error) => sum + error * error, 0) / errors.length),
+        name,
+      ).toBeLessThanOrEqual(0.2);
+    }
+  });
+
+  it("covers the true a and b with 0.92 to 0.98 of its 95% intervals over the 150 items of the seeds, where the GGUM package's errors of b cover fewer", () => {
+    const covered = { a: 0, b: 0, ggumB: 0, items: 0 };
+    for (const [name, reference] of cases.filter(([name]) => name.startsWith("seed"))) {
+      const { items } = fitOf(name, reference.responses);
+      const sign = orientation(items, reference.truth);
+      items.forEach(({ parameters, standardErrors }, i) => {
+        const truth = defined(reference.truth[i]);
+        const { b: ggumB, standardErrors: ggumErrors } = defined(reference.expected.items[i]);
+        const errors = defined(standardErrors);
+        covered.items++;
+        if (Math.abs(parameters.a - truth.a) < NORMAL_95 * defined(errors.a)) covered.a++;
+        if (Math.abs(parameters.b - sign * truth.b) < NORMAL_95 * defined(errors.b)) covered.b++;
+        if (Math.abs(ggumB - sign * truth.b) < NORMAL_95 * ggumErrors.b) covered.ggumB++;
+      });
+    }
+    expect(covered.items).toBe(150);
+    for (const share of [covered.a / covered.items, covered.b / covered.items]) {
+      expect(share).toBeGreaterThanOrEqual(0.92);
+      expect(share).toBeLessThanOrEqual(0.98);
+    }
+    expect([covered.a, covered.b, covered.ggumB]).toEqual([141, 142, 125]);
+  });
+
+  it("gives Hessian errors within 10% of the cross-product errors", () => {
+    const [name = "", reference] = defined(cases[0]);
+    const hessian = calibrateUnfolding(unfoldingMatrix(defined(reference).responses), { standardErrors: "hessian" });
+    fitOf(name, defined(reference).responses).items.forEach((item, i) => {
+      expectParameters(
+        defined(hessian.items[i]).standardErrors,
+        item.standardErrors,
+        0.1,
+        `${item.id} Hessian errors`,
+        Math.abs,
+      );
+    });
+  });
+
+  it("reaches the maximum that the GGUM package stops short of at its default tolerance", () => {
+    const { case: name, items, logLikelihood, tightLogLikelihood } = unfolding.defaultTolerance;
+    const reference = defined(unfolding.cases[name as keyof typeof unfolding.cases]);
+    const result = fitOf(name, reference.responses);
+    const gaps = result.items.map((item, i) => Math.abs(item.parameters.b - defined(items[i]).b));
+    expect(Math.max(...gaps)).toBeGreaterThan(0.15);
+    expect(tightLogLikelihood - logLikelihood).toBeGreaterThan(0.14);
+  });
+
+  it("leaves out the persons who disagree with every item they answered", () => {
+    const rows = [
+      [0, 1, 0],
+      [3, 0, 1],
+      [0, 3, 2],
+      [1, 0, null],
+      [1, 2, 0],
+      [2, 1, 3],
+      [null, null, null],
+      [0, 1, 2],
+    ];
+    const result = calibrateUnfolding(responseMatrix(rows), { maxIterations: 20 });
+    expect(result.persons).toBe(5);
+    const kept = calibrateUnfolding(responseMatrix(rows.filter((_, person) => ![0, 3, 6].includes(person))), {
+      maxIterations: 20,
+    });
+    expect(result.items.map((item) => item.parameters)).toEqual(kept.items.map((item) => item.parameters));
+    expect(result.logLikelihood).toBe(kept.logLikelihood);
+    expect(result.bic).toBe(kept.bic);
+  });
+
+  it("gives records the calibration of the matrix", () => {
+    const rows = defined(unfolding.cases.mixed).responses.slice(0, 300);
+    const matrix = unfoldingMatrix(rows);
+    const records = responseRecords(
+      rows.flatMap((row, person) =>
+        Array.from(row, (response, item) => ({
+          person: defined(matrix.personIds[person]),
+          item: defined(matrix.itemIds[item]),
+          response: Number(response),
+        })),
+      ),
+    );
+    expect(calibrateUnfolding(records, { maxIterations: 30 })).toEqual(
+      calibrateUnfolding(matrix, { maxIterations: 30 }),
+    );
+  });
+
+  it("takes the quadrature and the stopping rules, and reports the last stage's iterations", () => {
+    const reference = defined(unfolding.cases.mixed);
+    const matrix = unfoldingMatrix(reference.responses);
+    const short = calibrateUnfolding(matrix, { maxIterations: 1 });
+    expect(short.converged).toBe(false);
+    expect(short.iterations).toBe(1);
+    expect(short.items.every((item) => item.standardErrors === null)).toBe(true);
+    const hermite = calibrateUnfolding(matrix, { quadrature: { method: "gauss-hermite", points: 41 } });
+    expect(hermite.converged).toBe(true);
+    defined(reference.expected.items).forEach(({ b }, i) => {
+      expectClose(defined(hermite.items[i]).parameters.b, b, 0.02);
+    });
+  });
+
+  it("calibrates by calibrate from starts by proportions alone, which place every location on one side", () => {
+    const matrix = unfoldingMatrix(defined(unfolding.cases.mixed).responses);
+    const result = calibrate(matrix, { model: generalizedGradedUnfolding, maxIterations: 50 });
+    expect(nonFinite(result)).toEqual([]);
+    expect(result.items.every((item) => item.parameters.a > 0)).toBe(true);
+  });
+
+  it("rejects invalid options and data, and an item with responses in one category", () => {
+    const matrix = responseMatrix([
+      [0, 2],
+      [2, 1],
+      [1, 0],
+    ]);
+    expect(() => calibrateUnfolding(matrix, JSON.parse("null"))).toThrow(DataError);
+    expect(() => calibrateUnfolding(matrix, JSON.parse('{ "tolerance": "1e-4" }'))).toThrow(DataError);
+    expect(() => calibrateUnfolding(matrix, JSON.parse('{ "standardErrors": "sandwich" }'))).toThrow(DataError);
+    expect(() => calibrateUnfolding(matrix, JSON.parse('{ "quadrature": { "points": 1 } }'))).toThrow(DataError);
+    expect(() => calibrateUnfolding(JSON.parse('{ "responses": {} }'))).toThrow(DataError);
+    expect(() =>
+      calibrateUnfolding(
+        responseMatrix([
+          [0, 0],
+          [0, 1],
+        ]),
+      ),
+    ).toThrow('Item "item1" has responses in fewer than two categories; calibration needs at least two.');
+    expect(() =>
+      calibrateUnfolding(
+        responseMatrix([
+          [0, 1],
+          [1, 0],
+          [3, 3],
+          [2, 2],
+        ]),
+      ),
+    ).toThrow(
+      'Item "item1" has no response in category 0 from a person who agrees with an item; unfolding calibration leaves out the persons who disagree with every item they answered.',
+    );
+  });
+});
+
 describe("properties", () => {
   it("a shift of every threshold leaves the conditional probability of a response pattern unchanged", () => {
     const item = fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: 1, maxLength: 3 });
@@ -2949,6 +3247,7 @@ describe("properties", () => {
       partialCredit,
       ratingScale,
       nominalResponse,
+      generalizedGradedUnfolding,
     );
     fc.assert(
       fc.property(rows, models, (data, m) => {

@@ -1,7 +1,7 @@
 /**
- * Item response theory: dichotomous and polytomous models, calibration by marginal and joint maximum likelihood with
- * groups and distributions of theta, conditional maximum likelihood of the Rasch family, ability estimation,
- * summed-score tables, information and reliability.
+ * Item response theory: dichotomous, polytomous and unfolding models, calibration by marginal and joint maximum
+ * likelihood with groups and distributions of theta, conditional maximum likelihood of the Rasch family, ability
+ * estimation, summed-score tables, information and reliability.
  *
  * @module @measurekit/psychometrics/irt
  */
@@ -62,3 +62,9 @@ export { type RatingScaleParameters, ratingScale } from "./rating-scale.js";
 export { empiricalReliability, marginalReliability } from "./reliability.js";
 export { type SummedScoreEstimate, summedScoreTable } from "./summed-score.js";
 export type { TestletEstimate } from "./testlets.js";
+export { generalizedGradedUnfolding, type UnfoldingParameters } from "./unfolding.js";
+export {
+  calibrateUnfolding,
+  type UnfoldingCalibration,
+  type UnfoldingCalibrationOptions,
+} from "./unfolding-calibration.js";

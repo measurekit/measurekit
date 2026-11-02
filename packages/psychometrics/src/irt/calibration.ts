@@ -191,7 +191,21 @@ export function calibrateWithCovariance<TParameters>(
   options: CalibrationOptions<TParameters>,
 ): CovarianceCalibration<TParameters> {
   checkOptions(options);
-  const responses = compressResponses(data);
+  return calibrateResponses(compressResponses(data), options);
+}
+
+/**
+ * Calibrates checked responses as {@link calibrateWithCovariance} does, each estimated item starting from its entry of
+ * `starts` when given, else from its model's starting values.
+ *
+ * @param starts - The starting parameters of each item, in item order.
+ * @throws `DataError` as {@link calibrate} does.
+ */
+export function calibrateResponses<TParameters>(
+  responses: CompressedResponses,
+  options: CalibrationOptions<TParameters>,
+  starts?: readonly TParameters[],
+): CovarianceCalibration<TParameters> {
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, standardErrors = "none" } = options;
   checkStopping(tolerance, maxIterations);
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
@@ -199,7 +213,7 @@ export function calibrateWithCovariance<TParameters>(
   const { answered, respondents } = respondentsOf(responses);
   const rule = quadratureRule(options.quadrature);
   const { nodes } = rule;
-  const setup = setUp(responses, options, answered, rule);
+  const setup = setUp(responses, options, answered, rule, starts);
   const { items, values, population: latent, design } = setup;
   const mStep = maximization(setup, nodes);
   const eStep = expectationStep(responses, items, nodes, latent, design);

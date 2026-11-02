@@ -8,6 +8,7 @@ import {
   DataError,
   type Distribution,
   fourParameterLogistic,
+  generalizedGradedUnfolding,
   generalizedPartialCredit,
   gradedResponse,
   type IrtItem,
@@ -281,7 +282,10 @@ describe("simulateItems", () => {
     const random = createRandom(13);
     const custom: IrtModel = { ...twoParameterLogistic, name: "custom" };
     expect(() => simulateItems(custom, 1, random)).toThrow(
-      `Simulation supports the built-in models only, found the "custom" model.`,
+      `Simulation supports the built-in models other than the GGUM, found the "custom" model.`,
+    );
+    expect(() => simulateItems(generalizedGradedUnfolding, 1, random)).toThrow(
+      `Simulation supports the built-in models other than the GGUM, found the "GGUM" model.`,
     );
     expect(() => simulateItems(JSON.parse("null"), 1, random)).toThrow(
       "The model must be one of the built-in models, such as twoParameterLogistic, found null.",

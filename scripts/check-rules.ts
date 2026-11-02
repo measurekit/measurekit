@@ -124,6 +124,14 @@ export const RULES: readonly Rule[] = [
     titles: "rejects an item without responses",
   },
   {
+    rule: "A GGUM item needs a slope above 0, as a slope of 0 makes every category equally likely and a negative one reverses the item.",
+    file: "packages/psychometrics/src/irt/unfolding.ts",
+    find: "Number.isFinite(a) &&\n    a > 0 &&",
+    replace: "Number.isFinite(a) &&",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "rejects a slope that is not above 0",
+  },
+  {
     rule: "An item is fixed by an entry of its own, and not by a property of every object.",
     file: "packages/psychometrics/src/irt/calibration-setup.ts",
     find: "Object.hasOwn(fixed, id) ? fixed[id] : undefined",

@@ -36,7 +36,7 @@ IRT form.
 
 A conversion from mirt throws `DataError` when a name of the form is missing or not finite, when the coefficients have
 a name the form does not use, when it would divide by a slope a1 = 0, or when the parameters are invalid for the
-model. Only the built-in models convert.
+model. Only the built-in models other than the GGUM convert.
 
 - **Rating scale.** mirt's thresholds are b_j - c / a1, with b_j shared by its rsm items. `fromMirtIrt` takes the
   location b as their mean and the steps around it; `toMirtIrt` writes the steps as b1 to b(K-1) and c = -a b, which

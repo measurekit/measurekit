@@ -101,3 +101,8 @@ Fixed forms are assembled in parallel: `assembleForms` takes several forms from 
 testlets taken whole, items in several content areas and a most of `overlap` items that two forms may share.
 
 The options that restrict the items of an adaptive test, `contentTargets`, `enemies` and `withinTestlet`, are one type, `TestControlOptions`, which the options of the adaptive, diagnostic and multidimensional tests extend. Every function documents each parameter and its result.
+
+`generalizedGradedUnfolding` is the generalized graded unfolding model for agree-disagree items, whose persons agree most
+near an item's location. `calibrateUnfolding` calibrates it as the GGUM package does: from Roberts and Laughlin's starts,
+through the graded unfolding model and the model with a = 1, to every parameter, leaving out the persons who disagree
+with every item and reporting how many it kept.

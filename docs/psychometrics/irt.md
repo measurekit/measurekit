@@ -1,9 +1,10 @@
 # Item response theory
 
 `@measurekit/psychometrics/irt` calibrates items by marginal maximum likelihood, in one or several groups of
-persons, with the distribution of theta fixed or estimated, and Rasch, partial credit and rating scale items also by
-joint or conditional maximum likelihood. It estimates abilities, converts summed scores to theta, and computes information and
-reliability. Every estimate is validated against mirt, ltm, TAM and base R ([validation](validation.md)). Theta is
+persons, with the distribution of theta fixed or estimated, Rasch, partial credit and rating scale items also by
+joint or conditional maximum likelihood, and agree-disagree items by the generalized graded unfolding model. It estimates
+abilities, converts summed scores to theta, and computes information and reliability. Every estimate is validated
+against mirt, ltm, TAM, the GGUM package and base R ([validation](validation.md)). Theta is
 on the N(0, 1) scale unless a calibration estimates its distribution.
 
 ## Models
@@ -48,6 +49,20 @@ The type `ThresholdItem` is `{ a, b }`; `RatingScaleParameters` and `NominalPara
 - **NRM** (Bock). One slope and one intercept per category, for unordered categories. Adding a constant to all slopes
   or all intercepts changes nothing; calibration reports both summing to 0, as mirt does.
 
+### Unfolding
+
+An unfolding item, such as an attitude statement rated from strongly disagree (0) to strongly agree (C), is agreed with
+most by the persons near its location b, and less the farther they are from it on either side: a person far below and a
+person far above both disagree. `generalizedGradedUnfolding` (GGUM, Roberts, Donoghue and Laughlin) gives an item of C +
+1 categories the parameters `UnfoldingParameters`, `{ a, b, t: [t1, ..., tC] }`, and
+
+P(z | θ) ∝ exp(a (z (θ - b) - T_z)) + exp(a ((M - z) (θ - b) - T_z)), M = 2C + 1, T_z = t_1 + ... + t_z, T_0 = 0.
+
+Each observed category z joins two subjective ones, z below the item and M - z above it, of a partial credit item of
+2C + 2 categories with thresholds b + t_1, ..., b + t_C, b, b - t_C, ..., b - t_1. a, b and t are the GGUM package's α,
+δ and τ_1 to τ_C; mirt's `ggum` item type has the same a and b and writes the thresholds with the opposite sign.
+Reflecting theta and every b, θ → -θ and b → -b, changes no probability. [Unfolding calibration](#unfolding-calibration) estimates them.
+
 ### Estimated parameters
 
 Calibration estimates each model's parameter vector. Its entries name the standard errors and the priors.
@@ -60,6 +75,7 @@ Calibration estimates each model's parameter vector. Its entries name the standa
 | PCM           | a, b1 to b(K-1)                                  | a                           |
 | RSM           | a, b, step1 to step(K-2); τ_(K-1) = -(τ_1 + ...) | a, the steps                |
 | NRM           | a1 to a(K-1), c1 to c(K-1); aK and cK = -(sums)  |                             |
+| GGUM          | a, b, t1 to tC                                   |                             |
 
 A shared parameter has one value for all estimated items of its model in a calibration, so all RSM items need the same
 number of categories.
@@ -499,6 +515,65 @@ self.onmessage = (event: MessageEvent<ResponseMatrix>) => {
 };
 ```
 
+## Unfolding calibration
+
+`calibrateUnfolding(data, options)` calibrates the GGUM as the GGUM package and GGUM2004 do, in three stages, each the
+EM of `calibrate` with a standard normal theta, started from the stage before.
+
+```mermaid
+flowchart LR
+  D["Responses"] --> K["Persons who agree with an item"]
+  K --> S["Starts: Roberts and Laughlin's procedure"]
+  S --> A["1. GUM: a = 1, thresholds shared by the items with as many categories"]
+  A --> B["2. a = 1, each item's thresholds"]
+  B --> C["3. GGUM: every parameter"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrateUnfolding, generalizedGradedUnfolding, posteriorMeanEstimate } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// Nine statements of four categories, from strongly disagree (0) to strongly agree (3), placed from -2 to 2.
+const random = createRandom(5);
+const items = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2].map((b) => ({
+  model: generalizedGradedUnfolding,
+  parameters: { a: 1.2, b, t: [-1.4, -1, -0.6] },
+}));
+const matrix = simulateResponses(items, simulateThetas(1000, random), random);
+const result = calibrateUnfolding(matrix, { standardErrors: "cross-product" });
+result.items[0]?.parameters; // { a: 1.22, b: 2.11, t: [-1.63, -1.11, -0.51] }: this scale is reflected
+result.persons; // 998: two persons disagreed with every statement
+posteriorMeanEstimate(result.items, [3, 2, 1, 0, 0, 0, 0, 0, 0]); // { theta: 2.30, standardError: 0.37 }
+```
+
+| Option           | Default        | Meaning                                                                          |
+| ---------------- | -------------- | -------------------------------------------------------------------------------- |
+| `quadrature`     | 61 rectangular | Nodes over theta, as `calibrate`'s.                                              |
+| `standardErrors` | `"none"`       | `"none"`, `"hessian"` or `"cross-product"`, of the last stage, as `calibrate`'s. |
+| `tolerance`      | `1e-4`         | Each stage stops when no parameter changes by more than this in an iteration.    |
+| `maxIterations`  | `500`          | The most EM iterations of each stage.                                            |
+
+| Step       | Rule                                                                                                                                                                                                                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Persons    | A person whose every response is below its item's agree category, the middle category or, with an even number of categories, the first agree category, is left out, as the GGUM package and GGUM2004 leave them: a person who disagrees with everything may sit beyond either end of the items. `persons` counts the rest. |
+| Starts     | Roberts and Laughlin's procedure, as the GGUM package's: a = 1; the most endorsed item at 0; each other location's distance from it from the item's share of responses at or above its agree category; its sign from its loading on the leading eigenvector of the pairwise item correlations; thresholds from that share. |
+| Stages     | The graded unfolding model (a = 1, thresholds shared by the items with the same number of categories), then each item's thresholds with a = 1, then every parameter. A stage that does not converge starts the next; `converged` and `iterations` are the last stage's.                                                    |
+| Reflection | θ → -θ with every b → -b leaves the likelihood unchanged. The starts' signs fix the orientation, the loadings summing to at least 0. Compare two solutions after reflecting one whose locations correlate negatively with the other's.                                                                                     |
+| Bounds     | a in (0.1, 10) and b in (-10, 10), the GGUM package's; the thresholds are free.                                                                                                                                                                                                                                            |
+| Result     | A `Calibration` of `generalizedGradedUnfolding` items with `persons`: the log-likelihood, AIC and BIC are those of the persons kept.                                                                                                                                                                                       |
+
+`calibrate` takes `generalizedGradedUnfolding` as any model, from starts by each item's shares alone: a = 1, b from its
+agreement at 0 or above, which cannot place the sign of a location, so it may stop at a local maximum. Unfolding data go
+to `calibrateUnfolding`. Ability estimation, information, fit and adaptive tests take the calibrated items as they take
+any; linking, equating, the Bookmark method, `simulateItems` and the conversions to mirt do not take GGUM items.
+
+| `DataError`                                                                 | What to do                                                                            |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| An item has responses in fewer than two categories                          | Leave the item out                                                                    |
+| An item has no response in a category below its highest                     | Merge the empty category with a neighbor                                              |
+| An item has no response in a category from a person who agrees with an item | Merge the category with a neighbor: only persons who disagree with every item used it |
+
 ## Joint maximum likelihood
 
 `jointMaximumLikelihood` estimates the Rasch model for dichotomous items and the PCM for the others jointly with the
@@ -724,8 +799,8 @@ is a² times the variance of the category, and for the NRM the variance of the s
 A model is an object implementing `IrtModel<TParameters>`. Calibration, ability estimation, information, adaptive and
 multistage tests, fit, characteristic curve linking and `simulateResponses` use only its members, so a model defined
 outside the package works there as a built-in one does. Functions that rely on the parameters of the built-in
-models take those only: moment linking, `transformItem`, true-score equating, Lord's chi-square, `simulateItems`,
-the Bookmark method and the conversions of `@measurekit/psychometrics/parameterization`.
+models take those only, the GGUM excepted: moment linking, `transformItem`, true-score equating, Lord's chi-square,
+`simulateItems`, the Bookmark method and the conversions of `@measurekit/psychometrics/parameterization`.
 
 | Member                                               | Purpose                                                                                                         |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -798,7 +873,25 @@ calibrate(
 
 Validate a new model against an R reference before relying on it, as [validation](validation.md) describes.
 
+## Differences from the references
+
+| Topic                                                        | This package                                                           | Reference                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stopping of an unfolding calibration                         | Each stage's EM to `tolerance` on every parameter                      | The GGUM package stops when an EM cycle changes no parameter by more than 0.001, short of the maximum on a slow item: on the fixtures' seed 1, a location by 0.16, and its own log-likelihood 0.149 below that at `tol = 1e-6`                                         |
+| Standard errors of an unfolding item                         | The information of all the items inverted whole, as `"cross-product"`  | The GGUM package inverts each item's block of the same information alone, which leaves out the covariance between items: this package's errors of b are 1.03 to 1.73 times its, and their 95% intervals cover the true b of 142 of the fixtures' 150 items, its of 125 |
+| Names of the GGUM package's threshold errors                 | `t1` to `tC`, in the order of the thresholds                           | Its `SE.tau1` to `SE.tauC` are the errors of τ_C to τ_1                                                                                                                                                                                                                |
+| Quadrature of an unfolding calibration                       | 61 nodes from -6 to 6                                                  | The GGUM package's 30 nodes from -4 to 4: estimates differ by up to 2.2e-3, the most on an item far from the persons                                                                                                                                                   |
+| Starts of an item of six or more categories                  | Its share at or above the middle category, or the first agree category | The GGUM package's share at or above category 2                                                                                                                                                                                                                        |
+| Start of an item agreed with too little to find its distance | 6, the end of the bracket of distances                                 | The GGUM package's 2                                                                                                                                                                                                                                                   |
+| First stage with items of different numbers of categories    | Thresholds shared by the items with the same number                    | The GGUM package's one set, each item taking its last thresholds                                                                                                                                                                                                       |
+
 ## Not included
 
 - **Pairwise, PML, PROX and eigenvector Rasch estimators.** Outside the sources: CML, MML and JML are the practice, and
   are built.
+- **Hyperbolic cosine model.** No reference: no package fits it; the GGUM, the chapter's other unfolding model, is
+  built.
+- **Ideal-point, ALM, SSLM and parallelogram items.** Outside the sources: unfolding forms of mirt; the GGUM is the
+  Handbook's model, and is built.
+- **Linking and equating of unfolding items.** No reference: equateIRT links the dominance models only, and a GGUM
+  item's expected score falls on both sides of its location, where true-score equating needs it to increase.

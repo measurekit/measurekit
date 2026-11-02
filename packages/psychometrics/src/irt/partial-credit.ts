@@ -82,12 +82,17 @@ export function partialCreditDerivatives(
   writeSlopeDerivatives(location, steps, theta, out);
 }
 
-/** Writes dP_k/dδ_m = a P_k (S_m - [k ≥ m]) into columns 1 to K - 1, given the probabilities in column 0. */
-function writeThresholdDerivatives(a: number, count: number, out: Float64Array): void {
+/**
+ * Writes dP_k/dδ_m = a P_k (S_m - [k ≥ m]), for the K - 1 thresholds of an item with K = `count` categories, into
+ * columns `offset` to `offset` + K - 2 of rows of `size` entries, given the probabilities in column 0.
+ */
+export function writeThresholdDerivatives(a: number, count: number, out: Float64Array, size = count, offset = 1): void {
   let tail = 0;
   for (let m = count - 1; m >= 1; m--) {
-    tail += out[m * count] ?? 0;
-    for (let k = 0; k < count; k++) out[k * count + m] = a * (out[k * count] ?? 0) * (tail - (k >= m ? 1 : 0));
+    tail += out[m * size] ?? 0;
+    for (let k = 0; k < count; k++) {
+      out[k * size + offset + m - 1] = a * (out[k * size] ?? 0) * (tail - (k >= m ? 1 : 0));
+    }
   }
 }
 

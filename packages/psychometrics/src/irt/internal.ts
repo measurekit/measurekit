@@ -83,3 +83,4 @@ export { itemTrace, scoreLikelihoods, summedScoreLikelihoods, summedScoreTable }
 export { combine, itemFunctions, logFunction, NO_ITEMS } from "./symmetric-functions.js";
 export { type CheckedThetaDistribution, checkThetaDistribution } from "./theta-distribution.js";
 export { formatList, sharesAbove } from "./thresholds.js";
+export { unfoldingStarts } from "./unfolding-start.js";

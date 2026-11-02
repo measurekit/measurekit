@@ -6,6 +6,7 @@ import {
   fromMirtIrt,
   fromMirtMultidimensional,
   fromMirtSlopeIntercept,
+  generalizedGradedUnfolding,
   generalizedPartialCredit,
   gradedResponse,
   type IrtItem,
@@ -126,14 +127,19 @@ describe("mirt", () => {
   it("converts only the built-in models", () => {
     const custom: IrtModel<LogisticItem> = { ...oneParameterLogistic, name: "Rasch" };
     expect(() => toMirtIrt({ model: custom, parameters: { a: 1, b: 0, c: 0, d: 1 } })).toThrow(
-      `Only the built-in models convert to and from mirt, found the "Rasch" model.`,
+      `Only the built-in models other than the GGUM convert to and from mirt, found the "Rasch" model.`,
+    );
+    expect(() => toMirtIrt({ model: generalizedGradedUnfolding, parameters: { a: 1, b: 0, t: [-1] } })).toThrow(
+      `Only the built-in models other than the GGUM convert to and from mirt, found the "GGUM" model.`,
     );
     expect(() => fromMirtIrt({ a: 1, b: 0, g: 0, u: 1 }, custom)).toThrow(DataError);
   });
 
   it("round-trips the parameters of every built-in model through both forms", () => {
-    // The slope-intercept forms divide by the slope, and mirt fixes the nominal model's first and last slopes apart.
+    // The GGUM does not convert; the slope-intercept forms divide by the slope, and mirt fixes the nominal model's first
+    // and last slopes apart.
     const convertible = arbitraryItem.filter(({ model, parameters }) => {
+      if (model === generalizedGradedUnfolding) return false;
       const vector = model.toVector(parameters);
       if (model !== nominalResponse) return Math.abs(vector[0] ?? 0) > 1e-3;
       // The vector holds every slope but the last, which is minus their sum.

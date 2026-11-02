@@ -328,7 +328,9 @@ function multidimensionalFormOf(model: MultidimensionalModel): MirtForm {
 function formsOf(model: IrtModel): MirtForms {
   const forms = FORMS.get(model);
   if (forms === undefined) {
-    throw new DataError(`Only the built-in models convert to and from mirt, found the ${describe(model.name)} model.`);
+    throw new DataError(
+      `Only the built-in models other than the GGUM convert to and from mirt, found the ${describe(model.name)} model.`,
+    );
   }
   return forms;
 }

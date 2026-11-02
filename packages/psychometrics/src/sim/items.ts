@@ -122,7 +122,9 @@ export function simulateItems<TParameters>(
   checkModel(model, "The model must be one of the built-in models, such as twoParameterLogistic");
   const draws = DRAWS.get(model);
   if (draws === undefined) {
-    throw new DataError(`Simulation supports the built-in models only, found the ${describe(model.name)} model.`);
+    throw new DataError(
+      `Simulation supports the built-in models other than the GGUM, found the ${describe(model.name)} model.`,
+    );
   }
   checkPositiveInteger(count, "The number of items");
   checkRandom(random);

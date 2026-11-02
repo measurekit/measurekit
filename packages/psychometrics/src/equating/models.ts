@@ -40,7 +40,9 @@ function scaleKind(item: IrtItem, label: string): ScaleKind {
   checkItem(item, label);
   const kind = KINDS.get(item.model);
   if (kind === undefined) {
-    throw new DataError(`${label} has the ${item.model.name} model; linking supports the built-in models only.`);
+    throw new DataError(
+      `${label} has the ${item.model.name} model; linking supports the built-in models other than the GGUM.`,
+    );
   }
   return kind;
 }

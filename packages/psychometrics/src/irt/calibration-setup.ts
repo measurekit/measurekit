@@ -52,12 +52,14 @@ export interface FreeParameter {
  * values.
  *
  * @param answered - Whether each person answered an item.
+ * @param starts - The starting parameters of each item, in item order; without them, its model's starting values.
  */
 export function setUp<TParameters>(
   responses: CompressedResponses,
   options: CalibrationOptions<TParameters>,
   answered: readonly boolean[],
   rule: Quadrature,
+  starts?: readonly TParameters[],
 ): Setup<TParameters> {
   const { itemIds } = responses;
   const tallies = categoryTallies(responses);
@@ -89,7 +91,7 @@ export function setUp<TParameters>(
     if (parameters !== undefined) return fixedItem(id, model, parameters, tally.highest + 1, nodes);
     const proportions = checkCategories(id, model, tally);
     const categoryCount = proportions.length;
-    const start = model.toVector(model.startingValues(proportions));
+    const start = model.toVector(starts?.[column] ?? model.startingValues(proportions));
     const specifications = model.parameters(categoryCount);
     const shared = sharedSlots(sharing, model, { id, categoryCount, specifications });
     const own = priorsOfItem.get(id);
