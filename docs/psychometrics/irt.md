@@ -394,7 +394,7 @@ person who understood the passage does better on all its questions. The testlet 
 Wang, 1999) adds a person's effect γ for each testlet: an item of testlet d answers at θ + γ_d, γ_d ~ N(0, σ_d²),
 independent of θ and of the other testlets. It is the bifactor model whose specific slope equals the general one (Li,
 Bolt and Fu, 2006), and it works for items of any model. Use it when local dependence shows within passages, such as
-Yen's Q3 ([fit](fit.md#yens-q3)) well above the average for their pairs: ignoring it overstates the information of the
+Yen's Q3 ([fit](fit.md#local-dependence)) well above the average for their pairs: ignoring it overstates the information of the
 passage's items and the precision of theta.
 
 `testlets` declares the testlets, `{ passage1: ["q1", "q2", "q3"], passage2: [...] }`, two items or more each; items in

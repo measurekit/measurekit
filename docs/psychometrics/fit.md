@@ -1,14 +1,15 @@
 # Item and person fit
 
 `@measurekit/psychometrics/fit` checks how well items and persons fit an [IRT model](irt.md): Rasch infit and
-outfit, the S-X² item fit statistic, the lz person fit statistic, Yen's Q3 for local dependence, the fit of a whole
-calibration by M2, M2* and C2 with RMSEA, SRMSR, TLI and CFI, and the Andersen, Martin-Löf and Wald tests of the Rasch
-family. Each is validated against eRm or mirt ([validation](validation.md)).
+outfit, the S-X² item fit statistic, the RMSD of items, the lz person fit statistic, Yen's Q3 and Chen and Thissen's
+chi-square for local dependence, the fit of a whole calibration by M2, M2* and C2 with RMSEA, SRMSR, TLI and CFI, and
+the Andersen, Martin-Löf and Wald tests of the Rasch family. Each is validated against eRm or mirt ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
   M["Response matrix"] --> I["Items of any model, one per column"]
   I --> S["summedScoreFit: S-X²"]
+  I --> D["Over a population of theta: rootMeanSquareDeviation, localDependenceChiSquare"]
   I --> R["With one theta per person: itemFit, personFit, yenQ3"]
   R --> A["Infit and outfit, lz, Q3"]
   M --> C["A calibration of the matrix"]
@@ -22,7 +23,9 @@ flowchart LR
 Every function takes a [response matrix](data.md) and its items, one per column, of any model, such as a
 calibration's `items`. The residual statistics also take one theta per person, finite, from any estimator; the
 references use maximum likelihood estimates for Rasch items (eRm) and EAP estimates otherwise (mirt).
-`limitedInformationFit` takes the calibration itself, whose group it integrates over. The Rasch tests take the matrix
+`rootMeanSquareDeviation` and `localDependenceChiSquare` integrate over a population of theta, the option
+`population`, N(0, 1) on 61 rectangular points from -6 to 6 by default: give a calibration's group at its nodes when it
+is not standard normal. `limitedInformationFit` takes the calibration itself, whose group it integrates over. The Rasch tests take the matrix
 alone, as they estimate the items themselves.
 
 | Function                                        | Result per                    | Persons used                                                |
@@ -31,6 +34,8 @@ alone, as they estimate the items themselves.
 | `personFit(matrix, items, thetas)`              | person: `PersonFit`           | Each person's answered items                                |
 | `summedScoreFit(matrix, items)`                 | item: `SummedScoreFit`        | Persons who answered every item                             |
 | `yenQ3(matrix, items, thetas)`                  | pair of items: a matrix entry | For each pair, the persons who answered both                |
+| `rootMeanSquareDeviation(matrix, items, …)`     | item: `ItemDeviation`         | Persons with a response                                     |
+| `localDependenceChiSquare(matrix, items, …)`    | pair: `LocalDependencePair`   | For each pair, the persons who answered both                |
 | `limitedInformationFit(matrix, calibration, …)` | test: `LimitedInformationFit` | Persons who answered every item                             |
 | `andersenTest(matrix, options)`                 | test: `AndersenTest`          | Those of conditional maximum likelihood                     |
 | `raschWaldTest(matrix, options)`                | item: `RaschWaldItem`         | Those of conditional maximum likelihood                     |
@@ -112,6 +117,48 @@ mirt's `itemfit(fit_stats = "S_X2")`:
 The degrees of freedom count every parameter of the item's model as estimated, so for anchor items, which were not
 estimated, they are too few by the anchor's parameters.
 
+## RMSD
+
+`rootMeanSquareDeviation` compares each item's curve with its observed shares at the nodes of the population, as TAM's
+`IRT.RMSD` (Oliveri and von Davier, 2014).
+
+```mermaid
+flowchart LR
+  P["Each person's posterior over the nodes,<br/>from the answered items"] --> O["O_qk: the posteriors summed by<br/>the category of the item's response"]
+  O --> S["Observed shares O_qk / O_q"]
+  S --> R["RMSD: √(Σ_q f_q Σ_k (O_qk / O_q - P_k(θ_q))² / K)"]
+  S --> M["Mean deviation: Σ_q f_q Σ_k k (O_qk / O_q - P_k(θ_q)) / (K - 1)"]
+```
+
+f_q is the mean posterior of the persons with a response, the distribution of theta in the sample, and K the item's
+categories. The RMSD is near 0 when the item fits, and does not grow with the persons as a chi-square does. The mean
+deviation is signed: positive when the persons score higher than the item's curve expects. Both are `null` for an item
+no person answered.
+
+```ts
+import {
+  calibrate,
+  createRandom,
+  localDependenceChiSquare,
+  rootMeanSquareDeviation,
+  simulateItems,
+  simulateResponses,
+  simulateThetas,
+  twoParameterLogistic,
+} from "@measurekit/psychometrics";
+
+const random = createRandom(11);
+const items = simulateItems(twoParameterLogistic, 6, random);
+const matrix = simulateResponses(items, simulateThetas(1000, random), random);
+const calibration = calibrate(matrix, { model: twoParameterLogistic });
+rootMeanSquareDeviation(matrix, calibration.items)[0]; // { id: "item1", rmsd: 0.0020, meanDeviation: -2.7e-7 }
+localDependenceChiSquare(matrix, calibration.items)[0];
+// { items: ["item1", "item2"], chiSquare: 0.041, degreesOfFreedom: 1, significance: 0.84, cramersV: -0.0064 }
+```
+
+On 2,000 seeded persons and 10 2PL items, an item given 1 logit harder than its responses has an RMSD above 0.1, and
+the others below 0.05.
+
 ## lz
 
 `standardizedLogLikelihood` in `PersonFit` is Drasgow, Levine and Williams's (1985) lz for items of any model, as
@@ -123,11 +170,25 @@ mirt's `personfit` computes `Zh`. With l0 = Σ ln P(x) over the answered items:
 
 lz is about N(0, 1) under fit at the true theta; large negative values flag unexpected patterns.
 
-## Yen's Q3
+## Local dependence
 
 `yenQ3` correlates the residuals x - E(x | θ) of each pair of items over persons (Yen, 1984), as mirt's
 `residuals(type = "Q3")`. Under local independence Q3 is near -1 / (k - 1) for k items; pairs well above the average
 Q3 suggest dependence, as items sharing a stimulus.
+
+`localDependenceChiSquare` tests each pair without thetas, as mirt's `residuals(type = "LD")` (Chen and Thissen,
+1997). The persons who answered both items fill the table of their categories, O, against the table the model expects
+under local independence:
+
+| Field              | Definition                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `chiSquare`        | Σ (O - E)² / E, with E_kl = n Σ_q w_q P_k(θ_q) P_l(θ_q) over the population; `null` without persons          |
+| `degreesOfFreedom` | (K₁ - 1)(K₂ - 1)                                                                                             |
+| `significance`     | The upper tail of the chi-square                                                                             |
+| `cramersV`         | √(χ² / (n (min(K₁, K₂) - 1))), negative when the observed gamma is below the expected one; `null` without it |
+
+The pairs come in item order: the first item with each later one, then the second. A pair whose items agree more than
+the model expects, as items that share a stimulus, has a large chi-square and a positive V.
 
 ## Limited-information fit
 
@@ -293,44 +354,49 @@ below 1e-5 on each of 5 sets.
 
 Invalid input throws `DataError` naming the value found.
 
-| Error                                                | What to do                                                                    |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
-| The items or the thetas do not match the matrix      | Give one item for each column and one finite theta for each person            |
-| A response is not a category of its item             | Calibrate the item on these data, or give it the categories the data use      |
-| `summedScoreFit` when no person answered every item  | Use `itemFit`, which works from the answered items of each person             |
-| Several groups, covariates, testlets, or a histogram | Calibrate one group of a normal distribution; each group alone is a fit       |
-| More than 60 items                                   | Test a part of the form, or use `summedScoreFit` for each item                |
-| `"m2"` with a polytomous item                        | Use `"m2-star"` or `"c2"`                                                     |
-| A nominal item                                       | Its categories have no order for the mean products to read                    |
-| Parameters that differ from the calibration's AIC    | Give the anchors' ids in `fixed`                                              |
-| Fewer than two persons who answered every item       | Calibrate and test the persons with complete responses                        |
-| A split into one group                               | Give labels of at least two groups; `raschWaldTest` takes exactly two         |
-| Fewer than two items left in a Rasch test            | Split into fewer groups, or test more persons                                 |
-| A set of the Martin-Löf test with one item           | Give sets of two or more items that hold every item once                      |
-| `martinLofTest` when no person answered every item   | Test the items that the same persons answered                                 |
-| A conditional maximum likelihood error               | As in [irt](irt.md#conditional-maximum-likelihood): a category no person used |
+| Error                                                    | What to do                                                                              |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| The items or the thetas do not match the matrix          | Give one item for each column and one finite theta for each person                      |
+| A response is not a category of its item                 | Calibrate the item on these data, or give it the categories the data use                |
+| `summedScoreFit` when no person answered every item      | Use `itemFit`, which works from the answered items of each person                       |
+| Several groups, covariates, testlets, or a histogram     | Calibrate one group of a normal distribution; each group alone is a fit                 |
+| More than 60 items                                       | Test a part of the form, or use `summedScoreFit` for each item                          |
+| `"m2"` with a polytomous item                            | Use `"m2-star"` or `"c2"`                                                               |
+| A nominal item                                           | Its categories have no order for the mean products to read                              |
+| Parameters that differ from the calibration's AIC        | Give the anchors' ids in `fixed`                                                        |
+| Fewer than two persons who answered every item           | Calibrate and test the persons with complete responses                                  |
+| A split into one group                                   | Give labels of at least two groups; `raschWaldTest` takes exactly two                   |
+| Fewer than two items left in a Rasch test                | Split into fewer groups, or test more persons                                           |
+| A set of the Martin-Löf test with one item               | Give sets of two or more items that hold every item once                                |
+| `martinLofTest` when no person answered every item       | Test the items that the same persons answered                                           |
+| A population that is not nodes with weights summing to 1 | Give finite nodes and non-negative weights that sum to 1, such as a calibration group's |
+| A conditional maximum likelihood error                   | As in [irt](irt.md#conditional-maximum-likelihood): a category no person used           |
 
 ## Differences from the references
 
-| Topic                                                  | This package                                                                                     | Reference                                                                                                                                                                               |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Missing responses                                      | Infit and outfit skip them in every sum                                                          | eRm's infit sums W over every person                                                                                                                                                    |
-| Small probabilities                                    | ln P of an observed category clamped at the smallest double                                      | mirt's `personfit` counts an observed category with P below 2.2e-16 as P = 1                                                                                                            |
-| Person mean squares                                    | As eRm                                                                                           | mirt's `personfit` raises W² below 1e-5 to 1e-5 and caps q at 1.4142                                                                                                                    |
-| S-X² degrees of freedom                                | Every parameter of the model                                                                     | mirt: the freely estimated parameters                                                                                                                                                   |
-| An empty S-X² table                                    | `null` for the item                                                                              | mirt stops collapsing the remaining items                                                                                                                                               |
-| M2 of the Rasch model with a free variance             | Δ has the column of the variance, which the df counts                                            | mirt's Δ leaves it out, while its df counts it: 242.156, against 242.051 with the column, which equals mirt's 1PL, the same model, at 242.052                                           |
-| M2 of an estimated normal group                        | Δ has the columns of its mean and SD, which the df counts                                        | mirt's Δ leaves them out, while its df counts them: 72.176 on the fixtures' anchored 2PL, against 72.079 with the columns                                                               |
-| M2 and C2 of a GPCM or PCM                             | The model's derivative with respect to its slope                                                 | mirt's `dP` of a `gpcm` slope is wrong: at θ = 1, -0.62 against 0.79 by central differences of mirt's own probabilities; its PCM C2 is 224.87, against 228.77 with the right derivative |
-| M2* of the independence model                          | N Σ r², on J (J - 1) / 2 df: the statistic on the whole complement of Δ, on polytomous items too | mirt's Δ has rank J below its columns, and `qr.Q` takes an arbitrary part of the complement: 238.6, and 257.6 with the items reversed                                                   |
-| A Δ whose rank is below its columns                    | The whole complement of its span, with the moments less its rank as df                           | mirt and GDINA take nrow - ncol columns of `qr.Q`'s complement, which depend on the order of Δ's columns                                                                                |
-| Missing responses in M2                                | The persons who answered every item                                                              | mirt: each moment from the persons who answered its items                                                                                                                               |
-| Rasch tests with missing responses of polytomous items | Each conditional likelihood is maximized                                                         | eRm's `PCM` does not maximize it (see [irt](irt.md#differences-from-erm)), so neither does `LRtest`: 60.46 on the fixtures' small sparse test, whose statistic is 11.65 by base R       |
-| Items left out of a Rasch test                         | Counted again after each item left out, over the persons each conditional likelihood uses        | eRm checks each group once over all its persons, so an item that another's exclusion leaves constant stays, and its parameter in that group diverges                                    |
-| The Wald test of a polytomous item                     | The item's location, the mean of its thresholds                                                  | eRm's `Waldtest` compares each item-category parameter, normalized to sum to 0 for the PCM; for the rating scale model the location equals eRm's first one                              |
-| The Martin-Löf test of the rating scale model          | Its degrees of freedom count the steps of each set                                               | eRm's `MLoef` counts those of the partial credit model: 80 on the fixtures' rating scale test, against 82                                                                               |
-| The Martin-Löf test with missing responses             | The persons who answered every item                                                              | eRm's `MLoef` stops                                                                                                                                                                     |
-| A total equal to the mean, with missing responses      | In the lower group                                                                               | eRm puts it in the upper group with missing responses, in the lower without                                                                                                             |
+| Topic                                                  | This package                                                                                     | Reference                                                                                                                                                                                                                                          |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing responses                                      | Infit and outfit skip them in every sum                                                          | eRm's infit sums W over every person                                                                                                                                                                                                               |
+| Small probabilities                                    | ln P of an observed category clamped at the smallest double                                      | mirt's `personfit` counts an observed category with P below 2.2e-16 as P = 1                                                                                                                                                                       |
+| Person mean squares                                    | As eRm                                                                                           | mirt's `personfit` raises W² below 1e-5 to 1e-5 and caps q at 1.4142                                                                                                                                                                               |
+| S-X² degrees of freedom                                | Every parameter of the model                                                                     | mirt: the freely estimated parameters                                                                                                                                                                                                              |
+| An empty S-X² table                                    | `null` for the item                                                                              | mirt stops collapsing the remaining items                                                                                                                                                                                                          |
+| M2 of the Rasch model with a free variance             | Δ has the column of the variance, which the df counts                                            | mirt's Δ leaves it out, while its df counts it: 242.156, against 242.051 with the column, which equals mirt's 1PL, the same model, at 242.052                                                                                                      |
+| M2 of an estimated normal group                        | Δ has the columns of its mean and SD, which the df counts                                        | mirt's Δ leaves them out, while its df counts them: 72.176 on the fixtures' anchored 2PL, against 72.079 with the columns                                                                                                                          |
+| M2 and C2 of a GPCM or PCM                             | The model's derivative with respect to its slope                                                 | mirt's `dP` of a `gpcm` slope is wrong: at θ = 1, -0.62 against 0.79 by central differences of mirt's own probabilities; its PCM C2 is 224.87, against 228.77 with the right derivative                                                            |
+| M2* of the independence model                          | N Σ r², on J (J - 1) / 2 df: the statistic on the whole complement of Δ, on polytomous items too | mirt's Δ has rank J below its columns, and `qr.Q` takes an arbitrary part of the complement: 238.6, and 257.6 with the items reversed                                                                                                              |
+| A Δ whose rank is below its columns                    | The whole complement of its span, with the moments less its rank as df                           | mirt and GDINA take nrow - ncol columns of `qr.Q`'s complement, which depend on the order of Δ's columns                                                                                                                                           |
+| Missing responses in M2                                | The persons who answered every item                                                              | mirt: each moment from the persons who answered its items                                                                                                                                                                                          |
+| Rasch tests with missing responses of polytomous items | Each conditional likelihood is maximized                                                         | eRm's `PCM` does not maximize it (see [irt](irt.md#differences-from-erm)), so neither does `LRtest`: 60.46 on the fixtures' small sparse test, whose statistic is 11.65 by base R                                                                  |
+| Items left out of a Rasch test                         | Counted again after each item left out, over the persons each conditional likelihood uses        | eRm checks each group once over all its persons, so an item that another's exclusion leaves constant stays, and its parameter in that group diverges                                                                                               |
+| The Wald test of a polytomous item                     | The item's location, the mean of its thresholds                                                  | eRm's `Waldtest` compares each item-category parameter, normalized to sum to 0 for the PCM; for the rating scale model the location equals eRm's first one                                                                                         |
+| The Martin-Löf test of the rating scale model          | Its degrees of freedom count the steps of each set                                               | eRm's `MLoef` counts those of the partial credit model: 80 on the fixtures' rating scale test, against 82                                                                                                                                          |
+| The Martin-Löf test with missing responses             | The persons who answered every item                                                              | eRm's `MLoef` stops                                                                                                                                                                                                                                |
+| A total equal to the mean, with missing responses      | In the lower group                                                                               | eRm puts it in the upper group with missing responses, in the lower without                                                                                                                                                                        |
+| The mean deviation of items of unequal categories      | Each item's divided by its own K - 1                                                             | CDM's `IRT.RMSD` divides a table of nodes by items by the vector of the items' K - 1, which R recycles down the nodes, so each node takes another item's divisor: up to 0.0034 off on the fixtures, where the written-out values are the reference |
+| RMSD of an item with a category no person chose        | The deviations averaged over the item's categories                                               | CDM averages over the categories chosen                                                                                                                                                                                                            |
+| Persons without responses in the RMSD                  | Left out of f, the mean posterior                                                                | TAM's `pi.k` averages the prior of such a person too                                                                                                                                                                                               |
+| A pair whose observed gamma is undefined               | The chi-square, with `cramersV` `null`                                                           | mirt gives `NaN` for both                                                                                                                                                                                                                          |
 
 ## Not included
 
@@ -338,6 +404,10 @@ Invalid input throws `DataError` naming the value found.
 - **Stepwise item elimination.** No fit: a loop over `andersenTest` or `raschWaldTest`.
 - **Bootstrap goodness of fit of the Rasch model.** No fit: a loop over `calibrate`.
 - **eRm's `gofIRT`.** Outside the sources: an option of eRm.
+- **The G² form of local dependence.** Outside the sources: an option of mirt; `localDependenceChiSquare` is Chen and
+  Thissen's X² form.
+- **Bias-corrected RMSD, MAD and the RMSD chi-square.** Outside the sources: options of CDM's `IRT.RMSD`.
+- **MADaQ3 and TAM's absolute chi-square.** Outside the sources: options of TAM; `yenQ3` and SRMSR cover them.
 - **M2 for several groups.** Outside the sources: an option of mirt; `limitedInformationFit` takes one population.
 - **M2 with covariates, testlets or an empirical histogram.** Outside the sources: options of mirt; the normal population
   is the practice.

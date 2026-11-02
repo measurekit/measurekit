@@ -1,6 +1,149 @@
+import { chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { type IrtItem, largestCategoryCount } from "../irt/internal.js";
-import { checkItems, checkPersonThetas, scoreMoments } from "./inputs.js";
+import { type IrtItem, itemTrace, largestCategoryCount } from "../irt/internal.js";
+import { checkItems, checkPersonThetas, type ResidualFitOptions, residualPopulation, scoreMoments } from "./inputs.js";
+
+/** Chen and Thissen's local-dependence statistic of a pair of items. */
+export interface LocalDependencePair {
+  /** The ids of the two items, in item order. */
+  readonly items: readonly [first: string, second: string];
+  /**
+   * Σ (O - E)² / E over the cells of the pair's table of categories; `null` when no person answered both items or a
+   * cell's expected count is 0.
+   */
+  readonly chiSquare: number | null;
+  /** (K₁ - 1)(K₂ - 1) for the items' numbers of categories. */
+  readonly degreesOfFreedom: number;
+  /** The upper tail of the chi-square at the statistic; `null` with it. */
+  readonly significance: number | null;
+  /**
+   * Cramér's V, √(χ² / (n (min(K₁, K₂) - 1))), positive when the observed association, by Goodman and Kruskal's gamma,
+   * is at least the expected one, and negative when below it; `null` with `chiSquare`, or when the observed table has
+   * no pairs of persons that order the items, so that its gamma is undefined.
+   */
+  readonly cramersV: number | null;
+}
+
+/**
+ * Returns Chen and Thissen's local-dependence chi-square for every pair of items, as mirt's `residuals(type = "LD")`.
+ *
+ * @remarks
+ * For each pair, the persons who answered both items fill a table of their categories, O, which is compared with the
+ * table the model expects under local independence, E_kl = n Σ_q w_q P_k(θ_q) P_l(θ_q) over the nodes and weights of
+ * the population: χ² = Σ (O - E)² / E, about chi-square on (K₁ - 1)(K₂ - 1) degrees of freedom when the items are
+ * independent given theta. Cramér's V scales it to a size, signed by whether the items agree more than the model
+ * expects. The pairs are in item order: the first item with each later one, then the second, and so on.
+ *
+ * @param matrix - The responses of the persons.
+ * @param items - The calibrated items, in the order of the matrix's items.
+ * @param options - The population.
+ * @returns For each pair of items, the statistic, its degrees of freedom and significance, and the signed Cramér's V.
+ * @throws `DataError` when the matrix, the items or the population are invalid, or a response is not a category of
+ * its item.
+ * @see {@link https://doi.org/10.3102/10769986022003265 | Chen and Thissen (1997)}
+ */
+export function localDependenceChiSquare(
+  matrix: ResponseMatrix,
+  items: readonly IrtItem[],
+  options: ResidualFitOptions = {},
+): LocalDependencePair[] {
+  checkItems(matrix, items);
+  const { nodes, weights } = residualPopulation(options);
+  const counts = items.map((item) => item.model.categoryCount(item.parameters));
+  const traces = items.map((item, i) => itemTrace(item, counts[i] ?? 0, nodes));
+  const pairs: LocalDependencePair[] = [];
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const first = { column: i, count: counts[i] ?? 0, trace: traces[i] ?? new Float64Array(0) };
+      const second = { column: j, count: counts[j] ?? 0, trace: traces[j] ?? new Float64Array(0) };
+      pairs.push({
+        items: [matrix.itemIds[i] ?? "", matrix.itemIds[j] ?? ""],
+        ...pairStatistic(matrix.responses, first, second, weights),
+      });
+    }
+  }
+  return pairs;
+}
+
+/** An item of a pair: its column, its number of categories and its probabilities at the nodes, by node, then category. */
+interface PairItem {
+  readonly column: number;
+  readonly count: number;
+  readonly trace: Float64Array;
+}
+
+/** Returns the statistic of a pair of items from the persons who answered both. */
+function pairStatistic(
+  responses: ResponseMatrix["responses"],
+  first: PairItem,
+  second: PairItem,
+  weights: Float64Array,
+): Omit<LocalDependencePair, "items"> {
+  const columns = second.count;
+  const degreesOfFreedom = (first.count - 1) * (columns - 1);
+  const observed = new Float64Array(first.count * columns);
+  let persons = 0;
+  for (const row of responses) {
+    const k = row[first.column] ?? null;
+    const l = row[second.column] ?? null;
+    if (k === null || l === null) continue;
+    observed[k * columns + l] = (observed[k * columns + l] ?? 0) + 1;
+    persons++;
+  }
+  const expected = new Float64Array(first.count * columns);
+  weights.forEach((weight, q) => {
+    for (let k = 0; k < first.count; k++) {
+      const left = weight * (first.trace[q * first.count + k] ?? 0);
+      for (let l = 0; l < columns; l++) {
+        expected[k * columns + l] = (expected[k * columns + l] ?? 0) + left * (second.trace[q * columns + l] ?? 0);
+      }
+    }
+  });
+  let chiSquare = 0;
+  for (let cell = 0; cell < expected.length; cell++) {
+    const count = persons * (expected[cell] ?? 0);
+    expected[cell] = count;
+    chiSquare += ((observed[cell] ?? 0) - count) ** 2 / count;
+  }
+  if (persons === 0 || !Number.isFinite(chiSquare)) {
+    return { chiSquare: null, degreesOfFreedom, significance: null, cramersV: null };
+  }
+  const association = goodmanKruskalGamma(observed, columns) - goodmanKruskalGamma(expected, columns);
+  const size = Math.sqrt(chiSquare / (persons * (Math.min(first.count, columns) - 1)));
+  return {
+    chiSquare,
+    degreesOfFreedom,
+    significance: chiSquareUpperTail(chiSquare, degreesOfFreedom),
+    cramersV: Number.isNaN(association) ? null : association < 0 ? -size : size,
+  };
+}
+
+/**
+ * Returns Goodman and Kruskal's gamma of a table by rows, (C - D) / (C + D) for C the pairs of persons ordered alike on
+ * both items and D those ordered oppositely; NaN when there are none.
+ */
+function goodmanKruskalGamma(table: Float64Array, columns: number): number {
+  const rows = table.length / columns;
+  let concordant = 0;
+  let discordant = 0;
+  for (let k = 0; k < rows - 1; k++) {
+    for (let l = 0; l < columns; l++) {
+      const cell = table[k * columns + l] ?? 0;
+      concordant += cell * blockSum(table, columns, k + 1, l + 1, columns);
+      discordant += cell * blockSum(table, columns, k + 1, 0, l);
+    }
+  }
+  return (concordant - discordant) / (concordant + discordant);
+}
+
+/** Returns the sum of a table's cells in the rows from `row` on and the columns from `start` to before `end`. */
+function blockSum(table: Float64Array, columns: number, row: number, start: number, end: number): number {
+  let sum = 0;
+  for (let index = row * columns; index < table.length; index += columns) {
+    for (let l = start; l < end; l++) sum += table[index + l] ?? 0;
+  }
+  return sum;
+}
 
 /**
  * Returns Yen's Q3 for every pair of items.

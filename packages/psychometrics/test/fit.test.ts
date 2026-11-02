@@ -15,6 +15,7 @@ import {
   itemFit,
   type LimitedInformationFit,
   limitedInformationFit,
+  localDependenceChiSquare,
   martinLofTest,
   nominalResponse,
   oneParameterLogistic,
@@ -23,6 +24,7 @@ import {
   type ResponseMatrix,
   raschWaldTest,
   responseMatrix,
+  rootMeanSquareDeviation,
   simulateItems,
   simulateResponses,
   simulateThetas,
@@ -34,9 +36,11 @@ import {
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
 import limited from "./fixtures/fit-limited-information.json" with { type: "json" };
+import localDependence from "./fixtures/fit-local-dependence.json" with { type: "json" };
 import rasch from "./fixtures/fit-rasch.json" with { type: "json" };
 import raschTests from "./fixtures/fit-rasch-tests.json" with { type: "json" };
 import residuals from "./fixtures/fit-residuals.json" with { type: "json" };
+import rmsd from "./fixtures/fit-rmsd.json" with { type: "json" };
 import summedScore from "./fixtures/fit-summed-score.json" with { type: "json" };
 
 // Tolerances against R, explained in docs/validation.md.
@@ -48,6 +52,8 @@ const LIMITED_TOLERANCE = 1e-3;
 const LIMITED_EM_TOLERANCE = 1e-8;
 /** M2 of the rejection sets, whose calibrations stop at the reference's 1e-6. */
 const REJECTION_TOLERANCE = 2e-2;
+/** The RMSD and mean deviation against TAM, whose calibrations stop at 1e-10. */
+const RMSD_TOLERANCE = 1e-8;
 /** The likelihood-ratio statistics of the Rasch tests against eRm, whose nlm stops short of the maximum. */
 const RASCH_STATISTIC_TOLERANCE = 1e-6;
 /** The Wald z of an item against eRm, first-order in the estimates where nlm stops. */
@@ -203,6 +209,83 @@ describe("yenQ3", () => {
   });
 });
 
+describe("localDependenceChiSquare", () => {
+  for (const fixture of localDependence.cases) {
+    it(`matches mirt's LD residuals for ${fixture.name}`, () => {
+      const options = "population" in fixture ? { population: fixture.population } : {};
+      const result = localDependenceChiSquare(responseMatrix(fixture.responses), fixtureItems(fixture.items), options);
+      expect(result.map((pair) => pair.degreesOfFreedom)).toEqual(fixture.degreesOfFreedom);
+      result.forEach((pair, p) => {
+        const label = pair.items.join(", ");
+        expectClose(pair.chiSquare, fixture.chiSquare[p] ?? null, FIT_TOLERANCE, `χ² ${label}`);
+        expectClose(pair.significance, fixture.significance[p] ?? null, FIT_TOLERANCE, `p ${label}`);
+        expectClose(pair.cramersV, fixture.cramersV[p] ?? null, FIT_TOLERANCE, `V ${label}`);
+      });
+    });
+  }
+
+  it("lists each pair once, the first item with each later one, then the second", () => {
+    const { matrix, items: pool } = simulated(41, 100, 4);
+    expect(localDependenceChiSquare(matrix, pool).map((pair) => pair.items.join())).toEqual([
+      "item1,item2",
+      "item1,item3",
+      "item1,item4",
+      "item2,item3",
+      "item2,item4",
+      "item3,item4",
+    ]);
+  });
+
+  it("flags a planted dependent pair with a positive V", () => {
+    // Thresholds set before the first run: the planted pair has p below 1e-6 and the largest V.
+    const random = createRandom(43);
+    const { matrix, items: pool } = simulated(42, 2000, 8);
+    const planted = responseMatrix(
+      matrix.responses.map((row) =>
+        row.map((response, i) => (i === 1 && random.uniform() < 0.5 ? (row[0] ?? 0) : response)),
+      ),
+    );
+    const [first, ...others] = localDependenceChiSquare(planted, pool);
+    expect(defined(first?.significance)).toBeLessThan(1e-6);
+    expect(others.every((pair) => defined(pair.cramersV) < defined(first?.cramersV))).toBe(true);
+  });
+
+  it("uses the persons who answered both items, and gives null where a table has no persons or no order", () => {
+    const pool = [...HALVES, ...HALVES.slice(0, 1)];
+    const [both, none, constant] = localDependenceChiSquare(
+      responseMatrix([
+        [1, null, 1],
+        [0, null, 1],
+        [null, 1, 1],
+      ]),
+      pool,
+    );
+    expect(both).toEqual({
+      items: ["item1", "item2"],
+      chiSquare: null,
+      degreesOfFreedom: 1,
+      significance: null,
+      cramersV: null,
+    });
+    // Item 3 is 1 for both persons of the pair: the observed gamma is undefined, the chi-square is not.
+    expect(none?.items).toEqual(["item1", "item3"]);
+    expect([none?.chiSquare === null, none?.cramersV]).toEqual([false, null]);
+    expect(constant?.chiSquare).not.toBeNull();
+  });
+
+  it("refuses arguments of other types", () => {
+    const { matrix, items: pool } = simulated(44, 20, 3);
+    expect(() => localDependenceChiSquare(JSON.parse("null"), pool)).toThrow(DataError);
+    expect(() => localDependenceChiSquare(matrix, JSON.parse("{}"))).toThrow(
+      "The items must be an array, found an object.",
+    );
+    expect(() => localDependenceChiSquare(matrix, pool, JSON.parse("null"))).toThrow(DataError);
+    expect(() => localDependenceChiSquare(matrix, pool, JSON.parse('{ "population": null }'))).toThrow(
+      /The population must be an object/,
+    );
+  });
+});
+
 describe("personFit", () => {
   for (const fixture of rasch.cases) {
     it(`matches eRm's personfit for the ${fixture.name} model`, () => {
@@ -307,6 +390,67 @@ function calibratedCase(
     ...(latent !== undefined && { latent: "normal" as const }),
   });
 }
+
+describe("rootMeanSquareDeviation", () => {
+  for (const fixture of rmsd.cases) {
+    it(`matches TAM's IRT.RMSD for ${fixture.name}`, () => {
+      const result = rootMeanSquareDeviation(responseMatrix(fixture.responses), fixtureItems(fixture.items), {
+        population: fixture.population,
+      });
+      result.forEach((item, i) => {
+        expectClose(item.rmsd, fixture.rmsd[i] ?? null, RMSD_TOLERANCE, `${item.id} RMSD`);
+        expectClose(item.meanDeviation, fixture.meanDeviation[i] ?? null, RMSD_TOLERANCE, `${item.id} MD`);
+      });
+    });
+  }
+
+  it("divides each item's mean deviation by its own categories, where IRT.RMSD takes another item's", () => {
+    const fixture = defined(rmsd.cases.find((candidate) => candidate.name === "partial credit"));
+    const differences = fixture.meanDeviation.map((value, i) => Math.abs(value - (fixture.tamMeanDeviation[i] ?? 0)));
+    expect(Math.max(...differences)).toBeGreaterThan(1e-3);
+  });
+
+  it("finds a shifted item, and items that fit near 0", () => {
+    // Thresholds set before the first run: above 0.1 for an item 1 logit harder than its responses, below 0.05 otherwise.
+    const { matrix, items: pool } = simulated(45, 2000, 10);
+    const shifted = pool.map((item, i) =>
+      i === 0
+        ? {
+            ...item,
+            parameters: { ...(item.parameters as { b: number }), b: (item.parameters as { b: number }).b + 1 },
+          }
+        : item,
+    );
+    const [first, ...others] = rootMeanSquareDeviation(matrix, shifted);
+    expect(defined(first?.rmsd)).toBeGreaterThan(0.1);
+    expect(defined(first?.meanDeviation)).toBeGreaterThan(0);
+    expect(others.every((item) => defined(item.rmsd) < 0.05)).toBe(true);
+  });
+
+  it("integrates over N(0, 1) on 61 points by default, and leaves out persons without responses", () => {
+    const { matrix, items: pool } = simulated(46, 200, 4);
+    const nodes = Array.from({ length: 61 }, (_, q) => -6 + q / 5);
+    const densities = nodes.map((node) => Math.exp(-(node ** 2) / 2));
+    const total = densities.reduce((sum, density) => sum + density, 0);
+    const population = { nodes, weights: densities.map((density) => density / total) };
+    expectSameNumbers(rootMeanSquareDeviation(matrix, pool), rootMeanSquareDeviation(matrix, pool, { population }));
+    const empty = responseMatrix([...matrix.responses, [null, null, null, null]]);
+    expectSameNumbers(rootMeanSquareDeviation(empty, pool), rootMeanSquareDeviation(matrix, pool));
+    const unanswered = responseMatrix(matrix.responses.map((row) => [null, ...row.slice(1)]));
+    expect(rootMeanSquareDeviation(unanswered, pool)[0]).toEqual({ id: "item1", rmsd: null, meanDeviation: null });
+  });
+
+  it("refuses arguments of other types", () => {
+    const { matrix, items: pool } = simulated(47, 20, 3);
+    expect(() => rootMeanSquareDeviation(JSON.parse("[]"), pool)).toThrow(DataError);
+    expect(() => rootMeanSquareDeviation(matrix, pool.slice(1))).toThrow("Found 2 items for 3 columns of responses.");
+    expect(() => rootMeanSquareDeviation(matrix, pool, JSON.parse("null"))).toThrow(DataError);
+    const population = (value: string) => () =>
+      rootMeanSquareDeviation(matrix, pool, { population: JSON.parse(value) });
+    expect(population('{ "nodes": "0", "weights": [1] }')).toThrow(/The nodes of the population must be an array/);
+    expect(population('{ "nodes": [0, 1], "weights": [0.5, 0.6] }')).toThrow(/must sum to 1, found 1.1/);
+  });
+});
 
 describe("limitedInformationFit", () => {
   const binary = responseMatrix(limited.binary.responses);
@@ -844,6 +988,25 @@ describe("properties", () => {
           items: order.map((i): CalibratedItem<unknown> => defined(calibration.items[i])),
         };
         expectSameNumbers(limitedInformationFit(items, reversed, { statistic }), fit);
+      }),
+      { numRuns: 20 },
+    );
+  });
+
+  it("the local-dependence statistics of a pair do not depend on the order of the items", () => {
+    fc.assert(
+      fc.property(seeds, (seed) => {
+        const { matrix, items: pool } = simulated(seed, 80, 4);
+        const reversed = responseMatrix(
+          matrix.responses.map((row) => [...row].reverse()),
+          { itemIds: [...matrix.itemIds].reverse() },
+        );
+        const forward = localDependenceChiSquare(matrix, pool);
+        const backward = localDependenceChiSquare(reversed, [...pool].reverse());
+        for (const pair of forward) {
+          const twin = defined(backward.find((other) => other.items.join() === [...pair.items].reverse().join()));
+          expectSameNumbers({ ...twin, items: [] }, { ...pair, items: [] });
+        }
       }),
       { numRuns: 20 },
     );

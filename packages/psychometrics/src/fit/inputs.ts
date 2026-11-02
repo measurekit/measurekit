@@ -1,6 +1,33 @@
-import { checkArray, checkFinite, DataError } from "@measurekit/core";
+import { checkArray, checkFinite, checkOptions, DataError, type ThetaDistribution } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { checkItem, type IrtItem } from "../irt/internal.js";
+import {
+  type CheckedThetaDistribution,
+  checkItem,
+  checkThetaDistribution,
+  type IrtItem,
+  quadratureRule,
+} from "../irt/internal.js";
+
+/** Options of {@link rootMeanSquareDeviation} and {@link localDependenceChiSquare}. */
+export interface ResidualFitOptions {
+  /**
+   * The distribution of theta of the persons, such as a calibration's group at its nodes.
+   *
+   * @defaultValue N(0, 1) on 61 rectangular points from -6 to 6
+   */
+  readonly population?: ThetaDistribution;
+}
+
+/**
+ * Checks the options of a residual fit statistic and returns its population's nodes and weights.
+ *
+ * @throws `DataError` when the options or the population are invalid.
+ */
+export function residualPopulation(options: ResidualFitOptions): CheckedThetaDistribution {
+  checkOptions(options);
+  const { population } = options;
+  return population === undefined ? quadratureRule() : checkThetaDistribution(population, "population");
+}
 
 /**
  * Checks a response matrix and its items: one valid item per column, and every response a category of its item.

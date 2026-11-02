@@ -204,6 +204,14 @@ export const RULES: readonly Rule[] = [
     titles: "martinLofTest.*uses the persons who answered every item",
   },
   {
+    rule: "A local-dependence table counts the persons who answered both items, and a missing response is not read as category 0.",
+    file: "packages/psychometrics/src/fit/local-dependence.ts",
+    find: "if (k === null || l === null) continue;",
+    replace: "",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "localDependenceChiSquare.*uses the persons who answered both items",
+  },
+  {
     rule: "The fit of a diagnosis model stops at 60 items, before the moments, whose matrix grows with their fourth power.",
     file: "packages/psychometrics/src/cdm/model-fit.ts",
     find: "if (models.length > MAX_MOMENT_ITEMS) {",
