@@ -116,7 +116,8 @@ pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumente
 ```
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before
-finishing a change. Development needs Node.js 22.18+ and pnpm 12.
+finishing a change. Development needs Node.js 22.18+ and pnpm 12. Every push runs every job of CI, and a newer push to the same
+ref cancels the run in progress; a cancelled run is not a failure.
 
 ## Releases
 

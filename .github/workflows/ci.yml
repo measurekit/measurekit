@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# A newer push to a branch or a pull request cancels the run in progress: it holds the commits of the older run, and every run
+# checks the whole repository.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
