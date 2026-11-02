@@ -74,6 +74,7 @@ import {
   NO_ITEMS,
   NO_RESPONSES,
   population,
+  rescaledWeights,
   squarem,
   unfoldingStarts,
 } from "../src/irt/internal.js";
@@ -93,6 +94,7 @@ import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json"
 import latent from "./fixtures/irt-latent.json" with { type: "json" };
 import latentRegression from "./fixtures/irt-latent-regression.json" with { type: "json" };
 import lsat7 from "./fixtures/irt-lsat7.json" with { type: "json" };
+import weighted from "./fixtures/irt-person-weights.json" with { type: "json" };
 import posterior from "./fixtures/irt-posterior.json" with { type: "json" };
 import science from "./fixtures/irt-science.json" with { type: "json" };
 import scoring from "./fixtures/irt-scoring.json" with { type: "json" };
@@ -123,6 +125,14 @@ const MODAL_TOLERANCE = 1e-5;
 const EXACT_ABILITY_TOLERANCE = 1e-10;
 /** Information against mirt; absolute, as mirt's 1 - P loses relative precision in the tails. */
 const INFORMATION_TOLERANCE = 1e-12;
+/** Calibrations with person weights against mirt and TAM, and a weighted latent regression against repeated persons. */
+const WEIGHTED_TOLERANCE = 1e-3;
+/** Integer weights against the persons repeated by them: the same sums, rounded in another order. */
+const EXPANSION_TOLERANCE = 1e-9;
+/** Relative tolerance of the standard errors of integer weights: numerical Hessians of two scaled likelihoods. */
+const EXPANSION_STANDARD_ERROR_TOLERANCE = 1e-8;
+/** Relative tolerance of weights times a constant, rescaled: a few rounding errors in each weight and in their sum. */
+const RESCALED_WEIGHTS_TOLERANCE = 1e-13;
 /** CML estimates, standard errors and log-likelihood against eRm, whose nlm stops short of the maximum. */
 const ERM_TOLERANCE = 2e-4;
 /** CML against base R's conditional likelihood by every pattern, maximized by optim to 1e-15. */
@@ -1397,7 +1407,7 @@ describe("expectationStep", () => {
   }
 
   function groups(logWeights?: Float64Array) {
-    const result = population({}, answered, rule, true, false, () => 0);
+    const result = population({}, answered, rule, true, false, () => 0, null);
     if (logWeights !== undefined) result.groups[0]?.logWeights.set(logWeights);
     return result;
   }
@@ -2377,6 +2387,283 @@ describe("reliability", () => {
   });
 });
 
+/** Returns the entries of each person repeated as often as the person's integer weight. */
+function repeated<T>(values: readonly T[], weights: readonly number[]): T[] {
+  return values.flatMap((value, person) => Array.from({ length: weights[person] ?? 0 }, () => value));
+}
+
+describe("person weights", () => {
+  const { twoPl, graded, groups, rasch, regression } = weighted.cases;
+  const matrixOf = (reference: {
+    readonly itemIds: readonly string[];
+    readonly responses: readonly (readonly (number | null)[])[];
+  }) => responseMatrix(reference.responses, { itemIds: reference.itemIds });
+  const tight = { tolerance: 1e-8, maxIterations: 5000 } as const;
+
+  it("matches mirt's survey weights for the 2PL: items, log-likelihood, BIC and both kinds of standard errors", () => {
+    const methods = [
+      ["hessian", twoPl.hessianErrors],
+      ["cross-product", twoPl.crossProductErrors],
+    ] as const;
+    for (const [standardErrors, expectedErrors] of methods) {
+      const result = calibrate(matrixOf(twoPl), {
+        model: twoParameterLogistic,
+        personWeights: twoPl.weights,
+        standardErrors,
+        ...tight,
+      });
+      expect(result.converged).toBe(true);
+      twoPl.items.forEach((expected, i) => {
+        const item = defined(result.items[i]);
+        expectParameters(
+          { a: (item.parameters as LogisticItem).a, b: (item.parameters as LogisticItem).b },
+          expected,
+          WEIGHTED_TOLERANCE,
+          `item ${i + 1}`,
+        );
+        expectParameters(item.standardErrors, expectedErrors[i], WEIGHTED_TOLERANCE, `${standardErrors} ${i + 1}`);
+      });
+      expectClose(result.logLikelihood, twoPl.logLikelihood, WEIGHTED_TOLERANCE);
+      expectClose(result.bic, twoPl.bic, WEIGHTED_TOLERANCE);
+    }
+  });
+
+  it("matches mirt's survey weights for the graded response model", () => {
+    const result = calibrate(matrixOf(graded), { model: gradedResponse, personWeights: graded.weights, ...tight });
+    expect(result.converged).toBe(true);
+    graded.items.forEach((expected, i) => {
+      expectParameters(defined(result.items[i]).parameters, expected, WEIGHTED_TOLERANCE, `item ${i + 1}`);
+    });
+    expectClose(result.logLikelihood, graded.logLikelihood, WEIGHTED_TOLERANCE);
+  });
+
+  it("matches base R's maximum of the weighted likelihood in two groups, which mirt's survey weights stop short of", () => {
+    const result = calibrate(matrixOf(groups), {
+      model: twoParameterLogistic,
+      personWeights: groups.weights,
+      groups: groups.groups,
+      latent: { focal: "normal" },
+      ...tight,
+    });
+    expect(result.converged).toBe(true);
+    groups.items.forEach((expected, i) => {
+      const { a, b } = defined(result.items[i]).parameters as LogisticItem;
+      expectParameters({ a, b }, expected, WEIGHTED_TOLERANCE, `item ${i + 1}`);
+    });
+    const focal = defined(result.groups.find(({ group }) => group === "focal"));
+    expectClose(focal.mean, groups.focal.mean, WEIGHTED_TOLERANCE);
+    expectClose(focal.sd, groups.focal.sd, WEIGHTED_TOLERANCE);
+    expectClose(result.logLikelihood, groups.logLikelihood, WEIGHTED_TOLERANCE);
+    expect(result.logLikelihood).toBeGreaterThan(groups.mirt.logLikelihood);
+    expectClose(focal.sd, groups.mirt.focal.sd, WEIGHTED_TOLERANCE);
+  });
+
+  it("matches TAM's pweights for the Rasch model with a latent regression, on the Rasch scale", () => {
+    const result = calibrate(matrixOf(rasch), {
+      model: oneParameterLogistic,
+      personWeights: rasch.weights,
+      covariates: rasch.covariates,
+      ...tight,
+    });
+    expect(result.converged).toBe(true);
+    const a = (defined(result.items[0]).parameters as LogisticItem).a;
+    expectClose(a * defined(result.regression?.coefficients.x), rasch.tam.coefficient, WEIGHTED_TOLERANCE);
+    expectClose(a * a, rasch.tam.residualVariance, WEIGHTED_TOLERANCE);
+    rasch.tam.difficulties.forEach((difficulty, i) => {
+      expectClose(a * (defined(result.items[i]).parameters as LogisticItem).b, difficulty, WEIGHTED_TOLERANCE);
+    });
+  });
+
+  it("weights the latent regression as the repeated persons do, where mirt's survey weights leave it out", () => {
+    const result = calibrate(matrixOf(regression), {
+      model: twoParameterLogistic,
+      personWeights: regression.weights,
+      covariates: regression.covariates,
+      ...tight,
+    });
+    expect(result.converged).toBe(true);
+    regression.items.forEach((expected, i) => {
+      const { a, b } = defined(result.items[i]).parameters as LogisticItem;
+      expectParameters({ a, b }, expected, WEIGHTED_TOLERANCE, `item ${i + 1}`);
+    });
+    expectClose(defined(result.regression?.coefficients.x), regression.coefficient, WEIGHTED_TOLERANCE);
+    expectClose(result.logLikelihood, regression.logLikelihood, WEIGHTED_TOLERANCE);
+    // Base R's weighted log-likelihood at mirt's estimates with survey.weights is lower, so they are not its maximum.
+    expect(result.logLikelihood).toBeGreaterThan(regression.mirtSurveyWeights.logLikelihood + 1);
+  });
+
+  describe("integer weights give the calibration of the persons repeated by them", () => {
+    const rows = simulate(31, 240, ITEMS_2PL).map((row, person) => (person === 5 ? row.map(() => null) : row));
+    const weights = rows.map((_, person) => 1 + (person % 3));
+    const labels = rows.map((_, person) => (person % 2 === 0 ? "reference" : "focal"));
+    const x = rows.map((_, person) => ((person % 7) - 3) / 2);
+    const anchor = { item1: defined(PARAMETERS_2PL[0]) };
+    const testletCase = defined(testlet.cases[0]);
+    const testletRows = testletCase.responses.slice(0, 300);
+    const cases: readonly {
+      readonly name: string;
+      readonly rows: readonly (readonly (number | null)[])[];
+      readonly itemIds?: readonly string[];
+      readonly options: CalibrationOptions<unknown>;
+      readonly byPerson?: (weights: readonly number[]) => Partial<CalibrationOptions<unknown>>;
+    }[] = [
+      {
+        name: "the 2PL with errors from the Hessian",
+        rows,
+        options: { model: twoParameterLogistic, standardErrors: "hessian" },
+      },
+      {
+        name: "the 2PL with cross-product errors",
+        rows,
+        options: { model: twoParameterLogistic, standardErrors: "cross-product" },
+      },
+      { name: "the GPCM", rows: simulate(32, 240, ITEMS_GPCM), options: { model: generalizedPartialCredit } },
+      {
+        name: "two groups, the focal group's normal estimated",
+        rows,
+        options: { model: twoParameterLogistic, latent: { focal: "normal" }, standardErrors: "hessian" },
+        byPerson: (each) => ({ groups: repeated(labels, each) }),
+      },
+      {
+        name: "a histogram of theta on a fixed item's scale",
+        rows,
+        options: { model: twoParameterLogistic, fixed: anchor, latent: "empirical-histogram", maxIterations: 5000 },
+      },
+      {
+        name: "a latent regression on a fixed item's scale",
+        rows,
+        options: { model: twoParameterLogistic, fixed: anchor, standardErrors: "hessian" },
+        byPerson: (each) => ({ covariates: { x: repeated(x, each) } }),
+      },
+      {
+        name: "testlets",
+        rows: testletRows,
+        itemIds: testletCase.itemIds,
+        options: {
+          model: twoParameterLogistic,
+          testlets: definedEntries(testletCase.testlets),
+          standardErrors: "hessian",
+        },
+      },
+    ];
+
+    for (const { name, rows: data, itemIds, options, byPerson } of cases) {
+      it(`with ${name}`, () => {
+        const each = data.map((_, person) => 1 + (person % 3));
+        const ones = data.map(() => 1);
+        const ids = itemIds === undefined ? {} : { itemIds };
+        const fit = calibrate(responseMatrix(data, ids), {
+          ...options,
+          ...byPerson?.(ones),
+          personWeights: each,
+        });
+        const expanded = calibrate(responseMatrix(repeated(data, each), ids), {
+          ...options,
+          ...byPerson?.(each),
+        });
+        const answered = data.map((row) => row.some((response) => response !== null));
+        const respondents = answered.filter(Boolean).length;
+        const ratio = each.reduce((sum, weight, person) => sum + (answered[person] ? weight : 0), 0) / respondents;
+        expect(fit.converged).toBe(true);
+        expect(expanded.converged).toBe(true);
+        expect(fit.iterations).toBe(expanded.iterations);
+        fit.items.forEach((item, i) => {
+          const twin = defined(expanded.items[i]);
+          expectParameters(item.parameters, twin.parameters, EXPANSION_TOLERANCE, `item ${i + 1}`);
+          if (twin.standardErrors === null) {
+            expect(item.standardErrors).toBeNull();
+            return;
+          }
+          const scaled = Object.fromEntries(
+            Object.entries(defined(item.standardErrors)).map(([key, error]) => [key, error / Math.sqrt(ratio)]),
+          );
+          expectParameters(
+            scaled,
+            twin.standardErrors,
+            EXPANSION_STANDARD_ERROR_TOLERANCE,
+            `errors ${i + 1}`,
+            Math.abs,
+          );
+        });
+        fit.groups.forEach((group, g) => {
+          const twin = defined(expanded.groups[g]);
+          expectParameters(
+            { mean: group.mean, sd: group.sd, weights: group.weights },
+            { mean: twin.mean, sd: twin.sd, weights: twin.weights },
+            EXPANSION_TOLERANCE,
+            `group ${g + 1}`,
+          );
+        });
+        expectParameters(fit.regression?.coefficients, expanded.regression?.coefficients, EXPANSION_TOLERANCE, "β");
+        fit.testlets.forEach((estimate, t) => {
+          expectClose(estimate.sd, defined(expanded.testlets[t]).sd, EXPANSION_TOLERANCE, `testlet ${t + 1}`);
+        });
+        expectClose(fit.logLikelihood * ratio, expanded.logLikelihood, EXPANSION_TOLERANCE * -expanded.logLikelihood);
+      });
+    }
+
+    it("gives the unweighted calibration, to the last digit, when every weight is equal", () => {
+      const matrix = responseMatrix(rows);
+      const options = { model: twoParameterLogistic, standardErrors: "cross-product" } as const;
+      expect(calibrate(matrix, { ...options, personWeights: rows.map(() => 2.5) })).toEqual(calibrate(matrix, options));
+    });
+
+    it("ignores the weight of a person without responses and rescales weights of any size", () => {
+      const matrix = responseMatrix(rows);
+      const options = { model: twoParameterLogistic, ...tight } as const;
+      const base = calibrate(matrix, { ...options, personWeights: weights });
+      const heavy = weights.map((weight, person) => (person === 5 ? 1e300 : weight));
+      expect(calibrate(matrix, { ...options, personWeights: heavy })).toEqual(base);
+      for (const scale of [1e306, 1e-310]) {
+        const result = calibrate(matrix, { ...options, personWeights: weights.map((weight) => weight * scale) });
+        expect(nonFinite(result)).toEqual([]);
+        result.items.forEach((item, i) => {
+          expectParameters(item.parameters, defined(base.items[i]).parameters, EXPANSION_TOLERANCE, `item ${i + 1}`);
+        });
+      }
+    });
+  });
+
+  it("aligns the weights with the persons of records as with the rows of a matrix", () => {
+    const matrix = matrixOf(twoPl);
+    const records = responseRecords(
+      matrix.responses
+        .flatMap((row, person) =>
+          row.flatMap((response, item) =>
+            response === null
+              ? []
+              : [{ person: defined(matrix.personIds[person]), item: defined(matrix.itemIds[item]), response }],
+          ),
+        )
+        .reverse(),
+      { personIds: matrix.personIds, itemIds: matrix.itemIds },
+    );
+    const options = { model: twoParameterLogistic, personWeights: twoPl.weights } as const;
+    expect(calibrate(records, options)).toEqual(calibrate(matrix, options));
+  });
+
+  it("rejects weights that are not a positive number for each person, from JavaScript or JSON", () => {
+    const matrix = responseMatrix(simulate(33, 20, ITEMS_2PL));
+    const fit = (personWeights: unknown) =>
+      calibrate(matrix, { model: twoParameterLogistic, ...JSON.parse(JSON.stringify({ personWeights })) });
+    const at = (value: unknown) => Array.from({ length: 20 }, (_, person) => (person === 2 ? value : 1));
+    const third = (value: unknown) =>
+      new DataError(`The weight of person 3 must be a positive number, found ${value}.`);
+    expect(() => fit([1, 2])).toThrow(new DataError("Found 2 person weights for 20 persons."));
+    expect(() => fit(at(0))).toThrow(third(0));
+    expect(() => fit(at(-1))).toThrow(third(-1));
+    expect(() => fit(at("2"))).toThrow(third('"2"'));
+    expect(() => fit(at(null))).toThrow(third(null));
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      const personWeights = Array.from({ length: 20 }, (_, person) => (person === 2 ? value : 1));
+      expect(() => calibrate(matrix, { model: twoParameterLogistic, personWeights })).toThrow(third(value));
+    }
+    const notAnArray = "The option personWeights must be an array with a weight for each person, found";
+    expect(() => fit(null)).toThrow(new DataError(`${notAnArray} null.`));
+    expect(() => fit({ 0: 1 })).toThrow(new DataError(`${notAnArray} an object.`));
+  });
+});
+
 /** An iteration of x → x + (target - x) (1 - rate) on one number, whose log-likelihood rises toward the target. */
 function linear(target: number, rate: number, start: number): Iteration & { readonly state: () => number } {
   let x = start;
@@ -3305,6 +3592,56 @@ describe("properties", () => {
         expect(run()).toEqual(run());
       }),
       { numRuns: 10 },
+    );
+  });
+
+  it("person weights all equal give the unweighted calibration", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 1_000_000 }),
+        fc.double({ min: 1e-3, max: 1e3, noNaN: true }),
+        (seed, weight) => {
+          const matrix = responseMatrix(simulate(seed, 100, ITEMS_2PL));
+          const options = { model: twoParameterLogistic, standardErrors: "cross-product" } as const;
+          const personWeights = matrix.personIds.map(() => weight);
+          expect(calibrate(matrix, { ...options, personWeights })).toEqual(calibrate(matrix, options));
+        },
+      ),
+      { numRuns: 20 },
+    );
+  });
+
+  it("person weights scaled by a constant rescale alike, and by a power of 2 give the same calibration", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 1_000_000 }),
+        fc.array(fc.double({ min: 0.1, max: 10, noNaN: true }), { minLength: 100, maxLength: 100 }),
+        fc.double({ min: 1e-3, max: 1e3, noNaN: true }),
+        fc.integer({ min: -60, max: 60 }),
+        (seed, weights, scale, power) => {
+          const matrix = responseMatrix(simulate(seed, 100, ITEMS_2PL));
+          const fit = (factor: number) =>
+            calibrate(matrix, {
+              model: twoParameterLogistic,
+              standardErrors: "cross-product",
+              personWeights: weights.map((weight) => weight * factor),
+            });
+          expect(fit(2 ** power)).toEqual(fit(1));
+          const answered = weights.map(() => true);
+          const base = defined(rescaledWeights(weights, answered));
+          const scaled = defined(
+            rescaledWeights(
+              weights.map((weight) => weight * scale),
+              answered,
+            ),
+          );
+          scaled.forEach((weight, person) => {
+            const expected = defined(base[person]);
+            expectClose(weight, expected, RESCALED_WEIGHTS_TOLERANCE * expected, `person ${person + 1}`);
+          });
+        },
+      ),
+      { numRuns: 20 },
     );
   });
 });

@@ -58,9 +58,9 @@ interface Regression {
   readonly patternOf: Int32Array;
   /** The distinct covariate rows of the respondents, by pattern, then covariate. */
   readonly patterns: Float64Array;
-  /** The number of respondents of each pattern. */
+  /** The number of respondents of each pattern, or the sum of their weights. */
   readonly respondents: Float64Array;
-  /** The inverse of XᵀX over the respondents, by rows. */
+  /** The inverse of XᵀX over the respondents, each counted with its weight, by rows. */
   readonly inverseGram: Float64Array;
   /** The free parameter of each coefficient. */
   readonly slots: Int32Array;
@@ -79,6 +79,11 @@ export interface Population {
   readonly groupOf: Int32Array;
   /** The regression of theta on covariates, if there is one. */
   readonly regression?: Regression | undefined;
+  /**
+   * Each person's weight in every sum over persons, rescaled to sum to the persons with a response; absent without
+   * person weights, when each person counts 1.
+   */
+  readonly weights?: Float64Array | undefined;
 }
 
 /** The population options of a calibration: each person's group and the distribution of theta in each group. */
@@ -98,6 +103,7 @@ const DISTRIBUTIONS: readonly LatentDistribution[] = ["standard-normal", "normal
  * free parameters of their normal distributions.
  *
  * @param scaleFixed - Whether fixed items fix the theta scale.
+ * @param weights - Each person's rescaled weight, or `null` when each counts 1.
  * @throws `DataError` when `groups` does not give each person a string label, `latent` names an unknown distribution or
  * group, a group has no person with a response, a distribution other than the standard normal is used with a rule
  * other than the rectangular one, or no fixed item and no standard normal group fixes the scale for the distributions
@@ -111,9 +117,11 @@ export function population(
   rectangular: boolean,
   scaleFixed: boolean,
   addFree: AddFreeParameter,
+  weights: Float64Array | null,
 ): Population {
+  const weighted = weights === null ? {} : { weights };
   if (options.covariates !== undefined) {
-    return regressionPopulation(options, answered, rule, rectangular, scaleFixed, addFree);
+    return { ...regressionPopulation(options, answered, rule, rectangular, scaleFixed, addFree, weights), ...weighted };
   }
   const { labels, groupOf } = personGroups(options.groups, answered.length);
   const names: readonly (string | null)[] = labels ?? [null];
@@ -146,7 +154,7 @@ export function population(
       sdSlot: normal ? addFree(0, 1) : -1,
     };
   });
-  return { groups, groupOf };
+  return { groups, groupOf, ...weighted };
 }
 
 function distributionOf(
@@ -486,6 +494,7 @@ function regressionPopulation(
   rectangular: boolean,
   scaleFixed: boolean,
   addFree: AddFreeParameter,
+  weights: Float64Array | null,
 ): Population {
   if (options.groups !== undefined) {
     throw new DataError("Covariates need one group: a group is a covariate in a latent regression.");
@@ -497,7 +506,7 @@ function regressionPopulation(
   }
   if (!rectangular) throw new DataError("A latent regression needs the rectangular quadrature rule.");
   const { names, columns } = checkCovariates(options.covariates, answered.length);
-  const { patternOf, patterns, respondents } = distinctPatterns(columns, answered);
+  const { patternOf, patterns, respondents } = distinctPatterns(columns, answered, weights);
   const size = names.length;
   const inverseGram = invertPositiveDefinite(gramMatrix(patterns, respondents, size), size);
   if (inverseGram === null) {
@@ -560,10 +569,14 @@ function checkCovariates(
   return { names, columns };
 }
 
-/** Groups the respondents by their covariates: each person's pattern, the patterns' rows and their respondents. */
+/**
+ * Groups the respondents by their covariates: each person's pattern, the patterns' rows and their respondents, counted
+ * with their weights.
+ */
 function distinctPatterns(
   columns: readonly (readonly number[])[],
   answered: readonly boolean[],
+  weights: Float64Array | null,
 ): { readonly patternOf: Int32Array; readonly patterns: Float64Array; readonly respondents: Float64Array } {
   const rows: number[][] = [];
   const counts: number[] = [];
@@ -580,7 +593,7 @@ function distinctPatterns(
       rows.push(row);
       counts.push(0);
     }
-    counts[pattern] = (counts[pattern] ?? 0) + 1;
+    counts[pattern] = (counts[pattern] ?? 0) + (weights?.[person] ?? 1);
     patternOf[person] = pattern;
   });
   return { patternOf, patterns: Float64Array.from(rows.flat()), respondents: Float64Array.from(counts) };
@@ -631,7 +644,8 @@ function refreshRegression(regression: Regression, values: Float64Array, nodes: 
 /**
  * Sets the coefficients to the least squares fit to the respondents' posterior means, β = (XᵀX)⁻¹ Σ_r x_r Σ_q n_rq θ_q,
  * and, where the items fix the scale, the residual variance to the mean over respondents of the squared residual of the
- * posterior mean plus the posterior variance, Σ_r Σ_q n_rq (θ_q - x_rᵀβ)² / N.
+ * posterior mean plus the posterior variance, Σ_r Σ_q n_rq (θ_q - x_rᵀβ)² / N. With person weights, X, n and N count
+ * each respondent with its weight: weighted least squares.
  *
  * @see {@link https://doi.org/10.1007/BF02294457 | Mislevy (1985)}
  */

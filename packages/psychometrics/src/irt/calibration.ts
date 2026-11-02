@@ -60,7 +60,10 @@ export interface Calibration<TParameters> {
   };
   /** The standard deviation of each testlet's effect, in the order of the `testlets` option; none without testlets. */
   readonly testlets: readonly TestletEstimate[];
-  /** The marginal log-likelihood at the estimates, without the priors. */
+  /**
+   * The marginal log-likelihood at the estimates, without the priors; with `personWeights`, each person's term times the
+   * person's rescaled weight.
+   */
   readonly logLikelihood: number;
   /**
    * Akaike's information criterion: -2 logLikelihood + 2p, with p the number of estimated parameters, those of the
@@ -94,11 +97,12 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * With `covariates`, theta follows a normal distribution whose mean is a regression on each person's covariates.
  * With priors, the estimates are posterior modes. Standard errors come from the Hessian of the marginal log-likelihood
  * plus the log priors, by central differences of its exact gradient. Missing responses are skipped; persons without
- * responses change nothing.
+ * responses change nothing. With `personWeights`, each person counts with the weight in every sum over persons: the
+ * expected counts, the log-likelihood, the starting values and the cross-products.
  *
  * @param data - The responses of the persons, as a matrix or as records.
  * @param options - The model, fixed items, priors, quadrature, groups, distributions of theta, covariates, standard
- *   errors, testlets and stopping rules; each option has its default.
+ *   errors, testlets, person weights and stopping rules; each option has its default.
  * @returns The items with their parameters, the groups, the regression, the testlets, the log-likelihood, AIC and BIC,
  *   whether the EM converged and the iterations run.
  * @throws `DataError` when the matrix or an option is invalid, there are no responses, a fixed item's parameters are
@@ -106,7 +110,8 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * categories than its model allows, estimated items of a model that share parameters, as RSM items share the steps,
  * have different numbers of categories, a group has no person with a response, distributions are estimated without
  * the rectangular rule or without fixed items or a standard normal group, or covariates are not a finite number for each
- * person, come with groups, `latent`, testlets or the standard errors `"cross-product"`, or are collinear.
+ * person, come with groups, `latent`, testlets or the standard errors `"cross-product"`, or are collinear, or the person
+ * weights are not a positive number for each person.
  *
  * @example
  * ```ts

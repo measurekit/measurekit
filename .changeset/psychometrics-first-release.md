@@ -63,6 +63,12 @@ links.
 with a correlation matrix you give: every posterior keeps its distribution, a correlation of 1 gives one quantile in all of
 them, and 0 gives independent draws. It forecasts a composite of several scores, or bounds one when the correlation is unknown.
 
+`calibrate` takes `personWeights`, each person's survey weight, rescaled to sum to the persons with a response, as mirt's
+`survey.weights` asks: every sum over persons counts the person times the weight, the regression of theta on covariates
+included, so that the estimates are the population's and the standard errors keep the sample's size. Without the
+option, every result is the same to the last digit and as fast. Lord's chi-square, Raju's area and the IRT
+likelihood-ratio test take no weights.
+
 The testlet response model of `calibrate` works with `groups`: groups of persons, each with its own distribution of theta
 and the scale set by a standard normal group or fixed items, share one SD for each testlet, so that one concurrent
 calibration covers passages given to several grades or forms.

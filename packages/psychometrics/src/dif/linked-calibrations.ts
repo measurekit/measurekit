@@ -15,7 +15,7 @@ export const MINIMUM_LINK_ANCHORS = 2;
 /** The calibration options of each group in the statistics that compare separate calibrations. */
 type GroupCalibrationOptions = Omit<
   CalibrationOptions<LogisticItem>,
-  "fixed" | "groups" | "latent" | "covariates" | "standardErrors"
+  "fixed" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
 >;
 
 /** An item's estimated parameters in both groups, the focal group's on the reference scale, with their covariances. */

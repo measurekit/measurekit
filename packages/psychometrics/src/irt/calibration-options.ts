@@ -87,6 +87,14 @@ export interface CalibrationOptions<TParameters> {
    */
   readonly testlets?: Readonly<Record<string, readonly string[]>>;
   /**
+   * Each person's survey weight, above 0, aligned with the persons. The weights are rescaled to sum to the persons with
+   * a response, as mirt asks of `survey.weights`, so the log-likelihood, the BIC and the standard errors keep the
+   * sample's size. They are not design-based: strata and clusters stay with the caller.
+   *
+   * @defaultValue 1 for every person
+   */
+  readonly personWeights?: readonly number[];
+  /**
    * EM has converged when no estimated parameter changes by more than this in an iteration.
    *
    * @defaultValue `1e-4`

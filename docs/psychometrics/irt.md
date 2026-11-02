@@ -140,6 +140,7 @@ in proportion to the responses only.
 | `covariates`     | none                | Each person's covariates by name, for a [latent regression](#latent-regression) of theta.                                |
 | `standardErrors` | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                         |
 | `testlets`       | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                              |
+| `personWeights`  | 1 for every person  | Each person's survey weight, above 0, for [a sample that stands for a population](#person-weights).                      |
 | `tolerance`      | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                      |
 | `maxIterations`  | `500`               | The most EM iterations.                                                                                                  |
 
@@ -453,6 +454,67 @@ abilityEstimates(matrix, result.items, (items, responses) => posteriorMeanEstima
 The testlet EM converges slowly when a testlet has few items, as variance components do; a tight `tolerance` takes
 thousands of iterations. Adaptive tests select single items; selecting whole testlets is not part of
 `@measurekit/psychometrics/cat`.
+
+### Person weights
+
+A survey that samples some persons more often than others gives each person a weight, the number of persons in the
+population the person stands for: the inverse of the probability of being sampled, adjusted for the persons who did not respond.
+`personWeights` gives calibration one weight per person, so that the estimates are those of the population rather than
+of the sample, as large-scale assessments calibrate (van der Linden, 2017, Handbook of Item Response Theory, volume 3,
+chapter 14).
+
+```mermaid
+flowchart LR
+  W["personWeights: one per person, above 0"] --> R["Rescaled to sum to the persons with a response, n"]
+  R --> E["E-step: each person's posterior times the weight"]
+  E --> C["Expected counts of items, groups and covariate patterns"]
+  E --> L["Log-likelihood: each person's term times the weight"]
+  C --> M["M-step, unchanged"]
+  L --> S["Hessian standard errors, AIC, BIC with n"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// The population's theta is N(0, 1). The sample takes 3 in 4 of the persons above 0 and 1 in 4 of those below, so each
+// person's weight is the inverse of that share.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 20, random);
+const thetas = simulateThetas(4000, random).filter((theta) => random.uniform() < (theta > 0 ? 0.75 : 0.25));
+const responses = simulateResponses(items, thetas, random);
+const personWeights = thetas.map((theta) => (theta > 0 ? 4 / 3 : 4));
+
+items[0]?.parameters; // { a: 0.91, b: -0.24, c: 0, d: 1 }, the truth
+const weighted = calibrate(responses, { model: twoParameterLogistic, personWeights, standardErrors: "hessian" });
+weighted.items[0]?.parameters; // { a: 0.90, b: -0.17, c: 0, d: 1 }, on the population's scale
+weighted.items[0]?.standardErrors; // { a: 0.069, b: 0.060 }
+const unweighted = calibrate(responses, { model: twoParameterLogistic });
+unweighted.items[0]?.parameters; // { a: 0.82, b: -0.68, c: 0, d: 1 }, on the scale of the sample, whose mean is higher
+```
+
+| Where a weight w enters                   | How                                                                        |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| Expected counts of items and groups       | The person's posterior over the nodes times w                              |
+| Latent regression                         | Each covariate pattern counts its persons' weights: weighted least squares |
+| Testlets                                  | The person's counts over θ + γ times w                                     |
+| Log-likelihood, and so `"hessian"` errors | The person's log marginal likelihood times w                               |
+| `"cross-product"` errors                  | The person's outer product s sᵀ times w                                    |
+| Starting values                           | Each item's shares of its categories, weighted                             |
+| BIC                                       | n is the number of persons with a response, not the sum of the weights     |
+
+| Rule        | Definition                                                                                                                                                           |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Weights     | A finite number above 0 for each person, aligned with the rows of the responses or the `personIds` of records                                                        |
+| Rescaling   | To sum to n, the persons with a response, as mirt's `survey.weights` asks and TAM's `pweights` does: weights times any constant give the same calibration            |
+| Persons     | A person without responses changes nothing, whatever the weight; weights all equal give the unweighted calibration, to the last digit                                |
+| Frequencies | A person of integer weight k counts as k persons with the same responses, but the log-likelihood is on n persons: it is n / Σw times theirs                          |
+| Errors      | Larger than those of the repeated persons by √(Σw / n): the information of n persons, not of Σw. They are not design-based: strata and clusters stay with the caller |
+
+The other functions of the module, such as ability estimation, and those of [fit](fit.md), take each person once.
+Lord's chi-square, Raju's area and the IRT likelihood-ratio test of [DIF](dif.md) take no weights: they split the persons
+into groups, and a likelihood ratio of weighted fits is not chi-square.
 
 ### Priors
 
@@ -885,6 +947,7 @@ Validate a new model against an R reference before relying on it, as [validation
 | Starts of an item of six or more categories                  | Its share at or above the middle category, or the first agree category | The GGUM package's share at or above category 2                                                                                                                                                                                                                        |
 | Start of an item agreed with too little to find its distance | 6, the end of the bracket of distances                                 | The GGUM package's 2                                                                                                                                                                                                                                                   |
 | First stage with items of different numbers of categories    | Thresholds shared by the items with the same number                    | The GGUM package's one set, each item taking its last thresholds                                                                                                                                                                                                       |
+| Person weights in a latent regression                        | Covariate patterns count their persons' weights, as TAM's `pweights`   | mirt's `survey.weights` leave the regression out: on the fixture's 600 persons of weights 1 to 4, its coefficient is 0.754 against 0.712 for the persons repeated, its items differ by up to 0.19, and base R's weighted log-likelihood is 1.65 lower at its estimates |
 
 ## Not included
 
@@ -896,3 +959,5 @@ Validate a new model against an R reference before relying on it, as [validation
   Handbook's model, and is built.
 - **Linking and equating of unfolding items.** No reference: equateIRT links the dominance models only, and a GGUM
   item's expected score falls on both sides of its location, where true-score equating needs it to increase.
+- **Design-based standard errors with survey weights.** No fit: strata and clusters are survey design, the `survey`
+  package's; `personWeights` are rescaled frequencies, and a replicate-weight variance is a loop over `calibrate`.

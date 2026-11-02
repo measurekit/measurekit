@@ -6,12 +6,20 @@ import { type DifAnalysis, type PurificationOptions, purified, significant } fro
 
 /**
  * Options of {@link irtLikelihoodRatioDif}: the model, quadrature and stopping rules of the calibrations, and `purify`.
- * The groups and their distributions of theta are the test's own, and priors would turn the likelihood ratio into a
- * ratio of posteriors.
+ * The groups and their distributions of theta are the test's own, priors would turn the likelihood ratio into a ratio
+ * of posteriors, and person weights would turn it into a ratio of pseudo-likelihoods, which is not chi-square.
  */
 export type IrtDifOptions<TParameters> = Omit<
   CalibrationOptions<TParameters>,
-  "fixed" | "groups" | "latent" | "covariates" | "standardErrors" | "testlets" | "priors" | "itemPriors"
+  | "fixed"
+  | "groups"
+  | "latent"
+  | "covariates"
+  | "standardErrors"
+  | "testlets"
+  | "priors"
+  | "itemPriors"
+  | "personWeights"
 > &
   PurificationOptions;
 

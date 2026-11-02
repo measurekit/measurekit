@@ -6,7 +6,13 @@ import { checkFixedCategories, checkFixedIds, checkItem, checkModel, modelsOf } 
 import { type Population, population } from "./latent.js";
 import type { IrtModel, ModelParameter } from "./model.js";
 import { checkPrior, type ParameterPrior } from "./prior.js";
-import { type CompressedResponses, categoryTallies, checkCategories, NO_RESPONSES } from "./responses.js";
+import {
+  type CompressedResponses,
+  categoryTallies,
+  checkCategories,
+  NO_RESPONSES,
+  rescaledWeights,
+} from "./responses.js";
 import { type TestletDesign, testletDesign, testletWeights } from "./testlets.js";
 
 /** An item during calibration. */
@@ -49,7 +55,7 @@ export interface FreeParameter {
 
 /**
  * Checks the options against the data and builds the items, the groups and the free parameters with their starting
- * values.
+ * values. Each item starts from its shares of the responses in each category, weighted by the persons' weights.
  *
  * @param answered - Whether each person answered an item.
  * @param starts - The starting parameters of each item, in item order; without them, its model's starting values.
@@ -62,7 +68,8 @@ export function setUp<TParameters>(
   starts?: readonly TParameters[],
 ): Setup<TParameters> {
   const { itemIds } = responses;
-  const tallies = categoryTallies(responses);
+  const weights = rescaledWeights(options.personWeights, answered);
+  const tallies = categoryTallies(responses, weights);
   const models = modelsOf(options.model, itemIds.length, (each) =>
     checkModel(each, "The option model must be an IRT model such as twoParameterLogistic"),
   );
@@ -130,7 +137,7 @@ export function setUp<TParameters>(
     if (!estimatedNames.has(name)) throw new DataError(`A prior is given for "${name}", which no estimated item has.`);
   }
   checkItemPriorNames(priorsOfItem, items);
-  const groups = population(options, answered, rule, rectangular, Object.keys(fixed).length > 0, addFree);
+  const groups = population(options, answered, rule, rectangular, Object.keys(fixed).length > 0, addFree, weights);
   if (design !== null) {
     checkTestletOptions(options);
     testletWeights(design, Float64Array.from(values), rule.nodes);

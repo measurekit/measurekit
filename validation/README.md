@@ -20,6 +20,7 @@ Rscript validation/psychometrics/ctt.R               # classical test theory; th
 Rscript validation/psychometrics/augmented-subscores.R  # augmented subscores: the subscore package's subscore.Wainer, base R, a simulation with known true subscores
 Rscript validation/psychometrics/irt.R               # item response theory: calibration, JML, ability estimation, information
 Rscript validation/psychometrics/latent-regression.R # latent regression in `calibrate`: mirt's covdata and formula, TAM's tam.mml(Y = x)
+Rscript validation/psychometrics/person-weights.R   # person weights in `calibrate`: mirt's survey.weights, TAM's pweights, base R's weighted likelihood and mirt on repeated persons
 JAVA_HOME=<a JDK> Rscript validation/psychometrics/irt-unfolding.R # the generalized graded unfolding model: the GGUM package, base R for the log-likelihood and the cross-product errors; case names as arguments run only those cases
 Rscript validation/psychometrics/dimensionality.R    # polychoric correlations, parallel analysis: psych, polycor
 Rscript validation/psychometrics/exploratory-factors.R # minres factors, rotations, minimum average partial test, smoothing: psych, GPArotation and base R

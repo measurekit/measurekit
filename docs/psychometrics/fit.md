@@ -268,7 +268,8 @@ The population is the calibration's group, with its nodes and weights. Δ has on
 
 The estimated parameters must equal those in the calibration's AIC. A `Calibration` does not record its anchors, so
 give their ids in `fixed`. The check catches a list of the wrong size; a list of the right size that swaps anchors for
-estimated items of the same model passes and gives a wrong Δ. The moments are unweighted: each person counts once.
+estimated items of the same model passes and gives a wrong Δ. The moments are unweighted: each person counts once, also
+for a calibration with [person weights](irt.md#person-weights), whose weights they do not read.
 
 Where the first- and second-order margins do not identify every parameter, Δ's rank is below its columns. The statistic
 then uses the whole complement of Δ's span, a column that adds nothing to it is left out, and the degrees of freedom

@@ -18,11 +18,12 @@ import { type DifAnalysis, type PurificationOptions, purified, significant } fro
 
 /**
  * Options of {@link lordChiSquare}: the calibration of each group, without fixed items, groups, distributions of theta,
- * covariates or the choice of standard errors, which the statistic needs, and `purify`.
+ * covariates or the choice of standard errors, which the statistic needs, or person weights, which align with the
+ * whole matrix while each group's calibration takes its own persons, and `purify`.
  */
 export type LordOptions = Omit<
   CalibrationOptions<LogisticItem>,
-  "fixed" | "groups" | "latent" | "covariates" | "standardErrors"
+  "fixed" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
 > &
   PurificationOptions;
 

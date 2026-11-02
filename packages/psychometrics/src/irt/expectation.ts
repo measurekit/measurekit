@@ -25,12 +25,14 @@ export interface ExpectationStep {
    * Evaluates every person's posterior over the quadrature nodes, under the weights of the person's group, or with a
    * regression of the person's covariates, and the items' current parameters; writes the items' expected counts and
    * each group's, or each covariate pattern's, expected number of persons at each node; and returns the marginal
-   * log-likelihood: the sum over persons of log Σ_q w_q Π_i P_i(x_i | θ_q).
+   * log-likelihood: the sum over persons of log Σ_q w_q Π_i P_i(x_i | θ_q). With person weights, each person's
+   * posterior enters the counts, and the person's term the sum, times the person's weight.
    */
   run(): number;
   /**
    * Calls `visit` with each person who answered an item and the person's posterior over the nodes, at the parameters
-   * of the last run. `posterior` is reused between calls. Not with testlets, whose posteriors span θ and γ.
+   * of the last run, not times the person's weight. `posterior` is reused between calls. Not with testlets, whose
+   * posteriors span θ and γ.
    */
   forEachPosterior(visit: (person: number, posterior: Float64Array) => void): void;
 }
@@ -55,7 +57,7 @@ export function expectationStep(
   data: CompressedResponses,
   items: readonly ExpectationItem[],
   nodes: Float64Array,
-  { groups, groupOf, regression }: Population,
+  { groups, groupOf, regression, weights }: Population,
   design: TestletDesign | null = null,
   logTerms: Float64Array | null = null,
 ): ExpectationStep {
@@ -154,7 +156,14 @@ export function expectationStep(
         if (group === undefined) return;
         joint(person, start, end, group.logWeights);
         reduction?.integrate(person, start, end, posterior);
-        logLikelihood += normalizeLogs(posterior);
+        const logMarginal = normalizeLogs(posterior);
+        if (weights === undefined) {
+          logLikelihood += logMarginal;
+        } else {
+          const weight = weights[person] ?? 0;
+          logLikelihood += weight * logMarginal;
+          for (let q = 0; q < nodeCount; q++) posterior[q] = (posterior[q] ?? 0) * weight;
+        }
         count(person, start, end, group.counts);
         reduction?.count(person, start, end, posterior);
       });

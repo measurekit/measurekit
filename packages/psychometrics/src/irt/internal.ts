@@ -79,6 +79,7 @@ export {
   forEachRespondent,
   NO_RESPONSES,
   personGroups,
+  rescaledWeights,
   respondentsOf,
 } from "./responses.js";
 export { type Iteration, squarem } from "./squarem.js";

@@ -1,4 +1,4 @@
-import { DataError, describe } from "@measurekit/core";
+import { checkArray, checkPositive, DataError, describe } from "@measurekit/core";
 import {
   checkResponseMatrix,
   checkResponseRecords,
@@ -90,23 +90,34 @@ export function responseCodes(matrix: ResponseMatrix): Int32Array {
 export interface CategoryTally {
   /** The highest response to the item; -1 when it has none. */
   readonly highest: number;
-  /** The number of responses in each category that has one. */
+  /** The number of responses in each category that has one, or the sum of their persons' weights. */
   readonly counts: ReadonlyMap<number, number>;
 }
 
 /** The tally of an item without responses. */
 export const NO_RESPONSES: CategoryTally = { highest: -1, counts: new Map() };
 
-/** Returns the responses to each item by category, in space that grows with the categories used, not with the highest. */
-export function categoryTallies({ itemIds, items, codes }: CompressedResponses): CategoryTally[] {
+/**
+ * Returns the responses to each item by category, in space that grows with the categories used, not with the highest.
+ *
+ * @param weights - Each person's weight, which a response counts as; without them, each response counts 1.
+ */
+export function categoryTallies(
+  { itemIds, offsets, items, codes }: CompressedResponses,
+  weights: Float64Array | null = null,
+): CategoryTally[] {
   const counts = itemIds.map(() => new Map<number, number>());
   const highest = new Int32Array(itemIds.length).fill(-1);
-  items.forEach((item, r) => {
-    const response = codes[r] ?? 0;
-    const itemCounts = counts[item];
-    itemCounts?.set(response, (itemCounts.get(response) ?? 0) + 1);
-    highest[item] = Math.max(highest[item] ?? -1, response);
-  });
+  for (let person = 0; person < offsets.length - 1; person++) {
+    const weight = weights?.[person] ?? 1;
+    for (let r = offsets[person] ?? 0; r < (offsets[person + 1] ?? 0); r++) {
+      const item = items[r] ?? 0;
+      const response = codes[r] ?? 0;
+      const itemCounts = counts[item];
+      itemCounts?.set(response, (itemCounts.get(response) ?? 0) + weight);
+      highest[item] = Math.max(highest[item] ?? -1, response);
+    }
+  }
   return counts.map((itemCounts, item) => ({ highest: highest[item] ?? -1, counts: itemCounts }));
 }
 
@@ -167,6 +178,45 @@ export function personGroups(groups: readonly string[] | undefined, personCount:
   });
   const labels = [...new Set(groups)];
   return { labels, groupOf: Int32Array.from(groups, (label) => labels.indexOf(label)) };
+}
+
+/**
+ * Checks the weights that the option `personWeights` gives to the persons and returns them rescaled to sum to the
+ * persons with a response, or `null` without the option.
+ *
+ * @remarks
+ * Each weight is divided by the largest of the respondents' before the sum, so that no sum of large weights overflows
+ * and weights that are all equal become exactly 1. Persons without responses take 0, as they count in no sum.
+ *
+ * @param weights - The option `personWeights`.
+ * @param answered - Whether each person has a response; at least one has.
+ * @throws `DataError` when the weights are not an array of a positive number for each person.
+ */
+export function rescaledWeights(
+  weights: readonly number[] | undefined,
+  answered: readonly boolean[],
+): Float64Array | null {
+  if (weights === undefined) return null;
+  checkArray(weights, "The option personWeights must be an array with a weight for each person");
+  if (weights.length !== answered.length) {
+    throw new DataError(`Found ${weights.length} person weights for ${answered.length} persons.`);
+  }
+  weights.forEach((weight, person) => {
+    checkPositive(weight, `The weight of person ${person + 1}`);
+  });
+  let largest = 0;
+  let respondents = 0;
+  answered.forEach((any, person) => {
+    if (!any) return;
+    largest = Math.max(largest, weights[person] ?? 0);
+    respondents++;
+  });
+  let sum = 0;
+  answered.forEach((any, person) => {
+    if (any) sum += (weights[person] ?? 0) / largest;
+  });
+  const scale = respondents / sum;
+  return Float64Array.from(weights, (weight, person) => (answered[person] ? (weight / largest) * scale : 0));
 }
 
 /**

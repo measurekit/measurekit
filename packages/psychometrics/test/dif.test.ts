@@ -1,6 +1,6 @@
 import { chiSquareUpperTail, mean } from "@measurekit/core";
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { purified } from "../src/dif/internal.js";
 import {
   createRandom,
@@ -10,11 +10,13 @@ import {
   differentialFunctioning,
   generalizedPartialCredit,
   gradedResponse,
+  type IrtDifOptions,
   type IrtDifTest,
   type IrtModel,
   irtLikelihoodRatioDif,
   type LogisticItem,
   type LogisticRegressionDif,
+  type LordOptions,
   logisticDiscriminantDif,
   logisticRegressionDif,
   lordChiSquare,
@@ -472,6 +474,10 @@ describe("lordChiSquare", () => {
     const references: DifGroup[] = CONSTANT_GROUPS.map(() => "reference");
     expect(() => lordChiSquare(matrix, references, { model: twoParameterLogistic })).toThrow(DataError);
   });
+
+  it("takes no person weights, which align with the whole matrix while each group's calibration takes its own", () => {
+    expectTypeOf<LordOptions>().not.toHaveProperty("personWeights");
+  });
 });
 
 /** The cases of dif.json and dif-polytomous.json that the fixtures of the other units key by name. */
@@ -714,6 +720,10 @@ describe("irtLikelihoodRatioDif", () => {
     expect(() => irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS.slice(1), { model: twoParameterLogistic })).toThrow(
       DataError,
     );
+  });
+
+  it("takes no person weights, whose likelihood ratio would not be chi-square", () => {
+    expectTypeOf<IrtDifOptions<LogisticItem>>().not.toHaveProperty("personWeights");
   });
 });
 

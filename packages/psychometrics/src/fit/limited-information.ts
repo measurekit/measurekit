@@ -110,7 +110,8 @@ const DEFAULT_LEVEL = 0.9;
  *
  * The independence model holds each item at its observed shares, without a trait. Its statistic is N Σ_(i<j) r_ij², on
  * J (J - 1) / 2 degrees of freedom. TLI = (χ²₀/df₀ - χ²/df) / (χ²₀/df₀ - 1) and CFI = 1 - (χ² - df) / (χ²₀ - df₀).
- * Uses the persons who answered every item; each counts once.
+ * Uses the persons who answered every item; each counts once, also for a calibration with `personWeights`, whose
+ * weights the moments do not read.
  *
  * @param matrix - The responses of the persons.
  * @param calibration - The calibration of the matrix's items, in its order, on one group.

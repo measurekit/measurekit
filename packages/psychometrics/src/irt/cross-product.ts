@@ -25,9 +25,10 @@ interface ScoredCalibration {
  * Returns the covariance matrix of the free parameters, by rows, from the cross-product information.
  *
  * @remarks
- * The information is Σ_p s_p s_pᵀ over persons, with s_p the derivative of a person's log marginal likelihood, Σ_q
- * post_p(q) ∂ ln P(x_p | θ_q) / ∂ξ, plus minus the second derivatives of the log priors, as mirt's `SE.type =
- * "crossprod"`. `null` when the information is not positive definite. Uses the posteriors of the E-step's last run.
+ * The information is Σ_p w_p s_p s_pᵀ over persons, with s_p the derivative of a person's log marginal likelihood, Σ_q
+ * post_p(q) ∂ ln P(x_p | θ_q) / ∂ξ, and w_p the person's weight, 1 without person weights, plus minus the second
+ * derivatives of the log priors, as mirt's `SE.type = "crossprod"`. `null` when the information is not positive
+ * definite. Uses the posteriors of the E-step's last run.
  */
 export function crossProductCovariance(
   calibration: ScoredCalibration,
@@ -57,7 +58,7 @@ export function crossProductCovariance(
       score.add(group.meanSlot, nodeSum(posterior, slopes.mean, 0, 1));
       score.add(group.sdSlot, nodeSum(posterior, slopes.sd, 0, 1));
     }
-    score.addOuterProduct(information);
+    score.addOuterProduct(information, population.weights?.[person] ?? 1);
   });
   free.forEach(({ prior }, j) => {
     if (prior !== undefined) {
@@ -96,8 +97,11 @@ interface SparseScore {
   start(person: number): void;
   /** Adds `value` to the entry of a slot. */
   add(slot: number, value: number): void;
-  /** Adds the outer product of the score vector with itself to `information`, a matrix of all slots by rows. */
-  addOuterProduct(information: Float64Array): void;
+  /**
+   * Adds the outer product of the score vector with itself, times `weight`, to `information`, a matrix of all slots by
+   * rows.
+   */
+  addOuterProduct(information: Float64Array, weight: number): void;
 }
 
 function sparseScore(size: number): SparseScore {
@@ -119,10 +123,10 @@ function sparseScore(size: number): SparseScore {
       }
       score[slot] = (score[slot] ?? 0) + value;
     },
-    addOuterProduct(information) {
+    addOuterProduct(information, weight) {
       for (let a = 0; a < count; a++) {
         const row = touched[a] ?? 0;
-        const value = score[row] ?? 0;
+        const value = (score[row] ?? 0) * weight;
         for (let b = 0; b < count; b++) {
           const index = row * size + (touched[b] ?? 0);
           information[index] = (information[index] ?? 0) + value * (score[touched[b] ?? 0] ?? 0);
