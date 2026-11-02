@@ -211,36 +211,83 @@ const RESIDUAL_ROUNDING = 1e-12;
 /** The ridge added to the approximate Hessian, relative to its mean diagonal, which it may leave singular. */
 const RIDGE = 1e-10;
 
+/** The fit of the factors at some communalities, as an objective of the communalities measures it. */
+interface CommunalityFit {
+  /** The objective, which the communalities that solve the extraction minimize. */
+  readonly value: number;
+  /** The derivative of `value` with respect to each communality. */
+  readonly gradient: Float64Array;
+  /** Returns the Hessian of `value` at a perfect fit for the communalities in `free`, by rows, with a small ridge. */
+  readonly hessian: (free: readonly number[]) => Float64Array;
+  /**
+   * Returns the loadings, items by factors, by rows, on the principal axes of the fit: each factor's loadings sum to a
+   * number that is not negative.
+   */
+  readonly loadings: () => Float64Array;
+}
+
+/** An objective of the communalities of a factor extraction: the fit of the factors at each set of communalities. */
+export type CommunalityObjective = (communalities: Float64Array) => CommunalityFit;
+
 /**
  * Returns the minimum residual (minres) solution of a correlation matrix for `factors` factors: the communalities for
  * which the best rank-`factors` fit of the matrix, with them on its diagonal, leaves the least squared residuals.
  *
  * @remarks
  * The loadings are the leading eigenvectors of the reduced matrix, scaled by the roots of their eigenvalues, as the
- * unweighted least squares method of Jöreskog and psych's `fa` define the solution. The communalities are the
- * unknowns, in the interval from 0 to 0.995, and the objective is half the sum of the squared eigenvalues that the fit
- * leaves out, with a negative eigenvalue among the leading ones counting in full. Each iteration takes a Newton step
- * on the communalities that are not at a bound, with the Hessian of the objective at a perfect fit, the squares of the
- * entries of the projector onto the eigenvectors left out, a backtracking line search that keeps the projection onto
- * the bounds, and an eigendecomposition. The search starts from the squared multiple correlations, or from the squared
- * largest correlation of each item when the matrix is not positive definite. The residuals of a communality at a bound
- * are those of psych's, whose loadings there can have a communality beyond the bound; `minresLoadings` instead bounds
- * the loadings of one factor. The matrix is symmetric, by rows, with 1 on the diagonal, and `factors` is a positive
- * integer below `size`; the function assumes both valid.
+ * unweighted least squares method of Jöreskog and psych's `fa` define the solution. The objective is half the sum of the
+ * squared eigenvalues that the fit leaves out, with a negative eigenvalue among the leading ones counting in full, and
+ * its Hessian at a perfect fit is the squares of the entries of the projector onto the eigenvectors left out. The search
+ * is {@link minimizeCommunalities}, from the squared multiple correlations, or from the squared largest correlation of
+ * each item when the matrix is not positive definite. The residuals of a communality at a bound are those of psych's,
+ * whose loadings there can have a communality beyond the bound; `minresLoadings` instead bounds the loadings of one
+ * factor. The matrix is symmetric, by rows, with 1 on the diagonal, and `factors` is a positive integer below `size`;
+ * the function assumes both valid.
  *
  * @see {@link https://doi.org/10.1007/BF02289658 | Jöreskog (1967)}
  */
 export function minres(r: Float64Array, size: number, factors: number, options: MinresOptions = {}): Minres {
+  return minimizeCommunalities(
+    residualObjective(r, size, factors),
+    startingCommunalities(r, size),
+    size,
+    factors,
+    options,
+  );
+}
+
+/**
+ * Returns the communalities from 0 to 0.995 that minimize an objective, with the loadings of its fit there.
+ *
+ * @remarks
+ * Each iteration takes a Newton step on the communalities that are not at a bound, with the Hessian of the objective at
+ * a perfect fit, and a backtracking line search that keeps the projection onto the bounds. A communality at a bound
+ * whose gradient points outward stays there. The search stops when the largest change of a communality falls below the
+ * tolerance. `start` holds one communality per item, which the bounds clamp.
+ *
+ * @param objective - The fit of the factors at each set of communalities.
+ * @param start - The communalities the search starts from, one per item.
+ * @param size - The number of items.
+ * @param factors - The number of factors.
+ * @param options - The stopping rules.
+ */
+export function minimizeCommunalities(
+  objective: CommunalityObjective,
+  start: ArrayLike<number>,
+  size: number,
+  factors: number,
+  options: MinresOptions = {},
+): Minres {
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   const upper = 1 - MIN_UNIQUENESS;
-  const communalities = Float64Array.from(startingCommunalities(r, size), (value) => clamp(value, upper, 0));
+  const communalities = Float64Array.from(start, (value) => clamp(value, upper, 0));
   const trial = new Float64Array(size);
-  let current = reducedFit(r, size, factors, communalities);
+  let current = objective(communalities);
   let converged = false;
   let iterations = 0;
   while (!converged && iterations < maxIterations) {
     iterations++;
-    const direction = communalityStep(current, communalities, size, factors, upper);
+    const direction = communalityStep(current, communalities, upper);
     let moved = 0;
     let latest = current;
     const step = backtrack(
@@ -250,7 +297,7 @@ export function minres(r: Float64Array, size: number, factors: number, options: 
           trial[i] = clamp((communalities[i] ?? 0) + length * (direction[i] ?? 0), upper, 0);
           moved = Math.max(moved, Math.abs((trial[i] ?? 0) - (communalities[i] ?? 0)));
         }
-        latest = reducedFit(r, size, factors, trial);
+        latest = objective(trial);
         // A move below the tolerance is accepted whatever it does to the value: it is below what the solution is
         // sought to, and the value changes by less than its rounding.
         if (moved < tolerance) return Number.NEGATIVE_INFINITY;
@@ -258,57 +305,84 @@ export function minres(r: Float64Array, size: number, factors: number, options: 
       },
       current.value,
       0,
-      { decrease: 0, slack: RESIDUAL_ROUNDING * current.value },
+      { decrease: 0, slack: RESIDUAL_ROUNDING * Math.abs(current.value) },
     );
     if (step === null) break;
     communalities.set(trial);
     current = latest;
     converged = moved < tolerance;
   }
-  return { ...loadingsOf(current, size, factors), converged, iterations };
+  const loadings = current.loadings();
+  const fitted = Float64Array.from({ length: size }, (_, i) =>
+    loadings.subarray(i * factors, (i + 1) * factors).reduce((sum, value) => sum + value * value, 0),
+  );
+  return { loadings, communalities: fitted, converged, iterations };
 }
 
-/** The reduced matrix at some communalities, its eigendecomposition and the residuals of the fit with the factors. */
-interface ReducedFit {
-  /** Half the sum of the squared eigenvalues that the fit leaves out. */
-  readonly value: number;
-  /** The derivative of `value` with respect to each communality: the diagonal of the residual matrix. */
-  readonly gradient: Float64Array;
-  readonly values: Float64Array;
-  /** The eigenvectors by rows, row k of the eigenvalue k. */
-  readonly vectors: Float64Array;
+/** Returns minres's objective of the communalities of `factors` factors of the correlation matrix `r`. */
+function residualObjective(r: Float64Array, size: number, factors: number): CommunalityObjective {
+  return (communalities) => {
+    const reduced = Float64Array.from(r);
+    for (let i = 0; i < size; i++) reduced[i * size + i] = communalities[i] ?? 0;
+    const { values, vectors } = symmetricEigen(reduced, size);
+    const gradient = new Float64Array(size);
+    let value = 0;
+    for (let k = 0; k < size; k++) {
+      const excess = k < factors ? Math.min(values[k] ?? 0, 0) : (values[k] ?? 0);
+      value += 0.5 * excess * excess;
+      for (let i = 0; i < size; i++) gradient[i] = (gradient[i] ?? 0) + excess * (vectors[k * size + i] ?? 0) ** 2;
+    }
+    return {
+      value,
+      gradient,
+      hessian: (free) => projectorHessian(vectors, size, factors, free),
+      loadings: () =>
+        principalAxes(
+          values,
+          vectors,
+          size,
+          factors,
+          Float64Array.from({ length: size }, () => 1),
+        ),
+    };
+  };
 }
 
-/** Returns the fit of `factors` factors to the matrix with `communalities` on its diagonal. */
-function reducedFit(r: Float64Array, size: number, factors: number, communalities: Float64Array): ReducedFit {
-  const reduced = Float64Array.from(r);
-  for (let i = 0; i < size; i++) reduced[i * size + i] = communalities[i] ?? 0;
-  const { values, vectors } = symmetricEigen(reduced, size);
-  const gradient = new Float64Array(size);
-  let value = 0;
-  for (let k = 0; k < size; k++) {
-    const excess = k < factors ? Math.min(values[k] ?? 0, 0) : (values[k] ?? 0);
-    value += 0.5 * excess * excess;
-    for (let i = 0; i < size; i++) gradient[i] = (gradient[i] ?? 0) + excess * (vectors[k * size + i] ?? 0) ** 2;
+/**
+ * Returns the loadings on the leading principal axes of a matrix, eigenvector k scaled by the root of `extent[k]` and
+ * entry i by `scale[i]`, each factor's sum made not negative.
+ *
+ * @param values - The extent of each factor, such as an eigenvalue; a negative one counts as 0.
+ * @param vectors - The eigenvectors by rows, row k of factor k.
+ */
+export function principalAxes(
+  values: Float64Array,
+  vectors: Float64Array,
+  size: number,
+  factors: number,
+  scale: Float64Array,
+): Float64Array {
+  const loadings = new Float64Array(size * factors);
+  for (let k = 0; k < factors; k++) {
+    const root = Math.sqrt(Math.max(values[k] ?? 0, 0));
+    let sum = 0;
+    for (let i = 0; i < size; i++) sum += (scale[i] ?? 0) * root * (vectors[k * size + i] ?? 0);
+    const sign = sum < 0 ? -1 : 1;
+    for (let i = 0; i < size; i++)
+      loadings[i * factors + k] = sign * (scale[i] ?? 0) * root * (vectors[k * size + i] ?? 0);
   }
-  return { value, gradient, values, vectors };
+  return loadings;
 }
 
 /**
  * Returns the Newton step of the communalities, zero for those at a bound that the gradient pushes outside, or the
  * steepest descent where the Hessian is not positive definite.
  */
-function communalityStep(
-  fit: ReducedFit,
-  communalities: Float64Array,
-  size: number,
-  factors: number,
-  upper: number,
-): Float64Array {
+function communalityStep(fit: CommunalityFit, communalities: Float64Array, upper: number): Float64Array {
   const free = Array.from(communalities.keys()).filter((i) => !pushedOut(communalities[i], fit.gradient[i], upper));
   const slope = Float64Array.from(free, (i) => fit.gradient[i] ?? 0);
-  const step = descent(approximateHessian(fit.vectors, size, factors, free), slope);
-  const direction = new Float64Array(size);
+  const step = descent(fit.hessian(free), slope);
+  const direction = new Float64Array(communalities.length);
   free.forEach((i, a) => {
     direction[i] = step[a] ?? 0;
   });
@@ -321,14 +395,18 @@ function pushedOut(communality = 0, gradient = 0, upper = 1): boolean {
 }
 
 /**
- * Returns the Hessian of the objective at a perfect fit for the communalities in `free`, with a small ridge: the
- * squares of the entries of the projector onto the eigenvectors that the fit leaves out.
+ * Returns the Hessian at a perfect fit of an objective of the communalities in `free`, with a small ridge: the squares
+ * of the entries of the projector onto the eigenvectors that the fit leaves out, each row and column i times `scale[i]`.
+ *
+ * @param vectors - The eigenvectors by rows, row k of the eigenvalue k, the `factors` leading ones first.
+ * @param scale - The factor of each row and column; 1 when not given.
  */
-function approximateHessian(
+export function projectorHessian(
   vectors: Float64Array,
   size: number,
   factors: number,
   free: readonly number[],
+  scale?: Float64Array,
 ): Float64Array {
   const projector = identity(size);
   for (let k = 0; k < factors; k++) {
@@ -343,7 +421,7 @@ function approximateHessian(
   const hessian = new Float64Array(count * count);
   free.forEach((i, a) => {
     free.forEach((j, b) => {
-      hessian[a * count + b] = (projector[i * size + j] ?? 0) ** 2;
+      hessian[a * count + b] = (projector[i * size + j] ?? 0) ** 2 * (scale?.[i] ?? 1) * (scale?.[j] ?? 1);
     });
   });
   let trace = 0;
@@ -366,24 +444,8 @@ function descent(hessian: Float64Array, slope: Float64Array): Float64Array {
   return step;
 }
 
-/** Returns the loadings on the principal axes of a fit, with their communalities. */
-function loadingsOf(fit: ReducedFit, size: number, factors: number): Pick<Minres, "loadings" | "communalities"> {
-  const loadings = new Float64Array(size * factors);
-  for (let k = 0; k < factors; k++) {
-    const scale = Math.sqrt(Math.max(fit.values[k] ?? 0, 0));
-    let sum = 0;
-    for (let i = 0; i < size; i++) sum += scale * (fit.vectors[k * size + i] ?? 0);
-    const sign = sum < 0 ? -1 : 1;
-    for (let i = 0; i < size; i++) loadings[i * factors + k] = sign * scale * (fit.vectors[k * size + i] ?? 0);
-  }
-  const communalities = Float64Array.from({ length: size }, (_, i) =>
-    loadings.subarray(i * factors, (i + 1) * factors).reduce((sum, value) => sum + value * value, 0),
-  );
-  return { loadings, communalities };
-}
-
 /** Returns the squared multiple correlations, or where the matrix is not positive definite the squared largest. */
-function startingCommunalities(r: Float64Array, size: number): number[] {
+export function startingCommunalities(r: Float64Array, size: number): number[] {
   const inverse = invertPositiveDefinite(r, size);
   return Array.from({ length: size }, (_, i) => {
     if (inverse !== null) return 1 - 1 / (inverse[i * size + i] ?? 1);

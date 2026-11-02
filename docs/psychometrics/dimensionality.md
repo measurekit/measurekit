@@ -3,9 +3,10 @@
 `@measurekit/psychometrics/dimensionality` estimates the correlations of the normal variables behind item responses,
 polychoric for items with several categories and tetrachoric for dichotomous items, and asks how many dimensions a test
 has: by Horn's parallel analysis and by Velicer's minimum average partial test. It fits that many factors to the items by
-the minimum residual method, rotated to a simple structure, and smooths correlation matrices that are not positive
-definite. The correlations are validated against psych and polycor, the bivariate normal distribution against mvtnorm,
-and the eigenvalues, the factors and the partial correlations against base R and psych ([validation](validation.md)).
+the minimum residual method or maximum likelihood, rotated to a simple structure, with the fit of the factors, and
+smooths correlation matrices that are not positive definite. The correlations are validated against psych and polycor,
+the bivariate normal distribution against mvtnorm, and the eigenvalues, the factors, their fit and the partial
+correlations against base R and psych ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
@@ -13,8 +14,8 @@ flowchart LR
   C --> PA["parallelAnalysis: how many dimensions, against random data"]
   C --> S["Smoothed if not positive definite"]
   S --> MAP["minimumAveragePartial: how many, by partial correlations"]
-  S --> F["exploratoryFactorAnalysis: minimum residual fit, rotation"]
-  F --> L["Loadings, communalities, correlations of the factors"]
+  S --> F["exploratoryFactorAnalysis: minres or maximum likelihood, rotation"]
+  F --> L["Loadings, communalities, correlations of the factors, fit"]
 ```
 
 ## Correlations
@@ -142,28 +143,30 @@ with it throws `DataError`.
 ## Exploratory factor analysis
 
 `exploratoryFactorAnalysis(matrix, options)` fits `factors` common factors to the items by the minimum residual (minres)
-method, as `psych::fa(fm = "minres")`. It takes a [response matrix](data.md), correlates the items, smooths the
-correlations if they are not positive definite, and returns the rotated loadings, the communalities and the correlations
-between the factors.
+method, as `psych::fa(fm = "minres")`, or by maximum likelihood, as `fa(fm = "ml")`. It takes a
+[response matrix](data.md), correlates the items, smooths the correlations if they are not positive definite, and
+returns the rotated loadings, the communalities, the correlations between the factors and the fit of the factors.
 
-| Option          | Default     | Meaning                                                                                                               |
-| --------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `factors`       | required    | The number of factors, a positive integer that the items identify: 12 items identify at most 7                        |
-| `correlation`   | `"pearson"` | `"pearson"` for scores treated as continuous, over the persons who answered a pair; `"polychoric"` for item responses |
-| `rotation`      | `"oblimin"` | `"none"`; `"varimax"`, orthogonal with Kaiser's normalization; `"oblimin"`, oblique. One factor is not rotated        |
-| `tolerance`     | `1e-6`      | The largest change of a communality in an iteration at which the fit stops                                            |
-| `maxIterations` | `100`       | The most iterations of the fit                                                                                        |
-| `correction`    | `0.5`       | As for [`polychoricCorrelations`](#correlations)                                                                      |
+| Option          | Default     | Meaning                                                                                                                 |
+| --------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `factors`       | required    | The number of factors, a positive integer that the items identify: 12 items identify at most 7                          |
+| `correlation`   | `"pearson"` | `"pearson"` for scores treated as continuous, over the persons who answered a pair; `"polychoric"` for item responses   |
+| `extraction`    | `"minres"`  | `"minres"`, the least squared residuals; `"maximum-likelihood"`, Jöreskog's likelihood concentrated on the uniquenesses |
+| `rotation`      | `"oblimin"` | `"none"`; `"varimax"`, orthogonal with Kaiser's normalization; `"oblimin"`, oblique. One factor is not rotated          |
+| `tolerance`     | `1e-6`      | The largest change of a communality in an iteration at which the fit stops                                              |
+| `maxIterations` | `100`       | The most iterations of the fit                                                                                          |
+| `correction`    | `0.5`       | As for [`polychoricCorrelations`](#correlations)                                                                        |
 
-| Field           | Meaning                                                                            |
-| --------------- | ---------------------------------------------------------------------------------- |
-| `itemIds`       | The item ids, in the matrix's order                                                |
-| `loadings`      | Items by factors; the factors are in the order of the variance they account for    |
-| `communalities` | The part of each item's variance that the factors share                            |
-| `correlations`  | Between the factors, by rows: the identity unless the rotation is oblique          |
-| `converged`     | Whether the fit and the rotation both reached their tolerances                     |
-| `iterations`    | The iterations of the fit                                                          |
-| `smoothed`      | Whether the correlations of the items were not positive definite and were smoothed |
+| Field           | Meaning                                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| `itemIds`       | The item ids, in the matrix's order                                                                         |
+| `loadings`      | Items by factors; the factors are in the order of the variance they account for                             |
+| `communalities` | The part of each item's variance that the factors share                                                     |
+| `correlations`  | Between the factors, by rows: the identity unless the rotation is oblique                                   |
+| `converged`     | Whether the fit and the rotation both reached their tolerances                                              |
+| `iterations`    | The iterations of the fit                                                                                   |
+| `smoothed`      | Whether the correlations of the items were not positive definite and were smoothed                          |
+| `fit`           | The fit of the factors, below; `null` for polychoric correlations, or a model that is not positive definite |
 
 ```ts continues
 import { exploratoryFactorAnalysis } from "@measurekit/psychometrics/dimensionality";
@@ -177,24 +180,57 @@ fit.correlations; // [[1, 0.017], [0.017, 1]]: the traits are independent
 fit.converged; // true
 ```
 
-**The fit.** The unknowns are the communalities h, which lie from 0 to 0.995: each item's uniqueness is at least 0.005, as
-in psych's `fa`. For some h, the correlation matrix with h on its diagonal has eigenvalues, and the best fit of the
-factors to it keeps the leading ones; what the fit leaves out, half the sum of the squares of the other eigenvalues, is
-the objective. It is the sum of the squared residuals of the off-diagonal correlations, where the communalities are those
-of the fit. Each iteration takes a Newton step on the communalities, with the Hessian that the objective has at a perfect
-fit, a backtracking line search that keeps the bounds, and an eigendecomposition of the matrix. The search starts from
-the squared multiple correlations. Convergence takes 5 to 20 iterations and a few milliseconds for 25 items.
+**The extraction.** The unknowns are the communalities h, which lie from 0 to 0.995: each item's uniqueness is at least
+0.005, as in psych's `fa`. Each extraction measures what the factors leave out at some h:
 
-**The solution.** The unrotated loadings are the leading eigenvectors of the reduced matrix scaled by the roots of their
-eigenvalues. They are rotated by gradient projection from there, with the oblimin criterion without normalization, as
+| Extraction             | Objective                                                                                                                              | Loadings                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `"minres"`             | Half the sum of the squared eigenvalues of R with h on its diagonal that the factors leave out: the squared residuals off the diagonal | The leading eigenvectors of that matrix, times the roots of their eigenvalues |
+| `"maximum-likelihood"` | Σ (γ - ln γ - 1) over the eigenvalues γ of Ψ^(-1/2) R Ψ^(-1/2) that the factors leave out, with Ψ = 1 - h                              | Ψ^(1/2) times the leading eigenvectors, times √(γ - 1)                        |
+
+Each iteration takes a Newton step on the communalities, with the Hessian that the objective has at a perfect fit, a
+backtracking line search that keeps the bounds, and an eigendecomposition of the matrix. The search starts from the
+squared multiple correlations. Convergence takes 5 to 20 iterations and a few milliseconds for 25 items. Fabrigar et
+al. (1999) call maximum likelihood the best choice for data near the normal distribution, as it gives a test of the
+fit, and principal axis factoring, whose limit is minres, the choice for data far from it.
+
+**The solution.** The unrotated loadings, those of the table above, are rotated by gradient projection, with the oblimin criterion without normalization, as
 `GPArotation::oblimin`, or the varimax criterion with each item's loadings scaled to unit length, as `stats::varimax`
 does. Each factor's sign makes its loadings sum to a positive number, and the factors follow the variance they account
 for, the diagonal of Φ ΛᵀΛ, as psych orders them. The communalities are the diagonal of Λ Φ Λᵀ for every rotation.
 
-A communality that the fit pushes beyond 0.995, a Heywood case, stays at the bound in the matrix the fit starts from, and
-the communality of the loadings can exceed it, as it does in psych; `converged` is `true`. More factors than the items
+A communality that the fit pushes beyond 0.995, a Heywood case, stays at the bound, and the communality of the loadings
+can exceed it, as it does in psych, for either extraction; `converged` is `true`. More factors than the items
 identify throw `DataError`: the number of correlations must be at least the number of loadings less the rotations that
 leave the model as it is.
+
+**The fit.** For Pearson correlations, `fit` holds what `psych::fa` reports for either extraction, for p items, m
+factors and the N persons of the matrix. The model's correlations M are Λ Φ Λᵀ off the diagonal and 1 on it.
+
+| Field              | Definition                                                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `chiSquare`        | (N - 1 - (2p + 5) / 6 - 2m / 3) F, at least 0, with F = tr(M⁻¹ R) - ln det(M⁻¹ R) - p: the likelihood ratio, with Bartlett's correction |
+| `degreesOfFreedom` | p (p - 1) / 2 - p m + m (m - 1) / 2                                                                                                     |
+| `significance`     | P(χ² > `chiSquare`)                                                                                                                     |
+| `rmsea`            | √max(χ² / (df N) - 1 / (N - 1), 0)                                                                                                      |
+| `rmseaInterval`    | Its 90% interval: √(λ / ((N - 1) df)) at the noncentralities λ that put χ² at the 95th and 5th percentiles                              |
+| `tli`              | Tucker and Lewis's index against the independence model, whose F is -ln det R; it can exceed 1                                          |
+| `bic`              | χ² - df ln N                                                                                                                            |
+| `srmsr`            | The root mean square of the residual correlations R - M over the pairs of items, each weighted by the persons who answered it           |
+
+With 0 degrees of freedom, as one factor of three items, the significance, the RMSEA, its interval and the TLI are
+`null`, and the BIC is χ². The chi-square of polychoric correlations has no reference distribution, so their `fit` is
+`null`, and so is that of a model whose correlations are not positive definite. Rotation leaves the model, and so the
+fit, as it is.
+
+```ts continues
+const ml = exploratoryFactorAnalysis(matrix, { factors: 2, extraction: "maximum-likelihood" });
+ml.loadings.slice(0, 2); // [[0.638, -0.018], [0.618, 0.02]]: of Pearson correlations, lower than polychoric
+ml.fit;
+// { chiSquare: 36.1, degreesOfFreedom: 43, significance: 0.762, rmsea: 0, rmseaInterval: [0, 0.0173], tli: 1.006,
+//   bic: -251.3, srmsr: 0.0172 }
+exploratoryFactorAnalysis(matrix, { factors: 1, extraction: "maximum-likelihood" }).fit?.rmsea; // 0.133: one factor misfits
+```
 
 **Which function.** `exploratoryFactorAnalysis` works on the correlations of the items, takes milliseconds and returns
 the factors. `calibrateMultidimensional` with `dimensions` estimates a compensatory item response model from the
@@ -247,10 +283,30 @@ negative.
 
 ## Not included
 
-- **Factor extraction other than minres, such as maximum likelihood.** Outside the sources: an option of `psych::fa`,
-  beside the minres extraction that is built.
-- **Rotations other than varimax and oblimin, such as promax.** Outside the sources: options of `psych::fa`, beside
-  oblimin, its default, and varimax, which are built.
+- **Rotations other than varimax and oblimin, such as promax.** Outside the sources: Fabrigar et al. (1999) prefer no
+  oblique rotation, as their results are alike; oblimin, `psych::fa`'s default, and varimax are built.
+- **WLS and WLSMV extraction.** Outside the sources: options of psych and lavaan.
+- **Standard errors of loadings.** Outside the sources: a bootstrap over the persons gives them.
+- **Factor scores.** Outside the sources: not confirmed in them; `multidimensionalEstimates` scores persons on the
+  full-information route.
+- **The Kaiser-Meyer-Olkin measure.** Outside the sources: not confirmed in them; parallel analysis, MAP and the fit
+  decide the number of factors.
+- **Bartlett's test of sphericity.** Outside the sources: not confirmed in them; it rejects at any useful sample size.
+- **Very simple structure.** Outside the sources: a function of psych, beside MAP.
+- **Principal components analysis.** No fit: general statistics; `parallelAnalysis` reports the eigenvalues, and
+  Fabrigar et al. (1999) set it apart from factor analysis.
+- **ICLUST and Bass-Ackward factoring.** Outside the sources: functions of psych.
+- **Nonparametric conditional covariances.** Outside the sources: a function of sirt.
+- **Statistical implicative analysis.** Outside the sources: a function of sirt.
+- **Confirmatory factor analysis of ordinal items.** No fit: structural equation modeling, another domain's tool,
+  lavaan.
+- **Modification indices and score tests.** No fit: structural equation modeling, lavaan.
+- **Multi-group confirmatory factor analysis and measurement invariance.** No fit: structural equation modeling,
+  lavaan; `dif` tests items.
+- **Structural paths, mediation and full-information maximum likelihood.** No fit: structural equation modeling,
+  lavaan.
+- **Invariance alignment.** No fit: structural equation modeling, sirt and Mplus.
+- **Local structural equation models.** No fit: structural equation modeling, sirt.
 - **DETECT.** Outside the sources: a method for clusters of items, beside the parallel analysis, MAP and factor analysis
   that are built.
 - **DIMTEST.** No reference: no package that runs it was found.
@@ -262,21 +318,26 @@ negative.
 
 ## Differences from psych
 
-| Topic                        | This package                                                                      | psych                                                                         |
-| ---------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Maximum of the likelihood    | Newton's method with derivatives, to 1e-13; the maximum of `optimize`             | `optimize` with its default tolerance, within about 2e-5 of the maximum       |
-| Correlation matrix           | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite          |
-| `correct`                    | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds    |
-| Thresholds                   | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item   |
-| Random data                  | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal |
-| Suggested numbers            | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations              |
-| Replications                 | 100                                                                               | 20 (`n.iter`)                                                                 |
-| Factor eigenvalues           | One-factor minres by Newton's method from the centroid loadings, to 1e-8          | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations        |
-| Minres solution              | Newton steps on the communalities from the squared multiple correlations          | L-BFGS-B on the same objective, within about 1e-5 of its minimum              |
-| Varimax                      | Gradient projection to a gradient of 1e-10, with Kaiser's normalization           | `stats::varimax`, which stops at 1e-5 of its criterion: loadings within 1e-2  |
-| Smoothed correlations        | Of the items' correlations in the factors and the test; not in `parallelAnalysis` | Of every correlation matrix `tetrachoric` and `polychoric` return             |
-| Items without variance       | `null` in the correlations; an error in parallel analysis                         | Deleted with a message                                                        |
-| An item correlated with none | `minimumAveragePartial` throws once a component holds all of its variance         | `VSS` stops with an error in `principal`                                      |
+| Topic                              | This package                                                                      | psych                                                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Maximum of the likelihood          | Newton's method with derivatives, to 1e-13; the maximum of `optimize`             | `optimize` with its default tolerance, within about 2e-5 of the maximum                                                  |
+| Correlation matrix                 | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite                                                     |
+| `correct`                          | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds                                               |
+| Thresholds                         | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item                                              |
+| Random data                        | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal                                            |
+| Suggested numbers                  | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations                                                         |
+| Replications                       | 100                                                                               | 20 (`n.iter`)                                                                                                            |
+| Factor eigenvalues                 | One-factor minres by Newton's method from the centroid loadings, to 1e-8          | `fa(fm = "minres")` by L-BFGS-B from the squared multiple correlations                                                   |
+| Minres solution                    | Newton steps on the communalities from the squared multiple correlations          | L-BFGS-B on the same objective, within about 1e-5 of its minimum                                                         |
+| Maximum likelihood                 | The same Newton steps, with the likelihood's Hessian at a perfect fit, to 1e-6    | L-BFGS-B on the uniquenesses from 0.005 to 1: loadings within 2e-5                                                       |
+| Unweighted least squares           | Minres is the solution                                                            | `fm = "uls"` gives the minres solution: within 9e-6 on `bfi`                                                             |
+| Principal axis factoring           | Minres is its limit                                                               | `fm = "pa"` run to `min.err = 1e-12` is within 4e-6 of minres on `bfi`; its default `min.err` of 0.001 stops 0.0017 away |
+| Interval of the RMSEA              | Roots in [0, χ²] and [0, max(N - 1, 5 χ²)]                                        | `uniroot` in [0, max(N, χ²) + 2N], to its default tolerance                                                              |
+| Residuals of smoothed correlations | Of the smoothed correlations that the factors fit                                 | Of the correlations before smoothing; the same for a matrix that needs none                                              |
+| Varimax                            | Gradient projection to a gradient of 1e-10, with Kaiser's normalization           | `stats::varimax`, which stops at 1e-5 of its criterion: loadings within 1e-2                                             |
+| Smoothed correlations              | Of the items' correlations in the factors and the test; not in `parallelAnalysis` | Of every correlation matrix `tetrachoric` and `polychoric` return                                                        |
+| Items without variance             | `null` in the correlations; an error in parallel analysis                         | Deleted with a message                                                                                                   |
+| An item correlated with none       | `minimumAveragePartial` throws once a component holds all of its variance         | `VSS` stops with an error in `principal`                                                                                 |
 
 ## References
 

@@ -7,12 +7,24 @@ import {
   DataError,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { minres, resolveRotation, rotateLoadingMatrix } from "../math/internal.js";
+import {
+  minimizeCommunalities,
+  minres,
+  resolveRotation,
+  rotateLoadingMatrix,
+  startingCommunalities,
+} from "../math/internal.js";
+import type { CodedItem } from "./coded-items.js";
+import { type FactorFit, factorFit } from "./factor-fit.js";
+import { likelihoodObjective } from "./factor-likelihood.js";
 import { ITEM_CORRELATIONS, type ItemCorrelation, positiveDefiniteCorrelations } from "./item-correlations.js";
 import { DEFAULT_CORRECTION, type PolychoricOptions } from "./polychoric.js";
 
 /** The rotation of the factors: none, orthogonal (Kaiser-normalized varimax) or oblique (oblimin). */
 export type FactorRotation = "none" | "varimax" | "oblimin";
+
+/** The extraction of the factors: minimum residuals, or maximum likelihood. */
+export type FactorExtraction = "minres" | "maximum-likelihood";
 
 /** Options of {@link exploratoryFactorAnalysis}. */
 export interface ExploratoryFactorOptions extends PolychoricOptions {
@@ -32,6 +44,13 @@ export interface ExploratoryFactorOptions extends PolychoricOptions {
    * @defaultValue `"oblimin"`
    */
   readonly rotation?: FactorRotation;
+  /**
+   * The extraction: `"minres"`, the least squared residuals of the correlations, or `"maximum-likelihood"`, Jöreskog's
+   * likelihood concentrated on the uniquenesses.
+   *
+   * @defaultValue `"minres"`
+   */
+  readonly extraction?: FactorExtraction;
   /**
    * The largest change of a communality in an iteration at which the fit stops.
    *
@@ -62,32 +81,42 @@ export interface ExploratoryFactors {
   readonly iterations: number;
   /** Whether the correlations of the items were not positive definite and were smoothed. */
   readonly smoothed: boolean;
+  /**
+   * The fit of the factors, as `psych::fa` reports it for both extractions; `null` for the polychoric correlation, whose
+   * chi-square has no reference distribution, and when the model's correlations are not positive definite.
+   */
+  readonly fit: FactorFit | null;
 }
 
 const ROTATIONS = ["none", "varimax", "oblimin"] as const;
+const EXTRACTIONS = ["minres", "maximum-likelihood"] as const;
 const DEFAULT_TOLERANCE = 1e-6;
 const DEFAULT_MAX_ITERATIONS = 100;
 
 /**
- * Returns the factors of the items of a response matrix by the minimum residual method, rotated.
+ * Returns the factors of the items of a response matrix by the minimum residual method or maximum likelihood, rotated,
+ * with the fit of the factors.
  *
  * @remarks
  * The correlations of the items, Pearson's over the persons who answered both items of each pair or polychoric, are
  * smoothed when they are not positive definite, as psych's `cor.smooth` does. The loadings are those of
  * `psych::fa(fm = "minres")`: the communalities that leave the least squared residuals, with the uniqueness of an item
  * at least 0.005, and the loadings the leading eigenvectors of the correlations with those communalities on the
- * diagonal. They are rotated by gradient projection from the unrotated solution, oblimin without normalization or
- * Kaiser-normalized varimax. The sign of each factor makes its loadings sum to a positive number, and the factors
- * are in the order of the variance they account for, the diagonal of Φ ΛᵀΛ, as psych's. A solution beyond
- * what the items identify, more factors than the largest number with at least as many correlations as parameters,
- * throws. `calibrateMultidimensional` with `dimensions` estimates the same model from the responses, by full
- * information and far more slowly, and gives the item parameters of the model.
+ * diagonal; or of `fa(fm = "ml")`: the uniquenesses from 0.005 to 1 that maximize Jöreskog's likelihood, by the same
+ * projected Newton search with the likelihood's Hessian at a perfect fit. They are rotated by gradient projection from
+ * the unrotated solution, oblimin without normalization or Kaiser-normalized varimax. The sign of each factor makes its
+ * loadings sum to a positive number, and the factors are in the order of the variance they account for, the diagonal
+ * of Φ ΛᵀΛ, as psych's. A solution beyond what the items identify, more factors than the largest number with at least as
+ * many correlations as parameters, throws. The fit of Pearson correlations is psych's: the likelihood ratio statistic,
+ * its RMSEA, TLI and BIC for the persons of the matrix, and the root mean square of the residual correlations.
+ * `calibrateMultidimensional` with `dimensions` estimates the same model from the responses, by full information and far
+ * more slowly, and gives the item parameters of the model.
  *
  * @param data - The responses of the persons.
- * @param options - The number of factors, the correlation, the rotation, the stopping rules and the correction for
- *   continuity.
+ * @param options - The number of factors, the correlation, the extraction, the rotation, the stopping rules and the
+ *   correction for continuity.
  * @returns The loadings and communalities of the items, the correlations of the factors, whether the extraction
- *   converged and the iterations run.
+ *   converged, the iterations run and the fit.
  * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
  * categories, a pair of items has too few persons for a correlation, an option is invalid, or `factors` is more than the
  * items identify.
@@ -99,6 +128,7 @@ export function exploratoryFactorAnalysis(data: ResponseMatrix, options: Explora
   const {
     factors,
     correlation = "pearson",
+    extraction = "minres",
     rotation = "oblimin",
     tolerance = DEFAULT_TOLERANCE,
     maxIterations = DEFAULT_MAX_ITERATIONS,
@@ -106,6 +136,7 @@ export function exploratoryFactorAnalysis(data: ResponseMatrix, options: Explora
   } = options;
   checkPositiveInteger(factors, "The option factors");
   checkChoice(correlation, "The option correlation", ITEM_CORRELATIONS);
+  checkChoice(extraction, "The option extraction", EXTRACTIONS);
   checkChoice(rotation, "The option rotation", ROTATIONS);
   checkStopping(tolerance, maxIterations);
   checkNonNegative(correction, "The option correction");
@@ -117,17 +148,55 @@ export function exploratoryFactorAnalysis(data: ResponseMatrix, options: Explora
   );
   const size = items.length;
   checkIdentified(size, factors);
-  const solution = factorSolution(correlations, size, factors, rotation, { tolerance, maxIterations });
-  return { itemIds: data.itemIds, ...solution, smoothed };
+  const solution = factorSolution(correlations, size, factors, rotation, { tolerance, maxIterations }, extraction);
+  const fit =
+    correlation === "pearson"
+      ? factorFit(correlations, size, modelOf(solution), factors, data.responses.length, pairCounts(items))
+      : null;
+  return { itemIds: data.itemIds, ...solution, smoothed, fit };
 }
 
 /** The factors of a correlation matrix. */
-export type FactorSolution = Omit<ExploratoryFactors, "itemIds" | "smoothed">;
+export type FactorSolution = Omit<ExploratoryFactors, "itemIds" | "smoothed" | "fit">;
+
+/** Returns the model's correlations off the diagonal, Λ Φ Λᵀ, by rows. */
+function modelOf({ loadings, correlations }: FactorSolution): Float64Array {
+  const size = loadings.length;
+  const model = new Float64Array(size * size);
+  loadings.forEach((row, i) => {
+    loadings.forEach((other, l) => {
+      let sum = 0;
+      row.forEach((a, j) => {
+        other.forEach((b, k) => {
+          sum += a * (correlations[j]?.[k] ?? 0) * b;
+        });
+      });
+      model[i * size + l] = sum;
+    });
+  });
+  return model;
+}
+
+/** Returns the number of persons who answered each pair of items, by rows; the diagonal those who answered each item. */
+function pairCounts(items: readonly CodedItem[]): Float64Array {
+  const size = items.length;
+  const counts = new Float64Array(size * size);
+  items.forEach(({ values: first }, i) => {
+    items.forEach(({ values: second }, j) => {
+      let count = 0;
+      for (let person = 0; person < first.length; person++) {
+        if (!Number.isNaN(first[person]) && !Number.isNaN(second[person])) count++;
+      }
+      counts[i * size + j] = count;
+    });
+  });
+  return counts;
+}
 
 /**
- * Returns the minimum residual solution of a correlation matrix (`size` rows, by rows, 1 on the diagonal), rotated, with
- * each factor's sign and the order of the factors as `exploratoryFactorAnalysis` gives them. `factors` is a positive
- * integer that the matrix identifies.
+ * Returns the minimum residual or maximum likelihood solution of a correlation matrix (`size` rows, by rows, 1 on the
+ * diagonal), rotated, with each factor's sign and the order of the factors as `exploratoryFactorAnalysis` gives them.
+ * `factors` is a positive integer that the matrix identifies, and the matrix is positive definite for maximum likelihood.
  */
 export function factorSolution(
   correlations: Float64Array,
@@ -135,8 +204,18 @@ export function factorSolution(
   factors: number,
   rotation: FactorRotation,
   stopping: { readonly tolerance: number; readonly maxIterations: number },
+  extraction: FactorExtraction = "minres",
 ): FactorSolution {
-  const fit = minres(correlations, size, factors, stopping);
+  const fit =
+    extraction === "minres"
+      ? minres(correlations, size, factors, stopping)
+      : minimizeCommunalities(
+          likelihoodObjective(correlations, size, factors),
+          startingCommunalities(correlations, size),
+          size,
+          factors,
+          stopping,
+        );
   const rotated = rotate(fit.loadings, size, factors, rotation);
   const order = byVariance(rotated.loadings, rotated.correlations, size, factors);
   return {

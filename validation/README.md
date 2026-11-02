@@ -23,6 +23,7 @@ Rscript validation/psychometrics/latent-regression.R # latent regression in `cal
 JAVA_HOME=<a JDK> Rscript validation/psychometrics/irt-unfolding.R # the generalized graded unfolding model: the GGUM package, base R for the log-likelihood and the cross-product errors; case names as arguments run only those cases
 Rscript validation/psychometrics/dimensionality.R    # polychoric correlations, parallel analysis: psych, polycor
 Rscript validation/psychometrics/exploratory-factors.R # minres factors, rotations, minimum average partial test, smoothing: psych, GPArotation and base R
+Rscript validation/psychometrics/efa-fit.R           # maximum likelihood factors and the fit of factors: psych's fa and fa.stats, base R
 Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic: cdcatR; multidimensional: mirtCAT; testlets: base R and mirtCAT
 Rscript validation/psychometrics/cat-bounds.R        # content bounds: base R replays; the shadow test of mirtCAT with lpSolve, in two processes, about 4 minutes
 Rscript validation/psychometrics/form-assembly.R     # assembly of forms: base R replays; highs on 85 blueprints, about 4 minutes
@@ -93,7 +94,8 @@ run only those cases and keep the others of the fixture.
 `multidimensional-groups.R` writes one fixture of five cases, two groups of correlated dimensions, the same data with fixed
 items, three groups with items missing by design, the graded model and three dimensions, and takes about a minute.
 `exploratory-factors.R` writes one fixture of ten correlation matrices, simulated, `bfi`, `SAT12`, Harman's tests and a Heywood case,
-with their minres solutions in base R and psych, and takes seconds.
+with their minres solutions in base R and psych, and takes seconds. `factor-solutions.R` holds the base R solutions by
+minres and maximum likelihood and their rotations, which it, `efa-fit.R` and `factor-hierarchy.R` share.
 
 `bifactor.R` takes the cases `m2pl`, `long`, `two-tier`, `m3pl`, `graded`, `incomplete` and `recovery` as arguments, and runs
 all of them without; it takes about half an hour, as mirt's EM at `TOL = 1e-10` runs to its limit of 5,000 cycles on the 3PL and

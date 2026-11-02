@@ -308,6 +308,14 @@ export const RULES: readonly Rule[] = [
     titles: "groups larger than the persons",
   },
   {
+    rule: "An extraction other than minres and maximum likelihood is refused, and never read as maximum likelihood.",
+    file: "packages/psychometrics/src/dimensionality/exploratory-factors.ts",
+    find: 'checkChoice(extraction, "The option extraction", EXTRACTIONS);',
+    replace: "",
+    test: "packages/psychometrics/test/dimensionality.test.ts",
+    titles: "rejects options of other types",
+  },
+  {
     rule: "A component that leaves an item no variance ends the test, and gives no NaN.",
     file: "packages/psychometrics/src/dimensionality/minimum-average-partial.ts",
     find: "for (let i = 0; i < size; i++) if (!((covariance[i * size + i] ?? 0) > 0)) return null;",

@@ -33,7 +33,15 @@ export {
   traceOfProduct,
   transpose,
 } from "./matrix.js";
-export { minres, minresLoadings } from "./minres.js";
+export {
+  type CommunalityObjective,
+  minimizeCommunalities,
+  minres,
+  minresLoadings,
+  principalAxes,
+  projectorHessian,
+  startingCommunalities,
+} from "./minres.js";
 export { noncentralChiSquareCdf } from "./noncentral-chi-square.js";
 export { normalCdf, normalDensity } from "./normal.js";
 export { type HessianFunction, type NewtonOptions, newton } from "./optimize.js";

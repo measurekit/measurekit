@@ -4,13 +4,16 @@ import { describe, expect, it } from "vitest";
 import {
   averagePartials,
   correlationEigenvalues,
+  type FactorExtraction,
   type FactorRotation,
+  factorFit,
   factorSolution,
 } from "../src/dimensionality/internal.js";
 import {
   createRandom,
   DataError,
   type ExploratoryFactorOptions,
+  type ExploratoryFactors,
   exploratoryFactorAnalysis,
   mcdonaldOmega,
   minimumAveragePartial,
@@ -36,6 +39,7 @@ import {
 import { defined, expectClose } from "./assertions.js";
 import bivariate from "./fixtures/dimensionality-bivariate-normal.json" with { type: "json" };
 import factorFixture from "./fixtures/dimensionality-factors.json" with { type: "json" };
+import fitFixture from "./fixtures/dimensionality-fit.json" with { type: "json" };
 import parallel from "./fixtures/dimensionality-parallel.json" with { type: "json" };
 import polychoric from "./fixtures/dimensionality-polychoric.json" with { type: "json" };
 
@@ -58,6 +62,12 @@ const FACTOR_TOLERANCE = 1e-8;
 const PSYCH_FACTOR_TOLERANCE = 1e-4;
 /** Varimax loadings against psych's, whose `stats::varimax` stops at 1e-5 of its criterion, about 1e-2 of the loadings. */
 const PSYCH_VARIMAX_TOLERANCE = 2e-2;
+/** The fit against psych's fa.stats of the base R solution, whose uniroot finds the RMSEA's interval to about 1e-8. */
+const FIT_TOLERANCE = 1e-7;
+/** The fit against psych's fa on the responses, whose L-BFGS-B stops short of the optimum. */
+const PSYCH_FIT_TOLERANCE = 1e-2;
+/** The mean loading of each factor of a simulation against its truth, at 1,000 persons. */
+const RECOVERY_TOLERANCE = 0.03;
 /** Factors and partial correlations of this package's polychoric correlations against psych's, which differ by 1e-4. */
 const PSYCH_POLYCHORIC_FACTOR_TOLERANCE = 3e-4;
 /** Means of random eigenvalues against a reference of its own random data: this many Monte Carlo standard errors. */
@@ -985,10 +995,11 @@ describe("exploratoryFactorAnalysis", () => {
     expect(unrotated.correlations).toEqual([[1]]);
   });
 
-  it("uses Pearson correlations and oblimin by default, and polychoric correlations when asked", () => {
+  it("uses Pearson correlations, minres and oblimin by default, and polychoric correlations when asked", () => {
     const explicit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, {
       factors: 2,
       correlation: "pearson",
+      extraction: "minres",
       rotation: "oblimin",
       tolerance: 1e-6,
       maxIterations: 100,
@@ -1018,6 +1029,130 @@ describe("exploratoryFactorAnalysis", () => {
     );
     expect(missing).toBeGreaterThan(0);
     expect(exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 5 }).loadings).toHaveLength(25);
+  });
+
+  describe("extraction by maximum likelihood and fit", () => {
+    type FitCase = (typeof fitFixture.cases)[number];
+    type ReferenceFit = FitCase["base"]["fit"];
+
+    function fitOf(c: FitCase): ReturnType<typeof exploratoryFactorAnalysis> {
+      return exploratoryFactorAnalysis(responseMatrix(c.responses, { itemIds: c.itemIds }), {
+        factors: c.factors,
+        extraction: c.extraction as FactorExtraction,
+        rotation: c.rotation as FactorRotation,
+        tolerance: 1e-10,
+        maxIterations: 500,
+      });
+    }
+
+    function expectFit(actual: ExploratoryFactors["fit"], expected: ReferenceFit, tolerance: number, label: string) {
+      const fit = defined(actual);
+      const scaled = (value: number | null) => tolerance * Math.max(1, Math.abs(value ?? 0));
+      expect(fit.degreesOfFreedom, label).toBe(expected.degreesOfFreedom);
+      for (const key of ["chiSquare", "significance", "rmsea", "tli", "bic", "srmsr"] as const) {
+        expectClose(fit[key], expected[key], scaled(expected[key]), `${label} ${key}`);
+      }
+      const interval = expected.rmseaInterval;
+      if (interval === null) expect(fit.rmseaInterval, label).toBeNull();
+      else
+        interval.forEach((value, k) => {
+          expectClose(fit.rmseaInterval?.[k] ?? null, value, tolerance, `${label} interval`);
+        });
+    }
+
+    for (const c of fitFixture.cases) {
+      it(`matches the base R solution and psych's fa.stats of it on ${c.name}`, () => {
+        const fit = fitOf(c);
+        expect(fit.converged).toBe(true);
+        expectMatrix(fit.loadings, c.base.loadings, FACTOR_TOLERANCE, "loading");
+        expectMatrix(fit.correlations, c.base.phi, FACTOR_TOLERANCE, "factor correlation");
+        c.base.communalities.forEach((value, i) => {
+          expectClose(defined(fit.communalities[i]), value, FACTOR_TOLERANCE, `communality ${i + 1}`);
+        });
+        expectFit(fit.fit, c.base.fit, FIT_TOLERANCE, "fit");
+      });
+
+      it(`matches psych's fa on the responses of ${c.name}`, () => {
+        const fit = fitOf(c);
+        const tolerance = c.rotation === "varimax" ? PSYCH_VARIMAX_TOLERANCE : PSYCH_FACTOR_TOLERANCE;
+        expectMatrix(fit.loadings, c.psych.loadings, tolerance, "loading");
+        expectMatrix(fit.correlations, c.psych.phi, PSYCH_FACTOR_TOLERANCE, "factor correlation");
+        expectFit(fit.fit, c.psych.fit, PSYCH_FIT_TOLERANCE, "fit");
+      });
+    }
+
+    it("keeps a uniqueness at its bound of 0.005, where the loadings' communality is just above 0.995, as psych's", () => {
+      const c = defined(fitFixture.cases.find(({ name }) => name === "a uniqueness at its bound, maximum likelihood"));
+      const communality = defined(fitOf(c).communalities[0]);
+      expect(communality).toBeGreaterThan(0.995);
+      expectClose(communality, 1 - defined(c.psych.uniquenesses[0]), PSYCH_FACTOR_TOLERANCE, "psych");
+    });
+
+    it("gives by minres the solution of unweighted least squares and of principal axis factoring run to convergence", () => {
+      const c = defined(fitFixture.cases.find(({ name }) => name === "bfi, ten items, two factors, minres"));
+      const fit = fitOf(c);
+      expectMatrix(fit.loadings, defined(c.psych.unweightedLeastSquares), PSYCH_FACTOR_TOLERANCE, "uls");
+      expectMatrix(fit.loadings, defined(c.psych.principalAxis), PSYCH_FACTOR_TOLERANCE, "pa");
+    });
+
+    it("leaves the significance, the RMSEA, its interval and the TLI undefined without degrees of freedom", () => {
+      const c = defined(fitFixture.cases.find(({ name }) => name === "three items, one factor, no degrees of freedom"));
+      const fit = defined(fitOf(c).fit);
+      expect(fit).toMatchObject({
+        degreesOfFreedom: 0,
+        significance: null,
+        rmsea: null,
+        rmseaInterval: null,
+        tli: null,
+      });
+      expect(fit.bic).toBe(fit.chiSquare);
+    });
+
+    it("recovers the mean loadings 0.7 and 0.6 of two factors at 1,000 persons", () => {
+      // Two factors correlated 0.3, six items each with loadings 0.7 and 0.6, scored in hundredths.
+      const random = createRandom(20261104);
+      const rows = Array.from({ length: 1000 }, () => {
+        const first = random.normal();
+        const second = 0.3 * first + Math.sqrt(1 - 0.09) * random.normal();
+        return Array.from({ length: 12 }, (_, item) => {
+          const loading = item % 6 < 3 ? 0.7 : 0.6;
+          const trait = item < 6 ? first : second;
+          return Math.round(100 * (loading * trait + Math.sqrt(1 - loading ** 2) * random.normal())) + 1000;
+        });
+      });
+      const fit = exploratoryFactorAnalysis(responseMatrix(rows), { factors: 2, extraction: "maximum-likelihood" });
+      const primary = fit.loadings.map((row) => Math.max(...row));
+      const meanOf = (items: readonly number[]) =>
+        items.reduce((sum, item) => sum + defined(primary[item]), 0) / items.length;
+      expectClose(meanOf([0, 1, 2, 6, 7, 8]), 0.7, RECOVERY_TOLERANCE, "0.7");
+      expectClose(meanOf([3, 4, 5, 9, 10, 11]), 0.6, RECOVERY_TOLERANCE, "0.6");
+      expect(defined(fit.fit).significance).toBeGreaterThan(0.01);
+    });
+
+    it("gives the same fit for every rotation, and none for polychoric correlations", () => {
+      const data = FACTOR_DATA.bfi;
+      const fits = (["none", "varimax", "oblimin"] as const).map((rotation) =>
+        defined(exploratoryFactorAnalysis(data, { factors: 3, rotation }).fit),
+      );
+      for (const fit of fits.slice(1)) {
+        expectClose(fit.chiSquare, defined(fits[0]).chiSquare, 1e-8, "chi-square");
+        expectClose(fit.srmsr, defined(fits[0]).srmsr, 1e-12, "SRMSR");
+      }
+      expect(
+        exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, correlation: "polychoric" }).fit,
+      ).toBeNull();
+    });
+
+    it("has no fit when the model's correlations are not positive definite", () => {
+      // The model takes 1 on its diagonal; off it, a correlation of 0.4 is a model, and one of 1.2 is not.
+      const r = Float64Array.from([1, 0.5, 0.5, 0.5, 1, 0.2, 0.5, 0.2, 1]);
+      const model = Float64Array.from([0.5, 0.4, 0.4, 0.4, 0.3, 0.2, 0.4, 0.2, 0.3]);
+      const counts = new Float64Array(9).fill(100);
+      expect(factorFit(r, 3, model, 1, 100, counts)).not.toBeNull();
+      model[1] = 1.2;
+      model[3] = 1.2;
+      expect(factorFit(r, 3, model, 1, 100, counts)).toBeNull();
+    });
   });
 
   describe("errors", () => {
@@ -1072,6 +1207,9 @@ describe("exploratoryFactorAnalysis", () => {
       );
       expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "correlation": 1}'))).toThrow(
         "The option correlation",
+      );
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "extraction": "ml"}'))).toThrow(
+        "The option extraction",
       );
       expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "tolerance": -1}'))).toThrow(DataError);
       expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "maxIterations": 1.5}'))).toThrow(
@@ -1252,6 +1390,33 @@ describe("properties", () => {
         expect(Math.abs(p - upper)).toBeLessThan(1e-14);
       }),
       { numRuns: 300 },
+    );
+  });
+
+  it("maximum likelihood gives communalities below 1, and loadings that follow the order of the items", () => {
+    const columns = fc.uniqueArray(fc.integer({ min: 0, max: 24 }), { minLength: 6, maxLength: 10 });
+    fc.assert(
+      fc.property(columns, (chosen) => {
+        const pick = (ids: readonly number[]) =>
+          responseMatrix(
+            FACTOR_DATA.bfi.responses.map((row) => ids.map((item) => row[item] ?? null)),
+            { itemIds: ids.map((item) => `${item}`) },
+          );
+        const options = { factors: 2, extraction: "maximum-likelihood", rotation: "none", tolerance: 1e-10 } as const;
+        const forward = exploratoryFactorAnalysis(pick(chosen), options);
+        for (const communality of forward.communalities) {
+          expect(communality).toBeGreaterThanOrEqual(0);
+          expect(communality).toBeLessThan(1);
+        }
+        const backward = exploratoryFactorAnalysis(pick([...chosen].reverse()), options);
+        [...backward.loadings].reverse().forEach((row, i) => {
+          row.forEach((value, k) => {
+            expect(Math.abs(Math.abs(value) - Math.abs(defined(forward.loadings[i]?.[k])))).toBeLessThan(1e-6);
+          });
+        });
+        expect(defined(backward.fit).chiSquare).toBeCloseTo(defined(forward.fit).chiSquare, 6);
+      }),
+      { numRuns: 15 },
     );
   });
 
