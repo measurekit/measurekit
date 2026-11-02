@@ -30,6 +30,10 @@ post-stratification designs, as kequate: log-linear presmoothing, Gaussian conti
 the penalty, the percent relative errors of the moments, and standard errors by the delta method;
 `kernelEquatingDifference` gives the standard error of the difference of two equatings, as kequate's `genseed`.
 
+`linkCovariance` gives the standard errors and covariance of a link between separately calibrated forms, or of a chain
+of them, from each form's covariance, counting a form between two links once, as `equateIRT::chainec`;
+`linkedEquatingErrors` gives the standard errors of IRT true-score or observed-score equating through such a link.
+
 Lord's chi-square can be purified: with `purify: true` the items it flags leave the anchors of the linking, which is
 repeated on the two calibrations until two rounds flag the same items.
 

@@ -4,8 +4,8 @@
 and converts the scores of one form to the scale of another (equating). Linking is validated against equateIRT and
 base R, observed-score equating, with or without common items, and its bootstrap standard errors against the equate
 package and base R, true-score equating against base R and equateIRT, IRT observed-score equating against base R and
-equateIRT, kernel equating against kequate, and the standard errors of IRT equating against base R and mirt
-([validation](validation.md)).
+equateIRT, kernel equating against kequate, the standard errors of IRT equating against base R and mirt, and those of
+links between separate calibrations against equateIRT ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
@@ -514,8 +514,8 @@ covariance that belongs to an item of the forms must lie inside its range, so th
 
 The standard errors are valid when both forms are on the scale of one calibration: a concurrent calibration of both
 forms, or a calibration of one form with the other's common items fixed to their values. A response left `null` for an
-item a person did not take makes a NEAT design one calibration. The covariance of a linking of two calibrations
-requires the joint covariance of the linking coefficients and of both calibrations, which is not available.
+item a person did not take makes a NEAT design one calibration. Forms calibrated apart and linked take
+[`linkedEquatingErrors`](#standard-errors-across-separate-calibrations), which adds the error of the link.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -541,12 +541,75 @@ irtEquatingStandardErrors(formX, formY, covariance, { method: "observed-score" }
 // [0.04, 0.048, 0.042, 0.035, 0.033, 0.033, 0.034, 0.034, 0.029, 0.022], after rounding
 ```
 
+## Standard errors across separate calibrations
+
+When each form is calibrated on its own, a common item has an estimate on each form, and a link between the forms
+carries the error of both. A `CalibratedForm` is `{ items, covariance }`: a form's items with string ids and the
+covariance of their parameters, as `calibrateWithCovariance` returns it. Forms share items by id.
+
+```mermaid
+flowchart LR
+  F1["Form 1: items, covariance"] --> L["Links of neighboring forms"]
+  F2["Form 2: items, covariance"] --> L
+  F3["Form 3: items, covariance"] --> L
+  L --> C["Chain: last form to the first form's scale"]
+  C --> D["Delta method: the sum over forms of J Σ Jᵀ"]
+```
+
+| Function                                  | Returns                                                                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `linkCovariance(forms, options)`          | The transformation of the last form to the first form's scale, each form linked to the one before it, with the standard errors and the covariance of A and B |
+| `linkedEquatingErrors(from, to, options)` | The standard error of each equated score of `from`, its items moved to the scale of `to` by their link, the link's error included                            |
+
+Both differentiate their result by central differences in each parameter of each form's covariance, as
+`irtEquatingStandardErrors` does, and add J Σ Jᵀ over the forms, which are independent: a form between two links counts
+once, as `equateIRT::chainec` does (Ogasawara, 2001; Battauz, 2015). Two forms are a chain of one link. A parameter that
+a covariance lacks, such as one of a fixed item, is known; in `linkCovariance`, one of an item that no neighboring form
+shares does not enter a link.
+
+| Option        | Default           | Meaning                                                                                                            |
+| ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `linking`     | `"stocking-lord"` | `"mean-mean"`, `"mean-sigma"`, `"haebara"` or `"stocking-lord"`                                                    |
+| `quadrature`  | as above          | The quadrature of the characteristic curve methods                                                                 |
+| `method`      | `"true-score"`    | `linkedEquatingErrors` only: `"true-score"` or `"observed-score"`                                                  |
+| `populations` | as above          | `linkedEquatingErrors` with `"observed-score"`: `from` lies on the `from` form's own scale and moves with the link |
+| `weight`      | `0.5`             | `linkedEquatingErrors` with `"observed-score"`                                                                     |
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { linkCovariance, linkedEquatingErrors } from "@measurekit/psychometrics/equating";
+import { calibrateWithCovariance, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+const random = createRandom(3);
+const truth = simulateItems(twoParameterLogistic, 16, random);
+// Form X has items 1 to 10 and form Y items 7 to 16, each calibrated on its own group; Y's group is abler.
+const calibrated = (first: number, shift: number) => {
+  const ids = Array.from({ length: 10 }, (_, j) => `q${first + j}`);
+  const thetas = simulateThetas(1500, random).map((theta) => theta + shift);
+  const matrix = simulateResponses(truth.slice(first - 1, first + 9), thetas, random);
+  const { calibration, covariance } = calibrateWithCovariance(matrix, {
+    model: twoParameterLogistic,
+    standardErrors: "hessian",
+  });
+  if (covariance === null) throw new Error("The calibration has no covariance.");
+  const id = (item: string) => ids[Number(item.slice(4)) - 1] ?? item;
+  return {
+    items: calibration.items.map((item) => ({ ...item, id: id(item.id) })),
+    covariance: { ...covariance, parameters: covariance.parameters.map((p) => ({ ...p, item: id(p.item) })) },
+  };
+};
+const formX = calibrated(1, 0);
+const formY = calibrated(7, 0.5);
+const { transformation, errors } = linkCovariance([formX, formY]); // Y's scale to X's
+transformation; // { slope: 0.976, intercept: 0.411 }, after rounding
+errors.standardErrors; // { slope: 0.082, intercept: 0.065 }, after rounding
+linkedEquatingErrors(formY, formX);
+// [0, 0.139, 0.192, 0.181, 0.126, 0.087, 0.091, 0.108, 0.112, 0.086, 0]: the error of each form Y score's equivalent
+```
+
 ## Not included
 
-- **Standard errors of IRT equating across separate calibrations.** No fit: they need each form's item parameters and
-  their covariance, and the joint covariance of the linking coefficients (Ogasawara, 2001).
-- **Standard errors of a chain of links.** No fit: consecutive links share the estimates of the form between them, so
-  per-link covariances overstate the errors; `equateIRT::chainec` gives them from each form's covariance.
 - **Braun-Holland linear equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the
   linear, equipercentile and frequency estimation families that are built.
 - **Circle-arc equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the families
@@ -565,22 +628,28 @@ irtEquatingStandardErrors(formX, formY, covariance, { method: "observed-score" }
   post-stratification on an anchor is the practice, and is built.
 - **Logistic and uniform kernels.** Outside the sources: options of kequate; the Gaussian kernel is the practice.
 - **Freeman-Tukey residuals of a presmoothing.** No fit: one line over the fitted counts.
+- **Composite linking.** Outside the sources: an option of equate.
+- **Bisector linking.** Outside the sources: an option of equateIRT.
+- **Linking several forms at once, Haberman's linking, robust linking.** Outside the sources: `linkCovariance` over a
+  chain and concurrent `groups` are the practice.
+- **Identity and chain-consistency tests.** Outside the sources: functions of equateIRT; `robustZ` screens the items.
 
 ## Differences from the references
 
-| Topic                          | This package                                                                      | Reference                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rasch items                    | A estimated by every method; 1 by mean-mean                                       | equateIRT fixes A = 1 for its Rasch model                                                                                                                                                                                                                                                                                                                |
-| Polytomous items               | Every method; NRM by the characteristic curves only                               | equateIRT's `direc`: dichotomous items                                                                                                                                                                                                                                                                                                                   |
-| Percentile ranks               | Exact                                                                             | equate rounds them and the cumulative shares to 10 decimals: up to 1e-7 apart                                                                                                                                                                                                                                                                            |
-| X scores above Y's scale       | Rank 1 gives Y's highest score plus 0.5                                           | equate returns the X score itself                                                                                                                                                                                                                                                                                                                        |
-| True scores below Σ c          | Kolen and Brennan's line from 0                                                   | equateIRT's `score` leaves them out                                                                                                                                                                                                                                                                                                                      |
-| Frequency estimation weights   | `weight` is w₁ of the synthetic population                                        | equate's `ws` also multiplies the groups' numbers of persons, so its default weights `from` by n₁² / (n₁² + n₂²); `ws = w₁ n₂ / (w₁ n₂ + (1 - w₁) n₁)` gives w₁, and the two agree for groups of one size                                                                                                                                                |
-| Anchor score of one group only | `DataError` naming the score                                                      | equate gives the persons at it their own group's weight alone, so the synthetic distributions lose mass                                                                                                                                                                                                                                                  |
-| Bivariate presmoothing degrees | `degrees: [total, anchor]` and `crossDegree`, at most the smaller degree          | `degrees = list(c(total, anchor), cross)`, with the cross products as in `crossDegree`                                                                                                                                                                                                                                                                   |
-| Bootstrap                      | The seeded `Random` of the package; replications default to 500                   | R's `sample`, 100 replications; the standard errors agree within their Monte Carlo error                                                                                                                                                                                                                                                                 |
-| IRT observed-score populations | Any discrete distribution per group; default N(0, 1) on 61 rectangular points     | equateIRT's `score(method = "OSE")`: N(0, 1) on `theta` for one group and N(B, A²) on A `theta` + B for the other                                                                                                                                                                                                                                        |
-| Kernel presmoothing            | `degrees` and `crossDegree` of the log-linear models, fitted here                 | kequate takes fitted `glm` objects with their design matrices                                                                                                                                                                                                                                                                                            |
-| Counterbalanced weights        | `weight` w of the first group in r, s and their standard errors                   | kequate's `wcb` weighs the first group by w in r and s, but by 1 - w in the Jacobian of s; its standard errors at w ≠ 1/2 belong to no equating it computes. The delta method written out in base R, through the parameters of the log-linear fits, reproduces kequate at w = 1/2 and this package at 0.7 (`validation/psychometrics/kernel-equating.R`) |
-| Kernel equated scores          | Each inverse solved to a bracket of 1e-12                                         | kequate's `uniroot(tol = 1e-6)`                                                                                                                                                                                                                                                                                                                          |
-| IRT equating standard errors   | Delta method on one calibration's covariance, parameters of the populations known | equateIRT's include the uncertainty of the linking coefficients across separate calibrations                                                                                                                                                                                                                                                             |
+| Topic                          | This package                                                                                                                            | Reference                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rasch items                    | A estimated by every method; 1 by mean-mean                                                                                             | equateIRT fixes A = 1 for its Rasch model                                                                                                                                                                                                                                                                                                                |
+| Polytomous items               | Every method; NRM by the characteristic curves only                                                                                     | equateIRT's `direc`: dichotomous items                                                                                                                                                                                                                                                                                                                   |
+| Percentile ranks               | Exact                                                                                                                                   | equate rounds them and the cumulative shares to 10 decimals: up to 1e-7 apart                                                                                                                                                                                                                                                                            |
+| X scores above Y's scale       | Rank 1 gives Y's highest score plus 0.5                                                                                                 | equate returns the X score itself                                                                                                                                                                                                                                                                                                                        |
+| True scores below Σ c          | Kolen and Brennan's line from 0                                                                                                         | equateIRT's `score` leaves them out                                                                                                                                                                                                                                                                                                                      |
+| Frequency estimation weights   | `weight` is w₁ of the synthetic population                                                                                              | equate's `ws` also multiplies the groups' numbers of persons, so its default weights `from` by n₁² / (n₁² + n₂²); `ws = w₁ n₂ / (w₁ n₂ + (1 - w₁) n₁)` gives w₁, and the two agree for groups of one size                                                                                                                                                |
+| Anchor score of one group only | `DataError` naming the score                                                                                                            | equate gives the persons at it their own group's weight alone, so the synthetic distributions lose mass                                                                                                                                                                                                                                                  |
+| Bivariate presmoothing degrees | `degrees: [total, anchor]` and `crossDegree`, at most the smaller degree                                                                | `degrees = list(c(total, anchor), cross)`, with the cross products as in `crossDegree`                                                                                                                                                                                                                                                                   |
+| Bootstrap                      | The seeded `Random` of the package; replications default to 500                                                                         | R's `sample`, 100 replications; the standard errors agree within their Monte Carlo error                                                                                                                                                                                                                                                                 |
+| IRT observed-score populations | Any discrete distribution per group; default N(0, 1) on 61 rectangular points                                                           | equateIRT's `score(method = "OSE")`: N(0, 1) on `theta` for one group and N(B, A²) on A `theta` + B for the other                                                                                                                                                                                                                                        |
+| Kernel presmoothing            | `degrees` and `crossDegree` of the log-linear models, fitted here                                                                       | kequate takes fitted `glm` objects with their design matrices                                                                                                                                                                                                                                                                                            |
+| Counterbalanced weights        | `weight` w of the first group in r, s and their standard errors                                                                         | kequate's `wcb` weighs the first group by w in r and s, but by 1 - w in the Jacobian of s; its standard errors at w ≠ 1/2 belong to no equating it computes. The delta method written out in base R, through the parameters of the log-linear fits, reproduces kequate at w = 1/2 and this package at 0.7 (`validation/psychometrics/kernel-equating.R`) |
+| Kernel equated scores          | Each inverse solved to a bracket of 1e-12                                                                                               | kequate's `uniroot(tol = 1e-6)`                                                                                                                                                                                                                                                                                                                          |
+| IRT equating standard errors   | Delta method on one calibration's covariance, parameters of the populations known; across separate calibrations, `linkedEquatingErrors` | equateIRT's `score(se = TRUE)` links the form to equate to onto the scale of the form to equate, the reverse of this package's link; the two agree for mean-mean, whose links are inverse functions, and differ by the asymmetry of the other methods                                                                                                    |
+| Mean-sigma link errors         | ∂A/∂b of A = sd b_to / sd b_from divides by n - 1, as the standard deviations do                                                        | equateIRT's `direc` divides by n, which shrinks the variance of A by ((n - 1) / n)², 0.81 for 10 common items, and its `chainec` and `score` with it; numDeriv's Jacobian of `direc`'s own links reproduces its mean-mean, Haebara and Stocking-Lord errors, and this package's mean-sigma (`validation/psychometrics/linking-errors.R`)                 |

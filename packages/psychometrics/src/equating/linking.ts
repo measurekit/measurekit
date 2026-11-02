@@ -103,9 +103,9 @@ export function transformItem<TItem extends IrtItem>(item: TItem, transformation
  *
  * @remarks
  * Composing θ₂ = A₁ θ₁ + B₁ with θ₃ = A₂ θ₂ + B₂ gives A = A₁ A₂ and B = A₂ B₁ + B₂, so the chain folds as B ← B Aᵢ + Bᵢ
- * from A = 1 and B = 0. The chain carries the error of every link and gives no standard error of its own: consecutive
- * links share the estimates of the form between them, so adding the errors of the links overstates the error of the
- * chain.
+ * from A = 1 and B = 0. The chain carries the error of every link; consecutive links share the estimates of the form
+ * between them, so adding the errors of the links overstates the error of the chain, which {@link linkCovariance} gives
+ * from each form's covariance.
  *
  * @param links - The transformations of consecutive links, in order.
  * @returns The transformation of the first scale to the last.

@@ -36,6 +36,7 @@ Rscript validation/psychometrics/dif-polytomous-tests.R # Liu-Agresti odds ratio
 Rscript validation/psychometrics/rasch-cml.R         # conditional maximum likelihood: eRm's RM, PCM, RSM; base R's conditional likelihood by every pattern
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/kernel-equating.R   # kernel equating in five designs: kequate; base R's delta method where kequate's counterbalanced errors differ
+Rscript validation/psychometrics/linking-errors.R   # errors of links between separate calibrations and of equating through them: equateIRT's direc, chainec and score, numDeriv where equateIRT is not the reference; about 30 seconds
 Rscript validation/psychometrics/vertical-scaling.R  # chains of links and growth between grades: equateIRT's chainec, mirt's multipleGroup and base R
 Rscript validation/psychometrics/explanatory.R       # item parameters regressed on item features: mirt, metafor and base R
 Rscript validation/psychometrics/linear-change.R     # linear logistic change: glm on the persons who changed, base R and eRm's LLRA
@@ -65,7 +66,7 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 ```
 
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
-sirt, kequate, nlme, LNIRT, numDeriv, lme4, metafor, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, lpSolve, highs, GPArotation, polycor, mvtnorm, clinicalsignificance and jsonlite;
+sirt, kequate, nlme, LNIRT, numDeriv, lme4, metafor, statmod, Matrix, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, lpSolve, highs, GPArotation, polycor, mvtnorm, clinicalsignificance and jsonlite;
 `common.R` holds their shared helpers, `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share, `mokken-data.R` the data that `mokken.R` and `mokken-reliability.R` share, and `many-facet-likelihood.R` the many-facet likelihood that `rater.R` and `rater-bias.R` share.
 
 `generalizability-unbalanced.py` checks the fixture that `generalizability-unbalanced.R` writes against GeneralizIT 0.1.2. It

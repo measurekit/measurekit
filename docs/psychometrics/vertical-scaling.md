@@ -152,10 +152,11 @@ elsewhere. The result moves items and thetas as the links do one after another: 
 `transformTheta(theta, chain)`.
 
 Each link carries the estimation error of its common items, and the errors of the links accumulate along the chain, so a
-long chain is less certain than any one of its links. The library gives no standard error of a chain: consecutive links
-share the estimates of the form between them, which treating the links as independent ignores, so adding their errors
-overstates the error of the chain. Keep chains short, give each link enough common items, and screen them for drift with
-`robustZ` before linking.
+long chain is less certain than any one of its links. Consecutive links share the estimates of the form between them,
+which treating the links as independent ignores, so adding their errors overstates the error of the chain:
+[`linkCovariance`](equating.md#standard-errors-across-separate-calibrations) takes each form's items and covariance and
+counts that form once. Keep chains short, give each link enough common items, and screen them for drift with `robustZ`
+before linking.
 
 ## Reporting growth
 
@@ -208,9 +209,6 @@ Invalid input throws `DataError` with the value found.
 
 ## Not included
 
-- **Standard errors of a chain.** No fit: consecutive links share the estimates of the form between them, so per-link
-  covariances overstate the errors; `equateIRT::chainec` gives them from each form's covariance, and the library has no
-  covariance of separate calibrations.
 - **Growth curves.** No fit: general statistics applied to scores.
 - **Mixed models.** No fit: general statistics applied to scores; `lme4` fits them.
 - **Student growth percentiles.** No fit: quantile regression and accountability policy are a wider domain than scaling;
@@ -222,10 +220,10 @@ Invalid input throws `DataError` with the value found.
 
 ## Differences from the references
 
-| Reference             | Difference                                                                                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `equateIRT::chainec`  | It takes the direct links by form name and a path, and gives standard errors. `chainTransformations` takes the links in order and gives the point values only |
-| Growth between grades | No package computes it; the reference is base R, with Yen's effect size as Briggs and Betebenner define it                                                    |
+| Reference             | Difference                                                                                                                                                                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `equateIRT::chainec`  | It takes the direct links by form name and a path, and gives standard errors. `chainTransformations` takes the links in order and gives the point values; `linkCovariance` takes the forms in order and gives the standard errors |
+| Growth between grades | No package computes it; the reference is base R, with Yen's effect size as Briggs and Betebenner define it                                                                                                                        |
 
 ## References
 

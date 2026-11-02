@@ -1,9 +1,11 @@
+import { cholesky } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   type BivariateDistribution,
   bivariateLogLinearPresmoothing,
   bootstrapEquating,
+  type CalibratedForm,
   calibrateWithCovariance,
   chainedEquipercentileEquating,
   chainedLinearEquating,
@@ -23,8 +25,11 @@ import {
   type KernelEquating,
   kernelEquating,
   kernelEquatingDifference,
+  type LinkMethod,
   levineEquating,
   linearEquating,
+  linkCovariance,
+  linkedEquatingErrors,
   logLinearPresmoothing,
   meanMeanLinking,
   meanSigmaLinking,
@@ -49,13 +54,14 @@ import {
 } from "../src/index.js";
 import { arbitraryItem, arbitraryLocation, arbitraryLocations } from "./arbitraries.js";
 import { defined, expectClose } from "./assertions.js";
-import { fixtureItems, MODELS } from "./fixture-items.js";
+import { fixtureItems, item2pl, MODELS } from "./fixture-items.js";
 import bivariatePresmoothing from "./fixtures/equating-bivariate-presmoothing.json" with { type: "json" };
 import bootstrap from "./fixtures/equating-bootstrap.json" with { type: "json" };
 import chain from "./fixtures/equating-chain.json" with { type: "json" };
 import irtObserved from "./fixtures/equating-irt-observed-score.json" with { type: "json" };
 import standardErrors from "./fixtures/equating-irt-standard-errors.json" with { type: "json" };
 import kernel from "./fixtures/equating-kernel.json" with { type: "json" };
+import linkErrors from "./fixtures/equating-link-errors.json" with { type: "json" };
 import linking from "./fixtures/equating-linking.json" with { type: "json" };
 import neat from "./fixtures/equating-neat.json" with { type: "json" };
 import observed from "./fixtures/equating-observed-score.json" with { type: "json" };
@@ -89,6 +95,12 @@ const KERNEL_TOLERANCE = 1e-5;
 const BANDWIDTH_TOLERANCE = 1e-6;
 /** Percent relative errors of ten moments, whose powers carry the error of the equated scores. */
 const PRE_TOLERANCE = 1e-4;
+/** Links of separate calibrations against equateIRT's direc and chainec, whose nlminb stops near 1e-9. */
+const LINK_TOLERANCE = 1e-7;
+/** Standard errors and covariances of links: central differences against direc's derivatives. */
+const LINK_ERROR_TOLERANCE = 1e-5;
+/** Standard errors of linked equating against score and numDeriv's Richardson differences over nlminb's links. */
+const LINKED_ERROR_TOLERANCE = 5e-4;
 
 function expectTransformation(actual: ScaleTransformation, expected: ScaleTransformation, tolerance: number): void {
   expectClose(actual.slope, expected.slope, tolerance, "slope");
@@ -1690,6 +1702,174 @@ describe("irtEquatingStandardErrors", () => {
   });
 });
 
+describe("linkCovariance and linkedEquatingErrors", () => {
+  const form = (name: "T1" | "T2" | "T3"): CalibratedForm => {
+    const { items, covariance } = linkErrors.forms[name];
+    return { items: items.map(({ id, parameters }) => item2pl(id, parameters.a, parameters.b)), covariance };
+  };
+  const Methods: Readonly<Record<string, LinkMethod>> = {
+    meanMean: "mean-mean",
+    meanSigma: "mean-sigma",
+    haebara: "haebara",
+    stockingLord: "stocking-lord",
+  };
+  const quadrature = { method: "gauss-hermite", points: 30 } as const;
+  const expectLink = (
+    found: ReturnType<typeof linkCovariance>,
+    expected: (typeof linkErrors.links)["meanMean"],
+    label: string,
+  ) => {
+    expectClose(found.transformation.slope, expected.slope, LINK_TOLERANCE, `${label} slope`);
+    expectClose(found.transformation.intercept, expected.intercept, LINK_TOLERANCE, `${label} intercept`);
+    const { slope, intercept } = found.errors.standardErrors;
+    expectClose(slope, expected.standardErrors.slope, LINK_ERROR_TOLERANCE, `${label} slope error`);
+    expectClose(intercept, expected.standardErrors.intercept, LINK_ERROR_TOLERANCE, `${label} intercept error`);
+    found.errors.covariance.forEach((value, i) => {
+      expectClose(value, defined(expected.covariance[i]), LINK_ERROR_TOLERANCE, `${label} covariance ${i}`);
+    });
+  };
+
+  for (const [name, expected] of Object.entries(linkErrors.links)) {
+    it(`matches equateIRT's direc for a link of two forms by ${Methods[name]}`, () => {
+      expectLink(linkCovariance([form("T2"), form("T1")], { linking: Methods[name], quadrature }), expected, name);
+    });
+  }
+
+  for (const [name, expected] of Object.entries(linkErrors.chains)) {
+    it(`matches equateIRT's chainec for a chain of three forms by ${Methods[name]}`, () => {
+      const forms = [form("T3"), form("T2"), form("T1")];
+      expectLink(linkCovariance(forms, { linking: Methods[name], quadrature }), expected, name);
+    });
+  }
+
+  for (const [name, expected] of Object.entries(linkErrors.trueScore)) {
+    it(`gives the errors of true-score equating through a link by ${Methods[name]}`, () => {
+      const found = linkedEquatingErrors(form("T1"), form("T2"), { linking: Methods[name], quadrature });
+      expect(found).toHaveLength(21);
+      expected.scores.forEach((x, i) => {
+        expectClose(defined(found[x]), defined(expected.standardErrors[i]), LINKED_ERROR_TOLERANCE, `score ${x}`);
+      });
+    });
+  }
+
+  it("gives the errors of observed-score equating through a link, the from group moving with it", () => {
+    const { nodes, weights } = linkErrors.quadrature;
+    const found = linkedEquatingErrors(form("T1"), form("T2"), {
+      linking: "mean-mean",
+      method: "observed-score",
+      populations: { from: { nodes, weights }, to: { nodes, weights } },
+    });
+    const expected = linkErrors.observedScore.meanMean;
+    expected.scores.forEach((x, i) => {
+      expectClose(defined(found[x]), defined(expected.standardErrors[i]), LINKED_ERROR_TOLERANCE, `score ${x}`);
+    });
+  });
+
+  it("recovers the spread of a chain's slope and intercept over draws of the estimates from their covariances", () => {
+    // Three forms of 20 2PL items, 10 common between neighbors, calibrated apart on groups N(0, 1), N(0.5, 1.1²) and
+    // N(1, 1.2²) of the first form's scale; the estimates are then drawn from their covariances, as calibrations of new
+    // samples would scatter them, and the chain linked by Stocking-Lord for each draw.
+    const random = createRandom(20261102);
+    const truth = simulateItems(twoParameterLogistic, 40, random);
+    const groups = [
+      [0, 1],
+      [0.5, 1.1],
+      [1, 1.2],
+    ] as const;
+    const forms = groups.map(([mean, sd], f) => {
+      const ids = Array.from({ length: 20 }, (_, j) => `i${10 * f + j}`);
+      const thetas = simulateThetas(1000, random).map((theta) => mean + sd * theta);
+      const responses = simulateResponses(truth.slice(10 * f, 10 * f + 20), thetas, random);
+      const { calibration, covariance } = calibrateWithCovariance(responses, {
+        model: twoParameterLogistic,
+        standardErrors: "hessian",
+      });
+      const rename = (id: string): string => defined(ids[Number(id.slice(4)) - 1]);
+      const matrix = defined(covariance);
+      return {
+        items: calibration.items.map((item) => ({ ...item, id: rename(item.id) })),
+        covariance: {
+          ...matrix,
+          parameters: matrix.parameters.map(({ item, name }) => ({ item: rename(item), name })),
+        },
+      };
+    });
+    const result = linkCovariance(forms);
+    const factors = forms.map(({ covariance }) => {
+      const size = covariance.parameters.length;
+      return defined(cholesky(Float64Array.from(covariance.matrix.flat()), size));
+    });
+    const chain = (current: readonly (readonly TestItem[])[]): ScaleTransformation => {
+      const link = (from: readonly TestItem[], to: readonly TestItem[]) => {
+        const ids = new Set(to.map(({ id }) => id));
+        const common = from.filter(({ id }) => ids.has(id));
+        return stockingLordLinking(
+          common,
+          common.map(({ id }) => defined(to.find((item) => item.id === id))),
+        );
+      };
+      return chainTransformations([
+        link(defined(current[2]), defined(current[1])),
+        link(defined(current[1]), defined(current[0])),
+      ]);
+    };
+    const draws = Array.from({ length: 300 }, () =>
+      chain(
+        forms.map(({ items, covariance }, f) => {
+          const size = covariance.parameters.length;
+          const factor = defined(factors[f]);
+          const z = Array.from({ length: size }, () => random.normal());
+          const shifts = new Map<string, number>();
+          covariance.parameters.forEach(({ item, name }, k) => {
+            let shift = 0;
+            for (let m = 0; m <= k; m++) shift += (factor[k * size + m] ?? 0) * (z[m] ?? 0);
+            shifts.set(`${item} ${name}`, shift);
+          });
+          const shifted = (id: string, name: string, value: number): number =>
+            value + (shifts.get(`${id} ${name}`) ?? 0);
+          return items.map(({ id, parameters: { a, b } }) => item2pl(id, shifted(id, "a", a), shifted(id, "b", b)));
+        }),
+      ),
+    );
+    const spread = (values: readonly number[]): number => {
+      const center = values.reduce((a, b) => a + b, 0) / values.length;
+      return Math.sqrt(values.reduce((sum, value) => sum + (value - center) ** 2, 0) / (values.length - 1));
+    };
+    const { slope, intercept } = result.errors.standardErrors;
+    expect(slope / spread(draws.map((draw) => draw.slope))).toBeGreaterThan(0.9);
+    expect(slope / spread(draws.map((draw) => draw.slope))).toBeLessThan(1.1);
+    expect(intercept / spread(draws.map((draw) => draw.intercept))).toBeGreaterThan(0.9);
+    expect(intercept / spread(draws.map((draw) => draw.intercept))).toBeLessThan(1.1);
+    expectClose(result.transformation.slope, 1.2, 3 * slope, "slope");
+    expectClose(result.transformation.intercept, 1, 3 * intercept, "intercept");
+  });
+
+  it("rejects too few forms, invalid forms, forms without common items and invalid options", () => {
+    const [first, second] = [form("T1"), form("T2")];
+    expect(() => linkCovariance([first])).toThrow("A link needs at least two forms, found 1.");
+    expect(() => linkCovariance(JSON.parse("null"))).toThrow("The forms must be an array of calibrated forms");
+    expect(() => linkCovariance([first, JSON.parse("null")])).toThrow("Form 2 must be an object { items, covariance }");
+    expect(() => linkCovariance([first, { ...second, covariance: JSON.parse("1") }])).toThrow(
+      "The covariance must be an object { parameters, matrix }, found 1.",
+    );
+    expect(() =>
+      linkCovariance([first, { ...second, items: second.items.map((item) => ({ ...item, id: `x${item.id}` })) }]),
+    ).toThrow("The forms 1 and 2 share no item by id; a link needs common items.");
+    expect(() => linkCovariance([first, second], { linking: JSON.parse('"bisector"') })).toThrow(
+      "The option linking must be",
+    );
+    expect(() => linkCovariance([first, second], JSON.parse("null"))).toThrow("The options must be an object");
+    const unlabeled = { ...second, covariance: { parameters: [{ item: "nothing", name: "a" }], matrix: [[1]] } };
+    expect(() => linkCovariance([{ ...first, covariance: unlabeled.covariance }, unlabeled])).toThrow(
+      "No covariance has a parameter of a common item",
+    );
+    expect(() => linkedEquatingErrors(first, second, { method: JSON.parse('"kernel"') })).toThrow(
+      'The option method must be "true-score" or "observed-score", found "kernel".',
+    );
+    expect(() => linkedEquatingErrors(first, JSON.parse("null"))).toThrow("The to form must be an object");
+  });
+});
+
 describe("properties", () => {
   /** Items whose expected score increases with theta: the 3PL, GRM and GPCM with positive slopes. */
   const risingItem: fc.Arbitrary<IrtItem> = fc.oneof(
@@ -1954,6 +2134,38 @@ describe("properties", () => {
         kernelEquating({ ...data, to: from }).equated.forEach((value, x) => {
           expectClose(value, x, 1e-9, `identity ${x}`);
         });
+      }),
+      { numRuns: 30 },
+    );
+  });
+  it("links two forms as the linking method does, with errors of at least 0", () => {
+    const parameters = fc.array(
+      fc.record({ a: fc.double({ min: 0.5, max: 2, noNaN: true }), b: fc.double({ min: -2, max: 2, noNaN: true }) }),
+      { minLength: 6, maxLength: 6 },
+    );
+    const variances = fc.array(fc.double({ min: 0, max: 0.02, noNaN: true }), { minLength: 12, maxLength: 12 });
+    fc.assert(
+      fc.property(parameters, parameters, variances, (fromItems, toItems, diagonal) => {
+        const calibrated = (rows: typeof fromItems, prefix: string): CalibratedForm => {
+          const items = rows.map(({ a, b }, j) => item2pl(j < 4 ? `common${j}` : `${prefix}${j}`, a, b));
+          const labels = items.flatMap(({ id }) => [
+            { item: id, name: "a" },
+            { item: id, name: "b" },
+          ]);
+          const matrix = labels.map((_, i) => labels.map((__, k) => (i === k ? defined(diagonal[i]) : 0)));
+          return { items, covariance: { parameters: labels, matrix } };
+        };
+        const to = calibrated(toItems, "to");
+        const from = calibrated(fromItems, "from");
+        const result = linkCovariance([to, from], { linking: "mean-mean" });
+        expectTransformation(
+          result.transformation,
+          meanMeanLinking(from.items.slice(0, 4), to.items.slice(0, 4)),
+          1e-12,
+        );
+        expect(result.errors.standardErrors.slope).toBeGreaterThanOrEqual(0);
+        expect(result.errors.standardErrors.intercept).toBeGreaterThanOrEqual(0);
+        expect(result.errors.covariance[1]).toBe(result.errors.covariance[2]);
       }),
       { numRuns: 30 },
     );

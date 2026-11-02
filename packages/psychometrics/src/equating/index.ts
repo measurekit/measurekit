@@ -4,7 +4,8 @@
  * random groups, with log-linear presmoothing; equating through common items from nonequivalent groups by the Tucker,
  * Levine, chained and frequency estimation methods; bootstrap standard errors; the robust z screen of common items;
  * kernel equating in five designs with its standard errors; IRT true-score and observed-score equating; and
- * delta-method standard errors of IRT equating.
+ * delta-method standard errors of IRT equating, of links between separate calibrations and chains of them, and of IRT
+ * equating through such a link.
  *
  * @module @measurekit/psychometrics/equating
  */
@@ -36,6 +37,16 @@ export {
   kernelEquating,
   kernelEquatingDifference,
 } from "./kernel.js";
+export {
+  type CalibratedForm,
+  type LinkCovariance,
+  type LinkErrorOptions,
+  type LinkErrors,
+  type LinkMethod,
+  linkCovariance,
+  type TransformationErrors,
+} from "./link-covariance.js";
+export { type LinkedEquatingOptions, linkedEquatingErrors } from "./linked-errors.js";
 export {
   chainTransformations,
   meanMeanLinking,

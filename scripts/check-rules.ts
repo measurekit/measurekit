@@ -212,6 +212,22 @@ export const RULES: readonly Rule[] = [
     titles: "rejects equatings of different designs",
   },
   {
+    rule: "A link pairs the items of two forms by id, so that no item of one form is read as another's.",
+    file: "packages/psychometrics/src/equating/link-covariance.ts",
+    find: "    if (k === undefined) continue;\n",
+    replace: "",
+    test: "packages/psychometrics/test/equating.test.ts",
+    titles: "rejects too few forms",
+  },
+  {
+    rule: "The errors of a link need covariances that name the parameters of its common items.",
+    file: "packages/psychometrics/src/equating/link-covariance.ts",
+    find: "if (parameters === 0) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/equating.test.ts",
+    titles: "rejects too few forms",
+  },
+  {
     rule: "The incomplete standard errors stop at their limit of success probabilities, before the calibration.",
     file: "packages/psychometrics/src/cdm/standard-errors.ts",
     find: "if (probabilities > MAX_INCOMPLETE_PROBABILITIES) {",
