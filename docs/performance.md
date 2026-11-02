@@ -393,3 +393,53 @@ and on a slower one only the ratios to the references apply. The factor allows f
 fastest samples of one benchmark differed by a median of 1.9 times and by up to 3.2 times between runs; every budget stands at
 least 2.9 times above the slowest of those samples. It is far below the cost of the changes that the budgets exist to catch.
 A budget changes only with the reason in the commit that changes it.
+
+## Sizes
+
+Each entry point bundled alone, as a host's bundler makes it: minified with esbuild, `export *` of the entry, core from
+its sources. The modules each holds are those the import rules of [AGENTS.md](../AGENTS.md#dependencies) allow it, so
+that importing one module never pulls in the others; a module of a library is a folder of its `src/`, or `checks` and
+`model` for the files of those names. Every package declares `sideEffects: false`, so a named import from the root of a
+library holds only what that name needs: `cronbachAlpha` from `@measurekit/psychometrics` bundles to 3.3 KB, with
+`ctt`, `data`, `math` and core.
+
+| Entry point                                  | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own                          |
+| -------------------------------------------- | ---------------: | -----------: | --------------------------------------------------------- |
+| `@measurekit/core`                           |           12,787 |        5,248 | nothing                                                   |
+| `@measurekit/psychometrics`                  |          498,568 |      166,183 | every module of the package, and core                     |
+| `@measurekit/psychometrics/cat`              |           67,960 |       22,554 | core, cdm, checks, data, irt, math, multidimensional, sim |
+| `@measurekit/psychometrics/cdm`              |           42,459 |       15,524 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/change`           |            5,281 |        2,257 | core, checks                                              |
+| `@measurekit/psychometrics/ctt`              |           21,428 |        8,203 | core, data, math                                          |
+| `@measurekit/psychometrics/data`             |            6,272 |        2,219 | core                                                      |
+| `@measurekit/psychometrics/dif`              |           83,401 |       28,802 | core, data, equating, irt, math                           |
+| `@measurekit/psychometrics/dimensionality`   |           37,903 |       14,058 | core, data, math                                          |
+| `@measurekit/psychometrics/equating`         |           58,620 |       19,917 | core, checks, irt, math                                   |
+| `@measurekit/psychometrics/explanatory`      |           48,842 |       17,086 | core, data, irt, math                                     |
+| `@measurekit/psychometrics/fit`              |           55,082 |       19,237 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/generalizability` |           14,695 |        5,440 | core, data, math                                          |
+| `@measurekit/psychometrics/irt`              |           80,271 |       27,117 | core, checks, data, math                                  |
+| `@measurekit/psychometrics/mokken`           |           29,895 |       11,140 | core, data, math                                          |
+| `@measurekit/psychometrics/multidimensional` |          125,459 |       40,746 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/parameterization` |           18,215 |        5,933 | core, irt, multidimensional                               |
+| `@measurekit/psychometrics/rater`            |           52,291 |       17,971 | core, checks, data, fit, irt, math                        |
+| `@measurekit/psychometrics/response-time`    |           54,265 |       18,395 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/scaling`          |           30,799 |       11,439 | core, checks, equating, irt, math                         |
+| `@measurekit/psychometrics/sim`              |           20,347 |        6,814 | core, cdm, checks, data, irt, multidimensional            |
+| `@measurekit/psychometrics/standard-setting` |           28,233 |       10,711 | core, checks, equating, irt, math                         |
+| `@measurekit/knowledge-tracing`              |          136,189 |       46,040 | every module of the package, and core                     |
+| `@measurekit/knowledge-tracing/bkt`          |           22,982 |        8,198 | core, data, math                                          |
+| `@measurekit/knowledge-tracing/data`         |            5,625 |        2,230 | core, math                                                |
+| `@measurekit/knowledge-tracing/elo`          |            6,482 |        2,274 | core, data, math                                          |
+| `@measurekit/knowledge-tracing/evaluate`     |           16,480 |        6,007 | core, data, math, model                                   |
+| `@measurekit/knowledge-tracing/irt`          |           13,728 |        5,380 | core, data, math                                          |
+| `@measurekit/knowledge-tracing/kst`          |           42,314 |       15,045 | core, data, math                                          |
+| `@measurekit/knowledge-tracing/logistic`     |           48,569 |       16,030 | core, data, math, model                                   |
+| `@measurekit/knowledge-tracing/practice`     |            6,043 |        2,260 | core, data, model                                         |
+| `@measurekit/knowledge-tracing/sim`          |            4,356 |        1,621 | core, data, model                                         |
+
+`scripts/test/entry-sizes.test.ts`, which `pnpm test --project scripts` runs without a build, bundles each entry point
+and fails when it takes more than its budget after gzip, or holds a module that its budget in `scripts/size-budgets.ts`
+does not list, or when a named import from the root of a library holds more than the subpath of its module. A budget is
+1.25 times the size measured after gzip, rounded up to the next 500 bytes. `node scripts/entry-sizes.ts` prints this
+table.

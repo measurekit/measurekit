@@ -95,11 +95,12 @@ packages/knowledge-tracing/   src/<module>/ for data, math, evaluate, elo, bkt, 
 packages/<package>/           src/<module>/index.ts is the public API of a module, internal.ts what the package shares, and math/,
                               which no subpath exports, has internal.ts alone; test/<module>.test.ts, one for each src folder, with fixtures/ of reference results;
                               README.md, LICENSE, NOTICE, package.json, typedoc.json and the tsconfig files
-docs/<package>/               guides, which TypeDoc publishes with the API reference; docs/performance.md the benchmarks
+docs/<package>/               guides, which TypeDoc publishes with the API reference; docs/performance.md the benchmarks and sizes
 validation/<package>/         R and Python scripts that write the fixtures; validation/README.md lists them
 validation/benchmarks/        the inputs of the benchmarks and the timing of their references; bench/ their harness
 examples/<package>/           runnable examples; examples/test/ runs each of them
-scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts and their tests
+scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts and their tests; entry-sizes.ts
+                              bundles each entry point alone, against the budgets of size-budgets.ts in test/entry-sizes.test.ts
 biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
 ```
 
