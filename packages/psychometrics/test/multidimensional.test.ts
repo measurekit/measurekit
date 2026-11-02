@@ -3385,92 +3385,6 @@ describe("errors", () => {
   });
 });
 
-describe("properties", () => {
-  /** Small simulated data: a matrix of persons whose order the properties permute. */
-  const rows = m2pl.responses.slice(0, 120);
-  const columns = [...m2pl.itemIds];
-
-  it("gives estimates that do not depend on the order of the persons", () => {
-    const options = {
-      model: multidimensionalTwoParameterLogistic,
-      loadings: m2pl.loadings,
-      points: 11,
-      tolerance: 1e-10,
-    };
-    const fit = calibrateMultidimensional(responseMatrix(rows, { itemIds: columns }), options);
-    fc.assert(
-      fc.property(fc.shuffledSubarray(rows, { minLength: rows.length, maxLength: rows.length }), (shuffled) => {
-        const other = calibrateMultidimensional(responseMatrix(shuffled, { itemIds: columns }), options);
-        expectClose(other.logLikelihood, fit.logLikelihood, 1e-8);
-        other.items.forEach(({ parameters }, i) => {
-          expectClose(defined(parameters.a[i < 6 ? 0 : 1]), defined(fit.items[i]?.parameters.a[i < 6 ? 0 : 1]), 1e-6);
-        });
-        expectClose(defined(other.correlations[0]?.[1]), defined(fit.correlations[0]?.[1]), 1e-6);
-      }),
-      { numRuns: 3 },
-    );
-  });
-
-  it("gives longitudinal estimates that do not depend on the order of the persons", () => {
-    const data = simulateOccasions(11, 120, 5, SMALL);
-    const options = { points: 15, tolerance: 1e-9 };
-    const fit = calibrateLongitudinal(data, options);
-    fc.assert(
-      fc.property(
-        fc.shuffledSubarray(
-          Array.from({ length: 120 }, (_, p) => p),
-          { minLength: 120, maxLength: 120 },
-        ),
-        (order) => {
-          const shuffled = data.map((occasion) =>
-            responseMatrix(
-              order.map((p) => defined(occasion.responses[p])),
-              { personIds: order.map((p) => defined(occasion.personIds[p])), itemIds: [...occasion.itemIds] },
-            ),
-          );
-          expectSameFit(calibrateLongitudinal(shuffled, options), fit);
-        },
-      ),
-      { numRuns: 3 },
-    );
-  });
-
-  it("gives estimates that do not depend on the order of the items", () => {
-    const items = itemsOf(m2pl);
-    fc.assert(
-      fc.property(
-        fc.array(fc.constantFrom(0, 1), { minLength: 12, maxLength: 12 }),
-        fc.shuffledSubarray([...items.keys()], { minLength: 12, maxLength: 12 }),
-        (pattern, order) => {
-          const prior = { mean: [0, 0], covariance: m2pl.correlations };
-          const estimate = multidimensionalPosteriorModeEstimate(items, pattern, { prior });
-          const permuted = multidimensionalPosteriorModeEstimate(
-            order.map((i) => defined(items[i])),
-            order.map((i) => defined(pattern[i])),
-            { prior },
-          );
-          estimate.theta.forEach((value, d) => {
-            expectClose(defined(permuted.theta[d]), value, 1e-8);
-          });
-        },
-      ),
-      { numRuns: 20 },
-    );
-  });
-
-  it("keeps the posterior mode inside the range of the data for a standard normal prior", () => {
-    const items = itemsOf(m2pl);
-    fc.assert(
-      fc.property(fc.array(fc.constantFrom(0, 1), { minLength: 12, maxLength: 12 }), (pattern) => {
-        const estimate = multidimensionalPosteriorModeEstimate(items, pattern);
-        expect(estimate.theta.every((value) => Math.abs(value) < 6)).toBe(true);
-        expect(estimate.standardErrors.every((se) => se > 0 && se <= 1)).toBe(true);
-      }),
-      { numRuns: 30 },
-    );
-  });
-});
-
 describe("input of other types", () => {
   const item = defined(itemsOf(m2pl)[0]);
   const items = itemsOf(m2pl);
@@ -3559,5 +3473,91 @@ describe("input of other types", () => {
       "The option points must be an integer from 2, found 1.",
     );
     expect(() => multidimensionalPosteriorMeanEstimate([item], [1], { points: JSON.parse('"9"') })).toThrow(DataError);
+  });
+});
+
+describe("properties", () => {
+  /** Small simulated data: a matrix of persons whose order the properties permute. */
+  const rows = m2pl.responses.slice(0, 120);
+  const columns = [...m2pl.itemIds];
+
+  it("gives estimates that do not depend on the order of the persons", () => {
+    const options = {
+      model: multidimensionalTwoParameterLogistic,
+      loadings: m2pl.loadings,
+      points: 11,
+      tolerance: 1e-10,
+    };
+    const fit = calibrateMultidimensional(responseMatrix(rows, { itemIds: columns }), options);
+    fc.assert(
+      fc.property(fc.shuffledSubarray(rows, { minLength: rows.length, maxLength: rows.length }), (shuffled) => {
+        const other = calibrateMultidimensional(responseMatrix(shuffled, { itemIds: columns }), options);
+        expectClose(other.logLikelihood, fit.logLikelihood, 1e-8);
+        other.items.forEach(({ parameters }, i) => {
+          expectClose(defined(parameters.a[i < 6 ? 0 : 1]), defined(fit.items[i]?.parameters.a[i < 6 ? 0 : 1]), 1e-6);
+        });
+        expectClose(defined(other.correlations[0]?.[1]), defined(fit.correlations[0]?.[1]), 1e-6);
+      }),
+      { numRuns: 3 },
+    );
+  });
+
+  it("gives longitudinal estimates that do not depend on the order of the persons", () => {
+    const data = simulateOccasions(11, 120, 5, SMALL);
+    const options = { points: 15, tolerance: 1e-9 };
+    const fit = calibrateLongitudinal(data, options);
+    fc.assert(
+      fc.property(
+        fc.shuffledSubarray(
+          Array.from({ length: 120 }, (_, p) => p),
+          { minLength: 120, maxLength: 120 },
+        ),
+        (order) => {
+          const shuffled = data.map((occasion) =>
+            responseMatrix(
+              order.map((p) => defined(occasion.responses[p])),
+              { personIds: order.map((p) => defined(occasion.personIds[p])), itemIds: [...occasion.itemIds] },
+            ),
+          );
+          expectSameFit(calibrateLongitudinal(shuffled, options), fit);
+        },
+      ),
+      { numRuns: 3 },
+    );
+  });
+
+  it("gives estimates that do not depend on the order of the items", () => {
+    const items = itemsOf(m2pl);
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom(0, 1), { minLength: 12, maxLength: 12 }),
+        fc.shuffledSubarray([...items.keys()], { minLength: 12, maxLength: 12 }),
+        (pattern, order) => {
+          const prior = { mean: [0, 0], covariance: m2pl.correlations };
+          const estimate = multidimensionalPosteriorModeEstimate(items, pattern, { prior });
+          const permuted = multidimensionalPosteriorModeEstimate(
+            order.map((i) => defined(items[i])),
+            order.map((i) => defined(pattern[i])),
+            { prior },
+          );
+          estimate.theta.forEach((value, d) => {
+            expectClose(defined(permuted.theta[d]), value, 1e-8);
+          });
+        },
+      ),
+      { numRuns: 20 },
+    );
+  });
+
+  it("keeps the posterior mode inside the range of the data for a standard normal prior", () => {
+    const items = itemsOf(m2pl);
+    fc.assert(
+      fc.property(fc.array(fc.constantFrom(0, 1), { minLength: 12, maxLength: 12 }), (pattern) => {
+        const estimate = multidimensionalPosteriorModeEstimate(items, pattern);
+        expect(estimate.theta.every((value) => Math.abs(value) < 6)).toBe(true);
+        expect(estimate.standardErrors.every((se) => se > 0 && se <= 1)).toBe(true);
+      }),
+      { numRuns: 30 },
+    );
   });
 });

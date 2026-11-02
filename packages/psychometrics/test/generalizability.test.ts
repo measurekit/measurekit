@@ -743,6 +743,68 @@ describe("decisionStudy", () => {
   });
 });
 
+describe("the recipe for a multivariate G study", () => {
+  const persons = 300;
+  const items = 6;
+  const random = createRandom(2026);
+  const reading = Array.from({ length: persons }, () => random.normal());
+  const listening = reading.map((score) => 0.6 * score + 0.8 * random.normal());
+  const readingItems = Array.from({ length: items }, () => 0.3 * random.normal());
+  const listeningItems = Array.from({ length: items }, () => 0.3 * random.normal());
+  const noise = () => random.normal();
+  const x = reading.map((truth) => readingItems.map((effect) => truth + effect + noise()));
+  const y = listening.map((truth) => listeningItems.map((effect) => truth + effect + noise()));
+
+  /** The variance components of p × i for a score at each cell. */
+  const components = (cell: (person: number, item: number) => number): number[] =>
+    generalizabilityStudy(
+      Array.from({ length: persons * items }, (_, k) => {
+        const person = Math.floor(k / items);
+        const item = k % items;
+        return { levels: { person: `p${person}`, item: `i${item}` }, score: cell(person, item) };
+      }),
+      { facets: ["item"] },
+    ).components.map(({ variance }) => variance);
+
+  const varianceX = components((p, i) => defined(x[p])[i] ?? 0);
+  const varianceY = components((p, i) => defined(y[p])[i] ?? 0);
+  const varianceSum = components((p, i) => (defined(x[p])[i] ?? 0) + (defined(y[p])[i] ?? 0));
+  const covariances = varianceSum.map((total, k) => (total - (varianceX[k] ?? 0) - (varianceY[k] ?? 0)) / 2);
+
+  /** The covariance components from the mean products of the two scores, the way the mean squares are made. */
+  const direct = (): number[] => {
+    const mean = (values: number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
+    const cell = (matrix: number[][], p: number, i: number): number => defined(matrix[p])[i] ?? 0;
+    const personMeans = (matrix: number[][]) => matrix.map(mean);
+    const itemMeans = (matrix: number[][]) =>
+      Array.from({ length: items }, (_, i) => mean(matrix.map((row) => row[i] ?? 0)));
+    const grand = (matrix: number[][]) => mean(matrix.flat());
+    const [px, py, ix, iy, gx, gy] = [personMeans(x), personMeans(y), itemMeans(x), itemMeans(y), grand(x), grand(y)];
+    let personProducts = 0;
+    for (let p = 0; p < persons; p++) personProducts += ((px[p] ?? 0) - gx) * ((py[p] ?? 0) - gy);
+    let itemProducts = 0;
+    for (let i = 0; i < items; i++) itemProducts += ((ix[i] ?? 0) - gx) * ((iy[i] ?? 0) - gy);
+    let cellProducts = 0;
+    for (let p = 0; p < persons; p++) {
+      for (let i = 0; i < items; i++) {
+        cellProducts +=
+          (cell(x, p, i) - (px[p] ?? 0) - (ix[i] ?? 0) + gx) * (cell(y, p, i) - (py[p] ?? 0) - (iy[i] ?? 0) + gy);
+      }
+    }
+    const productPerson = (items * personProducts) / (persons - 1);
+    const productItem = (persons * itemProducts) / (items - 1);
+    const productCell = cellProducts / ((persons - 1) * (items - 1));
+    return [(productPerson - productCell) / items, (productItem - productCell) / persons, productCell];
+  };
+
+  it("takes the covariance components of two scores from studies of each and of their sum, as the direct estimate does", () => {
+    const expected = direct();
+    covariances.forEach((covariance, k) => {
+      expect(covariance).toBeCloseTo(defined(expected[k]), 9);
+    });
+  });
+});
+
 describe("properties", () => {
   /** Scores of persons by items from 0 to 20 in a matrix of 2 to 6 persons and 2 to 5 items. */
   const matrix = fc.tuple(fc.integer({ min: 2, max: 6 }), fc.integer({ min: 2, max: 5 })).chain(([persons, items]) =>
@@ -928,67 +990,5 @@ describe("properties", () => {
         expect(JSON.parse(JSON.stringify(study))).toEqual(study);
       }),
     );
-  });
-});
-
-describe("the recipe for a multivariate G study", () => {
-  const persons = 300;
-  const items = 6;
-  const random = createRandom(2026);
-  const reading = Array.from({ length: persons }, () => random.normal());
-  const listening = reading.map((score) => 0.6 * score + 0.8 * random.normal());
-  const readingItems = Array.from({ length: items }, () => 0.3 * random.normal());
-  const listeningItems = Array.from({ length: items }, () => 0.3 * random.normal());
-  const noise = () => random.normal();
-  const x = reading.map((truth) => readingItems.map((effect) => truth + effect + noise()));
-  const y = listening.map((truth) => listeningItems.map((effect) => truth + effect + noise()));
-
-  /** The variance components of p × i for a score at each cell. */
-  const components = (cell: (person: number, item: number) => number): number[] =>
-    generalizabilityStudy(
-      Array.from({ length: persons * items }, (_, k) => {
-        const person = Math.floor(k / items);
-        const item = k % items;
-        return { levels: { person: `p${person}`, item: `i${item}` }, score: cell(person, item) };
-      }),
-      { facets: ["item"] },
-    ).components.map(({ variance }) => variance);
-
-  const varianceX = components((p, i) => defined(x[p])[i] ?? 0);
-  const varianceY = components((p, i) => defined(y[p])[i] ?? 0);
-  const varianceSum = components((p, i) => (defined(x[p])[i] ?? 0) + (defined(y[p])[i] ?? 0));
-  const covariances = varianceSum.map((total, k) => (total - (varianceX[k] ?? 0) - (varianceY[k] ?? 0)) / 2);
-
-  /** The covariance components from the mean products of the two scores, the way the mean squares are made. */
-  const direct = (): number[] => {
-    const mean = (values: number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
-    const cell = (matrix: number[][], p: number, i: number): number => defined(matrix[p])[i] ?? 0;
-    const personMeans = (matrix: number[][]) => matrix.map(mean);
-    const itemMeans = (matrix: number[][]) =>
-      Array.from({ length: items }, (_, i) => mean(matrix.map((row) => row[i] ?? 0)));
-    const grand = (matrix: number[][]) => mean(matrix.flat());
-    const [px, py, ix, iy, gx, gy] = [personMeans(x), personMeans(y), itemMeans(x), itemMeans(y), grand(x), grand(y)];
-    let personProducts = 0;
-    for (let p = 0; p < persons; p++) personProducts += ((px[p] ?? 0) - gx) * ((py[p] ?? 0) - gy);
-    let itemProducts = 0;
-    for (let i = 0; i < items; i++) itemProducts += ((ix[i] ?? 0) - gx) * ((iy[i] ?? 0) - gy);
-    let cellProducts = 0;
-    for (let p = 0; p < persons; p++) {
-      for (let i = 0; i < items; i++) {
-        cellProducts +=
-          (cell(x, p, i) - (px[p] ?? 0) - (ix[i] ?? 0) + gx) * (cell(y, p, i) - (py[p] ?? 0) - (iy[i] ?? 0) + gy);
-      }
-    }
-    const productPerson = (items * personProducts) / (persons - 1);
-    const productItem = (persons * itemProducts) / (items - 1);
-    const productCell = cellProducts / ((persons - 1) * (items - 1));
-    return [(productPerson - productCell) / items, (productItem - productCell) / persons, productCell];
-  };
-
-  it("takes the covariance components of two scores from studies of each and of their sum, as the direct estimate does", () => {
-    const expected = direct();
-    covariances.forEach((covariance, k) => {
-      expect(covariance).toBeCloseTo(defined(expected[k]), 9);
-    });
   });
 });
