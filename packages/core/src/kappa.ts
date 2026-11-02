@@ -25,25 +25,22 @@ export function kappaOfPairs(
   weights: KappaWeights = "none",
 ): number | null {
   const { lowest, highest } = categoryRange(first, second);
-  const range = highest - lowest;
-  const agreement = agreementOf(weights, range);
-  const size = range + 1;
-  const firstCounts = new Float64Array(size);
-  const secondCounts = new Float64Array(size);
+  const agreement = agreementOf(weights, highest - lowest);
+  const firstCounts = new Map<number, number>();
+  const secondCounts = new Map<number, number>();
   let observed = 0;
   for (let i = 0; i < first.length; i++) {
     const x = first[i] ?? 0;
     const y = second[i] ?? 0;
     observed += agreement(x, y);
-    firstCounts[x - lowest] = (firstCounts[x - lowest] ?? 0) + 1;
-    secondCounts[y - lowest] = (secondCounts[y - lowest] ?? 0) + 1;
+    firstCounts.set(x, (firstCounts.get(x) ?? 0) + 1);
+    secondCounts.set(y, (secondCounts.get(y) ?? 0) + 1);
   }
   const n = first.length;
+  // Over the categories that occur, so that the work grows with the pairs, not with the range of the categories.
   let chance = 0;
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j < size; j++) {
-      chance += ((firstCounts[i] ?? 0) * (secondCounts[j] ?? 0) * agreement(i, j)) / (n * n);
-    }
+  for (const [x, firstCount] of firstCounts) {
+    for (const [y, secondCount] of secondCounts) chance += (firstCount * secondCount * agreement(x, y)) / (n * n);
   }
   return chance < 1 ? (observed / n - chance) / (1 - chance) : null;
 }

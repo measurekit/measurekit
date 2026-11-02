@@ -35,6 +35,14 @@ describe("kappaOfPairs", () => {
     expect(kappaOfPairs([0], [0], "quadratic")).toBeNull();
   });
 
+  it("takes the categories that occur, however far apart, without a table over their range", () => {
+    const far = Number.MAX_SAFE_INTEGER;
+    // p_o = 2/3 and p_e = 2/3 * 1/3 + 1/3 * 2/3 = 4/9, with no partial credit between categories a range apart.
+    for (const weights of ["none", "linear", "quadratic"] as const) {
+      expect(kappaOfPairs([0, far, 0], [0, far, far], weights)).toBeCloseTo(0.4, 14);
+    }
+  });
+
   it("does not depend on which list is first, on the order of the pairs, or on where the categories start", () => {
     const weights = fc.constantFrom<KappaWeights>("none", "linear", "quadratic");
     const pairs = fc.array(fc.tuple(fc.integer({ min: 0, max: 5 }), fc.integer({ min: 0, max: 5 })), {
