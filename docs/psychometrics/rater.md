@@ -3,11 +3,12 @@
 `@measurekit/psychometrics/rater` measures how far raters agree: exact and adjacent agreement, Cohen's kappa for two
 raters, unweighted, linear or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of
 scores; how far two raters order the subjects alike, by the correlation of their ratings; and how far one rater is more
-lenient than another, by the standardized mean difference. It also estimates what
+lenient than another, by the standardized mean difference, of a whole sample or of a subgroup. With them it evaluates
+automated scores against human ones, as RSMTool does ([recipe](#recipe-evaluating-automated-scores)). It also estimates what
 raters do to scores: the many-facet Rasch model puts persons, items and raters on one scale, so that a rater's severity
 is a number of logits and a person's score can be adjusted for the raters who gave it, and a bias analysis finds the
-raters who are harsher or milder than usual on one item. The agreement statistics are validated against irr, psych and
-effsize, the model against base R and TAM ([validation](validation.md)).
+raters who are harsher or milder than usual on one item. The agreement statistics are validated against irr, psych,
+effsize and RSMTool, the model against base R and TAM ([validation](validation.md)).
 
 ## Ratings
 
@@ -203,10 +204,111 @@ standardizedMeanDifference([
 ]); // 0.22: rater 1 is 0.22 standard deviations more lenient
 ```
 
+A subgroup's SMD, as of the essays of one group of writers, is read against the whole population's: `population` gives
+each rater's standard deviation over every subject, and the subgroup's difference of means is divided by
+√((first² + second²) / 2), as Williamson, Xi and Breyer (2012) recommend and RSMTool's `method = "williamson"` computes.
+Then the subgroups' SMDs share one scale, and a group whose ratings vary less is not made to look more different.
+
+| Option       | Default                                             | Meaning                                                                                                        |
+| ------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `population` | the pooled standard deviation of the subjects given | `{ first, second }`: each rater's standard deviation over the population, non-negative; `null` when both are 0 |
+
 Not included: the small-sample correction of Hedges' g, confidence intervals, and the differences among more than two
 raters, which pairs of raters give. Where effsize treats the two sets of ratings as independent samples, so does this
 function, though the same subjects were rated; it does not use the standard deviation of the differences, as a paired
 effect size would.
+
+## Recipe: evaluating automated scores
+
+A scoring engine's scores are evaluated against human scores on the same responses before it scores operationally:
+agreement, association and the difference of means, overall and by subgroup, and against the agreement of two humans,
+as Williamson, Xi and Breyer (2012) set out and RSMTool, ETS's evaluation tool, computes. Each is a function above.
+
+```mermaid
+flowchart LR
+  P["Machine scores"] --> R["Rounded and trimmed to the scale"]
+  R --> M["Against human scores: agreement, kappa, QWK, r, SMD, RMSE, SD ratio"]
+  R --> G["By subgroup: SMD on the population's SDs"]
+  H["A second human score"] --> HH["Human-human: the same statistics"]
+  M --> D["Degradation: machine-human less human-human; disattenuated r"]
+  HH --> D
+```
+
+| Statistic                       | measurekit, rows `[machine, human]`                        | RSMTool                                                          |
+| ------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| Exact and adjacent agreement    | `exactAgreement`, `adjacentAgreement`                      | `agreement(tolerance = 0, 1)`, in percent                        |
+| Kappa, quadratic weighted kappa | `cohenKappa`, `cohenKappa({ weights: "quadratic" })`       | `kappa`, `quadratic_weighted_kappa`                              |
+| Correlation                     | `ratingCorrelation`                                        | `pearsonr`                                                       |
+| SMD, whole sample               | `standardizedMeanDifference`                               | `standardized_mean_difference(method = "pooled")`                |
+| SMD of a subgroup               | `standardizedMeanDifference` with `population`             | `method = "williamson"`                                          |
+| RMSE, R², SD ratio              | One line each                                              | `RMSE`, `R2`, `sys_sd` and `h_sd`                                |
+| Degradation, disattenuated r    | Differences of the statistics; r over √r of the two humans | The analyzer's degradation; `compute_disattenuated_correlations` |
+
+```ts
+import {
+  adjacentAgreement,
+  cohenKappa,
+  exactAgreement,
+  ratingCorrelation,
+  standardizedMeanDifference,
+} from "@measurekit/psychometrics/rater";
+
+// Ten essays on a scale of 1 to 6: a human's scores, a second human's, an engine's unrounded scores and the writers' groups.
+const human = [3, 4, 2, 5, 3, 4, 1, 3, 6, 4];
+const second = [3, 4, 3, 5, 2, 4, 2, 3, 5, 4];
+const predicted = [3.4, 3.6, 2.6, 4.4, 3.3, 4.6, 1.8, 3.7, 5.3, 4.2];
+const groups = ["a", "a", "a", "a", "a", "b", "b", "b", "b", "b"];
+
+const machine = predicted.map((score) => Math.min(6, Math.max(1, Math.round(score))));
+const against = (scores: readonly number[]) => scores.map((score, i) => [score, human[i] ?? null]);
+const evaluate = (rows: (number | null)[][]) => ({
+  exact: exactAgreement(rows),
+  adjacent: adjacentAgreement(rows),
+  kappa: cohenKappa(rows),
+  quadraticKappa: cohenKappa(rows, { weights: "quadratic" }),
+  correlation: ratingCorrelation(rows),
+  smd: standardizedMeanDifference(rows),
+});
+const system = evaluate(against(machine)); // exact 0.4, adjacent 1, kappa 0.21, QWK 0.78, r 0.86, SMD 0.16
+const humans = evaluate(against(second)); // exact 0.6, adjacent 1, kappa 0.49, QWK 0.86, r 0.90, SMD 0
+system.quadraticKappa - humans.quadraticKappa; // -0.084: the degradation of QWK
+(system.correlation ?? 0) / Math.sqrt(humans.correlation ?? 0); // 0.91: the disattenuated r
+
+const sd = (scores: readonly number[]) => {
+  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  return Math.sqrt(scores.reduce((sum, score) => sum + (score - mean) ** 2, 0) / (scores.length - 1));
+};
+const population = { first: sd(machine), second: sd(human) };
+for (const group of ["a", "b"]) {
+  standardizedMeanDifference(
+    against(machine).filter((_, i) => groups[i] === group),
+    { population },
+  ); // 0 for a, 0.33 for b, where b's own SDs would give 0.26
+}
+```
+
+Machine scores are rounded before kappa, as a category is an integer. The thresholds below are the programs' policies,
+which a host applies to these values:
+
+| Statistic                                       | Threshold                       | Source                                                                           |
+| ----------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------- |
+| Quadratic weighted kappa, machine-human         | At least 0.70                   | Williamson, Xi and Breyer (2012), in ACT's technical brief R2100 (2021), Table 2 |
+| Its degradation from human-human                | At most 0.10                    | The same                                                                         |
+| SMD, machine-human                              | From -0.15 to 0.15              | The same                                                                         |
+| SD ratio, human over machine                    | From 2/3 to 1.50                | Wang and von Davier (2014), in ACT's Table 2                                     |
+| Exact agreement, human-human less machine-human | At most 5.125 percentage points | McGraw-Hill Education CTB (2014) and Pearson and ETS (2014), in ACT's Table 2    |
+| Pearson's r, machine-human                      | At least 0.70                   | Williamson et al. (2012), in ETS's RM-23-01 (2023), p. 7                         |
+
+On PERSUADE 2.0's essays on one prompt and ELLIPSE's double-scored essays, with machine scores from essay length,
+every statistic of the recipe equals RSMTool 12.0.0's within 1.3e-13 ([validation](validation.md)).
+
+| Topic                      | This recipe                                        | RSMTool                                                               |
+| -------------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
+| Agreement                  | A proportion                                       | A percentage                                                          |
+| The SMD of a whole sample  | Pooled over the two raters, Williamson et al.'s    | `"unpooled"`, the human SD alone, by default in the analyzer          |
+| The SMD of a subgroup      | On the population's pooled SD, Williamson et al.'s | The difference of standardized means (DSM) by default in the analyzer |
+| The degradation of the SMD | Both SMDs pooled                                   | The machine-human SMD unpooled, the human-human SMD pooled            |
+| Kappa of unrounded scores  | Round first: a category is an integer              | `quadratic_weighted_kappa` takes continuous scores                    |
 
 ## Many-facet Rasch model
 
@@ -401,15 +503,6 @@ The biases enter `manyFacetEstimates` and `manyFacetFit`, which score each ratin
 enter `expectedRating` or the fair averages of a facet, which are at a facet's mean: a facet that is not in `levels` has
 no cell.
 
-### Not included
-
-- **Joint maximum likelihood (FACETS).** Outside the sources: its measures are biased for short tests, and marginal
-  maximum likelihood is consistent. Measures differ from FACETS' by its bias.
-- **Rater drift over time.** No reference: it needs its own terms in the model, and no package that runs it was found.
-- **The hierarchical rater model.** No reference: it needs its own terms in the model, and no package that runs it was
-  found.
-- **A person facet other than one.** No reference: the persons are the only random facet.
-
 ### Differences from FACETS
 
 | Topic          | This package                                                         | FACETS                                                                  |
@@ -428,6 +521,31 @@ no cell.
 | Constraints           | Each facet and each set of thresholds sums to 0                                                      | The same, with `constraint = "items"`                                                   |
 | Thresholds by a facet | Any facet                                                                                            | `rater:step` fails with more than three raters in TAM 4.3-25                            |
 | Interaction           | `interactions`: biases within 4e-4 of TAM's on the fixture; standard errors from the Hessian         | `item:rater`: standard errors of its own parameters, 0.6 to 2.4 times the Hessian's     |
+
+## Not included
+
+- **Joint maximum likelihood (FACETS).** Outside the sources: its measures are biased for short tests, and marginal
+  maximum likelihood is consistent. Measures differ from FACETS' by its bias.
+- **Rater drift over time.** No reference: it needs its own terms in the model, and no package that runs it was found.
+- **The hierarchical rater model.** No reference: it needs its own terms in the model, and no package that runs it was
+  found.
+- **A person facet other than one.** No reference: the persons are the only random facet.
+- **PRMSE of automated scores on true scores (Loukina et al., 2020).** Outside the sources: no program report found uses
+  it, and ETS's RM-23-01 (2023) was still exploring thresholds for its operational use; RSMTool has it.
+- **Quadratic weighted kappa of continuous scores (Haberman, 2019).** Outside the sources: no program report found uses
+  it; programs round machine scores, and on integers `cohenKappa` with quadratic weights is the same statistic.
+- **The difference of standardized means by subgroup (DSM).** Outside the sources: RSMTool's option; Williamson et al.'s
+  subgroup SMD is `standardizedMeanDifference` with `population`.
+- **The SMD on the human SD alone, or on the population's human SD.** Outside the sources: RSMTool's `"unpooled"` and
+  `"johnson"`; Williamson et al. pool the two SDs.
+- **Fairness models OSA, OSD and CSD (Loukina, Madnani and Zechner, 2019).** Outside the sources: a research proposal; no
+  program report found uses them.
+- **Building, explaining and cross-validating a scoring model.** No fit: machine learning, another domain; RSMTool, SHAP
+  and SKLL do it.
+- **Acceptance thresholds.** No fit: a host's policy; the recipe tables them with their sources.
+- **Confusion matrices, score distributions and descriptive statistics.** No fit: counts and general statistics.
+- **Scaling of machine scores to the human scores.** No fit: the scorer's transformation, one line.
+- **Evaluation reports, as RSMTool's HTML, `rsmcompare` and `rsmsummarize`.** No fit: input and output.
 
 ## References
 
@@ -448,4 +566,6 @@ no cell.
   Journal of Applied Measurement, 5, 189-227.
 - Shrout, P. E., & Fleiss, J. L. (1979). Intraclass correlations: Uses in assessing rater reliability. Psychological
   Bulletin, 86, 420-428.
+- Williamson, D. M., Xi, X., & Breyer, F. J. (2012). A framework for evaluation and use of automated scoring.
+  Educational Measurement: Issues and Practice, 31(1), 2-13.
 - Wright, B. D., & Masters, G. N. (1982). Rating scale analysis. MESA Press.

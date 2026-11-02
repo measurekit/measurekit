@@ -9,3 +9,5 @@ validation/knowledge-tracing/.venv/
 __pycache__/
 validation/benchmarks/results/
 validation/psychometrics/.venv/
+validation/psychometrics/.venv-scoring/
+validation/psychometrics/.data/

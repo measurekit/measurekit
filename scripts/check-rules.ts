@@ -228,6 +228,14 @@ export const RULES: readonly Rule[] = [
     titles: "rejects responses other than 0 and 1, and arguments of other types",
   },
   {
+    rule: "A population's standard deviations are non-negative numbers, so that a negative or a string is not read as a scale.",
+    file: "packages/psychometrics/src/rater/mean-difference.ts",
+    find: 'checkNonNegative(population.second, "The population\'s standard deviation of the second rater");',
+    replace: "",
+    test: "packages/psychometrics/test/rater.test.ts",
+    titles: "rejects population deviations that are not non-negative numbers, and options of other types",
+  },
+  {
     rule: "A limited-information statistic stops at 60 items, before the moments, whose matrix grows with their fourth power.",
     file: "packages/psychometrics/src/fit/limited-information.ts",
     find: "if (items.length > MAX_MOMENT_ITEMS) {",

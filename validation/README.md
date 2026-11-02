@@ -54,6 +54,7 @@ Rscript validation/psychometrics/lltm-polytomous.R   # the LLTM of partial credi
 Rscript validation/psychometrics/generalizability.R  # variance components and decision studies of balanced designs: base R aov and lme4
 Rscript validation/psychometrics/generalizability-unbalanced.R  # variance components with empty cells: Henderson's Method 1 in base R
 validation/psychometrics/.venv/bin/python validation/psychometrics/generalizability-unbalanced.py  # the same components by GeneralizIT
+validation/psychometrics/.venv-scoring/bin/python -I validation/psychometrics/automated-scoring.py  # the evaluation of automated scores: RSMTool on PERSUADE 2.0 and ELLIPSE
 Rscript validation/psychometrics/mokken.R            # Mokken scale analysis: mokken's coefH, aisp, check.monotonicity and check.iio
 Rscript validation/psychometrics/mokken-reliability.R  # Molenaar-Sijtsma reliability: mokken's check.reliability on exact proportions of item steps; shares the data of mokken.R through mokken-data.R
 Rscript validation/psychometrics/mokken-steps.R      # Guttman errors and conditional association: mokken's check.errors and check.ca; G+ over the orders of tied steps in base R
@@ -89,6 +90,16 @@ runs in a Python 3.12 environment in `validation/psychometrics/.venv`, which git
 ```bash
 uv venv --python 3.12 validation/psychometrics/.venv
 uv pip install --python validation/psychometrics/.venv -r validation/psychometrics/requirements.txt
+```
+
+`automated-scoring.py` writes `rater-automated-scoring.json` from RSMTool 12.0.0 in a Python 3.11 environment of its own,
+as RSMTool and its SKLL pin older versions of scikit-learn and NumPy. It downloads PERSUADE 2.0's training set (about 620 MB, from
+Google Drive) and ELLIPSE's raw rater scores into `validation/psychometrics/.data`, which git ignores, checks their SHA-256,
+and takes about a minute once they are there:
+
+```bash
+uv venv --python 3.11 validation/psychometrics/.venv-scoring
+uv pip install --python validation/psychometrics/.venv-scoring -r validation/psychometrics/automated-scoring-requirements.txt
 ```
 
 `multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`

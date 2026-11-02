@@ -20,10 +20,12 @@ import {
   ratingCorrelation,
   standardizedMeanDifference,
 } from "../src/index.js";
+import { standardDeviation } from "../src/math/internal.js";
 import { summarizeFacet } from "../src/rater/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/rater.json" with { type: "json" };
 import agreementFixture from "./fixtures/rater-agreement.json" with { type: "json" };
+import scoringFixture from "./fixtures/rater-automated-scoring.json" with { type: "json" };
 import biasFixture from "./fixtures/rater-bias.json" with { type: "json" };
 import correlationFixture from "./fixtures/rater-correlation.json" with { type: "json" };
 import manyFacetFixture from "./fixtures/rater-many-facet.json" with { type: "json" };
@@ -32,6 +34,8 @@ import manyFacetFixture from "./fixtures/rater-many-facet.json" with { type: "js
 const TOLERANCE = 1e-12;
 /** Agreement shares, standardized mean differences and correlations against irr, effsize and cor: closed forms of the same counts and sums. */
 const AGREEMENT_TOLERANCE = 1e-12;
+/** The evaluation of automated scores against RSMTool: closed forms of the same counts and sums. */
+const SCORING_TOLERANCE = 1e-10;
 /** Measures, thresholds, the mean and SD of theta against the base R maximum of the marginal likelihood. */
 const ESTIMATE_TOLERANCE = 1e-8;
 /** The marginal log-likelihood at the maximum. */
@@ -49,6 +53,59 @@ const FIELDS = [
   "agreementAverage",
   "consistencyAverage",
 ] as const;
+
+/** RSMTool's metrics of one pair of scores, agreement in percent. */
+interface ScoringMetrics {
+  readonly kappa: number | null;
+  readonly quadraticKappa: number | null;
+  readonly exactPercent: number | null;
+  readonly adjacentPercent: number | null;
+  readonly smd: number | null;
+  readonly correlation: number | null;
+  readonly rSquared: number | null;
+  readonly rmse: number | null;
+  readonly machineSd: number | null;
+  readonly humanSd: number | null;
+}
+
+/** The PERSUADE 2.0 case of the fixture: one human score, a machine score and a group per essay. */
+const PERSUADE = scoringFixture.cases["PERSUADE 2.0"];
+/** The ELLIPSE case of the fixture: two human scores and a machine score per essay. */
+const ELLIPSE = scoringFixture.cases.ELLIPSE;
+
+/** The recipe of rater.md: machine scores rounded and trimmed to the scale. */
+function toScale(scores: readonly number[], [low = 0, high = 0]: readonly number[]): number[] {
+  return scores.map((score) => Math.min(high, Math.max(low, Math.round(score))));
+}
+
+/** The recipe of rater.md: the metrics of a second rating against the first, the human, as rows [second, first]. */
+function evaluate(human: readonly number[], machine: readonly number[]): ScoringMetrics {
+  const pairs = machine.map((score, i) => [score, human[i] ?? null]);
+  const squares = machine.reduce((sum, score, i) => sum + (score - (human[i] ?? 0)) ** 2, 0);
+  const humanMean = human.reduce((sum, score) => sum + score, 0) / human.length;
+  const spread = human.reduce((sum, score) => sum + (score - humanMean) ** 2, 0);
+  return {
+    kappa: cohenKappa(pairs),
+    quadraticKappa: cohenKappa(pairs, { weights: "quadratic" }),
+    exactPercent: 100 * exactAgreement(pairs),
+    adjacentPercent: 100 * adjacentAgreement(pairs),
+    smd: standardizedMeanDifference(pairs),
+    correlation: ratingCorrelation(pairs),
+    rSquared: 1 - squares / spread,
+    rmse: Math.sqrt(squares / human.length),
+    machineSd: standardDeviation(Float64Array.from(machine)),
+    humanSd: standardDeviation(Float64Array.from(human)),
+  };
+}
+
+/** Expects the recipe's metrics to be RSMTool's, agreement in percent at 100 times the tolerance. */
+function expectMetrics(actual: ScoringMetrics, expected: ScoringMetrics, label: string): void {
+  for (const [name, value] of Object.entries(expected)) {
+    const found: unknown = Object.entries(actual).find(([key]) => key === name)?.[1];
+    const scale = name.endsWith("Percent") ? 100 : 1;
+    expectClose(typeof found === "number" ? found : null, value, scale * SCORING_TOLERANCE, `${label} ${name}`);
+  }
+}
 
 /** Ratings of 2 to 20 subjects by `raters` raters in categories 0 to 4. */
 function ratings(raters: number): fc.Arbitrary<number[][]> {
@@ -418,6 +475,75 @@ describe("standardizedMeanDifference", () => {
     expect(() => standardizedMeanDifference(JSON.parse("null"))).toThrow(
       "The standardized mean difference needs an array of ratings, one row per subject.",
     );
+  });
+
+  it("matches RSMTool's Williamson SMD of each subgroup on the population's deviations", () => {
+    const { human, machine: predicted, groups, scale, byGroup } = PERSUADE;
+    const machine = toScale(predicted, scale);
+    const population = {
+      first: standardDeviation(Float64Array.from(machine)),
+      second: standardDeviation(Float64Array.from(human)),
+    };
+    for (const { group, subjects, smd } of byGroup) {
+      const rows = machine.flatMap((score, i) => (groups[i] === group ? [[score, human[i] ?? null]] : []));
+      expect(rows, group).toHaveLength(subjects);
+      expectClose(standardizedMeanDifference(rows, { population }), smd, SCORING_TOLERANCE, group);
+    }
+  });
+
+  it("divides by the population's pooled deviation, derived by hand, and is null when it is 0", () => {
+    const rows = [
+      [3, 2],
+      [4, 4],
+    ];
+    // Means 3.5 and 3 over √((1² + 3²) / 2) = √5.
+    expectClose(standardizedMeanDifference(rows, { population: { first: 1, second: 3 } }), 0.5 / Math.sqrt(5), 1e-15);
+    expect(standardizedMeanDifference(rows, { population: { first: 0, second: 0 } })).toBeNull();
+    const constant = [
+      [2, 2],
+      [2, 2],
+    ];
+    expect(standardizedMeanDifference(constant, { population: { first: 1, second: 1 } })).toBe(0);
+  });
+
+  it("rejects population deviations that are not non-negative numbers, and options of other types", () => {
+    const rows = [
+      [1, 2],
+      [2, 3],
+    ];
+    expect(() => standardizedMeanDifference(rows, { population: { first: -1, second: 1 } })).toThrow(
+      "The population's standard deviation of the first rater must be a non-negative number, found -1.",
+    );
+    expect(() =>
+      standardizedMeanDifference(rows, JSON.parse('{ "population": { "first": 1, "second": "1" } }')),
+    ).toThrow('The population\'s standard deviation of the second rater must be a non-negative number, found "1".');
+    expect(() => standardizedMeanDifference(rows, JSON.parse('{ "population": [1, 1] }'))).toThrow(
+      "The option population must be an object { first, second }",
+    );
+    expect(() => standardizedMeanDifference(rows, JSON.parse('{ "population": null }'))).toThrow(DataError);
+    expect(() => standardizedMeanDifference(rows, JSON.parse("null"))).toThrow(DataError);
+  });
+});
+
+describe("the recipe for evaluating automated scores", () => {
+  it("gives RSMTool's metrics of machine against human scores on PERSUADE 2.0", () => {
+    expectMetrics(evaluate(PERSUADE.human, toScale(PERSUADE.machine, PERSUADE.scale)), PERSUADE.overall, "PERSUADE");
+  });
+
+  it("gives RSMTool's metrics, human-human agreement, degradation and disattenuated correlation on ELLIPSE", () => {
+    const { first, second, machine, scale, humanSystem, humanHuman, degradation, disattenuated } = ELLIPSE;
+    const system = evaluate(first, toScale(machine, scale));
+    const humans = evaluate(first, second);
+    expectMetrics(system, humanSystem, "human-system");
+    expectMetrics(humans, humanHuman, "human-human");
+    for (const [name, value] of Object.entries(degradation)) {
+      const lost = (metrics: ScoringMetrics): number =>
+        defined(Object.entries(metrics).find(([key]) => key === name)?.[1]);
+      const scale = name.endsWith("Percent") ? 100 : 1;
+      expectClose(lost(system) - lost(humans), value, scale * SCORING_TOLERANCE, `degradation of ${name}`);
+    }
+    const correlation = defined(system.correlation) / Math.sqrt(defined(humans.correlation));
+    expectClose(correlation, disattenuated, SCORING_TOLERANCE, "disattenuated r");
   });
 });
 
@@ -1257,6 +1383,23 @@ describe("properties", () => {
         } catch (error) {
           if (!(error instanceof DataError)) throw error;
         }
+      }),
+    );
+  });
+
+  it("the SMD on the subjects' own deviations as the population's is the SMD, and swapping the raters negates it", () => {
+    fc.assert(
+      fc.property(ratings(2), (rows) => {
+        const value = standardizedMeanDifference(rows);
+        if (value === null) return;
+        const deviation = (rater: number): number =>
+          standardDeviation(Float64Array.from(rows, (row) => defined(row[rater])));
+        const population = { first: deviation(0), second: deviation(1) };
+        expectClose(standardizedMeanDifference(rows, { population }), value, 1e-12);
+        const swapped = rows.map(([first, second]) => [defined(second), defined(first)]);
+        expectClose(standardizedMeanDifference(swapped), -value, 1e-12);
+        const reversed = { first: population.second, second: population.first };
+        expectClose(standardizedMeanDifference(swapped, { population: reversed }), -value, 1e-12);
       }),
     );
   });

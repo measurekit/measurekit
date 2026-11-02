@@ -10,7 +10,7 @@ polytomous items, with SIBTEST of items and bundles, IRT likelihood-ratio tests,
 standard errors by bootstrap and the delta method, score scaling and prediction with norms and their standard errors, dimensionality by polychoric
 correlations, parallel analysis, exploratory factors by minres or maximum likelihood with their fit, and omega hierarchical, explanatory item response models, including the linear logistic test model of
 partial credit and rating scale items and the linear logistic model of change, generalizability theory, Mokken scale analysis with two-way imputation, Guttman errors and conditional association,
-simulation, standard setting, rater agreement and rater effects, including the many-facet Rasch model, response
+simulation, standard setting, rater agreement and rater effects, including the many-facet Rasch model and the evaluation of automated scores, with the standardized mean difference of a subgroup on the population's standard deviations, response
 times with the joint model of speed and accuracy, and change between two occasions: gains, the reliability of a
 difference and reliable change.
 
