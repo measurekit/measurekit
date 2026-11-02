@@ -365,6 +365,48 @@ describe("logisticRegressionDif", () => {
     });
   }
 
+  it("gives null tests where every person has the same matching score, which leaves no score to match on", () => {
+    // Every person answers one of the two items, so every matching score is 1, while item 1 is easier for the
+    // reference group: without the rule, each regression stays at its start and the tests are 0.
+    const rows = [
+      [1, 0],
+      [1, 0],
+      [1, 0],
+      [0, 1],
+      [0, 1],
+      [0, 1],
+      [0, 1],
+      [1, 0],
+      [1, 0],
+      [0, 1],
+    ];
+    const rowGroups: DifGroup[] = rows.map((_, person) => (person < 4 ? "reference" : "focal"));
+    const { items } = logisticRegressionDif(responseMatrix(rows), rowGroups);
+    for (const item of items) {
+      expect([item.uniform.chiSquare, item.nonuniform.chiSquare, item.both.chiSquare]).toEqual([null, null, null]);
+    }
+  });
+
+  it("gives null tests whose model has collinear terms, and the others", () => {
+    // Every focal person has the matching score 1, so S G equals G: the interaction cannot be tested.
+    const rows = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [1, 1, 1],
+      [0, 1, 1],
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+      [1, 0, 0],
+      [0, 1, 0],
+    ];
+    const rowGroups: DifGroup[] = rows.map((_, person) => (person < 5 ? "reference" : "focal"));
+    const item = defined(logisticRegressionDif(responseMatrix(rows), rowGroups).items[0]);
+    expect(item.uniform.chiSquare).not.toBeNull();
+    expect([item.nonuniform.chiSquare, item.both.chiSquare]).toEqual([null, null]);
+  });
+
   it("gives null tests for an item every person answered alike or with persons of one group", () => {
     const { items } = logisticRegressionDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS);
     expect(items[0]?.both).toEqual({ chiSquare: null, degreesOfFreedom: 2, significance: null, rSquaredChange: null });

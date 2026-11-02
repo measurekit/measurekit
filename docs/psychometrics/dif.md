@@ -150,7 +150,8 @@ D0 the deviance of the intercept alone, as difR's `deltaR2`.
 | `both`       | 2 vs 0 | 2                  | Either                                          |
 
 Where an estimate diverges (separation), the deviance reaches its infimum and the test is still computed. An item
-its persons answered alike, or answered by one group only, has `null` tests.
+its persons answered alike, answered by one group only, or whose persons share one matching score has `null` tests, as
+does a test whose model has collinear terms, such as the interaction when every focal person has the same score.
 
 ## Lord's chi-square
 

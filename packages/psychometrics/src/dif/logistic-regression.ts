@@ -35,8 +35,9 @@ export const MAX_ITERATIONS = 100;
  * with `purify`, the anchors, and the studied item, and G = 1 in the focal group and 0 in the reference group: model 0,
  * β0 + β1 S; model 1, adding β2 G; model 2, adding β3 S G. The R² change is Nagelkerke's, as difR's `deltaR2`. Each
  * item uses the persons who answered it and another matching item, their score scaled from the matching items they
- * answered (see the guide). A test is `null` for an item these persons answered alike or that has persons of one group
- * only. Purification flags items whose test of both terms is significant at 0.05, difR's default type.
+ * answered (see the guide). A test is `null` for an item these persons answered alike, that has persons of one group
+ * only or whose persons share one matching score, and where a model's terms are collinear, as when every focal person
+ * has the same score. Purification flags items whose test of both terms is significant at 0.05, difR's default type.
  *
  * @param matrix - The responses of the persons, dichotomous.
  * @param groups - The group of each person, in the order of the matrix.
@@ -67,20 +68,24 @@ function itemTests(cases: ItemCases): Omit<LogisticRegressionDif, "id"> {
   const count = cases.scores.length;
   const correct = cases.responses.reduce((sum, response) => sum + response, 0);
   const focal = cases.focal.reduce((sum, flag) => sum + flag, 0);
-  const defined = correct > 0 && correct < count && focal > 0 && focal < count;
-  const [none = 0, score = 0, group = 0, interaction = 0] = defined
+  const varies = cases.scores.some((score) => score !== cases.scores[0]);
+  const defined = correct > 0 && correct < count && focal > 0 && focal < count && varies;
+  const [none = null, score = null, group = null, interaction = null] = defined
     ? [1, 2, 3, 4].map((terms) => deviance(cases, terms))
     : [];
-  const test = (smaller: number, larger: number, degreesOfFreedom: number): LikelihoodRatioTest =>
-    defined ? likelihoodRatioTest(smaller, larger, degreesOfFreedom, none, count) : undefinedTest(degreesOfFreedom);
+  const test = (smaller: number | null, larger: number | null, degreesOfFreedom: number): LikelihoodRatioTest =>
+    none !== null && smaller !== null && larger !== null
+      ? likelihoodRatioTest(smaller, larger, degreesOfFreedom, none, count)
+      : undefinedTest(degreesOfFreedom);
   return { uniform: test(score, group, 1), nonuniform: test(group, interaction, 1), both: test(score, interaction, 2) };
 }
 
 /**
  * Returns the deviance, -2 ln L, of the logistic regression of an item's responses on the first `terms` of 1, S, G and
- * S G, fitted by Newton's method from 0.
+ * S G, fitted by Newton's method from 0, or `null` when the Hessian is singular at the start: the terms are collinear.
+ * A Hessian that turns singular later comes from separation, where the deviance has reached its infimum.
  */
-function deviance(cases: ItemCases, terms: number): number {
+function deviance(cases: ItemCases, terms: number): number | null {
   const fit: LogisticFit = {
     terms,
     covariates: new Float64Array(4),
@@ -91,7 +96,10 @@ function deviance(cases: ItemCases, terms: number): number {
   let value = evaluate(cases, fit);
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     const step = newtonStep(fit);
-    if (step === null) break;
+    if (step === null) {
+      if (iteration === 0) return null;
+      break;
+    }
     value = evaluate(cases, fit);
     if (step <= STEP_TOLERANCE) break;
   }
