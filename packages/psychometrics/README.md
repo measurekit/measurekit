@@ -1,12 +1,15 @@
 # @measurekit/psychometrics
 
-Psychometrics for JavaScript and TypeScript: classical test theory, item response theory (calibration in groups, on
-sparse data and online; multidimensional models; ability estimation; summed-score tables), cognitive diagnosis, adaptive
-and multistage testing with exposure control and form assembly, item and person fit, differential item functioning,
-linking and equating, score scaling and prediction, gains and reliable change, dimensionality, explanatory models of
-item difficulty, generalizability theory, Mokken scale analysis, simulation, standard setting, rater agreement and effects, and response
-times. Every statistic is validated against R. Its only dependency is `@measurekit/core`, which has none; it runs in any
-JavaScript runtime.
+Psychometrics for JavaScript and TypeScript: classical test theory, item response theory (calibration by marginal and
+conditional maximum likelihood, in groups, on sparse data, online and with survey weights; multidimensional and unfolding
+models; ability estimation; summed-score tables), cognitive diagnosis, adaptive and multistage testing with exposure
+control and form assembly, global, item and person fit, differential item functioning, linking and equating including
+kernel equating, score scaling and prediction, gains and reliable change, dimensionality, explanatory models of item
+difficulty, generalizability theory, Mokken scale analysis, simulation, standard setting with classification accuracy and
+consistency, rater agreement and effects, the evaluation of automated scores, and response times. Every statistic is
+validated against R. Its only dependency is `@measurekit/core`, which has none; it runs in any JavaScript runtime. The
+guide of each module lists what it leaves out under Not included, with the reason for each method, and shows as recipes
+what a few lines over its functions compute, such as plausible values and bootstrap standard errors.
 
 ```mermaid
 flowchart LR

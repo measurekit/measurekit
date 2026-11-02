@@ -122,3 +122,8 @@ The options that restrict the items of an adaptive test, `contentTargets`, `enem
 near an item's location. `calibrateUnfolding` calibrates it as the GGUM package does: from Roberts and Laughlin's starts,
 through the graded unfolding model and the model with a = 1, to every parameter, leaving out the persons who disagree
 with every item and reporting how many it kept.
+
+The guide of each module lists under Not included the methods it leaves out, one bullet each with its reason, and
+`check:standards` fails a module guide without the section. The guides show as recipes what a few lines over the functions
+compute, each with a test against its reference: plausible values and Rubin's rules, responses missing not at random,
+restricted exposure, the nested-model chi-square, bootstrap standard errors and the intervals of alpha and omega.
