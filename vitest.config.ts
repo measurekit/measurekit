@@ -47,6 +47,18 @@ const SLOW_BENCHMARK_TIMEOUT = 1_800_000;
 // biome-ignore lint/style/noDefaultExport: Vitest reads its configuration from the default export.
 export default defineConfig({
   test: {
+    coverage: {
+      provider: "v8",
+      include: ["packages/*/src/**/*.ts"],
+      reporter: ["text-summary"],
+      // One floor for each package: a gap in the tests of a package fails its own floor and no other. CI checks each
+      // package in the job of its project, with the files of that package alone. Psychometrics has no floor yet: its
+      // tests take ten minutes, and over two hours under coverage on a loaded machine, so its floor waits for a run on CI.
+      thresholds: {
+        "packages/core/src/**": { statements: 94, branches: 74, functions: 96, lines: 95 },
+        "packages/knowledge-tracing/src/**": { statements: 98, branches: 82, functions: 99, lines: 99 },
+      },
+    },
     projects: [
       {
         test: {
@@ -72,6 +84,8 @@ export default defineConfig({
           name: "knowledge-tracing",
           include: ["packages/knowledge-tracing/test/**/*.test.ts"],
           setupFiles: ["packages/knowledge-tracing/test/setup.ts"],
+          // Fits of BLIM and the drift of IRT take a second or two, several times as long under coverage and load.
+          testTimeout: 60_000,
         },
       },
       { test: { name: "scripts", include: ["scripts/test/**/*.test.ts"] } },

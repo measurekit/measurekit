@@ -53,6 +53,7 @@ pnpm lint             # Biome and cspell
 pnpm check:standards  # the rules of the standards that a script can check
 pnpm typecheck        # every package and its examples
 pnpm test             # Vitest, a project per package, the scripts and the examples; runs offline
+pnpm test:coverage    # the coverage floors of the packages
 pnpm bench            # the benchmarks of every package, against their budgets
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # the built packages
