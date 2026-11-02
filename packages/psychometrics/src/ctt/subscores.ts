@@ -15,7 +15,8 @@ export interface SubscoreValue {
    */
   readonly subscorePrmse: number | null;
   /**
-   * The PRMSE of the total score as a predictor of the true subscore: the squared correlation of the two. `null` where
+   * The PRMSE of the total score as a predictor of the true subscore: the squared correlation of the two. It can exceed
+   * 1, as ρ is estimated, where the sections correlate above 1 once corrected for unreliability. `null` where
    * `subscorePrmse` is.
    */
   readonly totalPrmse: number | null;

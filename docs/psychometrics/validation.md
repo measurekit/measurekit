@@ -240,6 +240,11 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | Unbalanced variance components                    | Base R: Henderson's Method 1 written out, from T and the coefficients k; GeneralizIT 0.1.2 agrees within its rounding to 4 decimals        |
 | Universe score and error variances, coefficients  | Base R: the textbook formulas of each design (Brennan, 2001), components below 0 taken as 0                                                |
 
+The generalizability fixtures are simulations: the references run on any data, and the worked examples published with
+their components, Brennan's synthetic data sets, are printed in the book and in no package used here. The components are exact functions of the sums of squares, so data of any origin
+take the same path; the simulations choose what real data would meet by chance, such as a negative component, labels
+repeated within their parents and empty cells.
+
 | Response time quantity                                                                                   | Reference                                                                                                                                                                                                                           |
 | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Lognormal model: intensities, discriminations, σ_τ, log-likelihood                                       | nlme's `lme(log(t) ~ 0 + item, random = ~ 1 \| person, weights = varIdent(form = ~ 1 \| item), method = "ML")`, taken to the maximum of the written-out likelihood by Newton steps with numDeriv; LNIRT's `LNRT` by MCMC within 0.1 |
