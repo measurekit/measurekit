@@ -134,7 +134,7 @@ const STANDARD_ERRORS: readonly FacetStandardErrors[] = ["none", "hessian"];
  *   distribution of the persons, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations
  *   run.
  * @throws `DataError` when the options are invalid, the scores are not objects { levels, score } with an element of
- * each facet and an integer score from 0, fewer than two persons were scored, the design is not connected, a
+ * each facet and an integer score from 0 to 2³¹ - 1, fewer than two persons were scored, the design is not connected, a
  * threshold set uses fewer than two categories or skips one, or an interaction has no estimable bias.
  * @see {@link https://doi.org/10.1007/BF02293801 | Bock and Aitkin (1981)}
  */

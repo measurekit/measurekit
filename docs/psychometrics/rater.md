@@ -267,7 +267,7 @@ biased.interactions?.map(({ levels, bias }) => [...levels, Math.round(bias * 100
 ### Scores
 
 `scores` is an array of `FacetedScore`s, `{ levels, score }`, one for each score in long format ([data](data.md)):
-`levels` holds the element of each facet by facet name, as strings, and `score` an integer from 0.
+`levels` holds the element of each facet by facet name, as strings, and `score` an integer from 0 to 2³¹ - 1.
 
 | Rule                                 | Meaning                                                                                                                     |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |

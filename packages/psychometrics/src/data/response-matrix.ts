@@ -1,5 +1,6 @@
 import { checkArray, checkOptions, DataError, describe, isPositive } from "@measurekit/core";
 import { indexIds } from "./ids.js";
+import { isResponse, MAX_RESPONSE } from "./response.js";
 
 /** Scored responses of persons to items, with their ids. */
 export interface ResponseMatrix {
@@ -45,8 +46,8 @@ export interface ResponseMatrixOptions {
  * @param options - The ids of the persons and items, and the response times.
  * @returns The matrix, whose ids are `person1`, `item1` and so on without the options.
  * @throws `DataError` when the rows are not an array, there are no persons or no items, the rows differ in length, a
- * response is not a non-negative integer or `null`, the ids do not match the rows and columns or repeat, or the times
- * do not match the responses or are not positive finite numbers or `null`.
+ * response is not an integer from 0 to 2³¹ - 1 or `null`, the ids do not match the rows and columns or repeat, or the
+ * times do not match the responses or are not positive finite numbers or `null`.
  */
 export function responseMatrix(
   rows: readonly (readonly (number | null)[])[],
@@ -57,7 +58,7 @@ export function responseMatrix(
 
 /**
  * Builds a response matrix that holds the rows given, not copies of them: for a function that made the rows and knows
- * that every response in them is a non-negative integer or `null`. Checks the rest of what {@link responseMatrix}
+ * that every response in them is an integer from 0 to 2³¹ - 1 or `null`. Checks the rest of what {@link responseMatrix}
  * checks.
  */
 export function responseMatrixOfRows(
@@ -164,13 +165,13 @@ function checkMatrix(
   if (matrix.times !== undefined) checkTimes(matrix);
 }
 
-/** Checks that each response of a person is a non-negative integer or `null`. */
+/** Checks that each response of a person is an integer from 0 to {@link MAX_RESPONSE} or `null`. */
 function checkRow(row: readonly unknown[], personId: string | undefined, itemIds: readonly string[]): void {
   for (let item = 0; item < row.length; item++) {
     const response = row[item];
-    if (response !== null && !(typeof response === "number" && Number.isSafeInteger(response) && response >= 0)) {
+    if (response !== null && !isResponse(response)) {
       throw new DataError(
-        `The response of person "${personId}" to item "${itemIds[item]}" must be a non-negative integer or null, found ${describe(response)}.`,
+        `The response of person "${personId}" to item "${itemIds[item]}" must be an integer from 0 to ${MAX_RESPONSE} or null, found ${describe(response)}.`,
       );
     }
   }

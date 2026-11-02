@@ -39,19 +39,19 @@ const byColumns = responseMatrixFromColumns(
 );
 ```
 
-| Rule      | Detail                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------ |
-| Responses | Integers from 0: 0 and 1 for dichotomous items, 0 to k - 1 for items with k categories. `null` when missing. |
-| Size      | At least one person and one item; every row has one response per item.                                       |
-| Ids       | Strings, unique among persons and among items. Default: `person1`, `person2`, ... and `item1`, `item2`, ...  |
-| Copies    | The builders copy the rows, so later changes to the input do not change the matrix.                          |
+| Rule      | Detail                                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Responses | Integers from 0 to 2³¹ - 1: 0 and 1 for dichotomous items, 0 to k - 1 for items with k categories. `null` when missing. |
+| Size      | At least one person and one item; every row has one response per item.                                                  |
+| Ids       | Strings, unique among persons and among items. Default: `person1`, `person2`, ... and `item1`, `item2`, ...             |
+| Copies    | The builders copy the rows, so later changes to the input do not change the matrix.                                     |
 
 `responseMatrix(rows, { times })` adds response times in seconds, by person, then item, aligned with the responses:
 positive, `null` when missing, and only where there is a response. A record takes its time as an optional `time`.
 [Response times](response-time.md) uses them; the other analyses ignore them.
 
 A malformed matrix throws `DataError` naming the first problem, e.g.
-`The response of person "budi" to item "q2" must be a non-negative integer or null, found 0.5.` `NaN`, `undefined`,
+`The response of person "budi" to item "q2" must be an integer from 0 to 2147483647 or null, found 0.5.` `NaN`, `undefined`,
 holes in sparse arrays and values of other types are rejected.
 
 ## Response records
@@ -76,7 +76,7 @@ data.personIds; // ["ana", "budi"], in order of first appearance
 
 | Rule      | Detail                                                                                                                                         |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Responses | Integers from 0. A response not given has no record.                                                                                           |
+| Responses | Integers from 0 to 2³¹ - 1. A response not given has no record.                                                                                |
 | Ids       | `personIds` and `itemIds` default to the order of first appearance; pass them to include persons or items without records or to fix the order. |
 | Records   | Each person and item among the ids; a person has at most one record per item.                                                                  |
 

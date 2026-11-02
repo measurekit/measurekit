@@ -1,5 +1,5 @@
 import { DataError, describe } from "@measurekit/core";
-import { checkFacetedScores, type FacetedScore } from "../data/internal.js";
+import { checkFacetedScores, type FacetedScore, isResponse, MAX_RESPONSE } from "../data/internal.js";
 import type { CompressedResponses, LinearRaschModel, LocationRow } from "../irt/internal.js";
 import { type DesignInteraction, designInteraction } from "./facet-interactions.js";
 
@@ -94,8 +94,10 @@ export function facetDesign(
 
 function checkIntegerScores(scores: readonly FacetedScore[]): void {
   scores.forEach(({ score }, index) => {
-    if (!(Number.isSafeInteger(score) && score >= 0)) {
-      throw new DataError(`Score ${index + 1} needs an integer score from 0, found ${describe(score)}.`);
+    if (!isResponse(score)) {
+      throw new DataError(
+        `Score ${index + 1} needs an integer score from 0 to ${MAX_RESPONSE}, found ${describe(score)}.`,
+      );
     }
   });
 }

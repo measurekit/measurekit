@@ -109,6 +109,12 @@ describe("responseMatrix", () => {
     ["rows of unequal length", [[1, 0], [1]], {}, 'Person "person2" has 1 responses, but there are 2 item ids.'],
     ["a negative response", [[1, -1]], {}, "found -1"],
     ["a fractional response", [[0.5]], {}, "found 0.5"],
+    [
+      "a response above 2³¹ - 1, which 32-bit arrays cannot hold",
+      [[1, 2 ** 32 + 1]],
+      {},
+      'The response of person "person1" to item "item2" must be an integer from 0 to 2147483647 or null, found 4294967297.',
+    ],
     ["too few person ids", [[1], [0]], { personIds: ["a"] }, "Found 2 rows of responses and 1 person ids."],
     ["repeated item ids", [[1, 0]], { itemIds: ["q", "q"] }, 'The item id "q" appears more than once.'],
   ])("rejects %s", (_, rows, options, message) => {
@@ -119,7 +125,7 @@ describe("responseMatrix", () => {
   it("rejects NaN, infinities and values of other types", () => {
     expect(() => responseMatrix([[1, Number.NaN]])).toThrow("found NaN");
     for (const json of ["[[1, 1e999]]", '[[1, "1"]]', "[[1, true]]"]) {
-      expect(() => responseMatrix(JSON.parse(json))).toThrow("must be a non-negative integer or null");
+      expect(() => responseMatrix(JSON.parse(json))).toThrow("must be an integer from 0 to 2147483647 or null");
     }
   });
 
@@ -188,7 +194,10 @@ describe("responseRecords", () => {
       'Record 1 needs a person and an item among the ids, found person "ana" and item "q1".',
     );
     expect(() => responseRecords([{ ...record, response: -1 }])).toThrow(
-      'The response of person "ana" to item "q1" must be a non-negative integer, found -1.',
+      'The response of person "ana" to item "q1" must be an integer from 0 to 2147483647, found -1.',
+    );
+    expect(() => responseRecords([{ ...record, response: 2 ** 31 }])).toThrow(
+      'The response of person "ana" to item "q1" must be an integer from 0 to 2147483647, found 2147483648.',
     );
     expect(() => responseRecords([record, { ...record, response: 0 }])).toThrow(
       'Person "ana" has two records of item "q1"; a person answers an item once.',

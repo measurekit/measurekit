@@ -1,5 +1,6 @@
 import { checkArray, checkOptions, checkRecord, DataError, describe, isPositive, isRecord } from "@measurekit/core";
 import { indexIds } from "./ids.js";
+import { isResponse, MAX_RESPONSE } from "./response.js";
 
 /** One response in long format: a person's score on an item. */
 export interface ResponseRecord {
@@ -50,7 +51,7 @@ export interface ResponseRecordsOptions {
  * @param options - The ids of the persons and items.
  * @returns The records with the persons and items.
  * @throws `DataError` when the records are not an array, a record's person or item is not a string among the ids, a
- * response is not a non-negative integer, a time is not a positive finite number, a person has two records of one
+ * response is not an integer from 0 to 2³¹ - 1, a time is not a positive finite number, a person has two records of one
  * item, or the ids repeat.
  */
 export function responseRecords(
@@ -109,9 +110,9 @@ export function checkResponseRecords(data: ResponseRecords): IndexedRecord[][] {
       );
     }
     const { response } = record;
-    if (!(Number.isSafeInteger(response) && response >= 0)) {
+    if (!isResponse(response)) {
       throw new DataError(
-        `The response of person "${record.person}" to item "${record.item}" must be a non-negative integer, found ${describe(response)}.`,
+        `The response of person "${record.person}" to item "${record.item}" must be an integer from 0 to ${MAX_RESPONSE}, found ${describe(response)}.`,
       );
     }
     const { time } = record;

@@ -627,16 +627,19 @@ describe("manyFacetRasch", () => {
     );
   });
 
-  it("rejects scores that are not integers from 0, lack a facet, or leave a category unused", () => {
+  it("rejects scores that are not integers from 0 to 2³¹ - 1, lack a facet, or leave a category unused", () => {
     const base = simulatedScores(2, 20);
     const first = base[0];
     if (first === undefined) return;
     const options = { facets: ["item", "rater"] };
     expect(() => manyFacetRasch([...base.slice(0, 2), { ...first, score: 1.5 }], options)).toThrow(
-      "Score 3 needs an integer score from 0, found 1.5.",
+      "Score 3 needs an integer score from 0 to 2147483647, found 1.5.",
     );
     expect(() => manyFacetRasch([{ ...first, score: -1 }], options)).toThrow(
-      "Score 1 needs an integer score from 0, found -1.",
+      "Score 1 needs an integer score from 0 to 2147483647, found -1.",
+    );
+    expect(() => manyFacetRasch([...base.slice(0, 2), { ...first, score: 2 ** 32 + 1 }], options)).toThrow(
+      "Score 3 needs an integer score from 0 to 2147483647, found 4294967297.",
     );
     expect(() => manyFacetRasch([first, { levels: { person: "p1", item: "i0" }, score: 1 }], options)).toThrow(
       'Score 2 needs a string element for the facet "rater", found undefined.',
