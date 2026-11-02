@@ -513,18 +513,114 @@ const test = adaptiveTest({ ...options, pool: controlled });
 
 The test checks its stopping rule before every item, the first included, and also ends when no item is left.
 
-| Rule                                | Stops when                                              | catR                      |
-| ----------------------------------- | ------------------------------------------------------- | ------------------------- |
-| `testLength(count)`                 | `count` items have been administered                    | `length`                  |
-| `standardErrorThreshold(threshold)` | the standard error is at most `threshold`               | `precision`               |
-| `informationThreshold(threshold)`   | no eligible item has information above `threshold` at θ̂ | `minInfo`                 |
-| `allOf(...rules)`                   | every rule stops                                        |                           |
-| `anyOf(...rules)`                   | any rule stops                                          | `stop` with several rules |
+| Rule                                        | Stops when                                              | catR                      |
+| ------------------------------------------- | ------------------------------------------------------- | ------------------------- |
+| `testLength(count)`                         | `count` items have been administered                    | `length`                  |
+| `standardErrorThreshold(threshold)`         | the standard error is at most `threshold`               | `precision`               |
+| `informationThreshold(threshold)`           | no eligible item has information above `threshold` at θ̂ | `minInfo`                 |
+| `classificationThreshold(cuts, options)`    | the interval θ̂ ± z SE clears every cut                  | `classification`          |
+| `sequentialProbabilityRatio(cuts, options)` | Wald's test has decided at every cut                    | mirtCAT's SPRT            |
+| `allOf(...rules)`                           | every rule stops                                        |                           |
+| `anyOf(...rules)`                           | any rule stops                                          | `stop` with several rules |
 
 `testLength` is a maximum length alone or in `anyOf`, and a minimum length in `allOf`:
 `anyOf(testLength(30), allOf(testLength(10), standardErrorThreshold(0.3)))` gives 10 to 30 items. A custom rule
 implements `StoppingRule`: `stops(context)` with the context of [item selection](#item-selection) without `random`,
 `eligible` marking the items not administered or withheld.
+
+### Classification
+
+A test that classifies a person, as master or not, or into three levels, ends once it has decided the category. Both
+rules take cuts on theta, one for two categories and two for three, and return a `ClassificationRule`: a stopping rule
+whose `classify(context)` gives the category, from 0 below every cut to the number of cuts above every one, or `null`
+while a cut is undecided.
+
+```mermaid
+flowchart LR
+  R["Responses so far"] --> I["classificationThreshold:<br/>θ̂ ± z SE, z at the level"]
+  R --> W["sequentialProbabilityRatio:<br/>ln L(upper) - ln L(lower) at each cut"]
+  I --> D{"Every cut decided?"}
+  W --> D
+  D -->|yes| S["Stop: classify gives the category"]
+  D -->|no| N["Next item"]
+```
+
+| Rule                                        | A cut is decided when                                                                                                                          | Options, with defaults                         |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `classificationThreshold(cuts, { level })`  | the interval θ̂ ± z SE is at or above it, or at or below it; z the quantile of 1 - (1 - level) / 2                                              | `level`, `0.95`                                |
+| `sequentialProbabilityRatio(cuts, options)` | the log-likelihood ratio of its `upper` against its `lower` is above ln((1 - β) / α), deciding above, or below ln(β / (1 - α)), deciding below | `alpha`, `0.05`; `beta`, `0.05`: α + β below 1 |
+
+The interval rule reads the estimate and its standard error, so it works with any estimator; before the first response
+an estimate with a prior has a finite standard error, and a cut far from the prior's mean may be decided at once. The
+SPRT reads the likelihood of the responses alone (Eggen, 1999): each cut is an indifference region `{ lower, upper }`,
+inside which a person may fall either way, and α and β bound the rates of deciding above for a person at `lower` and
+below for one at `upper`. Cuts increase, and the SPRT's regions do not overlap. Give a minimum length with `allOf` and a
+maximum with `anyOf`, as a person near a cut may stay undecided.
+
+```ts
+import {
+  adaptiveTest,
+  allOf,
+  anyOf,
+  sequentialProbabilityRatio,
+  simulateAdaptiveTest,
+  testLength,
+} from "@measurekit/psychometrics/cat";
+import { createRandom, simulateItems, twoParameterLogistic } from "@measurekit/psychometrics";
+
+const random = createRandom(5);
+const pool = simulateItems(twoParameterLogistic, 100, random).map((item, i) => ({ id: `item${i + 1}`, ...item }));
+// Three categories, cut at -0.5 and 0.5, each told apart 0.3 on either side of its cut.
+const sprt = sequentialProbabilityRatio([
+  { lower: -0.8, upper: -0.2 },
+  { lower: 0.2, upper: 0.8 },
+]);
+const test = adaptiveTest({ pool, stopping: anyOf(testLength(40), allOf(testLength(5), sprt)) });
+const { persons } = simulateAdaptiveTest(test, [1.1, -0.1], random);
+for (const { state } of persons) {
+  const administered = state.items.map((id) => pool.findIndex((item) => item.id === id));
+  sprt.classify({ pool, administered, responses: state.responses, estimate: state.estimate });
+  // 2 after 11 items for the person at 1.1; 1, the middle, after 33 for the person at -0.1
+}
+```
+
+On 400 seeded persons at each bound of a cut 0.3 from it, with a pool of 200 2PL items and at most 60 of them, the SPRT
+at α = β = 0.05 decided wrongly for 3.0% of the persons at `lower` and 1.8% of those at `upper`, after 24 items on
+average; 10% and 11% were undecided at 60 items ([validation](validation.md#simulation)).
+
+### Recipe: stopping on the change of theta
+
+A rule that stops once the last response moved the estimate by less than a threshold computes the estimate before that
+response again, with the test's estimator:
+
+```ts
+import {
+  adaptiveTest,
+  anyOf,
+  type StoppingRule,
+  simulateAdaptiveTest,
+  testLength,
+} from "@measurekit/psychometrics/cat";
+import { createRandom, posteriorMeanEstimate, simulateItems, twoParameterLogistic } from "@measurekit/psychometrics";
+
+/** Stops once the last response moved the EAP estimate by less than `threshold`. */
+function thetaChangeBelow(threshold: number): StoppingRule {
+  return {
+    stops: ({ pool, administered, responses, estimate }) => {
+      if (administered.length < 2) return false;
+      const items = administered.slice(0, -1).flatMap((index) => pool[index] ?? []);
+      const previous = posteriorMeanEstimate(items, responses.slice(0, -1));
+      return Math.abs(estimate.theta - previous.theta) < threshold;
+    },
+  };
+}
+
+const random = createRandom(6);
+const pool = simulateItems(twoParameterLogistic, 50, random).map((item, i) => ({ id: `item${i + 1}`, ...item }));
+const test = adaptiveTest({ pool, stopping: anyOf(testLength(30), thetaChangeBelow(0.05)) });
+const [person] = simulateAdaptiveTest(test, [0.5], random).persons;
+person?.state.items.length; // 25: the 25th response moved θ̂ by less than 0.05, to 0.44
+```
 
 ### Rules for other items and estimates
 
@@ -1135,6 +1231,8 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
   lowering the bounds and the targets by the anchors' values.
 - **Routing cuts by other rules than equal information and shares of a population.** Outside the sources: optimizing the
   accuracy of classification is a variant of the two rules that are built.
+- **Stopping on the change of theta.** No fit: one line of a `StoppingRule`, the
+  [recipe](#recipe-stopping-on-the-change-of-theta).
 - **Cuts that differ with the route that led to a module.** Outside the sources: the cuts of a stage are the same for
   every route, except through the items on the scale `"number-correct"`.
 - **b-blocking.** Outside the sources: a variant of `aStratified`.
@@ -1168,6 +1266,7 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | Exposure control  | Sympson-Hetter, calibrated by `calibrateExposure`                          | `simulateRespondents(rmax)`: the restricted and item eligibility methods |
 | `minInfo`         | Over items not administered or withheld                                    | Over items not administered                                              |
 | Testlets          | [Selected as a unit](#testlets), administered together                     | None                                                                     |
+| Classification    | `classificationThreshold` stops when every cut is decided                  | `stop` with several `classification` rules stops when any one is         |
 
 ## Differences from cdcatR
 
@@ -1185,18 +1284,20 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 
 ## Differences from mirtCAT
 
-| Topic             | This package                                                             | mirtCAT                                                                                                         |
-| ----------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| D-rule            | `maximumDeterminant`: the precision of the prior is always added         | `DPrule` adds it, as this package does; `Drule` does not: every score is 0 at first                             |
-| Prior             | One `prior` for the rule and one for the estimator                       | The `latent_covariance` of the model, for both                                                                  |
-| Estimates         | `MultidimensionalEstimate`: `theta`, `standardErrors`, covariance        | A matrix of estimates by step, `thetas_history`, and `thetas_SE_history`                                        |
-| Estimators        | Posterior mode and mean, or your own function                            | MAP, EAP, ML, WLE and others, by the `method` of the design                                                     |
-| First item        | The D-rule at the prior                                                  | `start_item = 1` by default; `"DPrule"` selects as this package does                                            |
-| Other rules       | `randomesque` of any rule, and your own                                  | A-, E-, T- and W-optimality, and Kullback-Leibler rules                                                         |
-| Content, exposure | Kingsbury-Zara balancing, content bounds, enemy sets, Sympson-Hetter     | Content proportions, exclusion sets and its own exposure control                                                |
-| Content bounds    | A filter and a priority index; a greedy cover for items in several areas | A shadow test: `constr_fun` and `lp` solve an integer program at each step, which proves a blueprint infeasible |
-| Testlets          | A testlet is scored by the mean of its items; `withinTestlet`            | `ordered` and `unordered` groups: the group of the most informative item, from its first item                   |
-| Test length       | A test ends after a testlet that began; any stopping rule                | `min_SEM` ends after the group; `max_items` inside a group stops with an error                                  |
+| Topic                   | This package                                                             | mirtCAT                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| D-rule                  | `maximumDeterminant`: the precision of the prior is always added         | `DPrule` adds it, as this package does; `Drule` does not: every score is 0 at first                             |
+| Prior                   | One `prior` for the rule and one for the estimator                       | The `latent_covariance` of the model, for both                                                                  |
+| Estimates               | `MultidimensionalEstimate`: `theta`, `standardErrors`, covariance        | A matrix of estimates by step, `thetas_history`, and `thetas_SE_history`                                        |
+| Estimators              | Posterior mode and mean, or your own function                            | MAP, EAP, ML, WLE and others, by the `method` of the design                                                     |
+| First item              | The D-rule at the prior                                                  | `start_item = 1` by default; `"DPrule"` selects as this package does                                            |
+| Other rules             | `randomesque` of any rule, and your own                                  | A-, E-, T- and W-optimality, and Kullback-Leibler rules                                                         |
+| Content, exposure       | Kingsbury-Zara balancing, content bounds, enemy sets, Sympson-Hetter     | Content proportions, exclusion sets and its own exposure control                                                |
+| Content bounds          | A filter and a priority index; a greedy cover for items in several areas | A shadow test: `constr_fun` and `lp` solve an integer program at each step, which proves a blueprint infeasible |
+| Testlets                | A testlet is scored by the mean of its items; `withinTestlet`            | `ordered` and `unordered` groups: the group of the most informative item, from its first item                   |
+| Test length             | A test ends after a testlet that began; any stopping rule                | `min_SEM` ends after the group; `max_items` inside a group stops with an error                                  |
+| SPRT                    | `sequentialProbabilityRatio` decides each of several cuts                | One cut alone: with several, its `\|\|` compares a vector, which R 4.3 and later refuse                         |
+| Interval classification | A cut the interval touches is decided, as catR                           | `classify` needs \|θ̂ - cut\| / SE strictly beyond the quantile                                                  |
 
 ## Implementation
 

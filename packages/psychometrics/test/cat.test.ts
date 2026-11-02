@@ -25,6 +25,7 @@ import {
   assembleForms,
   type ContentConstraint,
   calibrateExposure,
+  classificationThreshold,
   closestDifficulty,
   contentBounds,
   contentMinimumsMet,
@@ -87,7 +88,9 @@ import {
   randomesque,
   ratingScale,
   type SelectionContext,
+  type SprtCut,
   type StoppingRule,
+  sequentialProbabilityRatio,
   shannonEntropy,
   simulateAdaptiveTest,
   simulateCdmResponses,
@@ -102,6 +105,7 @@ import {
   testLength,
   threeParameterLogistic,
   twoParameterLogistic,
+  uniformDistribution,
   untilMixed,
   type WithinTestlet,
   weightedLikelihoodEstimate,
@@ -118,6 +122,7 @@ import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
 import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
 import cutsFixture from "./fixtures/cat-multistage-cuts.json" with { type: "json" };
 import catSelection from "./fixtures/cat-selection.json" with { type: "json" };
+import catStopping from "./fixtures/cat-stopping.json" with { type: "json" };
 import catTestlets from "./fixtures/cat-testlets.json" with { type: "json" };
 import catForms from "./fixtures/form-assembly.json" with { type: "json" };
 
@@ -3292,6 +3297,171 @@ describe("stopping rules", () => {
   });
 });
 
+describe("classification stopping rules", () => {
+  /** The context of a catR run after k responses, at catR's estimate then. */
+  const contextOfRun = (name: string, k: number): AdaptiveTestContext => {
+    const run = defined(cat3pl.runs.find((candidate) => candidate.name === name));
+    const { theta, standardError } = k < run.steps.length ? defined(run.steps[k]) : run.final;
+    return contextAfter(POOL_3PL, run.steps, k, { theta, standardError: defined(standardError) });
+  };
+
+  for (const fixture of catStopping.interval) {
+    it(`match catR's checkStopRule at every cut for ${fixture.name}`, () => {
+      const rule = classificationThreshold(fixture.cuts, { level: fixture.level });
+      for (const { run, decisions } of fixture.runs) {
+        for (const { administered, stops, category } of decisions) {
+          const context = contextOfRun(run, administered);
+          expect(rule.stops(context), `${run}, ${administered} items`).toBe(stops);
+          expect(rule.classify(context), `${run}, ${administered} items`).toBe(category ?? null);
+        }
+      }
+    });
+  }
+
+  for (const fixture of catStopping.sprt) {
+    it(`match mirtCAT's SPRT written out in base R for ${fixture.name}`, () => {
+      const rule = sequentialProbabilityRatio(fixture.cuts, { alpha: fixture.alpha, beta: fixture.beta });
+      for (const { run, decisions } of fixture.runs) {
+        for (const { administered, stops, category } of decisions) {
+          const context = contextOfRun(run, administered);
+          expect(rule.stops(context), `${run}, ${administered} items`).toBe(stops);
+          expect(rule.classify(context), `${run}, ${administered} items`).toBe(category ?? null);
+        }
+      }
+    });
+  }
+
+  it("keep the SPRT's classification errors at most alpha + 0.02 on persons at the bounds of the cut", () => {
+    // Threshold from the design, set before the first run: wrong decisions at most α + 0.02 of the persons at lower,
+    // and β + 0.02 of those at upper; undecided persons at the maximum length are not wrong.
+    const random = createRandom(20261102);
+    const items = simulateItems(twoParameterLogistic, 200, random, {
+      distributions: { a: uniformDistribution(0.8, 2), b: uniformDistribution(-2, 2) },
+    });
+    const pool: PoolItem[] = items.map((item, i) => ({ id: `item${i + 1}`, ...item }));
+    const rule = sequentialProbabilityRatio([{ lower: -0.3, upper: 0.3 }]);
+    const test = adaptiveTest({ pool, stopping: anyOf(testLength(60), rule) });
+    for (const [theta, wrongCategory] of [
+      [-0.3, 1],
+      [0.3, 0],
+    ] as const) {
+      const { persons } = simulateAdaptiveTest(test, new Array(400).fill(theta), random);
+      const wrong = persons.filter(({ state }) => {
+        const administered = state.items.map((id) => poolIndex(pool, id));
+        return (
+          rule.classify({ pool, administered, responses: state.responses, estimate: state.estimate }) === wrongCategory
+        );
+      }).length;
+      expect(wrong / persons.length, `theta ${theta}`).toBeLessThanOrEqual(0.05 + 0.02);
+    }
+  });
+
+  it("decide a cut that the interval touches, and nothing on an infinite standard error", () => {
+    const rule = classificationThreshold([0, 1]);
+    expect(rule.classify(contextOf(POOL_3PL, 2, { theta: 0, standardError: 0 }))).toBe(1);
+    expect(rule.classify(contextOf(POOL_3PL, 2, { theta: 1, standardError: 0 }))).toBe(2);
+    expect(rule.classify(contextOf(POOL_3PL, 2, { theta: -0.5, standardError: 0.25 }))).toBe(0);
+    expect(rule.classify(contextOf(POOL_3PL, 2, { theta: 0.5, standardError: 0.2 }))).toBe(1);
+    expect(rule.classify(contextOf(POOL_3PL, 2, { theta: 0.5, standardError: 0.3 }))).toBeNull();
+    const infinite = { theta: 6, standardError: Number.POSITIVE_INFINITY };
+    expect(rule.stops(contextOf(POOL_3PL, 1, infinite))).toBe(false);
+  });
+
+  it("leave every cut of the SPRT undecided before the first response", () => {
+    const rule = sequentialProbabilityRatio([
+      { lower: -1, upper: -0.5 },
+      { lower: 0.5, upper: 1 },
+    ]);
+    const context = contextOf(POOL_3PL, 0, { theta: 0, standardError: 1 });
+    expect(rule.classify(context)).toBeNull();
+    expect(rule.stops(context)).toBe(false);
+  });
+
+  it("decide a cut of the SPRT from the likelihood alone, whatever the estimate", () => {
+    const rule = sequentialProbabilityRatio([{ lower: -0.5, upper: 0.5 }]);
+    const context = contextOf(POOL_3PL, 30, { theta: 0, standardError: 1 });
+    expect(rule.classify(context)).toBe(1);
+    expect(rule.classify({ ...context, estimate: { theta: -3, standardError: 0.1 } })).toBe(1);
+  });
+
+  it("reject cuts that do not increase, and invalid levels and rates", () => {
+    expect(() => classificationThreshold([])).toThrow("A classification needs at least one cut.");
+    expect(() => classificationThreshold([1, 0])).toThrow(
+      "The cuts must increase without overlapping, but cut 2 is not above cut 1.",
+    );
+    expect(() => classificationThreshold([0, 0])).toThrow(DataError);
+    expect(() => classificationThreshold([0], { level: 1 })).toThrow(
+      "The option level must be a number between 0 and 1, exclusive, found 1.",
+    );
+    const cut: SprtCut = { lower: -0.5, upper: 0.5 };
+    expect(() => sequentialProbabilityRatio([{ lower: 0.5, upper: 0.5 }])).toThrow(
+      "Cut 1 needs its lower bound below its upper, found 0.5 and 0.5.",
+    );
+    expect(() =>
+      sequentialProbabilityRatio([
+        { lower: -1, upper: 0.2 },
+        { lower: 0, upper: 1 },
+      ]),
+    ).toThrow("The cuts must increase without overlapping, but cut 2 is not above cut 1.");
+    expect(() => sequentialProbabilityRatio([cut], { alpha: 0 })).toThrow(
+      "The option alpha must be a number between 0 and 1, exclusive, found 0.",
+    );
+    expect(() => sequentialProbabilityRatio([cut], { alpha: 0.6, beta: 0.4 })).toThrow(
+      "The options alpha and beta need a sum below 1, found 0.6 and 0.4.",
+    );
+  });
+
+  it("refuse arguments of other types", () => {
+    expect(() => classificationThreshold(JSON.parse("null"))).toThrow("The cuts must be an array, found null.");
+    expect(() => classificationThreshold(JSON.parse('["0"]'))).toThrow('Cut 1 must be a finite number, found "0".');
+    expect(() => classificationThreshold([0], JSON.parse("null"))).toThrow(DataError);
+    expect(() => classificationThreshold([0], JSON.parse('{ "level": "0.9" }'))).toThrow(
+      'The option level must be a number between 0 and 1, exclusive, found "0.9".',
+    );
+    expect(() => sequentialProbabilityRatio(JSON.parse("[0]"))).toThrow(
+      "Cut 1 must be an object { lower, upper }, found 0.",
+    );
+    expect(() => sequentialProbabilityRatio(JSON.parse('[{ "lower": null, "upper": 1 }]'))).toThrow(
+      "The lower bound of cut 1 must be a finite number, found null.",
+    );
+    expect(() => sequentialProbabilityRatio(JSON.parse("{}"))).toThrow("The cuts must be an array, found an object.");
+    expect(() => sequentialProbabilityRatio([{ lower: 0, upper: 1 }], JSON.parse('{ "beta": null }'))).toThrow(
+      "The option beta must be a number between 0 and 1, exclusive, found null.",
+    );
+  });
+});
+
+describe("the recipe for stopping on the change of theta", () => {
+  /** The recipe of cat.md: stops once the last response moved the EAP estimate by less than `threshold`. */
+  function thetaChangeBelow(threshold: number): StoppingRule {
+    return {
+      stops: ({ pool, administered, responses, estimate }) => {
+        if (administered.length < 2) return false;
+        const items = administered.slice(0, -1).flatMap((index) => pool[index] ?? []);
+        const previous = posteriorMeanEstimate(items, responses.slice(0, -1));
+        return Math.abs(estimate.theta - previous.theta) < threshold;
+      },
+    };
+  }
+
+  it("stops when the last response moves the estimate by less than the threshold", () => {
+    const run = defined(cat3pl.runs.find((candidate) => candidate.name === "MFI with EAP until mixed, then ML"));
+    const rule = thetaChangeBelow(0.1);
+    let stopped = 0;
+    for (let k = 1; k <= 14; k++) {
+      const items = run.steps.slice(0, k).map((step) => defined(POOL_3PL[poolIndex(POOL_3PL, step.nextItem)]));
+      const responses = run.steps.slice(0, k).map((step) => step.response);
+      const estimate = posteriorMeanEstimate(items, responses);
+      const before = posteriorMeanEstimate(items.slice(0, -1), responses.slice(0, -1));
+      const stops = rule.stops(contextAfter(POOL_3PL, run.steps, k, estimate));
+      expect(stops, `${k} items`).toBe(k >= 2 && Math.abs(estimate.theta - before.theta) < 0.1);
+      if (stops) stopped++;
+    }
+    expect(stopped).toBeGreaterThan(0);
+    expect(stopped).toBeLessThan(14);
+  });
+});
+
 describe("Sympson-Hetter exposure control", () => {
   it("administers the item every test selects first at the rate of its exposure parameter", () => {
     // At θ = 0, where every test starts, "best" is by far the most informative item.
@@ -4953,6 +5123,58 @@ describe("properties", () => {
     const given = counts(state.items.map((id) => defined(pool.find((item) => item.id === id))));
     return { constraints, state, given };
   }
+
+  it("the SPRT with alpha equal to beta decides the mirror image of mirrored items, responses and cuts", () => {
+    const twoPl = fc.record({
+      a: fc.double({ min: 0.3, max: 2.5, noNaN: true }),
+      b: fc.double({ min: -3, max: 3, noNaN: true }),
+    });
+    const cuts = fc
+      .uniqueArray(fc.double({ min: -2, max: 2, noNaN: true }), {
+        minLength: 2,
+        maxLength: 4,
+        comparator: "SameValueZero",
+      })
+      .map((bounds) => {
+        const sorted = [...bounds].sort((x, y) => x - y);
+        return Array.from({ length: Math.floor(sorted.length / 2) }, (_, i) => ({
+          lower: defined(sorted[2 * i]),
+          upper: defined(sorted[2 * i + 1]),
+        }));
+      });
+    fc.assert(
+      fc.property(
+        fc.array(fc.tuple(twoPl, fc.integer({ min: 0, max: 1 })), { minLength: 1, maxLength: 30 }),
+        cuts,
+        fc.double({ min: 0.001, max: 0.49, noNaN: true }),
+        (answers, regions, rate) => {
+          const pool = (sign: number): PoolItem[] =>
+            answers.map(([{ a, b }], i) => ({
+              id: `item${i}`,
+              model: twoParameterLogistic,
+              parameters: { a, b: sign * b, c: 0, d: 1 },
+            }));
+          const administered = answers.map((_, i) => i);
+          const estimate = { theta: 0, standardError: 1 };
+          const options = { alpha: rate, beta: rate };
+          const category = sequentialProbabilityRatio(regions, options).classify({
+            pool: pool(1),
+            administered,
+            responses: answers.map(([, response]) => response),
+            estimate,
+          });
+          const mirrored = regions.map(({ lower, upper }) => ({ lower: -upper, upper: -lower })).reverse();
+          const mirror = sequentialProbabilityRatio(mirrored, options).classify({
+            pool: pool(-1),
+            administered,
+            responses: answers.map(([, response]) => 1 - response),
+            estimate,
+          });
+          expect(mirror).toBe(category === null ? null : regions.length - category);
+        },
+      ),
+    );
+  });
 
   it("tests never give more items than the length or more of an area than its maximum", () => {
     fc.assert(

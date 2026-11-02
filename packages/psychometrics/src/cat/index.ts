@@ -1,6 +1,7 @@
 /**
  * Adaptive and multistage testing: adaptive test sessions with item selection rules, starting items, content balancing, enemy sets,
- * testlets, Sympson-Hetter exposure control and its calibration, and stopping rules; adaptive tests of cognitive diagnosis and of
+ * testlets, Sympson-Hetter exposure control and its calibration, and stopping rules, classification by confidence
+ * interval and by the sequential probability ratio test among them; adaptive tests of cognitive diagnosis and of
  * multidimensional items; multistage panels with routing and the derivation of their cuts; simulation of all of them; and the assembly of fixed forms.
  *
  * @module @measurekit/psychometrics/cat
@@ -8,6 +9,15 @@
 export { aStratified } from "./a-stratified.js";
 export { type AdaptiveTest, type AdaptiveTestOptions, type AdaptiveTestState, adaptiveTest } from "./adaptive-test.js";
 export { contentBounds } from "./bounds.js";
+export {
+  type ClassificationContext,
+  type ClassificationOptions,
+  type ClassificationRule,
+  classificationThreshold,
+  type SprtCut,
+  type SprtOptions,
+  sequentialProbabilityRatio,
+} from "./classification-stopping.js";
 export { closestDifficulty } from "./closest-difficulty.js";
 export type { ContentConstraint } from "./content-constraints.js";
 export type {

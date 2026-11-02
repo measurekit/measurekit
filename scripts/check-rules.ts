@@ -196,6 +196,22 @@ export const RULES: readonly Rule[] = [
     titles: "leaves out a missing response and ranks no person without any",
   },
   {
+    rule: "Classification cuts increase without overlapping, so that a category counts the cuts below the estimate.",
+    file: "packages/psychometrics/src/cat/classification-stopping.ts",
+    find: "if (previous !== undefined && !(current[0] >= previous[1] && current[1] > previous[1])) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/cat.test.ts",
+    titles: "reject cuts that do not increase, and invalid levels and rates",
+  },
+  {
+    rule: "The SPRT's error rates sum below 1, so that its lower bound is below 0 and its upper above, and no test is decided before a response.",
+    file: "packages/psychometrics/src/cat/classification-stopping.ts",
+    find: "if (!(alpha + beta < 1)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/cat.test.ts",
+    titles: "reject cuts that do not increase, and invalid levels and rates",
+  },
+  {
     rule: "A limited-information statistic stops at 60 items, before the moments, whose matrix grows with their fourth power.",
     file: "packages/psychometrics/src/fit/limited-information.ts",
     find: "if (items.length > MAX_MOMENT_ITEMS) {",

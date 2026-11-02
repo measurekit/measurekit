@@ -27,6 +27,7 @@ Rscript validation/psychometrics/exploratory-factors.R # minres factors, rotatio
 Rscript validation/psychometrics/efa-fit.R           # maximum likelihood factors and the fit of factors: psych's fa and fa.stats, base R
 Rscript validation/psychometrics/factor-hierarchy.R  # Schmid-Leiman and omega hierarchical: psych's schmid and omega, base R
 Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic: cdcatR; multidimensional: mirtCAT; testlets: base R and mirtCAT
+Rscript validation/psychometrics/cat-stopping.R      # classification stopping: catR's checkStopRule per cut; mirtCAT's SPRT in base R, checked against mirtCAT on one cut; reads cat-3pl.json
 Rscript validation/psychometrics/cat-bounds.R        # content bounds: base R replays; the shadow test of mirtCAT with lpSolve, in two processes, about 4 minutes
 Rscript validation/psychometrics/cat-selection.R     # the other selection rules and starting items: catR and base R on the banks of cat.R, about 4 minutes
 Rscript validation/psychometrics/form-assembly.R     # assembly of forms: base R replays; highs on 85 blueprints, about 4 minutes
