@@ -300,6 +300,14 @@ export const RULES: readonly Rule[] = [
     titles: "gives no count to a person with a missing response",
   },
   {
+    rule: "Two-way imputation refuses a person without responses, whose mean would make every imputed response NaN.",
+    file: "packages/psychometrics/src/mokken/two-way-imputation.ts",
+    find: "if (answered === 0) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/mokken.test.ts",
+    titles: "rejects a person or an item without responses",
+  },
+  {
     rule: "The groups of a rest score are at most as many persons as answered every item, so that no group is read beyond them.",
     file: "packages/psychometrics/src/mokken/conditional-association.ts",
     find: "if (minimumSize > data.persons) {",
@@ -322,6 +330,14 @@ export const RULES: readonly Rule[] = [
     replace: "",
     test: "packages/psychometrics/test/dimensionality.test.ts",
     titles: "rejects solutions of fewer than three factors",
+  },
+  {
+    rule: "A norm sample takes finite scores alone, and a score of another type is refused.",
+    file: "packages/psychometrics/src/scaling/norm-statistics.ts",
+    find: "checkFinite(score, ",
+    replace: "void (score, ",
+    test: "packages/psychometrics/test/scaling.test.ts",
+    titles: "rejects fewer than two scores",
   },
   {
     rule: "A component that leaves an item no variance ends the test, and gives no NaN.",

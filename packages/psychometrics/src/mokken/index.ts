@@ -1,7 +1,7 @@
 /**
- * Mokken scale analysis: scalability coefficients with standard errors, automated item selection into scales, Guttman
- * errors of persons, conditional association of items, checks of monotonicity and invariant item ordering, and the
- * reliability of the total score.
+ * Mokken scale analysis: two-way imputation of missing responses, Guttman errors of persons, scalability coefficients
+ * with standard errors, automated item selection into scales, conditional association of items, checks of monotonicity
+ * and invariant item ordering, and the reliability of the total score.
  *
  * @module @measurekit/psychometrics/mokken
  */
@@ -27,3 +27,4 @@ export {
   type ScalabilityCoefficient,
   scalability,
 } from "./scalability.js";
+export { type TwoWayImputationOptions, twoWayImputation } from "./two-way-imputation.js";

@@ -1,34 +1,74 @@
 # Mokken scale analysis
 
 `@measurekit/psychometrics/mokken` analyses a set of items with nonparametric item response theory, without a model of
-the items' curves: it finds persons whose responses contradict the order of the items, measures how well items scale
+the items' curves: it imputes missing responses, finds persons whose responses contradict the order of the items, measures how well items scale
 together, selects items into scales, checks the local independence of the items and the two assumptions that make the
 total score a good measure. It suits questionnaires and attitude scales, and screens achievement items for response
-curves that fall with ability. The Guttman errors, the coefficients and their standard errors, the item selection, the
+curves that fall with ability. The imputation, the Guttman errors, the coefficients and their standard errors, the item selection, the
 conditional association, the monotonicity check, the invariant item ordering check and the reliability of the total
 score are validated against the mokken package ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
-  E["guttmanErrors: outlying persons"] --> H["scalability, automatedItemSelection: scales"]
+  I["twoWayImputation: missing responses"] --> E["guttmanErrors: outlying persons"]
+  E --> H["scalability, automatedItemSelection: scales"]
   H --> C["conditionalAssociation: local independence"]
   C --> M["monotonicity, invariantItemOrdering"]
   M --> R["molenaarSijtsmaReliability"]
+  R --> N["normStatistics of scaling: norms"]
 ```
+
+The steps follow Sijtsma and van der Ark's (2017) ten, whose ninth, norms of the total score, is
+[`normStatistics`](scaling.md#norms) of the scaling module.
 
 Items may be dichotomous or polytomous: scores are integers, and the lowest score of all items is taken as 0, so scores
 from 1 to 5 work as scores from 0 to 4. Scores may span at most 10 categories, as in mokken. Every function uses the
 persons who answered every item, and needs at least two of them. The functions take a `ResponseMatrix`.
 
-| Function                                  | Result                                                                |
-| ----------------------------------------- | --------------------------------------------------------------------- |
-| `guttmanErrors(matrix)`                   | G+ of each person, Tukey's upper fence, and the persons above it      |
-| `scalability(matrix)`                     | H, H_i and H_ij with standard errors                                  |
-| `automatedItemSelection(matrix, options)` | Scales of items, and the items in none                                |
-| `conditionalAssociation(matrix, options)` | The indices W1, W2 and W3, and the items and pairs they flag          |
-| `monotonicity(matrix, options)`           | Violations of monotone response curves, by item                       |
-| `invariantItemOrdering(matrix, options)`  | Violations of the order of items, by item, the items removed, and H^T |
-| `molenaarSijtsmaReliability(matrix)`      | The reliability of the total score, MS                                |
+| Function                                    | Result                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------- |
+| `twoWayImputation(matrix, random, options)` | A copy of the matrix with each missing response imputed               |
+| `guttmanErrors(matrix)`                     | G+ of each person, Tukey's upper fence, and the persons above it      |
+| `scalability(matrix)`                       | H, H_i and H_ij with standard errors                                  |
+| `automatedItemSelection(matrix, options)`   | Scales of items, and the items in none                                |
+| `conditionalAssociation(matrix, options)`   | The indices W1, W2 and W3, and the items and pairs they flag          |
+| `monotonicity(matrix, options)`             | Violations of monotone response curves, by item                       |
+| `invariantItemOrdering(matrix, options)`    | Violations of the order of items, by item, the items removed, and H^T |
+| `molenaarSijtsmaReliability(matrix)`        | The reliability of the total score, MS                                |
+
+## Missing responses
+
+Every other function of the module uses the persons who answered every item. `twoWayImputation(matrix, random,
+options)` fills the missing responses instead, step 2 of the analysis, by van Ginkel, van der Ark and Sijtsma's two-way
+imputation with a random error, as mokken's `twoway`:
+
+1. A missing response of person i to item j takes TW = PM_i + IM_j - OM, the person's mean response plus the item's
+   less the mean of all observed responses.
+2. A normal error is added, of variance the sample variance of the observed responses less their TW.
+3. The value is rounded, a half to the even integer as R's `round`, and kept from `minimum` to `maximum`.
+
+| Option    | Default                            | Meaning                                                             |
+| --------- | ---------------------------------- | ------------------------------------------------------------------- |
+| `minimum` | The lowest response of the matrix  | The lowest imputed score, an integer at most the lowest response    |
+| `maximum` | The highest response of the matrix | The highest imputed score, an integer at least the highest response |
+
+```ts
+import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { twoWayImputation } from "@measurekit/psychometrics/mokken";
+
+const matrix = responseMatrix([
+  [3, 4, null, 4],
+  [1, 2, 1, null],
+  [2, 3, 2, 3],
+  [null, 1, 0, 1],
+]);
+twoWayImputation(matrix, createRandom(1)).responses; // [[3, 4, 3, 4], [1, 2, 1, 2], [2, 3, 2, 3], [1, 1, 0, 1]]
+twoWayImputation(matrix, createRandom(2)).responses[3]; // [0, 1, 0, 1]: another draw of the error
+```
+
+The result is a new matrix with the same ids and times; a matrix without missing responses comes back as a copy. Each
+call draws one completion: for multiple imputation, impute several times with one generator and run the analysis on
+each. A person or an item without any response throws `DataError`.
 
 ## Guttman errors
 
@@ -405,8 +445,6 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
 - **The O+ outlier score.** Outside the sources: the tutorial uses G+.
 - **Two-level scalability for clustered persons, such as raters.** Outside the sources: a multilevel option of mokken
   (`MLcoefH`).
-- **The imputation of missing responses.** Outside the sources: an option of mokken, beside the pairwise treatment that
-  is built.
 
 ## Errors
 
@@ -423,18 +461,21 @@ Invalid input throws `DataError` naming the value found.
 
 ## Differences from the references
 
-| Topic                                   | This package                                                                 | mokken                                                                                                                                                                                                                                         |
-| --------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Missing responses                       | The persons who answered every item are used                                 | Stops at a missing response; the references run on the complete cases                                                                                                                                                                          |
-| Items without variance                  | `null` coefficients; unscalable; left out of the other coefficients          | `coefH` and `aisp` stop                                                                                                                                                                                                                        |
-| Lower bound above every H_ij            | All items unscalable                                                         | `aisp` stops                                                                                                                                                                                                                                   |
-| Critical z of the monotonicity check    | The quantile of the standard normal distribution for `alpha`                 | The constant 1.6449; the check has no level                                                                                                                                                                                                    |
-| H_i in the criterion of the order check | Not rounded                                                                  | Rounded to three decimals by `summary`, which can change the criterion by 1                                                                                                                                                                    |
-| z of an item without violations         | `null`                                                                       | 0                                                                                                                                                                                                                                              |
-| Ties in the item selection of the order | The candidate that leaves the larger H, else the first in the order of means | The larger H plus random noise of SD 1e-5                                                                                                                                                                                                      |
-| Groups with equal paired differences    | Significant, without a statistic                                             | `t.test` stops                                                                                                                                                                                                                                 |
-| Order of the results                    | The order of the matrix's items                                              | `check.iio` lists items from the highest mean to the lowest                                                                                                                                                                                    |
-| Item steps passed by equal numbers      | Tied exactly, by their counts                                                | Tied when the proportions from `mean()` agree to the last bit, which depends on the order of the persons; the references run mokken's own code with exact proportions, and differ from `check.reliability` by up to 0.021 where it splits ties |
-| G+ of tied item steps                   | The mean over the orders of the tied steps, a multiple of 1/2                | `check.errors` takes the mean over 1,000 random orders, rounded to an integer: up to 1/2 away                                                                                                                                                  |
-| The steps of `check.ca`                 | One pass; the caller removes an item and calls again                         | Removes items until nothing is flagged, breaking the last ties at random                                                                                                                                                                       |
-| Conditional association of three items  | Computed: each pair's rest score is the third item                           | `check.ca` stops, as `apply` needs at least two rest items                                                                                                                                                                                     |
+| Topic                                   | This package                                                                   | mokken                                                                                                                                                                                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing responses                       | The persons who answered every item are used, or `twoWayImputation` fills them | Stops at a missing response; the references run on the complete cases                                                                                                                                                                          |
+| Items without variance                  | `null` coefficients; unscalable; left out of the other coefficients            | `coefH` and `aisp` stop                                                                                                                                                                                                                        |
+| Lower bound above every H_ij            | All items unscalable                                                           | `aisp` stops                                                                                                                                                                                                                                   |
+| Critical z of the monotonicity check    | The quantile of the standard normal distribution for `alpha`                   | The constant 1.6449; the check has no level                                                                                                                                                                                                    |
+| H_i in the criterion of the order check | Not rounded                                                                    | Rounded to three decimals by `summary`, which can change the criterion by 1                                                                                                                                                                    |
+| z of an item without violations         | `null`                                                                         | 0                                                                                                                                                                                                                                              |
+| Ties in the item selection of the order | The candidate that leaves the larger H, else the first in the order of means   | The larger H plus random noise of SD 1e-5                                                                                                                                                                                                      |
+| Groups with equal paired differences    | Significant, without a statistic                                               | `t.test` stops                                                                                                                                                                                                                                 |
+| Order of the results                    | The order of the matrix's items                                                | `check.iio` lists items from the highest mean to the lowest                                                                                                                                                                                    |
+| Item steps passed by equal numbers      | Tied exactly, by their counts                                                  | Tied when the proportions from `mean()` agree to the last bit, which depends on the order of the persons; the references run mokken's own code with exact proportions, and differ from `check.reliability` by up to 0.021 where it splits ties |
+| Error of the two-way imputation         | Normal, of the residuals' variance                                             | `twoway` passes the variance to `rnorm` as the standard deviation                                                                                                                                                                              |
+| A matrix without missing responses      | A copy                                                                         | `twoway` warns and returns it                                                                                                                                                                                                                  |
+| A person or an item without responses   | Throws                                                                         | `twoway` stops                                                                                                                                                                                                                                 |
+| G+ of tied item steps                   | The mean over the orders of the tied steps, a multiple of 1/2                  | `check.errors` takes the mean over 1,000 random orders, rounded to an integer: up to 1/2 away                                                                                                                                                  |
+| The steps of `check.ca`                 | One pass; the caller removes an item and calls again                           | Removes items until nothing is flagged, breaking the last ties at random                                                                                                                                                                       |
+| Conditional association of three items  | Computed: each pair's rest score is the third item                             | `check.ca` stops, as `apply` needs at least two rest items                                                                                                                                                                                     |

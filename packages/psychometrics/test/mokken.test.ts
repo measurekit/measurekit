@@ -1,3 +1,4 @@
+import { createRandom, type Random } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -12,9 +13,11 @@ import {
   type ResponseMatrix,
   responseMatrix,
   scalability,
+  twoWayImputation,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/mokken.json" with { type: "json" };
+import imputation from "./fixtures/mokken-imputation.json" with { type: "json" };
 import reliability from "./fixtures/mokken-reliability.json" with { type: "json" };
 import steps from "./fixtures/mokken-steps.json" with { type: "json" };
 
@@ -33,6 +36,8 @@ const SPLIT_TIES_GAP = 0.03;
 const STUDY_BIAS = 0.03;
 /** The indices of conditional association against check.ca: sums of normal probabilities of the same correlations. */
 const ASSOCIATION_TOLERANCE = 1e-10;
+/** The mean over items of the imputed data's item variance less the complete data's, at 10% missing. */
+const IMPUTED_VARIANCE_TOLERANCE = 0.02;
 /** G+ against check.errors where steps tie, as it rounds a mean over 1,000 random orders of them. */
 const RANDOM_ORDER_GAP = 0.5;
 
@@ -127,6 +132,130 @@ function guttman(items: number, personsPerScore: number): number[][] {
     return Array.from({ length: items }, (__, item) => (item < passed ? 1 : 0));
   });
 }
+
+describe("twoWayImputation", () => {
+  /** A generator whose normal draws are all `value`, so that the imputation's error is `value` standard deviations. */
+  const constant = (value: number): Random => ({ uniform: () => 0.5, normal: () => value });
+
+  for (const reference of imputation.cases) {
+    const options = {
+      ...(reference.minimum === null ? {} : { minimum: reference.minimum }),
+      ...(reference.maximum === null ? {} : { maximum: reference.maximum }),
+    };
+    const matrix = responseMatrix(reference.responses);
+
+    it(`imputes as twoway without its error term on ${reference.name}`, () => {
+      expect(twoWayImputation(matrix, constant(0), options).responses).toEqual(reference.imputed);
+    });
+
+    it(`adds an error of the residuals' standard deviation, not their variance, on ${reference.name}`, () => {
+      // One standard deviation, √v, above the two-way value of each missing cell, rounded and bounded.
+      const deviation = Math.sqrt(reference.residualVariance);
+      const low = reference.minimum ?? Math.min(...reference.responses.flat().filter((value) => value !== null));
+      const high = reference.maximum ?? Math.max(...reference.responses.flat().filter((value) => value !== null));
+      const imputed = twoWayImputation(matrix, constant(1), options).responses;
+      reference.responses.forEach((row, person) => {
+        row.forEach((response, item) => {
+          const twoWay = defined(reference.twoWay[person]?.[item]);
+          const expected = response ?? Math.min(high, Math.max(low, Math.round(twoWay + deviation)));
+          expect(imputed[person]?.[item], `${person + 1}, ${item + 1}`).toBe(expected);
+        });
+      });
+    });
+  }
+
+  it("keeps the variance of the items within 0.02 on average when 10% of the responses are missing", () => {
+    const reference = defined(imputation.cases.find(({ name }) => name === "acl, ten adjectives, 10% missing"));
+    const varianceOf = (values: readonly number[]) => {
+      const center = values.reduce((sum, value) => sum + value, 0) / values.length;
+      return values.reduce((sum, value) => sum + (value - center) ** 2, 0) / (values.length - 1);
+    };
+    const itemVariances = (rows: readonly (readonly (number | null)[])[]) =>
+      defined(rows[0]).map((_, item) => varianceOf(rows.map((row) => defined(row[item]))));
+    const complete = itemVariances(imputation.complete);
+    const random = createRandom(20261102);
+    const gaps = Array.from({ length: 20 }, () => {
+      const imputed = itemVariances(twoWayImputation(responseMatrix(reference.responses), random).responses);
+      return imputed.reduce((sum, value, item) => sum + value - defined(complete[item]), 0) / imputed.length;
+    });
+    expect(Math.abs(gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length)).toBeLessThan(IMPUTED_VARIANCE_TOLERANCE);
+  });
+
+  it("rounds a two-way value of a half to the even integer, as R does", () => {
+    const reference = defined(imputation.cases.find(({ name }) => name === "a two-way value of a half"));
+    expect(reference.twoWay[0]?.[2]).toBe(2.5);
+    expect(twoWayImputation(responseMatrix(reference.responses), constant(0)).responses[0]?.[2]).toBe(2);
+  });
+
+  it("keeps the responses, the ids and the times, and returns a copy of a matrix without missing responses", () => {
+    const matrix = responseMatrix(
+      [
+        [1, null, 2],
+        [0, 1, 1],
+        [2, 2, null],
+      ],
+      {
+        personIds: ["a", "b", "c"],
+        itemIds: ["x", "y", "z"],
+        times: [
+          [3, null, 4],
+          [5, 6, 7],
+          [8, 9, null],
+        ],
+      },
+    );
+    const imputed = twoWayImputation(matrix, createRandom(1));
+    expect(imputed.personIds).toEqual(["a", "b", "c"]);
+    expect(imputed.itemIds).toEqual(["x", "y", "z"]);
+    expect(imputed.times).toEqual(matrix.times);
+    expect(imputed.responses.flat().every((value) => value !== null)).toBe(true);
+    const complete = responseMatrix([
+      [1, 0],
+      [0, 1],
+    ]);
+    const copy = twoWayImputation(complete, createRandom(1));
+    expect(copy).toEqual(complete);
+    expect(copy.responses).not.toBe(complete.responses);
+  });
+
+  it("rejects a person or an item without responses, bounds inside the responses and arguments of other types", () => {
+    const matrix = responseMatrix([
+      [1, null],
+      [0, 1],
+      [2, 2],
+    ]);
+    expect(() =>
+      twoWayImputation(
+        responseMatrix([
+          [1, 0],
+          [null, null],
+        ]),
+        createRandom(1),
+      ),
+    ).toThrow('Two-way imputation needs a response of every person; "person2" has none.');
+    expect(() =>
+      twoWayImputation(
+        responseMatrix([
+          [1, null],
+          [0, null],
+        ]),
+        createRandom(1),
+      ),
+    ).toThrow('Two-way imputation needs a response to every item; "item2" has none.');
+    expect(() => twoWayImputation(matrix, createRandom(1), { minimum: 1 })).toThrow(
+      "The option minimum must be at most the lowest response, 0, found 1.",
+    );
+    expect(() => twoWayImputation(matrix, createRandom(1), { maximum: 1 })).toThrow(
+      "The option maximum must be at least the highest response, 2, found 1.",
+    );
+    expect(() => twoWayImputation(matrix, createRandom(1), { minimum: 0.5 })).toThrow("The option minimum");
+    expect(() => twoWayImputation(matrix, createRandom(1), JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => twoWayImputation(matrix, JSON.parse("{}"))).toThrow("A random number generator must be one");
+    expect(() => twoWayImputation(JSON.parse("null"), createRandom(1))).toThrow(DataError);
+  });
+});
 
 describe("guttmanErrors", () => {
   for (const reference of steps.errors) {
@@ -855,6 +984,31 @@ describe("properties", () => {
       }),
     )
     .filter((rows) => (rows[0] ?? []).every((_, item) => new Set(rows.map((row) => row[item])).size === 2));
+
+  it("imputation leaves the observed responses as they are and imputes within the bounds", () => {
+    const withMissing = matrix.chain((rows) =>
+      fc
+        .array(fc.boolean(), { minLength: rows.length, maxLength: rows.length })
+        .map((drops) =>
+          rows.map((row, person) =>
+            row.map((value, item) => (drops[person] && item === person % row.length ? null : value)),
+          ),
+        ),
+    );
+    fc.assert(
+      fc.property(withMissing, fc.integer({ min: 0, max: 1000 }), (rows, seed) => {
+        const imputed = twoWayImputation(responseMatrix(rows), createRandom(seed)).responses;
+        rows.forEach((row, person) => {
+          row.forEach((value, item) => {
+            const result = defined(imputed[person]?.[item]);
+            if (value !== null) expect(result).toBe(value);
+            else expect(result === 0 || result === 1).toBe(true);
+          });
+        });
+      }),
+      { numRuns: 30 },
+    );
+  });
 
   it("G+ is 0 for every person of a perfect Guttman scale, and is a multiple of 1/2", () => {
     expect(guttmanErrors(responseMatrix(guttman(5, 3))).errors.every((count) => count === 0)).toBe(true);

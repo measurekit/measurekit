@@ -3,8 +3,8 @@
 `@measurekit/psychometrics/scaling` turns theta and total scores into the scores a test reports, and predicts the
 score a person will be reported on an official form. It covers a linear scale with rounding and bounds, conversion
 tables from total scores to scale scores, the conditional standard error of measurement of scale scores, the scale
-scores of equated scores, percentile ranks in a norm sample, predictions from a posterior of theta, and joint draws of
-theta from separate posteriors. Every function is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
+scores of equated scores, percentile ranks and norms with their standard errors in a norm sample, predictions from a
+posterior of theta, and joint draws of theta from separate posteriors. Every function is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
 has [its own guide](vertical-scaling.md).
 
 ## Scales
@@ -132,6 +132,39 @@ percentileRanks(sample, [480, 500, 600, 800]); // [20, 30, 65, 100]
 The sample is sorted once and each rank found by binary search, so n scores and m ranks take O((n + m) log n). It needs
 at least one finite score, and the ranks are on the sample's own scale: norms of scale scores take a sample of scale
 scores and, as `scores`, a table's.
+
+`normStatistics(scores, options)` gives the norms of a sample with the standard errors that a norm sample's size
+leaves, as mokken's `check.norms` (Oosterhuis, van der Ark and Sijtsma, 2016), step 9 of a
+[Mokken scale analysis](mokken.md). Each is an `EstimateInterval`: `estimate`, `standardError`, `lower` and `upper`.
+
+| Field      | Estimate                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `mean`     | The mean of the scores                                                                                                          |
+| `sd`       | Their standard deviation, with denominator n - 1                                                                                |
+| `scores`   | For each distinct score from the lowest: `score`, its `z`, (score - mean) / SD, and its `percentile` rank, as `percentileRanks` |
+| `stanines` | The eight boundaries of the stanines, mean + c SD for c from -1.75 to 1.75 by 0.5                                               |
+
+| Option  | Default | Meaning                                                                              |
+| ------- | ------- | ------------------------------------------------------------------------------------ |
+| `level` | `0.95`  | The level of the intervals, above 0 and below 1: estimate ± its normal quantile × SE |
+
+The standard errors are the delta method over the numbers of persons with each score, taken as multinomial: for a
+statistic f of the counts n_k, Var f = Σ n_k (∂f/∂n_k)² - (Σ n_k ∂f/∂n_k)² / N. The mean's is the SD with
+denominator N over √N.
+
+```ts continues
+import { normStatistics } from "@measurekit/psychometrics/scaling";
+
+const norms = normStatistics(sample);
+norms.mean; // { estimate: 560, standardError: 27.166, lower: 506.755, upper: 613.245 }
+norms.sd.estimate; // 90.554, with a standard error of 15.719
+norms.scores[1]?.z; // { estimate: -0.883, standardError: 0.314, lower: -1.499, upper: -0.267 }: of the score 480
+norms.scores[1]?.percentile; // { estimate: 20, standardError: 10.488, lower: -0.556, upper: 40.556 }
+norms.stanines.map(({ estimate }) => estimate); // [401.531, 446.808, 492.085, 537.362, 582.638, 627.915, 673.192, 718.469]
+```
+
+The scores are finite numbers, at least two and not all equal. A sample of ten gives wide intervals: the percentile of
+480 above runs from -0.6 to 40.6, which is why norms need large samples.
 
 ## Predicting an official score
 
@@ -322,14 +355,16 @@ plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes tak
 
 ## Differences from the references
 
-| Topic                    | This package                                                    | Reference                                                                 |
-| ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Rounding of halves       | Up: 525 to 530 with a step of 10                                | R's `round` rounds halves to even; testing programs differ                |
-| EAP of the summed score  | 61 rectangular points on the prior, any prior                   | mirt's `fscores(method = "EAPsum")`: the model's own latent distribution  |
-| True-score theta         | The root of the curve; the range's end where there is none      | A procedure of each program for scores below the guessing level           |
-| Percentile ranks         | Of the sample's scores as given; a step function between scores | Kolen and Brennan interpolate linearly within each integer score          |
-| Error of reported scores | Of the rounded and bounded scores of the table                  | Kolen, Zeng and Hanson give the error before rounding too: slope × SEM(θ) |
-| Joint draws              | A Gaussian copula over separate posteriors                      | mirt's `fscores(plausible.draws =)`: one model's joint posterior          |
+| Topic                       | This package                                                    | Reference                                                                                                  |
+| --------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Rounding of halves          | Up: 525 to 530 with a step of 10                                | R's `round` rounds halves to even; testing programs differ                                                 |
+| EAP of the summed score     | 61 rectangular points on the prior, any prior                   | mirt's `fscores(method = "EAPsum")`: the model's own latent distribution                                   |
+| True-score theta            | The root of the curve; the range's end where there is none      | A procedure of each program for scores below the guessing level                                            |
+| Percentile ranks            | Of the sample's scores as given; a step function between scores | Kolen and Brennan interpolate linearly within each integer score                                           |
+| Intervals of norms          | The normal quantile of the level                                | `check.norms` uses 1.96                                                                                    |
+| Standard errors of z scores | The delta method                                                | `check.norms` subtracts the term (Σ n_k ∂f/∂n_k)² / N twice, which lowers them by up to 3e-6 of their size |
+| Error of reported scores    | Of the rounded and bounded scores of the table                  | Kolen, Zeng and Hanson give the error before rounding too: slope × SEM(θ)                                  |
+| Joint draws                 | A Gaussian copula over separate posteriors                      | mirt's `fscores(plausible.draws =)`: one model's joint posterior                                           |
 
 ## References
 
@@ -344,6 +379,8 @@ plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes tak
 - Lord, F. M., & Wingersky, M. S. (1984). Comparison of IRT true-score and equipercentile observed-score "equatings".
   Applied Psychological Measurement, 8(4), 453-461.
 - Nelsen, R. B. (2006). An introduction to copulas (2nd ed.). Springer.
+- Oosterhuis, H. E. M., van der Ark, L. A., & Sijtsma, K. (2016). Sample size requirements for traditional and
+  regression-based norms. Assessment, 23(2), 191-202.
 - Petersen, N. S., Kolen, M. J., & Hoover, H. D. (1989). Scaling, norming, and equating. In R. L. Linn (Ed.),
   Educational measurement (3rd ed., pp. 221-262). American Council on Education.
 - Thissen, D., Pommerich, M., Billeaud, K., & Williams, V. S. L. (1995). Item response theory for scores on tests

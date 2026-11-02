@@ -52,6 +52,7 @@ validation/psychometrics/.venv/bin/python validation/psychometrics/generalizabil
 Rscript validation/psychometrics/mokken.R            # Mokken scale analysis: mokken's coefH, aisp, check.monotonicity and check.iio
 Rscript validation/psychometrics/mokken-reliability.R  # Molenaar-Sijtsma reliability: mokken's check.reliability on exact proportions of item steps; shares the data of mokken.R through mokken-data.R
 Rscript validation/psychometrics/mokken-steps.R      # Guttman errors and conditional association: mokken's check.errors and check.ca; G+ over the orders of tied steps in base R
+Rscript validation/psychometrics/mokken-preparation.R  # two-way imputation and norms: mokken's twoway without its error and check.norms; the delta method in base R
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction, joint draws of theta: mirt, equate, mvtnorm and base R
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
 Rscript validation/psychometrics/cut-scores.R        # contrasting groups and Body of Work by glm per boundary, Beuk, and the recipes of Nedelsky, Ebel and the borderline group: base R

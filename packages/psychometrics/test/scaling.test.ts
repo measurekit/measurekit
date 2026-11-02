@@ -8,9 +8,11 @@ import {
   createRandom,
   DataError,
   drawJointThetas,
+  type EstimateInterval,
   generalizedPartialCredit,
   type IrtItem,
   nominalResponse,
+  normStatistics,
   percentileRanks,
   predictFormScore,
   predictThetaScore,
@@ -31,6 +33,7 @@ import { type FixtureItems, fixtureItems } from "./fixture-items.js";
 import conversions from "./fixtures/scaling-conversion.json" with { type: "json" };
 import growth from "./fixtures/scaling-growth.json" with { type: "json" };
 import joint from "./fixtures/scaling-joint-draws.json" with { type: "json" };
+import normStatisticsFixture from "./fixtures/scaling-norm-statistics.json" with { type: "json" };
 import norms from "./fixtures/scaling-norms.json" with { type: "json" };
 import predictions from "./fixtures/scaling-prediction.json" with { type: "json" };
 
@@ -567,6 +570,84 @@ describe("percentileRanks", () => {
     expect(() => percentileRanks([1], [0, Number.POSITIVE_INFINITY])).toThrow(
       "Score 2 must be a finite number, found Infinity.",
     );
+  });
+});
+
+describe("normStatistics", () => {
+  /** Estimates and standard errors against check.norms: delta-method sums of the same counts. */
+  const NormTolerance = 1e-10;
+
+  function expectInterval(actual: EstimateInterval | undefined, expected: EstimateInterval, label: string): void {
+    const tolerance = NormTolerance * Math.max(1, Math.abs(expected.estimate));
+    expectClose(actual?.estimate ?? null, expected.estimate, tolerance, `${label} estimate`);
+    expectClose(actual?.standardError ?? null, expected.standardError, NormTolerance, `${label} standard error`);
+    expectClose(actual?.lower ?? null, expected.lower, tolerance, `${label} lower`);
+    expectClose(actual?.upper ?? null, expected.upper, tolerance, `${label} upper`);
+  }
+
+  for (const reference of normStatisticsFixture.cases) {
+    it(`matches check.norms of the mokken package on ${reference.name}`, () => {
+      for (const expected of reference.levels) {
+        const result = normStatistics(reference.scores, { level: expected.level });
+        const label = `${expected.level}`;
+        expectInterval(result.mean, expected.mean, `${label} mean`);
+        expectInterval(result.sd, expected.sd, `${label} sd`);
+        expect(result.scores.map(({ score }) => score)).toEqual(expected.scores.map(({ score }) => score));
+        expected.scores.forEach((norm, k) => {
+          expectInterval(result.scores[k]?.z, norm.z, `${label} z of ${norm.score}`);
+          expectInterval(result.scores[k]?.percentile, norm.percentile, `${label} percentile of ${norm.score}`);
+        });
+        expected.stanines.forEach((stanine, k) => {
+          expectInterval(result.stanines[k], stanine, `${label} stanine boundary ${k + 1}`);
+        });
+      }
+    });
+  }
+
+  it("gives z scores standard errors above check.norms', which subtracts its correction twice", () => {
+    for (const reference of normStatisticsFixture.cases) {
+      const result = normStatistics(reference.scores);
+      reference.mokkenZErrors.forEach((mokken, k) => {
+        const own = defined(result.scores[k]).z.standardError;
+        expect(own).toBeGreaterThanOrEqual(mokken);
+        expect(own - mokken).toBeLessThan(1e-5 * own);
+      });
+    }
+  });
+
+  it("derives the norms of two scores by hand", () => {
+    // Scores 0 and 2: mean 1, SD √2, z of ∓1/√2, percentile ranks 25 and 75. The mean's standard error is the SD with
+    // denominator N, 1, over √2; a rank is 50 + 50 p̂ for p̂ the share of 0s, whose variance is 1/2 · 1/2 / 2.
+    const result = normStatistics([0, 2], { level: 0.5 });
+    expectClose(result.mean.estimate, 1, 1e-15);
+    expectClose(result.mean.standardError, 1 / Math.sqrt(2), 1e-15);
+    expectClose(result.sd.estimate, Math.sqrt(2), 1e-15);
+    expectClose(defined(result.scores[0]).z.estimate, -1 / Math.sqrt(2), 1e-15);
+    expect(result.scores.map(({ percentile }) => percentile.estimate)).toEqual([25, 75]);
+    expectClose(defined(result.scores[1]).percentile.standardError, 50 * Math.sqrt(1 / 8), 1e-12);
+    expectClose(result.mean.upper - result.mean.estimate, 0.6744897501960817 / Math.sqrt(2), 1e-12);
+  });
+
+  it("gives the stanine boundaries at a quarter of an SD around the mean and every half SD out", () => {
+    const { mean, sd, stanines } = normStatistics([1, 4, 4, 5, 7, 8, 9, 9, 12]);
+    expect(stanines).toHaveLength(8);
+    [-1.75, -1.25, -0.75, -0.25, 0.25, 0.75, 1.25, 1.75].forEach((multiple, k) => {
+      expectClose(defined(stanines[k]).estimate, mean.estimate + multiple * sd.estimate, 1e-12, `${k + 1}`);
+    });
+  });
+
+  it("takes 0.95 as the level by default", () => {
+    expect(normStatistics([1, 2, 2, 3, 5])).toEqual(normStatistics([1, 2, 2, 3, 5], { level: 0.95 }));
+  });
+
+  it("rejects fewer than two scores, scores that do not vary and arguments of other types", () => {
+    expect(() => normStatistics([3])).toThrow("Norm statistics need at least 2 scores, found 1.");
+    expect(() => normStatistics([3, 3, 3])).toThrow("Norm statistics need scores that vary.");
+    expect(() => normStatistics([1, Number.NaN])).toThrow("Score 2 must be a finite number, found NaN.");
+    expect(() => normStatistics(JSON.parse('[1, "2"]'))).toThrow('Score 2 must be a finite number, found "2".');
+    expect(() => normStatistics(JSON.parse("null"))).toThrow("The scores must be an array of numbers, found null.");
+    expect(() => normStatistics([1, 2], { level: 1 })).toThrow("The option level");
+    expect(() => normStatistics([1, 2], JSON.parse("null"))).toThrow("The options must be an object, found null.");
   });
 });
 
@@ -1287,6 +1368,22 @@ describe("drawJointThetas", () => {
 });
 
 describe("properties", () => {
+  it("norm statistics do not depend on the order of the scores", () => {
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: -20, max: 40 }), { minLength: 3, maxLength: 60 }), (scores) => {
+        fc.pre(new Set(scores).size > 1);
+        const forward = normStatistics(scores);
+        const backward = normStatistics([...scores].reverse());
+        expect(backward.scores.map(({ score }) => score)).toEqual(forward.scores.map(({ score }) => score));
+        expect(backward.mean.estimate).toBeCloseTo(forward.mean.estimate, 10);
+        forward.scores.forEach((norm, k) => {
+          expect(backward.scores[k]?.percentile.estimate).toBe(norm.percentile.estimate);
+          expect(backward.scores[k]?.z.standardError).toBeCloseTo(norm.z.standardError, 10);
+        });
+      }),
+      { numRuns: 50 },
+    );
+  });
   const thetas = fc.double({ min: -8, max: 8, noNaN: true });
 
   it("scale scores do not decrease with theta", () => {
