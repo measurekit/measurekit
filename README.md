@@ -57,6 +57,7 @@ pnpm bench            # the benchmarks of every package, against their budgets
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # the built packages
 pnpm check:packages   # publint and Are the Types Wrong on the packed packages
+pnpm check:rules      # the rules on untrusted input: each one's test fails without it
 pnpm check:licenses   # the licenses of the production dependencies
 pnpm check:audit      # known vulnerabilities of the dependencies
 pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumented exports
@@ -75,7 +76,7 @@ docs/                        guides of each package, in a folder named after it
 validation/                  R and Python scripts that write the fixtures and time the references; README.md runs them
 bench/                       the harness that the benchmarks of the packages share
 examples/                    runnable examples, run by a test
-scripts/                     the check of the standards
+scripts/                     the checks of the standards, the rules and the licenses
 biome/                       GritQL lint rules
 ```
 

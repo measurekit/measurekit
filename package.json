@@ -17,6 +17,7 @@
     "knip": "knip",
     "docs:api": "pnpm build && typedoc",
     "check:packages": "pnpm -r check:packages",
+    "check:rules": "node scripts/check-rules.ts",
     "check:licenses": "node scripts/check-licenses.ts",
     "check:audit": "pnpm audit --prod && pnpm audit --audit-level=high",
     "changeset": "changeset",

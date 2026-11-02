@@ -97,7 +97,7 @@ docs/<package>/               guides, which TypeDoc publishes with the API refer
 validation/<package>/         R and Python scripts that write the fixtures; validation/README.md lists them
 validation/benchmarks/        the inputs of the benchmarks and the timing of their references; bench/ their harness
 examples/<package>/           runnable examples; examples/test/ runs each of them
-scripts/                      check-standards.ts and its test
+scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts and their tests
 biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
 ```
 
@@ -113,6 +113,7 @@ pnpm bench            # builds, then the benchmarks of every package against the
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package, from a clean dist/
 pnpm check:packages   # builds, then publint and Are the Types Wrong on each packed package
+pnpm check:rules      # removes each rule of scripts/check-rules.ts from a copy of the code; its test must fail
 pnpm check:licenses   # fails on a production dependency whose license is not MIT, Apache-2.0, BSD or ISC
 pnpm check:audit      # pnpm audit of the production dependencies at any severity and of all at high; needs the network
 pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumented exports
@@ -318,7 +319,8 @@ others. A new clone is merged into a helper of the module that owns the concept,
 - A module has benchmarks of its hot path in `test/<module>.bench.ts`, the size of the input in the title of each, a budget
   in `test/budgets.ts` and, where a reference does the task, the same task timed in
   `validation/benchmarks/<package>/<module>.R` on the same data. `docs/performance.md` explains the method and the budgets.
-- A bug fix comes with a test that fails without it, in the test file of the fixed folder.
+- A bug fix comes with a test that fails without it, in the test file of the fixed folder. A rule that keeps untrusted
+  input from being misread, or from costing what its size does not, has an entry in `scripts/check-rules.ts`.
 
 ## Where things go
 
