@@ -9,8 +9,10 @@ const LANCZOS_G = 7;
 const HALF_LOG_TWO_PI = 0.9189385332046727;
 /** The relative size of a term at which the series stops: below double precision. */
 const EPSILON = 1e-16;
-/** The most terms of the series, ten times Numerical Recipes' limit. */
+/** The most terms of the series beyond those {@link TERMS_PER_ROOT} gives: ten times Numerical Recipes' limit. */
 const MAX_TERMS = 1000;
+/** Near z = a the terms fall as exp(-n² / 2a), so that they pass below {@link EPSILON} by n = 9 √a. */
+const TERMS_PER_ROOT = 9;
 
 /**
  * Returns ln Γ(x) for x ≥ 0.5 by the Lanczos approximation, accurate to about 1e-15.
@@ -52,7 +54,8 @@ export function chiSquareUpperTail(x: number, df: number): number {
 function lowerSeries(a: number, z: number, logScale: number): number {
   let term = 1 / a;
   let sum = term;
-  for (let n = 1; n < MAX_TERMS && Math.abs(term) > Math.abs(sum) * EPSILON; n++) {
+  const terms = MAX_TERMS + TERMS_PER_ROOT * Math.sqrt(a);
+  for (let n = 1; n < terms && Math.abs(term) > Math.abs(sum) * EPSILON; n++) {
     term *= z / (a + n);
     sum += term;
   }

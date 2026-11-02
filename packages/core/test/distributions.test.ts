@@ -39,6 +39,16 @@ describe("chiSquareUpperTail", () => {
     expect(chiSquareUpperTail(1, 1)).toBeCloseTo(0.31731050786291415, 14);
   });
 
+  it("meets the continued fraction at the switch with many degrees of freedom", () => {
+    // A statistic of df ± 2 is about 0.002 standard deviations from the center, where the tail is close to 1/2.
+    for (const df of [1e5, 6e5, 5e6]) {
+      const below = chiSquareUpperTail(df - 2, df);
+      const above = chiSquareUpperTail(df + 2, df);
+      expect(below).toBeGreaterThan(above);
+      expect(below - above).toBeLessThan(1e-2);
+    }
+  });
+
   it("falls from 1 to 0 as the statistic grows, and rises with the degrees of freedom", () => {
     fc.assert(
       fc.property(

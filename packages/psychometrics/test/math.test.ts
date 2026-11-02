@@ -34,6 +34,8 @@ import hermite from "./fixtures/math-gauss-hermite.json" with { type: "json" };
 const FUNCTION_TOLERANCE = 1e-14;
 /** Relative tolerance of the chi-square upper tail against R's pchisq. */
 const CHI_SQUARE_TOLERANCE = 1e-12;
+/** The same with up to 10⁷ degrees of freedom, where the scale ln Γ(df / 2) has about 8 digits left. */
+const LARGE_CHI_SQUARE_TOLERANCE = 1e-7;
 /** Absolute tolerance of Gauss-Hermite nodes and weights against R's eigenvalue method. */
 const QUADRATURE_TOLERANCE = 1e-12;
 /** Absolute tolerance of eigenvalues and, up to sign, eigenvectors against R's eigen. */
@@ -50,6 +52,15 @@ describe("chiSquareUpperTail", () => {
       const expected = defined(upperTail[i]);
       const label = `pchisq(${value}, ${df[i]})`;
       expectRelative(chiSquareUpperTail(value, defined(df[i])), expected, CHI_SQUARE_TOLERANCE, label);
+    });
+  });
+
+  it("matches it near the center with many degrees of freedom", () => {
+    const { x, df, upperTail } = functions.chiSquareLarge;
+    x.forEach((value, i) => {
+      const expected = defined(upperTail[i]);
+      const label = `pchisq(${value}, ${df[i]})`;
+      expectRelative(chiSquareUpperTail(value, defined(df[i])), expected, LARGE_CHI_SQUARE_TOLERANCE, label);
     });
   });
 });

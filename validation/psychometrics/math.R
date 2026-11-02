@@ -10,6 +10,9 @@ x <- c(-30, -10, -5, -2.5, -1, -0.3, 0, 0.3, 1, 2.5, 5, 10, 30)
 cumulative_x <- c(-40, -37.5, -20, -8, -5.7, -5.6, -3, -0.7, -0.6, -1e-20, 0, 1e-17, 0.2, 0.6744, 0.675, 2, 5.6, 5.7,
                   8, 9, 40)
 chi_square <- expand.grid(x = c(0, 1e-8, 0.01, 0.5, 1, 2.5, 3.841459, 7, 15, 40, 100, 400), df = c(1, 2, 3, 5, 12, 31, 100))
+# Near the center of a distribution with many degrees of freedom, where the series of the incomplete gamma function
+# needs terms in proportion to the square root of the degrees of freedom.
+chi_square_large <- data.frame(x = c(1e5, 99000, 6e5, 598000, 6e5 + 10, 1.8e6, 5e6, 4.99e6, 1e7), df = c(1e5, 1e5, 6e5, 6e5, 6e5, 1.8e6, 5e6, 5e6, 1e7))
 write_fixture("math-functions", list(
   source = "Base R qnorm, dnorm, pnorm, plogis and pchisq(lower.tail = FALSE).",
   p = p,
@@ -20,7 +23,9 @@ write_fixture("math-functions", list(
   normalDistribution = pnorm(cumulative_x),
   logistic = plogis(x),
   chiSquare = list(x = chi_square$x, df = chi_square$df,
-                   upperTail = pchisq(chi_square$x, chi_square$df, lower.tail = FALSE))
+                   upperTail = pchisq(chi_square$x, chi_square$df, lower.tail = FALSE)),
+  chiSquareLarge = list(x = chi_square_large$x, df = chi_square_large$df,
+                        upperTail = pchisq(chi_square_large$x, chi_square_large$df, lower.tail = FALSE))
 ))
 
 gauss_hermite <- function(count) {
