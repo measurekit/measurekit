@@ -228,6 +228,22 @@ export const RULES: readonly Rule[] = [
     titles: "rejects too few forms",
   },
   {
+    rule: "A cut score's boundary has persons on both sides, so that a category nobody holds is not read as a cut.",
+    file: "packages/psychometrics/src/standard-setting/contrasting-groups.ts",
+    find: "if (!categories.some((category) => category < k)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/standard-setting.test.ts",
+    titles: "rejects invalid scores, categories and options",
+  },
+  {
+    rule: "A category is an integer from 0, so that no fraction or negative number is read as a level.",
+    file: "packages/psychometrics/src/standard-setting/contrasting-groups.ts",
+    find: "if (!(Number.isSafeInteger(category) && category >= 0)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/standard-setting.test.ts",
+    titles: "rejects invalid scores, categories and options",
+  },
+  {
     rule: "The incomplete standard errors stop at their limit of success probabilities, before the calibration.",
     file: "packages/psychometrics/src/cdm/standard-errors.ts",
     find: "if (probabilities > MAX_INCOMPLETE_PROBABILITIES) {",

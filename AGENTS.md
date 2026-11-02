@@ -149,7 +149,7 @@ pull requests, and Dependabot version updates are off. Changesets, docs and TSDo
   the package share and is never exported from the package. `pnpm check:standards` fails on a deep path.
 
 Psychometrics: every module of `cat/`, `cdm/`, `change/`, `equating/`, `fit/`, `irt/`, `multidimensional/`, `rater/`,
-`scaling/` and `sim/` may also import `checks.ts`.
+`scaling/`, `sim/` and `standard-setting/` may also import `checks.ts`.
 
 | Module              | Imports                                               |
 | ------------------- | ----------------------------------------------------- |

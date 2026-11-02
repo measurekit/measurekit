@@ -224,13 +224,16 @@ distance of its EM from the margins.
 | Linear change: effects, standard errors, conditional log-likelihood                 | `glm` on the persons who changed, for two occasions and sets of items; the conditional likelihood written out in base R over the patterns of each sum, for three occasions and missing responses; eRm's `LLRA` cross-checks it                                         |
 | Polytomous LLTM: effects, standard errors, σ, steps, log-likelihood, AIC, BIC, test | Base R: the marginal likelihood of the partial credit and the rating scale model on the package's rule, maximized as for the LLTM; TAM's `tam.mml` with a design array `A` cross-checks it                                                                             |
 
-| Standard-setting quantity                              | Reference                                                                         |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| Angoff cut score, the panelists' cut scores, SD and SE | Base R: `rowSums`, `mean`, `sd`                                                   |
-| Bookmark page locations                                | Base R: `uniroot` on the cumulative category probabilities of mirt's `probtrace`  |
-| Bookmark raw cut scores                                | mirt's `expected.test` at the page locations                                      |
-| Hofstee cut score and failure rate                     | Base R: `uniroot` on the failure rates interpolated by `approxfun`, less the line |
-| Classification accuracy and consistency                | cacIRT's `class.Rud`; each category's probability by base R's `pnorm`             |
+| Standard-setting quantity                              | Reference                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Angoff cut score, the panelists' cut scores, SD and SE | Base R: `rowSums`, `mean`, `sd`                                                       |
+| Bookmark page locations                                | Base R: `uniroot` on the cumulative category probabilities of mirt's `probtrace`      |
+| Bookmark raw cut scores                                | mirt's `expected.test` at the page locations                                          |
+| Hofstee cut score and failure rate                     | Base R: `uniroot` on the failure rates interpolated by `approxfun`, less the line     |
+| Beuk cut score and failure rate                        | Base R: `uniroot` on the failure rates interpolated by `approxfun`, less the line     |
+| Contrasting-groups and Body of Work cut scores         | Base R: `glm(family = binomial)` per boundary to a deviance change of 1e-14           |
+| Recipes: Nedelsky, Ebel, the borderline group          | Base R: the sums of 1 over the options left, of items times proportions, and `median` |
+| Classification accuracy and consistency                | cacIRT's `class.Rud`; each category's probability by base R's `pnorm`                 |
 
 | Change quantity                                                 | Reference                                                                                 |
 | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -778,8 +781,8 @@ Several results of the reference packages are not references:
 - **mirt's rotation in `fscores`.** `fscores(rotate = "oblimin")` rotates to GPArotation's default tolerance, 1e-5, so
   its thetas in the rotated dimensions differ from those of a rotation run to 1e-10 by up to 2.4e-5.
 
-No package among the references implements the modified Angoff, Bookmark or Hofstee method, so their references are
-base R written out from each method's definition. The tests add values derived by hand: the Bookmark locations
+No package among the references implements the modified Angoff, Bookmark, Hofstee, Beuk, contrasting-groups or Body of
+Work method, so their references are base R written out from each method's definition. The tests add values derived by hand: the Bookmark locations
 b + ln((RP - c) / (d - RP)) / a of logistic items, b + ln 2 at RP 2/3 for a Rasch item (Huynh, 2006), and the peak of
 P(θ) I(θ) of a 3PL item at RP (2 + c) / 3 (Huynh, 1998).
 
@@ -833,6 +836,8 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   from its covariance, linked by Stocking-Lord into the chain of the third form to the first: the standard errors of A
   and B within 0.9 to 1.1 of the spread of the draws (0.99 and 1.04 found), and A and B within three standard errors of
   1.2 and 1.
+- **Contrasting groups.** 6,000 simulated persons of a 40-item test, mastery drawn with P = logistic(x - 22): the cut
+  within 0.2 of 22, 3.3 times its standard error of 0.061 by the expected information.
 - **Multidimensional categories.** The frequency of each category of 20,000 responses at one vector of thetas, for
   M2PL, M3PL and graded items on two and three dimensions.
 
@@ -901,6 +906,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `change-gain.json`                       | Two simulated occasions, `set.seed(20261029)`: 60 persons on a 0 to 50 test with 2 at the maximum, and 45 persons on a scale from 0 to 800; 7 sets of deviations, reliabilities and correlation                                                                                                                                             | Differences, residuals, Hake's gains with `null` at the maximum, Lord's reliability, one negative                                                                     |
 | `change-reliable.json`                   | The two occasions above with test reliabilities 0.88 and 0.91; 40 persons with two ability estimates and their standard errors                                                                                                                                                                                                              | The reliable change index of each person, and the classification at levels 0.8, 0.9, 0.95 and 0.99                                                                    |
 | `standard-setting.json`                  | Angoff ratings, `set.seed(20261029)`: 8 panelists, 30 items; 9 items set in mirt; SAT12, omissions wrong                                                                                                                                                                                                                                    | Every Bookmark page at RP 0.67 and 0.5; mean and whole Hofstee bounds; classification by one and three cuts                                                           |
+| `standard-setting-cut-scores.json`       | `set.seed(20261102)`: 400 persons of a 40-item test judged masters by a logistic of their scores; 120 collections of work in four levels; a separated boundary; Beuk judgments over the persons' scores; Nedelsky, Ebel and borderline-group panels                                                                                         | Two to four categories, probability 0.67, a `null` cut; three Beuk panels; the recipes                                                                                |
 | `irt-latent.json`                        | 2PL simulations, `set.seed(20261029)`: 4 anchors of 12 items, θ ~ N(0.5, 1.2²); 2 × 1000 persons; 2,000 adaptive tests of 37 operational and 6 pretest items                                                                                                                                                                                | A free normal distribution, two groups, online calibration, a histogram                                                                                               |
 | `irt-latent-regression.json`             | 2PL and GPCM simulations, `set.seed(20261029)`: 1000 persons, 15 items, a continuous and a binary covariate, 5% missing, and the same with 6 anchors; 800 persons, 10 items, a binary covariate; 1000 Rasch persons against TAM; 800 persons, 10 GPCM items                                                                                 |
 | `irt-scoring.json`                       | LSAT7 under the 2PL and Science under the GPCM, the calibrations of `irt-lsat7` and `irt-science`                                                                                                                                                                                                                                           | Summed-score tables and marginal reliability under two priors; 1000 EAP estimates                                                                                     |
@@ -1015,6 +1021,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Kernel equated scores and standard errors, against kequate's `uniroot(tol = 1e-6)`                | 1e-5 absolute                                      | 3.2e-6                   |
 | Kernel bandwidths, relative                                                                       | 1e-6                                               | 1.4e-8                   |
 | Percent relative errors of kernel equating                                                        | 1e-4 absolute                                      | 3.9e-6                   |
+| Contrasting-groups and Body of Work cut scores against glm                                        | 1e-6 absolute                                      | 1.8e-9                   |
 | Links of separate calibrations against direc and chainec                                          | 1e-7 absolute                                      | 1.1e-9                   |
 | Standard errors and covariances of links                                                          | 1e-5 absolute                                      | 5.3e-7                   |
 | Standard errors of equating through a link, against score and numDeriv over nlminb's links        | 5e-4 absolute                                      | 9.6e-5                   |

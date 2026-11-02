@@ -510,7 +510,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../irt/**", "!../equating/**", "!../math/**"],
+                    "group": ["../*", "../*/**", "!../checks.js", "!../irt/**", "!../equating/**", "!../math/**"],
                     "message": "standard-setting/ builds on irt/, equating/ and math/ only."
                   }
                 ]

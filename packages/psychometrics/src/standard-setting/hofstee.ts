@@ -52,23 +52,67 @@ export function hofsteeCutScore(distribution: readonly number[], bounds: Hofstee
       `The Hofstee failure rate bounds need 0 ≤ f_min < f_max ≤ 1, found ${minimumFailureRate} and ${maximumFailureRate}.`,
     );
   }
+  return crossFailureRate(
+    distribution,
+    total,
+    {
+      lowestCut: minimumCutScore,
+      highestCut: maximumCutScore,
+      highestRate: maximumFailureRate,
+      lowestRate: minimumFailureRate,
+    },
+    "The Hofstee line does not cross the observed failure rates between the minimum and maximum cut scores.",
+  );
+}
+
+/**
+ * A line in the plane of cut scores and failure rates that falls, or stays level, from (lowestCut, highestRate) to
+ * (highestCut, lowestRate).
+ */
+export interface FailureRateLine {
+  readonly lowestCut: number;
+  readonly highestCut: number;
+  readonly highestRate: number;
+  readonly lowestRate: number;
+}
+
+/**
+ * Returns where a falling line crosses the observed failure rate F(c), the share of persons with a total score below c,
+ * taken at each score from 0 to the highest and linear between them: the one crossing between the line's ends, as F
+ * rises.
+ *
+ * @param distribution - The persons at each total score, checked.
+ * @param total - Their number.
+ * @param line - The line, with its ends within the scores.
+ * @param message - The error when the line does not cross F between its ends.
+ * @throws `DataError` when it does not.
+ */
+export function crossFailureRate(
+  distribution: readonly number[],
+  total: number,
+  line: FailureRateLine,
+  message: string,
+): HofsteeCutScore {
+  const {
+    lowestCut: minimumCutScore,
+    highestCut: maximumCutScore,
+    highestRate: maximumFailureRate,
+    lowestRate: minimumFailureRate,
+  } = line;
+  const highest = distribution.length - 1;
   // F at the scores from 0: the share of persons below each.
   const below: number[] = [0];
   for (let score = 1; score <= highest; score++) below.push((below[score - 1] ?? 0) + (distribution[score - 1] ?? 0));
   const failure = (score: number): number => (below[score] ?? 0) / total;
   const cutRange = maximumCutScore - minimumCutScore;
   const rateRange = maximumFailureRate - minimumFailureRate;
-  const line = (c: number): number => maximumFailureRate - rateRange * ((c - minimumCutScore) / cutRange);
+  const rateAt = (c: number): number => maximumFailureRate - rateRange * ((c - minimumCutScore) / cutRange);
   // F, linear between scores, minus the line: it increases, so it is 0 at one cut score at most.
   const excess = (c: number): number => {
     const score = Math.min(Math.floor(c), highest - 1);
-    return failure(score) + (c - score) * (failure(score + 1) - failure(score)) - line(c);
+    return failure(score) + (c - score) * (failure(score + 1) - failure(score)) - rateAt(c);
   };
-  if (excess(minimumCutScore) > 0 || excess(maximumCutScore) < 0) {
-    throw new DataError(
-      "The Hofstee line does not cross the observed failure rates between the minimum and maximum cut scores.",
-    );
-  }
+  if (excess(minimumCutScore) > 0 || excess(maximumCutScore) < 0) throw new DataError(message);
   let score = Math.floor(minimumCutScore);
   while (score + 1 < maximumCutScore && excess(score + 1) < 0) score++;
   // On the segment from score to score + 1, F(score) + (c - score) step = line(c) at c = k_min + t (k_max - k_min),

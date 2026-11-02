@@ -2,8 +2,11 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   angoffCutScore,
+  beukCutScore,
   bookmarkCutScore,
   classificationAccuracy,
+  contrastingGroupsCutScores,
+  createRandom,
   DataError,
   fourParameterLogistic,
   generalizedPartialCredit,
@@ -18,12 +21,16 @@ import {
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureParameters, item2pl, MODELS } from "./fixture-items.js";
 import fixture from "./fixtures/standard-setting.json" with { type: "json" };
+import cuts from "./fixtures/standard-setting-cut-scores.json" with { type: "json" };
 
 /** Classification probabilities against R's pnorm: Cody's algorithm on both sides. */
 const CLASSIFICATION_TOLERANCE = 1e-14;
 
 /** Cut scores and Bookmark locations against R, explained in docs/validation.md: closed forms and uniroot to 1e-14. */
 const TOLERANCE = 1e-12;
+
+/** Contrasting-groups cut scores against glm, which stops at a deviance change of 1e-14. */
+const LOGISTIC_TOLERANCE = 1e-6;
 
 type FixtureItems = readonly { readonly id: string; readonly model: string; readonly parameters: FixtureParameters }[];
 
@@ -81,6 +88,41 @@ describe("angoffCutScore", () => {
     expect(() => angoffCutScore(JSON.parse('[[0.5], "a"]'))).toThrow(
       'The ratings of panelist 2 must be an array, found "a".',
     );
+  });
+});
+
+describe("beukCutScore", () => {
+  const { distribution } = cuts.beuk;
+
+  cuts.beuk.cases.forEach(({ judgments, expected }, index) => {
+    it(`matches the line's crossing written out in base R, case ${index + 1}`, () => {
+      const result = beukCutScore(distribution, judgments);
+      expectClose(result.cutScore, expected.cutScore, TOLERANCE, "cut score");
+      expectClose(result.failureRate, expected.failureRate, TOLERANCE, "failure rate");
+    });
+  });
+
+  it("moves a cut less the surer the panel is of it than of the pass rate", () => {
+    const judgments = { cutScore: 24, passRate: 0.55, cutScoreSd: 3, passRateSd: 0.12 };
+    const surerOfCut = beukCutScore(distribution, { ...judgments, cutScoreSd: 0.5 });
+    const surerOfRate = beukCutScore(distribution, { ...judgments, passRateSd: 0.01 });
+    expect(Math.abs(surerOfCut.cutScore - 24)).toBeLessThan(Math.abs(surerOfRate.cutScore - 24));
+  });
+
+  it("rejects invalid judgments and a line that does not cross the failure rates", () => {
+    const judgments = { cutScore: 24, passRate: 0.55, cutScoreSd: 3, passRateSd: 0.12 };
+    expect(() => beukCutScore(distribution, { ...judgments, cutScoreSd: 0 })).toThrow(
+      "The judgment cutScoreSd must be a positive number, found 0.",
+    );
+    expect(() => beukCutScore(distribution, { ...judgments, passRate: 1.2 })).toThrow("The judgment passRate");
+    expect(() => beukCutScore(distribution, { ...judgments, cutScore: 41 })).toThrow(
+      "The judgment cutScore must be a score from 0 to 40, found 41.",
+    );
+    expect(() => beukCutScore(distribution, { ...judgments, passRate: 0, cutScoreSd: 1e6 })).toThrow(
+      "The Beuk line does not cross the observed failure rates between the scores 0 and 40.",
+    );
+    expect(() => beukCutScore(distribution, JSON.parse("null"))).toThrow("The Beuk judgments must be an object");
+    expect(() => beukCutScore(JSON.parse("{}"), judgments)).toThrow(DataError);
   });
 });
 
@@ -237,6 +279,81 @@ describe("classificationAccuracy", () => {
     expect(() => classificationAccuracy([estimate], JSON.parse('["0"]'))).toThrow(
       'Cut 1 must be a finite number, found "0".',
     );
+  });
+});
+
+describe("contrastingGroupsCutScores", () => {
+  for (const fixtureCase of Object.values(cuts.contrasting)) {
+    it(`matches glm per boundary for ${fixtureCase.name}`, () => {
+      const result = contrastingGroupsCutScores(fixtureCase.scores, fixtureCase.categories, fixtureCase.options);
+      expect(result.cutScores).toHaveLength(fixtureCase.cutScores.length);
+      fixtureCase.cutScores.forEach((expected, k) => {
+        expectClose(result.cutScores[k] ?? null, expected, LOGISTIC_TOLERANCE, `boundary ${k + 1}`);
+      });
+      expect(result.converged).toBe(fixtureCase.converged);
+    });
+  }
+
+  it("recovers a known cut within 0.2 raw points from 6,000 persons", () => {
+    // Scores of a 40-item test; P(master | x) = logistic(x - 22), so the cut at probability 0.5 is 22. The cut's standard
+    // error is 0.061 by the expected information, so 0.2 is 3.3 of them; at 2,000 persons it would be 1.9.
+    const random = createRandom(20261102);
+    const scores = Array.from({ length: 6000 }, () => {
+      let score = 0;
+      const theta = random.normal();
+      for (let i = 0; i < 40; i++) if (random.uniform() < logistic(theta - (i - 19.5) / 12)) score++;
+      return score;
+    });
+    const masters = scores.map((score) => (random.uniform() < logistic(score - 22) ? 1 : 0));
+    expectClose(defined(contrastingGroupsCutScores(scores, masters).cutScores[0]), 22, 0.2);
+  });
+
+  it("rejects invalid scores, categories and options", () => {
+    expect(() => contrastingGroupsCutScores([1, 2, 3], [0, 1])).toThrow(
+      "The scores and the categories need one entry for each person, found 3 and 2.",
+    );
+    expect(() => contrastingGroupsCutScores([1, 2], [0, 1.5])).toThrow(
+      "Person 2 needs a category that is an integer from 0, found 1.5.",
+    );
+    expect(() => contrastingGroupsCutScores([1, JSON.parse('"2"')], [0, 1])).toThrow(
+      'Person 2 needs a finite score, found "2".',
+    );
+    expect(() => contrastingGroupsCutScores([1, 2], [0, 0])).toThrow(
+      "Cut scores need persons in at least two categories.",
+    );
+    expect(() => contrastingGroupsCutScores([1, 2, 3], [1, 2, 2])).toThrow(
+      "The boundary below category 1 needs persons on both sides, found none below it.",
+    );
+    expect(() => contrastingGroupsCutScores([1, 2, 3, 4], [0, 1, 0, 1], { probability: 1 })).toThrow(
+      "The option probability must be a number between 0 and 1, exclusive, found 1.",
+    );
+    expect(() => contrastingGroupsCutScores(JSON.parse("{}"), [0, 1])).toThrow("The scores must be an array");
+    expect(() => contrastingGroupsCutScores([1, 2], [0, 1], JSON.parse("null"))).toThrow(
+      "The options must be an object",
+    );
+  });
+});
+
+describe("recipes", () => {
+  it("gives Nedelsky's cut score as the Angoff cut score of 1 over the options left", () => {
+    const { optionsLeft, cutScore } = cuts.recipes.nedelsky;
+    const result = angoffCutScore(optionsLeft.map((row) => row.map((options) => 1 / options)));
+    expectClose(result.cutScore, cutScore, TOLERANCE);
+  });
+
+  it("gives Ebel's cut score as the Angoff cut score of each item rated with its cell's proportion", () => {
+    const { items: counts, proportions, cutScore } = cuts.recipes.ebel;
+    const ratings = counts.flatMap((count, cell) => new Array<number>(count).fill(defined(proportions[cell])));
+    expectClose(angoffCutScore([ratings]).cutScore, cutScore, TOLERANCE);
+  });
+
+  it("gives the borderline group's cut score as the median of its scores", () => {
+    const sorted = [...cuts.recipes.borderline.scores].sort((a, b) => a - b);
+    const middle = sorted.length / 2;
+    const median = Number.isInteger(middle)
+      ? (defined(sorted[middle - 1]) + defined(sorted[middle])) / 2
+      : defined(sorted[Math.floor(middle)]);
+    expect(median).toBe(cuts.recipes.borderline.cutScore);
   });
 });
 
@@ -402,6 +519,37 @@ describe("properties", () => {
           if (!(error instanceof DataError)) throw error;
         }
       }),
+    );
+  });
+  it("moves each contrasting-groups cut by an increasing linear transformation of the scores", () => {
+    const people = fc.array(fc.tuple(fc.integer({ min: 0, max: 30 }), fc.integer({ min: 0, max: 2 })), {
+      minLength: 12,
+      maxLength: 60,
+    });
+    fc.assert(
+      fc.property(
+        people,
+        fc.double({ min: 0.2, max: 5, noNaN: true }),
+        fc.double({ min: -50, max: 50, noNaN: true }),
+        (pairs, slope, shift) => {
+          const scores = pairs.map(([score]) => score);
+          const categories = pairs.map(([, category]) => category);
+          const highest = Math.max(...categories);
+          fc.pre(highest > 0 && categories.includes(0) && new Set(categories).size === highest + 1);
+          const before = contrastingGroupsCutScores(scores, categories);
+          const after = contrastingGroupsCutScores(
+            scores.map((score) => slope * score + shift),
+            categories,
+          );
+          before.cutScores.forEach((cut, k) => {
+            const moved = after.cutScores[k] ?? null;
+            if (cut === null) expect(moved).toBeNull();
+            else
+              expectClose(moved, slope * cut + shift, 1e-6 * (1 + Math.abs(slope * cut + shift)), `boundary ${k + 1}`);
+          });
+        },
+      ),
+      { numRuns: 50 },
     );
   });
 });
