@@ -3,7 +3,8 @@
  * Stocking-Lord methods, composed over a chain of forms; linear and equipercentile equating of observed scores from
  * random groups, with log-linear presmoothing; equating through common items from nonequivalent groups by the Tucker,
  * Levine, chained and frequency estimation methods; bootstrap standard errors; the robust z screen of common items;
- * IRT true-score and observed-score equating; and delta-method standard errors of IRT equating.
+ * kernel equating in five designs with its standard errors; IRT true-score and observed-score equating; and
+ * delta-method standard errors of IRT equating.
  *
  * @module @measurekit/psychometrics/equating
  */
@@ -27,6 +28,14 @@ export {
   irtObservedScoreEquating,
 } from "./irt-observed-score.js";
 export { type IrtEquatingErrorOptions, irtEquatingStandardErrors } from "./irt-standard-errors.js";
+export {
+  type KernelBandwidths,
+  type KernelData,
+  type KernelEquating,
+  type KernelEquatingOptions,
+  kernelEquating,
+  kernelEquatingDifference,
+} from "./kernel.js";
 export {
   chainTransformations,
   meanMeanLinking,

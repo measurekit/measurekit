@@ -25,6 +25,11 @@ those of an estimated normal distribution, and checks the parameters against the
 Jacobian's rank is below its columns, the statistic uses the whole complement of its span, with as many degrees of
 freedom as the moments less its rank.
 
+`kernelEquating` equates by the kernel method in the equivalent-groups, single-group, counterbalanced, chained and
+post-stratification designs, as kequate: log-linear presmoothing, Gaussian continuization with bandwidths that minimize
+the penalty, the percent relative errors of the moments, and standard errors by the delta method;
+`kernelEquatingDifference` gives the standard error of the difference of two equatings, as kequate's `genseed`.
+
 Lord's chi-square can be purified: with `purify: true` the items it flags leave the anchors of the linking, which is
 repeated on the two calibrations until two rounds flag the same items.
 

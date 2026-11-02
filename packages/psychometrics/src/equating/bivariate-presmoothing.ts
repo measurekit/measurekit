@@ -68,20 +68,8 @@ export function bivariateLogLinearPresmoothing(
       `The option crossDegree must be an integer from 0 to ${highestCross}, the smaller of the degrees, found ${describe(crossDegree)}.`,
     );
   }
-  const terms = termPowers(totalDegree, anchorDegree, crossDegree);
-  const totalBasis = orthonormalPolynomials(table.rows, totalDegree);
-  const anchorBasis = orthonormalPolynomials(table.columns, anchorDegree);
-  const basis = new Float64Array(table.rows * table.columns * terms.length);
-  for (let x = 0; x < table.rows; x++) {
-    for (let v = 0; v < table.columns; v++) {
-      const cell = (x * table.columns + v) * terms.length;
-      terms.forEach(([i, j], term) => {
-        basis[cell + term] =
-          (totalBasis[x * (totalDegree + 1) + i] ?? 0) * (anchorBasis[v * (anchorDegree + 1) + j] ?? 0);
-      });
-    }
-  }
-  const fit = poissonFit(table.counts, basis, terms.length, table.persons);
+  const { basis, terms } = bivariateBasis(table.rows, table.columns, totalDegree, anchorDegree, crossDegree);
+  const fit = poissonFit(table.counts, basis, terms, table.persons);
   return {
     distribution: Array.from({ length: table.rows }, (_, x) =>
       fit.distribution.slice(x * table.columns, (x + 1) * table.columns),
@@ -102,6 +90,34 @@ function checkDegree(degree: unknown, scores: number, label: string): void {
       `The degree of ${label} must be an integer from 1 to ${scores - 1}, one less than the number of scores, found ${describe(degree)}.`,
     );
   }
+}
+
+/**
+ * Returns the basis of the bivariate log-linear model, by cell (row, then column), then term, and its number of terms:
+ * the products of orthonormal polynomials of the two scores, the constant first, then the main terms and the cross
+ * products, which span the powers xⁱ vʲ of the model.
+ */
+export function bivariateBasis(
+  rows: number,
+  columns: number,
+  totalDegree: number,
+  anchorDegree: number,
+  crossDegree: number,
+): { readonly basis: Float64Array; readonly terms: number } {
+  const powers = termPowers(totalDegree, anchorDegree, crossDegree);
+  const totalBasis = orthonormalPolynomials(rows, totalDegree);
+  const anchorBasis = orthonormalPolynomials(columns, anchorDegree);
+  const basis = new Float64Array(rows * columns * powers.length);
+  for (let x = 0; x < rows; x++) {
+    for (let v = 0; v < columns; v++) {
+      const cell = (x * columns + v) * powers.length;
+      powers.forEach(([i, j], term) => {
+        basis[cell + term] =
+          (totalBasis[x * (totalDegree + 1) + i] ?? 0) * (anchorBasis[v * (anchorDegree + 1) + j] ?? 0);
+      });
+    }
+  }
+  return { basis, terms: powers.length };
 }
 
 /** Returns the powers [i, j] of the total and the anchor score of each term: the constant first, then the main terms and the cross products. */

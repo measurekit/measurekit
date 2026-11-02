@@ -19,6 +19,10 @@ import {
   type IrtItem,
   irtEquatingStandardErrors,
   irtObservedScoreEquating,
+  type KernelData,
+  type KernelEquating,
+  kernelEquating,
+  kernelEquatingDifference,
   levineEquating,
   linearEquating,
   logLinearPresmoothing,
@@ -51,6 +55,7 @@ import bootstrap from "./fixtures/equating-bootstrap.json" with { type: "json" }
 import chain from "./fixtures/equating-chain.json" with { type: "json" };
 import irtObserved from "./fixtures/equating-irt-observed-score.json" with { type: "json" };
 import standardErrors from "./fixtures/equating-irt-standard-errors.json" with { type: "json" };
+import kernel from "./fixtures/equating-kernel.json" with { type: "json" };
 import linking from "./fixtures/equating-linking.json" with { type: "json" };
 import neat from "./fixtures/equating-neat.json" with { type: "json" };
 import observed from "./fixtures/equating-observed-score.json" with { type: "json" };
@@ -78,6 +83,12 @@ const STANDARD_ERROR_TOLERANCE = 1e-6;
 const CHAIN_TOLERANCE = 1e-6;
 /** A chain of the reference's own links against chainec: the same fold. */
 const FOLD_TOLERANCE = 1e-12;
+/** Kernel equated scores and their standard errors against kequate, whose inverse stops at uniroot's 1e-6. */
+const KERNEL_TOLERANCE = 1e-5;
+/** Kernel bandwidths against kequate's optimize, relative: the same search, to its tolerance of 1.5e-8. */
+const BANDWIDTH_TOLERANCE = 1e-6;
+/** Percent relative errors of ten moments, whose powers carry the error of the equated scores. */
+const PRE_TOLERANCE = 1e-4;
 
 function expectTransformation(actual: ScaleTransformation, expected: ScaleTransformation, tolerance: number): void {
   expectClose(actual.slope, expected.slope, tolerance, "slope");
@@ -1062,6 +1073,231 @@ describe("bootstrapEquating", () => {
   });
 });
 
+describe("kernelEquating", () => {
+  /** Reads fixture data as JSON passes it. */
+  const kernelData = (value: unknown): KernelData => JSON.parse(JSON.stringify(value));
+  const results = new Map<string, KernelEquating>();
+  const result = (name: string): KernelEquating => defined(results.get(name));
+  const expectList = (actual: readonly number[], expected: readonly number[], tolerance: number, label: string) => {
+    expect(actual).toHaveLength(expected.length);
+    expected.forEach((value, i) => {
+      expectClose(defined(actual[i]), value, tolerance, `${label} ${i}`);
+    });
+  };
+
+  for (const fixture of Object.values(kernel.cases)) {
+    it(`matches kequate in the ${fixture.name} design`, () => {
+      const found = kernelEquating(kernelData(fixture.data), JSON.parse(JSON.stringify(fixture.options)));
+      results.set(fixture.name, found);
+      const { expected } = fixture;
+      expectList(found.equated, expected.equated, KERNEL_TOLERANCE, "equated");
+      expectList(found.standardErrors, expected.standardErrors, KERNEL_TOLERANCE, "standard error");
+      expectList(found.percentRelativeError, expected.percentRelativeError, PRE_TOLERANCE, "PRE");
+      if ("anchorPercentRelativeError" in expected) {
+        expectList(
+          defined(found.anchorPercentRelativeError),
+          expected.anchorPercentRelativeError,
+          PRE_TOLERANCE,
+          "PRE",
+        );
+      }
+      expect(Object.keys(found.bandwidths).sort()).toEqual(Object.keys(expected.bandwidths).sort());
+      for (const [name, value] of Object.entries(expected.bandwidths)) {
+        const bandwidth = Object.entries(found.bandwidths).find(([key]) => key === name)?.[1];
+        expectClose(defined(bandwidth), value, BANDWIDTH_TOLERANCE * value, name);
+      }
+      expect(found.converged).toBe(true);
+      found.errorVectors.forEach((vector, x) => {
+        expectClose(Math.hypot(...vector), defined(found.standardErrors[x]), 1e-12, `vector ${x}`);
+      });
+    });
+  }
+
+  it("weighs the first group of a counterbalanced design in the standard errors as kequate's equated scores do", () => {
+    const { expected } = kernel.cases["counterbalanced, weighted"];
+    const found = result("counterbalanced, weighted");
+    // kequate weighs that group's form to equate to by 1 - weight in its standard errors.
+    const largest = Math.max(...expected.kequate.map((value, x) => Math.abs(value - defined(found.standardErrors[x]))));
+    expect(largest).toBeGreaterThan(1e-2);
+  });
+
+  for (const fixture of kernel.differences) {
+    it(`matches kequate's standard error of the difference of ${fixture.first} and ${fixture.second}`, () => {
+      const found = kernelEquatingDifference(result(fixture.first), result(fixture.second));
+      expectList(found, fixture.expected, KERNEL_TOLERANCE, "difference");
+    });
+  }
+
+  describe("recovery", () => {
+    // The population of kequate's study (scratchpad prototype in the design): 40 Rasch items with difficulties from
+    // -1.5 to 1.5, theta N(0, 1) on 201 points, form X easier by 0.2 and form Y harder by 0.2.
+    const Items = 40;
+    const population = (shift: number): number[] => {
+      let total = new Float64Array(Items + 1);
+      for (let q = 0; q <= 200; q++) {
+        const theta = -5 + q * 0.05;
+        const weight = Math.exp(-0.5 * theta * theta);
+        let scores = new Float64Array([1]);
+        for (let i = 0; i < Items; i++) {
+          const p = 1 / (1 + Math.exp(-(theta - (-1.5 + (3 * i) / (Items - 1)) - shift)));
+          const next = new Float64Array(scores.length + 1);
+          scores.forEach((value, k) => {
+            next[k] = (next[k] ?? 0) + value * (1 - p);
+            next[k + 1] = (next[k + 1] ?? 0) + value * p;
+          });
+          scores = next;
+        }
+        total = total.map((value, k) => value + weight * (scores[k] ?? 0));
+      }
+      const sum = total.reduce((a, b) => a + b, 0);
+      return Array.from(total, (value) => value / sum);
+    };
+    const from = population(-0.2);
+    const to = population(0.2);
+    const sample = (shares: readonly number[], persons: number, random: ReturnType<typeof createRandom>) => {
+      const counts = new Array<number>(shares.length).fill(0);
+      for (let person = 0; person < persons; person++) {
+        let u = random.uniform();
+        let score = 0;
+        while (score < shares.length - 1 && u >= defined(shares[score])) u -= defined(shares[score++]);
+        counts[score] = defined(counts[score]) + 1;
+      }
+      return counts;
+    };
+    const equate = (fromCounts: readonly number[], toCounts: readonly number[], degree: number) =>
+      kernelEquating({ design: "equivalent-groups", from: fromCounts, to: toCounts, degrees: [degree, degree] });
+    const scaled = (shares: readonly number[]) => shares.map((share) => share * 1e6);
+    const truth = equate(scaled(from), scaled(to), 12).equated;
+
+    // 200 sets of 1,000 persons per form, presmoothed at degree 6, over the scores 5 to 35. The mean error of one
+    // set has a spread of about 0.33, so the bias is held to three of its Monte Carlo standard errors.
+    let simulated: KernelEquating[] | null = null;
+    const sets = (): KernelEquating[] => {
+      if (simulated === null) {
+        const random = createRandom(20261102);
+        simulated = Array.from({ length: 200 }, () => equate(sample(from, 1000, random), sample(to, 1000, random), 6));
+      }
+      return simulated;
+    };
+    const Scores = Array.from({ length: 31 }, (_, k) => k + 5);
+    const mean = (values: readonly number[]): number => values.reduce((a, b) => a + b, 0) / values.length;
+
+    it("recovers the population's kernel equating without bias", () => {
+      const setErrors = sets().map((set) => mean(Scores.map((x) => defined(set.equated[x]) - defined(truth[x]))));
+      const bias = mean(setErrors);
+      const spread = Math.sqrt(setErrors.reduce((sum, e) => sum + (e - bias) ** 2, 0) / (setErrors.length - 1));
+      expect(Math.abs(bias)).toBeLessThanOrEqual((3 * spread) / Math.sqrt(setErrors.length));
+    });
+
+    it("errs by no more than its standard errors predict", () => {
+      const errors = sets().flatMap((set) => Scores.map((x) => defined(set.equated[x]) - defined(truth[x])));
+      const predicted = sets().flatMap((set) => Scores.map((x) => defined(set.standardErrors[x]) ** 2));
+      expect(Math.sqrt(mean(errors.map((e) => e * e)))).toBeLessThanOrEqual(1.2 * Math.sqrt(mean(predicted)));
+    });
+
+    it("gives standard errors within 0.9 to 1.2 of the spread of the equated scores", () => {
+      for (const x of [10, 15, 20, 25, 30]) {
+        const values = sets().map((set) => defined(set.equated[x]));
+        const center = mean(values);
+        const spread = Math.sqrt(values.reduce((sum, value) => sum + (value - center) ** 2, 0) / (values.length - 1));
+        const error = mean(sets().map((set) => defined(set.standardErrors[x])));
+        expect(error / spread, `score ${x}`).toBeGreaterThanOrEqual(0.9);
+        expect(error / spread, `score ${x}`).toBeLessThanOrEqual(1.2);
+      }
+    });
+  });
+
+  const groups = {
+    design: "equivalent-groups",
+    from: [3, 8, 15, 20, 14, 7, 2],
+    to: [2, 6, 13, 19, 16, 9, 4],
+    degrees: [2, 2],
+  };
+
+  it("uses the bandwidths given, and 1000 standard deviations for those not given with linear", () => {
+    const fixed = kernelEquating(kernelData(groups), { bandwidths: { from: 0.7 }, linear: true });
+    expect(fixed.bandwidths.from).toBe(0.7);
+    expect(fixed.bandwidths.to).toBeGreaterThan(1000);
+    expect(fixed.bandwidths).not.toHaveProperty("fromAnchor");
+  });
+
+  it("reports a bandwidth whose search stops at its upper bound as not converged", () => {
+    // A binomial distribution of five scores, presmoothed at degree 2, is so near the normal that the penalty keeps
+    // falling as the bandwidth grows.
+    const binomial = [1, 4, 6, 4, 1];
+    const found = kernelEquating({ design: "equivalent-groups", from: binomial, to: binomial, degrees: [2, 2] });
+    expect(found.bandwidths.from).toBeCloseTo(4, 5);
+    expect(found.converged).toBe(false);
+  });
+
+  it("rejects invalid data", () => {
+    expect(() => kernelEquating(JSON.parse("null"))).toThrow("Kernel equating data must be an object");
+    expect(() => kernelEquating(kernelData({ ...groups, design: "random" }))).toThrow("The design must be");
+    expect(() => kernelEquating(kernelData({ ...groups, degrees: [2] }))).toThrow(
+      "The degrees must have the degrees of the two scores, found 1.",
+    );
+    expect(() => kernelEquating(kernelData({ ...groups, degrees: "2" }))).toThrow("The degrees must be an array");
+    expect(() => kernelEquating(kernelData({ ...groups, degrees: [9, 2] }))).toThrow("A log-linear degree");
+    expect(() => kernelEquating(kernelData({ ...groups, from: [0, 1, 0] }))).toThrow(
+      "Kernel equating needs more than one person in the from distribution.",
+    );
+    expect(() => kernelEquating(kernelData({ ...groups, to: { 0: 1 } }))).toThrow(
+      "The to score distribution must be an array",
+    );
+    const table = [
+      [5, 3, 1],
+      [3, 6, 3],
+      [1, 3, 5],
+    ];
+    expect(() =>
+      kernelEquating(
+        kernelData({ design: "counterbalanced", first: table, second: table.slice(0, 2), degrees: [1, 1] }),
+      ),
+    ).toThrow("The first and second distributions of a counterbalanced design need the same scores.");
+    expect(() =>
+      kernelEquating(
+        kernelData({ design: "chained", from: table, to: table.map((row) => row.slice(0, 2)), degrees: [1, 1] }),
+      ),
+    ).toThrow("The from and to distributions need the same anchor scores, found 3 and 2.");
+  });
+
+  it("rejects invalid options", () => {
+    const data = kernelData(groups);
+    expect(() => kernelEquating(data, JSON.parse("null"))).toThrow("The options must be an object");
+    expect(() => kernelEquating(data, { bandwidths: { from: 0 } })).toThrow(
+      "The bandwidth from must be a positive number, found 0.",
+    );
+    expect(() => kernelEquating(data, JSON.parse('{"bandwidths": [1]}'))).toThrow("The option bandwidths must be");
+    expect(() => kernelEquating(data, JSON.parse('{"linear": "yes"}'))).toThrow("The option linear");
+    expect(() => kernelEquating(data, { weight: 1.5 })).toThrow("The option weight");
+    expect(() => kernelEquating(data, JSON.parse('{"penaltyWeight": null}'))).toThrow("The option penaltyWeight");
+  });
+
+  it("rejects equatings of different designs or data in kernelEquatingDifference", () => {
+    const first = kernelEquating(kernelData(groups));
+    const shorter = kernelEquating(kernelData({ ...groups, from: [3, 8, 15, 20, 14, 7] }));
+    expect(() => kernelEquatingDifference(first, shorter)).toThrow(
+      "The two kernel equatings need error vectors for the same scores, found 7 and 6.",
+    );
+    const single = kernelEquating(
+      kernelData({
+        design: "single-group",
+        joint: [
+          [5, 3, 1],
+          [3, 6, 3],
+          [1, 3, 5],
+        ],
+        degrees: [1, 1],
+      }),
+    );
+    const other = kernelEquating(kernelData({ ...groups, from: [5, 3, 1], to: [3, 6, 3], degrees: [1, 1] }));
+    expect(() => kernelEquatingDifference(single, other)).toThrow("error vectors of one length");
+    expect(() => kernelEquatingDifference(first, JSON.parse("null"))).toThrow(
+      "The second kernel equating must be an object",
+    );
+  });
+});
+
 describe("robustZ", () => {
   for (const fixture of robust.cases) {
     it(`matches the robust z of base R for ${fixture.name} items`, () => {
@@ -1701,6 +1937,25 @@ describe("properties", () => {
         });
       }),
       { numRuns: 50 },
+    );
+  });
+  it("gives linear equating with linear kernel equating, and the identity for a form equated to itself", () => {
+    const counts = fc.array(fc.integer({ min: 1, max: 60 }), { minLength: 5, maxLength: 15 });
+    fc.assert(
+      fc.property(counts, counts, (from, to) => {
+        const data: KernelData = { design: "equivalent-groups", from, to, degrees: [2, 2] };
+        const fromMoments = linearEquating(
+          logLinearPresmoothing(from, 2).distribution.slice(),
+          logLinearPresmoothing(to, 2).distribution.slice(),
+        );
+        kernelEquating(data, { linear: true }).equated.forEach((value, x) => {
+          expectClose(value, defined(fromMoments[x]), 1e-4, `linear ${x}`);
+        });
+        kernelEquating({ ...data, to: from }).equated.forEach((value, x) => {
+          expectClose(value, x, 1e-9, `identity ${x}`);
+        });
+      }),
+      { numRuns: 30 },
     );
   });
 });
