@@ -443,3 +443,34 @@ and fails when it takes more than its budget after gzip, or holds a module that 
 does not list, or when a named import from the root of a library holds more than the subpath of its module. A budget is
 1.25 times the size measured after gzip, rounded up to the next 500 bytes. `node scripts/entry-sizes.ts` prints this
 table.
+
+## Peak memory
+
+What each reader of untrusted input adds to the peak resident memory of a Node.js process, on its worst inputs within
+the limits of [SECURITY.md](../SECURITY.md): the peak of a process that parses the input from JSON and reads it, less
+the peak of the same process that parses it and does not, the median of three pairs run one after the other. Each reader
+grows in proportion to its input, but for the designs of cognitive diagnosis, whose limits bound them.
+
+| Reader                        | Input                                                     | JSON (MB) | Peak added (MB)             |
+| ----------------------------- | --------------------------------------------------------- | --------: | --------------------------- |
+| `responseMatrix`              | 1,000 persons, 1,000 items                                |       1.9 | below the peak of the parse |
+| `responseMatrix`              | 1 person, 1,000,000 items, with the ids it gives them     |       1.9 | 86                          |
+| `responseMatrix`              | 1,000,000 persons, 1 item, with the ids it gives them     |       3.8 | 94                          |
+| `responseMatrix` with `times` | 1,000 persons, 1,000 items                                |       4.6 | 49                          |
+| `responseMatrixFromColumns`   | 1,000 persons, 1,000 items                                |       1.9 | 23                          |
+| `responseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items        |        43 | 106                         |
+| `responseRecords`             | 1,000,000 records, each of its own person and item        |        48 | 421                         |
+| `scoreResponses`              | 1,000 persons, 1,000 items of 4 options                   |       3.8 | 8                           |
+| `qMatrixIdentifiability`      | A Q-matrix of 100,000 items of 20 attributes              |        12 | 62                          |
+| `calibrateCdm`                | 20 items of one of 20 attributes, two persons             |    0.0004 | 1,030                       |
+| `calibrateCdm`                | 64 items of one of 20 attributes, the most items × 2^K    |    0.0013 | 1,900 to 2,000 by model     |
+| `calibrateCdm`                | 64 items, one of 19 attributes and 63 of 13               |    0.0056 | 1,000 to 1,200 by model     |
+| `eventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items        |        72 | 79                          |
+| `eventLog`                    | 1,000,000 events, each of its own learner, item and skill |        82 | 171                         |
+| `bkt` with stored parameters  | 100,000 skills                                            |       6.6 | 56                          |
+| `kst` with a structure        | 10,000 states of 64 items                                 |       1.9 | 1                           |
+
+A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or
+persons itself, and 2 to 9 times where the input names them. A design of cognitive diagnosis takes up to 2 GB from a
+few hundred bytes, which its limits stop there; a host that takes Q-matrices from users sets a lower limit where it
+cannot spare that.

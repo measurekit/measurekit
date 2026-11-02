@@ -51,6 +51,13 @@ export function bitPattern(profile: readonly number[], positions: Iterable<numbe
 
 /** The most attributes of a design: 2^20 profiles. */
 export const MAX_ATTRIBUTES = 20;
+/**
+ * The most cells of the items' tables from the profiles to their latent groups, items × 2^K: 256 MB of 32-bit integers,
+ * 64 items at 20 attributes.
+ */
+const MAX_PROFILE_CELLS = 2 ** 26;
+/** The most latent groups over all items, 2^k for an item of k attributes: the success probabilities of the G-DINA. */
+const MAX_LATENT_GROUPS = 2 ** 20;
 
 /**
  * Checks an item's attributes: at least one, each a non-empty string, none twice.
@@ -107,12 +114,27 @@ export function designAttributes(
 /**
  * Checks a Q-matrix against item ids and returns its design.
  *
- * @throws `DataError` as {@link designAttributes} does, or when there are more than 20 attributes.
+ * @throws `DataError` as {@link designAttributes} does, or when there are more than 20 attributes, more than 2^26 cells
+ * of items by profiles or more than 2^20 latent groups over all items.
  */
 export function cdmDesign(itemIds: readonly string[], qMatrix: QMatrix): CdmDesign {
   const { attributes, itemAttributes } = designAttributes(itemIds, qMatrix);
   if (attributes.length > MAX_ATTRIBUTES) {
     throw new DataError(`A design has at most ${MAX_ATTRIBUTES} attributes, found ${attributes.length}.`);
+  }
+  // A few hundred bytes of Q-matrix can name these, and a fit holds each of them: the limits keep its memory within
+  // about 2 GB.
+  const cells = itemAttributes.length * 2 ** attributes.length;
+  if (cells > MAX_PROFILE_CELLS) {
+    throw new DataError(
+      `A design has at most ${MAX_PROFILE_CELLS} cells of items by profiles, items × 2^attributes, found ${cells} of ${itemAttributes.length} items and ${attributes.length} attributes.`,
+    );
+  }
+  const groups = itemAttributes.reduce((sum, indices) => sum + 2 ** indices.length, 0);
+  if (groups > MAX_LATENT_GROUPS) {
+    throw new DataError(
+      `A design has at most ${MAX_LATENT_GROUPS} latent groups over all items, 2^k for an item of k attributes, found ${groups}.`,
+    );
   }
   const profiles = profilesOf(attributes.length);
   const groupOf = itemAttributes.map((indices) => {

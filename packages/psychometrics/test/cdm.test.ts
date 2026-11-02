@@ -570,6 +570,28 @@ describe("calibrateCdm", () => {
     );
   }, 5_000);
 
+  it("refuses more than 20 attributes, 2^26 cells of items by profiles or 2^20 latent groups, before it calibrates", () => {
+    const attributes = (count: number) => Array.from({ length: count }, (_, k) => `a${k}`);
+    const design = (entries: readonly (readonly string[])[]) => {
+      const qMatrix = Object.fromEntries(entries.map((listed, j) => [`item${j}`, listed]));
+      const itemIds = Object.keys(qMatrix);
+      return [responseMatrix([itemIds.map(() => 0), itemIds.map(() => 1)], { itemIds }), qMatrix] as const;
+    };
+    // 40 items of one of 21 attributes, 65 items of one of 20, and 2 items of all 20: each passes the other limits but
+    // the cells, which a fit without the first limit would meet at once.
+    const twentyOne = attributes(21);
+    expect(() => calibrateCdm(...design(Array.from({ length: 40 }, (_, j) => [twentyOne[j % 21] ?? ""])))).toThrow(
+      "A design has at most 20 attributes, found 21.",
+    );
+    const twenty = attributes(20);
+    expect(() => calibrateCdm(...design(Array.from({ length: 65 }, (_, j) => [twenty[j % 20] ?? ""])))).toThrow(
+      "A design has at most 67108864 cells of items by profiles, items × 2^attributes, found 68157440 of 65 items and 20 attributes.",
+    );
+    expect(() => calibrateCdm(...design([twenty, twenty]))).toThrow(
+      "A design has at most 1048576 latent groups over all items, 2^k for an item of k attributes, found 2097152.",
+    );
+  });
+
   it("rejects polytomous responses, a Q-matrix that does not fit the items and unknown models", () => {
     const matrix = responseMatrix([
       [1, 0],

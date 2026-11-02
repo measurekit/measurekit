@@ -101,10 +101,17 @@ the machine epsilon. Responses are 0 or 1; missing ones are skipped.
 | `converged`     | Whether EM reached `tolerance`                                                                                                                                                   |
 | `iterations`    | EM iterations run                                                                                                                                                                |
 
-| Limit                                       | Value                | Why                                                                                                     |
-| ------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
-| Attributes of a Q-matrix                    | 20                   | K attributes give 2^K profiles, and a fit's memory and time grow with them: about 1 GB at 20 attributes |
-| Success probabilities with `standardErrors` | 3,162 over all items | An item of k attributes has 2^k, and their information matrix has p² cells: 80 MB at the limit          |
+| Limit                                       | Value                    | Why                                                                                                                                |
+| ------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Attributes of a Q-matrix                    | 20                       | K attributes give 2^K profiles, and a fit's memory and time grow with them: 1.0 GB for 20 items of one of 20 attributes            |
+| Items × 2^K                                 | 2^26, 64 items at K = 20 | A fit holds a table from the profiles to the latent groups of each item: 2.0 GB for 64 items at 20 attributes, the most it reaches |
+| Latent groups, 2^k for an item of k         | 2^20 over all items      | A fit holds each group's success probability, with the model's work on it: 1.2 GB for 64 items, one of 19 attributes and 63 of 13  |
+| Success probabilities with `standardErrors` | 3,162 over all items     | An item of k attributes has 2^k, and their information matrix has p² cells: 80 MB at the limit                                     |
+
+The memory is the rise of the peak of a process over two iterations of EM on two persons, measured as
+[performance](../performance.md#peak-memory) says; persons add no more, as the posteriors are summed person by person. A
+Q-matrix of a few hundred bytes reaches these limits, so a server that takes Q-matrices from users needs room for
+the 2 GB, or a lower limit of its own.
 
 `coefficients` are GDINA's `coef(what = "delta")`:
 
