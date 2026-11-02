@@ -67,7 +67,7 @@ correlation. The key's `pointBiserial` equals the item's `itemTotal`.
 | `mcdonaldOmega`              | McDonald's omega total of one factor, 1 - Σ (1 - λ²) / Σ r, below                                                   |
 | `standardErrorOfMeasurement` | s √(1 - reliability), in total score points; the reliability defaults to `cronbachAlpha`                            |
 
-`splitHalf` splits the items `odd-even` (items 1, 3, 5, ... against 2, 4, 6, ...; the default) or `first-second`
+`splitHalf` splits the items by its option `split`: `odd-even` (items 1, 3, 5, ... against 2, 4, 6, ...; the default) or `first-second`
 (the first k / 2 items, rounded down, against the rest). The Spearman-Brown value assumes halves of equal variance;
 Guttman's coefficient (Flanagan-Rulon) does not. KR-21 assumes items of equal difficulty and is at most KR-20.
 
