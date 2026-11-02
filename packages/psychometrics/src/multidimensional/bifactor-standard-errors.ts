@@ -1,4 +1,4 @@
-import { symmetrized } from "../math/matrix.js";
+import { symmetrized } from "../math/internal.js";
 import type { BifactorFit } from "./bifactor-fit.js";
 import { addPersonMeans, addSubPattern, finishProducts, type GroupScores, groupScores } from "./bifactor-scores.js";
 import type { Latent } from "./correlation.js";

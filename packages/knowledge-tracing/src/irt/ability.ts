@@ -1,5 +1,4 @@
-import { indexOfMax } from "../math/extremes.js";
-import { type Jet, quinticDerivative, quinticHermite, quinticMaximum } from "../math/quintic.js";
+import { indexOfMax, type Jet, quinticDerivative, quinticHermite, quinticMaximum } from "../math/internal.js";
 
 /** An ability estimate. */
 export interface Ability {

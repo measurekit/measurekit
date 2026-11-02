@@ -1,4 +1,4 @@
-import { outcomeLogLikelihood } from "../math/logistic.js";
+import { outcomeLogLikelihood } from "../math/internal.js";
 import { type Attempt, type Event, isObserved, type ObservedEvent } from "./event.js";
 import type { EventLog } from "./event-log.js";
 

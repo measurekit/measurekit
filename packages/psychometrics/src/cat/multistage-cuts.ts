@@ -15,7 +15,7 @@ import {
   indexItems,
   largestCategoryCount,
 } from "../irt/internal.js";
-import { findRoot } from "../math/root.js";
+import { findRoot } from "../math/internal.js";
 import {
   locateStages,
   type MultistageModule,

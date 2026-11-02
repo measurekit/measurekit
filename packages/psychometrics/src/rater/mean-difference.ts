@@ -1,5 +1,5 @@
 import { mean } from "@measurekit/core";
-import { standardDeviation } from "../math/statistics.js";
+import { standardDeviation } from "../math/internal.js";
 import { isConstant, pairOfRaters } from "./ratings.js";
 
 /**

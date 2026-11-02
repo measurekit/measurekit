@@ -1,6 +1,6 @@
 import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
-import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { invertPositiveDefinite } from "../math/internal.js";
 import { forEachTime, type TimedResponses, type TimeItem, timedResponses } from "./timed-responses.js";
 
 /** Options of {@link calibrateResponseTimes}. */

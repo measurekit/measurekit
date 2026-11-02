@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { rank } from "../math/rank.js";
+import { rank } from "../math/internal.js";
 import { constraintsOf, type Restrictions, sharesRates } from "./constraints.js";
 import type { Blim } from "./estimation.js";
 import { type KstParameters, START_RATE } from "./parameters.js";

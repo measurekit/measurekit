@@ -1,5 +1,5 @@
 import { checkArray, checkNonNegative, DataError, mean } from "@measurekit/core";
-import { standardDeviation } from "../math/statistics.js";
+import { standardDeviation } from "../math/internal.js";
 
 /** A modified Angoff cut score with its spread across the panelists. */
 export interface AngoffCutScore {

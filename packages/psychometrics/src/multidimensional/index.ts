@@ -6,7 +6,7 @@
  * @module @measurekit/psychometrics/multidimensional
  */
 
-export type { RotationMethod, RotationOptions } from "../math/rotation.js";
+export type { RotationMethod, RotationOptions } from "../math/internal.js";
 export { type BifactorOptions, calibrateBifactor } from "./bifactor.js";
 export {
   type CalibratedMultidimensionalItem,

@@ -5,8 +5,7 @@ import {
   unboundedCoordinates,
   unboundedScales,
 } from "../irt/internal.js";
-import { numericalHessian } from "../math/hessian.js";
-import { invert, invertPositiveDefinite } from "../math/linear-algebra.js";
+import { invert, invertPositiveDefinite, numericalHessian } from "../math/internal.js";
 import type { LongitudinalFit } from "./longitudinal-em.js";
 
 /**

@@ -25,10 +25,14 @@ import {
   smoothCorrelations,
   twoParameterLogistic,
 } from "../src/index.js";
-import { bivariateNormalCdf, bivariateNormalDensity } from "../src/math/bivariate-normal.js";
-import { symmetricEigen } from "../src/math/eigen.js";
-import { minres, minresLoadings } from "../src/math/minres.js";
-import { normalCdf } from "../src/math/normal.js";
+import {
+  bivariateNormalCdf,
+  bivariateNormalDensity,
+  minres,
+  minresLoadings,
+  normalCdf,
+  symmetricEigen,
+} from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import bivariate from "./fixtures/dimensionality-bivariate-normal.json" with { type: "json" };
 import factorFixture from "./fixtures/dimensionality-factors.json" with { type: "json" };

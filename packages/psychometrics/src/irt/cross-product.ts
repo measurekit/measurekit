@@ -1,4 +1,4 @@
-import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { invertPositiveDefinite } from "../math/internal.js";
 import type { ExpectationStep } from "./expectation.js";
 import type { Population } from "./latent.js";
 import type { IrtModel } from "./model.js";

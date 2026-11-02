@@ -2,8 +2,8 @@ import {
   bivariateNormalCdf,
   bivariateNormalDensity,
   bivariateNormalLogDensitySlope,
-} from "../math/bivariate-normal.js";
-import { normalCdf } from "../math/normal.js";
+  normalCdf,
+} from "../math/internal.js";
 
 /**
  * The correlations searched are within this of ±1, where the distribution is almost a line and the cells of a table

@@ -1,6 +1,6 @@
 import { DataError } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { covariance } from "../math/statistics.js";
+import { covariance } from "../math/internal.js";
 
 /** The most categories an item may have: the mokken package handles scores from 0 to 9. */
 const MAX_CATEGORIES = 10;

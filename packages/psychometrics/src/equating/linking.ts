@@ -9,7 +9,7 @@ import {
   mean,
 } from "@measurekit/core";
 import { checkItem, type IrtItem } from "../irt/internal.js";
-import { standardDeviation } from "../math/statistics.js";
+import { standardDeviation } from "../math/internal.js";
 import { itemMoments, rescaledErrors, rescaledItem } from "./models.js";
 
 /**

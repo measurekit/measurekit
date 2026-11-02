@@ -12,7 +12,7 @@ import {
   maxAbs,
 } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { invertPositiveDefinite } from "../math/internal.js";
 
 /** Options of {@link linearChange}. */
 export interface LinearChangeOptions {

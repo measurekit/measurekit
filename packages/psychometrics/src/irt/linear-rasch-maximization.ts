@@ -1,4 +1,4 @@
-import type { HessianFunction } from "../math/optimize.js";
+import type { HessianFunction } from "../math/internal.js";
 
 /** An item's location as a sum of coefficients times parameters: `Σ coefficients[a] * parameters[indices[a]]`. */
 export interface LocationRow {

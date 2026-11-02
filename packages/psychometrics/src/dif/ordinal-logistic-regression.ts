@@ -1,6 +1,6 @@
 import { backtrack, checkArray, checkOptions, DataError, describe, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { invert } from "../math/linear-algebra.js";
+import { invert } from "../math/internal.js";
 import { type DifData, type DifGroup, itemCases, polytomousData } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
 import { type LogisticRegressionDif, MAX_ITERATIONS, STEP_TOLERANCE } from "./logistic-regression.js";

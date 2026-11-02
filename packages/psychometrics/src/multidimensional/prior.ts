@@ -1,6 +1,5 @@
 import { checkArray, checkFinite, checkRecord, DataError, isRecord } from "@measurekit/core";
-import { invertPositiveDefinite } from "../math/linear-algebra.js";
-import { identity } from "../math/matrix.js";
+import { identity, invertPositiveDefinite } from "../math/internal.js";
 
 /** A multivariate normal prior distribution of theta. */
 export interface MultivariateNormalPrior {

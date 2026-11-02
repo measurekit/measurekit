@@ -10,7 +10,7 @@ import {
   type TestItem,
   twoParameterLogistic,
 } from "../irt/internal.js";
-import { rectangular } from "../math/quadrature.js";
+import { rectangular } from "../math/internal.js";
 import { EM_MAX_ITERATIONS, EM_TOLERANCE } from "./calibration.js";
 import { latentDistribution } from "./correlation.js";
 import { productGrid } from "./grid.js";

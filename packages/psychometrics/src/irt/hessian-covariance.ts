@@ -1,5 +1,4 @@
-import { numericalHessian } from "../math/hessian.js";
-import { invert } from "../math/linear-algebra.js";
+import { invert, numericalHessian } from "../math/internal.js";
 import type { Setup } from "./calibration-setup.js";
 import type { ExpectationStep } from "./expectation.js";
 import { type Maximization, unboundedCoordinates, unboundedScales } from "./m-step.js";

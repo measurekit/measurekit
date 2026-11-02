@@ -8,8 +8,7 @@ import {
   type ThetaDistribution,
 } from "@measurekit/core";
 import { checkThetaDistribution } from "../irt/internal.js";
-import { symmetricEigen } from "../math/eigen.js";
-import { normalCdf } from "../math/normal.js";
+import { normalCdf, symmetricEigen } from "../math/internal.js";
 
 /** An eigenvalue of the correlation with an absolute value below this is 0, so that rounding does not part correlation 1. */
 const EIGENVALUE_TOLERANCE = 1e-10;

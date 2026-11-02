@@ -1,6 +1,6 @@
 import { checkOptions, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { invert } from "../math/linear-algebra.js";
+import { invert } from "../math/internal.js";
 import { type DifGroup, dichotomousData, type ItemCases, itemCases } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";

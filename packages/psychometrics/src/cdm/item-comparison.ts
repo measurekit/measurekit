@@ -1,5 +1,5 @@
 import { checkArray, checkChoice, checkOptions, checkRecord, chiSquareUpperTail, DataError } from "@measurekit/core";
-import { pseudoInverse } from "../math/pseudo-inverse.js";
+import { pseudoInverse } from "../math/internal.js";
 import { type CdmCalibration, type CdmModel, checkSuccessProbabilities } from "./calibration.js";
 import { profilesOf } from "./q-matrix.js";
 

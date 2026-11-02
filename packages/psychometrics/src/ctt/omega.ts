@@ -1,7 +1,6 @@
 import { DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { minresLoadings } from "../math/minres.js";
-import { covariance, variance } from "../math/statistics.js";
+import { covariance, minresLoadings, variance } from "../math/internal.js";
 import { itemScores } from "./complete-cases.js";
 import { reliabilityCases } from "./reliability.js";
 

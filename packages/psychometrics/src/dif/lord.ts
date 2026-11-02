@@ -18,7 +18,7 @@ import {
   type ParameterCovariance,
 } from "../irt/internal.js";
 
-import { invert } from "../math/linear-algebra.js";
+import { invert } from "../math/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 

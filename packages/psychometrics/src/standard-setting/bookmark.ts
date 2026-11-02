@@ -1,7 +1,7 @@
 import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
 import { scoreLimits } from "../equating/internal.js";
 import { expectedScore, indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
-import { findIncreasingRoot } from "../math/root.js";
+import { findIncreasingRoot } from "../math/internal.js";
 
 /** Options of {@link orderedItemBooklet} and {@link bookmarkCutScore}. */
 export interface BookmarkOptions {

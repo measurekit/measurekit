@@ -1,5 +1,5 @@
 import { checkIntegerFrom, checkRandom, DataError, type Random } from "@measurekit/core";
-import { permutation } from "../math/permutation.js";
+import { permutation } from "../math/internal.js";
 import { type Event, isObserved } from "./event.js";
 import { checkLog, type EventLog } from "./event-log.js";
 

@@ -1,6 +1,5 @@
 import { checkArray, checkRecord, DataError } from "@measurekit/core";
-import { multiply } from "../math/matrix.js";
-import { type RotationOptions, resolveRotation, rotateLoadingMatrix } from "../math/rotation.js";
+import { multiply, type RotationOptions, resolveRotation, rotateLoadingMatrix } from "../math/internal.js";
 import type { MultidimensionalCalibration } from "./calibration.js";
 import { checkMultidimensionalItem } from "./items.js";
 import type { MultidimensionalTestItem } from "./model.js";

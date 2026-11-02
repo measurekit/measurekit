@@ -1,6 +1,6 @@
 import { checkOptions, checkRecord, DataError } from "@measurekit/core";
 import { type ScoredResponses, scoreResponses } from "../data/internal.js";
-import { correlation } from "../math/statistics.js";
+import { correlation } from "../math/internal.js";
 import { completeCases } from "./complete-cases.js";
 import { type GroupOptions, groupMean, scoreGroups } from "./groups.js";
 

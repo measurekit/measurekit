@@ -2,7 +2,7 @@ import { checkIntegerFrom, checkOptions, DataError, normalizeLogs } from "@measu
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { estimatePersons } from "../irt/internal.js";
-import { invertPositiveDefinite } from "../math/linear-algebra.js";
+import { invertPositiveDefinite } from "../math/internal.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
 import { type GridLikelihood, gridLikelihood } from "./grid-likelihood.js";
 import { checkMultidimensionalPattern, indexMultidimensionalItems } from "./items.js";

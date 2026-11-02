@@ -1,6 +1,5 @@
 import { checkRecord, DataError, describe } from "@measurekit/core";
-import type { Quadrature } from "../math/quadrature.js";
-import { findRoot } from "../math/root.js";
+import { findRoot, type Quadrature } from "../math/internal.js";
 
 /** The estimated spread of a testlet's effects. */
 export interface TestletEstimate {

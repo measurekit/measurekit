@@ -90,7 +90,8 @@ packages/knowledge-tracing/   src/<module>/ for data, math, evaluate, elo, bkt, 
                               src/model.ts holds LearnerModel, ModelFit and checkModel, which every model implements;
                               src/index.ts re-exports every module, the model interface, and DataError, MeasurekitError
                               and createRandom
-packages/<package>/           src/<module>/index.ts is the public API of a module, internal.ts what the package shares; test/<module>.test.ts, one for each src folder, with fixtures/ of reference results;
+packages/<package>/           src/<module>/index.ts is the public API of a module, internal.ts what the package shares, and math/,
+                              which no subpath exports, has internal.ts alone; test/<module>.test.ts, one for each src folder, with fixtures/ of reference results;
                               README.md, LICENSE, NOTICE, package.json, typedoc.json and the tsconfig files
 docs/<package>/               guides, which TypeDoc publishes with the API reference; docs/performance.md the benchmarks
 validation/<package>/         R and Python scripts that write the fixtures; validation/README.md lists them

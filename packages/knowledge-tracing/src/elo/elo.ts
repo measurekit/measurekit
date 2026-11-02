@@ -22,7 +22,7 @@ import {
   type ObservedEvent,
   onePass,
 } from "../data/internal.js";
-import { outcomeLogLikelihood } from "../math/logistic.js";
+import { outcomeLogLikelihood } from "../math/internal.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { checkParameters, type EloItem, type EloParameters } from "./parameters.js";
 import { checkState, type EloState, type SkillAbility } from "./state.js";

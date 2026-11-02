@@ -1,5 +1,5 @@
 import { covarianceFromInformation, unboundedCoordinates, unboundedScales } from "../irt/internal.js";
-import { numericalHessian } from "../math/hessian.js";
+import { numericalHessian } from "../math/internal.js";
 import { expectation, type JointModel } from "./speed-accuracy-em.js";
 import { timeGradient } from "./speed-accuracy-time.js";
 

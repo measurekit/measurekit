@@ -1,4 +1,4 @@
-import { mirror, symmetrized } from "../math/matrix.js";
+import { mirror, symmetrized } from "../math/internal.js";
 import { type PersonResponses, responsesByPerson } from "./mhrm-chain.js";
 import { latentObservedInformation, personLatentScores, secondMoments } from "./mhrm-latent.js";
 import { observedItemInformation, priorMoments, responseScores } from "./mhrm-moments.js";

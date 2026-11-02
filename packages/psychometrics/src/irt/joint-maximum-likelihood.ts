@@ -9,9 +9,7 @@ import {
   type ThresholdItem,
 } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { invert } from "../math/linear-algebra.js";
-import { type NewtonOptions, newton } from "../math/optimize.js";
-import { findIncreasingRoot } from "../math/root.js";
+import { findIncreasingRoot, invert, type NewtonOptions, newton } from "../math/internal.js";
 import type { CalibratedItem } from "./calibration.js";
 import { oneParameterLogistic } from "./logistic.js";
 import { partialCredit, partialCreditInformation, stepStarts } from "./partial-credit.js";

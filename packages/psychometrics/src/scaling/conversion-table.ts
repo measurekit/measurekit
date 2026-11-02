@@ -12,7 +12,7 @@ import {
   summedScoreTable,
   type ThetaIntegrationOptions,
 } from "../irt/internal.js";
-import { findIncreasingRoot } from "../math/root.js";
+import { findIncreasingRoot } from "../math/internal.js";
 import { conditionalDeviation, highestScore } from "./conversion.js";
 import { checkScale, type ScoreScale, scoreOfTheta } from "./score-scale.js";
 

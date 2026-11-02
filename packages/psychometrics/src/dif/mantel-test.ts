@@ -1,8 +1,7 @@
 import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 
-import { invertPositiveDefinite } from "../math/linear-algebra.js";
-import { standardDeviation } from "../math/statistics.js";
+import { invertPositiveDefinite, standardDeviation } from "../math/internal.js";
 import { type DifGroup, type ItemCases, itemCases, polytomousData } from "./groups.js";
 import {
   type DifAnalysis,

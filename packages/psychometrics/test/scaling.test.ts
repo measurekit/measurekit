@@ -24,7 +24,7 @@ import {
   thetaPosterior,
   twoParameterLogistic,
 } from "../src/index.js";
-import { normalCdf } from "../src/math/normal.js";
+import { normalCdf } from "../src/math/internal.js";
 import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureItems, fixtureItems } from "./fixture-items.js";

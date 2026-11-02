@@ -1,5 +1,4 @@
-import { symmetricEigen } from "../math/eigen.js";
-import { minresLoadings } from "../math/minres.js";
+import { minresLoadings, symmetricEigen } from "../math/internal.js";
 
 /** The eigenvalues of the correlation matrix of items and of its reduced matrix. */
 export interface CorrelationEigenvalues {

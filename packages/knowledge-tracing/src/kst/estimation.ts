@@ -1,6 +1,5 @@
 import { DataError, normalizeLogs, type Stopping } from "@measurekit/core";
-import { expectationMaximization } from "../math/expectation-maximization.js";
-import { minimum } from "../math/extremes.js";
+import { expectationMaximization, minimum } from "../math/internal.js";
 
 /** A learner's answers to one item: the item, the states that master it, the count and the sum of outcomes. */
 export interface Row {

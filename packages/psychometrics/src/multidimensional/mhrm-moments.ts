@@ -1,5 +1,5 @@
 import { MIN_PROBABILITY } from "../irt/internal.js";
-import { symmetrized } from "../math/matrix.js";
+import { symmetrized } from "../math/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import { assignCoordinates, itemCoordinates, itemScales } from "./m-step.js";
 import type { ItemResponses } from "./mhrm-chain.js";

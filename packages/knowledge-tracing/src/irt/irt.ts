@@ -22,8 +22,7 @@ import {
   onePass,
   parametersOf,
 } from "../data/internal.js";
-import { indexOfMax } from "../math/extremes.js";
-import { reflectedWalk } from "../math/reflected-walk.js";
+import { indexOfMax, reflectedWalk } from "../math/internal.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { type Ability, average, type Derivatives, differences, posteriorMean, posteriorMode } from "./ability.js";
 import { categoryCount, categoryTerms, expectedOutcome, type IrtItem } from "./items.js";

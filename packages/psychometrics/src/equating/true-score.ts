@@ -1,6 +1,6 @@
 import { checkArray, DataError } from "@measurekit/core";
 import { expectedScore, type IrtItem, largestCategoryCount } from "../irt/internal.js";
-import { findIncreasingRoot } from "../math/root.js";
+import { findIncreasingRoot } from "../math/internal.js";
 import { scoreLimits } from "./models.js";
 
 /**

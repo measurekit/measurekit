@@ -1,6 +1,6 @@
 import { DataError, mean } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { variance } from "../math/statistics.js";
+import { variance } from "../math/internal.js";
 import { type MokkenData, mokkenData, scoreOf } from "./scores.js";
 
 /**

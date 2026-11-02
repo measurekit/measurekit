@@ -1,6 +1,6 @@
 import { DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { covariance, variance } from "../math/statistics.js";
+import { covariance, variance } from "../math/internal.js";
 import type { CompleteCases } from "./complete-cases.js";
 import { sectionCases, sectionStatistics } from "./sections.js";
 

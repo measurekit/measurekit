@@ -17,7 +17,7 @@ import {
   replay,
   type Steps,
 } from "../data/internal.js";
-import { indexOfMax } from "../math/extremes.js";
+import { indexOfMax } from "../math/internal.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import {
   checkRestrictions,

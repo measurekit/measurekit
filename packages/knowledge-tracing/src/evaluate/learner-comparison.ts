@@ -1,6 +1,6 @@
 import { checkArray, checkChoice, checkOptions, checkRecord, DataError, studentLowerTail } from "@measurekit/core";
 import { checkLog, type Fold } from "../data/internal.js";
-import { outcomeLogLikelihood } from "../math/logistic.js";
+import { outcomeLogLikelihood } from "../math/internal.js";
 import type { CrossValidation } from "./cross-validation.js";
 import { checkPredictionList } from "./observed-pairs.js";
 

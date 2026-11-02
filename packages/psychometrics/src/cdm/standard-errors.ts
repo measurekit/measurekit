@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { pseudoInverse } from "../math/pseudo-inverse.js";
+import { pseudoInverse } from "../math/internal.js";
 import { type CdmState, type DichotomousRows, forEachPosterior } from "./expectation.js";
 import type { CdmDesign } from "./q-matrix.js";
 

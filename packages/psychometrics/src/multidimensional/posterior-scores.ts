@@ -1,5 +1,5 @@
 import { type CompressedResponses, MIN_PROBABILITY } from "../irt/internal.js";
-import { mirror } from "../math/matrix.js";
+import { mirror } from "../math/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Latent } from "./correlation.js";
 import type { ExpectationStep } from "./expectation.js";

@@ -1,5 +1,5 @@
 import { DataError, describe, dot } from "@measurekit/core";
-import { newton } from "../math/optimize.js";
+import { newton } from "../math/internal.js";
 import { checkDistribution } from "./observed-score.js";
 
 /** A score distribution smoothed by a log-linear model. */

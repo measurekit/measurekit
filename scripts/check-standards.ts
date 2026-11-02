@@ -249,14 +249,17 @@ export function checkFamilies(files: Files): Violation[] {
   return found;
 }
 
-/** The module that holds a file: the nearest directory with an `index.ts`, or `undefined` for a file outside every module. */
+/**
+ * The module that holds a file: the nearest directory with an `index.ts` or, for a module that only the package uses, an
+ * `internal.ts`; `undefined` for a file outside every module.
+ */
 function moduleOf(file: string, files: Files): string | undefined {
   for (
     let directory = dirname(file);
     basename(directory) !== "src" && directory !== ".";
     directory = dirname(directory)
   ) {
-    if (files.has(`${directory}/index.ts`)) return directory;
+    if (files.has(`${directory}/index.ts`) || files.has(`${directory}/internal.ts`)) return directory;
   }
   return undefined;
 }

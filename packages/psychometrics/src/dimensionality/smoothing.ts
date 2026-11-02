@@ -1,5 +1,5 @@
 import { checkOptions, checkPositive, checkPositiveInteger, DataError } from "@measurekit/core";
-import { symmetricEigen } from "../math/eigen.js";
+import { symmetricEigen } from "../math/internal.js";
 
 /** Options of {@link smoothCorrelations}. */
 export interface SmoothingOptions {

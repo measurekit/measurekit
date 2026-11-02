@@ -60,7 +60,7 @@ import {
   population,
   squarem,
 } from "../src/irt/internal.js";
-import { rectangular } from "../src/math/quadrature.js";
+import { rectangular } from "../src/math/internal.js";
 import { arbitraryItem, arbitraryLocation, arbitraryLocations, arbitrarySlope } from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { definedEntries, type FixtureErrors, type FixtureParameters, MODELS } from "./fixture-items.js";

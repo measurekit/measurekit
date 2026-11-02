@@ -1,5 +1,5 @@
 import { DataError, describe } from "@measurekit/core";
-import { rectangular } from "../math/quadrature.js";
+import { rectangular } from "../math/internal.js";
 
 /** The most nodes a grid may have, which bounds the memory and time of an integral over it. */
 export const MAX_GRID_NODES = 1_000_000;

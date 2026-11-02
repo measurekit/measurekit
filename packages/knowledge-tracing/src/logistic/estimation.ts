@@ -1,14 +1,15 @@
 import { DataError, logistic } from "@measurekit/core";
 import { type EventLog, isObserved, type ObservedEvent } from "../data/internal.js";
-import { type FlatDirection, linear } from "../math/arrow-system.js";
-import { outcomeLogLikelihood } from "../math/logistic.js";
 import {
+  type FlatDirection,
   type GroupIntercepts,
   type LogisticRegression,
+  linear,
   logisticRegression,
   MAX_DENSE_COEFFICIENTS,
-} from "../math/logistic-regression.js";
-import type { SparseMatrix } from "../math/sparse-matrix.js";
+  outcomeLogLikelihood,
+  type SparseMatrix,
+} from "../math/internal.js";
 import type { LogisticParameters, LogisticSkill, Proficiency } from "./parameters.js";
 import { advanceInPlace, finishState, type LogisticState, startState, type WorkingState } from "./state.js";
 import { blockWidth, type InterceptKind, type TermSpec, type Terms, visitRow } from "./terms.js";

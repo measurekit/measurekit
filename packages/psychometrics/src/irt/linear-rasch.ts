@@ -1,8 +1,5 @@
 import { largestChange } from "@measurekit/core";
-import { numericalHessian } from "../math/hessian.js";
-import { invert } from "../math/linear-algebra.js";
-import { type HessianFunction, newton } from "../math/optimize.js";
-import type { Quadrature } from "../math/quadrature.js";
+import { type HessianFunction, invert, newton, numericalHessian, type Quadrature } from "../math/internal.js";
 import { type ExpectationItem, type ExpectationStep, expectationStep } from "./expectation.js";
 import type { Population } from "./latent.js";
 import {

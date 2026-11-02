@@ -1,5 +1,5 @@
 import { checkRecord, DataError } from "@measurekit/core";
-import type { Quadrature } from "../math/quadrature.js";
+import type { Quadrature } from "../math/internal.js";
 import type { CalibrationOptions } from "./calibration-options.js";
 import type { ExpectationItem } from "./expectation.js";
 import { checkFixedCategories, checkFixedIds, checkItem, checkModel, modelsOf } from "./items.js";

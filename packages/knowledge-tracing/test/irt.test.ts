@@ -19,7 +19,7 @@ import {
   type ThetaDistribution,
 } from "../src/index.js";
 import { categoryCount, categoryTerms, differences, expectedOutcome } from "../src/irt/internal.js";
-import { reflectedWalk } from "../src/math/reflected-walk.js";
+import { reflectedWalk } from "../src/math/internal.js";
 import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
 import reference from "./fixtures/irt-abilities.json" with { type: "json" };
 import drifting from "./fixtures/irt-drift.json" with { type: "json" };

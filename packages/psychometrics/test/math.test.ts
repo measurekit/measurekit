@@ -1,16 +1,29 @@
 import { chiSquareUpperTail, logistic, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { symmetricEigen } from "../src/math/eigen.js";
-import { numericalHessian } from "../src/math/hessian.js";
-import { invert, invertPositiveDefinite } from "../src/math/linear-algebra.js";
-import { identity, mirror, multiply, symmetrized, trace, traceOfProduct, transpose } from "../src/math/matrix.js";
-import { normalCdf, normalDensity } from "../src/math/normal.js";
-import { newton } from "../src/math/optimize.js";
-import { pseudoInverse } from "../src/math/pseudo-inverse.js";
-import { gaussHermite, rectangular } from "../src/math/quadrature.js";
-import { findIncreasingRoot, findRoot } from "../src/math/root.js";
-import { resolveRotation, rotateLoadingMatrix } from "../src/math/rotation.js";
+import {
+  findIncreasingRoot,
+  findRoot,
+  gaussHermite,
+  identity,
+  invert,
+  invertPositiveDefinite,
+  mirror,
+  multiply,
+  newton,
+  normalCdf,
+  normalDensity,
+  numericalHessian,
+  pseudoInverse,
+  rectangular,
+  resolveRotation,
+  rotateLoadingMatrix,
+  symmetricEigen,
+  symmetrized,
+  trace,
+  traceOfProduct,
+  transpose,
+} from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import factors from "./fixtures/dimensionality-factors.json" with { type: "json" };
 import eigen from "./fixtures/math-eigen.json" with { type: "json" };

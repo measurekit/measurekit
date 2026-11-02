@@ -1,6 +1,6 @@
 import { checkNonNegative, DataError, type ThetaDistribution } from "@measurekit/core";
 import { checkThetaDistribution } from "../irt/internal.js";
-import { normalCdf } from "../math/normal.js";
+import { normalCdf } from "../math/internal.js";
 import {
   checkLevel,
   type ScorePrediction,

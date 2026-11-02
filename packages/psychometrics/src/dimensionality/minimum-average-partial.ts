@@ -1,6 +1,6 @@
 import { checkChoice, checkNonNegative, checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { symmetricEigen } from "../math/eigen.js";
+import { symmetricEigen } from "../math/internal.js";
 import { ITEM_CORRELATIONS, type ItemCorrelation, positiveDefiniteCorrelations } from "./item-correlations.js";
 import { DEFAULT_CORRECTION, type PolychoricOptions } from "./polychoric.js";
 

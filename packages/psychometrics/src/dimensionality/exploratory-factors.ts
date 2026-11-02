@@ -7,8 +7,7 @@ import {
   DataError,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { minres } from "../math/minres.js";
-import { resolveRotation, rotateLoadingMatrix } from "../math/rotation.js";
+import { minres, resolveRotation, rotateLoadingMatrix } from "../math/internal.js";
 import { ITEM_CORRELATIONS, type ItemCorrelation, positiveDefiniteCorrelations } from "./item-correlations.js";
 import { DEFAULT_CORRECTION, type PolychoricOptions } from "./polychoric.js";
 

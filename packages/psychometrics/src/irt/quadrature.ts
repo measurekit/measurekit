@@ -1,5 +1,5 @@
 import { checkChoice, checkIntegerFrom, checkRecord } from "@measurekit/core";
-import { gaussHermite, type Quadrature, rectangular } from "../math/quadrature.js";
+import { gaussHermite, type Quadrature, rectangular } from "../math/internal.js";
 
 /** How to place quadrature nodes over theta. */
 export type QuadratureMethod = "rectangular" | "gauss-hermite";

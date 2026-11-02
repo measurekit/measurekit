@@ -183,7 +183,11 @@ describe("module entries", () => {
       'import { shared } from "../one/internal.js";',
       'import { read } from "../one/read.js";',
       'import { nested } from "../one/nested/deep.js";',
+      'import { solve } from "../math/internal.js";',
+      'import { invert } from "../math/invert.js";',
     ].join("\n"),
+    "packages/a/src/math/internal.ts": 'export { invert } from "./invert.js";\n',
+    "packages/a/src/math/invert.ts": "",
     "packages/a/test/one.test.ts": [
       'import { one } from "../src/one/index.js";',
       'import { read } from "../src/one/read.js";',
@@ -191,11 +195,12 @@ describe("module entries", () => {
     ].join("\n"),
   });
 
-  it("reports an import that reaches a file of another module", () => {
+  it("reports an import that reaches a file of another module, also of one with only an internal.ts", () => {
     expect(checkEntries(files).map(({ file, line }) => [file, line])).toStrictEqual([
       ["packages/a/src/one/nested/deep.ts", 1],
       ["packages/a/src/two/use.ts", 4],
       ["packages/a/src/two/use.ts", 5],
+      ["packages/a/src/two/use.ts", 7],
       ["packages/a/test/one.test.ts", 2],
     ]);
   });

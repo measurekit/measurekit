@@ -1,7 +1,7 @@
 import { bfgs, checkOptions, type OptimizerOptions } from "@measurekit/core";
 import { type IrtItem, largestCategoryCount, type QuadratureOptions, quadratureRule } from "../irt/internal.js";
 
-import type { Quadrature } from "../math/quadrature.js";
+import type { Quadrature } from "../math/internal.js";
 import { checkCommonItems, type ScaleTransformation } from "./linking.js";
 
 /** A scale transformation that minimizes a characteristic curve criterion, with the minimization's convergence. */

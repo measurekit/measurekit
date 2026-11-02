@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { rectangular } from "../math/quadrature.js";
+import { rectangular } from "../math/internal.js";
 import { type Grid, MAX_GRID_NODES } from "./grid.js";
 
 /** The nodes and weights of the specific dimensions: one rule for them all, as they share one normal distribution. */

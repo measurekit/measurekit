@@ -1,4 +1,4 @@
-import { type NewtonOptions, newton } from "../math/optimize.js";
+import { type NewtonOptions, newton } from "../math/internal.js";
 import { fromUnbounded, toUnbounded, unboundedDerivative } from "./bounds.js";
 import type { FreeParameter, ItemState, Setup } from "./calibration-setup.js";
 import { distributionObjective, normalWeights } from "./latent.js";

@@ -1,6 +1,6 @@
 import { DataError, describe } from "@measurekit/core";
 import { checkLearnerState } from "../data/internal.js";
-import { indexOfMax } from "../math/extremes.js";
+import { indexOfMax } from "../math/internal.js";
 
 /**
  * A learner's state in an IRT model: the log-density of the posterior of θ at each point of the model's grid, up to a

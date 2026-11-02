@@ -1,5 +1,5 @@
 import { DataError, kappaOfPairs, mean } from "@measurekit/core";
-import { outcomeLogLikelihood } from "../math/logistic.js";
+import { outcomeLogLikelihood } from "../math/internal.js";
 import { checkPredictions, isBinary } from "./predictions.js";
 
 /** The metrics of predictions against outcomes. */

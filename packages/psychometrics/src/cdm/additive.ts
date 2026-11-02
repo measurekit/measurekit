@@ -1,5 +1,5 @@
 import { backtrack, dot, logistic, maxAbs } from "@measurekit/core";
-import { invert, invertPositiveDefinite } from "../math/linear-algebra.js";
+import { invert, invertPositiveDefinite } from "../math/internal.js";
 import { profileIndices, profilesOf } from "./q-matrix.js";
 
 /**

@@ -9,8 +9,7 @@ import {
   normalizeLogs,
   type ThetaDistribution,
 } from "@measurekit/core";
-import type { Quadrature } from "../math/quadrature.js";
-import { findRoot } from "../math/root.js";
+import { findRoot, type Quadrature } from "../math/internal.js";
 import { answeredItems, checkPattern, indexItems, largestCategoryCount } from "./items.js";
 import type { IrtItem } from "./model.js";
 import { logProbability, MIN_PROBABILITY } from "./probability.js";

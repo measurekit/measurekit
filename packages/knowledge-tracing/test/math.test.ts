@@ -2,17 +2,22 @@ import { logistic, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { createRandom } from "../src/index.js";
-import { createProblem, penalizedNewton } from "../src/math/arrow-system.js";
-import { expectationMaximization } from "../src/math/expectation-maximization.js";
-import { forwardBackward } from "../src/math/hidden-markov.js";
-import { choleskySolve } from "../src/math/linear-algebra.js";
-import { outcomeLogLikelihood } from "../src/math/logistic.js";
-import { logisticRegression } from "../src/math/logistic-regression.js";
-import { newtonCg } from "../src/math/newton-cg.js";
-import { permutation } from "../src/math/permutation.js";
-import { quinticDerivative, quinticHermite, quinticMaximum } from "../src/math/quintic.js";
-import { rank } from "../src/math/rank.js";
-import type { SparseMatrix } from "../src/math/sparse-matrix.js";
+import {
+  choleskySolve,
+  createProblem,
+  expectationMaximization,
+  forwardBackward,
+  logisticRegression,
+  newtonCg,
+  outcomeLogLikelihood,
+  penalizedNewton,
+  permutation,
+  quinticDerivative,
+  quinticHermite,
+  quinticMaximum,
+  rank,
+  type SparseMatrix,
+} from "../src/math/internal.js";
 import { defined, expectAllClose, expectClose } from "./assertions.js";
 import hiddenMarkov from "./fixtures/math-forward-backward.json" with { type: "json" };
 import functions from "./fixtures/math-functions.json" with { type: "json" };
