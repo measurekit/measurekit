@@ -680,7 +680,8 @@ P(x | r) = Π_i e^(-η_(i x_i)) / γ_r(A).
 
 The result holds `items`, `logLikelihood` (conditional), `parameters`, `persons`, `converged` and `iterations`. The items
 take theta on the Rasch scale, and `itemFit` reads them. On 40 seeded sets of 2,000 persons and 15 items,
-the difficulties have an RMSE of 0.052 and their 95% intervals cover them in 96.3% of cases.
+the difficulties have an RMSE of 0.052 and their 95% intervals cover them in 96.3% of cases. The Andersen, Martin-Löf and
+Wald tests of [fit](fit.md#rasch-tests) compare CML fits in parts of the matrix.
 
 ### Differences from eRm
 

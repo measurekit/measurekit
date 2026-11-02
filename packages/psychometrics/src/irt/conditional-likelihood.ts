@@ -112,6 +112,26 @@ export function conditionalMaximumLikelihood(
   matrix: ResponseMatrix,
   options: ConditionalCalibrationOptions = {},
 ): ConditionalCalibration {
+  return conditionalFit(matrix, options).calibration;
+}
+
+/** A conditional calibration with the covariance matrix of the parameters it reports. */
+export interface ConditionalFit {
+  /** The calibration. */
+  readonly calibration: ConditionalCalibration;
+  /**
+   * The covariance matrix by rows of the reported parameters: the thresholds of every item, in item order, or under the
+   * rating scale model the locations and then the steps. `null` when the information matrix is singular.
+   */
+  readonly covariance: Float64Array | null;
+}
+
+/**
+ * Estimates as {@link conditionalMaximumLikelihood} does and also returns the covariance matrix of the parameters.
+ *
+ * @throws `DataError` as {@link conditionalMaximumLikelihood} does.
+ */
+export function conditionalFit(matrix: ResponseMatrix, options: ConditionalCalibrationOptions = {}): ConditionalFit {
   checkResponseMatrix(matrix);
   checkOptions(options);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
@@ -125,19 +145,18 @@ export function conditionalMaximumLikelihood(
   checkChoice(model, "The option model", MODELS);
   const data = conditionalData(matrix, highest, model);
   const layout = parameterLayout(highest, model);
-  const { estimates, covariance, logLikelihood, converged, iterations } = maximize(
-    data,
-    layout,
-    tolerance,
-    maxIterations,
-  );
+  const maximum = maximize(data, layout, tolerance, maxIterations);
+  const { values, covariance } = reportedValues(layout, maximum.estimates, maximum.covariance);
   return {
-    items: calibratedItems(itemIds, highest, model, layout, estimates, covariance),
-    logLikelihood,
-    parameters: layout.size,
-    persons: data.persons,
-    converged,
-    iterations,
+    calibration: {
+      items: calibratedItems(itemIds, highest, model, values, covariance),
+      logLikelihood: maximum.logLikelihood,
+      parameters: layout.size,
+      persons: data.persons,
+      converged: maximum.converged,
+      iterations: maximum.iterations,
+    },
+    covariance,
   };
 }
 
@@ -515,35 +534,35 @@ function projectedInformation(
   return { gradient: projected, matrix: matrix.map((value) => -value) };
 }
 
-/** Returns the reported parameters R φ and their standard errors, the square roots of the diagonal of R C Rᵀ. */
+/** Returns the reported parameters R φ and their covariance matrix R C Rᵀ. */
 function reportedValues(
   { reported, size }: ParameterLayout,
   estimates: Float64Array,
   covariance: Float64Array | null,
-): { readonly values: Float64Array; readonly errors: Float64Array | null } {
+): { readonly values: Float64Array; readonly covariance: Float64Array | null } {
   const count = reported.length / size;
   const values = new Float64Array(count);
   multiply(reported, estimates, count, size, 1, values);
-  if (covariance === null) return { values, errors: null };
+  if (covariance === null) return { values, covariance: null };
   const product = new Float64Array(count * size);
   multiply(reported, covariance, count, size, size, product);
-  const errors = Float64Array.from({ length: count }, (_, row) => {
-    let variance = 0;
-    for (let p = 0; p < size; p++) variance += (product[row * size + p] ?? 0) * (reported[row * size + p] ?? 0);
-    return Math.sqrt(variance);
-  });
-  return { values, errors };
+  const result = new Float64Array(count * count);
+  multiply(product, transpose(reported, count, size), count, size, count, result);
+  return { values, covariance: result };
 }
 
 function calibratedItems(
   itemIds: readonly string[],
   highest: Int32Array,
   model: ConditionalModel,
-  layout: ParameterLayout,
-  estimates: Float64Array,
+  values: Float64Array,
   covariance: Float64Array | null,
 ): CalibratedItem<LogisticItem | ThresholdItem | RatingScaleParameters>[] {
-  const { values, errors } = reportedValues(layout, estimates, covariance);
+  const count = values.length;
+  const errors =
+    covariance === null
+      ? null
+      : Float64Array.from({ length: count }, (_, row) => Math.sqrt(covariance[row * count + row] ?? 0));
   if (model === "rating-scale") {
     const steps = highest[0] ?? 0;
     const stepValues = Array.from(values.subarray(itemIds.length));

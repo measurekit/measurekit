@@ -2,20 +2,26 @@ import { chiSquareUpperTail } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  andersenTest,
   type CalibratedItem,
   type Calibration,
+  type ConditionalModel,
   calibrate,
   createRandom,
   DataError,
   type IrtItem,
   type IrtModel,
+  type ItemSplit,
   itemFit,
   type LimitedInformationFit,
   limitedInformationFit,
+  martinLofTest,
   nominalResponse,
   oneParameterLogistic,
   personFit,
+  type RaschSplit,
   type ResponseMatrix,
+  raschWaldTest,
   responseMatrix,
   simulateItems,
   simulateResponses,
@@ -29,6 +35,7 @@ import { defined, expectClose } from "./assertions.js";
 import { definedEntries, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
 import limited from "./fixtures/fit-limited-information.json" with { type: "json" };
 import rasch from "./fixtures/fit-rasch.json" with { type: "json" };
+import raschTests from "./fixtures/fit-rasch-tests.json" with { type: "json" };
 import residuals from "./fixtures/fit-residuals.json" with { type: "json" };
 import summedScore from "./fixtures/fit-summed-score.json" with { type: "json" };
 
@@ -41,6 +48,12 @@ const LIMITED_TOLERANCE = 1e-3;
 const LIMITED_EM_TOLERANCE = 1e-8;
 /** M2 of the rejection sets, whose calibrations stop at the reference's 1e-6. */
 const REJECTION_TOLERANCE = 2e-2;
+/** The likelihood-ratio statistics of the Rasch tests against eRm, whose nlm stops short of the maximum. */
+const RASCH_STATISTIC_TOLERANCE = 1e-6;
+/** The Wald z of an item against eRm, first-order in the estimates where nlm stops. */
+const RASCH_WALD_TOLERANCE = 1e-3;
+/** Andersen's statistic against base R's conditional likelihood, maximized by optim to 1e-15. */
+const RASCH_BASE_TOLERANCE = 1e-8;
 
 /** Expects each named statistic of `actual` to be within `tolerance` of the fixture's list of that statistic. */
 function expectTable(
@@ -492,6 +505,304 @@ describe("limitedInformationFit", () => {
   });
 });
 
+describe("Rasch tests", () => {
+  /** The model and split of a fixture case, read from its JSON. */
+  function modelOf(name: string): ConditionalModel {
+    if (name === "rasch" || name === "partial-credit" || name === "rating-scale") return name;
+    throw new Error(`Unknown model ${name}.`);
+  }
+  function personSplit(split: unknown): RaschSplit {
+    if (split === "median" || split === "mean") return split;
+    if (Array.isArray(split) && split.every((label) => typeof label === "string")) return split;
+    throw new Error("The case's split is not one of persons.");
+  }
+  function itemSplit(split: unknown): ItemSplit {
+    if (split === "median" || split === "mean") return split;
+    if (Array.isArray(split) && split.every((set) => Array.isArray(set) && set.every((id) => typeof id === "string"))) {
+      return split;
+    }
+    throw new Error("The case's split is not one of items.");
+  }
+  const caseNamed = <T extends { readonly name: string }>(cases: readonly T[], name: string): T =>
+    defined(cases.find((candidate) => candidate.name === name));
+
+  /** Two groups, a and b, where leaving out item1 makes person 3 extreme in b, and item2 then constant there. */
+  const Cascade = responseMatrix([
+    [0, 1, 1, 0],
+    [1, 0, 0, 1],
+    [0, 0, 1, 0],
+    [1, 1, 0, 1],
+    [1, 0, 0, 0],
+    [1, 1, 1, 0],
+    [1, 1, 0, 1],
+  ]);
+  const cascadeSplit = ["a", "a", "a", "a", "b", "b", "b"];
+
+  describe("andersenTest", () => {
+    for (const expected of raschTests.andersen) {
+      const reference = "erm" in expected ? "base R's conditional likelihood" : "eRm's LRtest";
+      it(`matches ${reference} on ${expected.name}`, () => {
+        const result = andersenTest(responseMatrix(expected.responses), {
+          model: modelOf(expected.model),
+          split: personSplit(expected.split),
+        });
+        const tolerance = "erm" in expected ? RASCH_BASE_TOLERANCE : RASCH_STATISTIC_TOLERANCE;
+        expectClose(result.statistic, expected.statistic, tolerance, "statistic");
+        expectClose(result.significance, expected.significance, tolerance, "significance");
+        expect([result.degreesOfFreedom, result.persons, result.converged]).toEqual([
+          expected.degreesOfFreedom,
+          expected.persons,
+          true,
+        ]);
+        expect(result.excluded).toEqual(expected.excluded);
+      });
+    }
+
+    it("maximizes each conditional likelihood on missing responses of polytomous items, where eRm's LRtest does not", () => {
+      const expected = caseNamed(raschTests.andersen, "small, sparse, median");
+      const { statistic } = andersenTest(responseMatrix(expected.responses));
+      expect(Math.abs(statistic - defined("erm" in expected ? expected.erm : null))).toBeGreaterThan(10);
+    });
+
+    it("splits persons with missing responses at the median of those who answered the same items", () => {
+      const matrix = responseMatrix([
+        [1, 1, 0, null],
+        [0, 1, 0, null],
+        [1, 1, 1, null],
+        [1, 0, 1, 1],
+        [0, 0, 1, 1],
+        [1, 1, 1, 0],
+        [0, 1, 1, 0],
+      ]);
+      // Medians: 2 among the first three persons, 2.5 among the others.
+      const labels = ["lower", "lower", "upper", "upper", "lower", "upper", "lower"];
+      expectSameNumbers(andersenTest(matrix, { split: labels }), andersenTest(matrix));
+    });
+
+    it("leaves out an item a group answers alike, and counts the persons again without it", () => {
+      const result = andersenTest(Cascade, { split: cascadeSplit });
+      // Without item1, person 5 has a total of 0, and item2 is 1 for the other two persons of group b.
+      expect(result.excluded).toEqual(["item1", "item2"]);
+      expect([result.degreesOfFreedom, result.persons]).toEqual([1, 6]);
+      expectClose(result.statistic, 0, 1e-9);
+    });
+
+    it("takes the model and the stopping rules of conditional maximum likelihood", () => {
+      const expected = caseNamed(raschTests.andersen, "pcmdat2, median");
+      const matrix = responseMatrix(expected.responses);
+      expect(andersenTest(matrix, { maxIterations: 1 }).converged).toBe(false);
+      const rating = andersenTest(matrix, { model: "rating-scale" });
+      expect(rating.degreesOfFreedom).toBe(4);
+      expect(() => andersenTest(matrix, { model: "rasch" })).toThrow(/allows responses from 0 to 1/);
+    });
+
+    it("refuses a split into one group, and too few items to test", () => {
+      const matrix = responseMatrix(caseNamed(raschTests.andersen, "raschdat1, median").responses);
+      expect(() => andersenTest(matrix, { split: matrix.personIds.map(() => "all") })).toThrow(
+        "The split puts every person in one group; the test needs at least two groups of persons.",
+      );
+      const constant = responseMatrix([
+        [1, 1, 0],
+        [1, 0, 1],
+        [1, 0, 0],
+        [1, 1, 1],
+      ]);
+      expect(() => andersenTest(constant, { split: ["a", "b", "a", "b"] })).toThrow(
+        /at least two items with a response in each of their categories in every group, found 0/,
+      );
+    });
+
+    it("refuses arguments of other types", () => {
+      const matrix = responseMatrix(caseNamed(raschTests.andersen, "raschdat1, median").responses);
+      expect(() => andersenTest(JSON.parse("null"))).toThrow(DataError);
+      expect(() => andersenTest(matrix, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      const options = (value: string) => () => andersenTest(matrix, JSON.parse(value));
+      expect(options('{ "split": null }')).toThrow(/The option split must be "median", "mean" or an array of labels/);
+      expect(options('{ "split": "upper" }')).toThrow(/The option split must be/);
+      expect(options('{ "split": ["a", "b"] }')).toThrow(/one label for each of the 100 persons, found 2/);
+      expect(() =>
+        andersenTest(matrix, { split: matrix.personIds.map((_, i) => JSON.parse(i < 50 ? "1" : "2")) }),
+      ).toThrow('The label of person "person1" must be a string, found 1.');
+      expect(options('{ "model": "RM" }')).toThrow(/The option model/);
+      expect(options('{ "tolerance": "small" }')).toThrow(DataError);
+    });
+  });
+
+  describe("raschWaldTest", () => {
+    for (const expected of raschTests.wald) {
+      const reference = expected.model === "partial-credit" ? "base R's locations of eRm's PCM" : "eRm's Waldtest";
+      it(`matches ${reference} on ${expected.name}`, () => {
+        const result = raschWaldTest(responseMatrix(expected.responses), {
+          model: modelOf(expected.model),
+          split: personSplit(expected.split),
+        });
+        result.items.forEach((item, i) => {
+          expectClose(item.z, expected.z[i] ?? null, RASCH_WALD_TOLERANCE, `${item.id} z`);
+          expectClose(item.significance, expected.significance[i] ?? null, RASCH_WALD_TOLERANCE, `${item.id} p`);
+        });
+        expect([result.excluded, result.persons, result.converged]).toEqual([
+          expected.excluded,
+          expected.persons,
+          true,
+        ]);
+      });
+    }
+
+    it("gives a positive z to an item harder for the second group", () => {
+      const random = createRandom(31);
+      const items = [-1, -0.5, 0, 0.5, 1].map((b) => ({
+        model: oneParameterLogistic,
+        parameters: { a: 1, b, c: 0, d: 1 },
+      }));
+      const shifted = items.map((item, i) => (i === 0 ? { ...item, parameters: { ...item.parameters, b: 0 } } : item));
+      const reference = simulateResponses(items, simulateThetas(1000, random), random);
+      const focal = simulateResponses(shifted, simulateThetas(1000, random), random);
+      const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+      const split = matrix.personIds.map((_, person) => (person < 1000 ? "1 reference" : "2 focal"));
+      const [first, ...others] = raschWaldTest(matrix, { split }).items;
+      expect(defined(first?.z)).toBeGreaterThan(5);
+      expect(others.every((item) => defined(item.z) < 0)).toBe(true);
+    });
+
+    it("gives null to the items it leaves out", () => {
+      const result = raschWaldTest(Cascade, { split: cascadeSplit });
+      expect(result.items.map((item) => item.z === null)).toEqual([true, true, false, false]);
+      expect(result.excluded).toEqual(["item1", "item2"]);
+      expect(result.persons).toBe(6);
+    });
+
+    it("refuses a split into more than two groups, and arguments of other types", () => {
+      const matrix = responseMatrix(caseNamed(raschTests.andersen, "raschdat1, three labels").responses);
+      const split = personSplit(caseNamed(raschTests.andersen, "raschdat1, three labels").split);
+      expect(() => raschWaldTest(matrix, { split })).toThrow("The Wald test compares two groups of persons, found 3.");
+      expect(() => raschWaldTest(JSON.parse("[]"))).toThrow(DataError);
+      expect(() => raschWaldTest(matrix, JSON.parse("null"))).toThrow(DataError);
+      expect(() => raschWaldTest(matrix, JSON.parse('{ "split": {} }'))).toThrow(/The option split must be/);
+    });
+  });
+
+  describe("martinLofTest", () => {
+    for (const expected of raschTests.martinLof) {
+      const reference =
+        expected.model === "rating-scale" ? "eRm's MLoef, with base R's degrees of freedom," : "eRm's MLoef";
+      it(`matches ${reference} on ${expected.name}`, () => {
+        const result = martinLofTest(responseMatrix(expected.responses), {
+          model: modelOf(expected.model),
+          split: itemSplit(expected.split),
+        });
+        expectClose(result.statistic, expected.statistic, RASCH_STATISTIC_TOLERANCE, "statistic");
+        expectClose(result.significance, expected.significance, RASCH_STATISTIC_TOLERANCE, "significance");
+        expect([result.degreesOfFreedom, result.persons, result.converged]).toEqual([
+          expected.degreesOfFreedom,
+          expected.persons,
+          true,
+        ]);
+      });
+    }
+
+    it("counts the steps of each set of a rating scale model, which eRm's degrees of freedom leave out", () => {
+      const expected = caseNamed(raschTests.martinLof, "rating scale, median");
+      // Two sets of items with 3 steps each: (2 - 1) (3 - 1) more parameters than eRm counts.
+      expect(expected.degreesOfFreedom - expected.ermDegreesOfFreedom).toBe(2);
+    });
+
+    it("uses the persons who answered every item", () => {
+      const expected = caseNamed(raschTests.martinLof, "raschdat1, median");
+      const matrix = responseMatrix(expected.responses);
+      const missing = responseMatrix([...expected.responses, [null, ...defined(expected.responses[0]).slice(1)]]);
+      expectSameNumbers(martinLofTest(missing), martinLofTest(matrix));
+      const none = responseMatrix(expected.responses.map((row) => [null, ...row.slice(1)]));
+      expect(() => martinLofTest(none)).toThrow(
+        "The Martin-Löf test needs persons who answered every item, found none.",
+      );
+    });
+
+    it("refuses sets that do not hold every item once, a set of one item, and arguments of other types", () => {
+      const matrix = responseMatrix([
+        [1, 0, 1, 1],
+        [0, 1, 0, 1],
+        [1, 1, 0, 0],
+        [0, 0, 1, 1],
+        [1, 1, 1, 0],
+      ]);
+      const sets = (split: ItemSplit) => () => martinLofTest(matrix, { split });
+      expect(sets([["item1", "item2", "item3", "item4"]])).toThrow(
+        "The option split needs at least two sets of item ids, found 1.",
+      );
+      expect(sets([["item1", "item2", "item3"], ["item4"]])).toThrow(/needs at least two items, found "item4"/);
+      expect(
+        sets([
+          ["item1", "item2"],
+          ["item2", "item3", "item4"],
+        ]),
+      ).toThrow(/names "item2", which is not an item id or is in an earlier set/);
+      expect(
+        sets([
+          ["item1", "item2"],
+          ["item3", "item5"],
+        ]),
+      ).toThrow(/names "item5"/);
+      expect(sets([["item1", "item2"], ["item3"]])).toThrow(
+        'The option split must place every item in a set; item "item4" is in none.',
+      );
+      expect(
+        sets([
+          ["item1", "item2"],
+          ["item3", "item4"],
+        ]),
+      ).not.toThrow();
+      const equal = responseMatrix([
+        [1, 0, 1, 0],
+        [0, 1, 0, 1],
+        [1, 1, 0, 0],
+        [0, 0, 1, 1],
+      ]);
+      expect(() => martinLofTest(equal)).toThrow(
+        "Each set of items of the Martin-Löf test needs at least two items, found no items.",
+      );
+      expect(() => martinLofTest(JSON.parse("null"))).toThrow(DataError);
+      expect(() => martinLofTest(matrix, JSON.parse("null"))).toThrow(DataError);
+      expect(() => martinLofTest(matrix, JSON.parse('{ "split": "upper" }'))).toThrow(
+        /The option split must be "median", "mean" or an array of sets of item ids/,
+      );
+      expect(() => martinLofTest(matrix, JSON.parse('{ "split": [["item1", "item2"], "item3"] }'))).toThrow(
+        /Set 2 of the option split must be an array of item ids/,
+      );
+    });
+  });
+
+  it("keeps the Rasch model at about its level on Rasch responses, and rejects it on 2PL responses", () => {
+    // Thresholds set before the first run: at 0.05 over 100 sets of 500 persons and 10 items, each test rejects at most
+    // 10% of the sets and the Wald test flags at most 10% of the items; Andersen's p is below 0.001 on each of 5 2PL sets
+    // with slopes from 0.4 to 2.
+    const random = createRandom(2027);
+    const difficulties = Array.from({ length: 10 }, (_, i) => -1.5 + (3 * i) / 9);
+    const items = difficulties.map((b) => ({ model: oneParameterLogistic, parameters: { a: 1, b, c: 0, d: 1 } }));
+    let andersen = 0;
+    let martinLof = 0;
+    let flagged = 0;
+    let tested = 0;
+    for (let set = 0; set < 100; set++) {
+      const matrix = simulateResponses(items, simulateThetas(500, random), random);
+      if (andersenTest(matrix).significance < 0.05) andersen++;
+      if (martinLofTest(matrix).significance < 0.05) martinLof++;
+      for (const item of raschWaldTest(matrix).items) {
+        tested++;
+        if (defined(item.significance) < 0.05) flagged++;
+      }
+    }
+    expect([andersen <= 10, martinLof <= 10, flagged / tested <= 0.1]).toEqual([true, true, true]);
+    const slopes = items.map((item, i) => ({
+      model: twoParameterLogistic,
+      parameters: { ...item.parameters, a: 0.4 + (1.6 * i) / 9 },
+    }));
+    for (let set = 0; set < 5; set++) {
+      const matrix = simulateResponses(slopes, simulateThetas(500, random), random);
+      expect(andersenTest(matrix).significance).toBeLessThan(0.001);
+    }
+  });
+});
+
 describe("properties", () => {
   const seeds = fc.integer({ min: 0, max: 2 ** 31 });
 
@@ -533,6 +844,35 @@ describe("properties", () => {
           items: order.map((i): CalibratedItem<unknown> => defined(calibration.items[i])),
         };
         expectSameNumbers(limitedInformationFit(items, reversed, { statistic }), fit);
+      }),
+      { numRuns: 20 },
+    );
+  });
+
+  it("the Rasch tests are at least 0, the same for a split given as labels, and free of the order of persons", () => {
+    fc.assert(
+      fc.property(seeds, (seed) => {
+        const random = createRandom(seed);
+        const items = [-1, -0.5, 0, 0.5, 1].map((b) => ({
+          model: oneParameterLogistic,
+          parameters: { a: 1, b, c: 0, d: 1 },
+        }));
+        const matrix = simulateResponses(items, simulateThetas(300, random), random);
+        const totals = matrix.responses.map((row) => row.reduce<number>((sum, response) => sum + (response ?? 0), 0));
+        const median =
+          [...totals]
+            .sort((a, b) => a - b)
+            .slice(149, 151)
+            .reduce((sum, total) => sum + total, 0) / 2;
+        const split = totals.map((total) => (total <= median ? "lower" : "upper"));
+        const andersen = andersenTest(matrix);
+        expect(andersen.statistic).toBeGreaterThanOrEqual(0);
+        expect(martinLofTest(matrix).statistic).toBeGreaterThanOrEqual(0);
+        expectSameNumbers(andersenTest(matrix, { split }), andersen);
+        expectSameNumbers(raschWaldTest(matrix, { split }), raschWaldTest(matrix));
+        const reversed = responseMatrix([...matrix.responses].reverse());
+        expectSameNumbers(andersenTest(reversed), andersen);
+        expectSameNumbers(martinLofTest(reversed), martinLofTest(matrix));
       }),
       { numRuns: 20 },
     );
