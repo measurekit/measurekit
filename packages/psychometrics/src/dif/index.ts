@@ -1,7 +1,7 @@
 /**
  * Differential item functioning: the Mantel-Haenszel statistics with the ETS categories, logistic regression DIF, the
- * Mantel test and ordinal logistic regression DIF for polytomous items, on sparse data and with purification, and
- * Lord's chi-square.
+ * Mantel test and ordinal logistic regression DIF for polytomous items, on sparse data and with purification, SIBTEST
+ * of items and bundles, and Lord's chi-square.
  *
  * @module @measurekit/psychometrics/dif
  */
@@ -27,3 +27,4 @@ export {
   ordinalLogisticRegressionDif,
 } from "./ordinal-logistic-regression.js";
 export type { DifAnalysis, DifPurification, PurificationOptions } from "./purification.js";
+export { type Sibtest, type SibtestDif, type SibtestOptions, sibtest } from "./sibtest.js";

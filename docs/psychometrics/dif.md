@@ -2,9 +2,10 @@
 
 `@measurekit/psychometrics/dif` tests whether an item functions differently for two groups of persons of equal
 ability. For dichotomous items it has the Mantel-Haenszel statistics with the ETS categories, logistic regression and
-Lord's chi-square; for items with any number of categories, the Mantel test and ordinal logistic regression. All but
-Lord's chi-square work on sparse data, and all purify their matching criterion or their link on request. The dichotomous statistics are
-validated against difR, the polytomous ones against base R, rms, MASS and lordif, and the sparse-data rule against base R
+Lord's chi-square; for items with any number of categories, the Mantel test, ordinal logistic regression and SIBTEST,
+which also tests bundles of items. The statistics on the matching score work on sparse data, and all purify their
+matching criterion or their link on request. The dichotomous statistics are validated against difR, the polytomous ones
+against base R, rms, MASS and lordif, SIBTEST against mirt and difR, and the sparse-data rule against base R
 ([validation](validation.md)).
 
 ## Groups
@@ -19,6 +20,7 @@ whose items are studied. Both groups need persons.
 | `lordChiSquare(matrix, groups, options)`                | 2PL, 3PL or 4PL | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
 | `mantelTest(matrix, groups, options)`                   | Any             | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
 | `ordinalLogisticRegressionDif(matrix, groups, options)` | Any             | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
+| `sibtest(matrix, groups, options)`                      | Any, or bundles | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -85,6 +87,7 @@ matching score or, for Lord's chi-square, the scale on which the groups are link
 | `mantelHaenszel`, `mantelTest`                          | The chi-square is significant                                | 1, the studied item's match                |
 | `logisticRegressionDif`, `ordinalLogisticRegressionDif` | The test of both terms is significant, difR's default `type` | 1                                          |
 | `lordChiSquare`                                         | The chi-square is significant                                | 2, as a transformation needs two locations |
+| `sibtest`                                               | An item's chi-square is significant; a bundle flags nothing  | 2, as coefficient alpha needs two items    |
 
 The result's `purification` holds the `anchors` of the final statistics, the `iterations` after the first statistics and
 whether they `converged`; it is `null` without `purify`. `converged` is `false` when the rounds ran out or too few anchors
@@ -280,6 +283,100 @@ With `matching` each item uses the persons who answered it and have a score. lor
 composition: `calibrate` a graded response model, `abilityEstimates` for theta, and pass theta as `matching`, as in the
 example above. A matching score that is not a sum of items cannot lose items to purification.
 
+## SIBTEST
+
+`sibtest` compares the groups on the studied items among persons of equal score on the other items, and corrects that
+score for the groups' difference in ability (Shealy and Stout, 1993), as `mirt::SIBTEST` and
+`difR::difSIBTEST(type = "udif")`. It takes items of any number of categories (Chang, Mazzeo and Roussos, 1996) and
+bundles of items (Douglas, Roussos and Stout, 1996).
+
+```mermaid
+flowchart LR
+  M["Match on the anchors,<br/>less the studied items"] --> S["Keep the score groups<br/>with enough persons of each group"]
+  S --> C["Regression correction:<br/>move both groups' means<br/>to a common true score"]
+  C --> B["β: their difference, weighted<br/>by the persons in each score group"]
+  B --> X["Chi-square (β / SE)²"]
+  X -- "purify" --> P["Flagged items leave the anchors"]
+  P --> M
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { type DifGroup, sibtest } from "@measurekit/psychometrics/dif";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 500 persons per group answer 20 items. The focal group's theta is 0.5 lower, and items 3 and 4 are half a point harder
+// for it.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 20, random);
+const shifted = items.map((item, j) =>
+  j === 2 || j === 3 ? { ...item, parameters: { ...item.parameters, b: item.parameters.b + 0.5 } } : item,
+);
+const reference = simulateResponses(items, simulateThetas(500, random), random);
+const focalThetas = simulateThetas(500, random).map((theta) => theta - 0.5);
+const focal = simulateResponses(shifted, focalThetas, random);
+const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+
+sibtest(matrix, groups).items[2]; // { id: "item3", beta: 0.092, standardError: 0.025, chiSquare: 13.5, significance: 0.00024 }
+sibtest(matrix, groups).items[10]; // { id: "item11", beta: 0.010, standardError: 0.027, chiSquare: 0.14, significance: 0.71 }
+// The two items as one bundle, purified: each item alone has 16.0 and 14.2 on the same anchors.
+sibtest(matrix, groups, { bundles: { passage: ["item3", "item4"] }, purify: true }).bundles;
+// [{ id: "passage", beta: 0.210, standardError: 0.041, chiSquare: 26.9, significance: 2.1e-7 }]
+```
+
+| Field           | Definition                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | The item's id, or the bundle's name                                                                                          |
+| `beta`          | β = Σ p(k) (m\*_R(k) - m\*_F(k)): positive when the item favors the reference group, the opposite sign of `delta` and of SMD |
+| `standardError` | SE = √(Σ p(k)² (s²_R(k) / n_R(k) + s²_F(k) / n_F(k))), of the raw scores in each score group                                 |
+| `chiSquare`     | (β / SE)², with one degree of freedom                                                                                        |
+| `significance`  | The probability of a chi-square at least as large without DIF                                                                |
+
+The result holds `items`, `bundles` in the order of the option, and the [`purification`](#purification). A statistic is
+`null` without a score group to use, or where the correction is undefined, as for fewer than two matching items.
+
+| Option        | Default    | Meaning                                                                                                                     |
+| ------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `purify`      | `false`    | [Purification](#purification), with at least 2 anchors and 10 rounds. It flags items, never bundles                         |
+| `minimumCell` | `5`        | A score group is used when each group has more than this many persons in it, mirt's `Jmin`. An integer from 2               |
+| `correction`  | `true`     | The regression correction. `false` compares the raw means, which group differences in ability bias: see below               |
+| `guessing`    | `0`        | The guessing parameter of the correction, mirt's `guess_correction`, for all items: from 0 to below 1                       |
+| `bundles`     | No bundles | `{ name: [item ids] }`: each bundle's total is tested against the anchors outside it. A bundle of one item equals that item |
+
+### Persons and score groups
+
+Persons are matched on their total over the matching items: all items or, with `purify`, the anchors, less the studied
+item or bundle. Each analysis uses the persons who answered every studied and matching item, as the correction needs
+one set of items for all of them. So a person with a missing response to an anchor leaves the analysis of every item,
+and [the scaled score](#matching-score) of the other statistics does not apply: with 2% of the responses missing at
+random over 30 items, 45% of the persons leave. Use `mantelHaenszel` or `mantelTest` on data missing by design.
+
+The score groups k are the matching scores that occur. A score group is used when:
+
+- each group has more than `minimumCell` persons in it, and their studied scores vary;
+- it is neither the lowest score nor the highest, which lack a neighbor for the correction;
+- k is at least `guessing` times the number of items.
+
+p(k) is k's share of the persons of the score groups used, of both groups.
+
+### Regression correction
+
+Two groups of different ability that share a matching score differ in true score, as the score is unreliable. With x_G
+the mean matching score of group G and b_G the coefficient alpha of the matching items in G, the estimated true score is
+V_G(k) = x_G + b_G (k - x_G). Each group's mean m_G(k) moves to the groups' common V(k) = (V_R(k) + V_F(k)) / 2, along the
+slope between the neighbors of k, the next scores that occur:
+
+m\*_G(k) = m_G(k) + M (V(k) - V_G(k)), with M = (m_G(k + 1) - m_G(k - 1)) / (V_G(k + 1) - V_G(k - 1)).
+
+A neighbor without persons of G has the mean 0, as in mirt. On 30 sets of 20 items with the focal group's theta 0.5
+lower, the correction holds the false alarms of clean items at 5.6%; without it they reach 9.8%.
+
+With `guessing`, an item with two different responses in a group enters coefficient alpha with the variance v (1 - v)
+in place of its own, for v = max((u - guessing) / (1 - guessing), 0) and u its mean above its lower response.
+
 ## Not included
 
 - **The exact Mantel-Haenszel test.** Outside the sources: an option of `difR::difMH`, off by default.
@@ -299,6 +396,29 @@ example above. A matching score that is not a sum of items cannot lose items to 
   the total score is the practice.
 - **Multiple focal groups.** Outside the sources: the sources were not confirmed to treat it, and [a
   recipe](#recipe-several-focal-groups) runs `mantelHaenszel` for each focal group.
+- **The Breslow-Day test.** Outside the sources: Penfield and Camilli cite neither Breslow and Day (1980) nor Penfield
+  (2003), and `logisticRegressionDif`'s `nonuniform` tests crossing DIF.
+- **Crossing SIBTEST.** Outside the sources: Li and Stout (1996) is not cited, and `logisticRegressionDif`'s `nonuniform`
+  tests crossing DIF.
+- **The multi-group SIBTEST of mirt.** Outside the sources: Chalmers and Zheng (2023) is not cited, and [a
+  recipe](#recipe-several-focal-groups) compares each focal group with the reference group.
+- **The focal group's weights of SIBTEST.** Outside the sources: an option of mirt (`pk_focal`), off by default.
+- **The reference and total weights of standardization.** Outside the sources: options of difR; focal weights, Dorans and
+  Kulick's, are `mantelTest`'s [standardized mean difference](#recipe-standardization).
+- **Standardized alpha.** No fit: one line from STD P-DIF and the focal group's proportion correct.
+- **Bayesian and hierarchical DIF.** Outside the sources: the listed chapter presents them as recent innovations, and
+  hierarchical models are lme4's.
+- **Quade-type association indices.** Outside the sources: not cited by the listed chapter, and the Mantel test is the
+  practice.
+- **Transformed item difficulties.** Outside the sources: not cited, and it matches no ability.
+- **Wald tests with a full covariance of groups.** Outside the sources: `lordChiSquare` is the Wald test of the sources.
+- **DIF between calibrations (`dif.test`).** Outside the sources: `lordChiSquare` is the same test.
+- **Lasso DIF.** Outside the sources: a research method of difR.
+- **Item-level heterogeneous mixed-model DIF.** Outside the sources: a research method of difR.
+- **DIF of continuous item scores.** No fit: a response is an integer category.
+- **Flagging by chi-square, slope or R² cutoffs.** No fit: the numbers are in the result, and a cutoff is the caller's.
+- **Monte Carlo and permutation cutoffs.** No fit: a loop over the simulation functions.
+- **Generation of DIF.** No fit: `simulateResponses` with changed items, as the examples above show.
 
 ## Recipe: several focal groups
 
@@ -354,6 +474,83 @@ correction holds the chance of any false flag to 0.05, so one comes about once i
 compares all the groups at once, as `difR::difGMH` does, is a different statistic from this recipe's pairs. The test of
 this recipe runs the code on the seeded groups and checks that item 5 is flagged in both comparisons.
 
+## Recipe: standardization
+
+STD P-DIF (Dorans and Kulick, 1986) is the focal group's proportion correct less the reference group's, averaged over
+the score groups with the focal group's persons as weights. On items scored 0 and 1 that is the
+`standardizedMeanDifference` of `mantelTest`: it equals `difR::difStd(stdWeight = "focal")` over the score groups that
+hold both groups. Its test runs on `verbal` and a simulation.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { type DifGroup, mantelTest } from "@measurekit/psychometrics/dif";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 500 persons per group answer 15 items; item 3 is one point harder for the focal group.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 15, random);
+const shifted = items.map((item, j) =>
+  j === 2 ? { ...item, parameters: { ...item.parameters, b: item.parameters.b + 1 } } : item,
+);
+const reference = simulateResponses(items, simulateThetas(500, random), random);
+const focal = simulateResponses(shifted, simulateThetas(500, random), random);
+const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+
+mantelTest(matrix, groups)
+  .items.map((item) => item.standardizedMeanDifference)
+  .slice(0, 4);
+// [0.009, -0.009, -0.111, -0.002]: on item 3 the focal group's proportion correct is 0.11 lower at equal scores
+```
+
+## Recipe: DIF variance
+
+The variance τ² of an item set's true DIF says how much the items differ (Camilli and Penfield, 1997), and shrinks each
+item's MH D-DIF towards the mean by what its standard error leaves unexplained (Longford, Holland and Thayer, 1993). With
+d the `delta` of `mantelHaenszel`, SE its `deltaStandardError`, d̄ their mean and w = 1 / SE²:
+
+τ² = max((Σ w² (d - d̄)² - Σ w) / Σ w², 0), λ = τ² / (τ² + SE²), shrunken d = λ d + (1 - λ) d̄.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { type DifGroup, mantelHaenszel } from "@measurekit/psychometrics/dif";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 500 persons per group answer 15 items; item 3 is one point harder for the focal group.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 15, random);
+const shifted = items.map((item, j) =>
+  j === 2 ? { ...item, parameters: { ...item.parameters, b: item.parameters.b + 1 } } : item,
+);
+const reference = simulateResponses(items, simulateThetas(500, random), random);
+const focal = simulateResponses(shifted, simulateThetas(500, random), random);
+const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+
+const sum = (values: readonly number[]): number => values.reduce((total, value) => total + value, 0);
+const estimates = mantelHaenszel(matrix, groups).items.flatMap(({ id, delta, deltaStandardError }) =>
+  delta === null || deltaStandardError === null ? [] : [{ id, delta, standardError: deltaStandardError }],
+);
+const center = sum(estimates.map(({ delta }) => delta)) / estimates.length;
+const weights = estimates.map(({ standardError }) => standardError ** -2);
+const excess = sum(estimates.map(({ delta }, i) => (weights[i] ?? 0) ** 2 * (delta - center) ** 2)) - sum(weights);
+const difVariance = Math.max(excess / sum(weights.map((weight) => weight ** 2)), 0);
+const shrunken = estimates.map(({ id, delta, standardError }) => {
+  const shrinkage = difVariance / (difVariance + standardError ** 2);
+  return { id, delta: shrinkage * delta + (1 - shrinkage) * center };
+});
+
+Math.sqrt(difVariance); // 0.361
+shrunken[2]; // { id: "item3", delta: -0.86 }, from -2.29
+```
+
+Its test compares with `sirt::dif.variance`. That function's `eb.dif` is λ (d - d̄) + (1 - λ) d̄, the shrunken estimate only
+when d̄ is 0, so the test passes it centered values and adds d̄ back.
+
 ## Errors
 
 Invalid input throws `DataError` naming the value found.
@@ -364,6 +561,8 @@ Invalid input throws `DataError` naming the value found.
 | An item is not dichotomous, for the dichotomous statistics       | Use `mantelTest` or `ordinalLogisticRegressionDif` for items with more categories |
 | `purify` with `matching`                                         | Purify the total score, or give the matching score and leave `purify` off         |
 | A matching score is not a finite number                          | Give `null` for a person to leave out                                             |
+| `minimumCell` is below 2, or `guessing` is 1 or more             | Give an integer from 2, and a guessing parameter from 0 to below 1                |
+| A bundle is empty, or names an unknown item or one item twice    | Give each bundle its distinct items, by their ids in the matrix                   |
 
 ## Differences from difR
 
@@ -375,6 +574,16 @@ Invalid input throws `DataError` naming the value found.
 | Lord's 1PL            | Not supported: `oneParameterLogistic` estimates a common a          | a fixed at 1                                                                                                  |
 | Lord's purification   | Stops before fewer than 2 anchors are left, and `converged` says so | Rescales on the items not flagged, whose spread is undefined for fewer than two                               |
 | Missing responses     | The scaled matching score of each item's persons                    | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect |
+
+## Differences from mirt
+
+| Topic                | This package                                                | mirt                                                                                                    |
+| -------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Missing responses    | Each analysis uses the persons who answered its items       | Refuses them; `na.rm` removes a person with a missing response to any item, studied and matching or not |
+| Undefined statistics | `null`                                                      | β and SE 0 with a chi-square of `NaN`, or `NaN` from the correction                                     |
+| Small significances  | The upper tail of the chi-square, which keeps its precision | `1 - pchisq`, which is 0 below about 1e-16                                                              |
+| Guessing             | One value for all items                                     | One for all items, or one per item                                                                      |
+| Purification         | `purify`, as difR's, stopping before fewer than 2 anchors   | None; difR's `purify` goes on without a floor                                                           |
 
 ## Differences from lordif
 

@@ -1,3 +1,4 @@
+import { chiSquareUpperTail, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { purified } from "../src/dif/internal.js";
@@ -18,6 +19,8 @@ import {
   ordinalLogisticRegressionDif,
   type PurificationOptions,
   responseMatrix,
+  type Sibtest,
+  sibtest,
   simulateItems,
   simulateResponses,
   simulateThetas,
@@ -27,6 +30,7 @@ import { defined, expectClose } from "./assertions.js";
 import fixture from "./fixtures/dif.json" with { type: "json" };
 import lordPurification from "./fixtures/dif-lord-purification.json" with { type: "json" };
 import polytomous from "./fixtures/dif-polytomous.json" with { type: "json" };
+import sibtestFixture from "./fixtures/dif-sibtest.json" with { type: "json" };
 
 // Tolerances against R, explained in docs/validation.md.
 /** Mantel-Haenszel statistics against difR and base R. */
@@ -43,6 +47,10 @@ const MANTEL_TEST_TOLERANCE = 1e-12;
 const ORDINAL_TOLERANCE = 1e-8;
 /** lordif's statistics, which it rounds to 4 decimals. */
 const LORDIF_TOLERANCE = 5e-5 + 1e-9;
+/** SIBTEST's statistics against mirt, the same sums, apart from rounding. */
+const SIBTEST_TOLERANCE = 1e-10;
+/** The recipes for standardization and DIF variance against difR's difStd and sirt's dif.variance. */
+const RECIPE_TOLERANCE = 1e-10;
 
 /** Item 1 everyone answered correctly; items 2 and 3 vary. */
 const CONSTANT_ROWS = [
@@ -79,6 +87,26 @@ const SCALING_ROWS = [
   [2, 0, 1],
 ];
 const SCALING_GROUPS: DifGroup[] = SCALING_ROWS.map((_, person) => (person < 6 ? "reference" : "focal"));
+
+/** Two items: item 2 scores 0, 1 and 2, so that its score 1 is the only score between the lowest and the highest. */
+const ONE_MIDDLE_SCORE_ROWS = [
+  [0, 0],
+  [0, 1],
+  [1, 1],
+  [1, 1],
+  [1, 2],
+  [0, 0],
+  [0, 1],
+  [0, 1],
+  [1, 1],
+  [1, 2],
+];
+const ONE_MIDDLE_SCORE_GROUPS: DifGroup[] = ONE_MIDDLE_SCORE_ROWS.map((_, person) =>
+  person < 5 ? "reference" : "focal",
+);
+const ONE_MIDDLE_SCORE_OPTIONS = { minimumCell: 2, correction: false };
+/** The statistics of an item or bundle without a defined SIBTEST, but its id. */
+const UNDEFINED_SIBTEST = { beta: null, standardError: null, chiSquare: null, significance: null };
 
 function groups(focal: readonly number[]): DifGroup[] {
   return focal.map((flag) => (flag === 1 ? "focal" : "reference"));
@@ -196,6 +224,44 @@ function expectOrdinal(
     }
     expectClose(item.slopeChange, lordif.slopeChange[i] ?? null, LORDIF_TOLERANCE, `lordif slope change ${i + 1}`);
   });
+}
+
+/** SIBTEST statistics of a fixture, by item. */
+type SibtestFixture = Readonly<
+  Record<"beta" | "standardError" | "chiSquare" | "significance", readonly (number | null)[]>
+>;
+
+/** SIBTEST statistics of a fixture, of one bundle. */
+type BundleFixture = Readonly<Record<keyof SibtestFixture, number | null>>;
+
+function expectSibtest(result: readonly Sibtest[], expected: SibtestFixture): void {
+  expect(result).toHaveLength(expected.beta.length);
+  result.forEach((item, i) => {
+    const label = `item ${i + 1}`;
+    expectClose(item.beta, expected.beta[i] ?? null, SIBTEST_TOLERANCE, `beta ${label}`);
+    expectClose(item.standardError, expected.standardError[i] ?? null, SIBTEST_TOLERANCE, `SE ${label}`);
+    expectClose(item.chiSquare, expected.chiSquare[i] ?? null, SIBTEST_TOLERANCE, `chi-square ${label}`);
+    expectClose(item.significance, expected.significance[i] ?? null, SIBTEST_TOLERANCE, `p ${label}`);
+  });
+}
+
+function expectBundle(result: Sibtest | undefined, expected: BundleFixture | undefined): void {
+  const { beta, standardError, chiSquare, significance } = defined(expected);
+  expectSibtest([defined(result)], {
+    beta: [beta],
+    standardError: [standardError],
+    chiSquare: [chiSquare],
+    significance: [significance],
+  });
+}
+
+/** The values of the recipes on a dataset of dif.json. */
+function sibtestRecipes(name: string): (typeof sibtestFixture.recipes)["verbal"] {
+  return name === "verbal" ? sibtestFixture.recipes.verbal : sibtestFixture.recipes.simulated;
+}
+
+function sum(values: readonly number[]): number {
+  return values.reduce((total, value) => total + value, 0);
 }
 
 function expectPurification(actual: DifPurification | null, expected: PurificationFixture): void {
@@ -662,6 +728,246 @@ describe("ordinalLogisticRegressionDif", () => {
   });
 });
 
+describe("sibtest", () => {
+  // Each dataset of the DIF fixtures, complete and sparse, in the order of the cases of dif-sibtest.json.
+  const inputs = [...fixture.cases, ...polytomous.cases].flatMap(({ responses, sparse, focal }) => [
+    { responses, focal },
+    { responses: sparse.responses, focal },
+  ]);
+
+  sibtestFixture.cases.forEach((expected, index) => {
+    const { responses, focal } = defined(inputs[index]);
+    const matrix = responseMatrix(responses);
+    const personGroups = groups(focal);
+
+    it(`matches mirt's SIBTEST and difR's difSIBTEST on ${expected.name}`, () => {
+      const result = sibtest(matrix, personGroups);
+      expect(result.purification).toBeNull();
+      expect(result.bundles).toEqual([]);
+      expectSibtest(result.items, expected.default);
+    });
+
+    it(`matches mirt without the correction and with guessing on ${expected.name}`, () => {
+      expectSibtest(sibtest(matrix, personGroups, { correction: false }).items, expected.uncorrected);
+      expectSibtest(sibtest(matrix, personGroups, { guessing: sibtestFixture.guessing }).items, expected.guessing);
+    });
+
+    it(`matches mirt's Jmin as the option minimumCell on ${expected.name}`, () => {
+      expectSibtest(sibtest(matrix, personGroups, { minimumCell: 2 }).items, expected.smallCells);
+      expectSibtest(sibtest(matrix, personGroups, { minimumCell: 20 }).items, expected.largeCells);
+    });
+
+    const bundles = Object.fromEntries(
+      expected.bundles.map(({ name, items }) => [name, items.map((item) => defined(matrix.itemIds[item]))]),
+    );
+
+    it(`matches mirt's suspect_set for bundles on ${expected.name}`, () => {
+      const result = sibtest(matrix, personGroups, { bundles });
+      expect(result.bundles.map((bundle) => bundle.id)).toEqual(expected.bundles.map((bundle) => bundle.name));
+      expected.bundles.forEach((bundle, i) => {
+        expectBundle(result.bundles[i], bundle.default);
+      });
+      expectSibtest(result.items, expected.default);
+    });
+
+    it(`matches difR's purification, and matches bundles on the final anchors, on ${expected.name}`, () => {
+      const result = sibtest(matrix, personGroups, { purify: true, bundles });
+      expectSibtest(result.items, expected.purified);
+      expectPurification(result.purification, expected.purified);
+      expected.bundles.forEach((bundle, i) => {
+        expectBundle(result.bundles[i], bundle.purified);
+      });
+    });
+  });
+
+  it("flags a shifted item and holds the false alarms of clean items on 30 sets", () => {
+    const sets = 30;
+    const shiftedItem = 0;
+    const random = createRandom(2026);
+    let hits = 0;
+    let falseAlarms = 0;
+    let cleanTests = 0;
+    for (let set = 0; set < sets; set++) {
+      const items = simulateItems(twoParameterLogistic, 20, random);
+      const shifted = items.map((item, j) =>
+        j === shiftedItem ? { ...item, parameters: { ...item.parameters, b: item.parameters.b + 0.8 } } : item,
+      );
+      const reference = simulateResponses(items, simulateThetas(500, random), random);
+      const focalThetas = simulateThetas(500, random).map((theta) => theta - 0.5);
+      const focal = simulateResponses(shifted, focalThetas, random);
+      const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+      const personGroups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+      sibtest(matrix, personGroups).items.forEach((item, j) => {
+        const flagged = (item.significance ?? 1) < 0.05;
+        if (j === shiftedItem) {
+          hits += flagged ? 1 : 0;
+          // The item is harder for the focal group, so it favors the reference group.
+          expect(item.beta).toBeGreaterThan(0);
+        } else {
+          falseAlarms += flagged ? 1 : 0;
+          cleanTests++;
+        }
+      });
+    }
+    expect(hits).toBeGreaterThanOrEqual(28);
+    expect(falseAlarms / cleanTests).toBeLessThanOrEqual(0.08);
+  });
+
+  it("derives the statistics of one score group by hand", () => {
+    // Only score 1 of item 2 lies between the lowest and the highest. It holds [0, 1, 1] and [0, 0, 1], whose means are
+    // 2/3 and 1/3 and whose sample variances are 1/3.
+    const { items } = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    expectClose(items[0]?.beta ?? null, 1 / 3, SIBTEST_TOLERANCE);
+    expectClose(items[0]?.standardError ?? null, Math.sqrt(2) / 3, SIBTEST_TOLERANCE);
+    expectClose(items[0]?.chiSquare ?? null, 1 / 2, SIBTEST_TOLERANCE);
+    expectClose(items[0]?.significance ?? null, chiSquareUpperTail(1 / 2, 1), SIBTEST_TOLERANCE);
+    // Matched on item 1, whose two scores are the lowest and the highest, nothing is left to compare.
+    expect(items[1]).toEqual({ ...UNDEFINED_SIBTEST, id: "item2" });
+  });
+
+  it("uses a score group only above minimumCell persons of each group, as mirt's Jmin", () => {
+    const matrix = responseMatrix(ONE_MIDDLE_SCORE_ROWS);
+    const options = { ...ONE_MIDDLE_SCORE_OPTIONS, minimumCell: 3 };
+    expect(sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, options).items[0]).toEqual({ ...UNDEFINED_SIBTEST, id: "item1" });
+  });
+
+  it("is undefined with the correction on one matching item, whose coefficient alpha is undefined", () => {
+    const matrix = responseMatrix(ONE_MIDDLE_SCORE_ROWS);
+    expect(sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, { minimumCell: 2 }).items[0]).toEqual({
+      ...UNDEFINED_SIBTEST,
+      id: "item1",
+    });
+  });
+
+  it("leaves out a person with a missing response to a matching or a studied item", () => {
+    const complete = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    const rows = [...ONE_MIDDLE_SCORE_ROWS, [1, null], [null, 1]];
+    const personGroups: DifGroup[] = [...ONE_MIDDLE_SCORE_GROUPS, "focal", "reference"];
+    const sparse = sibtest(responseMatrix(rows), personGroups, ONE_MIDDLE_SCORE_OPTIONS);
+    expect(sparse.items).toEqual(complete.items);
+  });
+
+  it("gives null statistics when no person answered the items of an analysis", () => {
+    const rows = ONE_MIDDLE_SCORE_ROWS.map(([studied, matching]) => [studied ?? null, matching ?? null, null]);
+    const { items } = sibtest(responseMatrix(rows), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    for (const item of items) expect(item).toEqual({ ...UNDEFINED_SIBTEST, id: item.id });
+  });
+
+  it("gives null statistics for an item every person answered alike, which leaves no score group a variance", () => {
+    const rows = ONE_MIDDLE_SCORE_ROWS.map(([, matching]) => [1, matching ?? 0]);
+    const { items } = sibtest(responseMatrix(rows), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    expect(items[0]).toEqual({ ...UNDEFINED_SIBTEST, id: "item1" });
+  });
+
+  it("gives null statistics for a bundle of every item, which leaves nothing to match on", () => {
+    const options = { ...ONE_MIDDLE_SCORE_OPTIONS, bundles: { all: ["item1", "item2"] } };
+    const result = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, options);
+    expect(result.bundles).toEqual([{ ...UNDEFINED_SIBTEST, id: "all" }]);
+  });
+
+  it("tables only the matching scores that occur, so scores far apart cost no more than close ones", () => {
+    const { responses, focal } = defined(polytomous.cases[0]);
+    const scale = 2 ** 16;
+    const scaled = responses.map((row) => row.map((response) => response * scale));
+    const close = sibtest(responseMatrix(responses), groups(focal)).items;
+    const far = sibtest(responseMatrix(scaled), groups(focal)).items;
+    far.forEach((item, i) => {
+      expectClose(item.chiSquare, close[i]?.chiSquare ?? null, 1e-9, `chi-square ${i + 1}`);
+      expectClose(item.beta, (close[i]?.beta ?? 0) * scale, 1e-6, `beta ${i + 1}`);
+    });
+  });
+
+  it("takes a bundle by its own name, whatever the name", () => {
+    const bundles = JSON.parse('{ "__proto__": ["item1"], "constructor": ["item2"] }');
+    const result = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, {
+      ...ONE_MIDDLE_SCORE_OPTIONS,
+      bundles,
+    });
+    expect(result.bundles.map((bundle) => bundle.id)).toEqual(["__proto__", "constructor"]);
+  });
+
+  it("stops purifying before fewer than two anchors are left", () => {
+    const { responses, focal } = defined(inputs.at(5)); // bfi, sparse: four of its five items are flagged.
+    const matrix = responseMatrix(responses);
+    const { items, purification } = sibtest(matrix, groups(focal), { purify: true });
+    expect(items.filter((item) => (item.significance ?? 1) < 0.05).length).toBeGreaterThan(matrix.itemIds.length - 2);
+    expect(purification).toEqual({ anchors: matrix.itemIds, iterations: 0, converged: false });
+  });
+
+  describe("errors", () => {
+    const matrix = responseMatrix(ONE_MIDDLE_SCORE_ROWS);
+    const analyze = (options: unknown) => sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, JSON.parse(JSON.stringify(options)));
+
+    it("rejects options, a matrix and groups of other types", () => {
+      expect(() => sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, JSON.parse("null"))).toThrow(
+        "The options must be an object, found null.",
+      );
+      expect(() => sibtest(JSON.parse("null"), ONE_MIDDLE_SCORE_GROUPS)).toThrow(DataError);
+      expect(() => sibtest(matrix, JSON.parse("null"))).toThrow("The groups must be an array, found null.");
+      expect(() => sibtest(matrix, JSON.parse('"focal"'))).toThrow('The groups must be an array, found "focal".');
+      expect(() => sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS.slice(1))).toThrow(DataError);
+      expect(() =>
+        sibtest(
+          matrix,
+          ONE_MIDDLE_SCORE_GROUPS.map((): DifGroup => "focal"),
+        ),
+      ).toThrow("SIBTEST needs persons with responses in both groups.");
+    });
+
+    it("rejects a minimumCell that is not an integer from 2", () => {
+      for (const [minimumCell, found] of [
+        [1, "1"],
+        [2.5, "2.5"],
+        ["5", '"5"'],
+        [null, "null"],
+      ]) {
+        expect(() => analyze({ minimumCell })).toThrow(
+          `The option minimumCell must be an integer from 2, found ${found}.`,
+        );
+      }
+    });
+
+    it("rejects a correction or purify option that is not a boolean", () => {
+      expect(() => analyze({ correction: "yes" })).toThrow('The option correction must be a boolean, found "yes".');
+      expect(() => analyze({ correction: null })).toThrow("The option correction must be a boolean, found null.");
+      expect(() => analyze({ purify: "yes" })).toThrow('The option purify must be a boolean, found "yes".');
+    });
+
+    it("rejects a guessing option that is not a number from 0 to below 1", () => {
+      expect(() => analyze({ guessing: -0.1 })).toThrow(
+        "The option guessing must be a non-negative number, found -0.1.",
+      );
+      expect(() => analyze({ guessing: "0.2" })).toThrow(
+        'The option guessing must be a non-negative number, found "0.2".',
+      );
+      expect(() => analyze({ guessing: null })).toThrow(
+        "The option guessing must be a non-negative number, found null.",
+      );
+      expect(() => analyze({ guessing: 1 })).toThrow("The option guessing must be below 1, found 1.");
+    });
+
+    it("rejects bundles that are not an object of lists of known items without repeats", () => {
+      expect(() => analyze({ bundles: null })).toThrow(
+        "The option bundles must be an object of item ids by bundle, found null.",
+      );
+      expect(() => analyze({ bundles: ["item1"] })).toThrow(
+        "The option bundles must be an object of item ids by bundle, found an array.",
+      );
+      expect(() => analyze({ bundles: { first: "item1" } })).toThrow(
+        'The bundle "first" must be an array of item ids, found "item1".',
+      );
+      expect(() => analyze({ bundles: { first: [] } })).toThrow('The bundle "first" needs at least one item.');
+      expect(() => analyze({ bundles: { first: ["item1", "nope"] } })).toThrow(
+        'The bundle "first" names the unknown item "nope".',
+      );
+      expect(() => analyze({ bundles: { first: [1] } })).toThrow('The bundle "first" names the unknown item 1.');
+      expect(() => analyze({ bundles: { first: ["item1", "item1"] } })).toThrow(
+        'The bundle "first" names the item "item1" twice.',
+      );
+    });
+  });
+});
+
 describe("options and groups", () => {
   const matrix = responseMatrix(CONSTANT_ROWS);
 
@@ -751,6 +1057,42 @@ describe("the recipe for several focal groups", () => {
     expect(flagged("second")).toContain("item8");
     expect(flagged("first")).not.toContain("item8");
   });
+});
+
+describe("the recipe for standardization", () => {
+  for (const dataset of fixture.cases) {
+    it(`equals difR's difStd with the focal group's weights on ${dataset.name} data`, () => {
+      const expected = sibtestRecipes(dataset.name).standardization;
+      const { items } = mantelTest(responseMatrix(dataset.responses), groups(dataset.focal));
+      items.forEach((item, i) => {
+        expectClose(item.standardizedMeanDifference, expected[i] ?? null, RECIPE_TOLERANCE, `item ${i + 1}`);
+      });
+    });
+  }
+});
+
+describe("the recipe for DIF variance", () => {
+  for (const dataset of fixture.cases) {
+    it(`equals sirt's dif.variance on ${dataset.name} data`, () => {
+      const expected = sibtestRecipes(dataset.name).variance;
+      const estimates = mantelHaenszel(responseMatrix(dataset.responses), groups(dataset.focal)).items.flatMap(
+        ({ delta, deltaStandardError }) =>
+          delta === null || deltaStandardError === null ? [] : [{ delta, standardError: deltaStandardError }],
+      );
+      const center = mean(estimates.map(({ delta }) => delta));
+      const weights = estimates.map(({ standardError }) => standardError ** -2);
+      const squaredWeights = sum(weights.map((weight) => weight ** 2));
+      const excess =
+        sum(estimates.map(({ delta }, i) => (weights[i] ?? 0) ** 2 * (delta - center) ** 2)) - sum(weights);
+      const difVariance = Math.max(excess / squaredWeights, 0);
+      expectClose(Math.sqrt(difVariance), expected.standardDeviation, RECIPE_TOLERANCE, "DIF standard deviation");
+      estimates.forEach(({ delta, standardError }, i) => {
+        const shrinkage = difVariance / (difVariance + standardError ** 2);
+        const shrunken = shrinkage * delta + (1 - shrinkage) * center;
+        expectClose(shrunken, expected.shrunken[i] ?? null, RECIPE_TOLERANCE, `item ${i + 1}`);
+      });
+    });
+  }
 });
 
 describe("properties", () => {
@@ -869,6 +1211,93 @@ describe("properties", () => {
           expectClose(other?.standardizedMeanDifference ?? null, item.standardizedMeanDifference, 1e-12);
           expect(other?.etsCategory).toBe(item.etsCategory);
         });
+      }),
+    );
+  });
+
+  /** Responses of 0 to 2 of enough persons that the middle score groups are used: 40 to 80 persons, 3 to 6 items. */
+  const crowdedRows = fc
+    .tuple(fc.integer({ min: 40, max: 80 }), fc.integer({ min: 3, max: 6 }))
+    .chain(([persons, items]) =>
+      fc.array(fc.array(fc.integer({ min: 0, max: 2 }), { minLength: items, maxLength: items }), {
+        minLength: persons,
+        maxLength: persons,
+      }),
+    );
+  const alternate = (rows: readonly unknown[]): DifGroup[] =>
+    rows.map((_, person) => (person % 2 === 0 ? "focal" : "reference"));
+
+  it("negates SIBTEST's beta and keeps its other statistics when the groups are swapped", () => {
+    let computed = 0;
+    fc.assert(
+      fc.property(crowdedRows, (rows) => {
+        const matrix = responseMatrix(rows);
+        const personGroups = alternate(rows);
+        const swapped = personGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
+        const other = sibtest(matrix, swapped, { minimumCell: 2 }).items;
+        sibtest(matrix, personGroups, { minimumCell: 2 }).items.forEach((item, i) => {
+          if (item.beta !== null) computed++;
+          expectClose(other[i]?.beta ?? null, item.beta === null ? null : -item.beta, 1e-9);
+          expectClose(other[i]?.standardError ?? null, item.standardError, 1e-9);
+          expectClose(other[i]?.chiSquare ?? null, item.chiSquare, 1e-9 * Math.max(1, item.chiSquare ?? 0));
+        });
+      }),
+    );
+    expect(computed).toBeGreaterThan(0);
+  });
+
+  it("gives a bundle of one item the statistics of that item", () => {
+    fc.assert(
+      fc.property(crowdedRows, fc.boolean(), (rows, purify) => {
+        const matrix = responseMatrix(rows);
+        const bundles = Object.fromEntries(matrix.itemIds.map((id) => [`bundle of ${id}`, [id]]));
+        const result = sibtest(matrix, alternate(rows), { minimumCell: 2, bundles, purify });
+        result.items.forEach((item, i) => {
+          expect(result.bundles[i]).toEqual({ ...item, id: `bundle of ${item.id}` });
+        });
+      }),
+    );
+  });
+
+  it("SIBTEST statistics do not depend on the order of persons", () => {
+    fc.assert(
+      fc.property(crowdedRows, (rows) => {
+        const personGroups = alternate(rows);
+        const forward = sibtest(responseMatrix(rows), personGroups, { minimumCell: 2 }).items;
+        const backward = sibtest(responseMatrix([...rows].reverse()), [...personGroups].reverse(), {
+          minimumCell: 2,
+        }).items;
+        forward.forEach((item, i) => {
+          expectClose(backward[i]?.beta ?? null, item.beta, 1e-9);
+          expectClose(backward[i]?.chiSquare ?? null, item.chiSquare, 1e-9 * Math.max(1, item.chiSquare ?? 0));
+        });
+      }),
+    );
+  });
+
+  it("finds no SIBTEST DIF between identical groups", () => {
+    fc.assert(
+      fc.property(crowdedRows, (rows) => {
+        const matrix = responseMatrix([...rows, ...rows]);
+        const personGroups: DifGroup[] = [...rows.map(() => "reference" as const), ...rows.map(() => "focal" as const)];
+        for (const item of sibtest(matrix, personGroups, { minimumCell: 2 }).items) {
+          if (item.beta !== null) expect(Math.abs(item.beta)).toBeLessThan(1e-12);
+          if (item.significance !== null) expect(item.significance).toBeCloseTo(1, 9);
+        }
+      }),
+    );
+  });
+
+  it("gives SIBTEST's chi-squares from 0 and significances from 0 to 1 for any responses", () => {
+    fc.assert(
+      fc.property(crowdedRows, fc.boolean(), (rows, correction) => {
+        const { items } = sibtest(responseMatrix(rows), alternate(rows), { minimumCell: 2, correction });
+        for (const item of items) {
+          expect(item.chiSquare ?? 0).toBeGreaterThanOrEqual(0);
+          expect(item.standardError ?? 0).toBeGreaterThanOrEqual(0);
+          expect(item.significance ?? 0.5).toBeGreaterThanOrEqual(0);
+          expect(item.significance ?? 0.5).toBeLessThanOrEqual(1);
+        }
       }),
     );
   });

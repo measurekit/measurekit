@@ -142,3 +142,12 @@ export function itemCases(data: DifData, item: number, anchors: Uint8Array): Ite
     maxScore: others + (maxScores[item] ?? 1),
   };
 }
+
+/**
+ * Returns the rank of each distinct value among the distinct values in ascending order, from 0, so that a table of
+ * scores or responses grows with the values that occur, not with the highest of them.
+ */
+export function ranksOf(values: ArrayLike<number>): Map<number, number> {
+  const distinct = [...new Set(Array.from(values))].sort((a, b) => a - b);
+  return new Map(distinct.map((value, rank) => [value, rank]));
+}

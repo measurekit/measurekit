@@ -140,20 +140,23 @@ CDM 8.3.14, cdcatR 1.0.7, mirtCAT 1.14, GPArotation 2026.8.2, polycor 0.8.2, mvt
 | Q3                                                         | mirt's `residuals(type = "Q3", Theta = )`, the same thetas                |
 | S-X², degrees of freedom, significance                     | mirt's `itemfit(fit_stats = "S_X2")`                                      |
 
-| DIF statistic                                                                | Reference                                                                                                                                                |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mantel-Haenszel chi-square, with and without the correction                  | Base R's `mantelhaen.test`; difMH's `MH` where they agree                                                                                                |
-| Common odds ratio, MH D-DIF and its standard error                           | difR's `difMH`: `alphaMH`, `varLambda`                                                                                                                   |
-| ETS categories                                                               | Base R: ETS's rule written out from the values above                                                                                                     |
-| Logistic regression chi-squares and R² changes                               | difR's `difLogistic(type = "udif", "nudif", "both")`                                                                                                     |
-| Lord's chi-square and the mean-sigma transformation                          | difR's `difLord(irtParam = )` on ltm calibrations run to convergence, checked against `LordChi2` and `itemRescale`                                       |
-| Purified Lord's chi-square                                                   | `difLord(irtParam = , purify = TRUE)` on the same calibrations; the final link against `LordChi2` and `itemRescale`                                      |
-| Purification, complete data                                                  | Base R's statistics on difR's anchors; `difMH(purify = TRUE)` and `difLogistic(purify = TRUE)` agree in odds ratios, chi-squares, rounds and convergence |
-| Sparse data, purified and not                                                | Base R: the matching score written out, `mantelhaen.test` and `glm` on each item's persons                                                               |
-| Mantel chi-square, standardized mean difference, effect size, ETS categories | Base R written out from the rows of each score group; the chi-square also against `mantelhaen.test(correct = FALSE)` on dichotomized items               |
-| Generalized Mantel-Haenszel chi-square and degrees of freedom                | Base R's `mantelhaen.test` on the 2 × K × S table of the categories used                                                                                 |
-| Ordinal logistic regression deviances, R² changes, slope change              | `rms::lrm`, lordif's engine, run to `eps = 1e-14`; `MASS::polr` agrees within 1e-8 in the deviance; lordif's `rundif` on the same matching scores        |
-| Polytomous sparse data and purification                                      | Base R: the matching score written out, `mantelhaen.test` and `lrm` on each item's persons; `rundif` agrees with the final criterion of each item        |
+| DIF statistic                                                                | Reference                                                                                                                                                  |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mantel-Haenszel chi-square, with and without the correction                  | Base R's `mantelhaen.test`; difMH's `MH` where they agree                                                                                                  |
+| Common odds ratio, MH D-DIF and its standard error                           | difR's `difMH`: `alphaMH`, `varLambda`                                                                                                                     |
+| ETS categories                                                               | Base R: ETS's rule written out from the values above                                                                                                       |
+| Logistic regression chi-squares and R² changes                               | difR's `difLogistic(type = "udif", "nudif", "both")`                                                                                                       |
+| Lord's chi-square and the mean-sigma transformation                          | difR's `difLord(irtParam = )` on ltm calibrations run to convergence, checked against `LordChi2` and `itemRescale`                                         |
+| Purified Lord's chi-square                                                   | `difLord(irtParam = , purify = TRUE)` on the same calibrations; the final link against `LordChi2` and `itemRescale`                                        |
+| Purification, complete data                                                  | Base R's statistics on difR's anchors; `difMH(purify = TRUE)` and `difLogistic(purify = TRUE)` agree in odds ratios, chi-squares, rounds and convergence   |
+| Sparse data, purified and not                                                | Base R: the matching score written out, `mantelhaen.test` and `glm` on each item's persons                                                                 |
+| Mantel chi-square, standardized mean difference, effect size, ETS categories | Base R written out from the rows of each score group; the chi-square also against `mantelhaen.test(correct = FALSE)` on dichotomized items                 |
+| Generalized Mantel-Haenszel chi-square and degrees of freedom                | Base R's `mantelhaen.test` on the 2 × K × S table of the categories used                                                                                   |
+| Ordinal logistic regression deviances, R² changes, slope change              | `rms::lrm`, lordif's engine, run to `eps = 1e-14`; `MASS::polr` agrees within 1e-8 in the deviance; lordif's `rundif` on the same matching scores          |
+| Polytomous sparse data and purification                                      | Base R: the matching score written out, `mantelhaen.test` and `lrm` on each item's persons; `rundif` agrees with the final criterion of each item          |
+| SIBTEST of items and bundles, every option                                   | mirt's `SIBTEST` with `match_set`, `suspect_set`, `guess_correction`, `Jmin`, `correction`, on each analysis's persons; `difSIBTEST(type = "udif")` agrees |
+| SIBTEST's purification                                                       | Base R's rounds on `SIBTEST`; `difSIBTEST(purify = TRUE)` agrees in β, rounds and convergence                                                              |
+| Recipes: STD P-DIF, DIF variance                                             | `difStd(stdWeight = "focal")`; sirt's `dif.variance` on the centered MH D-DIF, as its `eb.dif` shrinks towards the mean only then                          |
 
 | Linking and equating quantity                              | Reference                                                                                                      |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -612,6 +615,14 @@ Several results of the reference packages are not references:
   likelihood gives 0.78 (SE 0.05). The link is not the cause: maximum likelihood under the normal ogive gives 0.78
   too. On data simulated from the normal ogive estimates with ρ = 0.78, maximum likelihood gives 0.81 and LNIRT 0.63,
   so LNIRT's estimate is the one that is pulled toward lower values where the items say little about ability.
+- **mirt's SIBTEST.** `SIBTEST` refuses missing responses, so the script passes it each analysis's persons. A score group
+  needs more than `Jmin` persons of each group; a neighbor without persons of a group has the mean 0, which verbal's
+  items reach in 1 of 80 score groups; and the score groups below `guess_correction` times the number of columns are left
+  out, the studied and the flagged items counted: `sibtest` does all three. Its `1 - pchisq` reaches 0 below about
+  1e-16, which the tolerance covers. `difSIBTEST` calls `SIBTEST`.
+- **sirt's `eb.dif`.** `dif.variance` returns λ (d - d̄) + (1 - λ) d̄ with d̄ the mean of the MH D-DIF, where shrinkage towards
+  the mean is λ d + (1 - λ) d̄. They agree when d̄ is 0, so the fixture passes centered values and adds d̄ back. The
+  standard deviation does not depend on the centering.
 - **difLord's ltm calibrations.** With ltm's default control, 40 EM cycles and then BFGS at `optim`'s relative
   tolerance, the estimates stop up to 1.5e-3 from the maximum on the fixtures' groups, which moves Lord's chi-square by
   up to 2%. The fixture passes difLord calibrations run to convergence.
@@ -978,6 +989,9 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Recipe for several focal groups: the item with DIF in each comparison                             | Flagged at 0.05 over 20 tests                      | Flagged in both          |
 | Ordinal logistic regression chi-squares, significances, R², slope change                          | 1e-8 absolute                                      | 2e-10                    |
 | Ordinal logistic regression against lordif's rounded statistics                                   | 5e-5 + 1e-9 absolute                               | 4.96e-5                  |
+| SIBTEST: β, SE, chi-square, significance                                                          | 1e-10 absolute                                     | 3.1e-13                  |
+| SIBTEST: a shifted item, false alarms of clean items on 30 sets                                   | At least 28 of 30 flagged, at most 8%              | 29 of 30, 5.6%           |
+| Recipes for STD P-DIF and DIF variance                                                            | 1e-10 absolute                                     | 8.9e-16                  |
 | Presmoothed counts                                                                                | 1e-11 relative                                     | 6e-13                    |
 | Classification probabilities, accuracy, consistency                                               | 1e-14 absolute                                     | 1e-16                    |
 | Kappa and intraclass correlations                                                                 | 1e-12 absolute                                     | 2e-15                    |

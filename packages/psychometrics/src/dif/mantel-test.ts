@@ -2,7 +2,7 @@ import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 
 import { invertPositiveDefinite, standardDeviation } from "../math/internal.js";
-import { type DifGroup, type ItemCases, itemCases, polytomousData } from "./groups.js";
+import { type DifGroup, type ItemCases, itemCases, polytomousData, ranksOf } from "./groups.js";
 import {
   type DifAnalysis,
   type PurificationOptions,
@@ -152,12 +152,6 @@ function countByScore({ responses, scores, focal }: ItemCases): ScoreGroups {
     counted.counts[category] = (counted.counts[category] ?? 0) + 1;
   }
   return counted;
-}
-
-/** Returns the rank of each distinct value among the distinct values in ascending order, from 0. */
-function ranksOf(values: ArrayLike<number>): Map<number, number> {
-  const distinct = [...new Set(Array.from(values))].sort((a, b) => a - b);
-  return new Map(distinct.map((value, rank) => [value, rank]));
 }
 
 function statistics(cases: ItemCases): Omit<MantelTest, "id"> {
