@@ -92,7 +92,8 @@ flowchart TD
 | Time                 | Grows with the responses times `points ** D`         | Grows with the persons, responses and parameters; slower than EM below 4 dimensions |
 
 `calibrateMultidimensional(data, options)` takes a response matrix or response records, and a model, one for all items
-or one per item. Missing responses are skipped, and persons without responses change nothing.
+or one per item. Missing responses are skipped, which suits responses missing at random, and persons without responses change
+nothing. [A recipe](#recipe-responses-missing-not-at-random) models omissions that depend on the ability.
 
 | Option           | Default                                   | Meaning                                                                                                              |
 | ---------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -599,6 +600,75 @@ inverse of the matrix is the covariance of a maximum likelihood estimate of thet
 `simulateMultidimensionalResponses` ([simulation](sim.md#multidimensional-responses)) draws responses from a
 vector of thetas per person; `toMirtMultidimensional` and `fromMirtMultidimensional` ([parameterization](parameterization.md#multidimensional-items))
 convert items to and from mirt.
+
+## Recipe: responses missing not at random
+
+Persons of low ability often omit items, so whether a response is missing depends on the trait that the test measures,
+and skipping the missing responses biases the items and the abilities. Holman and Glas (2005) model the omissions: the
+response indicator of each item, 1 if answered, is an item of a second dimension, the propensity to respond, which
+correlates with the ability. `calibrateMultidimensional` fits the two dimensions and their correlation, with the
+indicators always observed and the responses missing where they were omitted.
+
+```mermaid
+flowchart LR
+  M["Responses with omissions"] --> I["Indicator of each response:<br/>1 if answered, else 0"]
+  M --> C["Combined matrix"]
+  I --> C
+  C --> F["calibrateMultidimensional:<br/>responses on 'ability', indicators on 'propensity'"]
+  F --> R["Items of both dimensions<br/>and their correlation"]
+  R --> S["Scores: a person's omissions<br/>inform the ability through the correlation"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { type ResponseMatrix, responseMatrix } from "@measurekit/psychometrics/data";
+import {
+  calibrateMultidimensional,
+  multidimensionalPosteriorModeEstimate,
+  multidimensionalTwoParameterLogistic,
+} from "@measurekit/psychometrics/multidimensional";
+
+// 800 persons answer 8 items; the persons of lower ability omit more, as the propensity correlates 0.5 with the ability.
+const random = createRandom(7);
+const logistic = (z: number) => 1 / (1 + Math.exp(-z));
+const rows = Array.from({ length: 800 }, () => {
+  const ability = random.normal();
+  const propensity = 0.5 * ability + Math.sqrt(0.75) * random.normal();
+  return Array.from({ length: 8 }, (_, j) => {
+    const answered = random.uniform() < logistic(propensity + 0.3 * (j - 3));
+    const correct = random.uniform() < logistic(ability - 1.4 + 0.4 * j);
+    return answered ? Number(correct) : null;
+  });
+});
+const matrix = responseMatrix(rows);
+
+/** The responses and, beside them, an indicator item of whether each was answered, with the dimension of every item. */
+function withIndicators(data: ResponseMatrix) {
+  const itemIds = [...data.itemIds, ...data.itemIds.map((id) => `answered:${id}`)];
+  const combined = data.responses.map((row) => [...row, ...row.map((response) => (response === null ? 0 : 1))]);
+  const loadings = Object.fromEntries(
+    itemIds.map((id, i) => [id, [i < data.itemIds.length ? "ability" : "propensity"]]),
+  );
+  return { matrix: responseMatrix(combined, { itemIds }), loadings };
+}
+
+const { matrix: combined, loadings } = withIndicators(matrix);
+const fit = calibrateMultidimensional(combined, { model: multidimensionalTwoParameterLogistic, loadings });
+fit.correlations; // [[1, 0.48], [0.48, 1]]: the truth is 0.5
+
+// The first person answered 4 of 8 items. Scored with the indicators and the correlation as the prior, the omissions count.
+const person = combined.responses[0] ?? [];
+const prior = { mean: [0, 0], covariance: fit.correlations };
+multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // [-0.54, -0.45]
+```
+
+| Choice     | Value                                                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model      | The 2PL for the responses, and for the indicators the same model, whose slope on the propensity is the indicator's discrimination              |
+| Dimensions | `loadings` puts each response on `"ability"` and each indicator on `"propensity"`; the correlation between them is estimated                   |
+| Time       | Two dimensions on a grid of 31 points, as any two-dimensional calibration: 800 persons and 16 items take under a second                        |
+| Check      | A correlation near 0 means the omissions say little about the ability, and the items differ little from those of a calibration that skips them |
+| Limits     | The model is the one of Holman and Glas: omissions depend on the ability only through the correlation of the two dimensions                    |
 
 ## Not included
 

@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   type ConversionTableOptions,
+  calibrate,
   conditionalScaleError,
   conversionTable,
   createRandom,
@@ -16,6 +17,7 @@ import {
   percentileRanks,
   predictFormScore,
   predictThetaScore,
+  responseMatrix,
   type ScorePrediction,
   type ScoreScale,
   scaleConversion,
@@ -26,7 +28,7 @@ import {
   thetaPosterior,
   twoParameterLogistic,
 } from "../src/index.js";
-import { normalCdf } from "../src/math/internal.js";
+import { covariance, normalCdf, variance } from "../src/math/internal.js";
 import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureItems, fixtureItems } from "./fixture-items.js";
@@ -35,6 +37,7 @@ import growth from "./fixtures/scaling-growth.json" with { type: "json" };
 import joint from "./fixtures/scaling-joint-draws.json" with { type: "json" };
 import normStatisticsFixture from "./fixtures/scaling-norm-statistics.json" with { type: "json" };
 import norms from "./fixtures/scaling-norms.json" with { type: "json" };
+import plausible from "./fixtures/scaling-plausible-values.json" with { type: "json" };
 import predictions from "./fixtures/scaling-prediction.json" with { type: "json" };
 
 // Tolerances against R, explained in docs/validation.md.
@@ -58,6 +61,14 @@ const JOINT_TRANSFORM_TOLERANCE = 1e-12;
 const MONTE_CARLO_ERRORS = 4;
 /** The draws that estimate a joint distribution function. */
 const CORNER_DRAWS = 200_000;
+/** The moments of 200 plausible values for each of 2,000 persons against mirt's and TAM's, which draw as many. */
+const PLAUSIBLE_MOMENT_TOLERANCE = 0.02;
+/** The same moments against their expectation computed from the posteriors, free of the Monte Carlo error of the draws. */
+const PLAUSIBLE_EXACT_TOLERANCE = 0.01;
+/** The posterior means and the regression coefficient of a calibration against mirt's, which integrates on 61 points. */
+const PLAUSIBLE_ESTIMATE_TOLERANCE = 1e-3;
+/** Rubin's rules against the formulas of mice::pool written out in base R. */
+const RUBIN_TOLERANCE = 1e-12;
 
 /** A scale of a fixture: the bounds and the step are absent where the scale has none. */
 interface FixtureScale {
@@ -1364,6 +1375,205 @@ describe("drawJointThetas", () => {
       );
       expect(() => drawJointThetas(posteriors, correlation, 10, JSON.parse("null"))).toThrow(DataError);
     });
+  });
+});
+
+describe("the recipe for plausible values", () => {
+  const matrix = responseMatrix(plausible.responses, { itemIds: [...plausible.itemIds] });
+  const covariate = Float64Array.from(plausible.covariate);
+
+  /**
+   * The recipe of scaling.md: `draws` plausible values for each person, drawn from the posterior given the person's
+   * responses and own prior, which is the calibration's regression on the covariate if `conditional` is true.
+   */
+  function plausibleValues(conditional: boolean): { values: number[][]; eap: number[]; coefficient: number } {
+    const fit = calibrate(matrix, {
+      model: twoParameterLogistic,
+      ...(conditional && { covariates: { x: [...covariate] } }),
+    });
+    const coefficient = fit.regression?.coefficients.x ?? 0;
+    const residualSd = fit.regression?.residualSd ?? 1;
+    const random = createRandom(2026);
+    const eap: number[] = [];
+    const values = matrix.responses.map((row, person) => {
+      const prior = { mean: coefficient * (covariate[person] ?? 0), sd: residualSd };
+      const posterior = thetaPosterior(fit.items, row, { prior, quadrature: { points: 241 } });
+      eap.push(posterior.nodes.reduce((sum, node, q) => sum + node * defined(posterior.weights[q]), 0));
+      return drawJointThetas([posterior], [[1]], plausible.draws, random).map(([theta]) => defined(theta));
+    });
+    return { values, eap, coefficient };
+  }
+
+  /** The mean, the variance and the slope on the covariate of the values of one draw, averaged over the draws. */
+  function moments(values: readonly (readonly number[])[]): { mean: number; variance: number; slope: number } {
+    const draws = Array.from({ length: plausible.draws }, (_, draw) =>
+      Float64Array.from(values, (person) => defined(person[draw])),
+    );
+    return {
+      mean: mean(draws.map((draw) => mean(draw))),
+      variance: mean(draws.map((draw) => variance(draw))),
+      slope: mean(draws.map((draw) => covariance(draw, covariate) / variance(covariate))),
+    };
+  }
+
+  /** Expects the moments of the values to be a reference's, within the tolerance. */
+  function expectMoments(
+    actual: { mean: number; variance: number; slope: number },
+    expected: { mean: number; variance: number; slope: number },
+    label: string,
+    tolerance = PLAUSIBLE_MOMENT_TOLERANCE,
+  ): void {
+    expectClose(actual.mean, expected.mean, tolerance, `${label} mean`);
+    expectClose(actual.variance, expected.variance, tolerance, `${label} variance`);
+    expectClose(actual.slope, expected.slope, tolerance, `${label} slope`);
+  }
+
+  const free = plausibleValues(false);
+  const conditional = plausibleValues(true);
+
+  it("draws values with the moments of mirt's and TAM's without covariates", () => {
+    const actual = moments(free.values);
+    expectMoments(actual, plausible.withoutCovariates.mirt, "mirt");
+    expectMoments(actual, plausible.withoutCovariates.tam, "TAM");
+    expectMoments(actual, plausible.withoutCovariates.exact, "expectation", PLAUSIBLE_EXACT_TOLERANCE);
+    const eap = Float64Array.from(free.eap);
+    expectClose(
+      variance(eap),
+      plausible.withoutCovariates.mirt.eap.variance,
+      PLAUSIBLE_ESTIMATE_TOLERANCE,
+      "EAP variance",
+    );
+  });
+
+  it("draws values with the moments of mirt's and TAM's given the covariate in the prior", () => {
+    const actual = moments(conditional.values);
+    expectMoments(actual, plausible.withCovariates.mirt, "mirt");
+    expectMoments(actual, plausible.withCovariates.tam, "TAM");
+    expectMoments(actual, plausible.withCovariates.exact, "expectation", PLAUSIBLE_EXACT_TOLERANCE);
+    expectClose(conditional.coefficient, plausible.withCovariates.coefficient, PLAUSIBLE_ESTIMATE_TOLERANCE, "β");
+    const eap = Float64Array.from(conditional.eap);
+    expectClose(
+      variance(eap),
+      plausible.withCovariates.mirt.eap.variance,
+      PLAUSIBLE_ESTIMATE_TOLERANCE,
+      "EAP variance",
+    );
+    expectClose(
+      covariance(eap, covariate) / variance(covariate),
+      plausible.withCovariates.mirt.eap.slope,
+      PLAUSIBLE_ESTIMATE_TOLERANCE,
+      "EAP slope",
+    );
+  });
+
+  it("understates the relation to a covariate that the prior leaves out", () => {
+    const withoutCovariate = moments(free.values).slope;
+    expect(withoutCovariate).toBeLessThan(0.5);
+    expect(withoutCovariate).toBeLessThan(plausible.withCovariates.mirt.slope - 0.25);
+  });
+
+  it("keeps the values of a person in the posterior's grid, from the lowest to the highest node", () => {
+    const lowest = free.values.reduce((low, person) => Math.min(low, ...person), Number.POSITIVE_INFINITY);
+    const highest = free.values.reduce((high, person) => Math.max(high, ...person), Number.NEGATIVE_INFINITY);
+    expect(lowest).toBeGreaterThanOrEqual(-6);
+    expect(highest).toBeLessThanOrEqual(6);
+  });
+
+  it("gives the same values for the same seed", () => {
+    expect(plausibleValues(true).values.slice(0, 20)).toStrictEqual(conditional.values.slice(0, 20));
+  });
+});
+
+describe("the recipe for Rubin's rules", () => {
+  const average = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const sampleVariance = (values: readonly number[]) => {
+    const center = average(values);
+    return values.reduce((sum, value) => sum + (value - center) ** 2, 0) / (values.length - 1);
+  };
+
+  /** The recipe of scaling.md: Rubin's rules for the estimates of the sets and their sampling variances. */
+  function combine(estimates: readonly number[], variances: readonly number[]) {
+    const sets = estimates.length;
+    const within = average(variances);
+    const between = sampleVariance(estimates);
+    const total = within + (1 + 1 / sets) * between;
+    const relativeIncrease = ((1 + 1 / sets) * between) / within;
+    return {
+      estimate: average(estimates),
+      within,
+      between,
+      total,
+      standardError: Math.sqrt(total),
+      degreesOfFreedom: (sets - 1) * (1 + 1 / relativeIncrease) ** 2,
+    };
+  }
+
+  const covariate = Float64Array.from(plausible.covariate);
+  const sets = Array.from({ length: plausible.rubin.plausibleValues[0]?.length ?? 0 }, (_, set) =>
+    Float64Array.from(plausible.rubin.plausibleValues, (person) => defined(person[set])),
+  );
+
+  /** The least-squares slope of a set on the covariate and the variance of that slope. */
+  function slopeOf(values: Float64Array): { estimate: number; variance: number } {
+    const persons = values.length;
+    const slope = covariance(values, covariate) / variance(covariate);
+    const residuals = values.map(
+      (value, person) => value - mean(values) - slope * (defined(covariate[person]) - mean(covariate)),
+    );
+    const residualVariance = residuals.reduce((sum, residual) => sum + residual ** 2, 0) / (persons - 2);
+    return { estimate: slope, variance: residualVariance / ((persons - 1) * variance(covariate)) };
+  }
+
+  /** Expects the pooled quantities to be those of the reference. */
+  function expectPooled(actual: ReturnType<typeof combine>, expected: typeof plausible.rubin.mean.pooled): void {
+    for (const name of ["estimate", "within", "between", "total", "degreesOfFreedom"] as const) {
+      expectClose(actual[name], expected[name], RUBIN_TOLERANCE * Math.max(1, Math.abs(expected[name])), name);
+    }
+    expectClose(actual.standardError, Math.sqrt(expected.total), RUBIN_TOLERANCE, "standard error");
+  }
+
+  it("pools the mean of the values and its variance as base R's formulas do", () => {
+    const estimates = sets.map((values) => average([...values]));
+    const variances = sets.map((values) => variance(values) / values.length);
+    estimates.forEach((estimate, set) => {
+      expectClose(estimate, defined(plausible.rubin.mean.estimates[set]), RUBIN_TOLERANCE, `estimate of set ${set}`);
+      expectClose(
+        defined(variances[set]),
+        defined(plausible.rubin.mean.variances[set]),
+        RUBIN_TOLERANCE,
+        `variance of set ${set}`,
+      );
+    });
+    expectPooled(combine(estimates, variances), plausible.rubin.mean.pooled);
+  });
+
+  it("pools the slope of the values on a covariate and its variance as base R's formulas do", () => {
+    const slopes = sets.map(slopeOf);
+    slopes.forEach(({ estimate, variance: sampling }, set) => {
+      expectClose(estimate, defined(plausible.rubin.slope.estimates[set]), RUBIN_TOLERANCE, `slope of set ${set}`);
+      expectClose(sampling, defined(plausible.rubin.slope.variances[set]), RUBIN_TOLERANCE, `variance of set ${set}`);
+    });
+    expectPooled(
+      combine(
+        slopes.map(({ estimate }) => estimate),
+        slopes.map(({ variance: sampling }) => sampling),
+      ),
+      plausible.rubin.slope.pooled,
+    );
+  });
+
+  it("adds to the within variance the between variance of the sets, scaled by 1 + 1 / m", () => {
+    const pooled = combine([1, 2, 3, 4], [0.5, 0.5, 0.5, 0.5]);
+    expect(pooled.within).toBe(0.5);
+    expect(pooled.between).toBeCloseTo(5 / 3, 12);
+    expect(pooled.total).toBeCloseTo(0.5 + 1.25 * (5 / 3), 12);
+  });
+
+  it("has infinite degrees of freedom and the within variance when the sets agree", () => {
+    const pooled = combine([0.3, 0.3, 0.3], [0.04, 0.04, 0.04]);
+    expect(pooled.between).toBe(0);
+    expect(pooled.total).toBe(0.04);
+    expect(pooled.degreesOfFreedom).toBe(Number.POSITIVE_INFINITY);
   });
 });
 

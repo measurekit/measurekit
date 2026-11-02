@@ -98,6 +98,7 @@ import {
   simulateItems,
   simulateMultidimensionalAdaptiveTest,
   simulateMultistageTest,
+  simulateThetas,
   standardErrorThreshold,
   startingItems,
   type TestItem,
@@ -3585,6 +3586,58 @@ function expectProfileEstimate(
   expect(actual.map, label).toEqual(expected.map);
   expect(actual.eap, label).toEqual(expected.mastery.map((m) => (m > 0.5 ? 1 : 0)));
 }
+
+/** The cap of the recipe, the persons expected in the window and the length of every test. */
+const EXPOSURE_CAP = 0.3;
+const EXPOSURE_PERSONS = 500;
+const EXPOSURE_TEST_LENGTH = 15;
+/** How far a rate may exceed the cap: the recipe stops at the cap, and the last eligible item is never withheld. */
+const EXPOSURE_SLACK = 0.02;
+
+describe("the recipe for restricted exposure", () => {
+  /** The recipe of cat.md, or the same tests without the control: each person's test, the counts and the final pool. */
+  function administer(restricted: boolean) {
+    const random = createRandom(4);
+    const thetas = simulateThetas(EXPOSURE_PERSONS, random);
+    let pool = simulateItems(twoParameterLogistic, 60, random).map((item, i) => ({ ...item, id: `q${i + 1}` }));
+    const counts = new Map<string, number>();
+    const lengths: number[] = [];
+    for (const theta of thetas) {
+      const test = adaptiveTest({ pool, stopping: testLength(EXPOSURE_TEST_LENGTH) });
+      const [person] = simulateAdaptiveTest(test, [theta], random).persons;
+      for (const id of person?.state.items ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
+      lengths.push(person?.state.items.length ?? 0);
+      if (restricted)
+        pool = pool.map((item) =>
+          (counts.get(item.id) ?? 0) >= EXPOSURE_CAP * thetas.length ? { ...item, exposure: 0 } : item,
+        );
+    }
+    return { counts, lengths, pool };
+  }
+
+  const controlled = administer(true);
+  const free = administer(false);
+  const highestRate = (counts: ReadonlyMap<string, number>) => Math.max(...counts.values()) / EXPOSURE_PERSONS;
+
+  it("keeps the exposure rate of every item at most the cap plus 0.02", () => {
+    expect(highestRate(controlled.counts)).toBeLessThanOrEqual(EXPOSURE_CAP + EXPOSURE_SLACK);
+  });
+
+  it("exceeds the cap by far without the control, so the cap is what holds the rate", () => {
+    expect(highestRate(free.counts)).toBeGreaterThan(2 * EXPOSURE_CAP);
+  });
+
+  it("gives every person a test of the full length", () => {
+    expect(controlled.lengths.every((length) => length === EXPOSURE_TEST_LENGTH)).toBe(true);
+  });
+
+  it("withholds exactly the items whose counts reached the cap", () => {
+    for (const item of controlled.pool) {
+      const reached = (controlled.counts.get(item.id) ?? 0) >= EXPOSURE_CAP * EXPOSURE_PERSONS;
+      expect("exposure" in item && item.exposure === 0, item.id).toBe(reached);
+    }
+  });
+});
 
 describe("diagnosticAdaptiveTest", () => {
   for (const reference of catCdm.cases) {

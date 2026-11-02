@@ -340,6 +340,120 @@ same draws for the same posteriors.
 The matrix is checked as symmetric and 1 on the diagonal to within 1e-8. A draw costs the square of the posteriors' number
 plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes take under a millisecond.
 
+## Recipe: plausible values
+
+A survey reports the distribution of theta in groups and its relation to other variables, not a score for each person. A
+point estimate such as the EAP shrinks toward its prior, so the variance of EAPs is too small and their relation to a
+variable the prior leaves out is too weak. Plausible values (Mislevy, 1991) are random draws from each person's posterior:
+a statistic computed from sets of them is unbiased if the prior of every person conditions on all the variables that the
+analysis uses (Mazzeo, 2017; Wu, 2005). The recipe is `calibrate` with `covariates`, `thetaPosterior` for the prior of
+each person, and `drawJointThetas` with one posterior and the correlation `[[1]]`:
+
+```mermaid
+flowchart LR
+  C["calibrate with covariates:<br/>items, β and σ"] --> P["Each person's prior N(xᵀβ, σ²)"]
+  R["Responses"] --> T["thetaPosterior<br/>for each person"]
+  P --> T
+  T --> D["drawJointThetas([posterior], [[1]], m, random)"]
+  D --> V["m plausible values for each person"]
+  V --> S["The statistic of each set of values"]
+  S --> B["Rubin's rules"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrate, thetaPosterior, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { drawJointThetas } from "@measurekit/psychometrics/scaling";
+import { normalDistribution, simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 1,500 persons answer 20 items. Their theta is 0.6 x + e, e ~ N(0, 0.8²), with the covariate x centered.
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 20, random);
+const raw = simulateThetas(1500, random);
+const center = raw.reduce((sum, value) => sum + value, 0) / raw.length;
+const x = raw.map((value) => value - center);
+const noise = simulateThetas(1500, random, normalDistribution(0, 0.8));
+const thetas = x.map((value, person) => 0.6 * value + (noise[person] ?? 0));
+const responses = simulateResponses(items, thetas, random);
+
+// Free slopes fix σ at 1, so β is in units of the residual SD: 0.6 / 0.8 = 0.75, estimated as 0.72.
+const fit = calibrate(responses, { model: twoParameterLogistic, covariates: { x } });
+const coefficient = fit.regression?.coefficients.x ?? 0;
+const residualSd = fit.regression?.residualSd ?? 1;
+
+// Five plausible values for each person: draws from the posterior given the responses and the person's own prior.
+const plausibleValues = responses.responses.map((row, person) => {
+  const prior = { mean: coefficient * (x[person] ?? 0), sd: residualSd };
+  const posterior = thetaPosterior(fit.items, row, { prior, quadrature: { points: 241 } });
+  return drawJointThetas([posterior], [[1]], 5, random).map(([theta]) => theta ?? 0);
+});
+plausibleValues[0]; // [-3.04, -2.41, -2.36, -2.92, -3.25]
+```
+
+| Choice          | Value                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Prior           | `{ mean, sd }` of the person: the group's `mean` and `sd` of a calibration with `groups`, or xᵀβ and `residualSd` of `regression` |
+| Quadrature      | 241 points, as [joint draws](#joint-draws-of-theta) advise: a cell of width h adds h² / 12 to the variance of a draw              |
+| Number of draws | 5 to 10 sets are usual for a survey; each set is analyzed apart                                                                   |
+| Items           | Known: the uncertainty of the item parameters is not in the draws                                                                 |
+| Weights         | The analysis applies them; the draws do not depend on them                                                                        |
+
+Without the covariates the prior is N(0, 1) for everyone, and the relation to x is understated: the correlation of the first
+set of values with x is 0.47 where the simulated thetas' own is 0.58, and 0.59 with the covariates. The prior conditions
+on every variable of the analysis for that reason.
+
+## Recipe: Rubin's rules
+
+The analysis of each set of plausible values gives an estimate and the sampling variance of that estimate, as if the
+values were the persons' thetas. Rubin's (1987) rules combine the m sets, with Ū the mean of the variances, B the variance
+of the estimates and m the number of sets:
+
+| Quantity           | Definition                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------- |
+| Estimate           | The mean of the estimates                                                                          |
+| Within variance Ū  | The mean of the sampling variances                                                                 |
+| Between variance B | The sample variance of the estimates, denominator m - 1                                            |
+| Total variance     | Ū + (1 + 1 / m) B; its square root is the standard error                                           |
+| Degrees of freedom | (m - 1) (1 + 1 / r)², with r = (1 + 1 / m) B / Ū, as `mice::pool` when the complete data are large |
+
+```ts continues
+const average = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+const sampleVariance = (values: readonly number[]) => {
+  const center = average(values);
+  return values.reduce((sum, value) => sum + (value - center) ** 2, 0) / (values.length - 1);
+};
+
+/** Rubin's rules for the estimates of the sets and their sampling variances. */
+function combine(estimates: readonly number[], variances: readonly number[]) {
+  const sets = estimates.length;
+  const within = average(variances);
+  const between = sampleVariance(estimates);
+  const total = within + (1 + 1 / sets) * between;
+  const relativeIncrease = ((1 + 1 / sets) * between) / within;
+  return {
+    estimate: average(estimates),
+    within,
+    between,
+    total,
+    standardError: Math.sqrt(total),
+    degreesOfFreedom: (sets - 1) * (1 + 1 / relativeIncrease) ** 2,
+  };
+}
+
+// The mean of theta, with the sampling variance of a mean, in each of the five sets.
+const sets = [0, 1, 2, 3, 4].map((set) => plausibleValues.map((values) => values[set] ?? 0));
+combine(
+  sets.map(average),
+  sets.map((values) => sampleVariance(values) / values.length),
+);
+// { estimate: 0.0075, within: 0.0010, between: 0.00016, total: 0.0012, standardError: 0.035, degreesOfFreedom: 157 }
+```
+
+The same function combines any statistic that has a sampling variance, such as the slope of theta on x with the variance of
+a regression. With no difference between the sets, B is 0 and the degrees of freedom are infinite. Strata, clusters and
+replicate weights of a survey design enter the variance of each set, which the caller computes ([not
+included](#not-included)).
+
 ## Not included
 
 - **Smoothed or continuous norming.** Outside the sources: a clinical practice with competing models (`cNORM`); it needs
@@ -367,9 +481,16 @@ plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes tak
 | Standard errors of z scores | The delta method                                                | `check.norms` subtracts the term (Σ n_k ∂f/∂n_k)² / N twice, which lowers them by up to 3e-6 of their size |
 | Error of reported scores    | Of the rounded and bounded scores of the table                  | Kolen, Zeng and Hanson give the error before rounding too: slope × SEM(θ)                                  |
 | Joint draws                 | A Gaussian copula over separate posteriors                      | mirt's `fscores(plausible.draws =)`: one model's joint posterior                                           |
+| Plausible values            | The posterior on a grid of the person's own prior, exact        | mirt: Metropolis-Hastings, or a normal at the EAP with covariates; `tam.pv` adds 0.03 at its default grid  |
 
 ## References
 
+- Mazzeo, J. (2017). Large-scale group-score assessments. In W. J. van der Linden (Ed.), Handbook of item response theory,
+  volume 3: Applications (pp. 297-312). CRC Press.
+- Mislevy, R. J. (1991). Randomization-based inference about latent variables from complex samples. Psychometrika, 56(2),
+  177-196.
+- Rubin, D. B. (1987). Multiple imputation for nonresponse in surveys. Wiley.
+- Wu, M. (2005). The role of plausible values in large-scale surveys. Studies in Educational Evaluation, 31(2-3), 114-128.
 - Kolen, M. J., & Brennan, R. L. (2014). Test equating, scaling, and linking: Methods and practices (3rd ed.). Springer.
 - Kolen, M. J., Zeng, L., & Hanson, B. A. (1996). Conditional standard errors of measurement for scale scores using IRT.
   Journal of Educational Measurement, 33(2), 129-140.

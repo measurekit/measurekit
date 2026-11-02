@@ -4,6 +4,7 @@ import {
   augmentedSubscores,
   classifyDifficulty,
   classifyDiscrimination,
+  createRandom,
   cronbachAlpha,
   DataError,
   DIFFICULTY_THRESHOLDS,
@@ -306,6 +307,82 @@ describe("reliability", () => {
     );
     expect(() => standardErrorOfMeasurement(polytomous, JSON.parse("null"))).toThrow(
       "A reliability must be a number from 0 to 1, found null.",
+    );
+  });
+});
+
+/** The loadings of the eight items of the recipe on one factor, and the cuts of their five categories. */
+const FACTOR_LOADINGS = [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8];
+const FACTOR_CUTS = [-1.2, -0.4, 0.4, 1.2];
+/** The range of the share of seeded samples whose 95% interval holds the population value. */
+const INTERVAL_COVERAGE = [0.92, 0.98] as const;
+const INTERVAL_SAMPLES = 200;
+const INTERVAL_RESAMPLES = 200;
+const INTERVAL_PERSONS = 200;
+
+describe("the recipe for intervals of alpha and omega", () => {
+  /** Persons answering items of five categories that load on one factor, as in ctt.md. */
+  function sample(persons: number, random: ReturnType<typeof createRandom>): ResponseMatrix {
+    const rows = Array.from({ length: persons }, () => {
+      const factor = random.normal();
+      return FACTOR_LOADINGS.map((loading) => {
+        const score = loading * factor + Math.sqrt(1 - loading ** 2) * random.normal();
+        return FACTOR_CUTS.filter((cut) => score > cut).length;
+      });
+    });
+    return responseMatrix(rows);
+  }
+
+  /** The recipe of ctt.md: the percentile interval of a statistic over bootstrap samples of the persons. */
+  function percentileInterval(
+    data: ResponseMatrix,
+    statistic: (resample: ResponseMatrix) => number,
+    random: ReturnType<typeof createRandom>,
+    { resamples = 1000, level = 0.95 } = {},
+  ): [number, number] {
+    const persons = data.responses.length;
+    const values = Array.from({ length: resamples }, () => {
+      const drawn = Array.from({ length: persons }, () => data.responses[Math.floor(random.uniform() * persons)] ?? []);
+      return statistic(responseMatrix(drawn, { itemIds: data.itemIds }));
+    }).sort((a, b) => a - b);
+    const tail = (1 - level) / 2;
+    return [values[Math.floor(tail * resamples)] ?? 0, values[Math.ceil((1 - tail) * resamples) - 1] ?? 0];
+  }
+
+  const omegaOf = (resample: ResponseMatrix) => mcdonaldOmega(resample).omega;
+
+  it("covers the population value of alpha and of omega in 92 to 98 percent of 200 seeded samples", () => {
+    const population = sample(200_000, createRandom(1));
+    const truth = { alpha: cronbachAlpha(population), omega: omegaOf(population) };
+    const random = createRandom(2);
+    const covered = { alpha: 0, omega: 0 };
+    for (let set = 0; set < INTERVAL_SAMPLES; set++) {
+      const data = sample(INTERVAL_PERSONS, random);
+      const [alphaLow, alphaHigh] = percentileInterval(data, cronbachAlpha, random, { resamples: INTERVAL_RESAMPLES });
+      const [omegaLow, omegaHigh] = percentileInterval(data, omegaOf, random, { resamples: INTERVAL_RESAMPLES });
+      if (alphaLow <= truth.alpha && truth.alpha <= alphaHigh) covered.alpha++;
+      if (omegaLow <= truth.omega && truth.omega <= omegaHigh) covered.omega++;
+    }
+    for (const name of ["alpha", "omega"] as const) {
+      expect(covered[name] / INTERVAL_SAMPLES, name).toBeGreaterThanOrEqual(INTERVAL_COVERAGE[0]);
+      expect(covered[name] / INTERVAL_SAMPLES, name).toBeLessThanOrEqual(INTERVAL_COVERAGE[1]);
+    }
+  });
+
+  it("brackets the estimate, and a lower level gives a narrower interval", () => {
+    const data = sample(INTERVAL_PERSONS, createRandom(3));
+    const wide = percentileInterval(data, cronbachAlpha, createRandom(4));
+    const narrow = percentileInterval(data, cronbachAlpha, createRandom(4), { level: 0.5 });
+    expect(wide[0]).toBeLessThan(cronbachAlpha(data));
+    expect(wide[1]).toBeGreaterThan(cronbachAlpha(data));
+    expect(narrow[0]).toBeGreaterThan(wide[0]);
+    expect(narrow[1]).toBeLessThan(wide[1]);
+  });
+
+  it("gives the same interval for the same seed", () => {
+    const data = sample(INTERVAL_PERSONS, createRandom(3));
+    expect(percentileInterval(data, omegaOf, createRandom(4), { resamples: 100 })).toStrictEqual(
+      percentileInterval(data, omegaOf, createRandom(4), { resamples: 100 }),
     );
   });
 });

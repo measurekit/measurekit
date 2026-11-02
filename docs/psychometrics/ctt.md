@@ -80,6 +80,65 @@ above 1 (a Heywood case) shows that one factor does not fit. Alpha equals omega 
 lower otherwise. A test of several group factors under a general one has omega hierarchical and omega total from
 [`omegaHierarchical`](dimensionality.md#omega-hierarchical).
 
+## Recipe: intervals of alpha and omega
+
+Alpha and omega are estimates from one sample of persons, and the bootstrap gives their sampling error without a formula:
+draw the persons with replacement, compute the statistic of each drawn sample, and take the quantiles of the results. A row
+of the matrix is a person, so a person's responses stay together.
+
+```mermaid
+flowchart LR
+  M["Response matrix"] --> D["Draw the persons with replacement,<br/>random.uniform()"]
+  D --> S["cronbachAlpha or mcdonaldOmega<br/>of the drawn sample"]
+  S -->|"1,000 times"| D
+  S --> Q["Sorted values: the 2.5% and 97.5% quantiles<br/>are the 95% interval"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { cronbachAlpha, mcdonaldOmega } from "@measurekit/psychometrics/ctt";
+import { type ResponseMatrix, responseMatrix } from "@measurekit/psychometrics/data";
+
+// 200 persons answer 8 items of five categories, which load 0.4 to 0.8 on one factor.
+const random = createRandom(2);
+const loadings = [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8];
+const rows = Array.from({ length: 200 }, () => {
+  const factor = random.normal();
+  return loadings.map((loading) => {
+    const score = loading * factor + Math.sqrt(1 - loading ** 2) * random.normal();
+    return [-1.2, -0.4, 0.4, 1.2].filter((cut) => score > cut).length;
+  });
+});
+const matrix = responseMatrix(rows);
+
+/** The percentile interval of a statistic over bootstrap samples of the persons. */
+function percentileInterval(
+  data: ResponseMatrix,
+  statistic: (resample: ResponseMatrix) => number,
+  { resamples = 1000, level = 0.95 } = {},
+): [number, number] {
+  const persons = data.responses.length;
+  const values = Array.from({ length: resamples }, () => {
+    const drawn = Array.from({ length: persons }, () => data.responses[Math.floor(random.uniform() * persons)] ?? []);
+    return statistic(responseMatrix(drawn, { itemIds: data.itemIds }));
+  }).sort((a, b) => a - b);
+  const tail = (1 - level) / 2;
+  return [values[Math.floor(tail * resamples)] ?? 0, values[Math.ceil((1 - tail) * resamples) - 1] ?? 0];
+}
+
+cronbachAlpha(matrix); // 0.741
+percentileInterval(matrix, cronbachAlpha); // [0.677, 0.793]
+mcdonaldOmega(matrix).omega; // 0.755
+percentileInterval(matrix, (resample) => mcdonaldOmega(resample).omega); // [0.695, 0.802]
+```
+
+| Choice        | Value                                                                                                                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resamples     | 1,000 for an interval; the quantile at 2.5% rests on the 25 smallest values                                                                                                                                       |
+| Level         | `level` from 0 to 1: the tails are (1 - level) / 2 each                                                                                                                                                           |
+| Coverage      | On 200 sets of 200 persons and the 8 items above, the 95% intervals held the population value in 92.5% of the sets for alpha and 93.5% for omega: percentile intervals of a sample this small are a little narrow |
+| A failed draw | A drawn sample whose total scores have no variance throws `DataError` in `cronbachAlpha`, and one with an item of no variance in `mcdonaldOmega`: draw again, or use more persons                                 |
+
 ## Subscore value
 
 `subscoreValue(matrix, sections)` tells, for each section of a test, whether its subscore is worth reporting. Haberman

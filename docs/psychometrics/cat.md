@@ -509,6 +509,41 @@ const { pool: controlled, converged } = calibrateExposure(options, simulateTheta
 const test = adaptiveTest({ ...options, pool: controlled });
 ```
 
+### Recipe: restricted exposure
+
+Sympson-Hetter control holds on average over the thetas it was calibrated for. A program that may not exceed a rate in its
+testing window counts administrations as they happen: between two tests, the host sets the `exposure` of each item whose
+count has reached the cap to 0, which withholds it from every later test. The cap is a share of the persons expected in
+the window.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { adaptiveTest, simulateAdaptiveTest, testLength } from "@measurekit/psychometrics/cat";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 500 persons are expected; no item may go to more than 30% of them.
+const random = createRandom(4);
+const cap = 0.3;
+const thetas = simulateThetas(500, random);
+let pool = simulateItems(twoParameterLogistic, 60, random).map((item, i) => ({ ...item, id: `q${i + 1}` }));
+const counts = new Map<string, number>();
+for (const theta of thetas) {
+  const test = adaptiveTest({ pool, stopping: testLength(15) });
+  const [person] = simulateAdaptiveTest(test, [theta], random).persons;
+  for (const id of person?.state.items ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
+  pool = pool.map((item) => ((counts.get(item.id) ?? 0) >= cap * thetas.length ? { ...item, exposure: 0 } : item));
+}
+Math.max(...counts.values()) / thetas.length; // 0.30; without the control, one item went to all 500 persons
+```
+
+| Choice          | Value                                                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Feasible cap    | Above the test length over the pool size, 15 / 60 = 0.25 here: below it, no pool can meet the cap                                               |
+| Rate at the end | At the cap, while enough items remain below it for a whole test; when none do, the last eligible item is administered whatever its exposure     |
+| Cost            | Items are withheld in the order the rule prefers them, so later persons see less informative items: 39 of the 60 items were withheld by the end |
+| Several servers | The counts are shared state: keep them in the host's store, and build the pool of each test from them                                           |
+
 ### Stopping rules
 
 The test checks its stopping rule before every item, the first included, and also ends when no item is left.

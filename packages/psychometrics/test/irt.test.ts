@@ -1,4 +1,4 @@
-import { normalQuantile } from "@measurekit/core";
+import { chiSquareUpperTail, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -94,6 +94,7 @@ import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json"
 import latent from "./fixtures/irt-latent.json" with { type: "json" };
 import latentRegression from "./fixtures/irt-latent-regression.json" with { type: "json" };
 import lsat7 from "./fixtures/irt-lsat7.json" with { type: "json" };
+import nestedModels from "./fixtures/irt-nested-models.json" with { type: "json" };
 import weighted from "./fixtures/irt-person-weights.json" with { type: "json" };
 import posterior from "./fixtures/irt-posterior.json" with { type: "json" };
 import science from "./fixtures/irt-science.json" with { type: "json" };
@@ -3325,6 +3326,100 @@ describe("calibrateUnfolding", () => {
     ).toThrow(
       'Item "item1" has no response in category 0 from a person who agrees with an item; unfolding calibration leaves out the persons who disagree with every item they answered.',
     );
+  });
+});
+
+/** The statistic of the likelihood ratio of two calibrations of the same responses. */
+const NESTED_TOLERANCE = 1e-3;
+
+describe("the recipe for the nested-model chi-square", () => {
+  /** The recipe of irt.md: the chi-square of a restricted fit against a general one, with its degrees of freedom and p-value. */
+  function likelihoodRatio(
+    restricted: { aic: number; logLikelihood: number },
+    general: { aic: number; logLikelihood: number },
+  ) {
+    const parameters = (fit: { aic: number; logLikelihood: number }) => (fit.aic + 2 * fit.logLikelihood) / 2;
+    const chiSquare = 2 * (general.logLikelihood - restricted.logLikelihood);
+    const degreesOfFreedom = parameters(general) - parameters(restricted);
+    return { chiSquare, degreesOfFreedom, pValue: chiSquareUpperTail(chiSquare, degreesOfFreedom) };
+  }
+
+  it("equals mirt's anova of the 1PL against the 2PL", () => {
+    const { slopes } = nestedModels;
+    const matrix = responseMatrix(slopes.responses, { itemIds: [...slopes.itemIds] });
+    const result = likelihoodRatio(
+      calibrate(matrix, { model: oneParameterLogistic }),
+      calibrate(matrix, { model: twoParameterLogistic }),
+    );
+    expectClose(result.chiSquare, slopes.chiSquare, NESTED_TOLERANCE, "chi-square");
+    expect(result.degreesOfFreedom).toBe(slopes.degreesOfFreedom);
+    expectClose(result.pValue, slopes.pValue, NESTED_TOLERANCE, "p-value");
+  });
+
+  it("equals mirt's anova of the partial credit model against the generalized partial credit model", () => {
+    const { credit } = nestedModels;
+    const matrix = responseMatrix(credit.responses, { itemIds: [...credit.itemIds] });
+    const result = likelihoodRatio(
+      calibrate(matrix, { model: partialCredit }),
+      calibrate(matrix, { model: generalizedPartialCredit }),
+    );
+    expectClose(result.chiSquare, credit.chiSquare, NESTED_TOLERANCE, "chi-square");
+    expect(result.degreesOfFreedom).toBe(credit.degreesOfFreedom);
+    expectClose(result.pValue, credit.pValue, NESTED_TOLERANCE, "p-value");
+  });
+
+  it("recovers the difference in the numbers of parameters that mirt counts", () => {
+    const { slopes, credit } = nestedModels;
+    expect(slopes.general.parameters - slopes.restricted.parameters).toBe(slopes.degreesOfFreedom);
+    expect(credit.general.parameters - credit.restricted.parameters).toBe(credit.degreesOfFreedom);
+  });
+
+  it("gives a statistic of 0 for a model against itself, which has no degrees of freedom", () => {
+    const matrix = responseMatrix(nestedModels.slopes.responses, { itemIds: [...nestedModels.slopes.itemIds] });
+    const fit = calibrate(matrix, { model: twoParameterLogistic });
+    expect(likelihoodRatio(fit, fit)).toMatchObject({ chiSquare: 0, degreesOfFreedom: 0 });
+  });
+});
+
+/** The shares of the Hessian's standard errors that the bootstrap's may differ by. */
+const BOOTSTRAP_SHARE = 0.15;
+/** The calibrations of resampled persons that a standard error is computed from. */
+const BOOTSTRAP_REPLICATES = 400;
+
+describe("the recipe for bootstrap standard errors", () => {
+  it("gives standard errors within 15% of the Hessian's on 1,000 persons and 8 items", () => {
+    const random = createRandom(5);
+    const items = Array.from({ length: 8 }, (_, j) => ({
+      model: twoParameterLogistic,
+      parameters: { a: 0.8 + 0.1 * j, b: -1.4 + 0.4 * j, c: 0, d: 1 },
+    }));
+    const matrix = simulateResponses(items, simulateThetas(1000, random), random);
+    const fit = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "hessian" });
+
+    // The recipe of irt.md: calibrations of persons drawn with replacement.
+    const persons = matrix.responses.length;
+    const replicates = Array.from({ length: BOOTSTRAP_REPLICATES }, () => {
+      const rows = Array.from(
+        { length: persons },
+        () => matrix.responses[Math.floor(random.uniform() * persons)] ?? [],
+      );
+      return calibrate(responseMatrix(rows, { itemIds: matrix.itemIds }), { model: twoParameterLogistic });
+    });
+    const standardDeviation = (values: readonly number[]) => {
+      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+      return Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1));
+    };
+
+    expect(replicates.every((replicate) => replicate.converged)).toBe(true);
+    fit.items.forEach((item, j) => {
+      for (const name of ["a", "b"] as const) {
+        const bootstrap = standardDeviation(
+          replicates.map((replicate) => defined(replicate.items[j]).parameters[name]),
+        );
+        const hessian = defined(item.standardErrors?.[name]);
+        expect(Math.abs(bootstrap / hessian - 1), `${item.id} ${name}`).toBeLessThan(BOOTSTRAP_SHARE);
+      }
+    });
   });
 });
 

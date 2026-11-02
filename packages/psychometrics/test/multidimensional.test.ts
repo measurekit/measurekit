@@ -73,6 +73,7 @@ import m2pl from "./fixtures/multidimensional-m2pl.json" with { type: "json" };
 import m3pl from "./fixtures/multidimensional-m3pl.json" with { type: "json" };
 import mhrm from "./fixtures/multidimensional-mhrm.json" with { type: "json" };
 import missing from "./fixtures/multidimensional-missing.json" with { type: "json" };
+import notAtRandom from "./fixtures/multidimensional-not-at-random.json" with { type: "json" };
 import rotation from "./fixtures/multidimensional-rotation.json" with { type: "json" };
 
 /** The built-in models by the names that fixtures give them. */
@@ -3132,6 +3133,73 @@ describe("scoring", () => {
         "The items must be an array, found null.",
       );
     });
+  });
+});
+
+/** Item parameters against mirt's two-dimensional model of the responses and their indicators. */
+const NOT_AT_RANDOM_TOLERANCE = 1e-3;
+
+describe("the recipe for responses missing not at random", () => {
+  /** The recipe of multidimensional.md: the responses and an indicator item of whether each was answered. */
+  function withIndicators(data: ResponseMatrix) {
+    const itemIds = [...data.itemIds, ...data.itemIds.map((id) => `answered:${id}`)];
+    const combined = data.responses.map((row) => [...row, ...row.map((response) => (response === null ? 0 : 1))]);
+    const loadings = Object.fromEntries(
+      itemIds.map((id, i) => [id, [i < data.itemIds.length ? "ability" : "propensity"]]),
+    );
+    return { matrix: responseMatrix(combined, { itemIds }), loadings };
+  }
+
+  const items = notAtRandom.itemIds.length / 2;
+  const omitted = responseMatrix(
+    notAtRandom.responses.map((row) => row.slice(0, items)),
+    { itemIds: notAtRandom.itemIds.slice(0, items) },
+  );
+  const recipe = withIndicators(omitted);
+
+  it("builds the combined responses and the loadings of the fixture", () => {
+    expect(recipe.matrix.responses).toEqual(notAtRandom.responses);
+    expect(Object.values(recipe.loadings)).toEqual(Object.values(notAtRandom.loadings));
+    expect(omitted.responses.flat().filter((response) => response === null).length).toBeGreaterThan(1000);
+  });
+
+  const fit = calibrateMultidimensional(recipe.matrix, {
+    model: multidimensionalTwoParameterLogistic,
+    loadings: recipe.loadings,
+    points: notAtRandom.points,
+    tolerance: 1e-9,
+    maxIterations: 2000,
+  });
+
+  it("matches the items, the correlation and the likelihood of mirt's two-dimensional model", () => {
+    const fixture: Fixture = { ...notAtRandom, itemIds: recipe.matrix.itemIds };
+    expectCalibration(
+      fit,
+      fixture,
+      { parameters: NOT_AT_RANDOM_TOLERANCE, errors: NOT_AT_RANDOM_TOLERANCE, likelihood: NOT_AT_RANDOM_TOLERANCE },
+      "not at random",
+    );
+    expect(fit.converged).toBe(true);
+  });
+
+  it("finds the correlation of the ability and the propensity that omits, near the 0.5 that made the data", () => {
+    expectClose(defined(fit.correlations[0]?.[1]), notAtRandom.truth.correlation, 0.1, "correlation");
+  });
+
+  it("estimates the intercepts of the items nearer their truth than a calibration that skips the omissions", () => {
+    const skipping = calibrateMultidimensional(omitted, {
+      model: multidimensionalTwoParameterLogistic,
+      loadings: Object.fromEntries(omitted.itemIds.map((id) => [id, ["ability"]])),
+      points: notAtRandom.points,
+    });
+    const meanError = (calibration: MultidimensionalCalibration<Parameters>) =>
+      mean(
+        notAtRandom.truth.intercepts.map((truth, i) => {
+          const parameters = defined(calibration.items[i]).parameters;
+          return Math.abs(("intercept" in parameters ? parameters.intercept : Number.NaN) - truth);
+        }),
+      );
+    expect(meanError(fit)).toBeLessThan(0.5 * meanError(skipping));
   });
 });
 

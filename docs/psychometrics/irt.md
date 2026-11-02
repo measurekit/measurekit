@@ -857,6 +857,107 @@ only. `empiricalReliability` takes estimates with finite thetas and standard err
 For a logistic item the information is a² (P - c)² (d - P)² / ((d - c)² P (1 - P)). For the partial credit models it
 is a² times the variance of the category, and for the NRM the variance of the slopes a_k, under P(k | θ).
 
+## Recipe: nested-model chi-square
+
+Two calibrations of the same responses, where the first is a special case of the second, differ in fit by a likelihood
+ratio: 2 (ln L₂ - ln L₁) follows a chi-square distribution with as many degrees of freedom as the models differ in
+parameters. The 1PL is the 2PL with one slope for all items, and the PCM is the GPCM with one slope, so
+`calibrate` with each gives mirt's `anova` ([validation](validation.md#references)). `chiSquareUpperTail` is in
+`@measurekit/core`, which this package depends on. The number of parameters follows from the information criterion, as
+AIC = -2 ln L + 2p:
+
+```ts
+import { chiSquareUpperTail } from "@measurekit/core";
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrate, oneParameterLogistic, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 1,000 persons answer 12 items whose slopes run from 0.7 to 1.8.
+const random = createRandom(3);
+const items = Array.from({ length: 12 }, (_, j) => ({
+  model: twoParameterLogistic,
+  parameters: { a: 0.7 + 0.1 * j, b: -1.5 + 0.3 * j, c: 0, d: 1 },
+}));
+const responses = simulateResponses(items, simulateThetas(1000, random), random);
+
+const restricted = calibrate(responses, { model: oneParameterLogistic });
+const general = calibrate(responses, { model: twoParameterLogistic });
+const parameters = (fit: { aic: number; logLikelihood: number }) => (fit.aic + 2 * fit.logLikelihood) / 2;
+const chiSquare = 2 * (general.logLikelihood - restricted.logLikelihood);
+const degreesOfFreedom = parameters(general) - parameters(restricted);
+({ chiSquare, degreesOfFreedom, pValue: chiSquareUpperTail(chiSquare, degreesOfFreedom) });
+// { chiSquare: 79.9, degreesOfFreedom: 11, pValue: 1.5e-12 }: equal slopes are rejected
+```
+
+| The test holds when                                           | Because                                                                          |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Both fits use the same responses, quadrature and distribution | The log-likelihood is of those data, integrated over that distribution           |
+| Neither fit has `priors` or `personWeights`                   | The log-likelihood is without the priors, and a weighted one is not a likelihood |
+| The first model is a special case of the second               | Otherwise the difference has no chi-square distribution; compare `aic` and `bic` |
+| No constrained parameter is at a boundary of its range        | A variance or a probability at 0 changes the distribution of the statistic       |
+| Both fits report `converged`                                  | The statistic is a difference of two maxima                                      |
+
+## Recipe: bootstrap standard errors
+
+The standard errors of a calibration come from the Hessian or the cross-products of the scores. The bootstrap gives them for
+any quantity computed from a calibration, such as a reliability, a linking constant or a likelihood-ratio statistic, and
+checks the Hessian's where its assumptions are doubtful, as with few persons or a 3PL. Persons are the units that are drawn:
+a row of the matrix is a person, so all of a person's responses stay together.
+
+```mermaid
+flowchart LR
+  M["Response matrix"] --> D["Draw the persons with replacement,<br/>random.uniform()"]
+  D --> C["calibrate the resampled matrix"]
+  C --> R["The replicate's parameters"]
+  R -->|"many times"| D
+  R --> S["Standard deviation of each parameter: its standard error;<br/>quantiles: a percentile interval"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { responseMatrix } from "@measurekit/psychometrics/data";
+import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 1,000 persons answer 8 items.
+const random = createRandom(5);
+const items = Array.from({ length: 8 }, (_, j) => ({
+  model: twoParameterLogistic,
+  parameters: { a: 0.8 + 0.1 * j, b: -1.4 + 0.4 * j, c: 0, d: 1 },
+}));
+const matrix = simulateResponses(items, simulateThetas(1000, random), random);
+const fit = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "hessian" });
+
+// 400 calibrations of persons drawn with replacement.
+const persons = matrix.responses.length;
+const replicates = Array.from({ length: 400 }, () => {
+  const rows = Array.from({ length: persons }, () => matrix.responses[Math.floor(random.uniform() * persons)] ?? []);
+  return calibrate(responseMatrix(rows, { itemIds: matrix.itemIds }), { model: twoParameterLogistic });
+});
+const standardDeviation = (values: readonly number[]) => {
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1));
+};
+fit.items.slice(0, 2).map((item, j) => ({
+  id: item.id,
+  bootstrap: standardDeviation(replicates.map((replicate) => replicate.items[j]?.parameters.a ?? 0)),
+  hessian: item.standardErrors?.a,
+}));
+// [{ id: "item1", bootstrap: 0.118, hessian: 0.117 }, { id: "item2", bootstrap: 0.128, hessian: 0.130 }]: the errors of a
+```
+
+| Choice                 | Value                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Replicates             | 200 to 1,000; the standard deviation of a standard error is about 1 / √(2R) of its value, 5% at 200          |
+| Time                   | One `calibrate` per replicate: 400 replicates of 1,000 persons and 8 items take about 8 seconds              |
+| A replicate that fails | Check `converged` and leave it out, reporting how many                                                       |
+| Intervals              | The values at the 2.5% and 97.5% ranks of a parameter's sorted replicates                                    |
+| Fixed settings         | The replicates use the options of the original fit, and the same `fixed` items                               |
+| Scale                  | With the default N(0, 1) distribution of theta every replicate is on the same scale, so no linking is needed |
+
+The bootstrap likelihood ratio resamples the persons the same way and recomputes the [nested-model
+chi-square](#recipe-nested-model-chi-square) for each.
+
 ## Adding a model
 
 A model is an object implementing `IrtModel<TParameters>`. Calibration, ability estimation, information, adaptive and
