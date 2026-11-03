@@ -348,12 +348,12 @@ export const RULES: readonly Rule[] = [
     titles: "rejects too few forms",
   },
   {
-    rule: "A cut score's boundary has persons on both sides, so that a category nobody holds is not read as a cut.",
+    rule: "Every category up to the highest has persons, so that a category nobody holds is not read as a cut and a large one does not cost a boundary for each number below it.",
     file: "packages/psychometrics/src/standard-setting/contrasting-groups.ts",
-    find: "if (!categories.some((category) => category < k)) {",
+    find: "if (present.size <= highest) {",
     replace: "if (false) {",
     test: "packages/psychometrics/test/standard-setting.test.ts",
-    titles: "rejects invalid scores, categories and options",
+    titles: "rejects invalid scores, categories and options|category that nobody holds",
   },
   {
     rule: "A category is an integer from 0, so that no fraction or negative number is read as a level.",

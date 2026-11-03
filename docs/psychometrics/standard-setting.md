@@ -164,9 +164,9 @@ contrastingGroupsCutScores(work, levels).cutScores; // [20.031, 32.5, 44.76], af
 | ------------- | ------- | ---------------------------------------------------------------- |
 | `probability` | `0.5`   | The probability of the higher category at a cut, between 0 and 1 |
 
-Categories are integers from 0, and every boundary up to the highest category needs persons on both sides. Where the
-scores of the two sides of a boundary do not overlap, the likelihood has no maximum: that cut is `null` and
-`converged` is `false`. A cut need not be a score.
+Categories are integers from 0, and every category from 0 to the highest needs persons, so that each boundary has
+persons on both sides. Where the scores of the two sides of a boundary do not overlap, the likelihood has no maximum:
+that cut is `null` and `converged` is `false`. A cut need not be a score.
 
 ## Classification accuracy
 

@@ -42,8 +42,8 @@ const DEFAULT_PROBABILITY = 0.5;
  * @param options - The probability of the higher category at a cut.
  * @returns The cut score of each boundary and whether every fit converged.
  * @throws `DataError` when the scores are not finite numbers, the categories not integers from 0, the two lists differ
- * in length, fewer than two categories occur, a boundary has no person on one side, or `probability` is not between 0
- * and 1.
+ * in length, fewer than two categories occur, a category from 0 to the highest has no person, or `probability` is not
+ * between 0 and 1.
  * @see {@link https://doi.org/10.4324/9781410600264 | Kingston, Kahl, Sweeney and Bay (2001)}
  */
 export function contrastingGroupsCutScores(
@@ -75,7 +75,7 @@ export function contrastingGroupsCutScores(
 /**
  * Checks the scores and categories and returns the highest category.
  *
- * @throws `DataError` when they are invalid, or a boundary has no person on one side.
+ * @throws `DataError` when they are invalid, or a category from 0 to the highest has no person.
  */
 function checkGroups(scores: readonly number[], categories: readonly number[]): number {
   checkArray(scores, "The scores must be an array of numbers");
@@ -90,6 +90,7 @@ function checkGroups(scores: readonly number[], categories: readonly number[]): 
       throw new DataError(`Person ${person + 1} needs a finite score, found ${describe(score)}.`);
     }
   });
+  const present = new Set<number>();
   let highest = 0;
   categories.forEach((category, person) => {
     if (!(Number.isSafeInteger(category) && category >= 0)) {
@@ -97,13 +98,18 @@ function checkGroups(scores: readonly number[], categories: readonly number[]): 
         `Person ${person + 1} needs a category that is an integer from 0, found ${describe(category)}.`,
       );
     }
+    present.add(category);
     highest = Math.max(highest, category);
   });
   if (highest === 0) throw new DataError("Cut scores need persons in at least two categories.");
-  for (let k = 1; k <= highest; k++) {
-    if (!categories.some((category) => category < k)) {
-      throw new DataError(`The boundary below category ${k} needs persons on both sides, found none below it.`);
-    }
+  // A category nobody holds would give its two boundaries one cut. Requiring every category up to the highest also
+  // keeps the boundaries, and their work, as many as the categories that occur, whatever the highest number.
+  if (present.size <= highest) {
+    let empty = 0;
+    while (present.has(empty)) empty++;
+    throw new DataError(
+      `Cut scores need persons in every category from 0 to the highest, ${highest}; category ${empty} has none.`,
+    );
   }
   return highest;
 }

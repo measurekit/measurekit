@@ -342,6 +342,16 @@ describe("contrastingGroupsCutScores", () => {
     expectClose(defined(contrastingGroupsCutScores(scores, masters).cutScores[0]), 22, 0.2);
   });
 
+  it("refuses a category that nobody holds, without a boundary for each number below a large one", () => {
+    expect(() => contrastingGroupsCutScores([1, 2, 3, 4], [0, 0, 2, 2])).toThrow(
+      "Cut scores need persons in every category from 0 to the highest, 2; category 1 has none.",
+    );
+    // A boundary for each number up to 2⁵³ - 1 would run for years; the check stops at the first empty category.
+    expect(() => contrastingGroupsCutScores([1, 2, 3], [0, 1, Number.MAX_SAFE_INTEGER])).toThrow(
+      `Cut scores need persons in every category from 0 to the highest, ${Number.MAX_SAFE_INTEGER}; category 2 has none.`,
+    );
+  });
+
   it("rejects invalid scores, categories and options", () => {
     expect(() => contrastingGroupsCutScores([1, 2, 3], [0, 1])).toThrow(
       "The scores and the categories need one entry for each person, found 3 and 2.",
@@ -356,7 +366,7 @@ describe("contrastingGroupsCutScores", () => {
       "Cut scores need persons in at least two categories.",
     );
     expect(() => contrastingGroupsCutScores([1, 2, 3], [1, 2, 2])).toThrow(
-      "The boundary below category 1 needs persons on both sides, found none below it.",
+      "Cut scores need persons in every category from 0 to the highest, 2; category 0 has none.",
     );
     expect(() => contrastingGroupsCutScores([1, 2, 3, 4], [0, 1, 0, 1], { probability: 1 })).toThrow(
       "The option probability must be a number between 0 and 1, exclusive, found 1.",
