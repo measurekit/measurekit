@@ -117,7 +117,7 @@ pnpm lint             # Biome and cspell; `pnpm format` fixes formatting
 pnpm check:standards  # the rules of STANDARDS.md that a script can check, over the whole repository
 pnpm typecheck        # tsc over the sources, tests, examples and scripts
 pnpm test             # Vitest, a project for each package, the scripts and the examples; `--project psychometrics` runs one
-pnpm test:coverage    # the tests of core and knowledge tracing with the coverage floors of vitest.config.ts
+pnpm test:coverage    # the tests of each package with its coverage floor of vitest.config.ts; psychometrics' take 40 minutes
 pnpm bench            # builds, then the benchmarks of every package against the budgets of `test/budgets.ts`
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package, from a clean dist/

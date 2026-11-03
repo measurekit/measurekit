@@ -157,6 +157,11 @@ interface MhrmFixture extends Pick<Fixture, "model" | "itemIds" | "responses" | 
 }
 
 const mirtMhrm: MhrmFixture = mhrm;
+/**
+ * The time a calibration of several groups may take under coverage, which CI's job of Node.js 22 runs and which makes it
+ * about five times as long: the slowest took 79 to 213 s under it, and 20 s without it.
+ */
+const UNDER_COVERAGE = 600_000;
 
 function modelOf(name: string): MultidimensionalModel<Parameters> {
   return defined(MODELS[name as ModelName]);
@@ -1499,28 +1504,36 @@ describe("multiple groups", () => {
     expect(fit.groups?.[0]?.covariance.map((row, i) => row[i])).toEqual([1, 1]);
   }, 120_000);
 
-  it("matches mirt when fixed items set the scale and every group's means and covariance are free", () => {
-    const fit = calibrateGroups(anchored, "hessian");
-    expectCalibration(fit, anchored, mirtTolerances, "fixed items");
-    expectGroups(fit, anchored, 5e-4);
-    // Fixed items keep their parameters and have no standard errors.
-    for (const [id, parameters] of Object.entries(defined(anchored.fixed))) {
-      const item = defined(fit.items.find((each) => each.id === id));
-      expect(item.parameters).toEqual(parametersOf(anchored.model, parameters));
-      expect(item.standardErrors).toBeNull();
-    }
-    expect(defined(fit.groups?.[0]).means.some((mean) => mean !== 0)).toBe(true);
-  }, 120_000);
+  it(
+    "matches mirt when fixed items set the scale and every group's means and covariance are free",
+    () => {
+      const fit = calibrateGroups(anchored, "hessian");
+      expectCalibration(fit, anchored, mirtTolerances, "fixed items");
+      expectGroups(fit, anchored, 5e-4);
+      // Fixed items keep their parameters and have no standard errors.
+      for (const [id, parameters] of Object.entries(defined(anchored.fixed))) {
+        const item = defined(fit.items.find((each) => each.id === id));
+        expect(item.parameters).toEqual(parametersOf(anchored.model, parameters));
+        expect(item.standardErrors).toBeNull();
+      }
+      expect(defined(fit.groups?.[0]).means.some((mean) => mean !== 0)).toBe(true);
+    },
+    UNDER_COVERAGE,
+  );
 
-  it("matches mirt for three groups of uncorrelated dimensions with items missing by design", () => {
-    const uncorrelated: GroupsFixture = groups.uncorrelated;
-    const fit = calibrateGroups(uncorrelated, "hessian");
-    expectCalibration(fit, uncorrelated, mirtTolerances, "three groups");
-    expectGroups(fit, uncorrelated, 5e-4);
-    expect(fit.correlationStandardErrors).toBeNull();
-    // The covariance of every group is diagonal.
-    expect(fit.groups?.every(({ covariance }) => covariance[0]?.[1] === 0)).toBe(true);
-  }, 120_000);
+  it(
+    "matches mirt for three groups of uncorrelated dimensions with items missing by design",
+    () => {
+      const uncorrelated: GroupsFixture = groups.uncorrelated;
+      const fit = calibrateGroups(uncorrelated, "hessian");
+      expectCalibration(fit, uncorrelated, mirtTolerances, "three groups");
+      expectGroups(fit, uncorrelated, 5e-4);
+      expect(fit.correlationStandardErrors).toBeNull();
+      // The covariance of every group is diagonal.
+      expect(fit.groups?.every(({ covariance }) => covariance[0]?.[1] === 0)).toBe(true);
+    },
+    UNDER_COVERAGE,
+  );
 
   it("matches mirt for the graded model in two groups", () => {
     const graded: GroupsFixture = groups.graded;
@@ -1529,12 +1542,16 @@ describe("multiple groups", () => {
     expectGroups(fit, graded, 5e-4);
   }, 120_000);
 
-  it("matches mirt for two groups on three dimensions", () => {
-    const three: GroupsFixture = groups.three;
-    const fit = calibrateGroups(three, "none");
-    expectCalibration(fit, three, mirtTolerances, "three dimensions");
-    expectGroups(fit, three, 5e-4);
-  }, 120_000);
+  it(
+    "matches mirt for two groups on three dimensions",
+    () => {
+      const three: GroupsFixture = groups.three;
+      const fit = calibrateGroups(three, "none");
+      expectCalibration(fit, three, mirtTolerances, "three dimensions");
+      expectGroups(fit, three, 5e-4);
+    },
+    UNDER_COVERAGE,
+  );
 
   it("gives the same calibration with the cross-product standard errors for the same groups", () => {
     const hessian = calibrateGroups(twoGroups, "hessian");
@@ -1707,36 +1724,41 @@ describe("multiple groups", () => {
       return { matrix: simulateMultidimensionalResponses(items, thetas, random), labels };
     }
 
-    it("recovers the means and covariances of three groups on three dimensions from 40 items per dimension", () => {
-      const { matrix, labels } = simulate(20261031);
-      const fit = calibrateMultidimensional(matrix, {
-        model: multidimensionalTwoParameterLogistic,
-        loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [`D${Math.floor(i / perDimension) + 1}`]])),
-        groups: labels,
-        points: 21,
-        maxIterations: 1000,
-      });
-      expect(fit.converged).toBe(true);
-      // The first group is the reference and has the moments of its scale. On this seed the errors are at most 0.13 for a
-      // mean and 0.18 for a covariance at 21 nodes, and 0.24 and 0.61 at the default 15, which the tolerances exclude.
-      truth.forEach(({ group, means, covariance }, g) => {
-        const found = defined(fit.groups?.[g]);
-        expect(found.group).toBe(group);
-        means.forEach((value, d) => {
-          expectClose(defined(found.means[d]), value, 0.18, `mean ${d + 1} of group ${group}`);
+    // Under coverage this recovery took 541 to 880 s.
+    it(
+      "recovers the means and covariances of three groups on three dimensions from 40 items per dimension",
+      () => {
+        const { matrix, labels } = simulate(20261031);
+        const fit = calibrateMultidimensional(matrix, {
+          model: multidimensionalTwoParameterLogistic,
+          loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [`D${Math.floor(i / perDimension) + 1}`]])),
+          groups: labels,
+          points: 21,
+          maxIterations: 1000,
         });
-        covariance.forEach((row, i) => {
-          row.forEach((value, j) => {
-            expectClose(
-              defined(found.covariance[i]?.[j]),
-              value,
-              0.25,
-              `covariance ${i + 1},${j + 1} of group ${group}`,
-            );
+        expect(fit.converged).toBe(true);
+        // The first group is the reference and has the moments of its scale. On this seed the errors are at most 0.13 for a
+        // mean and 0.18 for a covariance at 21 nodes, and 0.24 and 0.61 at the default 15, which the tolerances exclude.
+        truth.forEach(({ group, means, covariance }, g) => {
+          const found = defined(fit.groups?.[g]);
+          expect(found.group).toBe(group);
+          means.forEach((value, d) => {
+            expectClose(defined(found.means[d]), value, 0.18, `mean ${d + 1} of group ${group}`);
+          });
+          covariance.forEach((row, i) => {
+            row.forEach((value, j) => {
+              expectClose(
+                defined(found.covariance[i]?.[j]),
+                value,
+                0.25,
+                `covariance ${i + 1},${j + 1} of group ${group}`,
+              );
+            });
           });
         });
-      });
-    }, 600_000);
+      },
+      3 * UNDER_COVERAGE,
+    );
   });
 });
 

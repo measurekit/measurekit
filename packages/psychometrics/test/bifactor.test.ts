@@ -88,8 +88,11 @@ interface Case {
 const TOLERANCES = { parameters: 5e-4, errors: 1e-3, likelihood: 1e-4 } as const;
 /** The tolerance at which EM runs for a comparison with mirt's optimum, which mirt reaches at 1e-10. */
 const TIGHT = 1e-8;
-/** The time that a calibration at a tight tolerance may take on a shared machine, in milliseconds. */
-const SLOW = 120_000;
+/**
+ * The time that a calibration at a tight tolerance may take on a shared machine, in milliseconds: under coverage, which
+ * CI's job of Node.js 22 runs and which makes it about five times as long, the slowest took 84 to 219 s.
+ */
+const SLOW = 600_000;
 
 /**
  * A seeded bifactor 2PL: one general and two specific dimensions of four items each, with slopes and intercepts that

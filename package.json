@@ -10,7 +10,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck && tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --project core --project knowledge-tracing",
+    "test:coverage": "vitest run --coverage --project core --project psychometrics --project knowledge-tracing",
     "bench": "pnpm -r --workspace-concurrency=1 bench",
     "lint": "biome check . && cspell --no-progress",
     "check:standards": "node scripts/check-standards.ts",
