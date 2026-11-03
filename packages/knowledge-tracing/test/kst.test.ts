@@ -1093,6 +1093,13 @@ describe("KST edge cases", () => {
     expectClose(model.predict(state, at("r", ["a", "b"])), 0.04, 1e-15);
   });
 
+  it("makes one class of the elements of a cycle of prerequisites, however long", () => {
+    const m = 3000;
+    const cycle = Object.fromEntries(Array.from({ length: m }, (_, e) => [`e${e}`, [`e${(e + 1) % m}`]]));
+    const { states } = surmiseStructure(cycle);
+    expect(states.map((state) => state.length)).toEqual([0, m]);
+  });
+
   it("rejects malformed structures and too many states, suggesting a split by unit", () => {
     expect(() => isKnowledgeSpace({ domain: ["a", "b"], states: [[], ["a"]] })).toThrow(
       "A knowledge structure needs the state of the whole domain.",

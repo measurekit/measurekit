@@ -76,6 +76,13 @@ test("finds the base of a space of 12 elements and 125 states", async (context) 
   await benchmark(context, "kst.structureBase", () => structureBase(space));
 });
 
+/** A cycle of 3,000 elements, each requiring the next: one class, whose closure reaches every element from each. */
+const cycle = Object.fromEntries(Array.from({ length: 3000 }, (_, e) => [`e${e}`, [`e${(e + 1) % 3000}`]]));
+
+test("builds the space of a cycle of prerequisites of 3,000 elements", async (context) => {
+  await benchmark(context, "kst.surmiseStructure", () => surmiseStructure(cycle));
+});
+
 test("builds the space of 12 elements with clauses", async (context) => {
   await benchmark(context, "kst.clauseStructure", () => clauseStructure(structureFixture.clauses));
 });

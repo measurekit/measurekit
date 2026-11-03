@@ -46,28 +46,37 @@ export function surmiseStructure(
  * Returns `below`, an m × m matrix with 1 at j × m + i when i is a prerequisite of j, directly or through others; every
  * element is its own.
  *
+ * @remarks
+ * Each element's row is the set its prerequisites reach, found by a search over the direct ones, so that the time is m
+ * times the elements and prerequisites, not the cube of m that closing the matrix in place takes for a long cycle.
+ *
  * @throws `DataError` when an element's prerequisites are not a list, or one is not in `domain`.
  */
 export function transitiveClosure(prerequisites: Prerequisites, domain: readonly string[]): Uint8Array {
   const m = domain.length;
   const index = new Map(domain.map((element, e) => [element, e]));
-  const below = new Uint8Array(m * m);
-  domain.forEach((element, j) => {
-    below[j * m + j] = 1;
+  const direct = domain.map((element) => {
     const listed = prerequisites[element];
     if (!Array.isArray(listed)) throw new DataError(`The prerequisites of "${element}" must be a list of elements.`);
-    for (const required of listed) {
+    return listed.map((required) => {
       const i = index.get(required);
       if (i === undefined) {
         throw new DataError(`"${element}" requires "${required}", which is not a key of the prerequisites.`);
       }
-      below[j * m + i] = 1;
-    }
+      return i;
+    });
   });
-  for (let k = 0; k < m; k++) {
-    for (let j = 0; j < m; j++) {
-      if (below[j * m + k] !== 1) continue;
-      for (let i = 0; i < m; i++) if (below[k * m + i] === 1) below[j * m + i] = 1;
+  const below = new Uint8Array(m * m);
+  const pending: number[] = [];
+  for (let j = 0; j < m; j++) {
+    below[j * m + j] = 1;
+    pending.push(j);
+    for (let k = pending.pop(); k !== undefined; k = pending.pop()) {
+      for (const i of direct[k] ?? []) {
+        if (below[j * m + i] === 1) continue;
+        below[j * m + i] = 1;
+        pending.push(i);
+      }
     }
   }
   return below;
