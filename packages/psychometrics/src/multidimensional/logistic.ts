@@ -119,11 +119,14 @@ function logisticModel(name: string, guessing: boolean): MultidimensionalModel<M
   };
 }
 
-/** Writes the information of an item, `factor` times the outer product of the slopes `a`, by rows, into `out`. */
+/**
+ * Writes the information of an item, `factor` times the outer product of the slopes `a`, by rows, into `out`. A factor
+ * of 0, where the probabilities underflow, gives 0 even where the product of two slopes overflows.
+ */
 export function writeInformation(a: readonly number[], factor: number, out: Float64Array): void {
   a.forEach((ai, i) => {
     a.forEach((aj, j) => {
-      out[i * a.length + j] = factor * (ai * aj);
+      out[i * a.length + j] = factor === 0 ? 0 : factor * (ai * aj);
     });
   });
 }

@@ -3250,6 +3250,18 @@ describe("information", () => {
     expectClose(defined(matrix?.[0]), a * a * p * (1 - p), 1e-14);
   });
 
+  it("is 0 where the probabilities underflow, however large the slopes", () => {
+    const steep = [
+      { model: multidimensionalTwoParameterLogistic, parameters: { a: [1e200, 1e200], intercept: 0, c: 0, d: 1 } },
+      { model: multidimensionalGradedResponse, parameters: { a: [1e200, 1], intercepts: [1, -1] } },
+    ];
+    for (const item of steep)
+      expect(multidimensionalInformation([item], [1, 1])).toEqual([
+        [0, 0],
+        [0, 0],
+      ]);
+  });
+
   it("rejects items and thetas it cannot use", () => {
     const item = defined(itemsOf(m2pl)[0]);
     expect(() => multidimensionalInformation([], [0, 0])).toThrow("Information needs at least one item.");
