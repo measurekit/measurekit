@@ -1072,13 +1072,13 @@ const test = multistageTest({
 });
 ```
 
-| Option       | Default                 | Meaning                                                                                     |
-| ------------ | ----------------------- | ------------------------------------------------------------------------------------------- |
-| `method`     | `"maximum-information"` | `"maximum-information"` or `"routing-shares"`                                               |
-| `scale`      | `"theta"`               | `"theta"`, or `"number-correct"`: whole scores, as `multistageTest` routes by them          |
-| `range`      | `[-6, 6]`               | `maximum-information` only: the interval in which the peaks and crossings are searched      |
-| `population` | the standard normal     | `routing-shares` only: a `{ nodes, weights }` distribution, nodes ascending                 |
-| `shares`     | equal shares in a stage | `routing-shares` only: one list for each stage after the first, a positive share per module |
+| Option       | Default                 | Meaning                                                                                                    |
+| ------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `method`     | `"maximum-information"` | `"maximum-information"` or `"routing-shares"`                                                              |
+| `scale`      | `"theta"`               | `"theta"`, or `"number-correct"`: whole scores, as `multistageTest` routes by them                         |
+| `range`      | `[-6, 6]`               | `maximum-information` only: the interval in which the peaks and crossings are searched, at most 1,000 wide |
+| `population` | the standard normal     | `routing-shares` only: a `{ nodes, weights }` distribution, nodes ascending                                |
+| `shares`     | equal shares in a stage | `routing-shares` only: one list for each stage after the first, a positive share per module                |
 
 An option of the other method is an error. The result has one list for each module of the stages but the last, in the
 order of the panel; a module's list has one cut fewer than the modules of the next stage, ascending. The `cuts` that the

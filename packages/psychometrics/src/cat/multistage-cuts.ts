@@ -50,8 +50,8 @@ export interface MultistageCutsOptions {
    */
   readonly scale?: MultistageRouting;
   /**
-   * The interval of theta in which the peaks and the crossings of the information curves are searched. Only
-   * `maximum-information` takes it.
+   * The interval of theta in which the peaks and the crossings of the information curves are searched, at most 1,000
+   * wide. Only `maximum-information` takes it.
    *
    * @defaultValue `[-6, 6]`
    */
@@ -87,6 +87,12 @@ const OPTIONS_OF_METHOD: readonly (readonly [
 
 /** The spacing of the grid of theta on which the peaks of the information curves are found; theta has unit SD. */
 const GRID_STEP = 0.01;
+
+/**
+ * The widest range that `maximum-information` searches: its grid of 100,000 points takes 800 KB for each module, where a
+ * range of millions would take gigabytes, or more points than an array holds.
+ */
+const MAX_RANGE_WIDTH = 1000;
 
 /**
  * A score within this of a whole score counts as it, so that the rounding of a curve and a root does not lift a cut
@@ -128,8 +134,8 @@ const SHARE_SUM_TOLERANCE = 1e-6;
  * @param options - The method, the scale and what the method reads.
  * @returns The cuts of each module of the stages but the last, in ascending order.
  * @throws `DataError` when the stages, the items or an option are invalid, an option belongs to the other method, the
- * information of adjacent modules does not cross between their peaks, or the cuts of a module on the scale
- * `number-correct` do not ascend.
+ * range is wider than 1,000, the information of adjacent modules does not cross between their peaks, or the cuts of a
+ * module on the scale `number-correct` do not ascend.
  * @see {@link https://doi.org/10.1207/s15324818ame1903_2 | Luecht, Brumfield and Breithaupt (2006)}
  */
 export function multistageCuts(stages: Stages, options: MultistageCutsOptions = {}): number[][] {
@@ -166,6 +172,11 @@ interface InformationCurve {
 
 /** Returns the cuts into each stage at the crossings of the information of its adjacent modules. */
 function informationCuts(stages: Stages, [lower, upper]: readonly [number, number]): number[][] {
+  if (!(upper - lower <= MAX_RANGE_WIDTH)) {
+    throw new DataError(
+      `The option range spans ${upper - lower} of theta, and the information is searched on a grid of ${GRID_STEP} over at most ${MAX_RANGE_WIDTH}; give a range near the items, such as [-6, 6].`,
+    );
+  }
   const steps = Math.max(1, Math.ceil((upper - lower) / GRID_STEP));
   const grid = Float64Array.from({ length: steps + 1 }, (_, i) => lower + ((upper - lower) * i) / steps);
   return stages.map((modules, stage) => {

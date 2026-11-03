@@ -731,6 +731,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/psychometrics/test/fit.test.ts",
     titles: "highest total score of at most 300",
   },
+  {
+    rule: "multistageCuts searches a range at most 1,000 wide, so that an absurd range costs no grid of gigabytes.",
+    file: "packages/psychometrics/src/cat/multistage-cuts.ts",
+    find: "if (!(upper - lower <= MAX_RANGE_WIDTH)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/cat.test.ts",
+    titles: "refuses a range that is not an interval",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

@@ -2652,6 +2652,12 @@ describe("multistageCuts", () => {
         "The option range must be an array [lower, upper], found",
       );
       expect(() => multistageCuts(stages, { range: JSON.parse("null") })).toThrow(DataError);
+      // A grid of 0.01 over 2,000,000 would take 1.6 GB for each module, and over 2e308 more points than an array holds.
+      expect(multistageCuts(stages, { range: [-500, 500] })).toEqual(multistageCuts(stages));
+      const message = (width: number) =>
+        `The option range spans ${width} of theta, and the information is searched on a grid of 0.01 over at most 1000; give a range near the items, such as [-6, 6].`;
+      expect(() => multistageCuts(stages, { range: [-1e6, 1e6] })).toThrow(message(2e6));
+      expect(() => multistageCuts(stages, { range: [-1e308, 1e308] })).toThrow(message(Number.POSITIVE_INFINITY));
     });
 
     it("refuses shares that are not a positive share for each module of each stage after the first, summing to 1", () => {
