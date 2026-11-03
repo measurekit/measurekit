@@ -51,7 +51,7 @@ export const READERS: readonly ReaderCase[] = [
   },
   {
     name: "responseRecords: 1,000,000 records, each of its own person and item",
-    budget: 1060,
+    budget: 1070,
     input: () => Array.from({ length: 1_000_000 }, (_, k) => ({ person: `p${k}`, item: `i${k}`, response: k % 2 })),
     read: (records: unknown[], { psychometrics }) => psychometrics.responseRecords(records),
   },
@@ -88,6 +88,68 @@ export const READERS: readonly ReaderCase[] = [
     },
   },
   {
+    name: "iita: 1,000 items, 276 learners, 24 candidates of 23.9 million cells, from the events",
+    budget: 620,
+    // Learners who fail one item each, 1 to 23 of them per item: 24 candidates of a million prerequisites, the most
+    // that the limit of the candidates' cells lets through.
+    input: () =>
+      Array.from({ length: 23 }, (_, k) => Array.from({ length: k + 1 }, () => k))
+        .flat()
+        .flatMap((failed, learner) =>
+          Array.from({ length: 1000 }, (_, k) => ({
+            learner: `l${learner}`,
+            item: `i${k}`,
+            skills: [],
+            time: learner * 1000 + k,
+            outcome: k === failed ? 0 : 1,
+          })),
+        ),
+    read: (events: unknown[], { "knowledge-tracing": tracing }) => tracing.iita(tracing.eventLog(events)),
+  },
+  {
+    name: "surmiseStructure: 1,000 elements, 12 free and a class of 988, 8,192 states",
+    budget: 270,
+    input: () => ({
+      ...Object.fromEntries(ids("e", 12).map((element) => [element, []])),
+      ...Object.fromEntries(ids("c", 988).map((element, k) => [element, [`c${((k + 1) % 988) + 1}`]])),
+    }),
+    read: (prerequisites: unknown, { "knowledge-tracing": tracing }) => tracing.surmiseStructure(prerequisites),
+  },
+  {
+    name: "kst: the masks of 4,096 sets of 16 skills over 65,536 states, the most cells",
+    budget: 520,
+    input: () => {
+      const skills = ids("s", 16);
+      return {
+        skills,
+        attempts: Array.from({ length: 4096 }, (_, set) => ({
+          learner: "ana",
+          item: "q",
+          skills: skills.filter((_, k) => (((set + 1) >>> k) & 1) === 1),
+          time: 0,
+        })),
+      };
+    },
+    // Both processes build the model of 16 skills without prerequisites; the reading fills its masks.
+    prepare: ({ skills, attempts }: { skills: string[]; attempts: unknown[] }, { "knowledge-tracing": tracing }) => {
+      const structure = tracing.surmiseStructure(Object.fromEntries(skills.map((skill) => [skill, []])), {
+        maxStates: 2 ** 16,
+      });
+      const probabilities = structure.states.map(() => 1 / structure.states.length);
+      const model = tracing.kst({ structure, parameters: { probabilities, items: { q: { guess: 0.1, slip: 0.1 } } } });
+      return { model, state: model.initialState("ana"), attempts };
+    },
+    read: ({
+      model,
+      state,
+      attempts,
+    }: {
+      model: { nextQuestion: (s: unknown, a: unknown[]) => unknown };
+      state: unknown;
+      attempts: unknown[];
+    }) => model.nextQuestion(state, attempts),
+  },
+  {
     name: "qMatrixIdentifiability: 100,000 items of 20 attributes",
     budget: 320,
     input: () => Object.fromEntries(ids("item", 100_000).map((id) => [id, ids("a", 20)])),
@@ -120,6 +182,19 @@ export const READERS: readonly ReaderCase[] = [
       ),
     }),
     read: (parameters: unknown, { "knowledge-tracing": tracing }) => tracing.bkt({ parameters }),
+  },
+  {
+    name: "manyFacetRasch: 1,000 persons, 1 item, 500 raters, each person by two, with standard errors",
+    budget: 170,
+    // Person j is scored by raters j and j + 1, round the raters, so that the design connects 500 rater measures.
+    input: () =>
+      Array.from({ length: 1000 }, (_, person) =>
+        [0, 1].map((step) => ({
+          levels: { person: `p${person + 1}`, item: "i1", rater: `r${((person + step) % 500) + 1}` },
+          score: (person + step) % 3,
+        })),
+      ).flat(),
+    read: (scores: unknown[], { psychometrics }) => psychometrics.manyFacetRasch(scores, { facets: ["item", "rater"] }),
   },
   {
     name: "personScalability: 2 persons, 1,000,000 items",

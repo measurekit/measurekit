@@ -580,6 +580,7 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `structureValidity`           | 1,000 items, 200 learners, a chain                             |        14 | 42                          |
 | `surmiseStructure`            | 1,000 elements, 12 free and a class of 988: 8,192 states       |      0.02 | 138                         |
 | `kst`, its masks              | 4,096 sets of 16 skills, 65,536 states                         |      0.33 | 173                         |
+| `manyFacetRasch`              | 1,000 persons, 1 item, 500 raters, each person by two          |      0.13 | 74                          |
 | `personScalability`           | 2 persons, 1,000,000 items, from their response matrix         |       3.8 | 195                         |
 | `localDependenceChiSquare`    | 2 persons, 2,000 2PL items: 1,999,000 pairs                    |     0.057 | 430                         |
 | `diagnosticAdaptiveTest`      | 64 items of one of 20 attributes, the most items × 2^K         |    0.0039 | 740                         |
@@ -589,9 +590,10 @@ persons itself, and 2 to 9 times where the input names them. A design of cogniti
 adaptive test's pool, takes up to 2 GB from a few hundred bytes, which its limits stop there; a host that takes
 Q-matrices from users sets a lower limit where it cannot spare that. The analyses of knowledge structures take up to
 about 260 MB within their limits: IITA's candidates from 19 MB of responses, and the masks of a model from a few hundred
-kilobytes of sets of skills. A statistic of every pair of items, such as local dependence, Yen's Q3 or the scalability
-of Mokken pairs, returns items² values, so 2,000 items take 0.4 GB from 57 KB; a host that takes matrices of many items
-from users limits the items.
+kilobytes of sets of skills. A statistic of every pair of items that no limit bounds, local dependence, Yen's Q3 or the
+scalability of Mokken pairs, returns items² values, so 2,000 items take 0.4 GB from 57 KB; a host that takes matrices of
+many items from users limits the items. The many-facet Rasch model holds matrices of the square of its measures, which
+no limit bounds: 500 raters take 74 MB from 131 KB of scores.
 
 A calibration of several dimensions holds tables over its grid, whose limit stops them at 310 MB, and at 700 MB with the
 standard errors of an exploratory model. The standard errors of a bifactor model keep, for each pattern of the responses
