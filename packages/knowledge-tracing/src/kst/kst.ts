@@ -42,7 +42,14 @@ import { type GoodnessOfFit, goodnessOfFit, parameterCount } from "./goodness.js
 import { type Identifiability, localIdentifiability } from "./identifiability.js";
 import { checkParameters, type KstItem, type KstParameters, START_RATE } from "./parameters.js";
 import { checkState, type KstState } from "./state.js";
-import { type CompiledStructure, compile, elementsOf, holds, type KnowledgeStructure } from "./structure.js";
+import {
+  addElement,
+  type CompiledStructure,
+  compile,
+  elementsOf,
+  holds,
+  type KnowledgeStructure,
+} from "./structure.js";
 
 /** Options of {@link kst}. */
 export interface KstOptions {
@@ -123,8 +130,8 @@ export interface KstModel extends LearnerModel<KstState, KstParameters> {
    * `aic` and `bic` count the events with one.
    *
    * @throws `DataError` when the log is malformed or has no event with an outcome, an event's item or skills are
-   * outside the structure, `fixed` or `equal` names an item with no event with an outcome, or the outcomes have
-   * probability 0 under the parameters.
+   * outside the structure, `fixed` or `equal` names an item with no event with an outcome, the outcomes have
+   * probability 0 under the parameters, or the masks would hold more than 2^28 cells.
    */
   fit(log: EventLog): KstFit;
   /**
@@ -195,6 +202,10 @@ const DEFAULT_THRESHOLD = 0.9;
  * It is a basic local independence model on a knowledge structure, over skills or items. A learner's state is the
  * probability of each knowledge state; each event updates it by Bayes' rule, a correct answer having probability 1 -
  * slip where the state masters the item and guess where it does not. Outcomes between 0 and 1 count as partial credit.
+ *
+ * The model keeps, for each set of skills or item that its attempts have named, which states master it: a byte for each
+ * state. These masks hold at most 2^28 cells, 256 MB, as for 26,000 sets of skills over 10,000 states; an attempt that
+ * would pass them throws.
  *
  * @param options - The structure, whether it is over items or skills, the method and the start, fixed and equal rates
  *   of the fit.
@@ -385,6 +396,12 @@ function answeredOnce(observed: readonly ObservedEvent[], itemCount: number): bo
 }
 
 /**
+ * The most cells of the masks that a model holds: a byte for each state and each set of elements that its attempts
+ * master. 2^28 cells take 256 MB, as for 26,000 sets of skills over 10,000 states.
+ */
+const MAX_MASK_CELLS = 2 ** 28;
+
+/**
  * Returns a lookup of the states that master an attempt, as a 0/1 array over the states: those that hold all of its
  * skills, or its item. Masks depend only on the structure, so each distinct set of elements is computed once.
  */
@@ -393,24 +410,33 @@ function attemptMasks(compiled: CompiledStructure, over: "skills" | "items"): (a
   return (attempt) => {
     const elements = over === "items" ? [attempt.item] : [...new Set(attempt.skills)].sort();
     const key = compositeKey(elements);
-    let mask = masks.get(key);
-    if (mask === undefined) {
-      if (over === "skills") checkHasSkills(attempt, `The attempt at item "${attempt.item}"`, "KST model over skills");
-      const indices = elements.map((element) => {
-        const e = compiled.index.get(element);
-        if (e === undefined) {
-          throw new DataError(
-            `The attempt at item "${attempt.item}" needs "${element}", which is not in the structure.`,
-          );
-        }
-        return e;
-      });
-      mask = new Uint8Array(compiled.count);
-      for (let s = 0; s < compiled.count; s++) mask[s] = indices.every((e) => holds(compiled, s, e)) ? 1 : 0;
-      masks.set(key, mask);
+    const known = masks.get(key);
+    if (known !== undefined) return known;
+    if ((masks.size + 1) * compiled.count > MAX_MASK_CELLS) {
+      throw new DataError(
+        `A KST model holds the states that master at most ${Math.floor(MAX_MASK_CELLS / compiled.count)} sets of ${over} of its ${compiled.count} states, and the attempt at item "${attempt.item}" brings one more. Split the domain into units, each with a model of its own.`,
+      );
     }
+    if (over === "skills") checkHasSkills(attempt, `The attempt at item "${attempt.item}"`, "KST model over skills");
+    const mask = masteringStates(compiled, attempt, elements);
+    masks.set(key, mask);
     return mask;
   };
+}
+
+/** Returns 1 for each state that holds every element an attempt needs, 0 for the others. */
+function masteringStates(compiled: CompiledStructure, attempt: Attempt, elements: readonly string[]): Uint8Array {
+  const wanted = new Uint32Array(compiled.words);
+  for (const element of elements) {
+    const e = compiled.index.get(element);
+    if (e === undefined) {
+      throw new DataError(`The attempt at item "${attempt.item}" needs "${element}", which is not in the structure.`);
+    }
+    addElement(wanted, 0, e);
+  }
+  const mask = new Uint8Array(compiled.count);
+  for (let s = 0; s < compiled.count; s++) mask[s] = holdsAll(compiled, s, wanted) ? 1 : 0;
+  return mask;
 }
 
 /**
@@ -446,6 +472,16 @@ function groupsOf(
     else group.weight += 1;
   }
   return [...groups.values()];
+}
+
+/** Returns whether state s of a compiled structure holds every element of a bitset, a word at a time. */
+function holdsAll(compiled: CompiledStructure, s: number, wanted: Uint32Array): boolean {
+  const start = s * compiled.words;
+  for (let w = 0; w < wanted.length; w++) {
+    const word = wanted[w] ?? 0;
+    if (((compiled.bits[start + w] ?? 0) & word) !== word) return false;
+  }
+  return true;
 }
 
 function sumOver(probabilities: readonly number[], mask: Uint8Array): number {

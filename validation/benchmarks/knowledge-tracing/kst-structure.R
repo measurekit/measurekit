@@ -57,4 +57,4 @@ bench_task("kst.clauseStructure", "Space of clauses, by enumeration of the subse
            sprintf("%d elements, %d subsets", item_count, 2^item_count), "base R `expand.grid` and `apply`",
            enumerate_states, note = "no package takes clauses")
 bench_task("kst.surmiseStructure", "Quasi-ordinal space of a cycle of prerequisites, each element requiring the next",
-           "3,000 elements")
+           "1,000 elements")

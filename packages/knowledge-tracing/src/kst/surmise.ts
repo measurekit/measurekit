@@ -1,5 +1,6 @@
 import { checkOptions, DataError, describe, isRecord } from "@measurekit/core";
 import { checkMaxStates, type StateLimitOptions, tooManyStates } from "./build.js";
+import { checkElementCount } from "./element-limit.js";
 import { compareStates, type KnowledgeStructure, seal } from "./structure.js";
 
 /** Options of {@link surmiseStructure}. */
@@ -20,8 +21,8 @@ export type Prerequisites = Readonly<Record<string, readonly string[]>>;
  *   it has none. Prerequisites of prerequisites are implied; elements that require each other are learned together.
  * @param options - The most states to build.
  * @returns The quasi-ordinal knowledge space.
- * @throws `DataError` when an element is the empty string, a prerequisite is not a key, or the space has more states
- * than `maxStates`.
+ * @throws `DataError` when an element is the empty string, there are more than 1,000 elements, a prerequisite is not a
+ * key, or the space has more states than `maxStates`.
  */
 export function surmiseStructure(
   prerequisites: Prerequisites,
@@ -36,6 +37,7 @@ export function surmiseStructure(
   }
   const domain = Object.keys(prerequisites);
   if (domain.length === 0) throw new DataError("Prerequisites need at least one element.");
+  checkElementCount(domain.length, "A surmise relation", "elements");
   const below = transitiveClosure(prerequisites, domain);
   const m = domain.length;
   const states = downsets(below, m, maxStates).map((state) => state.map((e) => domain[e] ?? ""));

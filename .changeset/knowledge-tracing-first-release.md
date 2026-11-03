@@ -61,5 +61,7 @@ Ids may hold any character: the keys that join several, such as a learner and a 
 keep them apart. `iita`, `diffTest` and `structureValidity` refuse an incomplete table of responses at the cost of its
 events, `surmiseStructure` closes prerequisites in time proportional to the elements times their prerequisites, and a
 logistic feature whose value overflows throws `DataError`.
+These analyses and `surmiseStructure` take at most 1,000 elements, IITA's candidates hold at most 24 million cells, and
+the masks of a KST model at most 2^28, each refused with `DataError` past its limit.
 
 Every function documents each parameter and its result.

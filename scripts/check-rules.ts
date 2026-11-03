@@ -531,6 +531,30 @@ export const RULES: readonly Rule[] = [
     test: "packages/knowledge-tracing/test/data.test.ts",
     titles: "whatever characters their ids hold",
   },
+  {
+    rule: "The analyses of the relations between elements take at most 1,000 elements, as their tables grow with the square of their number.",
+    file: "packages/knowledge-tracing/src/kst/element-limit.ts",
+    find: "if (count <= MAX_ELEMENTS) return;",
+    replace: "return;",
+    test: "packages/knowledge-tracing/test/kst.test.ts",
+    titles: "up to 1,000 items|up to the 1,000 elements",
+  },
+  {
+    rule: "The candidates of IITA hold at most 24 million cells, as each lists the prerequisites of every item.",
+    file: "packages/knowledge-tracing/src/kst/iita.ts",
+    find: "if (cells > MAX_CANDIDATE_CELLS) {",
+    replace: "if (false) {",
+    test: "packages/knowledge-tracing/test/kst.test.ts",
+    titles: "24 million cells",
+  },
+  {
+    rule: "The masks of a KST model hold at most 2^28 cells, a byte for each state and set of skills its attempts name.",
+    file: "packages/knowledge-tracing/src/kst/kst.ts",
+    find: "if ((masks.size + 1) * compiled.count > MAX_MASK_CELLS) {",
+    replace: "if (false) {",
+    test: "packages/knowledge-tracing/test/kst.test.ts",
+    titles: "past 2\\^28 cells",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

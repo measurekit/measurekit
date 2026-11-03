@@ -26,7 +26,7 @@ const BUDGETS = {
   "kst.unionClosure": 1,
   "kst.structureBase": 0.6,
   "kst.clauseStructure": 5,
-  "kst.surmiseStructure": 900,
+  "kst.surmiseStructure": 100,
   "evaluate.auc": 80,
   "evaluate.metrics": 200,
   "evaluate.metricsByOpportunity": 200,

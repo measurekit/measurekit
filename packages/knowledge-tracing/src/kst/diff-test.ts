@@ -86,7 +86,7 @@ export interface DiffTest {
  *   the measure.
  * @returns The estimate, its z statistic, the probability and the interval.
  * @throws `DataError` when the log is malformed, a learner has not answered every item, an outcome is not 0 or 1, there
- * are fewer than 2 items, an item is solved by no learner, a quasi-order is not over the items of the log or has no
+ * are fewer than 2 or more than 1,000 items, an item is solved by no learner, a quasi-order is not over the items of the log or has no
  * implication, an option is invalid, or the estimate has variance 0, as when every learner has the same answers or the
  * two quasi orders are the same.
  * @see {@link https://doi.org/10.18637/jss.v037.i02 | Ünlü and Sargin (2010)}

@@ -1093,11 +1093,13 @@ describe("KST edge cases", () => {
     expectClose(model.predict(state, at("r", ["a", "b"])), 0.04, 1e-15);
   });
 
-  it("makes one class of the elements of a cycle of prerequisites, however long", () => {
-    const m = 3000;
-    const cycle = Object.fromEntries(Array.from({ length: m }, (_, e) => [`e${e}`, [`e${(e + 1) % m}`]]));
-    const { states } = surmiseStructure(cycle);
-    expect(states.map((state) => state.length)).toEqual([0, m]);
+  it("makes one class of the elements of a cycle of prerequisites, up to the 1,000 elements that it takes", () => {
+    const cycle = (m: number) =>
+      Object.fromEntries(Array.from({ length: m }, (_, e) => [`e${e}`, [`e${(e + 1) % m}`]]));
+    expect(surmiseStructure(cycle(1000)).states.map((state) => state.length)).toEqual([0, 1000]);
+    expect(() => surmiseStructure(cycle(1001))).toThrow(
+      "A surmise relation takes at most 1000 elements, as its tables grow with the square of their number; found 1001. Split the domain into units, such as chapters, and analyze each.",
+    );
   });
 
   it("rejects malformed structures and too many states, suggesting a split by unit", () => {
@@ -1175,18 +1177,67 @@ describe("KST edge cases", () => {
   });
 
   it("refuses an incomplete table at the cost of its events, without a pattern of every item for every learner", () => {
-    // 40,000 learners with an item each: their patterns over every item would hold 1.6 billion answers.
-    const learners = 40_000;
-    const log = eventLog(
-      Array.from({ length: learners }, (_, k) => ({
-        learner: `l${k}`,
-        item: `i${k}`,
+    // 40,000 learners with one of 1,000 items each: their patterns over every item would hold 40 million answers.
+    const log = Array.from({ length: 40_000 }, (_, k) => ({
+      learner: `l${k}`,
+      item: `i${k % 1000}`,
+      skills: [],
+      time: k,
+      outcome: 1,
+    }));
+    expect(() => iita(log)).toThrow('IITA needs every learner to answer every item; "l0" has no answer to "i1".');
+  });
+
+  it("takes up to 1,000 items in IITA, the difference test and the validity of a structure", () => {
+    const answers = (items: number) =>
+      Array.from({ length: items }, (_, k) => ({ learner: "ana", item: `i${k}`, skills: [], time: k, outcome: 1 }));
+    const found = "takes at most 1000 items, as its tables grow with the square of their number; found 1001.";
+    expect(() => iita(answers(1001))).toThrow(`IITA ${found}`);
+    expect(() => diffTest(answers(1001), { i0: [] })).toThrow(`The difference test ${found}`);
+    expect(() => structureValidity(surmiseStructure({ i0: [] }), answers(1001))).toThrow(
+      `The validity of a structure ${found}`,
+    );
+    expect(iita(answers(1000)).candidates).toHaveLength(1);
+  });
+
+  it("refuses the attempt whose set of skills would take the masks of a model past 2^28 cells", () => {
+    // 16 skills without prerequisites: 65,536 states, whose masks of 4,096 sets of skills fill the 2^28 cells.
+    const skills = Array.from({ length: 16 }, (_, k) => `s${k}`);
+    const structure = surmiseStructure(Object.fromEntries(skills.map((skill) => [skill, []])), { maxStates: 2 ** 16 });
+    const probabilities = structure.states.map(() => 1 / structure.states.length);
+    const model = kst({ structure, parameters: { probabilities, items: { q: { guess: 0.1, slip: 0.1 } } } });
+    const state = model.initialState("ana");
+    const attempt = (set: number) => ({
+      learner: "ana",
+      item: "q",
+      skills: skills.filter((_, k) => ((set >>> k) & 1) === 1),
+      time: 0,
+    });
+    const sets = Array.from({ length: 4096 }, (_, set) => attempt(set + 1));
+    expect(model.nextQuestion(state, sets)).toEqual(attempt(1));
+    expect(() => model.predict(state, attempt(4097))).toThrow(
+      'A KST model holds the states that master at most 4096 sets of skills of its 65536 states, and the attempt at item "q" brings one more. Split the domain into units, each with a model of its own.',
+    );
+    expect(model.predict(state, attempt(4096))).toBeCloseTo(0.1 + 0.8 / 2, 12);
+  });
+
+  it("refuses IITA whose candidates would hold more than 24 million cells, a cell for each prerequisite and 8 for each item", () => {
+    // Learners who fail one item each, 1 to 24 of them per item: every other item is a prerequisite of all from the
+    // start, and each count adds the row of one failed item, so that 25 candidates of a million prerequisites follow.
+    const items = Array.from({ length: 1000 }, (_, k) => `i${k}`);
+    const failures = Array.from({ length: 24 }, (_, k) => Array.from({ length: k + 1 }, () => k)).flat();
+    const log = failures.flatMap((failed, learner) =>
+      items.map((item, k) => ({
+        learner: `l${learner}`,
+        item,
         skills: [],
-        time: k,
-        outcome: 1,
+        time: learner * 1000 + k,
+        outcome: k === failed ? 0 : 1,
       })),
     );
-    expect(() => iita(log)).toThrow('IITA needs every learner to answer every item; "l0" has no answer to "i1".');
+    expect(() => iita(log)).toThrow(
+      "The candidates of IITA would hold more than 24000000 cells, a cell for each prerequisite and 8 for each item of each candidate. Analyze fewer items, such as those of a unit at a time.",
+    );
   });
 });
 
@@ -1336,10 +1387,8 @@ describe("BLIM constraints and diagnostics", () => {
       "with equal rates has no reference",
     );
     for (const length of [20, 40, 1100]) {
-      const long = surmiseStructure(
-        Object.fromEntries(Array.from({ length }, (_, i) => [`q${i}`, i === 0 ? [] : [`q${i - 1}`]])),
-        { maxStates: 2000 },
-      );
+      const domain = Array.from({ length }, (_, i) => `q${i}`);
+      const long = { domain, states: Array.from({ length: length + 1 }, (_, size) => domain.slice(0, size)) };
       expect(() => kst({ structure: long, over: "items" }).identifiability()).toThrow(
         `a Jacobian of 2 ^ ${length} patterns by ${length + 2 * length} parameters, more than the limit of 10000000 cells`,
       );

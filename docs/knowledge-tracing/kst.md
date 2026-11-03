@@ -375,12 +375,15 @@ probability of a smaller one, so values differ for one-sided tests.
 
 ## Limits and errors
 
-| Limit                                      | Value                | At the limit                                                                                                   |
-| ------------------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| States of a structure built by the module  | `maxStates`, `10000` | `DataError` that suggests units: [alternative prerequisites](#alternative-prerequisites)                       |
-| Learning paths                             | `maxPaths`, `10000`  | `DataError` that suggests `structureBase`                                                                      |
-| Cells of the Jacobian of `identifiability` | `1e7`                | `DataError` that names the patterns and parameters: check a structure with fewer items or states, or fix rates |
-| Elements for `distanceAgreement`           | `20`                 | `null`, as a table's statistic                                                                                 |
+| Limit                                                                                                        | Value                    | At the limit                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| States of a structure built by the module                                                                    | `maxStates`, `10000`     | `DataError` that suggests units: [alternative prerequisites](#alternative-prerequisites)                       |
+| Learning paths                                                                                               | `maxPaths`, `10000`      | `DataError` that suggests `structureBase`                                                                      |
+| Cells of the Jacobian of `identifiability`                                                                   | `1e7`                    | `DataError` that names the patterns and parameters: check a structure with fewer items or states, or fix rates |
+| Elements for `distanceAgreement`                                                                             | `20`                     | `null`, as a table's statistic                                                                                 |
+| Items of `iita`, `diffTest` and `structureValidity`; elements of `surmiseStructure`                          | `1000`                   | `DataError` that suggests units: their tables grow with the square of the elements                             |
+| Cells of the candidates of `iita`: a prerequisite each, and 8 for each item                                  | 24 million, about 260 MB | `DataError`: analyze fewer items                                                                               |
+| Cells of the masks of a model: a byte for each state and each set of skills, or item, that its attempts name | 2^28, 256 MB             | `DataError` that suggests a model for each unit                                                                |
 
 | Error                                                                                                   | What to do                                                                                    |
 | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |

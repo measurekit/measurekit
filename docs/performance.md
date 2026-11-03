@@ -316,7 +316,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Closure under union of the 12 atoms of a space                                                                                        | 12 elements, 125 states                          |           0.090 | kst 0.5.6 `kspace`                        |           11.6 |   0.0078× |
 | Base of a space                                                                                                                       | 12 elements, 125 states                          |           0.059 | kst 0.5.6 `kbase`                         |          1,614 | 0.000037× |
 | Space of clauses, by enumeration of the subsets in base R                                                                             | 12 elements, 4096 subsets                        |           0.369 | base R `expand.grid` and `apply`          |            338 |   0.0011× |
-| Quasi-ordinal space of a cycle of prerequisites, each element requiring the next                                                      | 3,000 elements                                   |            70.5 | none                                      |                |           |
+| Quasi-ordinal space of a cycle of prerequisites, each element requiring the next                                                      | 1,000 elements                                   |            10.4 | none                                      |                |           |
 | Fit of the basic local independence model of a chain of 12 items by EM                                                                | 1,000 persons, 12 items, 13 states               |            20.6 | pks 0.8.0 `blim`                          |           25.5 |     0.81× |
 | Inductive item tree analysis of the responses                                                                                         | 1,000 persons, 12 items                          |            1.13 | DAKS 2.1.3 `iita(v = 1)`                  |         73,057 | 0.000015× |
 | Fit of the basic local independence model of a chain of 12 items by minimum discrepancy maximum likelihood                            | 1,000 persons, 12 items, 13 states               |            58.4 | pks 0.8.0 `blim(method = "MDML")`         |            115 |     0.51× |
@@ -493,29 +493,36 @@ table.
 What each reader of untrusted input adds to the peak resident memory of a Node.js process, on its worst inputs within
 the limits of [SECURITY.md](../SECURITY.md): the peak of a process that parses the input from JSON and reads it, less
 the peak of the same process that parses it and does not, the median of three pairs run one after the other. Each reader
-grows in proportion to its input, but for the designs of cognitive diagnosis, whose limits bound them.
+grows in proportion to its input, but for the designs of cognitive diagnosis and the analyses of the relations between
+the elements of a knowledge structure, whose limits bound them.
 
-| Reader                        | Input                                                     | JSON (MB) | Peak added (MB)             |
-| ----------------------------- | --------------------------------------------------------- | --------: | --------------------------- |
-| `responseMatrix`              | 1,000 persons, 1,000 items                                |       1.9 | below the peak of the parse |
-| `responseMatrix`              | 1 person, 1,000,000 items, with the ids it gives them     |       1.9 | 86                          |
-| `responseMatrix`              | 1,000,000 persons, 1 item, with the ids it gives them     |       3.8 | 94                          |
-| `responseMatrix` with `times` | 1,000 persons, 1,000 items                                |       4.6 | 49                          |
-| `responseMatrixFromColumns`   | 1,000 persons, 1,000 items                                |       1.9 | 23                          |
-| `responseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items        |        43 | 106                         |
-| `responseRecords`             | 1,000,000 records, each of its own person and item        |        48 | 421                         |
-| `scoreResponses`              | 1,000 persons, 1,000 items of 4 options                   |       3.8 | 8                           |
-| `qMatrixIdentifiability`      | A Q-matrix of 100,000 items of 20 attributes              |        12 | 62                          |
-| `calibrateCdm`                | 20 items of one of 20 attributes, two persons             |    0.0004 | 1,030                       |
-| `calibrateCdm`                | 64 items of one of 20 attributes, the most items × 2^K    |    0.0013 | 1,900 to 2,000 by model     |
-| `calibrateCdm`                | 64 items, one of 19 attributes and 63 of 13               |    0.0056 | 1,000 to 1,200 by model     |
-| `eventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items        |        72 | 79                          |
-| `eventLog`                    | 1,000,000 events, each of its own learner, item and skill |        82 | 171                         |
-| `bkt` with stored parameters  | 100,000 skills                                            |       6.6 | 56                          |
-| `kst` with a structure        | 10,000 states of 64 items                                 |       1.9 | 1                           |
-| `iita`                        | 1,000,000 events, each of its own learner and item        |        77 | 270                         |
+| Reader                        | Input                                                          | JSON (MB) | Peak added (MB)             |
+| ----------------------------- | -------------------------------------------------------------- | --------: | --------------------------- |
+| `responseMatrix`              | 1,000 persons, 1,000 items                                     |       1.9 | below the peak of the parse |
+| `responseMatrix`              | 1 person, 1,000,000 items, with the ids it gives them          |       1.9 | 86                          |
+| `responseMatrix`              | 1,000,000 persons, 1 item, with the ids it gives them          |       3.8 | 94                          |
+| `responseMatrix` with `times` | 1,000 persons, 1,000 items                                     |       4.6 | 49                          |
+| `responseMatrixFromColumns`   | 1,000 persons, 1,000 items                                     |       1.9 | 23                          |
+| `responseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items             |        43 | 106                         |
+| `responseRecords`             | 1,000,000 records, each of its own person and item             |        48 | 421                         |
+| `scoreResponses`              | 1,000 persons, 1,000 items of 4 options                        |       3.8 | 8                           |
+| `qMatrixIdentifiability`      | A Q-matrix of 100,000 items of 20 attributes                   |        12 | 62                          |
+| `calibrateCdm`                | 20 items of one of 20 attributes, two persons                  |    0.0004 | 1,030                       |
+| `calibrateCdm`                | 64 items of one of 20 attributes, the most items × 2^K         |    0.0013 | 1,900 to 2,000 by model     |
+| `calibrateCdm`                | 64 items, one of 19 attributes and 63 of 13                    |    0.0056 | 1,000 to 1,200 by model     |
+| `eventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items             |        72 | 79                          |
+| `eventLog`                    | 1,000,000 events, each of its own learner, item and skill      |        82 | 171                         |
+| `bkt` with stored parameters  | 100,000 skills                                                 |       6.6 | 56                          |
+| `kst` with a structure        | 10,000 states of 64 items                                      |       1.9 | 1                           |
+| `iita`                        | 1,000,000 events, each of its own learner and item             |        77 | 270                         |
+| `iita`                        | 1,000 items, 276 learners: 24 candidates of 23.9 million cells |        19 | 259                         |
+| `diffTest`                    | 1,000 items, 200 learners                                      |        14 | 38                          |
+| `structureValidity`           | 1,000 items, 200 learners, a chain                             |        14 | 42                          |
+| `surmiseStructure`            | 1,000 elements, 12 free and a class of 988: 8,192 states       |      0.02 | 138                         |
+| `kst`, its masks              | 4,096 sets of 16 skills, 65,536 states                         |      0.33 | 173                         |
 
 A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or
 persons itself, and 2 to 9 times where the input names them. A design of cognitive diagnosis takes up to 2 GB from a
 few hundred bytes, which its limits stop there; a host that takes Q-matrices from users sets a lower limit where it
-cannot spare that.
+cannot spare that. The analyses of knowledge structures take up to about 260 MB within their limits: IITA's candidates
+from 19 MB of responses, and the masks of a model from a few hundred kilobytes of sets of skills.

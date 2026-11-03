@@ -52,7 +52,7 @@ export interface StructureValidity {
  * @returns The indices of agreement, such as γ and the discrepancy index, and the distances of the patterns to the
  *   structure.
  * @throws `DataError` when the structure or the log is malformed, a learner has not answered every item, an outcome is
- * not 0 or 1, or the items of the log are not the structure's domain.
+ * not 0 or 1, the log has more than 1,000 items, or its items are not the structure's domain.
  * @see {@link https://doi.org/10.1007/978-3-642-01039-2 | Falmagne and Doignon (2011), chapter 2}
  * @see {@link https://doi.org/10.18637/jss.v037.i02 | Ünlü and Sargin (2010)}
  */
@@ -63,13 +63,14 @@ export function structureValidity(structure: KnowledgeStructure, log: EventLog):
   const m = domain.length;
   const learners = patterns.length;
   const b = counterexamples(patterns, m);
-  const pairs = prerequisitePairs(compiled);
+  let pairs = 0;
   let concordant = 0;
   let discordant = 0;
-  for (const [i, j] of pairs) {
+  forEachPrerequisitePair(compiled, (i, j) => {
+    pairs++;
     concordant += b[j * m + i] ?? 0;
     discordant += b[i * m + j] ?? 0;
-  }
+  });
   const distances = distancesToNearest(compiled, patterns);
   const discrepancyIndex = distances.total / learners;
   const potential = m <= MAX_AGREEMENT_ELEMENTS ? meanDistanceOfAllPatterns(compiled) : null;
@@ -77,7 +78,7 @@ export function structureValidity(structure: KnowledgeStructure, log: EventLog):
     gamma: concordant + discordant === 0 ? null : (concordant - discordant) / (concordant + discordant),
     concordant,
     discordant,
-    violationalCoefficient: pairs.length === 0 ? null : discordant / (learners * pairs.length),
+    violationalCoefficient: pairs === 0 ? null : discordant / (learners * pairs),
     discrepancyIndex,
     distances: distances.counts,
     distanceAgreement: potential === null || potential === 0 ? null : discrepancyIndex / potential,
@@ -105,19 +106,20 @@ function domainPatterns(compiled: CompiledStructure, log: EventLog): number[][] 
   return patterns.map((pattern) => at.map((position) => pattern[position] ?? 0));
 }
 
-/** Returns the pairs i, j, i ≠ j, of the surmise relation: every state that holds j holds i. */
-function prerequisitePairs(compiled: CompiledStructure): (readonly [number, number])[] {
+/**
+ * Passes `use` each pair i, j, i ≠ j, of the surmise relation, in order: every state that holds j holds i. The pairs are
+ * counted as they are found, as a list of them would hold up to m² of them.
+ */
+function forEachPrerequisitePair(compiled: CompiledStructure, use: (i: number, j: number) => void): void {
   const m = compiled.domain.length;
-  const pairs: [number, number][] = [];
   for (let i = 0; i < m; i++) {
     for (let j = 0; j < m; j++) {
       if (i === j) continue;
       let implied = true;
       for (let s = 0; implied && s < compiled.count; s++) implied = !holds(compiled, s, j) || holds(compiled, s, i);
-      if (implied) pairs.push([i, j]);
+      if (implied) use(i, j);
     }
   }
-  return pairs;
 }
 
 /** Returns the number of learners at each distance to their nearest state, and the sum of the distances. */

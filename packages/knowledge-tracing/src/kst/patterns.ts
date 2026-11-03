@@ -1,5 +1,6 @@
 import { DataError } from "@measurekit/core";
 import { checkLog, type EventLog, isObserved } from "../data/internal.js";
+import { checkElementCount } from "./element-limit.js";
 
 /** The items of a log, and each learner's response pattern over them: 1 for a correct first answer, 0 for a wrong one. */
 export interface ResponsePatterns {
@@ -17,7 +18,8 @@ export interface ResponsePatterns {
  * The first outcomes are collected by learner and checked before the patterns are laid out, so that a log of many
  * learners, each with few items of their own, is refused at the cost of its events, not of learners × items.
  *
- * @throws `DataError` when the log is malformed, an outcome is not 0 or 1, or a learner has not answered every item.
+ * @throws `DataError` when the log is malformed, an outcome is not 0 or 1, there are more than 1,000 items, or a learner
+ * has not answered every item.
  */
 export function responsePatterns(log: EventLog, subject: string): ResponsePatterns {
   checkLog(log);
@@ -38,6 +40,7 @@ export function responsePatterns(log: EventLog, subject: string): ResponsePatter
     answers.set(event.item, event.outcome);
   }
   const order = [...items];
+  checkElementCount(order.length, subject, "items");
   for (const [learner, answers] of firsts) {
     const missing = answers.size < order.length ? order.find((item) => !answers.has(item)) : undefined;
     if (missing !== undefined) {
@@ -49,9 +52,12 @@ export function responsePatterns(log: EventLog, subject: string): ResponsePatter
   return { items: order, patterns: [...firsts.values()].map((answers) => order.map((item) => answers.get(item) ?? 0)) };
 }
 
-/** Returns b: at i × m + j, the number of learners who fail item i but solve item j. */
-export function counterexamples(patterns: readonly (readonly number[])[], m: number): Float64Array {
-  const b = new Float64Array(m * m);
+/**
+ * Returns b: at i × m + j, the number of learners who fail item i but solve item j. The counts are integers below the
+ * number of learners, so 32 bits hold them in half the bytes of doubles.
+ */
+export function counterexamples(patterns: readonly (readonly number[])[], m: number): Int32Array {
+  const b = new Int32Array(m * m);
   for (const pattern of patterns) {
     pattern.forEach((outcome, i) => {
       if (outcome === 1) return;

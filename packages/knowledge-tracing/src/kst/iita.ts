@@ -13,6 +13,15 @@ export type IitaVersion = "minimized" | "corrected" | "original";
 
 const DEFAULT_VERSION = "minimized";
 
+/**
+ * The most cells that the candidates of IITA hold: a cell for each prerequisite of each candidate, 8 bytes in its list,
+ * and {@link CELLS_PER_ITEM} for each item of each candidate, whose list and key take about 64. Each candidate lists the
+ * prerequisites of every item, and 24 million cells take about 260 MB.
+ */
+const MAX_CANDIDATE_CELLS = 24_000_000;
+/** The cells that an item's list of prerequisites takes in a candidate besides its prerequisites: its array and key. */
+const CELLS_PER_ITEM = 8;
+
 /** Options of {@link iita}. */
 export interface IitaOptions {
   /**
@@ -54,7 +63,8 @@ export interface IitaResult extends IitaCandidate {
  * @param options - The version of the algorithm.
  * @returns The candidate relations with their fit, the prerequisites of the best, its diff and its error rate.
  * @throws `DataError` when the log is malformed, a learner has not answered every item, an outcome is not 0 or 1, there
- * are fewer than 2 items with an outcome, or an item is solved by no learner.
+ * are fewer than 2 or more than 1,000 items with an outcome, an item is solved by no learner, or the candidates would
+ * hold more than 24 million cells, a cell for each prerequisite and 8 for each item.
  */
 export function iita(log: EventLog, options: IitaOptions = {}): IitaResult {
   checkOptions(options);
@@ -63,17 +73,24 @@ export function iita(log: EventLog, options: IitaOptions = {}): IitaResult {
   const { items, patterns } = responsePatterns(log, "IITA");
   if (items.length < 2) throw new DataError("IITA needs at least 2 items.");
   const data = counterexampleData(items, patterns);
-  const candidates = selectionSet(data.b, data.m).map((relation) => ({
-    prerequisites: prerequisitesOf(relation, items),
-    ...fitRelation(relation, data, version),
-  }));
+  const candidates: IitaCandidate[] = [];
+  let cells = 0;
+  forEachCandidate(data.b, data.m, (relation, implications) => {
+    cells += CELLS_PER_ITEM * data.m + implications;
+    if (cells > MAX_CANDIDATE_CELLS) {
+      throw new DataError(
+        `The candidates of IITA would hold more than ${MAX_CANDIDATE_CELLS} cells, a cell for each prerequisite and ${CELLS_PER_ITEM} for each item of each candidate. Analyze fewer items, such as those of a unit at a time.`,
+      );
+    }
+    candidates.push({ prerequisites: prerequisitesOf(relation, items), ...fitRelation(relation, data, version) });
+  });
   const best = candidates.reduce((x, y) => (y.diff < x.diff ? y : x));
   return { ...best, candidates };
 }
 
 /** The counterexamples b and solution rates p of m items answered by n learners. */
 export interface Counterexamples {
-  readonly b: Float64Array;
+  readonly b: Int32Array;
   readonly p: readonly number[];
   readonly m: number;
   readonly n: number;
@@ -98,39 +115,45 @@ export function counterexampleData(
 }
 
 /**
- * Returns the selection set: ⊑_0 holds i ⊑ j when b_ij = 0; at each further count of counterexamples, the pairs with at
- * most that many join, except those that take part in an intransitivity. Pairs are checked in order, i then j, each
- * against the pairs not yet excluded, and passes repeat until none is; this order resolves conflicts as DAKS does.
- * Relations without implications, or equal to the previous one, are left out. A relation is an m × m matrix: 1 at i × m
- * + j when i ⊑ j, i a prerequisite of j; the diagonal is 1.
+ * Passes `use` each relation of the selection set, in order, with its number of implications: ⊑_0 holds i ⊑ j when
+ * b_ij = 0; at each further count of counterexamples, the pairs with at most that many join, except those that take
+ * part in an intransitivity. Pairs are checked in order, i then j, each against the pairs not yet excluded, and passes
+ * repeat until none is; this order resolves conflicts as DAKS does. Relations without implications, or equal to the
+ * previous one, are left out. A relation is an m × m matrix: 1 at i × m + j when i ⊑ j, i a prerequisite of j; the
+ * diagonal is 1. Only the current relation is kept, so that the set costs the candidates made of it, not m² for each.
  *
  * @see {@link https://doi.org/10.23668/psycharchives.12781 | Schrepp (2003)}
  */
-function selectionSet(b: Float64Array, m: number): Uint8Array[] {
-  let relation: Uint8Array = Uint8Array.from(b, (value) => (value === 0 ? 1 : 0));
-  const relations = [relation];
+function forEachCandidate(b: Int32Array, m: number, use: (relation: Uint8Array, implications: number) => void): void {
+  let relation: Uint8Array = new Uint8Array(m * m);
+  for (let k = 0; k < relation.length; k++) relation[k] = b[k] === 0 ? 1 : 0;
+  const take = (candidate: Uint8Array): void => {
+    const implications = implicationCount(candidate, m);
+    if (implications > 0) use(candidate, implications);
+  };
+  take(relation);
   for (const level of [...new Set(b)].filter((value) => value > 0).sort((x, y) => x - y)) {
     const next = extend(relation, b, m, level);
-    if (next !== null) {
-      relation = next;
-      relations.push(relation);
-    }
+    if (next === null) continue;
+    relation = next;
+    take(relation);
   }
-  return relations.filter((candidate) => candidate.some((value, k) => value === 1 && k % (m + 1) !== 0));
+}
+
+/** Returns the number of pairs i ⊑ j with i ≠ j that a relation holds. */
+function implicationCount(relation: Uint8Array, m: number): number {
+  let count = 0;
+  for (let k = 0; k < relation.length; k++) if (relation[k] === 1 && k % (m + 1) !== 0) count++;
+  return count;
 }
 
 /**
  * Returns the relation with the pairs of at most `level` counterexamples that keep it transitive, or `null` if none.
  */
-function extend(relation: Uint8Array, b: Float64Array, m: number, level: number): Uint8Array | null {
+function extend(relation: Uint8Array, b: Int32Array, m: number, level: number): Uint8Array | null {
+  const added = pairsUpTo(relation, b, level);
   const union = relation.slice();
-  const added: number[] = [];
-  b.forEach((value, k) => {
-    if (relation[k] === 0 && value <= level) {
-      added.push(k);
-      union[k] = 1;
-    }
-  });
+  for (const k of added) union[k] = 1;
   for (let changed = true; changed; ) {
     changed = false;
     for (const k of added) {
@@ -141,6 +164,15 @@ function extend(relation: Uint8Array, b: Float64Array, m: number, level: number)
     }
   }
   return added.some((k) => union[k] === 1) ? union : null;
+}
+
+/** Returns the cells of the pairs outside a relation with at most `level` counterexamples, in order. */
+function pairsUpTo(relation: Uint8Array, b: Int32Array, level: number): Int32Array {
+  let count = 0;
+  for (let k = 0; k < b.length; k++) if (relation[k] === 0 && (b[k] ?? 0) <= level) count++;
+  const pairs = new Int32Array(count);
+  for (let k = 0, at = 0; k < b.length; k++) if (relation[k] === 0 && (b[k] ?? 0) <= level) pairs[at++] = k;
+  return pairs;
 }
 
 /**
@@ -239,9 +271,17 @@ function addMinimizingTerms(
   }
 }
 
+/** Returns each item's prerequisites in a relation, in lists of their exact length, which take 8 bytes an entry. */
 function prerequisitesOf(relation: Uint8Array, items: readonly string[]): Record<string, string[]> {
   const m = items.length;
   return Object.fromEntries(
-    items.map((item, j) => [item, items.filter((_, i) => i !== j && relation[i * m + j] === 1)]),
+    items.map((item, j) => {
+      let count = 0;
+      for (let i = 0; i < m; i++) if (i !== j && relation[i * m + j] === 1) count++;
+      const prerequisites = new Array<string>(count);
+      for (let i = 0, at = 0; i < m; i++)
+        if (i !== j && relation[i * m + j] === 1) prerequisites[at++] = items[i] ?? "";
+      return [item, prerequisites];
+    }),
   );
 }
