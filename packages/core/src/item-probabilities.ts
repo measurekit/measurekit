@@ -105,16 +105,27 @@ export function partialCreditProbabilities(
 }
 
 /**
- * Turns the logits at `values[k * stride]`, k < `count`, into probabilities in place: exp(z_k) / Σ_j exp(z_j).
+ * Turns the first `count` logits of `values` into probabilities in place: exp(z_k) / Σ_j exp(z_j).
  *
  * @remarks
  * Subtracting the largest logit keeps exp from overflowing. The partial credit and nominal response models use it.
  *
  * @param values - The logits, which the probabilities replace.
  * @param count - The number of logits.
+ */
+export function softmax(values: Float64Array, count: number): void {
+  stridedSoftmax(values, count, 1);
+}
+
+/**
+ * Turns the logits at `values[k * stride]`, k < `count`, into probabilities in place, as {@link softmax} does: the
+ * logits of one column of a matrix by rows, such as the nominal response model's table of derivatives.
+ *
+ * @param values - The logits, which the probabilities replace.
+ * @param count - The number of logits.
  * @param stride - The distance between two logits in `values`.
  */
-export function softmax(values: Float64Array, count: number, stride = 1): void {
+export function stridedSoftmax(values: Float64Array, count: number, stride: number): void {
   let largest = Number.NEGATIVE_INFINITY;
   for (let k = 0; k < count; k++) largest = Math.max(largest, values[k * stride] ?? 0);
   let total = 0;

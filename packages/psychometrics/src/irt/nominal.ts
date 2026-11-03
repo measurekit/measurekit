@@ -1,4 +1,4 @@
-import { DataError, isRecord, mean, softmax } from "@measurekit/core";
+import { DataError, isRecord, mean, softmax, stridedSoftmax } from "@measurekit/core";
 import { divideByTotalThetaDerivatives } from "./divide-by-total.js";
 import type { IrtModel } from "./model.js";
 import { allFinite, formatList } from "./thresholds.js";
@@ -70,7 +70,7 @@ export const nominalResponse: IrtModel<NominalParameters> = {
     const size = 2 * count - 2;
     const last = count - 1;
     for (let k = 0; k < count; k++) out[k * size] = (a[k] ?? 0) * theta + (c[k] ?? 0);
-    softmax(out, count, size);
+    stridedSoftmax(out, count, size);
     // Entry m of the slopes and of the intercepts raises z_m by θ and 1 and lowers z_(K-1) by as much, so
     // dP_k/dc_m = P_k ([k = m] - [k = K - 1] - P_m + P_(K-1)) and dP_k/da_m = θ dP_k/dc_m. Column 0 holds the
     // probabilities until the derivatives with respect to a1 replace them last.

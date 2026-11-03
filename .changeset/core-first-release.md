@@ -12,3 +12,4 @@ would skip, so that every check of a list reads each of its entries. `chiSquareU
 statistic.
 `kappaOfPairs` takes the chance agreement in time that grows with the categories that occur rather than with their
 pairs: 20,000 categories took seconds. It takes its weights as the option `weights`.
+`softmax` turns contiguous logits into probabilities, and `stridedSoftmax` the logits of a column at a stride.

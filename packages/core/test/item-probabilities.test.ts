@@ -8,6 +8,7 @@ import {
   orderedThresholds,
   partialCreditProbabilities,
   softmax,
+  stridedSoftmax,
   validAsymptotes,
 } from "../src/index.js";
 
@@ -156,9 +157,9 @@ describe("softmax", () => {
     expect(values[2]).toBeCloseTo(5 / 8, 15);
   });
 
-  it("reads and writes only the entries at the stride", () => {
+  it("reads and writes only the entries at the stride, by stridedSoftmax", () => {
     const values = Float64Array.of(0, 99, 99, Math.log(3), 99, 99);
-    softmax(values, 2, 3);
+    stridedSoftmax(values, 2, 3);
     expect(values[0]).toBeCloseTo(0.25, 15);
     expect(values[3]).toBeCloseTo(0.75, 15);
     expect([values[1], values[2], values[4], values[5]]).toEqual([99, 99, 99, 99]);
