@@ -78,10 +78,13 @@ from all responses.
 | An item with fewer than two observed categories | `null` in its row and column, the diagonal included |
 | A pair of items that no person answered both    | `null`                                              |
 | A table with one person                         | A number from -1 to 1, which carries no information |
+| An item with more than 8 observed categories    | A `DataError`, as psych's `polychoric` stops        |
 
 Cost grows with the pairs of items, the persons and the product of the items' categories: the 25 items of `bfi`, with
-six categories and 2,800 persons, take about 20 ms, and a parallel analysis of 100 replications under a second. Items
-with many categories, such as scores, suit Pearson correlations.
+six categories and 2,800 persons, take about 20 ms, and a parallel analysis of 100 replications under a second. An item
+has at most 8 observed categories, psych's `max.cat`, as a pair's search takes the bivariate normal distribution at
+every pair of thresholds; items with more, such as scores, suit Pearson correlations, which every function here takes
+with `correlation: "pearson"`.
 
 ## Parallel analysis
 
@@ -394,6 +397,7 @@ negative.
 | Correlation matrix                      | As estimated: not smoothed                                                        | `smooth = TRUE` by default, which makes the matrix positive definite                                                     |
 | `correct`                               | Two items with two categories each, over the pair's persons                       | The same for `tetrachoric`; `polychoric` ignores it with global thresholds                                               |
 | Thresholds                              | From all responses, over the observed categories                                  | The same (`global = TRUE`), over a range of categories shared by every item                                              |
+| Categories of an item                   | At most 8 observed; an item of more throws                                        | `max.cat = 8` by default: `polychoric` stops above it                                                                    |
 | Random data                             | Each item permuted among the persons (`resampled`), or normal data (`normal`)     | `fa.parallel` resamples each item with replacement, and also simulates normal                                            |
 | Suggested numbers                       | From the quantile of the comparison you choose                                    | From the simulated normal data, also for polychoric correlations                                                         |
 | Replications                            | 100                                                                               | 20 (`n.iter`)                                                                                                            |

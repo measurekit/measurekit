@@ -47,8 +47,9 @@ export interface MinimumAveragePartial {
  * @returns The average squared partial correlation for each number of factors, the number of factors that minimizes it
  *   and whether the correlations were smoothed.
  * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
- * categories, a pair of items has too few persons for a correlation, an option is invalid, or the components leave an
- * item no variance, so that its partial correlations are undefined, as for an item uncorrelated with every other.
+ * categories, a pair of items has too few persons for a correlation, an item has more than 8 observed categories for
+ * polychoric correlations, an option is invalid, or the components leave an item no variance, so that its partial
+ * correlations are undefined, as for an item uncorrelated with every other.
  * @see {@link https://doi.org/10.1007/BF02293557 | Velicer (1976)}
  */
 export function minimumAveragePartial(

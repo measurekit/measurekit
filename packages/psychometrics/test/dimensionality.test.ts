@@ -381,6 +381,21 @@ describe("polychoricCorrelations", () => {
     expect(value).toBeGreaterThan(0.99);
   });
 
+  it("takes items of up to 8 observed categories, as psych's polychoric, and refuses an item of more", () => {
+    const eight = Array.from({ length: 16 }, (_, i) => [i % 8, (i + 1) % 8, i % 2]);
+    expect(polychoricCorrelations(responses(eight)).thresholds[0]).toHaveLength(7);
+    // Items of as many categories as persons would cost each pair the square of the persons in time and memory.
+    const nine = responses(Array.from({ length: 18 }, (_, i) => [i % 9, (i + 1) % 9, i % 2]));
+    const message =
+      'Polychoric correlations need items of at most 8 observed categories, as psych\'s polychoric does, but item "item1" has 9; use Pearson correlations for items of more.';
+    expect(() => polychoricCorrelations(nine)).toThrow(message);
+    expect(() => parallelAnalysis(nine, createRandom(1), { replications: 1 })).toThrow(message);
+    expect(() => exploratoryFactorAnalysis(nine, { factors: 1, correlation: "polychoric" })).toThrow(message);
+    expect(
+      parallelAnalysis(nine, createRandom(1), { correlation: "pearson", replications: 1 }).factors.observed,
+    ).toHaveLength(3);
+  });
+
   it("rejects options and matrices of other types and invalid options", () => {
     const matrix = responses([
       [0, 1],

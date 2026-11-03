@@ -1,4 +1,4 @@
-import { checkNonNegative, checkOptions } from "@measurekit/core";
+import { checkNonNegative, checkOptions, DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CodedItem, codeItems, MISSING_RANK } from "./coded-items.js";
 import { createPairEstimator, type PairEstimator } from "./pair-correlation.js";
@@ -33,6 +33,12 @@ export interface PolychoricCorrelations {
 
 /** The count added to an empty cell of a table of two items with two categories each: psych's `correct`. */
 export const DEFAULT_CORRECTION = 0.5;
+/**
+ * The most observed categories of an item in a polychoric correlation: psych's `max.cat`, beyond which its `polychoric`
+ * stops. Each step of a pair's search takes the bivariate normal distribution at every pair of thresholds, so items of
+ * as many categories as persons would cost the square of the persons in time and memory.
+ */
+const MAX_POLYCHORIC_CATEGORIES = 8;
 
 /**
  * Returns the polychoric correlations of the items of a response matrix: the correlation of the normal variables
@@ -45,12 +51,14 @@ export const DEFAULT_CORRECTION = 0.5;
  * under the bivariate normal distribution with correlation ρ, by Newton's method with the exact derivatives safeguarded
  * by bisection. A table with an empty cell and no association gives -1 or 1, where the likelihood increases to the
  * boundary; the correction of `correction` avoids it for items with two categories. Categories are the observed
- * responses in order, so responses may skip numbers. Responses are integers from 0, which `responseMatrix` checks.
+ * responses in order, so responses may skip numbers. Responses are integers from 0, which `responseMatrix` checks. An
+ * item has at most 8 observed categories, psych's `max.cat`; items of more suit Pearson correlations.
  *
  * @param matrix - The responses of the persons.
  * @param options - The correction for continuity.
  * @returns The correlations of the items and their thresholds.
- * @throws `DataError` when the matrix is invalid or `correction` is not a non-negative number.
+ * @throws `DataError` when the matrix is invalid, an item has more than 8 observed categories, or `correction` is not a
+ * non-negative number.
  * @see {@link https://doi.org/10.1007/BF02296207 | Olsson (1979)}
  */
 export function polychoricCorrelations(
@@ -82,6 +90,12 @@ export function polychoricCorrelations(
  * The items' `ranks` are read at each call, so a caller can permute them in place.
  */
 export function polychoricMatrix(items: readonly CodedItem[], correction: number): Float64Array {
+  const many = items.find((item) => item.levels > MAX_POLYCHORIC_CATEGORIES);
+  if (many !== undefined) {
+    throw new DataError(
+      `Polychoric correlations need items of at most ${MAX_POLYCHORIC_CATEGORIES} observed categories, as psych's polychoric does, but item "${many.id}" has ${many.levels}; use Pearson correlations for items of more.`,
+    );
+  }
   const size = items.length;
   const result = new Float64Array(size * size).fill(Number.NaN);
   const largest = items.reduce((most, item) => Math.max(most, item.levels), 1);

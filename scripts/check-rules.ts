@@ -492,6 +492,14 @@ export const RULES: readonly Rule[] = [
     titles: "refuses items whose correlations are all 0",
   },
   {
+    rule: "An item of a polychoric correlation has at most 8 observed categories, so that items of as many categories as persons do not cost each pair the square of the persons.",
+    file: "packages/psychometrics/src/dimensionality/polychoric.ts",
+    find: "if (many !== undefined) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/dimensionality.test.ts",
+    titles: "refuses an item of more",
+  },
+  {
     rule: "Kappa takes a table of the range only where the range is no wider than the pairs.",
     file: "packages/core/src/kappa.ts",
     find: "highest - lowest < n",
