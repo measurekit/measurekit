@@ -557,6 +557,23 @@ describe("calibrateBifactor", () => {
       refused(matrix, { specific, model: null });
     });
 
+    it("refuses a two-tier model of no more persons than its two correlated primary dimensions", () => {
+      const ids = ["q1", "q2", "q3", "q4"];
+      const two = responseMatrix(
+        [
+          [0, 1, 0, 1],
+          [1, 0, 1, 0],
+        ],
+        { itemIds: ids },
+      );
+      const primary = { q1: ["P1"], q2: ["P1"], q3: ["P2"], q4: ["P2"] };
+      const specific = { q1: "s", q2: "s", q3: null, q4: null };
+      expect(() => calibrateBifactor(two, { specific, primary })).toThrow(
+        "The calibration has 2 persons with a response, no more than its 2 correlated dimensions",
+      );
+      expect(calibrateBifactor(two, { specific, maxIterations: 1 }).items).toHaveLength(4);
+    });
+
     it("refuses a calibration without responses", () => {
       const silent = responseMatrix(
         [

@@ -28,9 +28,9 @@ interface PopulationOptions {
  * estimated, as are those of every group but the first without anchors. The correlations are estimated in every group
  * when the design has them.
  *
- * @throws `DataError` when `groups` does not give each person a string label, a group has no person with a response,
- * the groups share no item with the first group, directly or through other groups, or anchors leave a dimension of some
- * set of groups without a scale.
+ * @throws `DataError` when `groups` does not give each person a string label, a group has no person with a response or,
+ * with correlated dimensions, no more persons with a response than dimensions, the groups share no item with the first
+ * group, directly or through other groups, or anchors leave a dimension of some set of groups without a scale.
  */
 export function population<TParameters>(
   options: PopulationOptions,
@@ -46,6 +46,9 @@ export function population<TParameters>(
   names.forEach((name, g) => {
     if (!answered[g]?.some(Boolean)) throw new DataError(`Group "${name}" has no person with a response.`);
   });
+  if (design.correlated) {
+    checkCorrelatedGroups(names, respondentCounts(responses, groupOf, names.length), design.dimensionNames.length);
+  }
   const anchored = items.some((item) => item.fixed);
   checkScale(names, answered, items, design, anchored);
   const latents = names.map((_, g) => {
@@ -53,6 +56,41 @@ export function population<TParameters>(
     return latentDistribution(grid, { correlations: design.correlated, variances: estimated, means: estimated });
   });
   return { labels, groupOf, latents };
+}
+
+/** Returns the number of persons with a response in each group. */
+function respondentCounts(responses: CompressedResponses, groupOf: Int32Array, groupCount: number): Int32Array {
+  const counts = new Int32Array(groupCount);
+  groupOf.forEach((group, person) => {
+    if ((responses.offsets[person + 1] ?? 0) > (responses.offsets[person] ?? 0))
+      counts[group] = (counts[group] ?? 0) + 1;
+  });
+  return counts;
+}
+
+/**
+ * Checks that every group whose correlations are estimated has more persons than correlated dimensions: the thetas of
+ * no more persons than dimensions span no more than a hyperplane, so that the correlations of the group run to ±1,
+ * where the likelihood has no maximum.
+ *
+ * @param names - The label of each group, `null` for the persons of a calibration without groups.
+ * @param counts - The number of persons with a response in each group.
+ * @param dimensions - The number of dimensions whose correlations are estimated.
+ * @throws `DataError` when a group has no more persons with a response than those dimensions.
+ */
+export function checkCorrelatedGroups(
+  names: readonly (string | null)[],
+  counts: ArrayLike<number>,
+  dimensions: number,
+): void {
+  names.forEach((name, g) => {
+    const persons = counts[g] ?? 0;
+    if (persons > dimensions) return;
+    const who = name === null ? "The calibration" : `Group "${name}"`;
+    throw new DataError(
+      `${who} has ${persons} ${persons === 1 ? "person" : "persons"} with a response, no more than its ${dimensions} correlated dimensions, whose correlations then run to ±1: estimate the correlations from more persons, or set correlated to false.`,
+    );
+  });
 }
 
 /** Returns, for each group, whether some person of it answered each item. */

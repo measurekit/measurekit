@@ -11,6 +11,7 @@ import { type ItemState, setUp } from "./calibration-setup.js";
 import { pairsOf } from "./correlation.js";
 import { type Design, designOf } from "./design.js";
 import { calibrateByEm, MAX_EM_DIMENSIONS } from "./em.js";
+import { checkCorrelatedGroups } from "./groups.js";
 import { standardizedLoadings } from "./loadings.js";
 import { calibrateByMhrm } from "./mhrm.js";
 import type { MultidimensionalTestItem } from "./model.js";
@@ -178,6 +179,8 @@ function mhrm<TParameters>(
       'MH-RM has no posterior over a grid to cross-multiply: the option standardErrors needs "none" or "hessian" with the method "mhrm".',
     );
   }
+  if (design.correlated)
+    checkCorrelatedGroups([null], [respondentsOf(responses).respondents], design.dimensionNames.length);
   const items = setUp(responses, options, design, 0);
   const fit = calibrateByMhrm(responses, items, design, {
     tolerance: settings.tolerance,

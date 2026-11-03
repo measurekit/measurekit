@@ -2020,6 +2020,30 @@ describe("multiple groups errors", () => {
     );
   });
 
+  it("needs more persons than correlated dimensions in each group, whose correlations otherwise run to ±1", () => {
+    const one = keep.map((k, p) =>
+      p === 0 || p >= 40 ? defined(responses[k]) : defined(responses[k]).map(() => null),
+    );
+    expect(() => calibrateMultidimensional(matrix(one), { ...base, groups: labels })).toThrow(
+      'Group "A" has 1 person with a response, no more than its 2 correlated dimensions, whose correlations then run to ±1: estimate the correlations from more persons, or set correlated to false.',
+    );
+    expect(calibrateMultidimensional(matrix(one), { ...base, groups: labels, correlated: false }).groups).toHaveLength(
+      2,
+    );
+    const three = keep.map((k, p) =>
+      p < 3 || p >= 40 ? defined(responses[k]) : defined(responses[k]).map(() => null),
+    );
+    expect(calibrateMultidimensional(matrix(three), { ...base, groups: labels }).groups).toHaveLength(2);
+    // Two persons of opposite responses, so that every item has both categories.
+    const first = defined(responses[0]).map((response) => response ?? 0);
+    const two = responseMatrix([first, first.map((response) => 1 - response)], { itemIds: [...itemIds] });
+    for (const method of ["em", "mhrm"] as const) {
+      expect(() => calibrateMultidimensional(two, { model: base.model, loadings, method })).toThrow(
+        "The calibration has 2 persons with a response, no more than its 2 correlated dimensions",
+      );
+    }
+  });
+
   it("needs groups that share items", () => {
     const rows = keep.map((k, p) =>
       defined(responses[k]).map((response, i) => (p < 40 ? (i < 6 ? response : null) : i < 6 ? null : response)),

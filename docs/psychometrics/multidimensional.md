@@ -252,7 +252,10 @@ are those of the first group's correlations.
 
 **Convergence.** A group's estimated distribution that runs to the edge of the grid, a mean outside it or a standard
 deviation below the spacing of its nodes or above its range, leaves `converged` `false`: a few persons, or too coarse a
-grid, give such a group no maximum. The default grid of three dimensions has 15 nodes per dimension; set `points: 21`
+grid, give such a group no maximum. A group whose correlations are estimated needs more persons with a response than
+dimensions, or a `DataError` says so: the thetas of fewer span no more than a hyperplane, and the correlations run to
+±1, where the likelihood has no maximum. The same holds for the persons of a calibration without groups, by EM or
+MH-RM, and for the two primary dimensions of a two-tier model. The default grid of three dimensions has 15 nodes per dimension; set `points: 21`
 above 20 items per dimension, where the coarse grid biases the moments of the groups.
 
 ### Longitudinal calibration
@@ -757,6 +760,9 @@ multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // [-
   constrain parameters that it does not estimate, so for fixed items it needs the other items named in `invariance`;
   here `fixed` frees the means and covariance of the first group as well. mirt's covariance of a group is free in
   every entry its model frees; here an uncorrelated model has a diagonal covariance in every group, as mirt's.
+- **Groups of few persons.** mirt's `multipleGroup` estimates the correlation of a group of one or two persons on two
+  dimensions as 1 and reports convergence, and stops with a singular covariance at five; here a group of no more persons
+  than its correlated dimensions is refused.
 - **Longitudinal calibration.** mirt needs the occasions as one wide matrix, a dimension for each, and `constrain`
   lists of parameter numbers that tie the items; here the occasions are response matrices whose items and persons are
   matched by id, and a person who missed an occasion has no row in it, where mirt has a row of missing responses. The
