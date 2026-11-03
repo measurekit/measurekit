@@ -93,54 +93,63 @@ function difData(matrix: ResponseMatrix, groups: readonly DifGroup[], statistic:
 }
 
 /**
- * Returns the highest possible scores of the answered other matching items of a person and the person's total over
- * them, or `null` when the person answered none.
- */
-function restScore(
-  { itemCount, responses, maxScores }: DifData,
-  person: number,
-  item: number,
-  anchors: Uint8Array,
-): { possible: number; score: number } | null {
-  let possible = 0;
-  let score = 0;
-  for (let j = 0; j < itemCount; j++) {
-    const other = responses[person * itemCount + j] ?? -1;
-    if (j === item || anchors[j] !== 1 || other < 0) continue;
-    possible += maxScores[j] ?? 1;
-    score += other;
-  }
-  return possible === 0 ? null : { possible, score };
-}
-
-/**
- * Returns the persons who answered an item and at least one other matching item, with their matching scores.
+ * Returns a function that gives the persons who answered an item and at least one other matching item, with their
+ * matching scores, for the anchors given.
  *
  * @remarks
  * The matching items are the anchors and the studied item. A person's score is the response to the studied item plus
  * the total over the other matching items the person answered, scaled to all of them and rounded to the nearest
  * integer, halves up: x + round(M s / m) for s the total over the answered others, m their highest possible sum and M
- * that of all the others. With every response present it is the total score over the matching items.
+ * that of all the others. With every response present it is the total score over the matching items. Each person's
+ * total and highest possible sum over the answered anchors are summed once, and an anchor's own share taken away for
+ * its statistics: sums of integers, exact, so that every item takes time with the persons, not the persons times the
+ * items.
  */
-export function itemCases(data: DifData, item: number, anchors: Uint8Array): ItemCases {
+export function itemCasesOf(data: DifData, anchors: Uint8Array): (item: number) => ItemCases {
   const { itemCount, responses, focal, maxScores } = data;
-  let others = 0;
-  for (let j = 0; j < itemCount; j++) if (j !== item && anchors[j] === 1) others += maxScores[j] ?? 1;
-  const persons: number[] = [];
-  const scores: number[] = [];
-  for (let person = 0; person < focal.length; person++) {
-    const response = responses[person * itemCount + item] ?? -1;
-    const rest = response < 0 ? null : restScore(data, person, item, anchors);
-    if (rest === null) continue;
-    persons.push(person);
-    scores.push(response + Math.floor((others * rest.score) / rest.possible + 0.5));
-  }
-  return {
-    responses: Int32Array.from(persons, (person) => responses[person * itemCount + item] ?? 0),
-    scores: Float64Array.from(scores),
-    focal: Uint8Array.from(persons, (person) => focal[person] ?? 0),
-    maxScore: others + (maxScores[item] ?? 1),
+  const { possible, totals, anchorPossible } = anchorSums(data, anchors);
+  return (item) => {
+    // 1 when the item is an anchor: the person answered it, so its share of the person's sums is its own.
+    const inAnchors = anchors[item] === 1 ? 1 : 0;
+    const own = maxScores[item] ?? 1;
+    const others = anchorPossible - inAnchors * own;
+    const persons: number[] = [];
+    const scores: number[] = [];
+    for (let person = 0; person < focal.length; person++) {
+      const response = responses[person * itemCount + item] ?? -1;
+      const restPossible = (possible[person] ?? 0) - inAnchors * own;
+      if (response < 0 || restPossible === 0) continue;
+      const rest = (totals[person] ?? 0) - inAnchors * response;
+      persons.push(person);
+      scores.push(response + Math.floor((others * rest) / restPossible + 0.5));
+    }
+    return {
+      responses: Int32Array.from(persons, (person) => responses[person * itemCount + item] ?? 0),
+      scores: Float64Array.from(scores),
+      focal: Uint8Array.from(persons, (person) => focal[person] ?? 0),
+      maxScore: others + own,
+    };
   };
+}
+
+/** Returns each person's highest possible sum and total over the answered anchors, and the anchors' possible sum. */
+function anchorSums(
+  { itemCount, responses, focal, maxScores }: DifData,
+  anchors: Uint8Array,
+): { possible: Float64Array; totals: Float64Array; anchorPossible: number } {
+  let anchorPossible = 0;
+  for (let j = 0; j < itemCount; j++) if (anchors[j] === 1) anchorPossible += maxScores[j] ?? 1;
+  const possible = new Float64Array(focal.length);
+  const totals = new Float64Array(focal.length);
+  for (let person = 0; person < focal.length; person++) {
+    for (let j = 0; j < itemCount; j++) {
+      const response = responses[person * itemCount + j] ?? -1;
+      if (anchors[j] !== 1 || response < 0) continue;
+      possible[person] = (possible[person] ?? 0) + (maxScores[j] ?? 1);
+      totals[person] = (totals[person] ?? 0) + response;
+    }
+  }
+  return { possible, totals, anchorPossible };
 }
 
 /**

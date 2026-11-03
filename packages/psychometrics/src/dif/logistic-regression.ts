@@ -1,7 +1,7 @@
 import { checkOptions, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/internal.js";
-import { type DifGroup, dichotomousData, itemCases } from "./groups.js";
+import { type DifGroup, dichotomousData, itemCasesOf } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 
@@ -58,11 +58,13 @@ export function logisticRegressionDif(
   return purified(
     matrix.itemIds,
     purify,
-    (anchors) =>
-      matrix.itemIds.map((id, item) => {
-        const { responses, scores, focal } = itemCases(data, item, anchors);
+    (anchors) => {
+      const casesOf = itemCasesOf(data, anchors);
+      return matrix.itemIds.map((id, item) => {
+        const { responses, scores, focal } = casesOf(item);
         return { id, ...logisticTests({ outcomes: responses, scores, predictors: focal }) };
-      }),
+      });
+    },
     (item) => significant(item.both.significance),
   );
 }

@@ -1,7 +1,7 @@
 import { checkBoolean, checkOptions, chiSquareUpperTail, normalQuantile } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 
-import { type DifGroup, dichotomousData, type ItemCases, itemCases } from "./groups.js";
+import { type DifGroup, dichotomousData, type ItemCases, itemCasesOf } from "./groups.js";
 import {
   type DifAnalysis,
   type PurificationOptions,
@@ -88,11 +88,13 @@ export function mantelHaenszel(
   return purified(
     matrix.itemIds,
     purify,
-    (anchors) =>
-      matrix.itemIds.map((id, item) => ({
+    (anchors) => {
+      const casesOf = itemCasesOf(data, anchors);
+      return matrix.itemIds.map((id, item) => ({
         id,
-        ...statistics(scoreTables(itemCases(data, item, anchors)), continuityCorrection),
-      })),
+        ...statistics(scoreTables(casesOf(item)), continuityCorrection),
+      }));
+    },
     (item) => significant(item.significance),
   );
 }

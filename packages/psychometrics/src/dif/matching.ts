@@ -1,6 +1,6 @@
 import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { type DifData, type DifGroup, itemCases, polytomousData } from "./groups.js";
+import { type DifData, type DifGroup, itemCasesOf, polytomousData } from "./groups.js";
 import { type DifAnalysis, type PurificationOptions, purified } from "./purification.js";
 
 /** Options of the regressions that take a matching score of the caller's: {@link ordinalLogisticRegressionDif} and {@link logisticDiscriminantDif}. */
@@ -54,8 +54,13 @@ export function matchedAnalysis<TItem>(
   return purified(
     matrix.itemIds,
     purify,
-    (anchors) =>
-      matrix.itemIds.map((id, item) => ({ id, ...statistics(matchedCases(data, item, anchors, matching), id) })),
+    (anchors) => {
+      const casesOf = matching === undefined ? itemCasesOf(data, anchors) : null;
+      return matrix.itemIds.map((id, item) => ({
+        id,
+        ...statistics(casesOf === null ? givenCases(data, item, matching ?? []) : casesOf(item), id),
+      }));
+    },
     flagged,
   );
 }
@@ -74,17 +79,8 @@ function checkMatching(matrix: ResponseMatrix, matching: readonly (number | null
   });
 }
 
-/** Returns the persons who answered an item and have a matching score: the given one, or the scaled total score. */
-function matchedCases(
-  data: DifData,
-  item: number,
-  anchors: Uint8Array,
-  matching: readonly (number | null)[] | undefined,
-): MatchedCases {
-  if (matching === undefined) {
-    const cases = itemCases(data, item, anchors);
-    return { responses: cases.responses, scores: cases.scores, focal: cases.focal };
-  }
+/** Returns the persons who answered an item and have a matching score given. */
+function givenCases(data: DifData, item: number, matching: readonly (number | null)[]): MatchedCases {
   const persons: number[] = [];
   matching.forEach((score, person) => {
     if (score !== null && (data.responses[person * data.itemCount + item] ?? -1) >= 0) persons.push(person);
