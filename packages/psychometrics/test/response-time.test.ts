@@ -698,6 +698,9 @@ describe("speedAccuracyEstimates", () => {
     expect(() => speedAccuracyEstimates(data, { ...calibration, items: JSON.parse('"items"') })).toThrow(
       'The calibration needs items, an array, found "items".',
     );
+    expect(() => speedAccuracyEstimates(data, { ...calibration, items: JSON.parse("[null]") })).toThrow(
+      "Item 1 of the calibration must be an object { id, model, parameters, intensity, discrimination }, found null.",
+    );
     expect(() => speedAccuracyEstimates(data, { ...calibration, correlation: 1 })).toThrow(
       "The calibration's correlation must be between -1 and 1, found 1.",
     );

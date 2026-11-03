@@ -410,8 +410,12 @@ function checkCalibration<TParameters>(calibration: SpeedAccuracyCalibration<TPa
   if (!Array.isArray(items)) {
     throw new DataError(`The calibration needs items, an array, found ${describe(items)}.`);
   }
-  for (const item of calibration.items) {
+  calibration.items.forEach((item, index) => {
+    checkRecord(
+      item,
+      `Item ${index + 1} of the calibration must be an object { id, model, parameters, intensity, discrimination }`,
+    );
     checkFinite(item.intensity, `The intensity of item ${describe(item.id)}`);
     checkPositive(item.discrimination, `The time discrimination of item ${describe(item.id)}`);
-  }
+  });
 }
