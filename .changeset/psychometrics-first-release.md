@@ -69,6 +69,12 @@ links.
 with a correlation matrix you give: every posterior keeps its distribution, a correlation of 1 gives one quantile in all of
 them, and 0 gives independent draws. It forecasts a composite of several scores, or bounds one when the correlation is unknown.
 
+`calibrate` holds single parameters of estimated items at given values with `fixedParameters`, such as the lower
+asymptote of a 3PL item at 1/4 while its slope and difficulty are estimated, as mirt's `est = FALSE`: a held parameter
+has no standard error, prior or place in the covariance, and the AIC and BIC do not count it. `limitedInformationFit`
+and `summedScoreFit` take the same object, and `summedScoreFit` the anchors' ids, so that Δ and the degrees of freedom
+count only the estimated parameters, as mirt's.
+
 `calibrate` takes `personWeights`, each person's survey weight, rescaled to sum to the persons with a response, as mirt's
 `survey.weights` asks: every sum over persons counts the person times the weight, the regression of theta on covariates
 included, so that the estimates are the population's and the standard errors keep the sample's size. Without the

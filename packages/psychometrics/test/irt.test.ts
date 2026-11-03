@@ -92,6 +92,7 @@ import { definedEntries, type FixtureErrors, type FixtureParameters, MODELS } fr
 import conditional from "./fixtures/irt-conditional.json" with { type: "json" };
 import covariance from "./fixtures/irt-covariance.json" with { type: "json" };
 import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json" };
+import fixedParameters from "./fixtures/irt-fixed-parameters.json" with { type: "json" };
 import latent from "./fixtures/irt-latent.json" with { type: "json" };
 import latentRegression from "./fixtures/irt-latent-regression.json" with { type: "json" };
 import lsat7 from "./fixtures/irt-lsat7.json" with { type: "json" };
@@ -1242,6 +1243,151 @@ describe("item priors", () => {
   it("treat an item id such as constructor as an id", () => {
     expect(() => calibrate(matrix, { ...options, itemPriors: JSON.parse('{ "constructor": {} }') })).toThrow(
       'Priors are given for "constructor", which is not an item id.',
+    );
+  });
+});
+
+describe("fixed parameters", () => {
+  const matrix = responseMatrix(fixedParameters.responses, { itemIds: fixedParameters.itemIds });
+  const options = {
+    model: fixedParameters.models.map(model),
+    fixedParameters: fixedParameters.fixedParameters,
+    tolerance: EM_TOLERANCE,
+    maxIterations: 10_000,
+  };
+
+  for (const reference of fixedParameters.calibrations) {
+    const standardErrors = reference.standardErrors === "cross-product" ? "cross-product" : "hessian";
+    it(`match mirt with est = FALSE on the held parameters, with ${standardErrors} standard errors`, () => {
+      const result = calibrate(matrix, { ...options, standardErrors });
+      expect(result.converged).toBe(true);
+      reference.items.forEach((expected, i) => {
+        const actual = defined(result.items[i]);
+        expectParameters(actual.parameters, expected.parameters, PARAMETER_TOLERANCE, actual.id);
+        const errors = defined(actual.standardErrors);
+        expect(Object.keys(errors)).toEqual(Object.keys(expected.standardErrors));
+        for (const [name, value = 0] of Object.entries(expected.standardErrors)) {
+          expectClose(defined(errors[name]), value, STANDARD_ERROR_TOLERANCE * value, `${actual.id} SE of ${name}`);
+        }
+      });
+      expectClose(result.logLikelihood, reference.logLikelihood, LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
+      expectClose(result.aic, reference.aic, 2 * LOG_LIKELIHOOD_TOLERANCE, "AIC");
+      expectClose(result.bic, reference.bic, 2 * LOG_LIKELIHOOD_TOLERANCE, "BIC");
+    });
+  }
+
+  it("keep each held value exactly, and leave it out of the standard errors and the covariance", () => {
+    const { calibration, covariance: result } = calibrateWithCovariance(matrix, {
+      ...options,
+      standardErrors: "hessian",
+    });
+    expect(defined(calibration.items[0]).parameters).toMatchObject({ c: 0.25 });
+    expect(defined(calibration.items[7]).parameters).toMatchObject({ c: 0.2 });
+    expect(defined(calibration.items[11]).parameters).toMatchObject({ a: 1 });
+    const labels = defined(result).parameters;
+    expect(labels).toHaveLength(defined(fixedParameters.calibrations[0]).estimated);
+    expect(labels.slice(0, 2)).toEqual([
+      { item: "item1", name: "a" },
+      { item: "item1", name: "b" },
+    ]);
+    expect(labels.at(-1)).toEqual({ item: "item12", name: "b" });
+    labels.forEach(({ item, name }, row) => {
+      const error = defined(calibration.items.find(({ id }) => id === item)?.standardErrors?.[name]);
+      expectClose(defined(defined(result).matrix[row]?.[row]), error ** 2, 1e-12 * error ** 2, `${item} ${name}`);
+    });
+  });
+
+  it("give the free calibration when a parameter is held at its estimate", () => {
+    const grades = responseMatrix(science.responses, { itemIds: science.itemIds });
+    const free = calibrate(grades, { model: generalizedPartialCredit, tolerance: EM_TOLERANCE, maxIterations: 10_000 });
+    const second = defined(free.items[1]);
+    const held = calibrate(grades, {
+      model: generalizedPartialCredit,
+      fixedParameters: { [second.id]: { b2: defined(second.parameters.b[1]) } },
+      tolerance: EM_TOLERANCE,
+      maxIterations: 10_000,
+    });
+    free.items.forEach((item, i) => {
+      expectParameters(defined(held.items[i]).parameters, item.parameters, 1e-6, item.id);
+    });
+    expectClose(held.logLikelihood, free.logLikelihood, 1e-8, "log-likelihood");
+    expectClose(held.aic, free.aic - 2, 1e-7, "AIC");
+  });
+
+  it("agree with the near-degenerate beta prior that held the guessing parameter", () => {
+    // A beta prior of mode c and SD about 0.004 for each held c: the estimates move by little more than that.
+    const itemPriors = Object.fromEntries(
+      Object.entries(fixedParameters.fixedParameters).flatMap(([id, held]) =>
+        "c" in held ? [[id, { c: betaPrior(1 + 10_000 * held.c, 1 + 10_000 * (1 - held.c)) }]] : [],
+      ),
+    );
+    const prior = calibrate(matrix, {
+      model: fixedParameters.models.map(model),
+      itemPriors,
+      fixedParameters: { item12: { a: 1 } },
+    });
+    const held = calibrate(matrix, { ...options, tolerance: 1e-4, maxIterations: 500 });
+    held.items.forEach((item, i) => {
+      expectParameters(defined(prior.items[i]).parameters, item.parameters, 0.02, item.id);
+    });
+  });
+
+  it("change nothing when empty", () => {
+    const sample = responseMatrix(simulate(20261029, 300, ITEMS_2PL));
+    const plain = calibrate(sample, { model: twoParameterLogistic });
+    expect(calibrate(sample, { model: twoParameterLogistic, fixedParameters: {} })).toEqual(plain);
+    expect(calibrate(sample, { model: twoParameterLogistic, fixedParameters: { item1: {} } })).toEqual(plain);
+  });
+
+  it("reject unknown and fixed items, parameters the model lacks or shares, every parameter, priors and values", () => {
+    const sample = responseMatrix(simulate(20261029, 300, ITEMS_2PL));
+    const two = { model: twoParameterLogistic } as const;
+    const fixed = { item1: defined(PARAMETERS_2PL[0]) };
+    const rejected = (value: object | string, extra: object = {}): string | undefined => {
+      try {
+        const held = typeof value === "string" ? JSON.parse(value) : value;
+        calibrate(sample, { ...two, ...extra, fixedParameters: held });
+      } catch (error) {
+        return error instanceof DataError ? error.message : undefined;
+      }
+      return undefined;
+    };
+    expect(rejected({ q1: { a: 1 } })).toBe(
+      'The option fixedParameters holds parameters of "q1", which is not an item id.',
+    );
+    expect(rejected({ item1: { b: 0 } }, { fixed })).toBe(
+      'The option fixedParameters holds parameters of item "item1", which the option fixed holds whole.',
+    );
+    expect(rejected({ item2: { c: 0.25 } })).toBe(
+      'The option fixedParameters holds "c" of item "item2", whose 2PL model has a, b.',
+    );
+    expect(rejected({ item2: { a: 1, b: 0 } })).toBe(
+      'The option fixedParameters holds every parameter of item "item2"; give its parameters in the option fixed.',
+    );
+    expect(rejected({ item2: { a: 1 } }, { itemPriors: { item2: { a: logNormalPrior(0, 0.5) } } })).toBe(
+      'A prior is given for "a" of item "item2", which the option fixedParameters holds.',
+    );
+    const allSlopes = Object.fromEntries(ITEMS_2PL.map((_, i) => [`item${i + 1}`, { a: 1 }]));
+    expect(rejected(allSlopes, { priors: { a: logNormalPrior(0, 0.5) } })).toBe(
+      'A prior is given for "a", which no estimated item has.',
+    );
+    expect(rejected({ item2: { a: 1 } }, { model: oneParameterLogistic })).toBe(
+      'The option fixedParameters holds "a" of item "item2", whose 1PL model shares it among items.',
+    );
+    expect(rejected({ item2: { c: 1 } }, { model: threeParameterLogistic })).toMatch(
+      /^Item "item2" with its held parameters: Logistic item parameters need finite a and b and 0 ≤ c < d ≤ 1, found .* c = 1, d = 1\.$/,
+    );
+    expect(rejected("null")).toBe(
+      "The option fixedParameters must be an object of values by item id and parameter name, found null.",
+    );
+    expect(rejected('{ "item1": [] }')).toBe(
+      'The held parameters of item "item1" must be an object of values by parameter name, found an array.',
+    );
+    expect(rejected('{ "item1": { "a": "1" } }')).toBe(
+      'The held value of "a" of item "item1" must be a finite number, found "1".',
+    );
+    expect(rejected('{ "constructor": {} }')).toBe(
+      'The option fixedParameters holds parameters of "constructor", which is not an item id.',
     );
   });
 });

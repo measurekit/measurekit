@@ -35,7 +35,7 @@ alone, as they estimate the items themselves, and so do the kernel curves, which
 | `itemFit(matrix, items, thetas)`                | item: `ItemFit`               | Persons without an extreme score; missing responses skipped |
 | `personFit(matrix, items, thetas)`              | person: `PersonFit`           | Each person's answered items                                |
 | `correctedPersonFit(matrix, items, thetas, …)`  | person: `CorrectedPersonFit`  | Each person's answered items; none of an extreme score      |
-| `summedScoreFit(matrix, items)`                 | item: `SummedScoreFit`        | Persons who answered every item                             |
+| `summedScoreFit(matrix, items, …)`              | item: `SummedScoreFit`        | Persons who answered every item                             |
 | `yenQ3(matrix, items, thetas)`                  | pair of items: a matrix entry | For each pair, the persons who answered both                |
 | `rootMeanSquareDeviation(matrix, items, …)`     | item: `ItemDeviation`         | Persons with a response                                     |
 | `localDependenceChiSquare(matrix, items, …)`    | pair: `LocalDependencePair`   | For each pair, the persons who answered both                |
@@ -118,8 +118,13 @@ mirt's `itemfit(fit_stats = "S_X2")`:
 4. S-X² = Σ (O - E)² / E over the cells left, with cells - groups - parameters degrees of freedom; `null` when none
    are left.
 
-The degrees of freedom count every parameter of the item's model as estimated, so for anchor items, which were not
-estimated, they are too few by the anchor's parameters.
+The parameters are those the calibration estimated, as mirt's: every parameter of the item's model unless the options
+say otherwise.
+
+| Option            | Meaning                                                                                               | Default |
+| ----------------- | ----------------------------------------------------------------------------------------------------- | ------- |
+| `fixed`           | The ids of the calibration's anchors, which count no parameter                                        | none    |
+| `fixedParameters` | The calibration's [held parameters](irt.md#held-parameters), the same object; only the names are read | none    |
 
 For each item the recursion sums the scores of the other items at every node, which costs the items times the square of
 the highest total score, so `summedScoreFit` takes items of a highest total score of at most 300: 300 dichotomous items,
@@ -276,11 +281,12 @@ moments less the parameters when the model holds.
 
 Each adds the mean product of the scores of each pair of items. On dichotomous items the three are equal.
 
-| Option      | Meaning                                                       | Default     |
-| ----------- | ------------------------------------------------------------- | ----------- |
-| `statistic` | The statistic above                                           | `"m2-star"` |
-| `fixed`     | The ids of the calibration's anchors, which add no parameters | none        |
-| `level`     | The level of the RMSEA interval                               | `0.9`       |
+| Option            | Meaning                                                                                              | Default     |
+| ----------------- | ---------------------------------------------------------------------------------------------------- | ----------- |
+| `statistic`       | The statistic above                                                                                  | `"m2-star"` |
+| `fixed`           | The ids of the calibration's anchors, which add no parameters                                        | none        |
+| `fixedParameters` | The calibration's [held parameters](irt.md#held-parameters), which add none; only the names are read | none        |
+| `level`           | The level of the RMSEA interval                                                                      | `0.9`       |
 
 | Field              | Definition                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -324,12 +330,13 @@ The population is the calibration's group, with its nodes and weights. Δ has on
 | ------------------------------------------------------------------- | ----------------------------------------------------- |
 | An item's own                                                       | One, from the model's `parameterDerivatives`          |
 | One the items of a model share, as the 1PL's `a` or the RSM's steps | One, the sum of the items' columns                    |
-| An anchor's                                                         | None                                                  |
+| An anchor's, and one `fixedParameters` holds                        | None                                                  |
 | The mean and SD of an estimated normal group                        | Two, from the derivatives of the weights of the nodes |
 
-The estimated parameters must equal those in the calibration's AIC. A `Calibration` does not record its anchors, so
-give their ids in `fixed`. The check catches a list of the wrong size; a list of the right size that swaps anchors for
-estimated items of the same model passes and gives a wrong Δ. The moments are unweighted: each person counts once, also
+The estimated parameters must equal those in the calibration's AIC. A `Calibration` does not record its anchors or its
+held parameters, so give the anchors' ids in `fixed` and the held parameters in `fixedParameters`. The check catches
+lists of the wrong size; lists of the right size that swap anchors or held parameters for estimated ones pass and give
+a wrong Δ. The moments are unweighted: each person counts once, also
 for a calibration with [person weights](irt.md#person-weights), whose weights they do not read.
 
 Where the first- and second-order margins do not identify every parameter, Δ's rank is below its columns. The statistic
@@ -502,10 +509,10 @@ Invalid input throws `DataError` naming the value found.
 | Missing responses                                      | Infit and outfit skip them in every sum                                                          | eRm's infit sums W over every person                                                                                                                                                                                                               |
 | Small probabilities                                    | ln P of an observed category clamped at the smallest double                                      | mirt's `personfit` counts an observed category with P below 2.2e-16 as P = 1                                                                                                                                                                       |
 | Person mean squares                                    | As eRm                                                                                           | mirt's `personfit` raises W² below 1e-5 to 1e-5 and caps q at 1.4142                                                                                                                                                                               |
-| S-X² degrees of freedom                                | Every parameter of the model                                                                     | mirt: the freely estimated parameters                                                                                                                                                                                                              |
 | An empty S-X² table                                    | `null` for the item                                                                              | mirt stops collapsing the remaining items                                                                                                                                                                                                          |
 | M2 of the Rasch model with a free variance             | Δ has the column of the variance, which the df counts                                            | mirt's Δ leaves it out, while its df counts it: 242.156, against 242.051 with the column, which equals mirt's 1PL, the same model, at 242.052                                                                                                      |
 | M2 of an estimated normal group                        | Δ has the columns of its mean and SD, which the df counts                                        | mirt's Δ leaves them out, while its df counts them: 72.176 on the fixtures' anchored 2PL, against 72.079 with the columns                                                                                                                          |
+| M2 of 3PL items with c held                            | The derivatives of `threeParameterLogistic`, which the written-out statistic shares              | mirt's M2* differs from the statistic written out in base R, whose Δ has a column for each estimated parameter: 41.98 against 42.31 on the fixture's items                                                                                         |
 | M2 and C2 of a GPCM or PCM                             | The model's derivative with respect to its slope                                                 | mirt's `dP` of a `gpcm` slope is wrong: at θ = 1, -0.62 against 0.79 by central differences of mirt's own probabilities; its PCM C2 is 224.87, against 228.77 with the right derivative                                                            |
 | M2* of the independence model                          | N Σ r², on J (J - 1) / 2 df: the statistic on the whole complement of Δ, on polytomous items too | mirt's Δ has rank J below its columns, and `qr.Q` takes an arbitrary part of the complement: 238.6, and 257.6 with the items reversed                                                                                                              |
 | A Δ whose rank is below its columns                    | The whole complement of its span, with the moments less its rank as df                           | mirt and GDINA take nrow - ncol columns of `qr.Q`'s complement, which depend on the order of Δ's columns                                                                                                                                           |

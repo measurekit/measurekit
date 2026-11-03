@@ -8,7 +8,7 @@ import {
 } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
-import { type Setup, setUp } from "./calibration-setup.js";
+import { type ItemState, type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
 import { type ExpectationStep, expectationStep } from "./expectation.js";
 import { hessianCovariance } from "./hessian-covariance.js";
@@ -223,7 +223,7 @@ export function calibrateResponses<TParameters>(
   const { items, values, population: latent, design } = setup;
   if (standardErrors !== "none") {
     // The covariance reported lists a parameter that items share once for each of them.
-    const listed = items.reduce((sum, item) => sum + item.names.length, 0);
+    const listed = items.reduce((sum, item) => sum + freeEntries(item).length, 0);
     checkStandardErrorSize(Math.max(values.length, listed));
   }
   const mStep = maximization(setup, nodes);
@@ -247,7 +247,7 @@ export function calibrateResponses<TParameters>(
         standardErrors:
           standardError === null || !item.estimated
             ? null
-            : Object.fromEntries(item.names.map((name, p) => [name, standardError(item.slots[p] ?? 0)])),
+            : Object.fromEntries(freeEntries(item).map(({ name, slot }) => [name, standardError(slot)])),
       })),
       groups: groupDistributions(latent, values, nodes, standardError),
       ...(regression !== undefined && { regression }),
@@ -307,16 +307,23 @@ function parameterCovariance<TParameters>(
   covariance: Float64Array | null,
   size: number,
 ): ParameterCovariance | null {
-  const estimated = items.filter((item) => item.estimated);
-  if (covariance === null || estimated.length === 0) return null;
-  const slots = estimated.flatMap((item) => Array.from(item.slots));
+  const entries = items.flatMap((item) => freeEntries(item).map((entry) => ({ ...entry, item: item.id })));
+  if (covariance === null || entries.length === 0) return null;
+  const slots = entries.map(({ slot }) => slot);
   return {
-    parameters: estimated.flatMap((item) => item.names.map((name) => ({ item: item.id, name }))),
+    parameters: entries.map(({ item, name }) => ({ item, name })),
     // The inverse of the Hessian is symmetric only to rounding.
     matrix: slots.map((row) =>
       slots.map((column) => ((covariance[row * size + column] ?? 0) + (covariance[column * size + row] ?? 0)) / 2),
     ),
   };
+}
+
+/** Returns the names of an item's free entries, with the free parameter behind each. */
+function freeEntries<TParameters>(
+  item: ItemState<TParameters>,
+): readonly { readonly name: string; readonly slot: number }[] {
+  return Array.from(item.freeEntries, (p) => ({ name: item.names[p] ?? "", slot: item.slots[p] ?? 0 }));
 }
 
 /** Returns the covariance matrix of the free parameters by the method, or `null` without standard errors. */

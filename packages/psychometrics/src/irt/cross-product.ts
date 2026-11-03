@@ -15,6 +15,8 @@ interface ScoredCalibration {
     readonly estimated: boolean;
     /** The free parameter behind each vector entry. */
     readonly slots: Int32Array;
+    /** The vector entries that a free parameter stands behind. */
+    readonly freeEntries: Int32Array;
   }[];
   readonly population: Population;
   readonly free: readonly { readonly prior: ParameterPrior | undefined }[];
@@ -68,7 +70,10 @@ export function crossProductCovariance(
   return invertPositiveDefinite(information, size);
 }
 
-/** Adds the derivatives of ln P(x | θ) of an estimated item's response x, averaged over the posterior, to the score. */
+/**
+ * Adds the derivatives of ln P(x | θ) of an estimated item's response x with respect to its free parameters, averaged
+ * over the posterior, to the score.
+ */
 function addItemScore(
   score: SparseScore,
   item: ScoredCalibration["items"][number] | undefined,
@@ -78,7 +83,7 @@ function addItemScore(
 ): void {
   if (item === undefined || ratios === null || ratios === undefined) return;
   const length = item.slots.length;
-  for (let l = 0; l < length; l++) {
+  for (const l of item.freeEntries) {
     score.add(item.slots[l] ?? 0, nodeSum(posterior, ratios, response * length + l, item.categoryCount * length));
   }
 }

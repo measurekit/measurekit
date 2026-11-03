@@ -128,21 +128,22 @@ result.logLikelihood; // also aic, bic, converged and iterations
 data, [response records](data.md#response-records): both give the same calibration, and records take memory
 in proportion to the responses only.
 
-| Option           | Default             | Meaning                                                                                                                  |
-| ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `model`          | required            | One model for every item, or an array with one per item, such as the 3PL and the GPCM.                                   |
-| `fixed`          | none                | Parameters of anchor items by item id. They are not estimated; the others take their scale.                              |
-| `priors`         | none                | A prior per vector entry name, such as `{ c: betaPrior(5, 17) }`, for every item estimating it.                          |
-| `itemPriors`     | none                | Priors by item id, then entry name, such as `{ new1: { b: normalPrior(0.4, 0.8) } }`: [priors of single items](#priors). |
-| `quadrature`     | 61 rectangular      | Nodes over theta: `{ method: "rectangular" \| "gauss-hermite", points }`.                                                |
-| `groups`         | one group           | Each person's group label, for [several groups on one scale](#groups-and-distributions-of-theta).                        |
-| `latent`         | `"standard-normal"` | The distribution of theta, for every group or by group label: `"standard-normal"`, `"normal"`, `"empirical-histogram"`.  |
-| `covariates`     | none                | Each person's covariates by name, for a [latent regression](#latent-regression) of theta.                                |
-| `standardErrors` | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                         |
-| `testlets`       | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                              |
-| `personWeights`  | 1 for every person  | Each person's survey weight, above 0, for [a sample that stands for a population](#person-weights).                      |
-| `tolerance`      | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                      |
-| `maxIterations`  | `500`               | The most EM iterations.                                                                                                  |
+| Option            | Default             | Meaning                                                                                                                                   |
+| ----------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`           | required            | One model for every item, or an array with one per item, such as the 3PL and the GPCM.                                                    |
+| `fixed`           | none                | Parameters of anchor items by item id. They are not estimated; the others take their scale.                                               |
+| `priors`          | none                | A prior per vector entry name, such as `{ c: betaPrior(5, 17) }`, for every item estimating it.                                           |
+| `itemPriors`      | none                | Priors by item id, then entry name, such as `{ new1: { b: normalPrior(0.4, 0.8) } }`: [priors of single items](#priors).                  |
+| `fixedParameters` | none                | Values by item id, then entry name, such as `{ q7: { c: 0.25 } }`, held while the rest is estimated: [held parameters](#held-parameters). |
+| `quadrature`      | 61 rectangular      | Nodes over theta: `{ method: "rectangular" \| "gauss-hermite", points }`.                                                                 |
+| `groups`          | one group           | Each person's group label, for [several groups on one scale](#groups-and-distributions-of-theta).                                         |
+| `latent`          | `"standard-normal"` | The distribution of theta, for every group or by group label: `"standard-normal"`, `"normal"`, `"empirical-histogram"`.                   |
+| `covariates`      | none                | Each person's covariates by name, for a [latent regression](#latent-regression) of theta.                                                 |
+| `standardErrors`  | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                                          |
+| `testlets`        | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                                               |
+| `personWeights`   | 1 for every person  | Each person's survey weight, above 0, for [a sample that stands for a population](#person-weights).                                       |
+| `tolerance`       | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                                       |
+| `maxIterations`   | `500`               | The most EM iterations.                                                                                                                   |
 
 The estimates maximize the marginal log-likelihood, theta integrated over its distribution, N(0, 1) by default; with
 priors, the log-likelihood plus the log prior densities. Bock-Aitkin EM alternates two steps:
@@ -187,8 +188,8 @@ complete-data gradient. On 20,000 persons and 60 2PL items, EM takes 1.3 to 2.0 
 more and cross-product ones 0.5 to 1.2 s more; on 4,000 persons answering 40 of 1,000 items, cross-product standard
 errors take 2.0 to 3.9 s, on a quiet machine and on one under load. Both methods estimate the same covariance in large
 samples; the Hessian is the reference for small ones.
-Standard errors are `null` for fixed items, and for every item when the information cannot be inverted or gives a
-variance that is not positive. They take at most 2,000 estimated parameters, counting a parameter that items share once
+Standard errors are `null` for fixed items, a held parameter has none, and every item has `null` when the information
+cannot be inverted or gives a variance that is not positive. They take at most 2,000 estimated parameters, counting a parameter that items share once
 for each of them, as the covariance lists it: the information holds every pair, about 210 MB at the bound, and its
 inverse takes time with the cube of P. Beyond it calibration throws `DataError` before it estimates anything; leave
 `standardErrors` at `"none"`, or calibrate the items in sets that share fixed anchors.
@@ -229,7 +230,7 @@ covariance?.matrix[0]?.[0]; // 0.160, the square of the standard error of item2'
 
 - **Which parameters.** The matrix is the part for the item parameters of the covariance matrix of all the estimated
   parameters, so it includes the uncertainty of estimated distributions of theta and of testlets, whose own parameters
-  it does not list. Fixed items are not listed.
+  it does not list. Fixed items and held parameters are not listed.
 - **Shared parameters.** Items whose model shares a parameter, as RSM items share a and the steps, list it once for each
   item, with the same variance and a correlation of 1.
 - **`null`.** Without standard errors (`standardErrors: "none"`), with no estimated item, and where the information
@@ -560,6 +561,51 @@ calibrate(responses, {
 The items must be estimated, ones in `fixed` have no prior, and the names must be ones the item's model has. A parameter
 that items of a model share, as RSM items share a and the steps, takes `priors` only. Each of these cases throws
 `DataError`.
+
+### Held parameters
+
+`fixedParameters` holds single parameters of estimated items at given values while the items' other parameters are
+estimated, as mirt's `est = FALSE` on one parameter: a 3PL item of four options whose lower asymptote is held at 1/4,
+or an item whose slope is held at 1 among 2PL items. The values are on the parameter's own scale, by item id and then
+the name of the entry in the item's parameter vector, as `itemPriors` names them.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrateWithCovariance, threeParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// Eight items of four options each, whose lower asymptote is 1/4.
+const random = createRandom(2026);
+const items = simulateItems(threeParameterLogistic, 8, random).map((item) => ({
+  ...item,
+  parameters: { ...item.parameters, c: 0.25 },
+}));
+const responses = simulateResponses(items, simulateThetas(2000, random), random);
+const fixedParameters = Object.fromEntries(responses.itemIds.map((id) => [id, { c: 0.25 }]));
+const { calibration, covariance } = calibrateWithCovariance(responses, {
+  model: threeParameterLogistic,
+  fixedParameters,
+  standardErrors: "hessian",
+});
+calibration.items[0]; // parameters { a: 0.93, b: -0.27, c: 0.25, d: 1 }, standardErrors { a: 0.13, b: 0.079 }
+covariance?.parameters.length; // 16: a and b of each item
+```
+
+| What                                      | A held parameter                                                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Its value                                 | Exactly the one given, in `parameters`                                                              |
+| Standard errors                           | None in the item's `standardErrors`; the information and its inverse hold the estimated parameters  |
+| Covariance                                | Not listed                                                                                          |
+| AIC, BIC                                  | Not counted: p counts the estimated parameters                                                      |
+| Priors                                    | None: `itemPriors` of a held parameter throws, and `priors` apply to the items that estimate it     |
+| `limitedInformationFit`, `summedScoreFit` | Pass the same `fixedParameters`, so that Δ and the degrees of freedom count only what was estimated |
+
+A held lower asymptote is the practice where the number of options sets the guessing level; a beta prior narrow
+enough to hold it gives nearly the same estimates, a little off the value. The items must be estimated, not in
+`fixed`; each must keep one parameter free, have the parameters named, and not share them among items, as RSM items
+share a and the steps; and the item with its held values must be valid for its model, so a held c needs c < d. Each of
+these cases throws `DataError`. Held parameters do not fix the scale: an estimated distribution of theta still needs
+items in `fixed` or a standard normal group.
 
 ### Quadrature
 

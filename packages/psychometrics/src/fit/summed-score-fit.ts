@@ -1,15 +1,38 @@
-import { chiSquareUpperTail, DataError } from "@measurekit/core";
+import { checkOptions, chiSquareUpperTail, DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { type IrtItem, itemTrace, quadratureRule, summedScoreLikelihoods } from "../irt/internal.js";
+import {
+  type FixedParameters,
+  type IrtItem,
+  itemTrace,
+  quadratureRule,
+  summedScoreLikelihoods,
+} from "../irt/internal.js";
 
 import { collapseCells } from "./collapse.js";
-import { checkItems } from "./inputs.js";
+import { checkItems, estimatedEntries } from "./inputs.js";
 
 /**
  * The highest total score of the items that S-X² takes. For each item it sums the scores of the other items at each
  * node, which costs the items times the square of the total score: 300 dichotomous items take 2 to 3 s.
  */
 const MAX_TOTAL_SCORE = 300;
+
+/** Options of {@link summedScoreFit}: what the items' calibration did not estimate. */
+export interface SummedScoreFitOptions {
+  /**
+   * The ids of the calibration's anchors, whose degrees of freedom count no parameter.
+   *
+   * @defaultValue none
+   */
+  readonly fixed?: readonly string[];
+  /**
+   * The parameters the calibration held at their values, as the option of `calibrate` of that name, which the degrees
+   * of freedom do not count; only their names are read.
+   *
+   * @defaultValue none
+   */
+  readonly fixedParameters?: FixedParameters;
+}
 
 /** The S-X² fit of one item. */
 export interface SummedScoreFit {
@@ -31,20 +54,29 @@ export interface SummedScoreFit {
  * The persons are grouped by total score, from 1 to the highest score less 1; for each group and category of an item,
  * the observed count of persons is compared with the count the model expects, integrating over theta ~ N(0, 1) with 61
  * rectangular points and the Lord-Wingersky recursion for the total score of the other items. Cells are collapsed as
- * mirt collapses them, to expected counts of at least 1. The degrees of freedom count every parameter of the item's
- * model as estimated. Uses the persons who answered every item.
+ * mirt collapses them, to expected counts of at least 1. The degrees of freedom subtract the item's estimated
+ * parameters, as mirt's: every parameter of its model, none of an anchor's in `fixed`, and not those `fixedParameters`
+ * holds. Uses the persons who answered every item.
  *
  * @param matrix - The responses of the persons.
  * @param items - The calibrated items, in the order of the matrix's items.
+ * @param options - The anchors and the held parameters of the items' calibration.
  * @returns For each item, the S-X² statistic with its degrees of freedom and probability; `null` where the statistic is
  *   undefined.
  * @throws `DataError` when the matrix or the items are invalid, a response is not a category of its item, the items'
- * highest total score is above 300, or no person answered every item.
+ * highest total score is above 300, no person answered every item, or the options are invalid for the items.
  * @see {@link https://doi.org/10.1177/01466216000241003 | Orlando and Thissen (2000)}
  * @see {@link https://doi.org/10.1111/j.1745-3984.2008.00071.x | Kang and Chen (2008)}
  */
-export function summedScoreFit(matrix: ResponseMatrix, items: readonly IrtItem[]): SummedScoreFit[] {
+export function summedScoreFit(
+  matrix: ResponseMatrix,
+  items: readonly IrtItem[],
+  options: SummedScoreFitOptions = {},
+): SummedScoreFit[] {
+  checkOptions(options);
+  const { fixed = [], fixedParameters = {} } = options;
   checkItems(matrix, items);
+  const estimated = estimatedEntries(items, matrix.itemIds, fixed, fixedParameters);
   const complete = matrix.responses.filter((row) => !row.includes(null));
   if (complete.length === 0) throw new DataError("S-X² needs at least one person who answered every item.");
   const counts = items.map((item) => item.model.categoryCount(item.parameters));
@@ -62,7 +94,7 @@ export function summedScoreFit(matrix: ResponseMatrix, items: readonly IrtItem[]
   const persons = new Float64Array(maxScore + 1);
   for (const total of totals) persons[total] = (persons[total] ?? 0) + 1;
 
-  return items.map((item, i) => {
+  return items.map((_, i) => {
     const categories = counts[i] ?? 0;
     const rest = summedScoreLikelihoods(traces, counts, i, nodes.length);
     const trace = traces[i] ?? new Float64Array(0);
@@ -88,7 +120,8 @@ export function summedScoreFit(matrix: ResponseMatrix, items: readonly IrtItem[]
       const response = row[i] ?? 0;
       if (cells !== undefined) cells[response] = (cells[response] ?? 0) + 1;
     });
-    return { id: matrix.itemIds[i] ?? "", ...statistic(observed, expected, item.model.parameters(categories).length) };
+    const parameterCount = (estimated[i] ?? []).filter(Boolean).length;
+    return { id: matrix.itemIds[i] ?? "", ...statistic(observed, expected, parameterCount) };
   });
 }
 

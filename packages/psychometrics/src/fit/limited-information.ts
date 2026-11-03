@@ -14,6 +14,7 @@ import type { ResponseMatrix } from "../data/internal.js";
 import {
   type Calibration,
   checkThetaDistribution,
+  type FixedParameters,
   type IrtItem,
   type IrtModel,
   itemTrace,
@@ -36,7 +37,7 @@ import {
   sampleMoments,
   tableMoments,
 } from "../math/internal.js";
-import { checkItems } from "./inputs.js";
+import { checkItems, estimatedEntries } from "./inputs.js";
 
 /** Options of {@link limitedInformationFit}. */
 export interface LimitedInformationOptions {
@@ -54,6 +55,13 @@ export interface LimitedInformationOptions {
    * @defaultValue none
    */
   readonly fixed?: readonly string[];
+  /**
+   * The parameters the calibration held at their values, as the option of `calibrate` of that name, which add no
+   * parameters; only their names are read. Checked with the anchors against the calibration's AIC.
+   *
+   * @defaultValue none
+   */
+  readonly fixedParameters?: FixedParameters;
   /**
    * The level of the RMSEA interval.
    *
@@ -105,13 +113,14 @@ const MAX_MOMENTS = (MAX_MOMENT_ITEMS * (MAX_MOMENT_ITEMS + 1)) / 2;
  * The statistic is N e′ (Ξ⁻¹ - Ξ⁻¹ Δ (Δ′ Ξ⁻¹ Δ)⁻¹ Δ′ Ξ⁻¹) e, for e the first- and second-order residuals, Ξ their
  * covariance matrix and Δ their Jacobian. It integrates over the nodes and weights of the calibration's group, so it
  * takes one group of a normal distribution, and no covariates or testlets. Δ has a column per estimated parameter: the
- * parameter a model shares among items has one column, an anchor has none, and an estimated normal distribution has the
- * columns of its mean and standard deviation. Those parameters must equal the count in the calibration's AIC. The
+ * parameter a model shares among items has one column, an anchor and a held parameter have none, and an estimated
+ * normal distribution has the columns of its mean and standard deviation. Those parameters must equal the count in the
+ * calibration's AIC. The
  * degrees of freedom are the moments less the rank of Δ, which is the number of parameters unless the margins leave
  * some unidentified; the statistic then uses the whole complement of Δ's span.
  *
- * A `Calibration` does not record its anchors, and the check of the AIC catches a list of the wrong size, not a list of
- * the right size that swaps anchors for estimated items of the same model, which gives a wrong Δ.
+ * A `Calibration` does not record its anchors or its held parameters, and the check of the AIC catches lists of the
+ * wrong size, not lists of the right size that swap anchors or held parameters for estimated ones, which give a wrong Δ.
  *
  * The independence model holds each item at its observed shares, without a trait. Its statistic is N Σ_(i<j) r_ij², on
  * J (J - 1) / 2 degrees of freedom. TLI = (χ²₀/df₀ - χ²/df) / (χ²₀/df₀ - 1) and CFI = 1 - (χ² - df) / (χ²₀ - df₀).
@@ -120,7 +129,7 @@ const MAX_MOMENTS = (MAX_MOMENT_ITEMS * (MAX_MOMENT_ITEMS + 1)) / 2;
  *
  * @param matrix - The responses of the persons.
  * @param calibration - The calibration of the matrix's items, in its order, on one group.
- * @param options - The statistic, the anchors and the level of the interval.
+ * @param options - The statistic, the anchors, the held parameters and the level of the interval.
  * @returns The statistic, its degrees of freedom and significance, and the fit indices, each `null` where undefined.
  * @throws `DataError` when the matrix, the calibration or an option is invalid, a response is not a category of its
  * item, fewer than two persons answered every item, there are more than 60 items or, with C2, more than 1,830 moments,
@@ -135,13 +144,17 @@ export function limitedInformationFit<TParameters>(
   options: LimitedInformationOptions = {},
 ): LimitedInformationFit {
   checkOptions(options);
-  const { statistic = "m2-star", fixed = [], level = DEFAULT_LEVEL } = options;
+  const { statistic = "m2-star", fixed = [], fixedParameters = {}, level = DEFAULT_LEVEL } = options;
   checkChoice(statistic, "The option statistic", STATISTICS);
   checkOpenUnitInterval(level, "The option level");
   const { items, group } = checkCalibration(matrix, calibration);
   checkStatistic(items, statistic);
   checkMoments(items, statistic);
-  const columns = parameterColumns(items, checkFixed(fixed, matrix.itemIds), group.normal);
+  const columns = parameterColumns(
+    items,
+    estimatedEntries(items, matrix.itemIds, fixed, fixedParameters),
+    group.normal,
+  );
   checkParameterCount(calibration, columns.count);
   const complete = matrix.responses.filter((row) => !row.includes(null));
   if (complete.length < 2) {
@@ -270,25 +283,9 @@ function checkMoments(items: readonly IrtItem[], statistic: Statistic): void {
   }
 }
 
-/**
- * Returns the indices of the anchors.
- *
- * @throws `DataError` when `fixed` is not an array of item ids.
- */
-function checkFixed(fixed: readonly string[], itemIds: readonly string[]): ReadonlySet<number> {
-  checkArray(fixed, "The option fixed must be an array of item ids");
-  return new Set(
-    fixed.map((id) => {
-      const index = itemIds.indexOf(id);
-      if (index < 0) throw new DataError(`The option fixed names ${describe(id)}, which is not an item id.`);
-      return index;
-    }),
-  );
-}
-
 /** Where each estimated parameter goes in Δ. */
 interface ParameterColumns {
-  /** The column of each entry of each item's parameter vector; empty for an anchor. */
+  /** The column of each entry of each item's parameter vector; {@link NOT_ESTIMATED} for an anchor's and a held one. */
   readonly ofItems: readonly Int32Array[];
   /** The columns of the mean and the standard deviation of an estimated normal distribution, the last two; -1 otherwise. */
   readonly mean: number;
@@ -297,16 +294,24 @@ interface ParameterColumns {
   readonly count: number;
 }
 
+/** The column of an entry that the calibration did not estimate. */
+const NOT_ESTIMATED = -1;
+
 /** Assigns the columns of Δ, as calibration assigns its free parameters: one for what the items of a model share. */
-function parameterColumns(items: readonly IrtItem[], fixed: ReadonlySet<number>, normal: boolean): ParameterColumns {
+function parameterColumns(
+  items: readonly IrtItem[],
+  estimated: readonly (readonly boolean[])[],
+  normal: boolean,
+): ParameterColumns {
   const sharing = new Map<IrtModel, Map<string, number>>();
   let count = 0;
   const ofItems = items.map((item, index) => {
-    if (fixed.has(index)) return new Int32Array(0);
     const { model, parameters } = item;
     const shared = sharing.get(model) ?? new Map<string, number>();
     sharing.set(model, shared);
-    return Int32Array.from(model.parameters(model.categoryCount(parameters)), ({ name, shared: common }) => {
+    const flags = estimated[index] ?? [];
+    return Int32Array.from(model.parameters(model.categoryCount(parameters)), ({ name, shared: common }, entry) => {
+      if (flags[entry] !== true) return NOT_ESTIMATED;
       const existing = common === true ? shared.get(name) : undefined;
       if (existing !== undefined) return existing;
       if (common === true) shared.set(name, count);
@@ -327,7 +332,7 @@ function checkParameterCount<TParameters>({ aic, logLikelihood }: Calibration<TP
   const counted = Math.round((aic + 2 * logLikelihood) / 2);
   if (counted !== count) {
     throw new DataError(
-      `The calibration estimated ${counted} parameters, but these items have ${count}; give the anchors' ids in the option fixed.`,
+      `The calibration estimated ${counted} parameters, but these items have ${count}; give the anchors' ids in the option fixed and the held parameters in the option fixedParameters.`,
     );
   }
 }
@@ -436,6 +441,7 @@ function jacobian(
     const count = item.model.categoryCount(item.parameters);
     const derivatives = categoryDerivatives(item, count, nodes);
     columns.ofItems[i]?.forEach((column, entry) => {
+      if (column === NOT_ESTIMATED) return;
       const entries = columns.ofItems[i]?.length ?? 0;
       const share = (k: number): number => categoryDerivative(derivatives, weights, count, entries, k, entry);
       if (statistic === "c2") {

@@ -2,6 +2,7 @@ import { checkRecord, DataError } from "@measurekit/core";
 import type { Quadrature } from "../math/internal.js";
 import type { CalibrationOptions } from "./calibration-options.js";
 import type { ExpectationItem } from "./expectation.js";
+import { checkHeldParameters, readFixedParameters } from "./fixed-parameters.js";
 import { checkFixedCategories, checkFixedIds, checkItem, checkModel, modelsOf } from "./items.js";
 import { type Population, population } from "./latent.js";
 import type { IrtModel, ModelParameter } from "./model.js";
@@ -26,9 +27,14 @@ export interface ItemState<TParameters> extends ExpectationItem {
   readonly names: readonly string[];
   /** The parameter vector of an estimated item; empty for a fixed item. */
   readonly vector: Float64Array;
-  /** The index of the free parameter behind each vector entry. */
+  /** The index of the free parameter behind each vector entry, or {@link HELD} for an entry held at its value. */
   readonly slots: Int32Array;
+  /** The vector entries that a free parameter stands behind, in vector order: none of a fixed item's. */
+  readonly freeEntries: Int32Array;
 }
+
+/** The slot of a vector entry that `fixedParameters` holds at its value: no free parameter stands behind it. */
+const HELD = -1;
 
 /**
  * The items and the free parameters of a calibration: the items' parameters, then the means and standard deviations
@@ -73,12 +79,13 @@ export function setUp<TParameters>(
   const models = modelsOf(options.model, itemIds.length, (each) =>
     checkModel(each, "The option model must be an IRT model such as twoParameterLogistic"),
   );
-  const { fixed = {}, priors = {}, itemPriors = {} } = options;
+  const { fixed = {}, priors = {}, itemPriors = {}, fixedParameters = {} } = options;
   checkRecord(fixed, "The option fixed must be an object of item parameters by item id");
   checkRecord(priors, "The option priors must be an object of priors by parameter name");
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);
   checkFixedIds(Object.keys(fixed), itemIds);
   const priorsOfItem = itemPriorMap(itemPriors, itemIds, fixed);
+  const heldOfItem = readFixedParameters(fixedParameters, itemIds, new Set(Object.keys(fixed)));
   const free: FreeParameter[] = [];
   const values: number[] = [];
   const addFree = (lower: number, start: number): number => {
@@ -102,23 +109,33 @@ export function setUp<TParameters>(
     const specifications = model.parameters(categoryCount);
     const shared = sharedSlots(sharing, model, { id, categoryCount, specifications });
     const own = priorsOfItem.get(id);
-    const slots = Int32Array.from(
-      specifications,
-      ({ name, lower = Number.NEGATIVE_INFINITY, upper = Number.POSITIVE_INFINITY, shared: common }, p) => {
-        if (common === true && own?.has(name) === true) {
-          throw new DataError(
-            `A prior is given for "${name}" of item "${id}", whose model shares it among items; use the option priors.`,
-          );
-        }
-        const existing = common === true ? shared.get(name) : undefined;
-        if (existing !== undefined) return existing;
-        free.push({ lower, upper, prior: own?.get(name) ?? priors[name] });
-        values.push(start[p] ?? 0);
-        if (common === true) shared.set(name, values.length - 1);
-        return values.length - 1;
-      },
+    const held = heldOfItem.get(id);
+    checkHeldItem(id, model.name, specifications, held, own);
+    const freeSlot = (
+      { name, lower = Number.NEGATIVE_INFINITY, upper = Number.POSITIVE_INFINITY, shared: common }: ModelParameter,
+      p: number,
+    ): number => {
+      if (common === true && own?.has(name) === true) {
+        throw new DataError(
+          `A prior is given for "${name}" of item "${id}", whose model shares it among items; use the option priors.`,
+        );
+      }
+      const existing = common === true ? shared.get(name) : undefined;
+      if (existing !== undefined) return existing;
+      free.push({ lower, upper, prior: own?.get(name) ?? priors[name] });
+      values.push(start[p] ?? 0);
+      if (common === true) shared.set(name, values.length - 1);
+      return values.length - 1;
+    };
+    const slots = Int32Array.from(specifications, (specification, p) =>
+      held?.has(specification.name) === true ? HELD : freeSlot(specification, p),
     );
-    const vector = Float64Array.from(slots, (slot) => values[slot] ?? 0);
+    const vector = Float64Array.from(slots, (slot, p) =>
+      slot === HELD ? (held?.get(specifications[p]?.name ?? "") ?? 0) : (values[slot] ?? 0),
+    );
+    if (held !== undefined) {
+      checkItem({ model, parameters: model.fromVector(vector) }, `Item "${id}" with its held parameters`);
+    }
     return {
       id,
       model,
@@ -130,9 +147,10 @@ export function setUp<TParameters>(
       names: specifications.map(({ name }) => name),
       vector,
       slots,
+      freeEntries: Int32Array.from(slots.keys()).filter((p) => slots[p] !== HELD),
     };
   });
-  const estimatedNames = new Set(items.flatMap((item) => item.names));
+  const estimatedNames = new Set(items.flatMap((item) => Array.from(item.freeEntries, (p) => item.names[p])));
   for (const name of Object.keys(priors)) {
     if (!estimatedNames.has(name)) throw new DataError(`A prior is given for "${name}", which no estimated item has.`);
   }
@@ -167,6 +185,27 @@ function itemPriorMap(
       return [id, new Map(Object.entries(byName))];
     }),
   );
+}
+
+/**
+ * Checks the parameters `fixedParameters` holds of an item against its model and its priors.
+ *
+ * @throws `DataError` when the model lacks or shares a held parameter, every parameter is held, or one has a prior.
+ */
+function checkHeldItem(
+  id: string,
+  modelName: string,
+  specifications: readonly ModelParameter[],
+  held: ReadonlyMap<string, number> | undefined,
+  own: ReadonlyMap<string, ParameterPrior> | undefined,
+): void {
+  if (held === undefined) return;
+  checkHeldParameters(id, modelName, specifications, held);
+  for (const name of held.keys()) {
+    if (own?.has(name) === true) {
+      throw new DataError(`A prior is given for "${name}" of item "${id}", which the option fixedParameters holds.`);
+    }
+  }
 }
 
 /**
@@ -260,5 +299,6 @@ function fixedItem<TParameters>(
     names: [],
     vector: new Float64Array(0),
     slots: new Int32Array(0),
+    freeEntries: new Int32Array(0),
   };
 }

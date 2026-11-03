@@ -5,7 +5,9 @@
 # - mirt's dP for gpcm items has a wrong derivative with respect to the slope, so its M2 and C2 of the GPCM and the PCM
 #   with estimated slopes are not the statistic: the script checks both this and its own derivative by central differences;
 # - for M2* on polytomous items, mirt's Δ of the independence model has rank J below its columns, and the columns of Q
-#   that M2 takes are then an arbitrary part of the complement: its statistic changes with the order of the items.
+#   that M2 takes are then an arbitrary part of the complement: its statistic changes with the order of the items;
+# - mirt's M2 of 3PL items whose lower asymptote est = FALSE holds is not the statistic that the written-out form gives,
+#   which reproduces mirt's 2PL.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages(library(mirt))
@@ -348,6 +350,71 @@ rejections <- lapply(seq_len(SETS), function(set) {
   list(responses = apply(data, 1, paste, collapse = ""), statistic = M2(fit, quadpts = POINTS, calcNull = FALSE)$M2)
 })
 
+# --- Held parameters ----------------------------------------------------------------------------------------------
+# Eight 3PL items with the lower asymptote held at 1/4 or 1/5, three 2PL items, and a 2PL item with its slope held at 1,
+# as mirt's est = FALSE; Δ has a column for each estimated parameter only.
+
+# The statistic of logistic items written out, items by rows of a, b and c; `slopes` says which slopes are estimated.
+# dP/da = (1 - c) L (1 - L) (θ - b) and dP/db = -(1 - c) L (1 - L) a, for L the logistic of a (θ - b).
+logistic_written <- function(items, data, slopes) {
+  probabilities <- lapply(seq_len(nrow(items)), function(j) {
+    p <- items[j, "c"] + (1 - items[j, "c"]) * plogis(items[j, "a"] * (THETA - items[j, "b"]))
+    cbind(1 - p, p)
+  })
+  weights <- normal_weights(0, 1)
+  rows <- statistic_rows(rep(2, nrow(items)), "M2*")
+  moments <- model_moments(rows, probabilities, weights)
+  columns <- lapply(seq_len(nrow(items)), function(j) {
+    logistic <- plogis(items[j, "a"] * (THETA - items[j, "b"]))
+    slope <- (1 - items[j, "c"]) * logistic * (1 - logistic)
+    location <- cbind(slope * items[j, "a"], -slope * items[j, "a"])
+    b <- item_column(rows, probabilities, weights, j, location)
+    if (!slopes[j]) return(b)
+    a <- item_column(rows, probabilities, weights, j, cbind(-slope, slope) * (THETA - items[j, "b"]))
+    cbind(a, b)
+  })
+  quadratic_form(observed_moments(rows, data) - moments$expected, moments$covariance, do.call(cbind, columns),
+                 nrow(data))
+}
+
+two_pl_items <- coef(two_pl, IRTpars = TRUE, simplify = TRUE)$items
+stopifnot(abs(logistic_written(cbind(two_pl_items[, c("a", "b")], c = 0), binary, rep(TRUE, ITEMS)) -
+                m2_of(two_pl)$statistic) < 1e-5)
+
+set.seed(20261104)
+held_guessing <- c(rep(0.25, 6), rep(0.2, 2), rep(0, 4))
+held_slopes <- round(rlnorm(ITEMS, 0.1, 0.25), 2)
+held_slopes[ITEMS] <- 1
+held_locations <- round(rnorm(ITEMS, 0, 0.8), 2)
+held_theta <- rnorm(PERSONS)
+held_probabilities <- sapply(seq_len(ITEMS), function(j) {
+  held_guessing[j] + (1 - held_guessing[j]) * plogis(held_slopes[j] * (held_theta - held_locations[j]))
+})
+held_data <- (matrix(runif(PERSONS * ITEMS), PERSONS) < held_probabilities) * 1
+colnames(held_data) <- colnames(binary)
+held_types <- c(rep("3PL", 8), rep("2PL", 4))
+held_values <- mirt(held_data, 1, itemtype = held_types, pars = "values")
+for (j in 1:8) {
+  rows <- held_values$item == colnames(held_data)[j] & held_values$name == "g"
+  held_values$value[rows] <- held_guessing[j]
+  held_values$est[rows] <- FALSE
+}
+held_values$value[held_values$item == colnames(held_data)[ITEMS] & held_values$name == "a1"] <- 1
+held_values$est[held_values$item == colnames(held_data)[ITEMS] & held_values$name == "a1"] <- FALSE
+held_fit <- fit_mirt(held_data, 1, held_types, pars = held_values)
+held_items <- coef(held_fit, IRTpars = TRUE, simplify = TRUE)$items
+colnames(held_items)[colnames(held_items) == "g"] <- "c"
+held_m2 <- m2_of(held_fit)
+held_written <- logistic_written(held_items, held_data, seq_len(ITEMS) != ITEMS)
+held_case <- list(
+  responses = unname(lapply(seq_len(PERSONS), function(i) as.numeric(held_data[i, ]))),
+  models = I(c(rep("3pl", 8), rep("2pl", 4))),
+  fixedParameters = c(setNames(lapply(held_guessing[1:8], function(g) list(c = g)), colnames(held_data)[1:8]),
+                      setNames(list(list(a = 1)), colnames(held_data)[ITEMS])),
+  mirtStatistic = held_m2$statistic,
+  expected = with_statistic(held_m2, held_written, independence(held_data), PERSONS)
+)
+
 write_fixture("fit-limited-information", list(
   source = "mirt::M2(quadpts = 61) on calibrations at TOL = 1e-8; written out in base R where the script says.",
   binary = list(responses = unname(lapply(seq_len(PERSONS), function(i) as.numeric(binary[i, ]))),
@@ -355,7 +422,8 @@ write_fixture("fit-limited-information", list(
   polytomous = list(responses = unname(lapply(seq_len(POLYTOMOUS_PERSONS), function(i) as.numeric(graded_data[i, ]))),
                     cases = polytomous_cases),
   level = list(level = 0.95, expected = m2_of(one_pl, CI = 0.95)),
-  rejections = list(sets = rejections, alpha = 0.05, degreesOfFreedom = 54)
+  rejections = list(sets = rejections, alpha = 0.05, degreesOfFreedom = 54),
+  held = held_case
 ))
 
 # --- The noncentral chi-square ------------------------------------------------------------------------------------

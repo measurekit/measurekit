@@ -31,7 +31,7 @@ export {
   calibrateWithCovariance,
   type ParameterCovariance,
 } from "./calibration.js";
-export type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
+export type { CalibrationOptions, FixedParameters, StandardErrorMethod } from "./calibration-options.js";
 export {
   type ConditionalCalibration,
   type ConditionalCalibrationOptions,

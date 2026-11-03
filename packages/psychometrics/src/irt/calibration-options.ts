@@ -10,6 +10,12 @@ import type { QuadratureOptions } from "./quadrature.js";
  */
 export type StandardErrorMethod = "none" | "hessian" | "cross-product";
 
+/**
+ * Values of single parameters of estimated items, by item id, then the name of the entry in the item's parameter vector,
+ * such as `{ q7: { c: 0.25 } }`: each is held at its value while the item's other parameters are estimated.
+ */
+export type FixedParameters = Readonly<Record<string, Readonly<Record<string, number>>>>;
+
 /** Options of {@link calibrate}. */
 export interface CalibrationOptions<TParameters> {
   /**
@@ -23,6 +29,16 @@ export interface CalibrationOptions<TParameters> {
    * @defaultValue none: every item is estimated
    */
   readonly fixed?: Readonly<Record<string, TParameters>>;
+  /**
+   * Values of single parameters of estimated items, by item id, then parameter name, such as `{ q7: { c: 0.25 } }` for
+   * a 3PL item whose lower asymptote is held at 1/4 while its `a` and `b` are estimated, as mirt's `est = FALSE` on one
+   * parameter. A held parameter has no standard error, no prior and no place in the covariance, and the AIC and BIC
+   * do not count it. The items must be estimated, keep at least one parameter free, and the parameters must be ones
+   * their model does not share among items.
+   *
+   * @defaultValue none: every parameter of an estimated item is estimated
+   */
+  readonly fixedParameters?: FixedParameters;
   /**
    * Priors by parameter name, such as `{ c: betaPrior(5, 17) }`, applied to that parameter of every estimated item
    * whose model has it.

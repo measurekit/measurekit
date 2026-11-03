@@ -51,6 +51,7 @@ import raschTests from "./fixtures/fit-rasch-tests.json" with { type: "json" };
 import residuals from "./fixtures/fit-residuals.json" with { type: "json" };
 import rmsd from "./fixtures/fit-rmsd.json" with { type: "json" };
 import summedScore from "./fixtures/fit-summed-score.json" with { type: "json" };
+import fixedParameters from "./fixtures/irt-fixed-parameters.json" with { type: "json" };
 
 // Tolerances against R, explained in docs/validation.md.
 /** Every fit statistic against eRm and mirt, from the same items and thetas. */
@@ -101,6 +102,13 @@ function simulated(seed: number, persons: number, itemCount: number): { matrix: 
   });
   return { matrix: simulateResponses(items, simulateThetas(persons, random), random), items };
 }
+
+/** The responses of the calibration with held parameters, and its items as mirt estimated them. */
+const heldMatrix = responseMatrix(fixedParameters.responses, { itemIds: fixedParameters.itemIds });
+const heldItems: IrtItem[] = fixedParameters.models.map((name, i) => ({
+  model: defined(MODELS[name]),
+  parameters: defined(fixedParameters.calibrations[0]?.items[i]).parameters,
+}));
 
 /** Returns the numbers and nulls of a result, depth first. */
 function numbers(value: unknown): (number | null)[] {
@@ -482,6 +490,40 @@ describe("summedScoreFit", () => {
     });
   }
 
+  it("matches mirt's S-X² of items with held parameters, counting the estimated ones", () => {
+    const result = summedScoreFit(heldMatrix, heldItems, { fixedParameters: fixedParameters.fixedParameters });
+    expectTable(result, fixedParameters.summedScore, FIT_TOLERANCE, "held parameters");
+    expect(result.map((item) => item.degreesOfFreedom)).toEqual(fixedParameters.summedScore.degreesOfFreedom);
+  });
+
+  it("counts every parameter of an item by default and none of an anchor", () => {
+    const counted = summedScoreFit(heldMatrix, heldItems);
+    const held = summedScoreFit(heldMatrix, heldItems, { fixedParameters: fixedParameters.fixedParameters });
+    const anchored = summedScoreFit(heldMatrix, heldItems, { fixed: ["item1", "item12"] });
+    expect(held.map((item, i) => item.degreesOfFreedom - defined(counted[i]).degreesOfFreedom)).toEqual([
+      1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1,
+    ]);
+    expect(anchored.map((item, i) => item.degreesOfFreedom - defined(counted[i]).degreesOfFreedom)).toEqual([
+      3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+    ]);
+  });
+
+  it("rejects anchors and held parameters that are not the items'", () => {
+    expect(() => summedScoreFit(heldMatrix, heldItems, { fixed: ["q1"] })).toThrow(
+      'The option fixed names "q1", which is not an item id.',
+    );
+    expect(() => summedScoreFit(heldMatrix, heldItems, { fixedParameters: { item9: { c: 0 } } })).toThrow(
+      'The option fixedParameters holds "c" of item "item9", whose 2PL model has a, b.',
+    );
+    expect(() =>
+      summedScoreFit(heldMatrix, heldItems, { fixed: ["item1"], fixedParameters: { item1: { c: 0.25 } } }),
+    ).toThrow('The option fixedParameters holds parameters of item "item1", which the option fixed holds whole.');
+    expect(() => summedScoreFit(heldMatrix, heldItems, JSON.parse("null"))).toThrow("The options must be an object");
+    expect(() => summedScoreFit(heldMatrix, heldItems, JSON.parse('{ "fixed": "item1" }'))).toThrow(
+      "The option fixed must be an array of item ids",
+    );
+  });
+
   it("uses the persons who answered every item", () => {
     const { matrix, items: pool } = simulated(5, 300, 8);
     const withMissing = responseMatrix([...matrix.responses, [null, 1, 0, 1, 0, 1, 0, 1]]);
@@ -636,6 +678,23 @@ describe("limitedInformationFit", () => {
       expectLimitedFit(result, expected, name);
     });
   }
+
+  it("matches the M2* written out for a calibration with held parameters, which add no columns to Δ", () => {
+    const { held } = limited;
+    const matrix = responseMatrix(held.responses);
+    const calibration = calibrate(matrix, {
+      model: held.models.map((name) => defined(MODELS[name])),
+      fixedParameters: held.fixedParameters,
+      tolerance: LIMITED_EM_TOLERANCE,
+      maxIterations: 100_000,
+    });
+    const result = limitedInformationFit(matrix, calibration, { fixedParameters: held.fixedParameters });
+    expectLimitedFit(result, held.expected, "held parameters");
+    expect(held.mirtStatistic).toBeLessThan(defined(result.statistic));
+    expect(() => limitedInformationFit(matrix, calibration)).toThrow(
+      "The calibration estimated 23 parameters, but these items have 32; give the anchors' ids in the option fixed and the held parameters in the option fixedParameters.",
+    );
+  });
 
   it("gives 54 degrees of freedom to the 2PL and 65 to the 1PL on 12 items", () => {
     expect(limitedInformationFit(binary, twoParameter).degreesOfFreedom).toBe(54);

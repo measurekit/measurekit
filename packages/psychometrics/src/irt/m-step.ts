@@ -57,7 +57,7 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
       values[j] = fromUnbounded(eta[l] ?? 0, lower, upper);
     }
     for (const item of block.items) {
-      for (let p = 0; p < item.slots.length; p++) item.vector[p] = values[item.slots[p] ?? 0] ?? 0;
+      for (const p of item.freeEntries) item.vector[p] = values[item.slots[p] ?? 0] ?? 0;
       item.parameters = item.model.fromVector(item.vector);
     }
     if (block.distributions) refreshWeights();
@@ -111,10 +111,12 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
     return value;
   };
 
-  /** Subtracts `weight` times category k's derivatives from the gradient at the item's slots. */
+  /** Subtracts `weight` times category k's derivatives from the gradient at the slots of the item's free entries. */
   const addGradient = (item: ItemState<TParameters>, k: number, weight: number): void => {
     const size = item.vector.length;
-    for (let i = 0; i < size; i++) {
+    const entries = item.freeEntries;
+    for (let e = 0; e < entries.length; e++) {
+      const i = entries[e] ?? 0;
       const slot = item.slots[i] ?? 0;
       gradient[slot] = (gradient[slot] ?? 0) - weight * (derivatives[k * size + i] ?? 0);
     }
@@ -129,10 +131,13 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
     blockSize: number,
   ): void => {
     const size = item.vector.length;
-    for (let i = 0; i < size; i++) {
+    const entries = item.freeEntries;
+    for (let e = 0; e < entries.length; e++) {
+      const i = entries[e] ?? 0;
       const row = (positions[item.slots[i] ?? 0] ?? 0) * blockSize;
       const scaled = weight * (derivatives[k * size + i] ?? 0);
-      for (let j = 0; j < size; j++) {
+      for (let f = 0; f < entries.length; f++) {
+        const j = entries[f] ?? 0;
         const index = row + (positions[item.slots[j] ?? 0] ?? 0);
         hessian[index] = (hessian[index] ?? 0) + scaled * (derivatives[k * size + j] ?? 0);
       }
@@ -245,6 +250,11 @@ export function unboundedScales(values: ArrayLike<number>, free: readonly FreePa
   });
 }
 
+/** Returns the free parameters behind an item's free entries. */
+function freeSlots<TParameters>(item: ItemState<TParameters>): Int32Array {
+  return item.freeEntries.map((p) => item.slots[p] ?? 0);
+}
+
 /**
  * Splits the estimated items into blocks the M-step can maximize separately: the items of a model with a shared
  * parameter form one block, every other item its own.
@@ -258,11 +268,11 @@ function blocksOf<TParameters>(items: readonly ItemState<TParameters>[]): Block<
       group.push(item);
       sharing.set(item.model, group);
     } else {
-      blocks.push({ items: [item], parameters: item.slots, distributions: false });
+      blocks.push({ items: [item], parameters: freeSlots(item), distributions: false });
     }
   }
   for (const group of sharing.values()) {
-    const parameters = new Set(group.flatMap((item) => [...item.slots]));
+    const parameters = new Set(group.flatMap((item) => [...freeSlots(item)]));
     blocks.push({ items: group, parameters: Int32Array.from(parameters), distributions: false });
   }
   return blocks;

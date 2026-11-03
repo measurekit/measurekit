@@ -17,13 +17,13 @@ import { type LinkedCalibrations, linkedCalibrations, MINIMUM_LINK_ANCHORS } fro
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 
 /**
- * Options of {@link lordChiSquare}: the calibration of each group, without fixed items, groups, distributions of theta,
- * covariates or the choice of standard errors, which the statistic needs, or person weights, which align with the
- * whole matrix while each group's calibration takes its own persons, and `purify`.
+ * Options of {@link lordChiSquare}: the calibration of each group, without fixed items or held parameters, groups,
+ * distributions of theta, covariates or the choice of standard errors, which the statistic needs, or person weights,
+ * which align with the whole matrix while each group's calibration takes its own persons, and `purify`.
  */
 export type LordOptions = Omit<
   CalibrationOptions<LogisticItem>,
-  "fixed" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
+  "fixed" | "fixedParameters" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
 > &
   PurificationOptions;
 

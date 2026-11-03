@@ -22,11 +22,12 @@ export {
   calibrateWithCovariance,
   type ParameterCovariance,
 } from "./calibration.js";
-export type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
+export type { CalibrationOptions, FixedParameters, StandardErrorMethod } from "./calibration-options.js";
 export { type Setup, setUp } from "./calibration-setup.js";
 export { type ConditionalCalibrationOptions, type ConditionalFit, conditionalFit } from "./conditional-likelihood.js";
 export { derivativeRatios } from "./cross-product.js";
 export { type ExpectationItem, type ExpectationStep, expectationStep } from "./expectation.js";
+export { checkHeldParameters, readFixedParameters } from "./fixed-parameters.js";
 export { gradedResponse } from "./graded.js";
 export { covarianceFromInformation } from "./hessian-covariance.js";
 export { conditionalStandardError } from "./information.js";
