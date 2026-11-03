@@ -564,10 +564,13 @@ if (selected("information")) {
            if (is.null(parameters$intercepts)) c(list(a = I(parameters$a), intercept = parameters$intercept, c = parameters$c, d = 1))
            else list(a = I(parameters$a), intercepts = I(parameters$intercepts))
          }),
-         thetas = lapply(thetas, I), matrices = matrices)
+         thetas = lapply(thetas, I), matrices = matrices,
+         # mirt's multidimensional discrimination and difficulty, one difficulty per boundary between categories.
+         discrimination = unname(MDISC(fit)),
+         difficulty = lapply(seq_len(items_count), function(i) I(unname(Filter(Negate(is.na), MDIFF(fit)[i, ])))))
   })
   write_fixture("multidimensional-information", list(
-    source = "Items set in mirt; information from the derivatives of the category probabilities in base R, checked against probtrace and iteminfo.",
+    source = "Items set in mirt; information from the derivatives of the category probabilities in base R, checked against probtrace and iteminfo; MDISC and MDIFF of mirt.",
     cases = cases
   ))
 }

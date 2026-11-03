@@ -18,6 +18,8 @@ import {
   type MultidimensionalLogisticParameters,
   type MultidimensionalModel,
   type MultidimensionalTestItem,
+  multidimensionalDifficulty,
+  multidimensionalDiscrimination,
   multidimensionalEstimates,
   multidimensionalGradedResponse,
   multidimensionalInformation,
@@ -3348,6 +3350,52 @@ describe("information", () => {
         [0, 0],
       ),
     ).toThrow("Item 1: An M2PL item needs finite slopes a");
+  });
+});
+
+describe("multidimensional discrimination and difficulty", () => {
+  for (const fixture of information.cases) {
+    it(`matches mirt's MDISC and MDIFF: ${fixture.model}`, () => {
+      const model = modelOf(fixture.model.replace(/3$/, ""));
+      fixture.items.forEach((parameters, i) => {
+        const item = { model, parameters: parametersOf(fixture.model.replace(/3$/, ""), parameters) };
+        expectClose(multidimensionalDiscrimination(item), defined(fixture.discrimination[i]), 1e-15, `MDISC ${i + 1}`);
+        const difficulty = multidimensionalDifficulty(item);
+        expect(difficulty).toHaveLength(defined(fixture.difficulty[i]).length);
+        difficulty.forEach((value, k) => {
+          expectClose(value, defined(fixture.difficulty[i]?.[k]), 1e-15, `MDIFF ${i + 1}, ${k + 1}`);
+        });
+      });
+    });
+  }
+
+  it("gives the slope and the difficulty of the one-dimensional model on one dimension", () => {
+    const item = { model: multidimensionalTwoParameterLogistic, parameters: { a: [-1.6], intercept: 0.8, c: 0, d: 1 } };
+    expect(multidimensionalDiscrimination(item)).toBe(1.6);
+    expect(multidimensionalDifficulty(item)).toEqual([-0.5]);
+  });
+
+  it("gives the discrimination of a model implemented outside the package, and needs a built-in one for difficulty", () => {
+    const custom = { ...multidimensionalTwoParameterLogistic, name: "Custom" };
+    const item = { model: custom, parameters: { a: [3, 4], intercept: 1, c: 0, d: 1 } };
+    expect(multidimensionalDiscrimination(item)).toBe(5);
+    expect(() => multidimensionalDifficulty(item)).toThrow(
+      'Only the built-in models have the intercepts of a multidimensional difficulty, found the "Custom" model.',
+    );
+  });
+
+  it("refuses the difficulty of an item without slopes, and items it cannot read", () => {
+    const flat = { model: multidimensionalGradedResponse, parameters: { a: [0, 0], intercepts: [1, -1] } };
+    expect(multidimensionalDiscrimination(flat)).toBe(0);
+    expect(() => multidimensionalDifficulty(flat)).toThrow(
+      "An item whose slopes are all 0 has no direction, and so no multidimensional difficulty.",
+    );
+    expect(() => multidimensionalDiscrimination(JSON.parse("null"))).toThrow(
+      "The item must be an item with a model and parameters, found null.",
+    );
+    expect(() =>
+      multidimensionalDifficulty({ model: multidimensionalTwoParameterLogistic, parameters: JSON.parse('{"a": "1"}') }),
+    ).toThrow("The item: An M2PL item needs finite slopes a");
   });
 });
 

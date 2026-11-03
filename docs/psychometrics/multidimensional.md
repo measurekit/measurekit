@@ -65,8 +65,11 @@ Valid input: the slopes are finite numbers of any sign, one or more; the interce
 1 and `d` is 1; the graded intercepts strictly decrease; thetas are finite. All items of a test have the same number of
 dimensions, and the slopes of a dimension an item does not load on are 0.
 
-The multidimensional discrimination of an item is MDISC = √(Σ a_d²), and its multidimensional difficulty, for a
-dichotomous item, MDIFF = -intercept / MDISC.
+`multidimensionalDiscrimination(item)` returns an item's multidimensional discrimination, MDISC = √(Σ a_d²), its
+largest slope in any direction of the dimensions, and `multidimensionalDifficulty(item)` its multidimensional difficulty
+at each boundary between its categories, MDIFF = -intercept / MDISC, the signed distance from the origin to its
+steepest point along the direction of its slopes: one value for a dichotomous item, one per intercept for a graded one,
+as mirt's `MDISC` and `MDIFF` (Reckase, 2009). MDISC takes an item of any model, MDIFF one of the built-in models.
 
 A model implemented outside the package works as the built-in ones do if it has the members of
 `MultidimensionalModel`. The first `dimensions` entries of its parameter vector are the slopes, `parameterDerivatives`

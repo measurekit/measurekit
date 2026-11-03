@@ -16,6 +16,7 @@ export {
   type MultidimensionalGroup,
 } from "./calibration.js";
 export type { CalibrationMethod, MultidimensionalCalibrationOptions } from "./calibration-options.js";
+export { multidimensionalDifficulty, multidimensionalDiscrimination } from "./direction.js";
 export { type MultidimensionalGradedParameters, multidimensionalGradedResponse } from "./graded.js";
 export { multidimensionalInformation } from "./information.js";
 export {

@@ -109,6 +109,7 @@ each case (0.441 and 0.135 at worst).
 | EAP theta and standard error                                       | `fscores(method = "EAP", QMC = FALSE)`, rectangular nodes from -6 to 6 on the prior                                                                   |
 | MAP theta; standard error                                          | `fscores(method = "MAP")`; the standard error from base R: the inverse of the information matrices plus the precision of the prior                    |
 | Information matrices                                               | Base R: the sum over categories of the outer products of the derivatives of the probabilities written out, checked against `probtrace` and `iteminfo` |
+| MDISC and MDIFF                                                    | mirt's `MDISC` and `MDIFF` of the items set in mirt                                                                                                   |
 | mirt's slope-intercept coefficients of items on 2 and 3 dimensions | `coef(simplify = TRUE)` and `probtrace` of the same items                                                                                             |
 
 | Dimensionality quantity                                                                                   | Reference                                                                                                                                                                                                                                |
@@ -1430,6 +1431,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Multidimensional MAP theta                                                                        | 1e-5 absolute                                                   | 5.2e-6                   |
 | Multidimensional MAP standard error                                                               | 1e-4 absolute                                                   | 1.4e-5                   |
 | Multidimensional information matrices                                                             | 1e-12 absolute                                                  | 2.8e-16                  |
+| Multidimensional discrimination and difficulty                                                    | 1e-15 absolute                                                  | 2.2e-16                  |
 | mirt's multidimensional coefficients and category probabilities                                   | 1e-15 relative                                                  | 4.4e-16                  |
 | Plausible values: 200 values for each of 2,000 persons, against mirt and TAM                      | 0.02 absolute                                                   | 0.0071                   |
 | Plausible values against the expectation of their moments                                         | 0.01 absolute                                                   | 5e-4                     |
