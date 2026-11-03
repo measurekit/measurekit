@@ -79,9 +79,19 @@ export function checkScale(scale: ScoreScale): CheckedScale {
 
 /** Returns a score rounded to the nearest multiple of the step, halves up, and bounded. */
 export function roundScore(score: number, { lowest, highest, step }: CheckedRounding): number {
-  const rounded = step > 0 ? Math.round(score / step) * step : score;
+  const rounded = step > 0 ? multipleOf(Math.round(score / step), step) : score;
   // Adding 0 turns -0, which rounding a small negative score gives, into 0.
   return Math.min(Math.max(rounded, lowest), highest) + 0;
+}
+
+/**
+ * Returns k times a step. A step such as 0.1 is no exact double, so k · 0.1 can miss the decimal, as 3 · 0.1 gives
+ * 0.30000000000000004; where the step is the inverse of a whole number, k divided by it gives the double nearest the
+ * decimal, 0.3.
+ */
+export function multipleOf(k: number, step: number): number {
+  const inverse = 1 / step;
+  return Number.isInteger(inverse) ? k / inverse : k * step;
 }
 
 /** Returns the reported score of theta on a checked scale. */

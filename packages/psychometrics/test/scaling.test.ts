@@ -160,6 +160,19 @@ describe("scaleScore", () => {
     expect(scaleScore(5, scale)).toBe(795);
   });
 
+  it("reports a multiple of a decimal step as the double nearest the decimal", () => {
+    expect(scaleScore(0.523, { slope: 100, intercept: 0, step: 0.1 })).toBe(52.3);
+    expect(scaleScore(0.3, { slope: 1, intercept: 0, step: 0.1 })).toBe(0.3);
+    expect(scaleScore(1.2345, { slope: 1, intercept: 0, step: 0.05 })).toBe(1.25);
+    expect(scaleConversion([1.5], [10.3, 20.7], { step: 0.1 })).toEqual([20.7]);
+    const prediction = predictThetaScore(
+      { nodes: [0.523], weights: [1] },
+      { slope: 100, intercept: 0, lowest: 0, highest: 100, step: 0.1 },
+    );
+    expect(prediction.distribution.find(({ probability }) => probability > 0)?.score).toBe(52.3);
+    expect(prediction.mean).toBe(52.3);
+  });
+
   it("rejects an invalid theta or scale", () => {
     expect(() => scaleScore(Number.NaN, SCALE)).toThrow("Theta must be a finite number, found NaN.");
     expect(() => scaleScore(JSON.parse('"1"'), SCALE)).toThrow('Theta must be a finite number, found "1".');

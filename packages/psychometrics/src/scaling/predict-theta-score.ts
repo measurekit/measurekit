@@ -8,7 +8,7 @@ import {
   summarize,
   type ThetaScorePredictionOptions,
 } from "./prediction.js";
-import { type CheckedScale, checkScale, type ScoreScale } from "./score-scale.js";
+import { type CheckedScale, checkScale, multipleOf, type ScoreScale } from "./score-scale.js";
 
 const DEFAULT_STANDARD_ERROR = 0;
 /**
@@ -115,7 +115,7 @@ function reportableScores({ lowest, highest, step, slope, intercept }: CheckedSc
   }
   return {
     scores: Array.from({ length }, (_, j) =>
-      j === 0 ? lowest : j === length - 1 ? highest : (firstMultiple + j) * step,
+      j === 0 ? lowest : j === length - 1 ? highest : multipleOf(firstMultiple + j, step),
     ),
     firstMultiple,
     boundaries: Array.from({ length: length - 1 }, (_, j) => ((firstMultiple + j + 0.5) * step - intercept) / slope),

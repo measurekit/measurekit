@@ -10,7 +10,8 @@ has [its own guide](vertical-scaling.md).
 ## Scales
 
 A scale reports slope θ + intercept, rounded to the nearest multiple of `step`, halves up, and bounded to `lowest` and
-`highest`. `scaleScore(theta, scale)` applies it.
+`highest`. `scaleScore(theta, scale)` applies it. A multiple of a decimal step such as 0.1 is the double nearest the
+decimal, 52.3 rather than 523 · 0.1 = 52.300000000000004.
 
 ```ts
 import { scaleScore } from "@measurekit/psychometrics/scaling";
