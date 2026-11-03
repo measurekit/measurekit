@@ -68,7 +68,7 @@ function jacobiEigenvalue(index: number, count: number): number {
 }
 
 /**
- * Returns the number of eigenvalues below `x` of the Jacobi matrix: the negative pivots of the LDLᵀ factorization of
+ * Returns the number of eigenvalues below `x` of the Jacobi matrix: the negative pivots of the factorization L D Lᵀ of
  * the matrix less x times the identity, Sturm's count for a symmetric tridiagonal matrix.
  */
 function eigenvaluesBelow(x: number, count: number): number {
