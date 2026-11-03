@@ -12,6 +12,7 @@ import {
   NO_RESPONSES,
   respondentsOf,
 } from "./responses.js";
+import { checkStandardErrorSize } from "./standard-error-size.js";
 import { generalizedGradedUnfolding, type UnfoldingParameters, unitUnfoldingModel } from "./unfolding.js";
 import { agreeCategory, unfoldingStarts } from "./unfolding-start.js";
 
@@ -113,6 +114,8 @@ export function calibrateUnfolding(
   const categoryCounts = all.itemIds.map(
     (id, i) => checkCategories(id, generalizedGradedUnfolding, allTallies[i] ?? NO_RESPONSES).length,
   );
+  // The last stage estimates a, b and a threshold for each category but the first, of every item.
+  if (standardErrors !== "none") checkStandardErrorSize(categoryCounts.reduce((sum, count) => sum + count + 1, 0));
   const responses = withoutDisagreement(all, categoryCounts);
   const { respondents } = respondentsOf(responses);
   const proportions = keptProportions(responses, categoryCounts);

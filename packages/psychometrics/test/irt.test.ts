@@ -908,6 +908,22 @@ describe("calibrate", () => {
     expect(pair.items.map((item) => item.standardErrors)).toEqual([null, null]);
   });
 
+  it("bounds standard errors to 2,000 parameters, counting a shared one for each item, before it estimates anything", () => {
+    // Three persons answer 1,001 items with both categories each: 2,002 parameters of the 2PL, and 1,002 of the 1PL,
+    // whose covariance lists the shared a for each of its items.
+    const rows = [0, 1, 2].map((k) => Array.from({ length: 1001 }, (_, j) => (j + k) % 2));
+    const matrix = responseMatrix(rows);
+    for (const [model, standardErrors] of [
+      [twoParameterLogistic, "hessian"],
+      [oneParameterLogistic, "cross-product"],
+    ] as const) {
+      expect(() => calibrate(matrix, { model, standardErrors })).toThrow(
+        "Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2002.",
+      );
+    }
+    expect(calibrate(matrix, { model: twoParameterLogistic, maxIterations: 1 }).items).toHaveLength(1001);
+  });
+
   it("rejects RSM items with different numbers of categories", () => {
     const matrix = responseMatrix([
       [0, 0],
@@ -3371,6 +3387,14 @@ describe("calibrateUnfolding", () => {
     const result = calibrate(matrix, { model: generalizedGradedUnfolding, maxIterations: 50 });
     expect(nonFinite(result)).toEqual([]);
     expect(result.items.every((item) => item.parameters.a > 0)).toBe(true);
+  });
+
+  it("bounds the standard errors of the last stage to 2,000 parameters before any stage runs", () => {
+    // 401 items of four categories estimate a, b and three thresholds each: 2,005 parameters.
+    const rows = [0, 1, 2, 3].map((k) => Array.from({ length: 401 }, (_, j) => (j + k) % 4));
+    expect(() => calibrateUnfolding(responseMatrix(rows), { standardErrors: "cross-product" })).toThrow(
+      "Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2005.",
+    );
   });
 
   it("rejects more than 500 items, whose starts would take minutes from data of a few kilobytes", () => {

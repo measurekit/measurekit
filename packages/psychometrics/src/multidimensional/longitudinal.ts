@@ -1,6 +1,7 @@
 import { checkChoice, checkIntegerFrom, checkOptions, checkStopping, DataError, describe } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
+  checkStandardErrorSize,
   gradedResponse,
   type IrtModel,
   maximization,
@@ -160,6 +161,7 @@ export function calibrateLongitudinal(
   const answered = Array.from(data.pooled.offsets.subarray(1), (end, row) => end > (data.pooled.offsets[row] ?? 0));
   const setup = setUp(data.pooled, { model }, answered, rule);
   const latent = latentDistribution(grid, { correlations: true, variances: true, means: true, pinned: [0] });
+  if (standardErrors !== "none") checkStandardErrorSize(setup.values.length + latent.size);
   const fit: LongitudinalFit<unknown> = {
     setup,
     maximization: maximization(setup, rule.nodes),

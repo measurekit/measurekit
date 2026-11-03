@@ -1,5 +1,5 @@
 import { checkIntegerFrom, DataError, largestChange } from "@measurekit/core";
-import { type CompressedResponses, type Iteration, squarem } from "../irt/internal.js";
+import { type CompressedResponses, checkStandardErrorSize, type Iteration, squarem } from "../irt/internal.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { setUp } from "./calibration-setup.js";
 import type { Latent } from "./correlation.js";
@@ -134,6 +134,7 @@ export function calibrateByEm<TParameters>(
     ),
     responses,
   };
+  if (settings.standardErrors !== "none") checkStandardErrorSize(parameterCount(fit));
   const { converged, iterations } = expectationMaximization(fit, settings.tolerance, settings.maxIterations);
   const logLikelihood = fit.eStep.run();
   const covariance = parameterCount(fit) > 0 ? covarianceOf(settings.standardErrors, fit) : null;

@@ -187,7 +187,10 @@ complete-data gradient. On 20,000 persons and 60 2PL items, EM takes about 3.5 s
 and cross-product ones 0.2 s more; on 4,000 persons answering 40 of 1,000 items, cross-product standard errors take
 about 3 s. Both methods estimate the same covariance in large samples; the Hessian is the reference for small ones.
 Standard errors are `null` for fixed items, and for every item when the information cannot be inverted or gives a
-variance that is not positive.
+variance that is not positive. They take at most 2,000 estimated parameters, counting a parameter that items share once
+for each of them, as the covariance lists it: the information holds every pair, about 210 MB at the bound, and its
+inverse takes time with the cube of P. Beyond it calibration throws `DataError` before it estimates anything; leave
+`standardErrors` at `"none"`, or calibrate the items in sets that share fixed anchors.
 
 Missing responses are skipped; persons without responses change nothing. An estimated item has the categories up to
 its highest response; it needs responses in every one of them, at least two, and no more than its model allows: a

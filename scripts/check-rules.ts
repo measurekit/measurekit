@@ -148,6 +148,14 @@ export const RULES: readonly Rule[] = [
     titles: "1,000 quadrature points",
   },
   {
+    rule: "Standard errors take at most 2,000 estimated parameters, as their information is a dense matrix of every pair and its inverse takes their cube.",
+    file: "packages/psychometrics/src/irt/standard-error-size.ts",
+    find: "if (parameters > MAX_STANDARD_ERROR_PARAMETERS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "bounds standard errors to 2,000",
+  },
+  {
     rule: "A range of theta is at most 10,000 wide, as the scan of modal estimation walks it in steps of 0.25.",
     file: "packages/psychometrics/src/irt/ability.ts",
     find: "if (!(upper - lower <= MAX_RANGE_WIDTH)) {",

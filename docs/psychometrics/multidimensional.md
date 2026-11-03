@@ -400,6 +400,9 @@ cycles at the estimates, summed over persons, and the information is the observe
 draws. The standard errors of MH-RM are therefore stochastic, as mirt's are; the person-wise covariance leaves out the
 covariance between persons, which is 0 given the parameters and would add noise.
 
+Standard errors take at most 2,000 estimated parameters, by EM, MH-RM, bifactor and longitudinal calibration alike, as
+[irt](irt.md#standard-errors) explains: beyond it calibration throws `DataError` before it estimates anything.
+
 A standard error is listed by the name of the parameter: `a1` to `aD` for the slopes the item loads on, `intercept` or
 `intercept1`, `intercept2`, ..., and `c`. Slopes fixed at 0 have none. All standard errors of a calibration are `null`
 if the information matrix cannot be inverted or gives a variance that is not positive.

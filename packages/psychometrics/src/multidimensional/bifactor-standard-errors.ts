@@ -25,7 +25,7 @@ export function bifactorCovariance<TParameters>(
   fit: BifactorFit<TParameters>,
   method: "hessian" | "cross-product",
 ): Float64Array | null {
-  const size = parameterCount(fit);
+  const size = bifactorParameterCount(fit);
   if (size === 0) return null;
   const louis = method === "hessian";
   const { outer, second } = scoreMoments(fit, size, louis);
@@ -39,7 +39,7 @@ export function bifactorCovariance<TParameters>(
 }
 
 /** Returns the number of estimated parameters: the items' estimated entries, then the correlation. */
-function parameterCount<TParameters>({ items, latent, correlated }: BifactorFit<TParameters>): number {
+export function bifactorParameterCount<TParameters>({ items, latent, correlated }: BifactorFit<TParameters>): number {
   return items.reduce((sum, item) => sum + item.free.length, 0) + (correlated ? latent.pairs.length : 0);
 }
 

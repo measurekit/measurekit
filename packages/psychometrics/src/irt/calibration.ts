@@ -26,6 +26,7 @@ import type { TestItem } from "./model.js";
 import { quadratureRule } from "./quadrature.js";
 import { type CompressedResponses, compressResponses, respondentsOf } from "./responses.js";
 import { squarem } from "./squarem.js";
+import { checkStandardErrorSize } from "./standard-error-size.js";
 import { maximizeTestlets, type TestletEstimate, testletEstimates } from "./testlets.js";
 
 /** An item with its calibrated parameters. */
@@ -220,6 +221,11 @@ export function calibrateResponses<TParameters>(
   const { nodes } = rule;
   const setup = setUp(responses, options, answered, rule, starts);
   const { items, values, population: latent, design } = setup;
+  if (standardErrors !== "none") {
+    // The covariance reported lists a parameter that items share once for each of them.
+    const listed = items.reduce((sum, item) => sum + item.names.length, 0);
+    checkStandardErrorSize(Math.max(values.length, listed));
+  }
   const mStep = maximization(setup, nodes);
   const eStep = expectationStep(responses, items, nodes, latent, design);
 

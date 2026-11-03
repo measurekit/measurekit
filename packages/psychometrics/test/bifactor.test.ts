@@ -727,6 +727,18 @@ function slopeOfFixture(fixture: Case, from: number, to: number): number {
 /** The largest error of the recovery of the two-tier case, fixed from its first run. */
 const RECOVERY = { primary: 0.1, specific: 0.14, correlation: 0.04 } as const;
 
+describe("standard errors of many parameters", () => {
+  it("are bounded to 2,000 parameters before the calibration runs", () => {
+    // Three persons answer 1,000 items with both categories each, two specific dimensions of 500: a general slope, a
+    // specific slope and an intercept each.
+    const matrix = responseMatrix([0, 1, 2].map((k) => Array.from({ length: 1000 }, (_, j) => (j + k) % 2)));
+    const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, i < 500 ? "s1" : "s2"]));
+    expect(() => calibrateBifactor(matrix, { specific, standardErrors: "cross-product" })).toThrow(
+      "Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 3000.",
+    );
+  });
+});
+
 describe("properties", () => {
   const specific = { q1: "a", q2: "a", q3: "a", q4: "b", q5: "b", q6: "b" };
   const itemIds = Object.keys(specific);

@@ -1,5 +1,5 @@
 import { backtrack, createRandom, largestChange } from "@measurekit/core";
-import type { CompressedResponses } from "../irt/internal.js";
+import { type CompressedResponses, checkStandardErrorSize } from "../irt/internal.js";
 import { invertPositiveDefinite } from "../math/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Design } from "./design.js";
@@ -94,6 +94,7 @@ export function calibrateByMhrm<TParameters>(
     random: createRandom(settings.seed),
     respondents: data.count,
   };
+  if (settings.standardErrors) checkStandardErrorSize(run.layout.size);
   const stages = stochasticApproximation(run, settings);
   const { converged, iterations } = stages;
   const covariance = settings.standardErrors ? observedInformation(run, stages.variance) : null;

@@ -86,6 +86,7 @@ export {
   respondentsOf,
 } from "./responses.js";
 export { type Iteration, squarem } from "./squarem.js";
+export { checkStandardErrorSize } from "./standard-error-size.js";
 export { itemTrace, scoreLikelihoods, summedScoreLikelihoods, summedScoreTable } from "./summed-score.js";
 export { combine, itemFunctions, logFunction, NO_ITEMS } from "./symmetric-functions.js";
 export { type CheckedThetaDistribution, checkThetaDistribution } from "./theta-distribution.js";

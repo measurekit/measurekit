@@ -3751,6 +3751,24 @@ describe("errors", () => {
     expect(multidimensionalInformation(limit, new Array<number>(100).fill(0))).toHaveLength(100);
   });
 
+  it("bounds standard errors to 2,000 parameters before it estimates anything, by EM, MH-RM and over occasions", () => {
+    // Three persons answer 701 items with both categories each: two slopes and an intercept each, 2,103 parameters.
+    const wide = responseMatrix([0, 1, 2].map((k) => Array.from({ length: 701 }, (_, j) => (j + k) % 2)));
+    const message = "Standard errors take at most 2000 estimated parameters, as their information holds every pair";
+    for (const standardErrors of ["hessian", "cross-product"] as const) {
+      expect(() => calibrateMultidimensional(wide, { model, dimensions: 2, standardErrors })).toThrow(message);
+    }
+    expect(() =>
+      calibrateMultidimensional(wide, { model, dimensions: 2, method: "mhrm", standardErrors: "hessian" }),
+    ).toThrow(message);
+    // Two occasions of 1,001 items each: their 2PL items alone have 2,002 parameters.
+    const occasion = (seed: number) =>
+      responseMatrix([0, 1, 2].map((k) => Array.from({ length: 1001 }, (_, j) => (j + k + seed) % 2)));
+    expect(() => calibrateLongitudinal([occasion(0), occasion(1)], { standardErrors: "cross-product" })).toThrow(
+      message,
+    );
+  });
+
   it("needs exactly one of dimensions and loadings", () => {
     expect(() => calibrateMultidimensional(data, { model })).toThrow(
       "Calibration needs the option dimensions, for an exploratory model, or loadings, for a confirmatory one.",

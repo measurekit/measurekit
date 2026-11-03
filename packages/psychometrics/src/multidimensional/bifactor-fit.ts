@@ -1,9 +1,9 @@
 import { largestChange } from "@measurekit/core";
-import { type CompressedResponses, type Iteration, squarem } from "../irt/internal.js";
+import { type CompressedResponses, checkStandardErrorSize, type Iteration, squarem } from "../irt/internal.js";
 import { type BifactorExpectation, bifactorExpectation, type GroupNodes } from "./bifactor-expectation.js";
 import { groupGrid, groupWeights, specificRule } from "./bifactor-nodes.js";
 import { type GroupPatterns, patternsOf } from "./bifactor-patterns.js";
-import { bifactorCovariance } from "./bifactor-standard-errors.js";
+import { bifactorCovariance, bifactorParameterCount } from "./bifactor-standard-errors.js";
 import type { BifactorStructure } from "./bifactor-structure.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { type ItemState, setUp } from "./calibration-setup.js";
@@ -129,9 +129,10 @@ export function solveBifactor<TParameters>(
   dimensions: number,
   settings: BifactorSettings,
 ): Solution<TParameters> {
+  const { standardErrors } = settings;
+  if (standardErrors !== "none") checkStandardErrorSize(bifactorParameterCount(fit));
   const { converged, iterations } = squarem(emIteration(fit), settings);
   const logLikelihood = fit.expectation.run();
-  const { standardErrors } = settings;
   return {
     items: fit.items,
     correlations: embedded(fit.latent, dimensions),
