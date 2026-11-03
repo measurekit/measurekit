@@ -21,7 +21,7 @@ import { checkPairedScores } from "./paired-scores.js";
  * @throws `DataError` when the scores are not arrays of the same length with at least one finite number each.
  * @see {@link https://doi.org/10.1037/h0029382 | Cronbach and Furby (1970)}
  */
-export function simpleGain(pre: readonly number[], post: readonly number[]): readonly number[] {
+export function simpleGain(pre: readonly number[], post: readonly number[]): number[] {
   checkPairedScores(pre, post, 1);
   return post.map((score, person) => score - (pre[person] ?? 0));
 }

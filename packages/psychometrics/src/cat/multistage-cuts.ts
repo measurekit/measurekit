@@ -132,7 +132,7 @@ const SHARE_SUM_TOLERANCE = 1e-6;
  * `number-correct` do not ascend.
  * @see {@link https://doi.org/10.1207/s15324818ame1903_2 | Luecht, Brumfield and Breithaupt (2006)}
  */
-export function multistageCuts(stages: Stages, options: MultistageCutsOptions = {}): readonly (readonly number[])[] {
+export function multistageCuts(stages: Stages, options: MultistageCutsOptions = {}): number[][] {
   checkOptions(options);
   const { method = "maximum-information", scale = "theta", range, population, shares } = options;
   checkChoice(method, "The option method", METHODS);

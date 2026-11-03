@@ -20,7 +20,7 @@ import { checkPairedScores } from "./paired-scores.js";
  * pre scores are all equal.
  * @see {@link https://doi.org/10.1037/h0029382 | Cronbach and Furby (1970)}
  */
-export function residualGain(pre: readonly number[], post: readonly number[]): readonly number[] {
+export function residualGain(pre: readonly number[], post: readonly number[]): number[] {
   checkPairedScores(pre, post, 2);
   const preMean = mean(pre);
   const postMean = mean(post);
