@@ -1,4 +1,7 @@
+# GeneralizIT 0.1.2 and the versions generalizability-unbalanced.py was run with, under Python 3.12, its dependencies included.
 generalizit==0.1.2
 numpy==2.5.4
 pandas==3.1.0
+python-dateutil==4.0.0
 scipy==1.18.1
+tzdata==2026.6
