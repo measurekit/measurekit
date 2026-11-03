@@ -135,6 +135,11 @@ describe("intraclassCorrelation", () => {
       [3, 3],
     ]);
     for (const field of FIELDS) expect(constant[field]).toBeNull();
+    // The means of 0.1 and 0.7 repeated round apart from the ratings, which left mean squares of rounding: 1.6, 2.
+    for (const rating of [0.1, 0.7]) {
+      const fractional = intraclassCorrelation(Array.from({ length: 3 }, () => [rating, rating, rating]));
+      for (const field of FIELDS) expect(fractional[field]).toBeNull();
+    }
   });
 
   it("rejects one rater, non-finite ratings and fewer than two subjects rated by every rater", () => {

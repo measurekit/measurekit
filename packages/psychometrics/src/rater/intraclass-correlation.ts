@@ -46,17 +46,21 @@ export function intraclassCorrelation(ratings: readonly (readonly (number | null
   });
   const n = rows.length;
   const k = rows[0]?.length ?? 0;
+  // The coefficients do not depend on the origin. Ratings taken from the first are exact zeros when all are equal, where
+  // the means of 0.1 repeated round apart and leave the mean squares of rounding.
+  const origin = rows[0]?.[0] ?? 0;
+  const centered = rows.map((row) => row.map((rating) => rating - origin));
   let grand = 0;
-  for (const row of rows) for (const rating of row) grand += rating;
+  for (const row of centered) for (const rating of row) grand += rating;
   grand /= n * k;
   const raterMeans = new Float64Array(k);
-  for (const row of rows) {
+  for (const row of centered) {
     for (const [j, rating] of row.entries()) raterMeans[j] = (raterMeans[j] ?? 0) + rating / n;
   }
   let subjects = 0;
   let within = 0;
   let total = 0;
-  for (const row of rows) {
+  for (const row of centered) {
     const mean = row.reduce((sum, rating) => sum + rating, 0) / k;
     subjects += (mean - grand) ** 2;
     for (const rating of row) {
