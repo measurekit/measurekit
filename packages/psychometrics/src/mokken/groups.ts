@@ -27,12 +27,29 @@ export interface RestScoreGroups {
 export function restScoreGroups(rest: Float64Array, minimumSize: number): RestScoreGroups {
   const persons = rest.length;
   const sorted = Float64Array.from(rest).sort();
-  // The number of persons up to the end of the tie that holds the person at a position.
-  const endOfTie = (position: number): number => sorted.lastIndexOf(sorted[position] ?? 0) + 1;
+  // The number of persons up to the end of the tie that holds the person at each position, from the last position back.
+  const tieEnds = new Int32Array(persons);
+  for (let position = persons - 1; position >= 0; position--) {
+    const tied = position + 1 < persons && sorted[position + 1] === sorted[position];
+    tieEnds[position] = tied ? (tieEnds[position + 1] ?? persons) : position + 1;
+  }
+  const endOfTie = (position: number): number => tieEnds[position] ?? persons;
   const cuts = [endOfTie(minimumSize - 1)];
   while (persons - (cuts.at(-1) ?? 0) >= minimumSize) cuts.push(endOfTie(minimumSize + (cuts.at(-1) ?? 0) - 1));
   cuts.pop();
-  const bounds = cuts.map((cut) => sorted[cut - 1] ?? 0);
-  const members = Int32Array.from(rest, (score) => bounds.filter((bound) => score > bound).length);
+  const bounds = Float64Array.from(cuts, (cut) => sorted[cut - 1] ?? 0);
+  const members = Int32Array.from(rest, (score) => boundsBelow(bounds, score));
   return { count: bounds.length + 1, members };
+}
+
+/** Returns the number of the ascending bounds below a score, by bisection, so that a person costs the log of the groups. */
+function boundsBelow(bounds: Float64Array, score: number): number {
+  let low = 0;
+  let high = bounds.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if ((bounds[middle] ?? 0) < score) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }
