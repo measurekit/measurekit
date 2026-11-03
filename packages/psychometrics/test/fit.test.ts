@@ -711,6 +711,19 @@ describe("limitedInformationFit", () => {
     expect(() => limitedInformationFit(matrix, calibration)).toThrow(/at most 60 items, found 61/);
   });
 
+  it("refuses C2 of more than 1,830 moments, those of 60 dichotomous items, so that categories do not grow its matrix", () => {
+    // 60 graded items of three categories: 120 moments of categories and 1,770 of pairs, where M2* has 60 and 1,770.
+    const rows = Array.from({ length: 50 }, (_, person) =>
+      Array.from({ length: 60 }, (_, item) => (person + item) % 3),
+    );
+    const matrix = responseMatrix(rows);
+    const calibration = calibrate(matrix, { model: gradedResponse, maxIterations: 1 });
+    expect(limitedInformationFit(matrix, calibration, { statistic: "m2-star" }).degreesOfFreedom).toBeGreaterThan(0);
+    expect(() => limitedInformationFit(matrix, calibration, { statistic: "c2" })).toThrow(
+      'The statistic "c2" has 1890 moments, a category above the lowest of each item and each pair of items, and takes at most 1830, as many as 60 dichotomous items have; test fewer items, or items of fewer categories.',
+    );
+  });
+
   it("refuses a calibration of several groups, covariates, testlets or a histogram", () => {
     const { matrix } = simulated(25, 200, 6);
     const groups = matrix.personIds.map((_, person) => (person % 2 === 0 ? "a" : "b"));

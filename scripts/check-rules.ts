@@ -699,6 +699,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/psychometrics/test/fit.test.ts",
     titles: "more than 2\\^24 cells in all",
   },
+  {
+    rule: "C2 has at most 1,830 moments, so that items of many categories do not grow its covariance matrix past what 60 items allow.",
+    file: "packages/psychometrics/src/fit/limited-information.ts",
+    find: "if (moments > MAX_MOMENTS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "refuses C2 of more than 1,830 moments",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

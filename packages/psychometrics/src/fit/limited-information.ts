@@ -92,6 +92,11 @@ type Statistic = NonNullable<LimitedInformationOptions["statistic"]>;
 
 const STATISTICS: readonly Statistic[] = ["m2", "m2-star", "c2"];
 const DEFAULT_LEVEL = 0.9;
+/**
+ * The most moments: those of the most items under M2 and M2*, one for each item and each pair, so that the categories of
+ * C2 do not take Ξ, which grows with their square and its factor with their cube, past what the limit of items allows.
+ */
+const MAX_MOMENTS = (MAX_MOMENT_ITEMS * (MAX_MOMENT_ITEMS + 1)) / 2;
 
 /**
  * Returns the limited-information fit of a calibration: M2, M2* or C2, with RMSEA, SRMSR, TLI and CFI, as mirt's `M2`.
@@ -117,10 +122,10 @@ const DEFAULT_LEVEL = 0.9;
  * @param calibration - The calibration of the matrix's items, in its order, on one group.
  * @param options - The statistic, the anchors and the level of the interval.
  * @returns The statistic, its degrees of freedom and significance, and the fit indices, each `null` where undefined.
- * @throws `DataError` when the matrix, the calibration or an option is invalid, a response is not a category of its item,
- * fewer than two persons answered every item, there are more than 60 items, the calibration has several groups,
- * covariates, testlets or an empirical histogram, `"m2"` meets a polytomous item, an item is nominal, or the estimated
- * parameters differ from the count in the calibration's AIC.
+ * @throws `DataError` when the matrix, the calibration or an option is invalid, a response is not a category of its
+ * item, fewer than two persons answered every item, there are more than 60 items or, with C2, more than 1,830 moments,
+ * the calibration has several groups, covariates, testlets or an empirical histogram, `"m2"` meets a polytomous item,
+ * an item is nominal, or the estimated parameters differ from the count in the calibration's AIC.
  * @see {@link https://doi.org/10.1007/s11336-005-1295-9 | Maydeu-Olivares and Joe (2006)}
  * @see {@link https://doi.org/10.1111/j.2044-8317.2012.02050.x | Cai and Hansen (2013)}
  */
@@ -135,6 +140,7 @@ export function limitedInformationFit<TParameters>(
   checkOpenUnitInterval(level, "The option level");
   const { items, group } = checkCalibration(matrix, calibration);
   checkStatistic(items, statistic);
+  checkMoments(items, statistic);
   const columns = parameterColumns(items, checkFixed(fixed, matrix.itemIds), group.normal);
   checkParameterCount(calibration, columns.count);
   const complete = matrix.responses.filter((row) => !row.includes(null));
@@ -243,6 +249,25 @@ function checkStatistic(items: readonly IrtItem[], statistic: Statistic): void {
       );
     }
   });
+}
+
+/**
+ * Checks that the statistic has at most {@link MAX_MOMENTS} moments: C2 has one for each category above an item's
+ * lowest, and every statistic one for each pair of items.
+ *
+ * @throws `DataError` when it has more.
+ */
+function checkMoments(items: readonly IrtItem[], statistic: Statistic): void {
+  const first =
+    statistic === "c2"
+      ? items.reduce((sum, item) => sum + item.model.categoryCount(item.parameters) - 1, 0)
+      : items.length;
+  const moments = first + (items.length * (items.length - 1)) / 2;
+  if (moments > MAX_MOMENTS) {
+    throw new DataError(
+      `The statistic "${statistic}" has ${moments} moments, a category above the lowest of each item and each pair of items, and takes at most ${MAX_MOMENTS}, as many as 60 dichotomous items have; test fewer items, or items of fewer categories.`,
+    );
+  }
 }
 
 /**

@@ -144,7 +144,7 @@ The analyses of the pairs of items, the correlations, factors, parallel analysis
 the omegas, take at most 1,000 items, as each holds a matrix of every pair; so do local dependence, Yen's Q3 and every
 Mokken scale analysis but the imputation and the person fit indices, and Molenaar-Sijtsma reliability takes at most
 1,000 item steps. The tables of local dependence hold at most 2^24 cells, a cell for each pair of categories of each pair
-of items.
+of items, and C2 takes at most the 1,830 moments of 60 dichotomous items.
 
 Multidimensional scoring has maximum likelihood and Warm's weighted likelihood estimates,
 `multidimensionalMaximumLikelihoodEstimate` and `multidimensionalWeightedLikelihoodEstimate`, within a `range` in every

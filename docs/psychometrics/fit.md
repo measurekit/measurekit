@@ -334,7 +334,9 @@ are the moments less the rank. No model of the fixtures has such a Δ; the diagn
 can.
 
 Ξ grows with the fourth power of the items, so the function takes 60 at most: 1,830 rows and 27 MB, and a call took 0.6
-s here for M2* and 0.9 s for C2. At 12 items and 2,000 persons a call takes about 5 ms, against 38 ms for mirt's `M2`.
+s here for M2* and 0.9 s for C2. C2 adds a row for each category above an item's second, so it takes at most the 1,830
+moments of 60 dichotomous items: 60 items of 21 categories, 2,970 rows, took 23 s, and items of a thousand would take
+gigabytes. At 12 items and 2,000 persons a call takes about 5 ms, against 38 ms for mirt's `M2`.
 
 ## Rasch tests
 
@@ -471,6 +473,7 @@ Invalid input throws `DataError` naming the value found.
 | `summedScoreFit` when no person answered every item       | Use `itemFit`, which works from the answered items of each person                       |
 | Several groups, covariates, testlets, or a histogram      | Calibrate one group of a normal distribution; each group alone is a fit                 |
 | More than 60 items                                        | Test a part of the form, or use `summedScoreFit` for each item                          |
+| C2 of more than 1,830 moments                             | Test fewer items, or group the categories of items of many                              |
 | More than 1,000 items for `yenQ3` or local dependence     | Test the pairs of a part of the items, such as those that share a stimulus              |
 | Tables of local dependence of more than 2^24 cells        | Test fewer items, or group the categories of items of many                              |
 | `"m2"` with a polytomous item                             | Use `"m2-star"` or `"c2"`                                                               |
