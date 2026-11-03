@@ -25,13 +25,15 @@ function progressiveWeight(options: ProgressiveOptions): (administered: number) 
   const { length, acceleration = 1 } = options;
   checkPositiveInteger(length, "The option length");
   checkNonNegative(acceleration, "The option acceleration");
+  // Each power is taken of i over the last planned i, so that the largest is 1 and none overflows at a high acceleration.
+  const last = length - 1;
   let planned = 0;
-  for (let i = 1; i < length; i++) planned += i ** acceleration;
+  for (let i = 1; i < length; i++) planned += (i / last) ** acceleration;
   return (administered) => {
     if (administered === 0) return 0;
-    if (administered >= length - 1) return 1;
+    if (administered >= last) return 1;
     let sum = 0;
-    for (let i = 1; i <= administered; i++) sum += i ** acceleration;
+    for (let i = 1; i <= administered; i++) sum += (i / last) ** acceleration;
     return sum / planned;
   };
 }

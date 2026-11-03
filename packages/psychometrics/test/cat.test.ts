@@ -3076,6 +3076,17 @@ describe("selection rules of catR beyond MFI and KL", () => {
       expectClose(defined(single[2]), defined(information[2]), 1e-15, "w = 1 after the planned length");
     });
 
+    it("keeps its weights at an acceleration whose powers overflow a double", () => {
+      // 8^400 is beyond the largest double; the weight after 7 of 9 planned items is (7/8)^400 over about 1, 6e-24.
+      const scores = scoresAfter(
+        progressive({ length: 9, acceleration: 400 }),
+        7,
+        draws(new Array<number>(8).fill(0.5)),
+      );
+      const largest = information.slice(7).reduce((most, value) => Math.max(most, value), 0);
+      expectClose(defined(scores[7]), 0.5 * largest, 1e-15, "chance only");
+    });
+
     it("never draws an item without information once the power is above 0", () => {
       const items = [item2pl("given", 1, 0), item2pl("none", 0, 0), item2pl("some", 1, 0)];
       const out = new Float64Array(items.length);
