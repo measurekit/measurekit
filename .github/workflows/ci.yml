@@ -60,7 +60,8 @@ jobs:
       - if: matrix.node != 22 || !contains(fromJSON('["core", "knowledge-tracing"]'), matrix.project)
         run: pnpm test --project ${{ matrix.project }}
       # On the oldest supported Node.js a package's tests also check its coverage floor (vitest.config.ts), on its files
-      # alone. Psychometrics' floor takes 36 minutes, so rules.yml checks it each week and before a release.
+      # alone. Psychometrics' floor takes 36 minutes, so rules.yml checks it each week and at a release: per-push CI stays
+      # short, as Actions minutes are limited.
       - if: matrix.node == 22 && contains(fromJSON('["core", "knowledge-tracing"]'), matrix.project)
         run: pnpm test --project ${{ matrix.project }} --coverage --coverage.include='packages/${{ matrix.project }}/src/**'
 

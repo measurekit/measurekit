@@ -34,7 +34,9 @@ release's changeset for that package in `.changeset/`, or a new one made with `p
 ([AGENTS.md](AGENTS.md#releases)).
 
 The pre-commit hook formats staged code, JSON, Markdown and YAML with Biome; the pre-push hook runs the type check,
-tests and Knip. CI tests each package, the scripts that check the repository and the examples on Node.js 22 and 24.
+tests and Knip. CI tests each package, the scripts that check the repository and the examples on Node.js 22 and 24, with
+the coverage floors of core and knowledge tracing. The mutation rules and the coverage floor of psychometrics, which take
+long, run each week and before a release, so that per-push CI stays short.
 
 ## License of contributions
 

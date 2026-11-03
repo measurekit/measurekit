@@ -131,18 +131,19 @@ pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumente
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before
 finishing a change. Development needs Node.js 22.18+ and pnpm 12. Every push runs every job of CI, and a newer push to
-the same ref cancels the run in progress; a cancelled run is not a failure. `rules.yml` runs the slow checks each week and
-on `workflow_dispatch`: `rules`, and `coverage`, the floor of psychometrics, whose tests take 36 minutes under coverage. A
-builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`), and the release gate needs a
-green `rules.yml` run on the commit being released.
+the same ref cancels the run in progress; a cancelled run is not a failure. Per-push CI stays short, as Actions minutes
+are limited: `rules.yml` runs the slow checks each Monday, on `workflow_dispatch` and from `release.yml` before it
+publishes: `rules`, and `coverage`, the floor of psychometrics, whose tests take 36 minutes under coverage. A builder runs
+the rules of its package before a merge (`pnpm check:rules packages/<package>`).
 
 ## Releases
 
 Changesets version and publish the packages, each on its own version. A release has one changeset per package in
 `.changeset/`; changes made before the release extend it. A pull request from a `changeset-release/` branch runs
 `pnpm changeset version`, which bumps the versions, writes `CHANGELOG.md` and consumes the changesets. After it is
-merged, the maintainer runs the Release workflow by hand: it runs `pnpm release`, which builds and runs `changeset
-publish` with npm trusted publishing, and publishes the versions not yet on npm; it uses no changesets/action. No
+merged, the maintainer runs the Release workflow by hand: it runs `rules.yml`, and when the rules and the coverage floor
+of psychometrics pass, `pnpm release`, which builds and runs `changeset publish` with npm trusted publishing, and
+publishes the versions not yet on npm; it uses no changesets/action. No
 workflow opens pull requests, and Dependabot version updates are off. Changesets, docs and TSDoc describe current behavior only.
 
 ## Dependencies

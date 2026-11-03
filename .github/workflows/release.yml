@@ -10,8 +10,13 @@ permissions:
   id-token: write
 
 jobs:
-  release:
+  # The release gate's slow checks: the mutation rules and the coverage floor of psychometrics, which no push runs.
+  checks:
     if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/rules.yml
+
+  release:
+    needs: checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
