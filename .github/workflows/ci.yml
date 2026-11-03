@@ -57,10 +57,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - if: matrix.node != 22 || !contains(fromJSON('["core", "psychometrics", "knowledge-tracing"]'), matrix.project)
+      - if: matrix.node != 22 || !contains(fromJSON('["core", "knowledge-tracing"]'), matrix.project)
         run: pnpm test --project ${{ matrix.project }}
-      # On the oldest supported Node.js a package's tests also check its coverage floor (vitest.config.ts), on its files alone.
-      - if: matrix.node == 22 && contains(fromJSON('["core", "psychometrics", "knowledge-tracing"]'), matrix.project)
+      # On the oldest supported Node.js a package's tests also check its coverage floor (vitest.config.ts), on its files
+      # alone. Psychometrics' floor takes 36 minutes, so rules.yml checks it each week and before a release.
+      - if: matrix.node == 22 && contains(fromJSON('["core", "knowledge-tracing"]'), matrix.project)
         run: pnpm test --project ${{ matrix.project }} --coverage --coverage.include='packages/${{ matrix.project }}/src/**'
 
   # The benchmarks of the packages, on seeded data. The job fails when the fastest sample of a benchmark is above its budget

@@ -1,9 +1,10 @@
 name: Rules
 
-# Removes each rule that scripts/check-rules.ts lists from a copy of the code, and fails when its test still passes.
-# It is slow, so it does not run on a push: a builder runs the rules of its package before a merge, with
-# `pnpm check:rules packages/<package>`, and this workflow runs all of them each week. The release gate needs a green run on
-# the commit that is released: start one with "Run workflow" on main before a release.
+# The slow checks, which do not run on a push. `rules` removes each rule that scripts/check-rules.ts lists from a copy of
+# the code, and fails when its test still passes; `coverage` runs the tests of psychometrics under coverage, 36 minutes,
+# and fails below its floor in vitest.config.ts. A builder runs the rules of its package before a merge, with
+# `pnpm check:rules packages/<package>`, and this workflow runs both each week. The release gate needs a green run on the
+# commit that is released: start one with "Run workflow" on main before a release.
 on:
   schedule:
     - cron: "23 3 * * 1"
@@ -28,3 +29,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:rules
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --project psychometrics --coverage --coverage.include='packages/psychometrics/src/**'

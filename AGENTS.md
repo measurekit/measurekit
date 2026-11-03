@@ -117,7 +117,7 @@ pnpm lint             # Biome and cspell; `pnpm format` fixes formatting
 pnpm check:standards  # the rules of STANDARDS.md that a script can check, over the whole repository
 pnpm typecheck        # tsc over the sources, tests, examples and scripts
 pnpm test             # Vitest, a project for each package, the scripts and the examples; `--project psychometrics` runs one
-pnpm test:coverage    # the tests of each package with its coverage floor of vitest.config.ts; psychometrics' take 40 minutes
+pnpm test:coverage    # the tests of each package with its coverage floor of vitest.config.ts; psychometrics' take 36 minutes
 pnpm bench            # builds, then the benchmarks of every package against the budgets of `test/budgets.ts`
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package, from a clean dist/
@@ -129,10 +129,11 @@ pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumente
 ```
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before
-finishing a change. Development needs Node.js 22.18+ and pnpm 12. Every push runs every job of CI but `rules`, and a newer
-push to the same ref cancels the run in progress; a cancelled run is not a failure. `rules.yml` runs `rules` each week and on
-`workflow_dispatch`: a builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`), and the release
-gate needs a green `rules` run on the commit being released.
+finishing a change. Development needs Node.js 22.18+ and pnpm 12. Every push runs every job of CI, and a newer push to
+the same ref cancels the run in progress; a cancelled run is not a failure. `rules.yml` runs the slow checks each week and
+on `workflow_dispatch`: `rules`, and `coverage`, the floor of psychometrics, whose tests take 36 minutes under coverage. A
+builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`), and the release gate needs a
+green `rules.yml` run on the commit being released.
 
 ## Releases
 

@@ -51,10 +51,11 @@ export default defineConfig({
       provider: "v8",
       include: ["packages/*/src/**/*.ts"],
       reporter: ["text-summary"],
-      // One floor for each package: a gap in the tests of a package fails its own floor and no other. CI checks each
-      // package in the job of its project on Node.js 22, with the files of that package alone. Psychometrics' floor is
-      // its measure on Node.js 22 rounded down; under coverage its tests take about 37 minutes, 4.6 times as long, and
-      // the timeouts of the slowest calibrations hold that.
+      // One floor for each package: a gap in the tests of a package fails its own floor and no other. CI checks core and
+      // knowledge tracing in the job of their project on Node.js 22, with the files of that package alone, and rules.yml
+      // checks psychometrics each week and before a release. Psychometrics' floor is its measure on Node.js 22 rounded
+      // down; under coverage its tests take about 36 minutes, 4.6 times as long, and the timeouts of the slowest
+      // calibrations hold that.
       thresholds: {
         "packages/core/src/**": { statements: 94, branches: 74, functions: 96, lines: 95 },
         "packages/knowledge-tracing/src/**": { statements: 98, branches: 82, functions: 99, lines: 99 },
