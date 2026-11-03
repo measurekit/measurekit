@@ -57,4 +57,9 @@ measures a structure against responses (gamma, the violational coefficient, the 
 agreement), `forwardGraded` and `backwardGraded` find where a structure is graded, and `diffTest` tests the fit of one
 quasi order, or the difference between two, with a delta-method variance.
 
+Ids may hold any character: the keys that join several, such as a learner and a skill or a pair of resources of BKT,
+keep them apart. `iita`, `diffTest` and `structureValidity` refuse an incomplete table of responses at the cost of its
+events, `surmiseStructure` closes prerequisites in time proportional to the elements times their prerequisites, and a
+logistic feature whose value overflows throws `DataError`.
+
 Every function documents each parameter and its result.
