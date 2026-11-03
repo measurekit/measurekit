@@ -108,8 +108,8 @@ uv venv --python 3.11 validation/psychometrics/.venv-scoring
 uv pip install --python validation/psychometrics/.venv-scoring -r validation/psychometrics/automated-scoring-requirements.txt
 ```
 
-`multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`
-and `information` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and
+`multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`,
+`information` and `likelihood` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and
 the base R maximum are slow, and `mhrm`, which runs mirt's MH-RM four times on five dimensions, takes about as long. `rotation` reads the fixture that `exploratory` writes, so run `exploratory` first.
 `multidimensional-items.R` holds the helper of `multidimensional.R` and `parameterization.R` that sets items in mirt.
 GGUM imports xlsx, which needs Java: install rJava against a JDK, with the variables that `R CMD javareconf -e` sets,

@@ -603,11 +603,13 @@ are the identity and it has at least two dimensions.
 
 ## Scoring
 
-| Function                                                           | Estimate                                                                                                       |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `multidimensionalPosteriorMeanEstimate(items, responses, options)` | EAP: the posterior mean, with the posterior covariance, by quadrature                                          |
-| `multidimensionalPosteriorModeEstimate(items, responses, options)` | MAP: the posterior mode; the covariance is the inverse of the test information plus the precision of the prior |
-| `multidimensionalEstimates(data, items, estimator)`                | The estimate of every person of a data set, `null` without responses                                           |
+| Function                                                                | Estimate                                                                                                       |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `multidimensionalPosteriorMeanEstimate(items, responses, options)`      | EAP: the posterior mean, with the posterior covariance, by quadrature                                          |
+| `multidimensionalPosteriorModeEstimate(items, responses, options)`      | MAP: the posterior mode; the covariance is the inverse of the test information plus the precision of the prior |
+| `multidimensionalMaximumLikelihoodEstimate(items, responses, options)`  | MLE: the maximum of the likelihood in `range`; the covariance is the inverse of the test information           |
+| `multidimensionalWeightedLikelihoodEstimate(items, responses, options)` | WLE (Warm): the root of the score plus ½ tr(I⁻¹ J_r) in `range`; the same covariance                           |
+| `multidimensionalEstimates(data, items, estimator)`                     | The estimate of every person of a data set, `null` without responses                                           |
 
 `items` are `{ model, parameters }` of one number of dimensions; `responses` has one response per item, `null` when
 missing. An estimate has `theta`, `standardErrors` and `covariance`.
@@ -616,6 +618,7 @@ missing. An estimate has `theta`, `standardErrors` and `covariance`.
 | -------- | -------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `prior`  | EAP, MAP | N(0, I)                                                     | `{ mean, covariance }`: pass the calibration's `correlations` as the covariance                      |
 | `points` | EAP      | `61`, `31`, `15`, `9`, `7` for 1 to 5 dimensions, `3` above | Nodes per dimension of the rectangular grid placed on the prior: `mean + sd * z` with z from -6 to 6 |
+| `range`  | MLE, WLE | `[-6, 6]`                                                   | The lowest and the highest theta in every dimension, as for `maximumLikelihoodEstimate`              |
 
 The covariance of the prior is symmetric and positive definite. EAP weights the grid nodes by the prior density times
 the likelihood. A grid of more than 10⁶ nodes throws, naming MAP, which works in any number of dimensions: a scan of 5
@@ -623,6 +626,25 @@ points per dimension (3 above three dimensions) from -3 to 3 prior standard devi
 prior mean and 3 prior standard deviations either side of it on each axis, picks the start of Fisher scoring with halved
 steps, which runs to a gradient below 1e-10. Without responses the estimate is the prior, also without
 items, when a `prior` gives the dimensions: an estimate from no items needs one.
+
+The MLE and the WLE need a response, and answered items whose slopes span the dimensions: along a dimension they leave
+out the likelihood is flat, and they throw `DataError`. The MLE starts from the point of the largest likelihood on the
+points of MAP's scan spread over the box of `range`, and Fisher scoring with the steps projected onto the box runs to a
+score below 1e-10 on the coordinates inside it. The WLE starts from MAP under N(0, I), and takes Fisher scoring's steps,
+or Newton's with the Jacobian of the weighted score by central differences where scoring's do not halve its length, to
+a weighted score below 1e-9. I is the test information and J_r the sum over the answered items and categories of
+∂P/∂θ_r ∇²P / P, as `weightedLikelihoodEstimate` has it on one dimension, where both estimates equal the
+one-dimensional ones.
+
+- **Extreme patterns.** Where the likelihood grows toward a face of the box, as for a pattern of lowest or highest
+  categories, or of items of one dimension all answered alike, the MLE lies on that face, with its other coordinates at
+  their maximum there, as the one-dimensional MLE is at an end of `range`. The WLE of such a pattern is finite where the
+  correction balances the score, and on the face where it does not.
+- **Several roots.** The weighted score is the gradient of the log of the likelihood times √det I, Jeffreys' prior, for
+  the M2PL and the graded model, and of no function for the M3PL, whose likelihood can have several maxima and its
+  weighted score several roots: the estimate is the one that the search reaches from the start.
+- **Time.** Warm's correction takes the gradients of each item at 2D points, and a Newton step the correction at 2D
+  more: on 100 dimensions and 500 items the WLE takes 2 s, and MAP and the MLE 0.06 s.
 
 `multidimensionalEstimates` matches the data's item ids to `items`, estimates each person from the person's answered
 items only, and takes `multidimensionalPosteriorModeEstimate` unless given an estimator, a function of items and
@@ -752,6 +774,12 @@ multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // [-
   dimensions; the communality here is λᵀ Φ λ.
 - **MAP standard errors.** They come from the expected information, as `posteriorModeEstimate` does; mirt's come from the
   observed Hessian, which differs for the graded model.
+- **ML and WLE.** Where the likelihood grows toward a face of the box, mirt's `fscores` returns -Inf, Inf or NaN, or
+  stops at ±20 without converging; here the estimate is on the face of `range`, and its other coordinates maximize the
+  likelihood there, so they differ from mirt's: of 10 M2PL items, five right on the first dimension and five wrong on
+  the second, mirt's MLE is (7.76, -20) and the MLE here (3.32, -6). mirt's WLE maximizes the likelihood times √det I,
+  which is Warm's estimator for the M2PL and the graded model, where the two agree; for the M3PL they differ by up to
+  0.87, as on one dimension.
 - **Rotation.** GPArotation's default algorithm, Barzilai-Borwein steps with a nonmonotone line search; mirt's
   `summary` and `fscores` rotate to GPArotation's default tolerance, 1e-5.
 - **Priors.** A prior of c is on the probability scale; mirt's `norm` on `g` is on its logit.

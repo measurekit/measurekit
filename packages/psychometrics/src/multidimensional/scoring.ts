@@ -1,13 +1,14 @@
 import { checkIntegerFrom, checkOptions, DataError, normalizeLogs } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
-import { estimatePersons } from "../irt/internal.js";
+import { checkRange, estimatePersons, type RangeOptions } from "../irt/internal.js";
 import { addOuterProduct, invertPositiveDefinite, mirror } from "../math/internal.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
 import { type GridLikelihood, gridLikelihood } from "./grid-likelihood.js";
 import { checkMultidimensionalPattern, indexMultidimensionalItems } from "./items.js";
+import { maximumLikelihoodMode, weightedLikelihoodMode } from "./likelihood-mode.js";
 import type { MultidimensionalItem, MultidimensionalTestItem } from "./model.js";
-import { answeredPattern } from "./pattern.js";
+import { type AnsweredPattern, answeredPattern } from "./pattern.js";
 import { posteriorMode } from "./posterior-mode.js";
 import { type CheckedPrior, checkedPrior, type MultivariateNormalPrior, priorDimensions } from "./prior.js";
 
@@ -18,8 +19,9 @@ export interface MultidimensionalEstimate {
   /** The standard error of each dimension: the square root of the diagonal of `covariance`. */
   readonly standardErrors: readonly number[];
   /**
-   * The covariance of the estimate: for the posterior mean the covariance of the posterior, and for the posterior mode
-   * the inverse of the sum of the test information and the inverse of the prior covariance.
+   * The covariance of the estimate: for the posterior mean the covariance of the posterior, for the posterior mode the
+   * inverse of the sum of the test information and the inverse of the prior covariance, and for the maximum and
+   * weighted likelihood estimates the inverse of the test information.
    */
   readonly covariance: readonly (readonly number[])[];
 }
@@ -226,6 +228,117 @@ export function multidimensionalPosteriorModeEstimate(
   const dimensions = checkMultidimensionalPattern(items, responses, priorDimensions(options.prior));
   const prior = checkedPrior(options.prior, dimensions);
   const { theta, information } = posteriorMode(answeredPattern(items, responses, dimensions), prior, dimensions);
+  const covariance =
+    invertPositiveDefinite(information, dimensions) ??
+    new Float64Array(dimensions * dimensions).fill(Number.POSITIVE_INFINITY);
+  return estimateOf(theta, covariance, dimensions);
+}
+
+/**
+ * Returns the maximum likelihood estimate (MLE) of the thetas within `range` in every dimension.
+ *
+ * @remarks
+ * A scan of the likelihood on a grid of 5 points per dimension (3 above three dimensions) of the box of `range`, or
+ * above five dimensions at its center and its faces on each axis, picks the start of Fisher scoring with the steps
+ * projected onto the box, which runs until the score of the coordinates inside it is below 1e-10. Where the likelihood
+ * grows without limit, as for an extreme pattern or a dimension whose items were all answered in their lowest or highest
+ * categories, the estimate is at that bound of `range`, as that of `maximumLikelihoodEstimate` is. The covariance is the
+ * inverse of the test information at the estimate. Missing responses are skipped.
+ *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The range of each theta.
+ * @returns The thetas, their standard errors and their covariance.
+ * @throws `DataError` when the items, responses or range are invalid, there is no response, or the slopes of the
+ * answered items do not span every dimension, along which the likelihood is then flat.
+ * @see {@link https://doi.org/10.1007/978-0-387-89976-3 | Reckase (2009)}
+ */
+export function multidimensionalMaximumLikelihoodEstimate(
+  items: readonly MultidimensionalItem[],
+  responses: readonly (number | null)[],
+  options: RangeOptions = {},
+): MultidimensionalEstimate {
+  const { dimensions, range } = checkLikelihoodPattern(items, responses, options, "Maximum likelihood");
+  const pattern = answeredPattern(items, responses, dimensions);
+  return informationEstimate(pattern, maximumLikelihoodMode(pattern, dimensions, range), dimensions);
+}
+
+/**
+ * Returns Warm's weighted likelihood estimate (WLE) of the thetas within `range` in every dimension.
+ *
+ * @remarks
+ * The root of the score plus Warm's correction, ½ tr(I⁻¹ J_r) for dimension r, with I the test information and J_r
+ * the sum over the answered items and their categories of ∂P/∂θ_r ∇²P / P: the score less the information times the
+ * first-order bias of the MLE, as `weightedLikelihoodEstimate` solves it on one dimension. It is the mode of the
+ * likelihood times √det I(θ), Jeffreys' prior, for the M2PL and the graded model, and differs from it for the M3PL. From
+ * the posterior mode under N(0, I), Fisher scoring's steps, or Newton's with the Jacobian by central differences where
+ * scoring's do not halve the weighted score, projected onto the box, run until the weighted score of the coordinates
+ * inside it is below 1e-9. The WLE of an extreme pattern is finite where the correction balances the score; where the
+ * weighted score still pushes outward, the estimate is at that bound of `range`. The covariance is the inverse of the
+ * test information at the estimate. Missing responses are skipped.
+ *
+ * @param items - The items the person answered, with their parameters.
+ * @param responses - The person's response to each item; `null` when missing.
+ * @param options - The range of each theta.
+ * @returns The thetas, their standard errors and their covariance.
+ * @throws `DataError` when the items, responses or range are invalid, there is no response, or the slopes of the
+ * answered items do not span every dimension.
+ * @see {@link https://doi.org/10.1007/BF02294627 | Warm (1989)}
+ * @see {@link https://doi.org/10.1007/s11336-013-9399-0 | Wang (2015)}
+ */
+export function multidimensionalWeightedLikelihoodEstimate(
+  items: readonly MultidimensionalItem[],
+  responses: readonly (number | null)[],
+  options: RangeOptions = {},
+): MultidimensionalEstimate {
+  const { dimensions, range } = checkLikelihoodPattern(items, responses, options, "Weighted likelihood");
+  const pattern = answeredPattern(items, responses, dimensions);
+  return informationEstimate(pattern, weightedLikelihoodMode(pattern, dimensions, range), dimensions);
+}
+
+/**
+ * Checks the options, the items and responses of a likelihood estimate, and that the slopes of the answered items span
+ * every dimension; returns the dimensions and the range.
+ *
+ * @throws `DataError` when they are invalid, there is no response, or the sum of the outer products of the slopes is
+ * singular.
+ */
+function checkLikelihoodPattern(
+  items: readonly MultidimensionalItem[],
+  responses: readonly (number | null)[],
+  options: RangeOptions,
+  method: string,
+): { readonly dimensions: number; readonly range: readonly [number, number] } {
+  checkOptions(options);
+  const noResponse = `${method} estimation needs at least one response.`;
+  if (Array.isArray(items) && items.length === 0) throw new DataError(noResponse);
+  const dimensions = checkMultidimensionalPattern(items, responses);
+  const range = checkRange(options.range);
+  const span = new Float64Array(dimensions * dimensions);
+  let answered = 0;
+  items.forEach((item, i) => {
+    if (responses[i] === null || responses[i] === undefined) return;
+    answered++;
+    addOuterProduct(span, item.model.toVector(item.parameters).subarray(0, dimensions));
+  });
+  if (answered === 0) throw new DataError(noResponse);
+  mirror(span, dimensions);
+  if (invertPositiveDefinite(span, dimensions) === null) {
+    throw new DataError(
+      `${method} estimation needs answered items whose slopes span the ${dimensions} dimensions: along a dimension they leave out, the likelihood is flat.`,
+    );
+  }
+  return { dimensions, range };
+}
+
+/** Returns the estimate at theta with the inverse of the test information there as its covariance. */
+function informationEstimate(
+  pattern: AnsweredPattern,
+  theta: Float64Array,
+  dimensions: number,
+): MultidimensionalEstimate {
+  const information = new Float64Array(dimensions * dimensions);
+  pattern.information(theta, information);
   const covariance =
     invertPositiveDefinite(information, dimensions) ??
     new Float64Array(dimensions * dimensions).fill(Number.POSITIVE_INFINITY);

@@ -1,9 +1,9 @@
 # Multidimensional item response theory fixtures: confirmatory and exploratory calibration of the M2PL, the M3PL and the
-# graded model with standard errors, rotation, EAP and MAP scoring, and information matrices. References: mirt
+# graded model with standard errors, rotation, EAP, MAP, ML and WLE scoring, and information matrices. References: mirt
 # (mirt, fscores, probtrace, iteminfo), GPArotation (varimax, oblimin) and base R written out below: direct
-# maximization of the marginal likelihood where mirt's EM stops short, the grid integral of the EAP, and the information
-# matrices from the derivatives of the category probabilities. The data are simulated with set.seed(20261029) or are
-# psych::bfi and mirt::SAT12.
+# maximization of the marginal likelihood where mirt's EM stops short, the grid integral of the EAP, the information
+# matrices from the derivatives of the category probabilities, and the roots of the score and of Warm's weighted score.
+# The data are simulated with set.seed(20261029) or are psych::bfi and mirt::SAT12.
 
 source("validation/psychometrics/common.R")
 source("validation/psychometrics/multidimensional-items.R")
@@ -571,6 +571,159 @@ if (selected("information")) {
   })
   write_fixture("multidimensional-information", list(
     source = "Items set in mirt; information from the derivatives of the category probabilities in base R, checked against probtrace and iteminfo; MDISC and MDIFF of mirt.",
+    cases = cases
+  ))
+}
+
+# --- Maximum and weighted likelihood estimates ---------------------------------------------------------------------------
+
+# Items of 2 and 3 dimensions, some on one dimension and some on two, with the patterns to score: seeded random
+# patterns, the lowest and the highest categories everywhere, the highest on the items of the first dimension alone with
+# the lowest elsewhere, and patterns with missing responses.
+likelihood_cases <- list(
+  list(name = "m2pl", dimensions = 2, itemtype = "2PL", categories = 2,
+       coefficients = data.frame(a1 = c(1.2, 0.9, 1.5, 0.7, 1.1, 0, 0, 0, 0.6, 0.8), a2 = c(0, 0, 0, 0, 0, 1.3, 0.8, 1.4, 0.9, 0.5),
+                                 d = c(0.4, -0.6, 1, -1.2, 0.2, 0.8, -0.3, -1, 0.5, -0.4), g = 0, u = 1)),
+  list(name = "m3pl", dimensions = 2, itemtype = "3PL", categories = 2,
+       coefficients = data.frame(a1 = c(1.2, 0.9, 1.5, 0.7, 1.1, 0, 0, 0, 0.6, 0.8), a2 = c(0, 0, 0, 0, 0, 1.3, 0.8, 1.4, 0.9, 0.5),
+                                 d = c(0.4, -0.6, 1, -1.2, 0.2, 0.8, -0.3, -1, 0.5, -0.4),
+                                 g = c(0.2, 0.15, 0.1, 0.25, 0.2, 0.1, 0.2, 0.15, 0.1, 0.2), u = 1)),
+  list(name = "mgrm", dimensions = 2, itemtype = "graded", categories = 4,
+       coefficients = data.frame(a1 = c(1.2, 0.8, 1.4, 0, 0, 0.7), a2 = c(0, 0, 0, 1.1, 1.5, 0.9),
+                                 d1 = c(2, 1.5, 2.2, 1.8, 2.4, 1.6), d2 = c(0, 0.3, -0.5, 0.2, 0, -0.2),
+                                 d3 = c(-2, -1.2, -1.9, -1.5, -2.2, -1.7))),
+  list(name = "mgrm3", dimensions = 3, itemtype = "graded", categories = 3,
+       coefficients = data.frame(a1 = c(1.2, 0.9, 0, 0, 0, 0, 0.7), a2 = c(0, 0, 1.1, 1.4, 0, 0, 0.6), a3 = c(0, 0, 0, 0, 1.3, 0.8, 0.5),
+                                 d1 = c(1.5, 1, 0.8, 1.2, 1.4, 0.9, 1.1), d2 = c(-1, -0.5, -1.4, -0.8, -1.2, -0.6, -0.9)))
+)
+LIKELIHOOD_RANGE <- c(-6, 6)
+
+# The probabilities of an item's categories at z = a · theta and their first and second derivatives along z.
+category_curves <- function(item, z) {
+  if (is.null(item$intercepts)) {
+    s <- plogis(z + item$intercept)
+    p1 <- item$c + (1 - item$c) * s
+    d1 <- (1 - item$c) * s * (1 - s)
+    d2 <- d1 * (1 - 2 * s)
+    list(p = c(1 - p1, p1), d1 = c(-d1, d1), d2 = c(-d2, d2))
+  } else {
+    s <- plogis(z + c(Inf, item$intercepts, -Inf))
+    first <- s * (1 - s)
+    second <- first * (1 - 2 * s)
+    list(p = -diff(s), d1 = -diff(first), d2 = -diff(second))
+  }
+}
+
+# The score, the information and Warm's correction of a pattern at theta, written out for compensatory items: with
+# P_k = f_k(a · theta), ∇P_k = f_k' a and ∇²P_k = f_k'' a aᵀ, so that ½ tr(I⁻¹ J_r) = ½ Σ_i Σ_k f' f'' / f (aᵀ I⁻¹ a) a_r.
+pattern_terms <- function(items, pattern, theta) {
+  dims <- length(theta)
+  score <- numeric(dims)
+  information <- matrix(0, dims, dims)
+  curvature <- list()
+  log_likelihood <- 0
+  for (i in seq_along(items)) {
+    if (is.na(pattern[i])) next
+    a <- items[[i]]$a
+    curves <- category_curves(items[[i]], sum(a * theta))
+    x <- pattern[i] + 1
+    log_likelihood <- log_likelihood + log(curves$p[x])
+    score <- score + curves$d1[x] / curves$p[x] * a
+    information <- information + sum(curves$d1^2 / curves$p) * a %o% a
+    curvature[[length(curvature) + 1]] <- list(a = a, j = sum(curves$d1 * curves$d2 / curves$p))
+  }
+  inverse <- solve(information)
+  correction <- Reduce(`+`, lapply(curvature, function(term) 0.5 * term$j * drop(t(term$a) %*% inverse %*% term$a) * term$a))
+  list(log_likelihood = log_likelihood, score = score, information = information, weighted = score + correction)
+}
+
+# The root of a field within the box by Newton's method on its coordinates inside the box, a coordinate at a bound staying
+# there while the field pushes it out, with the Jacobian by numDeriv and steps halved until the field's length falls.
+box_root <- function(field, start) {
+  clamp <- function(x) pmin(LIKELIHOOD_RANGE[2], pmax(LIKELIHOOD_RANGE[1], x))
+  free_of <- function(theta, g) !((theta <= LIKELIHOOD_RANGE[1] & g < 0) | (theta >= LIKELIHOOD_RANGE[2] & g > 0))
+  size <- function(theta) { g <- field(theta); sqrt(sum(g[free_of(theta, g)]^2)) }
+  theta <- clamp(start)
+  for (iteration in 1:200) {
+    g <- field(theta)
+    free <- free_of(theta, g)
+    if (all(abs(g[free]) < 1e-12)) break
+    jacobian <- numDeriv::jacobian(field, theta)
+    step <- numeric(length(theta))
+    step[free] <- -solve(jacobian[free, free, drop = FALSE], g[free])
+    current <- size(theta)
+    length <- 1
+    repeat {
+      trial <- clamp(theta + length * step)
+      if (size(trial) < current || length < 1e-12) break
+      length <- length / 2
+    }
+    if (length < 1e-12) break
+    theta <- trial
+  }
+  g <- field(theta)
+  stopifnot(all(abs(g[free_of(theta, g)]) < 1e-9))
+  theta
+}
+
+if (selected("likelihood")) {
+  set.seed(20261104)
+  cases <- lapply(likelihood_cases, function(case) {
+    count <- nrow(case$coefficients)
+    data <- as.data.frame(sapply(seq_len(count), function(i) rep(0:(case$categories - 1), length.out = 12)))
+    colnames(data) <- sprintf("q%d", seq_len(count))
+    # A confirmatory model of every item on every factor: mirt rotates the scores of an exploratory model by oblimin.
+    model <- mirt.model(paste0("F", seq_len(case$dimensions), " = 1-", count, collapse = "\n"))
+    fit <- set_multidimensional_items(data, model, case$itemtype, case$coefficients)
+    values <- coef(fit, simplify = TRUE)$items
+    items <- lapply(seq_len(count), function(i) {
+      a <- unname(values[i, paste0("a", seq_len(case$dimensions))])
+      if (case$itemtype == "graded") list(a = a, intercepts = unname(values[i, grep("^d[0-9]+$", colnames(values))]))
+      else list(a = a, intercept = values[i, "d"], c = values[i, "g"])
+    })
+    first <- sapply(items, function(item) item$a[1] != 0 && all(item$a[-1] == 0))
+    random <- t(replicate(10, sample(0:(case$categories - 1), count, replace = TRUE)))
+    missing <- random[1:2, ]
+    missing[1, c(2, 5)] <- NA
+    missing[2, c(1, 6)] <- NA
+    patterns <- rbind(random, rep(0, count), rep(case$categories - 1, count),
+                      ifelse(first, case$categories - 1, 0), missing)
+    colnames(patterns) <- colnames(data)
+    mirt_ml <- fscores(fit, method = "ML", response.pattern = patterns)
+    mirt_wle <- fscores(fit, method = "WLE", response.pattern = patterns)
+    factors <- paste0("F", seq_len(case$dimensions))
+    # mirt's WLE is the mode of L √det I, Jeffreys' prior: the gradient of its log vanishes at mirt's estimates, within
+    # mirt's tolerance. That is Warm's estimator for the M2PL and the graded model, not for the M3PL.
+    jeffreys <- function(pattern) function(theta) {
+      terms <- pattern_terms(items, pattern, theta)
+      terms$log_likelihood + 0.5 * log(det(terms$information))
+    }
+    for (p in seq_len(nrow(patterns))) {
+      stopifnot(max(abs(numDeriv::grad(jeffreys(patterns[p, ]), unname(mirt_wle[p, factors])))) < 1e-4)
+    }
+    estimates <- lapply(seq_len(nrow(patterns)), function(p) {
+      pattern <- patterns[p, ]
+      start_ml <- pmin(6, pmax(-6, ifelse(is.finite(mirt_ml[p, factors]), mirt_ml[p, factors], sign(mirt_ml[p, factors]) * 6)))
+      ml <- box_root(function(theta) pattern_terms(items, pattern, theta)$score, start_ml)
+      wle <- box_root(function(theta) pattern_terms(items, pattern, theta)$weighted, pmin(6, pmax(-6, mirt_wle[p, factors])))
+      se <- function(theta) sqrt(diag(solve(pattern_terms(items, pattern, theta)$information)))
+      list(pattern = I(unname(pattern)),
+           ml = I(ml), mlStandardErrors = I(se(ml)), wle = I(wle), wleStandardErrors = I(se(wle)),
+           mirtMl = I(unname(mirt_ml[p, factors])), mirtWle = I(unname(mirt_wle[p, factors])))
+    })
+    list(model = case$name, dimensions = case$dimensions,
+         items = lapply(items, function(item) {
+           if (is.null(item$intercepts)) list(a = I(item$a), intercept = item$intercept, c = item$c, d = 1)
+           else list(a = I(item$a), intercepts = I(item$intercepts))
+         }),
+         estimates = estimates)
+  })
+  write_fixture("multidimensional-likelihood", list(
+    source = paste("Items set in mirt; base R maximum likelihood and Warm's weighted likelihood estimates in the box [-6, 6],",
+                   "the roots of the score and of the score plus ½ tr(I⁻¹ J_r) by Newton's method; mirt's fscores ML and WLE,",
+                   "whose WLE maximizes L √det I, Warm's estimator for the M2PL and the graded model and not for the M3PL;",
+                   "standard errors from I⁻¹."),
+    range = I(LIKELIHOOD_RANGE),
     cases = cases
   ))
 }

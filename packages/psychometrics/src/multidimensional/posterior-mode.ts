@@ -11,7 +11,7 @@ const ROUNDING = 1e-12;
 /** The most times a step is halved. */
 const MAX_HALVINGS = 40;
 /** The scan for the starting point of the mode spans this many standard deviations of the prior around its mean. */
-const SCAN_SPAN = 3;
+export const SCAN_SPAN = 3;
 /** Points per dimension of the scan, and above three dimensions. */
 const SCAN_POINTS = 5;
 const SCAN_POINTS_ABOVE = 3;
@@ -41,7 +41,8 @@ export interface PosteriorMode {
  */
 export function posteriorMode(pattern: AnsweredPattern, prior: CheckedPrior, dimensions: number): PosteriorMode {
   const objective = negativeLogPosterior(pattern, prior, dimensions);
-  const theta = fisherScoring(objective, scanStart(prior, dimensions, objective.value));
+  const sds = Float64Array.from(prior.mean, (_, d) => Math.sqrt(prior.covariance[d * dimensions + d] ?? 0));
+  const theta = fisherScoring(objective, scanStart(prior.mean, sds, objective.value));
   const information = new Float64Array(dimensions * dimensions);
   objective.scoring(theta, new Float64Array(dimensions), information);
   return { theta, information };
@@ -85,10 +86,19 @@ function negativeLogPosterior(pattern: AnsweredPattern, prior: CheckedPrior, dim
   };
 }
 
-/** Returns the point of the scan with the lowest objective: of the grid, or along the axes above five dimensions. */
-function scanStart(prior: CheckedPrior, dimensions: number, objective: (theta: Float64Array) => number): Float64Array {
+/**
+ * Returns the point of the scan with the lowest objective: of the grid of 5 points per dimension (3 above three
+ * dimensions) at `center + scales * z`, z from -3 to 3, or above five dimensions of the center and the points z = ±3
+ * on each axis.
+ */
+export function scanStart(
+  center: ArrayLike<number>,
+  scales: ArrayLike<number>,
+  objective: (theta: Float64Array) => number,
+): Float64Array {
+  const dimensions = center.length;
   const theta = new Float64Array(dimensions);
-  let best = Float64Array.from(prior.mean);
+  let best = Float64Array.from(center);
   let bestValue = Number.POSITIVE_INFINITY;
   const visit = (): void => {
     const value = objective(theta);
@@ -100,18 +110,17 @@ function scanStart(prior: CheckedPrior, dimensions: number, objective: (theta: F
   if (dimensions <= MAX_GRID_SCAN_DIMENSIONS) {
     const perDimension = dimensions > 3 ? SCAN_POINTS_ABOVE : SCAN_POINTS;
     for (let q = 0; q < perDimension ** dimensions; q++) {
-      scanPoint(q, perDimension, prior, theta);
+      scanPoint(q, perDimension, center, scales, theta);
       visit();
     }
     return best;
   }
-  theta.set(prior.mean);
+  theta.set(Float64Array.from(center));
   visit();
   for (let d = 0; d < dimensions; d++) {
-    const sd = Math.sqrt(prior.covariance[d * dimensions + d] ?? 0);
     for (const z of [-SCAN_SPAN, SCAN_SPAN]) {
-      theta.set(prior.mean);
-      theta[d] = (prior.mean[d] ?? 0) + sd * z;
+      theta.set(Float64Array.from(center));
+      theta[d] = (center[d] ?? 0) + (scales[d] ?? 0) * z;
       visit();
     }
   }
@@ -119,12 +128,17 @@ function scanStart(prior: CheckedPrior, dimensions: number, objective: (theta: F
 }
 
 /** Writes the point q of the scan grid into `theta`, the first dimension varying fastest. */
-function scanPoint(q: number, perDimension: number, prior: CheckedPrior, theta: Float64Array): void {
-  const dimensions = theta.length;
+function scanPoint(
+  q: number,
+  perDimension: number,
+  center: ArrayLike<number>,
+  scales: ArrayLike<number>,
+  theta: Float64Array,
+): void {
   let rest = q;
-  for (let d = 0; d < dimensions; d++) {
+  for (let d = 0; d < theta.length; d++) {
     const z = -SCAN_SPAN + (2 * SCAN_SPAN * (rest % perDimension)) / (perDimension - 1);
-    theta[d] = (prior.mean[d] ?? 0) + Math.sqrt(prior.covariance[d * dimensions + d] ?? 0) * z;
+    theta[d] = (center[d] ?? 0) + (scales[d] ?? 0) * z;
     rest = Math.floor(rest / perDimension);
   }
 }

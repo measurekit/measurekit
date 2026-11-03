@@ -46,6 +46,8 @@ export {
   type MultidimensionalPosteriorMeanOptions,
   type MultidimensionalPosteriorModeOptions,
   multidimensionalEstimates,
+  multidimensionalMaximumLikelihoodEstimate,
   multidimensionalPosteriorMeanEstimate,
   multidimensionalPosteriorModeEstimate,
+  multidimensionalWeightedLikelihoodEstimate,
 } from "./scoring.js";

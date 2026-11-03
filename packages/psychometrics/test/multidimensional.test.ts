@@ -8,6 +8,7 @@ import {
   createRandom,
   DataError,
   generalizedPartialCredit,
+  gradedResponse,
   type LoadingPattern,
   type LongitudinalCalibration,
   logNormalPrior,
@@ -18,15 +19,18 @@ import {
   type MultidimensionalLogisticParameters,
   type MultidimensionalModel,
   type MultidimensionalTestItem,
+  maximumLikelihoodEstimate,
   multidimensionalDifficulty,
   multidimensionalDiscrimination,
   multidimensionalEstimates,
   multidimensionalGradedResponse,
   multidimensionalInformation,
+  multidimensionalMaximumLikelihoodEstimate,
   multidimensionalPosteriorMeanEstimate,
   multidimensionalPosteriorModeEstimate,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
+  multidimensionalWeightedLikelihoodEstimate,
   normalPrior,
   oneParameterLogistic,
   type ParameterPrior,
@@ -40,6 +44,7 @@ import {
   simulateMultidimensionalResponses,
   threeParameterLogistic,
   twoParameterLogistic,
+  weightedLikelihoodEstimate,
 } from "../src/index.js";
 import { compressResponses } from "../src/irt/internal.js";
 import { pearsonMatrix } from "../src/math/internal.js";
@@ -73,6 +78,7 @@ import graded from "./fixtures/multidimensional-graded.json" with { type: "json"
 import graded3 from "./fixtures/multidimensional-graded3.json" with { type: "json" };
 import groups from "./fixtures/multidimensional-groups.json" with { type: "json" };
 import information from "./fixtures/multidimensional-information.json" with { type: "json" };
+import likelihood from "./fixtures/multidimensional-likelihood.json" with { type: "json" };
 import m2pl from "./fixtures/multidimensional-m2pl.json" with { type: "json" };
 import m3pl from "./fixtures/multidimensional-m3pl.json" with { type: "json" };
 import mhrm from "./fixtures/multidimensional-mhrm.json" with { type: "json" };
@@ -3213,6 +3219,258 @@ describe("scoring", () => {
         "The items must be an array, found null.",
       );
     });
+  });
+});
+
+/** One pattern of multidimensional-likelihood.json: its base R MLE and WLE and mirt's, `null` where mirt's is infinite. */
+interface LikelihoodPattern {
+  readonly pattern: readonly (number | null)[];
+  readonly ml: readonly number[];
+  readonly mlStandardErrors: readonly number[];
+  readonly wle: readonly number[];
+  readonly wleStandardErrors: readonly number[];
+  readonly mirtMl: readonly (number | null)[];
+  readonly mirtWle: readonly (number | null)[];
+}
+
+/** A case of multidimensional-likelihood.json: items set in mirt and the estimates of their patterns. */
+interface LikelihoodCase {
+  readonly model: string;
+  readonly dimensions: number;
+  readonly items: readonly FixtureParameters[];
+  readonly estimates: readonly LikelihoodPattern[];
+}
+
+const likelihoodCases: readonly LikelihoodCase[] = likelihood.cases;
+const LOWEST = defined(likelihood.range[0]);
+const HIGHEST = defined(likelihood.range[1]);
+
+function likelihoodItems({ model, items }: LikelihoodCase): MultidimensionalItem<Parameters>[] {
+  const name = model.replace(/3$/, "");
+  return items.map((parameters) => ({ model: modelOf(name), parameters: parametersOf(name, parameters) }));
+}
+
+/** The log-likelihood of a pattern at theta, written out from the probabilities of the categories. */
+function patternLogLikelihood(
+  items: readonly MultidimensionalItem<Parameters>[],
+  pattern: readonly (number | null)[],
+  theta: readonly number[],
+): number {
+  const probabilities = new Float64Array(8);
+  const at = Float64Array.from(theta);
+  return items.reduce((sum, item, i) => {
+    const response = pattern[i];
+    if (response === null || response === undefined) return sum;
+    item.model.probabilities(item.parameters, at, probabilities);
+    return sum + Math.log(defined(probabilities[response]));
+  }, 0);
+}
+
+describe("maximum and weighted likelihood estimates", () => {
+  for (const fixture of likelihoodCases) {
+    const items = likelihoodItems(fixture);
+
+    it(`matches the base R MLE and WLE in the range, and their standard errors: ${fixture.model}`, () => {
+      fixture.estimates.forEach(({ pattern, ml, mlStandardErrors, wle, wleStandardErrors }, p) => {
+        const maximum = multidimensionalMaximumLikelihoodEstimate(items, pattern);
+        const weighted = multidimensionalWeightedLikelihoodEstimate(items, pattern);
+        ml.forEach((value, d) => {
+          expectClose(defined(maximum.theta[d]), value, 1e-8, `pattern ${p + 1} MLE ${d + 1}`);
+          expectClose(
+            defined(maximum.standardErrors[d]),
+            defined(mlStandardErrors[d]),
+            1e-8,
+            `pattern ${p + 1} MLE se`,
+          );
+        });
+        wle.forEach((value, d) => {
+          expectClose(defined(weighted.theta[d]), value, 1e-8, `pattern ${p + 1} WLE ${d + 1}`);
+          expectClose(
+            defined(weighted.standardErrors[d]),
+            defined(wleStandardErrors[d]),
+            1e-8,
+            `pattern ${p + 1} WLE se`,
+          );
+        });
+      });
+    });
+
+    it(`matches mirt's MLE inside the range, and is on a bound of the range where mirt's is not: ${fixture.model}`, () => {
+      fixture.estimates.forEach(({ pattern, mirtMl }, p) => {
+        const { theta } = multidimensionalMaximumLikelihoodEstimate(items, pattern);
+        // mirt gives -Inf, Inf or NaN, which the fixture writes as null, or stops short of convergence at ±20.
+        if (mirtMl.every((value) => value !== null && value > LOWEST && value < HIGHEST)) {
+          // mirt maximizes with nlm, to a tolerance of about 1e-5.
+          mirtMl.forEach((value, d) => {
+            expectClose(defined(theta[d]), defined(value), 1e-5, `pattern ${p + 1} theta ${d + 1}`);
+          });
+        } else {
+          expect(
+            theta.some((value) => value === LOWEST || value === HIGHEST),
+            `pattern ${p + 1}`,
+          ).toBe(true);
+        }
+      });
+    });
+
+    if (fixture.model !== "m3pl") {
+      it(`matches mirt's WLE where it is Warm's estimator: ${fixture.model}`, () => {
+        fixture.estimates.forEach(({ pattern, mirtWle }, p) => {
+          const { theta } = multidimensionalWeightedLikelihoodEstimate(items, pattern);
+          mirtWle.forEach((value, d) => {
+            expectClose(defined(theta[d]), defined(value), 1e-5, `pattern ${p + 1} theta ${d + 1}`);
+          });
+        });
+      });
+    }
+  }
+
+  it("differs from mirt's WLE for the M3PL, which maximizes the likelihood times √det I", () => {
+    const fixture = defined(likelihoodCases.find(({ model }) => model === "m3pl"));
+    const items = likelihoodItems(fixture);
+    const { pattern, mirtWle } = defined(fixture.estimates[0]);
+    const { theta } = multidimensionalWeightedLikelihoodEstimate(items, pattern);
+    expect(Math.abs(defined(theta[0]) - defined(mirtWle[0]))).toBeGreaterThan(0.05);
+  });
+
+  it("agrees with the one-dimensional MLE and WLE on one dimension, in any range", () => {
+    const one: MultidimensionalItem<Parameters>[] = [
+      { model: multidimensionalThreeParameterLogistic, parameters: { a: [1.3], intercept: -0.4, c: 0.2, d: 1 } },
+      { model: multidimensionalTwoParameterLogistic, parameters: { a: [0.8], intercept: 0.6, c: 0, d: 1 } },
+      { model: multidimensionalGradedResponse, parameters: { a: [1.6], intercepts: [1.5, 0.2, -1.1] } },
+      { model: multidimensionalTwoParameterLogistic, parameters: { a: [1.9], intercept: 1.1, c: 0, d: 1 } },
+    ];
+    // Slope-intercept to the IRT form: b = -intercept / a.
+    const unidimensional = [
+      { model: threeParameterLogistic, parameters: { a: 1.3, b: 0.4 / 1.3, c: 0.2, d: 1 } },
+      { model: twoParameterLogistic, parameters: { a: 0.8, b: -0.6 / 0.8, c: 0, d: 1 } },
+      { model: gradedResponse, parameters: { a: 1.6, b: [-1.5 / 1.6, -0.2 / 1.6, 1.1 / 1.6] } },
+      { model: twoParameterLogistic, parameters: { a: 1.9, b: -1.1 / 1.9, c: 0, d: 1 } },
+    ];
+    for (const pattern of [
+      [1, 0, 2, 1],
+      [0, 1, 1, null],
+      [0, 0, 0, 0],
+      [1, 1, 3, 1],
+      [null, null, 3, 1],
+    ]) {
+      for (const range of [undefined, [-3, 2.5] as const]) {
+        const options = range === undefined ? {} : { range };
+        const ml = multidimensionalMaximumLikelihoodEstimate(one, pattern, options);
+        const expectedMl = maximumLikelihoodEstimate(unidimensional, pattern, options);
+        expectClose(defined(ml.theta[0]), expectedMl.theta, 1e-8, `MLE ${pattern}`);
+        expectClose(defined(ml.standardErrors[0]), expectedMl.standardError, 1e-8, `MLE se ${pattern}`);
+        const wle = multidimensionalWeightedLikelihoodEstimate(one, pattern, options);
+        const expectedWle = weightedLikelihoodEstimate(unidimensional, pattern, options);
+        expectClose(defined(wle.theta[0]), expectedWle.theta, 1e-8, `WLE ${pattern}`);
+        expectClose(defined(wle.standardErrors[0]), expectedWle.standardError, 1e-8, `WLE se ${pattern}`);
+      }
+    }
+  });
+
+  it("puts the MLE of an extreme pattern at a corner of the range, and keeps its WLE inside", () => {
+    const fixture = defined(likelihoodCases.find(({ model }) => model === "mgrm3"));
+    const items = likelihoodItems(fixture);
+    const range = [-4, 5] as const;
+    const lowest = items.map(() => 0);
+    const highest = items.map((item) => item.model.categoryCount(item.parameters) - 1);
+    expect(multidimensionalMaximumLikelihoodEstimate(items, lowest, { range }).theta).toEqual([-4, -4, -4]);
+    expect(multidimensionalMaximumLikelihoodEstimate(items, highest, { range }).theta).toEqual([5, 5, 5]);
+    for (const pattern of [lowest, highest]) {
+      const { theta, standardErrors } = multidimensionalWeightedLikelihoodEstimate(items, pattern, { range });
+      expect(theta.every((value) => value > -4 && value < 5)).toBe(true);
+      expect(standardErrors.every((se) => Number.isFinite(se) && se > 0)).toBe(true);
+    }
+  });
+
+  it("finds the estimates in many dimensions, where the scan runs along the axes", () => {
+    // Items of one dimension each: the likelihood is a product, and its maximum the maxima of the dimensions.
+    const dimensions = 7;
+    const slopes = (size: number, at: number, j: number): number[] =>
+      Array.from({ length: size }, (_, d) => (d === at ? 0.8 + (j % 4) / 4 : 0));
+    const items = Array.from({ length: 3 * dimensions }, (_, j) => ({
+      model: multidimensionalTwoParameterLogistic,
+      parameters: { a: slopes(dimensions, j % dimensions, j), intercept: (j % 5) / 2 - 1, c: 0, d: 1 },
+    }));
+    const responses = items.map((_, j) => (j % 4 === 0 ? 0 : 1));
+    const ml = multidimensionalMaximumLikelihoodEstimate(items, responses);
+    const wle = multidimensionalWeightedLikelihoodEstimate(items, responses);
+    for (let d = 0; d < dimensions; d++) {
+      const own = [d, d + dimensions, d + 2 * dimensions];
+      const alone = own.map((j) => ({
+        model: multidimensionalTwoParameterLogistic,
+        parameters: { a: slopes(1, 0, j), intercept: (j % 5) / 2 - 1, c: 0, d: 1 },
+      }));
+      const answers = own.map((j) => defined(responses[j]));
+      const expectedMl = multidimensionalMaximumLikelihoodEstimate(alone, answers);
+      const expectedWle = multidimensionalWeightedLikelihoodEstimate(alone, answers);
+      expectClose(defined(ml.theta[d]), defined(expectedMl.theta[0]), 1e-8, `MLE ${d + 1}`);
+      expectClose(defined(wle.theta[d]), defined(expectedWle.theta[0]), 1e-8, `WLE ${d + 1}`);
+    }
+  });
+
+  it("estimates the persons of a data set", () => {
+    const items = itemsOf(m2pl);
+    const data = responseMatrix(
+      [
+        [1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+        [0, 0, 0, null, null, 1, 1, 1, 0, null, 1, 1],
+      ],
+      { itemIds: [...m2pl.itemIds] },
+    );
+    for (const estimator of [multidimensionalMaximumLikelihoodEstimate, multidimensionalWeightedLikelihoodEstimate]) {
+      const results = multidimensionalEstimates(data, items, estimator);
+      results.forEach(({ estimate }, p) => {
+        expect(estimate).toEqual(estimator(items, defined(data.responses[p])));
+      });
+    }
+  });
+
+  it("needs a response, and answered items whose slopes span every dimension", () => {
+    const items = likelihoodItems(defined(likelihoodCases[0]));
+    const none = items.map(() => null);
+    expect(() => multidimensionalMaximumLikelihoodEstimate(items, none)).toThrow(
+      "Maximum likelihood estimation needs at least one response.",
+    );
+    expect(() => multidimensionalWeightedLikelihoodEstimate([], [])).toThrow(
+      "Weighted likelihood estimation needs at least one response.",
+    );
+    // The first five items load on the first dimension alone.
+    const first = items.map((_, i) => (i < 5 ? 1 : null));
+    for (const estimate of [multidimensionalMaximumLikelihoodEstimate, multidimensionalWeightedLikelihoodEstimate]) {
+      expect(() => estimate(items, first)).toThrow(
+        "estimation needs answered items whose slopes span the 2 dimensions: along a dimension they leave out, the likelihood is flat.",
+      );
+    }
+    const all = items.map(() => 1);
+    expect(() => multidimensionalMaximumLikelihoodEstimate(items, all, { range: [1, 1] })).toThrow(
+      "The range needs the lower bound below the upper, found [1, 1].",
+    );
+    expect(() => multidimensionalWeightedLikelihoodEstimate(items, all, { range: [0, Number.NaN] })).toThrow(DataError);
+  });
+
+  it("has the largest likelihood of the range at the MLE", () => {
+    const fixture = defined(likelihoodCases[0]);
+    const items = likelihoodItems(fixture);
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom(0, 1, null), { minLength: items.length, maxLength: items.length }),
+        fc.array(fc.double({ min: LOWEST, max: HIGHEST, noNaN: true }), { minLength: 2, maxLength: 2 }),
+        (pattern, other) => {
+          let theta: readonly number[];
+          try {
+            theta = multidimensionalMaximumLikelihoodEstimate(items, pattern).theta;
+          } catch (error) {
+            expect(error).toBeInstanceOf(DataError);
+            return;
+          }
+          expect(theta.every((value) => value >= LOWEST && value <= HIGHEST)).toBe(true);
+          const at = patternLogLikelihood(items, pattern, theta);
+          expect(at).toBeGreaterThanOrEqual(patternLogLikelihood(items, pattern, other) - 1e-12);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 });
 
