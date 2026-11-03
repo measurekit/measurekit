@@ -513,6 +513,7 @@ grows in proportion to its input, but for the designs of cognitive diagnosis, wh
 | `eventLog`                    | 1,000,000 events, each of its own learner, item and skill |        82 | 171                         |
 | `bkt` with stored parameters  | 100,000 skills                                            |       6.6 | 56                          |
 | `kst` with a structure        | 10,000 states of 64 items                                 |       1.9 | 1                           |
+| `iita`                        | 1,000,000 events, each of its own learner and item        |        77 | 270                         |
 
 A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or
 persons itself, and 2 to 9 times where the input names them. A design of cognitive diagnosis takes up to 2 GB from a
