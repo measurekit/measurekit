@@ -18,6 +18,10 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   events, and cross-validation fits the model once per fold. Limit the size of data accepted from untrusted sources
   before analyzing it on a server: a response matrix or a log takes at most about 50 times the bytes of its JSON, and a
   Q-matrix of a few hundred bytes up to 2 GB within the limits below ([peak memory](docs/performance.md#peak-memory)).
+  The time of inductive item tree analysis grows faster than its limits bound: 1,000 learners take 10 ms at 12 items
+  and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items
+  ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). Run `iita` on logs from users in a worker with a
+  deadline, and end the worker when it passes.
 - **Limits.** Tables are sized by the values that occur in the data, not by the highest value, so that a small input
   with one large response costs no more than another of its size. What would grow faster than the input has a limit,
   and passing it throws `DataError`:

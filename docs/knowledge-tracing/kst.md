@@ -321,6 +321,19 @@ The result has `prerequisites`, `diff`, the mean squared difference of observed 
 resolves conflicting pairs in the order of the items. Pass `prerequisites` to `surmiseStructure` for the knowledge
 space.
 
+IITA's time grows faster than the items and the learners that its [limits](#limits-and-errors) bound: each count of
+counterexamples checks the pairs it adds against every item, pass after pass, until none breaks transitivity. DAKS's
+`iita` finds the same quasi-orders and takes longer, on the answers of 1,000 learners to a chain of items, each run in
+turn on one machine:
+
+| Items | `iita`       | DAKS 2.1.3 `iita(v = 1)`     |
+| ----: | ------------ | ---------------------------- |
+|    12 | 10 ms        | 133 to 144 s                 |
+|   400 | 11 s to 21 s | Not finished after 9 minutes |
+
+A host that runs IITA on logs from users runs it in a worker with a deadline, and ends the worker when the deadline
+passes.
+
 ## Validity of a structure
 
 `structureValidity(structure, log)` measures how well a structure agrees with learners' answers to its items, as kst's
