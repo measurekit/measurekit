@@ -139,8 +139,9 @@ gate needs a green `rules` run on the commit being released.
 Changesets version and publish the packages, each on its own version. A release has one changeset per package in
 `.changeset/`; changes made before the release extend it. A pull request from a `changeset-release/` branch runs
 `pnpm changeset version`, which bumps the versions, writes `CHANGELOG.md` and consumes the changesets. After it is
-merged, the maintainer runs the Release workflow by hand: it publishes the versions not yet on npm. No workflow opens
-pull requests, and Dependabot version updates are off. Changesets, docs and TSDoc describe current behavior only.
+merged, the maintainer runs the Release workflow by hand: it runs `pnpm release`, which builds and runs `changeset
+publish` with npm trusted publishing, and publishes the versions not yet on npm; it uses no changesets/action. No
+workflow opens pull requests, and Dependabot version updates are off. Changesets, docs and TSDoc describe current behavior only.
 
 ## Dependencies
 
@@ -217,7 +218,8 @@ Knowledge tracing: the model families never import each other, nor does anything
   `checkStopping`) and `checkFunction` and `checkOpenUnitInterval` of psychometrics. An option's label is `The option
   <name>`: `<Label> must be a positive number, found <value>.` A field of a record is tested with a predicate of core or
   of the language, such as `isUnitInterval` or `Number.isFinite`, and the message names the record
-  (`Event 3 needs an outcome from 0 to 1, found 2.`); values are shown with `describe`.
+  (`Event 3 needs an outcome from 0 to 1, found 2.`); values are shown with `describe`. A list is checked with
+  `checkArray`, which refuses holes, or read by index, as `forEach`, `map` and `every` skip a hole unseen.
 - Psychometrics checks items with `checkItem` or `checkItemList` and a model with `checkModel`, all of `irt/items.ts`.
   Knowledge tracing checks a learner model with `checkModel` of `model.ts`, attempts with `checkAttempts`, and a
   model's predictions with `checkUnitInterval`.
