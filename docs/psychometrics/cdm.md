@@ -189,7 +189,8 @@ probabilities over the latent groups of q, weighted by the groups' proportions, 
 expected share correct; PVAF(q) is ς²(q) over ς² of all attributes. The suggestion is the q-vector with the fewest
 attributes whose PVAF exceeds `eps`, default 0.95, of those the one of largest PVAF. An item whose success
 probabilities do not vary over the profiles, such as an item without responses, has `pvaf` `null` and keeps its
-attributes. A suggestion is evidence for experts to weigh, not a correction: calibrate the G-DINA before validating.
+attributes; a profile of proportion 0 adds nothing. ς² of every q-vector takes time that grows as 3^K, each summed from
+the groups of a q-vector of one attribute more: 160 ms an item at 15 attributes and 200 persons. A suggestion is evidence for experts to weigh, not a correction: calibrate the G-DINA before validating.
 
 ## Item-level model comparison
 

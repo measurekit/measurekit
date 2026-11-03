@@ -1014,6 +1014,28 @@ describe("validateQMatrix", () => {
     for (const item of [first, second]) expect(Number.isFinite(defined(item).pvaf)).toBe(true);
   });
 
+  it("leaves out the latent groups of profiles without proportion", () => {
+    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix));
+    const profiles = calibration.profiles.map((entry, c) => (c === 1 ? { ...entry, proportion: 0 } : entry));
+    for (const item of validateQMatrix(matrix, { ...calibration, profiles })) {
+      expect(item.pvaf).toBeGreaterThan(0);
+      expect(item.pvaf).toBeLessThanOrEqual(1 + 1e-12);
+    }
+  });
+
+  it("validates the items of 15 attributes, in time that grows as 3^K", () => {
+    const attributes = Array.from({ length: 15 }, (_, k) => `a${k}`);
+    const qMatrix = Object.fromEntries(attributes.map((attribute, k) => [`item${k + 1}`, [attribute]]));
+    const itemIds = Object.keys(qMatrix);
+    const matrix = responseMatrix(
+      Array.from({ length: 4 }, (_, person) => itemIds.map((_, item) => (person + item) % 2)),
+      { itemIds },
+    );
+    const suggestions = validateQMatrix(matrix, calibrateCdm(matrix, qMatrix, { maxIterations: 2 }));
+    expect(suggestions).toHaveLength(15);
+  });
+
   it("rejects an eps outside [0, 1] and options of other types", () => {
     const matrix = responseMatrix([
       [1, 0],

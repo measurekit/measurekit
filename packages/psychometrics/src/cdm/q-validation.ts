@@ -2,7 +2,7 @@ import { checkOptions, checkUnitInterval } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CdmCalibration, calibratedModel } from "./calibration.js";
 import { forEachPosterior } from "./expectation.js";
-import { profilesOf } from "./q-matrix.js";
+import { bitPattern, profileIndices, profilesOf } from "./q-matrix.js";
 
 const DEFAULT_EPS = 0.95;
 /**
@@ -46,7 +46,8 @@ export interface QVectorSuggestion {
  * the latent groups l of q, weighted by their proportions w, with each profile's success probability its persons'
  * expected share correct under the calibration; PVAF(q) = ς²(q) / ς² of all attributes. The suggestion is the q-vector
  * of the fewest attributes whose PVAF exceeds `eps`, of those the one with the largest PVAF, the first in profile order
- * on ties.
+ * on ties. A latent group whose profiles have no proportion adds nothing to ς². The groups of every q-vector are summed
+ * from those of the q-vectors with one attribute more, in time that grows as 3^K for K attributes.
  *
  * @param matrix - The responses of the persons.
  * @param calibration - The calibrated model.
@@ -81,18 +82,22 @@ export function validateQMatrix(
       });
     }
   });
-  const candidates = profilesOf(design.attributes.length).slice(1);
-  const weights = state.proportions;
+  const attributeCount = design.attributes.length;
+  const candidates = profilesOf(attributeCount).slice(1);
+  const masks = candidates.map((q) => bitPattern(q, q.keys()));
+  const indexOf = profileIndices(attributeCount);
+  const weights = Float64Array.from(indexOf, (c) => state.proportions[c] ?? 0);
   return calibration.items.map((item, j) => {
-    const success = Float64Array.from({ length: profileCount }, (_, c) => {
-      return ((correct[j]?.[c] ?? 0) + SMOOTHING) / ((persons[j]?.[c] ?? 0) + 2 * SMOOTHING);
+    const sums = Float64Array.from(indexOf, (c) => {
+      const success = ((correct[j]?.[c] ?? 0) + SMOOTHING) / ((persons[j]?.[c] ?? 0) + 2 * SMOOTHING);
+      return (state.proportions[c] ?? 0) * success;
     });
-    const variances = candidates.map((q) => groupVariance(q, design.profiles, success, weights));
-    const full = variances.at(-1) ?? 0;
+    const variances = groupVariances(weights, sums, attributeCount);
+    const full = variances[(1 << attributeCount) - 1] ?? 0;
     if (!(full > 0)) return { id: item.id, attributes: item.attributes, suggested: item.attributes, pvaf: null };
-    const pvaf = variances.map((value) => value / full);
+    const pvaf = masks.map((mask) => (variances[mask] ?? 0) / full);
     let best = candidates.length - 1;
-    for (let size = 1; size <= design.attributes.length; size++) {
+    for (let size = 1; size <= attributeCount; size++) {
       let top = -1;
       candidates.forEach((q, i) => {
         const count = q.reduce((sum, value) => sum + value, 0);
@@ -112,25 +117,77 @@ export function validateQMatrix(
   });
 }
 
-/** Returns Σ_l w_l (P̄_l - P̄)² over the latent groups of q-vector q, the profiles that agree on its attributes. */
-function groupVariance(
-  q: readonly number[],
-  profiles: readonly (readonly number[])[],
-  success: Float64Array,
-  weights: Float64Array,
-): number {
-  const groups = new Map<string, { weight: number; sum: number }>();
-  let mean = 0;
-  profiles.forEach((profile, c) => {
-    const key = profile.map((value, k) => (q[k] === 1 ? value : 0)).join("");
-    const w = weights[c] ?? 0;
-    const group = groups.get(key) ?? { weight: 0, sum: 0 };
-    group.weight += w;
-    group.sum += w * (success[c] ?? 0);
-    groups.set(key, group);
-    mean += w * (success[c] ?? 0);
-  });
+/**
+ * Returns ς²(q) = Σ_l W_l (S_l / W_l - P̄)² of every q-vector q, by its bit pattern, over the latent groups l of q: the
+ * profiles that agree on its attributes, with W_l the sum of their weights, S_l of their weighted success probabilities,
+ * and P̄ the weighted mean of all. A group without weight adds nothing.
+ *
+ * @remarks
+ * The groups of q are the marginal table over its attributes of the table of the profiles. Each q is reached from the
+ * full table by summing out its missing attributes in increasing order, so that each marginal table is summed once from
+ * the table of one attribute more: 3^K sums for K attributes, where grouping the profiles anew for each q takes 4^K.
+ *
+ * @param weights - Each profile's weight, by its bit pattern: bit k for attribute k.
+ * @param sums - Each profile's weight times its success probability, by its bit pattern.
+ */
+function groupVariances(weights: Float64Array, sums: Float64Array, attributeCount: number): Float64Array {
+  let totalWeight = 0;
+  let totalSum = 0;
+  for (let c = 0; c < weights.length; c++) {
+    totalWeight += weights[c] ?? 0;
+    totalSum += sums[c] ?? 0;
+  }
+  const mean = totalSum / totalWeight;
+  const variances = new Float64Array(weights.length);
+  // The marginal tables at each depth of the search: one attribute fewer for each depth, so a child reuses its depth's.
+  const tables = Array.from({ length: attributeCount + 1 }, (_, depth) => ({
+    weights: new Float64Array(2 ** (attributeCount - depth)),
+    sums: new Float64Array(2 ** (attributeCount - depth)),
+  }));
+  tables[0]?.weights.set(weights);
+  tables[0]?.sums.set(sums);
+  const visit = (mask: number, depth: number, from: number): void => {
+    const table = tables[depth];
+    const child = tables[depth + 1];
+    if (table === undefined) return;
+    variances[mask] = tableVariance(table, mean);
+    if (child === undefined) return;
+    // Attribute k sits at the position of the attributes of the mask below it, in the table's compressed index.
+    let position = 0;
+    for (let k = 0; k < attributeCount; k++) {
+      if (((mask >> k) & 1) === 0) continue;
+      if (k >= from) {
+        sumOut(table, child, position);
+        visit(mask & ~(1 << k), depth + 1, k + 1);
+      }
+      position++;
+    }
+  };
+  visit(weights.length - 1, 0, 0);
+  return variances;
+}
+
+/** Returns Σ_l W_l (S_l / W_l - mean)² over the groups of a marginal table that have weight. */
+function tableVariance(table: { readonly weights: Float64Array; readonly sums: Float64Array }, mean: number): number {
   let variance = 0;
-  for (const { weight, sum } of groups.values()) variance += weight * (sum / weight - mean) ** 2;
+  for (let g = 0; g < table.weights.length; g++) {
+    const weight = table.weights[g] ?? 0;
+    if (weight > 0) variance += weight * ((table.sums[g] ?? 0) / weight - mean) ** 2;
+  }
   return variance;
+}
+
+/** Writes into `child` the marginal table of `table` with the attribute at bit `position` of its index summed out. */
+function sumOut(
+  table: { readonly weights: Float64Array; readonly sums: Float64Array },
+  child: { readonly weights: Float64Array; readonly sums: Float64Array },
+  position: number,
+): void {
+  const low = (1 << position) - 1;
+  for (let g = 0; g < child.weights.length; g++) {
+    const absent = (g & low) | ((g & ~low) << 1);
+    const present = absent | (1 << position);
+    child.weights[g] = (table.weights[absent] ?? 0) + (table.weights[present] ?? 0);
+    child.sums[g] = (table.sums[absent] ?? 0) + (table.sums[present] ?? 0);
+  }
 }
