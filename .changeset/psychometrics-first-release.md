@@ -127,3 +127,9 @@ The guide of each module lists under Not included the methods it leaves out, one
 `check:standards` fails a module guide without the section. The guides show as recipes what a few lines over the functions
 compute, each with a test against its reference: plausible values and Rubin's rules, responses missing not at random,
 restricted exposure, the nested-model chi-square, bootstrap standard errors and the intervals of alpha and omega.
+
+What would cost more than its input has a limit: a G study has at most 6 facets with the object, as GENOVA and urGENOVA;
+a polychoric correlation takes items of at most 8 observed categories, as psych; a log-linear presmoothing has a degree
+of at most 20; a predicted theta score reports at most 10,000 scores; and contrasting groups need persons in every
+category up to the highest. The errors of links and of IRT equating take one Newton step from each link's minimum and
+each score's theta for a moved parameter, and a scale score of a decimal step is the double nearest the decimal.
