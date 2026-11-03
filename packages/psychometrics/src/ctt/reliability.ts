@@ -92,12 +92,15 @@ export function splitHalf(matrix: ResponseMatrix, options: SplitHalfOptions = {}
   checkChoice(split, "The option split", SPLIT_METHODS);
   const cases = reliabilityCases(matrix, "Split-half reliability");
   const items = matrix.itemIds.map((_, item) => item);
-  const half =
-    split === "odd-even" ? items.filter((item) => item % 2 === 0) : items.slice(0, Math.floor(items.length / 2));
-  const a = itemScores(cases, half);
+  const inFirst = (item: number): boolean =>
+    split === "odd-even" ? item % 2 === 0 : item < Math.floor(items.length / 2);
+  const a = itemScores(
+    cases,
+    items.filter((item) => inFirst(item)),
+  );
   const b = itemScores(
     cases,
-    items.filter((item) => !half.includes(item)),
+    items.filter((item) => !inFirst(item)),
   );
   const r = correlation(a, b);
   if (r === null) throw new DataError("Split-half reliability needs half scores with variance.");
