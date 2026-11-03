@@ -1,5 +1,5 @@
 import { checkIntegerFrom, checkOptions, checkRandom, DataError, type Random } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
+import { checkResponseMatrix, MAX_RESPONSE, type ResponseMatrix } from "../data/internal.js";
 
 /** Options of {@link twoWayImputation}. */
 export interface TwoWayImputationOptions {
@@ -10,7 +10,8 @@ export interface TwoWayImputationOptions {
    */
   readonly minimum?: number;
   /**
-   * The highest score an imputed response may take, an integer at least the highest response of the matrix.
+   * The highest score an imputed response may take, an integer at least the highest response of the matrix and at most
+   * 2³¹ - 1, the largest response.
    *
    * @defaultValue the highest response of the matrix
    */
@@ -35,7 +36,7 @@ export interface TwoWayImputationOptions {
  * @param options - The bounds of an imputed response.
  * @returns A new matrix without missing responses; a copy of `matrix` when it has none.
  * @throws `DataError` when the matrix is invalid, a person or an item has no response, `random` is not a generator, or
- * a bound is not an integer from 0 or does not hold every response.
+ * a bound is not an integer from 0 to 2³¹ - 1 or does not hold every response.
  * @see {@link https://doi.org/10.1111/bmsp.12078 | Sijtsma and van der Ark (2017)}
  */
 export function twoWayImputation(
@@ -132,10 +133,13 @@ function residualVariance(matrix: ResponseMatrix, twoWay: (person: number, item:
 /**
  * Checks a bound of the imputed responses.
  *
- * @throws `DataError` when it is not an integer from 0 or lies inside the observed responses.
+ * @throws `DataError` when it is not a response, an integer from 0 to 2³¹ - 1, or lies inside the observed responses.
  */
 function checkBound(bound: unknown, label: string, observed: number, relation: string): asserts bound is number {
   checkIntegerFrom(bound, label, 0);
+  if (bound > MAX_RESPONSE) {
+    throw new DataError(`${label} must be at most ${MAX_RESPONSE}, the largest response, found ${bound}.`);
+  }
   if (relation.startsWith("at most") ? bound > observed : bound < observed) {
     throw new DataError(`${label} must be ${relation} response, ${observed}, found ${bound}.`);
   }

@@ -54,10 +54,10 @@ imputation with a random error, as mokken's `twoway`:
 2. A normal error is added, of variance the sample variance of the observed responses less their TW.
 3. The value is rounded, a half to the even integer as R's `round`, and kept from `minimum` to `maximum`.
 
-| Option    | Default                            | Meaning                                                             |
-| --------- | ---------------------------------- | ------------------------------------------------------------------- |
-| `minimum` | The lowest response of the matrix  | The lowest imputed score, an integer at most the lowest response    |
-| `maximum` | The highest response of the matrix | The highest imputed score, an integer at least the highest response |
+| Option    | Default                            | Meaning                                                                                 |
+| --------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `minimum` | The lowest response of the matrix  | The lowest imputed score, an integer at most the lowest response                        |
+| `maximum` | The highest response of the matrix | The highest imputed score, an integer at least the highest response and at most 2³¹ - 1 |
 
 ```ts
 import { createRandom, responseMatrix } from "@measurekit/psychometrics";

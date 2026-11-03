@@ -250,6 +250,10 @@ describe("twoWayImputation", () => {
     expect(() => twoWayImputation(matrix, createRandom(1), { minimum: 1 })).toThrow(
       "The option minimum must be at most the lowest response, 0, found 1.",
     );
+    // Above 2³¹ - 1 an imputed response could leave the responses of a matrix, as 2,423,739,370 did.
+    expect(() => twoWayImputation(matrix, createRandom(1), { maximum: 2 ** 31 })).toThrow(
+      "The option maximum must be at most 2147483647, the largest response, found 2147483648.",
+    );
     expect(() => twoWayImputation(matrix, createRandom(1), { maximum: 1 })).toThrow(
       "The option maximum must be at least the highest response, 2, found 1.",
     );
