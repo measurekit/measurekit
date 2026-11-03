@@ -3,4 +3,11 @@
 export { additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
 export { type CdmItem, checkSuccessProbabilities, type ProfileProportion } from "./calibration.js";
 export { type ProfileEstimate, profileEstimate } from "./persons.js";
-export { bitPattern, checkItemAttributes, MAX_ATTRIBUTES, profileIndices, profilesOf } from "./q-matrix.js";
+export {
+  bitPattern,
+  checkDesignSize,
+  checkItemAttributes,
+  MAX_ATTRIBUTES,
+  profileIndices,
+  profilesOf,
+} from "./q-matrix.js";

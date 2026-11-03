@@ -460,6 +460,16 @@ describe("personScalability", () => {
     expect(result[0]?.ht).toBeNull();
   });
 
+  it("takes memory in proportion to the items, not their pairs, on 100,000 items", () => {
+    // One person fails the first half and passes the second, the other the reverse: every item has a proportion of one
+    // half, so each pair of a failed item and a passed one ties and counts half an error. A table of the pairs would
+    // take 80 GB.
+    const items = 100_000;
+    const row = Array.from({ length: items }, (_, i) => (i < items / 2 ? 0 : 1));
+    const [first] = personScalability(responseMatrix([row, row.map((response) => 1 - response)]));
+    expect(first?.normedGuttmanErrors).toBe(0.5);
+  });
+
   it("rejects responses other than 0 and 1, and arguments of other types", () => {
     expect(() => personScalability(responseMatrix([[0, 2]]))).toThrow(
       'Person scalability needs dichotomous items, but person "person1" scored 2 on item "item2".',

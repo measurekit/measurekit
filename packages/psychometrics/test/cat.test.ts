@@ -3,9 +3,11 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   bindPool,
+  checkPool,
   type DiagnosticTestItem,
   highestScore,
   informationPeak,
+  type ProfileSpace,
   poolTestlets,
   profileSpace,
   unitSelection,
@@ -3525,6 +3527,11 @@ const SKILL_POOL: readonly DiagnosticPoolItem[] = [
 ];
 const SKILLS = ["add", "subtract"];
 
+/** Returns the items of a pool bound to the profiles of a space, as a diagnostic test binds them. */
+function boundItems(pool: readonly DiagnosticPoolItem[], space: ProfileSpace): DiagnosticTestItem[] {
+  return bindPool(checkPool(pool, space.attributes), space.profiles).items;
+}
+
 function diagnosticPool(reference: CdmReference): DiagnosticPoolItem[] {
   return reference.items.map(({ id, attributes, probabilities }) => ({ id, attributes, probabilities }));
 }
@@ -3940,6 +3947,25 @@ describe("diagnosticAdaptiveTest", () => {
     );
   });
 
+  it("refuses a pool of more than 2^26 cells of items by profiles or 2^20 latent groups, before it holds the profiles", () => {
+    const attributes = Array.from({ length: 20 }, (_, k) => `a${k}`);
+    const options = { attributes, stopping: testLength(2) };
+    // 65 items of one of 20 attributes, and 2 items of all 20: each within the other limit.
+    const short = Array.from({ length: 65 }, (_, j) => ({
+      id: `q${j}`,
+      attributes: [attributes[j % 20] ?? ""],
+      probabilities: [0.2, 0.8],
+    }));
+    expect(() => diagnosticAdaptiveTest({ ...options, pool: short })).toThrow(
+      "A design has at most 67108864 cells of items by profiles, items × 2^attributes, found 68157440 of 65 items and 20 attributes.",
+    );
+    const probabilities = Array.from({ length: 2 ** 20 }, (_, g) => (g === 0 ? 0.2 : 0.8));
+    const long = ["q1", "q2"].map((id) => ({ id, attributes, probabilities }));
+    expect(() => diagnosticAdaptiveTest({ ...options, pool: long })).toThrow(
+      "A design has at most 1048576 latent groups over all items, 2^k for an item of k attributes, found 2097152.",
+    );
+  });
+
   it("rejects states and responses of other types and invalid ones", () => {
     const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
     const random = createRandom(1);
@@ -3978,7 +4004,7 @@ describe("diagnostic selection rules", () => {
     for (const [name, rule] of DIAGNOSTIC_RULES) {
       it(`scores the items as the written-out ${name} does on ${reference.name}`, () => {
         const space = profileSpace(reference.attributes, reference.profiles);
-        const { items } = bindPool(diagnosticPool(reference), space);
+        const items = boundItems(diagnosticPool(reference), space);
         const profiles = reference.profiles.map(({ profile }) => profile);
         for (const run of reference.runs.filter((candidate) => candidate.rule === name)) {
           run.steps.forEach((step, k) => {
@@ -4024,7 +4050,7 @@ describe("diagnostic selection rules", () => {
           { profile: [1], proportion: 0.7 },
         ]),
     );
-    const { items } = bindPool(pool, space);
+    const items = boundItems(pool, space);
     const estimate = profileEstimate([0.3, 0.7], [[0], [1]]);
     const out = new Float64Array(1);
     diagnosticKullbackLeibler.scores(
@@ -4051,7 +4077,7 @@ describe("diagnostic selection rules", () => {
 
   it("scores every item 0 when no item tells the profiles apart, for the rules that are zero there", () => {
     const pool: DiagnosticPoolItem[] = [{ id: "flat", attributes: ["a"], probabilities: [0.5, 0.5] }];
-    const { items } = bindPool(pool, profileSpace(["a"], undefined));
+    const items = boundItems(pool, profileSpace(["a"], undefined));
     const estimate = profileEstimate([0.5, 0.5], [[0], [1]]);
     for (const rule of [
       diagnosticKullbackLeibler,
@@ -4072,7 +4098,7 @@ describe("diagnostic selection rules", () => {
     // Two profiles, probabilities 0.2 and 0.9, posterior 0.5 and 0.5: P(correct) = 0.55; the posteriors after a
     // correct response are (0.1, 0.45) / 0.55 and after an incorrect one (0.4, 0.05) / 0.45.
     const pool: DiagnosticPoolItem[] = [{ id: "q", attributes: ["a"], probabilities: [0.2, 0.9] }];
-    const { items } = bindPool(pool, profileSpace(["a"], undefined));
+    const items = boundItems(pool, profileSpace(["a"], undefined));
     const entropy = (p: number): number => -(p * Math.log(p) + (1 - p) * Math.log(1 - p));
     const expected = -(0.55 * entropy(0.45 / 0.55) + 0.45 * entropy(0.4 / 0.45));
     const out = new Float64Array(1);
@@ -4097,7 +4123,7 @@ describe("diagnostic selection rules", () => {
       { id: "faint", attributes: ["a", "b", "c"], probabilities: [1.7763568394002505e-15, 0, 0, 0, 0, 0, 0, 0] },
     ];
     const space = profileSpace(["a", "b", "c"], undefined);
-    const { items } = bindPool(pool, space);
+    const items = boundItems(pool, space);
     // The posterior after a correct response to "sure": profiles that master c have none, and "faint" has groups of 0.
     const posterior = space.profiles.map((profile) => (profile[2] === 1 ? 0 : 0.25));
     const estimate = profileEstimate(posterior, space.profiles);
@@ -4119,7 +4145,7 @@ describe("diagnostic selection rules", () => {
   });
 
   it("leaves the scores of items that are not eligible as they are", () => {
-    const { items } = bindPool([...SKILL_POOL], profileSpace(SKILLS, undefined));
+    const items = boundItems([...SKILL_POOL], profileSpace(SKILLS, undefined));
     const estimate = profileEstimate(
       [0.25, 0.25, 0.25, 0.25],
       [
@@ -4151,7 +4177,7 @@ describe("diagnostic selection rules", () => {
 describe("diagnostic stopping rules", () => {
   for (const reference of catCdm.cases) {
     it(`stops as the written-out posterior and mastery thresholds do on ${reference.name}`, () => {
-      const { items } = bindPool(diagnosticPool(reference), profileSpace(reference.attributes, reference.profiles));
+      const items = boundItems(diagnosticPool(reference), profileSpace(reference.attributes, reference.profiles));
       const profiles = reference.profiles.map(({ profile }) => profile);
       const gdi = reference.runs.filter((run) => run.rule === "GDI");
       gdi.forEach((run, person) => {

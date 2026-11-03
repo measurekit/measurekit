@@ -112,6 +112,30 @@ export function designAttributes(
 }
 
 /**
+ * Checks that items of `itemAttributes` attributes each, over `attributes` attributes, stay within the cells of items by
+ * profiles and the latent groups that a design holds.
+ *
+ * @throws `DataError` when there are more than 2^26 cells of items by profiles, items × 2^K, or more than 2^20 latent
+ * groups over all items, 2^k for an item of k attributes.
+ */
+export function checkDesignSize(attributes: number, itemAttributes: readonly number[]): void {
+  // A few hundred bytes of Q-matrix can name these, and a fit or an adaptive test holds each of them: the limits keep
+  // its memory within about 2 GB.
+  const cells = itemAttributes.length * 2 ** attributes;
+  if (cells > MAX_PROFILE_CELLS) {
+    throw new DataError(
+      `A design has at most ${MAX_PROFILE_CELLS} cells of items by profiles, items × 2^attributes, found ${cells} of ${itemAttributes.length} items and ${attributes} attributes.`,
+    );
+  }
+  const groups = itemAttributes.reduce((sum, count) => sum + 2 ** count, 0);
+  if (groups > MAX_LATENT_GROUPS) {
+    throw new DataError(
+      `A design has at most ${MAX_LATENT_GROUPS} latent groups over all items, 2^k for an item of k attributes, found ${groups}.`,
+    );
+  }
+}
+
+/**
  * Checks a Q-matrix against item ids and returns its design.
  *
  * @throws `DataError` as {@link designAttributes} does, or when there are more than 20 attributes, more than 2^26 cells
@@ -122,20 +146,10 @@ export function cdmDesign(itemIds: readonly string[], qMatrix: QMatrix): CdmDesi
   if (attributes.length > MAX_ATTRIBUTES) {
     throw new DataError(`A design has at most ${MAX_ATTRIBUTES} attributes, found ${attributes.length}.`);
   }
-  // A few hundred bytes of Q-matrix can name these, and a fit holds each of them: the limits keep its memory within
-  // about 2 GB.
-  const cells = itemAttributes.length * 2 ** attributes.length;
-  if (cells > MAX_PROFILE_CELLS) {
-    throw new DataError(
-      `A design has at most ${MAX_PROFILE_CELLS} cells of items by profiles, items × 2^attributes, found ${cells} of ${itemAttributes.length} items and ${attributes.length} attributes.`,
-    );
-  }
-  const groups = itemAttributes.reduce((sum, indices) => sum + 2 ** indices.length, 0);
-  if (groups > MAX_LATENT_GROUPS) {
-    throw new DataError(
-      `A design has at most ${MAX_LATENT_GROUPS} latent groups over all items, 2^k for an item of k attributes, found ${groups}.`,
-    );
-  }
+  checkDesignSize(
+    attributes.length,
+    itemAttributes.map((indices) => indices.length),
+  );
   const profiles = profilesOf(attributes.length);
   const groupOf = itemAttributes.map((indices) => {
     const groups = profileIndices(indices.length);

@@ -1,11 +1,11 @@
 import { checkOptions, type Random } from "@measurekit/core";
 import { type ProfileEstimate, type ProfileProportion, profileEstimate } from "../cdm/internal.js";
-import { bindPool, type DiagnosticPoolItem, type DiagnosticTestItem } from "./diagnostic-items.js";
+import { bindPool, checkPool, type DiagnosticPoolItem, type DiagnosticTestItem } from "./diagnostic-items.js";
 import { gdinaDiscriminationIndex } from "./diagnostic-selection.js";
 import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
 import { checkCategory } from "./items.js";
 import { profilePosterior } from "./profile-posterior.js";
-import { profileSpace } from "./profile-space.js";
+import { checkAttributes, profileSpace } from "./profile-space.js";
 import type { ItemSelectionRule } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
 import type { TestControlOptions } from "./test-controls.js";
@@ -75,8 +75,9 @@ export interface DiagnosticAdaptiveTest {
  *   enemy sets and testlet order; each option has its default.
  * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when `stopping` or `selection` is not a rule, the attributes, the prior or the pool are
- * invalid, an item has an attribute that is not among the attributes, a content target is invalid or missing for an
- * item's area, an exposure parameter is outside [0, 1], or an enemy set does not name two or more distinct pool items.
+ * invalid, an item has an attribute that is not among the attributes, the pool has more than 2^26 cells of items by
+ * profiles or more than 2^20 latent groups over all items, a content target is invalid or missing for an item's area,
+ * an exposure parameter is outside [0, 1], or an enemy set does not name two or more distinct pool items.
  *
  * @example
  * ```ts
@@ -113,8 +114,10 @@ export function diagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): 
     withinTestlet,
   } = options;
   checkRules(stopping, selection, "gdinaDiscriminationIndex");
+  checkAttributes(attributes);
+  const checked = checkPool(pool, attributes);
   const space = profileSpace(attributes, prior);
-  const { items, indices } = bindPool(pool, space);
+  const { items, indices } = bindPool(checked, space.profiles);
   const engine = adaptiveEngine({
     pool: items,
     indices,

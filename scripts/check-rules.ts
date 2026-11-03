@@ -428,6 +428,14 @@ export const RULES: readonly Rule[] = [
     titles: "refuses more than 20 attributes",
   },
   {
+    rule: "A diagnostic adaptive test stops at 2^26 cells of items by profiles and 2^20 latent groups, before it holds its profiles.",
+    file: "packages/psychometrics/src/cat/diagnostic-items.ts",
+    find: "  checkDesignSize(\n    attributes.length,\n    items.map((checked) => checked.positions.length),\n  );\n",
+    replace: "",
+    test: "packages/psychometrics/test/cat.test.ts",
+    titles: "refuses a pool of more than",
+  },
+  {
     rule: "The incomplete standard errors stop at their limit of success probabilities, before the calibration.",
     file: "packages/psychometrics/src/cdm/standard-errors.ts",
     find: "if (probabilities > MAX_INCOMPLETE_PROBABILITIES) {",

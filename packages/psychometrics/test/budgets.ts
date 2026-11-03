@@ -122,7 +122,7 @@ const BUDGETS = {
   "mokken.guttmanErrors": 3,
   "mokken.conditionalAssociation": 300,
   "mokken.twoWayImputation": 2,
-  "mokken.personScalability": 40,
+  "mokken.personScalability": 20,
   "generalizability.generalizabilityStudy": 30,
   "generalizability.generalizabilityStudyUnbalanced": 30,
   "rater.exactAgreement": 0.3,

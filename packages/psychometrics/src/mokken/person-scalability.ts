@@ -1,5 +1,4 @@
 import { checkDichotomous, checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { stepPairErrors } from "./weights.js";
 
 /** The nonparametric person fit of one person's 0/1 responses. */
 export interface PersonScalability {
@@ -22,11 +21,13 @@ export interface PersonScalability {
   readonly ht: number | null;
 }
 
-/** What every person reads of the items: their proportions correct, log-odds and totals, and the errors of pairs. */
+/** What every person reads of the items: their proportions correct, log-odds and totals, and their orders. */
 interface ItemOrder {
   readonly totals: Float64Array;
-  /** By item, then item: the Guttman errors of failing the first and passing the second. */
-  readonly errors: Float64Array;
+  /** The proportion correct of each item over the persons who answered it. */
+  readonly proportions: Float64Array;
+  /** The items that someone answered, by proportion correct, the largest first. */
+  readonly byProportion: Int32Array;
   /** The log-odds of each item, 0 for one that everyone or no one who answered it passed. */
   readonly logOdds: Float64Array;
   /** The items by log-odds, the largest first. */
@@ -81,7 +82,7 @@ export function personScalability(matrix: ResponseMatrix): PersonScalability[] {
   });
 }
 
-/** Returns the items' totals, the errors of each pair by the order of their proportions correct, and their log-odds. */
+/** Returns the items' totals, proportions correct and log-odds, and the items in the order of each. */
 function itemOrder({ responses, itemIds }: ResponseMatrix): ItemOrder {
   const count = itemIds.length;
   const answered = new Float64Array(count);
@@ -94,16 +95,9 @@ function itemOrder({ responses, itemIds }: ResponseMatrix): ItemOrder {
     });
   }
   const proportions = totals.map((total, item) => total / (answered[item] ?? 0));
-  const errors = new Float64Array(count * count);
-  for (let i = 0; i < count; i++) {
-    const first = shares(proportions[i] ?? 0);
-    for (let j = i + 1; j < count; j++) {
-      // By the scores of item i, then j: (0, 1) fails i and passes j; (1, 0) passes i and fails j.
-      const table = stepPairErrors(first, shares(proportions[j] ?? 0));
-      errors[i * count + j] = table[1] ?? 0;
-      errors[j * count + i] = table[2] ?? 0;
-    }
-  }
+  const byProportion = Int32Array.from({ length: count }, (_, item) => item)
+    .filter((item) => (answered[item] ?? 0) > 0)
+    .sort((a, b) => (proportions[b] ?? 0) - (proportions[a] ?? 0));
   const logOdds = proportions.map((p) => {
     const odds = Math.log(p / (1 - p));
     return Number.isFinite(odds) ? odds : 0;
@@ -111,28 +105,37 @@ function itemOrder({ responses, itemIds }: ResponseMatrix): ItemOrder {
   const byOdds = Int32Array.from({ length: count }, (_, item) => item).sort(
     (a, b) => (logOdds[b] ?? 0) - (logOdds[a] ?? 0),
   );
-  return { totals, errors, logOdds, byOdds };
+  return { totals, proportions, byProportion, logOdds, byOdds };
 }
 
-/** Returns the shares of an item's two scores, which order its step as counts of persons do. */
-function shares(proportion: number): Float64Array {
-  return Float64Array.of(1 - proportion, proportion);
-}
-
-/** Returns a person's Guttman errors over their largest value, NC (n - NC). */
-function normedErrors(row: readonly (number | null)[], { errors }: ItemOrder): number {
-  const count = row.length;
+/**
+ * Returns a person's Guttman errors over their largest value, NC (n - NC). A pair of an item failed and a harder one
+ * passed is an error, and a pair of items of equal proportions half of one, as the step order of `stepPairErrors` counts
+ * them for 0/1 items; the counts are of halves, so their sum is exact in any order. The items are taken from the easiest,
+ * with the failures among easier ones counted, so that a person costs the items, not their pairs.
+ */
+function normedErrors(row: readonly (number | null)[], { proportions, byProportion }: ItemOrder): number {
   let errorCount = 0;
   let passed = 0;
   let failed = 0;
-  row.forEach((response, i) => {
-    if (response !== 1) return;
-    passed++;
-    row.forEach((other, j) => {
-      if (other === 0) errorCount += errors[j * count + i] ?? 0;
-    });
-  });
-  for (const response of row) if (response === 0) failed++;
+  for (let start = 0; start < byProportion.length; ) {
+    // The items of one proportion: a pass among them is an error with each failure of an easier item and half of one
+    // with each failure among them.
+    const proportion = proportions[byProportion[start] ?? 0];
+    let end = start;
+    let passedHere = 0;
+    let failedHere = 0;
+    while (end < byProportion.length && proportions[byProportion[end] ?? 0] === proportion) {
+      const response = row[byProportion[end] ?? 0] ?? null;
+      if (response === 1) passedHere++;
+      else if (response === 0) failedHere++;
+      end++;
+    }
+    errorCount += passedHere * failed + 0.5 * passedHere * failedHere;
+    passed += passedHere;
+    failed += failedHere;
+    start = end;
+  }
   return errorCount / (passed * failed);
 }
 

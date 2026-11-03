@@ -758,6 +758,10 @@ groups: the profiles over its attributes as listed, by the number of attributes 
 to 1. Content balancing, enemy sets and exposure control work as for [`adaptiveTest`](#adaptive-tests), and so do the
 steps before each item; the first item is selected at the prior. Responses are 0 or 1.
 
+The test holds each item's latent group in each profile, so the pool keeps to the [limits](cdm.md#calibration) of a
+calibration's design, which it checks before it holds any profile: at most 2^26 cells of items × 2^K, 64 items at 20
+attributes, where the test takes 0.75 GB, and 2^20 latent groups over all items.
+
 ### Estimate
 
 The state's `estimate` is a `ProfileEstimate`, the shape of an [`AttributeProfile`](cdm.md#persons) without an id.

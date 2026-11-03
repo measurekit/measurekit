@@ -13,16 +13,11 @@ export interface ProfileSpace {
 }
 
 /**
- * Checks the attributes of a diagnostic test and its prior, and returns the profiles with the prior matched to them by
- * pattern and normalized to sum to 1: uniform without a prior.
+ * Checks the attributes of a diagnostic test.
  *
- * @throws `DataError` when the attributes are not 1 to 20 distinct non-empty strings, or the prior does not list each
- * profile once, as 0s and 1s over the attributes, with a proportion from 0 to 1, the proportions not all 0.
+ * @throws `DataError` when they are not 1 to 20 distinct non-empty strings.
  */
-export function profileSpace(
-  attributes: readonly string[],
-  prior: readonly ProfileProportion[] | undefined,
-): ProfileSpace {
+export function checkAttributes(attributes: readonly string[]): void {
   checkArray(attributes, "The option attributes must be an array of attribute names");
   const valid = attributes.length > 0 && attributes.length <= MAX_ATTRIBUTES && attributes.every(isNonEmptyString);
   if (!(valid && new Set(attributes).size === attributes.length)) {
@@ -30,6 +25,19 @@ export function profileSpace(
       `The option attributes must list from 1 to ${MAX_ATTRIBUTES} distinct non-empty names, found ${formatList(attributes)}.`,
     );
   }
+}
+
+/**
+ * Checks the prior of a diagnostic test, whose attributes {@link checkAttributes} checked, and returns the profiles with
+ * the prior matched to them by pattern and normalized to sum to 1: uniform without a prior.
+ *
+ * @throws `DataError` when the prior does not list each profile once, as 0s and 1s over the attributes, with a
+ * proportion from 0 to 1, the proportions not all 0.
+ */
+export function profileSpace(
+  attributes: readonly string[],
+  prior: readonly ProfileProportion[] | undefined,
+): ProfileSpace {
   const profiles = profilesOf(attributes.length);
   const proportions = prior === undefined ? new Float64Array(profiles.length).fill(1) : matchPrior(prior, attributes);
   const total = proportions.reduce((sum, proportion) => sum + proportion, 0);
