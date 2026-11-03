@@ -389,7 +389,7 @@ function conditionalLikelihood(strata: readonly Stratum[], size: number, occasio
       writeColumns(pattern, stratum.pairs, occasions, columns);
       return dotAt(columns, effects, stratum.effects);
     });
-    const largest = Math.max(...logits);
+    const largest = logits.reduce((most, logit) => Math.max(most, logit), Number.NEGATIVE_INFINITY);
     const weights = logits.map((logit) => Math.exp(logit - largest));
     const total = weights.reduce((sum, weight) => sum + weight, 0);
     const logLikelihood =

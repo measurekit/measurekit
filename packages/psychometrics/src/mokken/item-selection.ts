@@ -65,7 +65,7 @@ export function automatedItemSelection(matrix: ResponseMatrix, options: ItemSele
   const moments = covariances(data);
   const usable = usableItems(moments, data.items);
   const assigned = searchScales(moments, data.items, usable, data.persons, lowerBound, alpha);
-  const scaleCount = Math.max(0, ...assigned);
+  const scaleCount = assigned.reduce((most, scale) => Math.max(most, scale), 0);
   return {
     scales: Array.from({ length: scaleCount }, (_, scale) =>
       data.itemIds.filter((_, item) => assigned[item] === scale + 1),
@@ -173,7 +173,7 @@ function growScale(pairs: PairStatistics, growth: Growth, lowerBound: number, al
     counts.push(available.length);
     const critical = Math.abs(normalQuantile(adjustedLevel(alpha, counts)));
     const results = available.map((item) => candidateCoefficient(pairs, members, item, lowerBound, critical));
-    const best = Math.max(...results);
+    const best = results.reduce((most, result) => Math.max(most, result), Number.NEGATIVE_INFINITY);
     if (best < lowerBound) return;
     available.forEach((item, k) => {
       if (results[k] === best) inSet[item] = scale;

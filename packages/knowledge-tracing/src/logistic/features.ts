@@ -285,7 +285,9 @@ export function needsOf(specs: readonly FeatureSpec[]): HistoryNeeds {
     practice: of(PRACTICE_KINDS).length > 0,
     leaks: distinct(of(["dash", "dashSuccess"])),
     times: unbounded || windows.length > 0,
-    horizon: unbounded ? Number.POSITIVE_INFINITY : Math.max(0, ...windows.map((spec) => spec.values[0] ?? 0)),
+    horizon: unbounded
+      ? Number.POSITIVE_INFINITY
+      : windows.reduce((most, spec) => Math.max(most, spec.values[0] ?? 0), 0),
   };
 }
 

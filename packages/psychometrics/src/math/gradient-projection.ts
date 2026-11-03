@@ -90,7 +90,7 @@ function descend(manifold: Manifold, size: number, tolerance: number, maxIterati
     if (norm < tolerance) return { rotation, iterations: iteration, converged: true };
     if (previousRotation === null) step *= 2;
     else step = barzilaiBorwein(rotation, previousRotation, projected, previousProjected, step);
-    const target = Math.max(...values.slice(-WINDOW));
+    const target = values.slice(-WINDOW).reduce((most, value) => Math.max(most, value), Number.NEGATIVE_INFINITY);
     let value = 0;
     for (let halving = 0; halving <= MAX_HALVINGS; halving++) {
       for (let k = 0; k < entries; k++) candidate[k] = (rotation[k] ?? 0) - step * (projected[k] ?? 0);

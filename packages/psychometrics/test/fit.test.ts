@@ -1197,6 +1197,14 @@ describe("kernelItemCurves", () => {
     });
   });
 
+  it("smooths 200,000 items, more than a function call takes arguments", () => {
+    // Two persons who score 0 on every item: one category of each item, at two nodes, so that the curves stay small.
+    const items = 200_000;
+    const curves = kernelItemCurves(responseMatrix([Array(items).fill(0), Array(items).fill(0)]), { points: 2 });
+    expect(curves).toHaveLength(items);
+    expect(curves[items - 1]?.probabilities).toEqual([[1, 1]]);
+  });
+
   it("takes the number of nodes and the bandwidth", () => {
     const { matrix } = simulated(48, 300, 4);
     const [curve] = kernelItemCurves(matrix, { points: 7, bandwidth: 0.5 });

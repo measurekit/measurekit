@@ -40,7 +40,7 @@ export function incompleteCovariances(data: DichotomousRows, design: CdmDesign, 
   const total = sizes.reduce((sum, size) => sum + size, 0);
   const information = new Float64Array(total * total);
   const score = new Float64Array(total);
-  const mass = new Float64Array(Math.max(...sizes));
+  const mass = new Float64Array(sizes.reduce((most, size) => Math.max(most, size), 0));
   forEachPosterior(data, design, state, (person, posterior) => {
     score.fill(0);
     state.probabilities.forEach((probabilities, j) => {

@@ -132,5 +132,5 @@ function logOddsZ(observed: PairTable, expected: PairTable, persons: number): nu
 /** Returns the smaller of the Holm-adjusted p-values of the two largest z over `pairs` pairs. */
 function adjusted(pairs: number, ...largest: readonly (number | null)[]): number | null {
   const values = largest.flatMap((z) => (z === null ? [] : [Math.min(1, pairs * 2 * normalCdf(-z))]));
-  return values.length === 0 ? null : Math.min(...values);
+  return values.length === 0 ? null : values.reduce((least, value) => Math.min(least, value));
 }

@@ -259,7 +259,7 @@ function backwardSelection(
       return partners;
     });
     if (counts.every((count) => count === 0)) return removed;
-    const most = Math.max(...counts);
+    const most = counts.reduce((largest, count) => Math.max(largest, count), 0);
     const tied = order.filter((_, position) => counts[position] === most);
     const chosen = tied.length === 1 ? (tied[0] ?? 0) : tiedByCoefficient(data, moments, tied, removed);
     for (let other = 0; other < items; other++) {

@@ -1,0 +1,8 @@
+`Math.$method($arguments)` as $call where {
+  $method <: or {
+    `max`,
+    `min`
+  },
+  $arguments <: some `...$_`,
+  register_diagnostic(span=$call, message="Math.max and Math.min take each value as an argument, so a spread of a long array overflows the stack: reduce the array instead.", severity="error")
+}

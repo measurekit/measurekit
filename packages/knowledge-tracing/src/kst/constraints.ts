@@ -122,7 +122,7 @@ export function constraintsOf(
     }
     for (const members of restrictions[name].groups) {
       const positions = members.map((id) => position(id, "equal"));
-      const first = Math.min(...positions);
+      const first = positions.reduce((least, value) => Math.min(least, value), Number.POSITIVE_INFINITY);
       for (const i of positions) group[i] = first;
     }
     return { held, group };

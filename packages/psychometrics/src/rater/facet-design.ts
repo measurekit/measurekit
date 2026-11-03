@@ -293,7 +293,7 @@ function thresholdSets(indexed: Indexed, items: VirtualItems, facet: number): Th
   });
   return {
     setOf,
-    categoryCounts: Int32Array.from(used, (categories) => Math.max(...categories) + 1),
+    categoryCounts: Int32Array.from(used, (categories) => highestOf(categories) + 1),
     elements: owners,
   };
 }
@@ -301,7 +301,7 @@ function thresholdSets(indexed: Indexed, items: VirtualItems, facet: number): Th
 /** Throws unless the categories used in a threshold set are 0 up to the highest, at least two of them. */
 function checkCategories(owner: string | null, facet: string, used: ReadonlySet<number>): void {
   const scope = owner === null ? "the rating scale" : `the thresholds of the ${facet} "${owner}"`;
-  const highest = Math.max(...used);
+  const highest = highestOf(used);
   if (highest < 1) throw new DataError(`The scores of ${scope} need at least two categories, found only category 0.`);
   for (let k = 0; k < highest; k++) {
     if (!used.has(k)) {
@@ -336,4 +336,11 @@ function compressed(indexed: Indexed, items: VirtualItems): CompressedResponses 
     codes,
     times: null,
   };
+}
+
+/** Returns the highest of the categories, -Infinity for none, without passing each as an argument. */
+function highestOf(categories: Iterable<number>): number {
+  let highest = Number.NEGATIVE_INFINITY;
+  for (const category of categories) highest = Math.max(highest, category);
+  return highest;
 }

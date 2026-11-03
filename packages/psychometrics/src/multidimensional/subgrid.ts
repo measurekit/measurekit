@@ -35,7 +35,7 @@ export function restriction(from: DimensionSet, to: DimensionSet, points: number
   const source = members(from);
   const target = members(to);
   const result = new Int32Array(subgridCount(from, points));
-  const positions = new Int32Array(Math.max(0, ...source) + 1);
+  const positions = new Int32Array(source.reduce((most, member) => Math.max(most, member), 0) + 1);
   for (let r = 0; r < result.length; r++) {
     let rest = r;
     for (const d of source) {

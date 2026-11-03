@@ -81,7 +81,7 @@ export function minimumAveragePartial(
       `The minimum average partial test is undefined after ${partials.indexOf(null) + 1} components: they leave an item no variance, as when it is uncorrelated with every other item.`,
     );
   }
-  return { map, factors: map.indexOf(Math.min(...map)) + 1, smoothed };
+  return { map, factors: map.indexOf(map.reduce((least, value) => Math.min(least, value))) + 1, smoothed };
 }
 
 /**

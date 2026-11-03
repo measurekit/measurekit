@@ -117,7 +117,7 @@ function describePool(pool: readonly PoolControls[], itemAreas: readonly (readon
     itemAreas,
     groups,
     groupOf,
-    widest: Math.max(0, ...groups.map((areas) => areas.length)),
+    widest: groups.reduce((most, areas) => Math.max(most, areas.length), 0),
     testlets: poolTestlets(pool),
   };
 }

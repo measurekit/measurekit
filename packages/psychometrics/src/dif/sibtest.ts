@@ -299,7 +299,9 @@ function itemVariance(responses: Float64Array, guessing: number): number {
   if (guessing === 0) return variance(responses);
   const distinct = new Set(responses);
   if (distinct.size !== 2) return variance(responses);
-  const adjusted = Math.max((mean(responses) - Math.min(...distinct) - guessing) / (1 - guessing), 0);
+  const [first = 0, second = 0] = distinct;
+  const lowest = Math.min(first, second);
+  const adjusted = Math.max((mean(responses) - lowest - guessing) / (1 - guessing), 0);
   return adjusted * (1 - adjusted);
 }
 

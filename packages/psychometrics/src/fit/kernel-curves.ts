@@ -94,8 +94,8 @@ export function kernelItemCurves(matrix: ResponseMatrix, options: KernelCurveOpt
     }),
   );
   const weights = new Float64Array(scores.length);
-  const own = new Float64Array(Math.max(...answers.map(({ persons }) => persons.length)));
-  const shares = new Float64Array(Math.max(...answers.map(({ categories }) => categories)));
+  const own = new Float64Array(answers.reduce((most, { persons }) => Math.max(most, persons.length), 0));
+  const shares = new Float64Array(answers.reduce((most, { categories }) => Math.max(most, categories), 0));
   nodes.forEach((node, q) => {
     relativeWeights(node, scores, h, weights);
     answers.forEach((item, i) => {

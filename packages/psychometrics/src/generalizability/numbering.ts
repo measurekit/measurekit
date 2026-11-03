@@ -38,7 +38,8 @@ export function numberScores(scores: readonly FacetedScore[], structure: Structu
  */
 export function facetSizes(numbering: Numbering, structure: Structure): number[] {
   return structure.names.map((name, facet) => {
-    const size = Math.max(...Array.from(numbering.labels[facet]?.values() ?? [], (list) => list.length));
+    let size = Number.NEGATIVE_INFINITY;
+    for (const list of numbering.labels[facet]?.values() ?? []) size = Math.max(size, list.length);
     if (size < 2) {
       throw new DataError(
         `The facet "${name}" needs at least 2 elements${(structure.ancestors[facet] ?? 0) > 0 ? " in each combination of the elements it is nested in" : ""}, found ${size}.`,

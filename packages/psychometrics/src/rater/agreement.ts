@@ -63,6 +63,14 @@ export function adjacentAgreement(
 function agreement(ratings: readonly (readonly (number | null)[])[], width: number, statistic: string): number {
   const rows = completeRatings(ratings, statistic, { categories: true, minRaters: 2, minSubjects: 1 });
   let agreeing = 0;
-  for (const row of rows) if (Math.max(...row) - Math.min(...row) <= width) agreeing++;
+  for (const row of rows) {
+    let lowest = Number.POSITIVE_INFINITY;
+    let highest = Number.NEGATIVE_INFINITY;
+    for (const rating of row) {
+      lowest = Math.min(lowest, rating);
+      highest = Math.max(highest, rating);
+    }
+    if (highest - lowest <= width) agreeing++;
+  }
   return agreeing / rows.length;
 }
