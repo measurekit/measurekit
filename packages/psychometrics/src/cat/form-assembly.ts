@@ -24,6 +24,12 @@ import { poolTestlets } from "./testlets.js";
  */
 const DEVIATION_TIE = 1e-12;
 
+/**
+ * The most counts an assembly holds, one for each pair of forms and one for each form and pool item: 2^26 of 4 bytes,
+ * 256 MB, as 8,191 forms of one pool item or 1,000 forms of 66,000 items take.
+ */
+const MAX_ASSEMBLY_CELLS = 2 ** 26;
+
 /** A point of a form's target information function. */
 export interface InformationTarget {
   /** The theta. */
@@ -114,10 +120,8 @@ interface FormState {
   readonly chosen: number[];
   /** Each property's sum over its items. */
   readonly totals: Float64Array;
-  /** 1 for each pool item on the form. */
-  readonly held: Uint8Array;
-  /** For each pool item, the number of its enemies on the form. */
-  readonly enemiesHeld: Int32Array;
+  /** For each pool item, what keeps the form from taking it: 1 when it is on the form, and 1 for each enemy on the form. */
+  readonly blocked: Int32Array;
   /** Whether the form can take no more units. */
   done: boolean;
 }
@@ -154,10 +158,11 @@ interface Assembly {
  *   overlap; each option has its default.
  * @returns The forms, in the order of the rotation's first round.
  * @throws `DataError` when an item's id or parameters are invalid, ids repeat, the length is not an integer from 1 to
- * the pool size, `forms` is not a positive integer, `overlap` is not an integer from 0, a constraint has bounds that are
- * not finite numbers with minimum ≤ maximum or a weight that is not positive, two constraints are on one area, an item's `contentAreas` is not an array of
- * distinct non-empty strings, a target has a theta or information that is not finite or a weight that is not positive,
- * an enemy set does not name two or more distinct pool items, or `random` is not a random number generator.
+ * the pool size, `forms` is not a positive integer or holds with the pool more than 2^26 counts, `overlap` is not an
+ * integer from 0, a constraint has bounds that are not finite numbers with minimum ≤ maximum or a weight that is not
+ * positive, two constraints are on one area, an item's `contentAreas` is not an array of distinct non-empty strings, a
+ * target has a theta or information that is not finite or a weight that is not positive, an enemy set does not name two
+ * or more distinct pool items, or `random` is not a random number generator.
  * @see {@link https://doi.org/10.1177/014662169301700205 | Swanson and Stocking (1993)}
  */
 export function assembleForms(options: FormAssemblyOptions): AssembledForm[] {
@@ -173,6 +178,12 @@ export function assembleForms(options: FormAssemblyOptions): AssembledForm[] {
   const constraints = readConstraints(content);
   checkArray(target, "The option target must be an array of information targets");
   checkPositiveInteger(forms, "The option forms");
+  const cells = forms * (forms + pool.length);
+  if (cells > MAX_ASSEMBLY_CELLS) {
+    throw new DataError(
+      `An assembly holds a count for each pair of forms and for each form and pool item, ${cells} for ${forms} forms of a pool of ${pool.length}, and takes at most ${MAX_ASSEMBLY_CELLS}; assemble fewer forms at a time.`,
+    );
+  }
   checkIntegerFrom(overlap, "The option overlap", 0);
   if (random !== undefined) checkRandom(random);
   const conflicts = enemyIndices(pool, indices, enemies);
@@ -211,8 +222,7 @@ function startAssembly(poolSize: number, forms: number, propertyCount: number): 
     forms: Array.from({ length: forms }, () => ({
       chosen: [],
       totals: new Float64Array(propertyCount),
-      held: new Uint8Array(poolSize),
-      enemiesHeld: new Int32Array(poolSize),
+      blocked: new Int32Array(poolSize),
       done: false,
     })),
     shared: new Int32Array(forms * forms),
@@ -318,20 +328,27 @@ function isAvailable(context: StepContext, formIndex: number, unit: number, plac
   const members = units.members[unit] ?? [];
   if (form === undefined || (sizes[unit] ?? 0) > places || units.divided[unit] === true) return false;
   for (const index of members) {
-    if (form.held[index] === 1 || (form.enemiesHeld[index] ?? 0) > 0) return false;
+    if ((form.blocked[index] ?? 0) > 0) return false;
   }
   return sharesWithin(context, formIndex, members, overlap);
 }
 
-/** Returns whether a form that took the items would share at most `overlap` items with each other form. */
+/**
+ * Returns whether a form that took the items would share at most `overlap` items with each other form. Only the forms
+ * that hold one of the items are counted: every other form shares at most `overlap` already, as each unit taken kept it.
+ */
 function sharesWithin(context: StepContext, formIndex: number, members: readonly number[], overlap: number): boolean {
   const { assembly, free } = context;
   const count = assembly.forms.length;
+  const holding: number[] = [];
   for (const index of members) {
-    for (const other of assembly.holders[index] ?? []) free[other] = (free[other] ?? 0) + 1;
+    for (const other of assembly.holders[index] ?? []) {
+      if ((free[other] ?? 0) === 0) holding.push(other);
+      free[other] = (free[other] ?? 0) + 1;
+    }
   }
   let within = true;
-  for (let other = 0; other < count; other++) {
+  for (const other of holding) {
     within = within && (free[other] ?? 0) + (assembly.shared[formIndex * count + other] ?? 0) <= overlap;
     free[other] = 0;
   }
@@ -346,8 +363,8 @@ function take(context: StepContext, formIndex: number, unit: number): void {
   const count = assembly.forms.length;
   for (const index of units.members[unit] ?? []) {
     form.chosen.push(index);
-    form.held[index] = 1;
-    for (const enemy of conflicts[index] ?? []) form.enemiesHeld[enemy] = (form.enemiesHeld[enemy] ?? 0) + 1;
+    form.blocked[index] = (form.blocked[index] ?? 0) + 1;
+    for (const enemy of conflicts[index] ?? []) form.blocked[enemy] = (form.blocked[enemy] ?? 0) + 1;
     for (const other of assembly.holders[index] ?? []) {
       assembly.shared[formIndex * count + other] = (assembly.shared[formIndex * count + other] ?? 0) + 1;
       assembly.shared[other * count + formIndex] = (assembly.shared[other * count + formIndex] ?? 0) + 1;

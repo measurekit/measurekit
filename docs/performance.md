@@ -588,6 +588,7 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `yenQ3`                       | 2 persons, 1,000 2PL items, the most                           |     0.028 | 22                          |
 | `scalability`                 | 200 persons of distinct patterns, 1,000 items, the most        |       0.4 | 117                         |
 | `conditionalAssociation`      | 8 persons, 1,000 items, the most                               |     0.015 | 141                         |
+| `assembleForms`               | 8,191 forms of the one item of a pool, the most counts         |    0.0001 | 223 to 288 by version, OS   |
 | `diagnosticAdaptiveTest`      | 64 items of one of 20 attributes, the most items × 2^K         |    0.0039 | 740                         |
 
 A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or

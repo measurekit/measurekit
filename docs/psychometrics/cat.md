@@ -1166,7 +1166,7 @@ flowchart LR
 | `content` | none                               | `{ area, minimum, maximum, weight }`: bounds on the number of items of an area; `weight` defaults to 1     |
 | `target`  | none                               | `{ theta, information, weight }`: the test information wanted at a theta; `weight` defaults to 1           |
 | `enemies` | none                               | Sets of item ids of which a form holds at most one                                                         |
-| `forms`   | `1`                                | The number of forms, a positive integer                                                                    |
+| `forms`   | `1`                                | The number of forms, a positive integer; forms × (forms + pool items) at most 2^26                         |
 | `overlap` | `0`                                | The most items two forms may share, an integer from 0                                                      |
 | `random`  | none: ties go to the first in pool | A `Random` that orders the pool before assembly, which settles ties                                        |
 
@@ -1177,6 +1177,10 @@ flowchart LR
 | Choice              | The unit whose projection has the smallest weighted sum of deviations from the bounds; deviations that differ by less than a share of 1e-12 are ties                           |
 | Projection          | For each property, the value of the units taken, plus the unit's, plus the mean value per item of the other available units times the places left                              |
 | Value               | A content area: 1 for each item with the area among its `contentAreas`. A target: the item's information at its theta. A unit has the sum of its items'                        |
+
+An assembly holds a count for each pair of forms, of the items they share, and for each form and pool item, of what keeps
+the form from taking it, so it takes at most 2^26 counts, 256 MB: 8,191 forms of a pool of one item, or 1,000 forms of a
+pool of 66,000, which take about 5 s.
 
 `assembleForms` returns one result for each form: the `items` in the order of selection, the `contentCounts` of the
 constrained areas and the test `information` at each target theta, to check the forms against their specification. One
@@ -1227,6 +1231,7 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | An invalid `forms`, `overlap`, `enemies` or `random`, or an invalid constraint or target | `DataError`                                           |
 | Two constraints on one content area                                                      | `DataError`                                           |
+| More than 2^26 counts: forms × (forms + pool items)                                      | `DataError`: assemble fewer forms at a time           |
 | An item whose `contentAreas` is not an array of distinct non-empty strings               | `DataError`                                           |
 | The pool, the enemies or `overlap` leave a form short                                    | The form has fewer than `length` items                |
 | The bounds are not met                                                                   | The counts and the information are returned, to check |

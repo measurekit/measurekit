@@ -2123,6 +2123,11 @@ describe("assembleForms", () => {
     expect(() => assembleForms({ ...base, content: [{ area: "algebra", minimum: 1, maximum: 2, weight: 0 }] })).toThrow(
       'The weight of the constraint on "algebra" must be a positive number, found 0.',
     );
+    // 8,191 forms of a pool of 3 would hold 67,117,054 counts of 4 bytes, beyond the 256 MB of 2^26.
+    expect(assembleForms({ ...base, forms: 2 })).toHaveLength(2);
+    expect(() => assembleForms({ pool: pool.slice(0, 3), length: 1, forms: 8191 })).toThrow(
+      "An assembly holds a count for each pair of forms and for each form and pool item, 67117054 for 8191 forms of a pool of 3, and takes at most 67108864; assemble fewer forms at a time.",
+    );
     // Two constraints on one area would count its items for the second alone, and leave the first's minimum unmet.
     const twice = [
       { area: "algebra", minimum: 3, maximum: 3 },

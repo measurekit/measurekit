@@ -277,6 +277,16 @@ export const READERS: readonly ReaderCase[] = [
     read: (matrix: unknown, { psychometrics }) => psychometrics.scalability(matrix),
   },
   {
+    name: "assembleForms: 8,191 forms of the one item of a pool, the most counts",
+    budget: 580,
+    input: () => ({ id: "q1", a: 1, b: 0 }),
+    prepare: ({ id, a, b }: { id: string; a: number; b: number }, { psychometrics }) => ({
+      pool: [{ id, model: psychometrics.twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } }],
+    }),
+    read: ({ pool }: { pool: unknown[] }, { psychometrics }) =>
+      psychometrics.assembleForms({ pool, length: 1, forms: 8191, overlap: 1 }),
+  },
+  {
     name: "diagnosticAdaptiveTest: 64 items of one of 20 attributes, the most items × 2^K",
     budget: 1940,
     input: () => ({

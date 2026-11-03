@@ -739,6 +739,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/psychometrics/test/cat.test.ts",
     titles: "refuses a range that is not an interval",
   },
+  {
+    rule: "Form assembly holds at most 2^26 counts of pairs of forms and of forms and pool items, so that many forms cost no table of gigabytes.",
+    file: "packages/psychometrics/src/cat/form-assembly.ts",
+    find: "if (cells > MAX_ASSEMBLY_CELLS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/cat.test.ts",
+    titles: "assembleForms.*rejects options of other types and invalid ones",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */
