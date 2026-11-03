@@ -41,6 +41,9 @@ export function chiSquareUpperTail(x: number, df: number): number {
   const a = df / 2;
   const z = x / 2;
   if (z === 0) return 1;
+  // An infinite statistic, as a likelihood ratio against a fit of probability 0 gives, has no tail; its log scale
+  // would be ∞ - ∞.
+  if (z === Number.POSITIVE_INFINITY) return 0;
   const logScale = a * Math.log(z) - z - logGamma(a);
   if (z < a + 1) return 1 - lowerSeries(a, z, logScale);
   const fraction = continuedFraction(

@@ -28,6 +28,10 @@ describe("chiSquareUpperTail", () => {
     for (const df of [1, 2, 7, 100]) expect(chiSquareUpperTail(0, df)).toBe(1);
   });
 
+  it("is 0 at an infinite statistic", () => {
+    for (const df of [1, 2, 7, 100]) expect(chiSquareUpperTail(Number.POSITIVE_INFINITY, df)).toBe(0);
+  });
+
   it("is exp(-x / 2) with 2 degrees of freedom, below and above the switch to the continued fraction", () => {
     for (const x of [0.1, 1, 3.9, 4, 4.1, 10, 50, 300]) {
       expect(chiSquareUpperTail(x, 2) / Math.exp(-x / 2)).toBeCloseTo(1, 12);

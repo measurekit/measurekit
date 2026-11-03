@@ -93,6 +93,17 @@ describe("checks of one value", () => {
     expect(() => checkSeed(1.5)).toThrow("A seed must be a safe integer, found 1.5.");
   });
 
+  it("refuse an array with a hole, which forEach, map and every would skip unseen", () => {
+    const sparse: unknown[] = [1];
+    sparse.length = 3;
+    expect(() => checkArray(sparse, "The items must be an array")).toThrow(
+      "The items must be an array, found an array with a hole at index 1.",
+    );
+    // biome-ignore lint/suspicious/noSparseArray: the hole is what the check refuses.
+    expect(() => checkArray([1, , 3], "The items must be an array")).toThrow("found an array with a hole at index 1.");
+    expect(() => checkArray([undefined, null], "The items must be an array")).not.toThrow();
+  });
+
   it("throw DataError for every other type of input", () => {
     for (const value of [json("null"), json('"x"'), json("[]"), json("{}"), Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(() => checkFinite(value, "A number")).toThrow(DataError);
