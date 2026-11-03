@@ -2,7 +2,15 @@ import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 
 import { invertPositiveDefinite, standardDeviation } from "../math/internal.js";
-import { countByScore, type DifGroup, type ItemCases, itemCases, polytomousData, type ScoreGroups } from "./groups.js";
+import {
+  checkCategoryCount,
+  countByScore,
+  type DifGroup,
+  type ItemCases,
+  itemCases,
+  polytomousData,
+  type ScoreGroups,
+} from "./groups.js";
 import { type LiuAgresti, liuAgresti } from "./liu-agresti.js";
 import {
   type DifAnalysis,
@@ -87,8 +95,8 @@ const POLYTOMOUS_ETS_THRESHOLDS = { moderate: 0.17, large: 0.25 } as const;
  * @param groups - The group of each person, in the order of the matrix.
  * @param options - Whether to purify the matching score.
  * @returns The statistics of every item, and the purification when it was asked for.
- * @throws `DataError` when the matrix or the groups are invalid, either group has no person with a response, or
- * `purify` is not a boolean.
+ * @throws `DataError` when the matrix or the groups are invalid, either group has no person with a response, `purify`
+ * is not a boolean, or an item's persons use more than 255 categories.
  * @see {@link https://doi.org/10.1080/01621459.1963.10500879 | Mantel (1963)}
  * @see {@link https://doi.org/10.1111/j.1745-3984.1993.tb00425.x | Zwick, Donoghue and Grima (1993)}
  * @see {@link https://doi.org/10.1080/00031305.1986.10475371 | Somes (1986)}
@@ -108,14 +116,15 @@ export function mantelTest(
     (anchors) =>
       matrix.itemIds.map((id, item) => ({
         id,
-        ...statistics(itemCases(data, item, anchors)),
+        ...statistics(id, itemCases(data, item, anchors)),
       })),
     (item) => significant(item.significance),
   );
 }
 
-function statistics(cases: ItemCases): Omit<MantelTest, "id"> {
+function statistics(id: string, cases: ItemCases): Omit<MantelTest, "id"> {
   const groups = countByScore(cases);
+  checkCategoryCount(groups.categories, "Mantel DIF", id);
   const { excess, variance } = mantelSums(groups);
   const chiSquare = variance > 0 ? (excess * excess) / variance : null;
   const significance = chiSquare === null ? null : chiSquareUpperTail(chiSquare, 1);
@@ -173,11 +182,6 @@ function responseSpread(responses: Int32Array): number | null {
   return responses.length < 2 ? null : standardDeviation(Float64Array.from(responses));
 }
 
-/** Returns the persons in score group s and group g (1 for focal) whose response is the category k. */
-function cell({ categories, counts }: ScoreGroups, s: number, g: number, k: number): number {
-  return counts[(2 * s + g) * categories + k] ?? 0;
-}
-
 /**
  * Returns the generalized Mantel-Haenszel test on the categories used in the score groups of more than one person, all
  * but the last of them.
@@ -194,13 +198,30 @@ function generalizedTest(groups: ScoreGroups): GeneralizedMantelHaenszel {
 }
 
 /** Returns the categories at least one person of a score group of more than one person responded. */
-function categoriesUsed(groups: ScoreGroups): readonly number[] {
+function categoriesUsed({ scoreCount, sizes, cellStarts, cellCategories }: ScoreGroups): readonly number[] {
   const used = new Set<number>();
-  for (let s = 0; s < groups.scoreCount; s++) {
-    if ((groups.sizes[2 * s] ?? 0) + (groups.sizes[2 * s + 1] ?? 0) <= 1) continue;
-    for (let k = 0; k < groups.categories; k++) if (cell(groups, s, 0, k) + cell(groups, s, 1, k) > 0) used.add(k);
+  for (let s = 0; s < scoreCount; s++) {
+    if ((sizes[2 * s] ?? 0) + (sizes[2 * s + 1] ?? 0) <= 1) continue;
+    for (let entry = cellStarts[2 * s] ?? 0; entry < (cellStarts[2 * s + 2] ?? 0); entry++) {
+      used.add(cellCategories[entry] ?? 0);
+    }
   }
   return [...used].sort((a, b) => a - b);
+}
+
+/** The sums of the generalized test over the score groups, with the columns of one score group. */
+interface Association {
+  /** Σ (a - E(a)), by dimension. */
+  readonly excess: Float64Array;
+  /** Σ Cov(a), by rows. */
+  readonly covariance: Float64Array;
+  /** The persons of the score group in each dimension's category, and those of the focal group. */
+  readonly column: Float64Array;
+  readonly focalColumn: Float64Array;
+  /** The dimensions whose columns the score group fills, ascending once it is read. */
+  readonly touched: number[];
+  /** The dimension of each category, -1 for the last used, which the test leaves out. */
+  readonly dimensionOf: Int32Array;
 }
 
 /**
@@ -209,20 +230,20 @@ function categoriesUsed(groups: ScoreGroups): readonly number[] {
  */
 function associationChiSquare(groups: ScoreGroups, categories: readonly number[]): number | null {
   const dimension = categories.length;
-  const excess = new Float64Array(dimension);
-  const covariance = new Float64Array(dimension * dimension);
-  const column = new Float64Array(dimension);
-  for (let s = 0; s < groups.scoreCount; s++) {
-    const reference = groups.sizes[2 * s] ?? 0;
-    const focal = groups.sizes[2 * s + 1] ?? 0;
-    if (reference + focal <= 1) continue;
-    categories.forEach((k, a) => {
-      column[a] = cell(groups, s, 0, k) + cell(groups, s, 1, k);
-      excess[a] = (excess[a] ?? 0) + cell(groups, s, 1, k) - (focal * (column[a] ?? 0)) / (reference + focal);
-    });
-    addCovariance(covariance, column, reference, focal);
-  }
-  const inverse = invertPositiveDefinite(covariance, dimension);
+  const sums: Association = {
+    excess: new Float64Array(dimension),
+    covariance: new Float64Array(dimension * dimension),
+    column: new Float64Array(dimension),
+    focalColumn: new Float64Array(dimension),
+    touched: [],
+    dimensionOf: new Int32Array(groups.categories).fill(-1),
+  };
+  categories.forEach((k, a) => {
+    sums.dimensionOf[k] = a;
+  });
+  for (let s = 0; s < groups.scoreCount; s++) addScoreGroup(sums, groups, s);
+  const { excess } = sums;
+  const inverse = invertPositiveDefinite(sums.covariance, dimension);
   if (inverse === null) return null;
   let chiSquare = 0;
   for (let i = 0; i < dimension; i++) {
@@ -232,17 +253,67 @@ function associationChiSquare(groups: ScoreGroups, categories: readonly number[]
   return Math.max(0, chiSquare);
 }
 
-/** Adds the covariance of the focal group's counts in a score group with the given category totals. */
-function addCovariance(covariance: Float64Array, column: Float64Array, reference: number, focal: number): void {
+/**
+ * Adds score group s of more than one person to the sums. Its cells list only the categories that occur in them, and
+ * the others add 0 to every sum.
+ */
+function addScoreGroup(sums: Association, groups: ScoreGroups, s: number): void {
+  const { excess, column, focalColumn, touched } = sums;
+  const reference = groups.sizes[2 * s] ?? 0;
+  const focal = groups.sizes[2 * s + 1] ?? 0;
+  if (reference + focal <= 1) return;
+  fillColumns(sums, groups, s);
+  for (const a of touched) {
+    excess[a] = (excess[a] ?? 0) + (focalColumn[a] ?? 0) - (focal * (column[a] ?? 0)) / (reference + focal);
+  }
+  addCovariance(sums.covariance, column, touched, reference, focal);
+  for (const a of touched) {
+    column[a] = 0;
+    focalColumn[a] = 0;
+  }
+  touched.length = 0;
+}
+
+/** Fills the columns of score group s at the dimensions its cells use, and lists them in `touched`, ascending. */
+function fillColumns(
+  { column, focalColumn, touched, dimensionOf }: Association,
+  { cellStarts, cellCategories, cellCounts }: ScoreGroups,
+  s: number,
+): void {
+  const focalStart = cellStarts[2 * s + 1] ?? 0;
+  for (let entry = cellStarts[2 * s] ?? 0; entry < (cellStarts[2 * s + 2] ?? 0); entry++) {
+    const a = dimensionOf[cellCategories[entry] ?? 0] ?? -1;
+    if (a < 0) continue;
+    const persons = cellCounts[entry] ?? 0;
+    if (column[a] === 0) touched.push(a);
+    column[a] = (column[a] ?? 0) + persons;
+    if (entry >= focalStart) focalColumn[a] = (focalColumn[a] ?? 0) + persons;
+  }
+  touched.sort((x, y) => x - y);
+}
+
+/**
+ * Adds the covariance of the focal group's counts in a score group with the given category totals, which are 0 but at
+ * the dimensions `touched`.
+ */
+function addCovariance(
+  covariance: Float64Array,
+  column: Float64Array,
+  touched: readonly number[],
+  reference: number,
+  focal: number,
+): void {
   const size = reference + focal;
   const weight = (reference * focal) / (size * size * (size - 1));
   const dimension = column.length;
-  column.forEach((a, i) => {
-    column.forEach((b, j) => {
+  for (const i of touched) {
+    const a = column[i] ?? 0;
+    for (const j of touched) {
+      const b = column[j] ?? 0;
       covariance[i * dimension + j] =
         (covariance[i * dimension + j] ?? 0) + weight * ((i === j ? size * a : 0) - a * b);
-    });
-  });
+    }
+  }
 }
 
 function etsCategory(effectSize: number | null, significance: number | null): PolytomousEtsCategory | null {

@@ -28,7 +28,7 @@ export interface MatchedCases {
  * Returns the statistics of every item on the persons {@link matchedCases} gives, purified on request.
  *
  * @param statistic - Names the statistic in error messages.
- * @param statistics - Computes one item's statistics from its persons.
+ * @param statistics - Computes one item's statistics from its persons and its id.
  * @param flagged - Whether an item's statistics flag it in purification.
  * @throws `DataError` when the matrix, the groups or the options are invalid, either group has no person with a
  * response, `matching` is not an array of finite numbers and `null` with one entry per person, or `purify` is `true`
@@ -39,7 +39,7 @@ export function matchedAnalysis<TItem>(
   groups: readonly DifGroup[],
   options: MatchingOptions,
   statistic: string,
-  statistics: (cases: MatchedCases) => TItem,
+  statistics: (cases: MatchedCases, id: string) => TItem,
   flagged: (item: TItem) => boolean,
 ): DifAnalysis<{ readonly id: string } & TItem> {
   checkOptions(options);
@@ -54,7 +54,8 @@ export function matchedAnalysis<TItem>(
   return purified(
     matrix.itemIds,
     purify,
-    (anchors) => matrix.itemIds.map((id, item) => ({ id, ...statistics(matchedCases(data, item, anchors, matching)) })),
+    (anchors) =>
+      matrix.itemIds.map((id, item) => ({ id, ...statistics(matchedCases(data, item, anchors, matching), id) })),
     flagged,
   );
 }

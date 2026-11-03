@@ -428,6 +428,14 @@ export const RULES: readonly Rule[] = [
     titles: "refuses more than 15 attributes",
   },
   {
+    rule: "The polytomous DIF statistics stop at 255 categories of an item, as the generalized test holds every pair of them.",
+    file: "packages/psychometrics/src/dif/groups.ts",
+    find: "if (categories > MAX_CATEGORIES) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/dif.test.ts",
+    titles: "more than 255 categories",
+  },
+  {
     rule: "A many-facet model stops at 1,000 parameters, before its Newton steps hold a matrix of every pair of them.",
     file: "packages/psychometrics/src/irt/linear-rasch.ts",
     find: "if (parameters > MAX_PARAMETERS) {",

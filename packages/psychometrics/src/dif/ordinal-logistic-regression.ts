@@ -1,7 +1,7 @@
 import { backtrack, logistic, logLogistic } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/internal.js";
-import type { DifGroup } from "./groups.js";
+import { checkCategoryCount, type DifGroup } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
 import { type LogisticRegressionDif, MAX_ITERATIONS, STEP_TOLERANCE } from "./logistic-regression.js";
 import { type MatchedCases, type MatchingOptions, matchedAnalysis } from "./matching.js";
@@ -42,8 +42,8 @@ const DEVIANCE_SLACK = 1e-12;
  * @param options - A matching score for each person instead of the total score, and whether to purify it.
  * @returns The tests of every item, and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, either group has no person with a response, `purify`
- * is not a boolean, `matching` is not an array of finite numbers and `null` with one entry per person, or `purify` is
- * `true` with `matching`.
+ * is not a boolean, `matching` is not an array of finite numbers and `null` with one entry per person, `purify` is
+ * `true` with `matching`, or an item's persons use more than 255 categories.
  * @see {@link https://doi.org/10.1097/01.mlr.0000245183.28384.ed | Crane, Gibbons, Jolley and van Belle (2006)}
  */
 export function ordinalLogisticRegressionDif(
@@ -74,8 +74,9 @@ function usedCategories(responses: Int32Array): UsedCategories {
 }
 
 /** Returns the three likelihood-ratio tests of an item, `null` where the item's persons cannot show DIF. */
-function itemTests(cases: MatchedCases): Omit<OrdinalLogisticDif, "id"> {
+function itemTests(cases: MatchedCases, id: string): Omit<OrdinalLogisticDif, "id"> {
   const { ranks, counts } = usedCategories(cases.responses);
+  checkCategoryCount(counts.length, "Ordinal logistic regression DIF", id);
   const count = ranks.length;
   const focal = cases.focal.reduce((sum, flag) => sum + flag, 0);
   const center = cases.scores.reduce((sum, score) => sum + score, 0) / count;

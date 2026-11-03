@@ -1066,6 +1066,16 @@ describe("mantelTest", () => {
       "Mantel DIF needs persons with responses in both groups.",
     );
   });
+
+  it("refuses an item whose persons use more than 255 categories, whose generalized test holds every pair", () => {
+    const rows = Array.from({ length: 512 }, (_, person) => [person % 256, person % 2]);
+    const groups: DifGroup[] = rows.map((_, person) => (person < 256 ? "reference" : "focal"));
+    expect(() => mantelTest(responseMatrix(rows), groups)).toThrow(
+      'Mantel DIF takes items of at most 255 categories, found 256 used for item "item1".',
+    );
+    const fewer = rows.map(([first = 0, second = 0]) => [Math.min(first, 254), second]);
+    expect(mantelTest(responseMatrix(fewer), groups).items[0]?.generalized.degreesOfFreedom).toBe(254);
+  });
 });
 
 describe("ordinalLogisticRegressionDif", () => {
@@ -1219,6 +1229,14 @@ describe("ordinalLogisticRegressionDif", () => {
     ]);
     expect(() => ordinalLogisticRegressionDif(missing, ["reference", "focal"])).toThrow(
       "Ordinal logistic regression DIF needs persons with responses in both groups.",
+    );
+  });
+
+  it("refuses an item whose persons use more than 255 categories, whose regression holds every pair", () => {
+    const rows = Array.from({ length: 512 }, (_, person) => [person % 256, person % 2]);
+    const groups: DifGroup[] = rows.map((_, person) => (person < 256 ? "reference" : "focal"));
+    expect(() => ordinalLogisticRegressionDif(responseMatrix(rows), groups)).toThrow(
+      'Ordinal logistic regression DIF takes items of at most 255 categories, found 256 used for item "item1".',
     );
   });
 });

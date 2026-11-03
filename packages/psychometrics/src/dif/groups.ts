@@ -143,6 +143,26 @@ export function itemCases(data: DifData, item: number, anchors: Uint8Array): Ite
   };
 }
 
+/**
+ * The most categories an item's persons may use in the polytomous statistics, whose generalized Mantel test and ordinal
+ * regression hold a matrix of every pair of them: FACETS's limit of a rating scale, 255.
+ */
+const MAX_CATEGORIES = 255;
+
+/**
+ * Checks the number of categories an item's persons used.
+ *
+ * @param statistic - Names the statistic in the message.
+ * @throws `DataError` when there are more than 255.
+ */
+export function checkCategoryCount(categories: number, statistic: string, id: string): void {
+  if (categories > MAX_CATEGORIES) {
+    throw new DataError(
+      `${statistic} takes items of at most ${MAX_CATEGORIES} categories, found ${categories} used for item "${id}".`,
+    );
+  }
+}
+
 /** The responses and matching scores of the persons a statistic uses, which {@link countByScore} tabulates. */
 export interface ScoredCases {
   /** Each person's response or studied score: an integer from 0. */
@@ -155,8 +175,9 @@ export interface ScoredCases {
 
 /**
  * Persons counted by matching score and group: the sums the statistics on a matching score are made of. The score groups
- * are the matching scores that occur and the categories the responses that occur, each in ascending order, so that the
- * tables grow with the persons, not with the highest score or response.
+ * are the matching scores that occur and the categories the responses that occur, each in ascending order, and each cell
+ * lists only the categories that occur in it, so that the tables grow with the persons, not with the highest score or
+ * response, nor with the score groups times the categories.
  */
 export interface ScoreGroups {
   /** The number of categories that occur. */
@@ -171,8 +192,15 @@ export interface ScoreGroups {
   readonly totals: Float64Array;
   /** The sums of their squared responses, at `2 s + g`. */
   readonly squares: Float64Array;
-  /** The persons in score group s and group g whose response is the category k, at `(2 s + g) categories + k`. */
-  readonly counts: Float64Array;
+  /**
+   * Where the categories of score group s and group g start in `cellCategories` and `cellCounts`, at `2 s + g`, and end,
+   * at `2 s + g + 1`.
+   */
+  readonly cellStarts: Int32Array;
+  /** The categories that occur in each cell, by their rank among all, ascending within the cell. */
+  readonly cellCategories: Int32Array;
+  /** The persons of each cell in each of its categories. */
+  readonly cellCounts: Float64Array;
 }
 
 /** Counts persons by matching score and group, with the sums of their responses and the categories they responded. */
@@ -181,25 +209,51 @@ export function countByScore({ responses, scores, focal }: ScoredCases): ScoreGr
   const categoryOf = ranksOf(responses);
   const scoreCount = groupOf.size;
   const categories = categoryOf.size;
-  const counted: ScoreGroups = {
-    categories,
-    scoreCount,
-    scores: Float64Array.from(groupOf.keys()),
-    sizes: new Float64Array(2 * scoreCount),
-    totals: new Float64Array(2 * scoreCount),
-    squares: new Float64Array(2 * scoreCount),
-    counts: new Float64Array(2 * scoreCount * categories),
-  };
+  const sizes = new Float64Array(2 * scoreCount);
+  const totals = new Float64Array(2 * scoreCount);
+  const squares = new Float64Array(2 * scoreCount);
+  // Each person's cell and category as one key, cell × categories + category: an integer below 2 persons², exact.
+  const keys = new Float64Array(scores.length);
   for (let person = 0; person < scores.length; person++) {
     const response = responses[person] ?? 0;
     const cell = 2 * (groupOf.get(scores[person] ?? 0) ?? 0) + (focal[person] ?? 0);
-    counted.sizes[cell] = (counted.sizes[cell] ?? 0) + 1;
-    counted.totals[cell] = (counted.totals[cell] ?? 0) + response;
-    counted.squares[cell] = (counted.squares[cell] ?? 0) + response * response;
-    const category = cell * categories + (categoryOf.get(response) ?? 0);
-    counted.counts[category] = (counted.counts[category] ?? 0) + 1;
+    sizes[cell] = (sizes[cell] ?? 0) + 1;
+    totals[cell] = (totals[cell] ?? 0) + response;
+    squares[cell] = (squares[cell] ?? 0) + response * response;
+    keys[person] = cell * categories + (categoryOf.get(response) ?? 0);
   }
-  return counted;
+  return {
+    categories,
+    scoreCount,
+    scores: Float64Array.from(groupOf.keys()),
+    sizes,
+    totals,
+    squares,
+    ...cellLists(keys.sort(), categories, 2 * scoreCount),
+  };
+}
+
+/** Returns the categories of each cell with their persons, from the sorted keys of the persons. */
+function cellLists(
+  keys: Float64Array,
+  categories: number,
+  cells: number,
+): Pick<ScoreGroups, "cellStarts" | "cellCategories" | "cellCounts"> {
+  const cellStarts = new Int32Array(cells + 1);
+  const cellCategories: number[] = [];
+  const cellCounts: number[] = [];
+  for (let at = 0; at < keys.length; ) {
+    const key = keys[at] ?? 0;
+    let end = at + 1;
+    while (keys[end] === key) end++;
+    const cell = Math.floor(key / categories);
+    cellStarts[cell + 1] = (cellStarts[cell + 1] ?? 0) + 1;
+    cellCategories.push(key - cell * categories);
+    cellCounts.push(end - at);
+    at = end;
+  }
+  for (let cell = 0; cell < cells; cell++) cellStarts[cell + 1] = (cellStarts[cell + 1] ?? 0) + (cellStarts[cell] ?? 0);
+  return { cellStarts, cellCategories: Int32Array.from(cellCategories), cellCounts: Float64Array.from(cellCounts) };
 }
 
 /** Returns the rank of each distinct value among the distinct values in ascending order, from 0. */

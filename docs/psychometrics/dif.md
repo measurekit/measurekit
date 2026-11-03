@@ -255,7 +255,9 @@ n_k who responded k, and F the sum of the focal group's responses:
 
 E(F) = n_F Σ k n_k / n, Var(F) = n_R n_F [n Σ k² n_k - (Σ k n_k)²] / (n² (n - 1)).
 
-Score groups of one person are left out.
+Score groups of one person are left out. An item's persons may use at most 255 categories, FACETS's limit of a rating
+scale, as the generalized test holds a matrix of every pair of them; each score group counts only the categories that
+occur in it, so that the counts grow with the persons.
 
 | Field                        | Definition                                                                                                                                                        |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -320,7 +322,7 @@ from 1; for k from 2 to K, the log odds that a response Y is in category k or ab
 
 The thresholds α_k decrease with k. Each model is fitted by Newton's method from the thresholds of the model with no
 covariates, halving a step that leaves the thresholds out of order or raises the deviance. A category no person used
-is skipped, whichever integers the responses are. Where an estimate diverges (separation), the deviance reaches its
+is skipped, whichever integers the responses are; the used categories are at most 255, as for the Mantel test. Where an estimate diverges (separation), the deviance reaches its
 infimum and the test is still computed. An item its persons answered alike, answered by one group only, or with the
 same matching score for every person has `null` tests.
 
@@ -771,6 +773,7 @@ Invalid input throws `DataError` naming the value found.
 | A matching score is not a finite number                                                                    | Give `null` for a person to leave out                                                                |
 | `smallCell` is below 2, or `guessing` is 1 or more                                                         | Give an integer from 2, and a guessing parameter from 0 to below 1                                   |
 | A bundle is empty, or names an unknown item or one item twice                                              | Give each bundle its distinct items, by their ids in the matrix                                      |
+| An item's persons use more than 255 categories, for `mantelTest` and `ordinalLogisticRegressionDif`        | Group the categories into at most 255                                                                |
 | Raju's area with a model other than the 2PL                                                                | Use `lordChiSquare` for the 3PL and 4PL, or `irtLikelihoodRatioDif` for any model                    |
 | IRT likelihood-ratio DIF with fewer than two items, or the Gauss-Hermite rule                              | Give at least two items, and the rectangular rule, which the focal group's normal distribution needs |
 | Differential functioning with lists of other items or order, or a population whose weights do not sum to 1 | Give the same items in the same order in both lists, and a distribution of theta                     |
