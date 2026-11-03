@@ -52,7 +52,7 @@ conversion renames: the slopes `a` are mirt's `a1` to `aD`, and the intercept is
 | Function                                        | Conversion                                                   |
 | ----------------------------------------------- | ------------------------------------------------------------ |
 | `toMirtMultidimensional(item)`                  | An item, such as a calibration's, to its coefficients        |
-| `fromMirtMultidimensional(model, coefficients)` | Coefficients to an item `{ model, parameters }` of the model |
+| `fromMirtMultidimensional(coefficients, model)` | Coefficients to an item `{ model, parameters }` of the model |
 
 | Model                                    | mirt item type | Coefficients                          |
 | ---------------------------------------- | -------------- | ------------------------------------- |
@@ -68,7 +68,7 @@ number of dimensions is the number of `a` names, `a1` up to the first one not gi
 import { fromMirtMultidimensional } from "@measurekit/psychometrics/parameterization";
 import { multidimensionalGradedResponse } from "@measurekit/psychometrics/multidimensional";
 
-const item = fromMirtMultidimensional(multidimensionalGradedResponse, { a1: 1.1, a2: 0.4, d1: 2, d2: 0, d3: -1.5 });
+const item = fromMirtMultidimensional({ a1: 1.1, a2: 0.4, d1: 2, d2: 0, d3: -1.5 }, multidimensionalGradedResponse);
 item.parameters; // { a: [1.1, 0.4], intercepts: [2, 0, -1.5] }
 ```
 

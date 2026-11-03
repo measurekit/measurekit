@@ -119,15 +119,15 @@ export function toMirtMultidimensional(item: MultidimensionalItem): MirtCoeffici
 /**
  * Returns the multidimensional item of a model with mirt's coefficients in the slope-intercept form.
  *
- * @param model - The model of the item.
  * @param coefficients - The coefficients of one item, as `coef(model, simplify = TRUE)$items` gives them.
+ * @param model - The model of the item.
  * @returns The item.
  * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
  * parameters, or the model is not one of the built-in multidimensional models.
  */
 export function fromMirtMultidimensional<TParameters>(
-  model: MultidimensionalModel<TParameters>,
   coefficients: MirtCoefficients,
+  model: MultidimensionalModel<TParameters>,
 ): MultidimensionalItem<TParameters> {
   checkRecord(coefficients, "The mirt coefficients must be an object of numbers by name");
   checkMultidimensionalModel(
