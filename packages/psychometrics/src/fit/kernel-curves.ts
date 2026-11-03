@@ -192,8 +192,9 @@ function itemAnswers(
 
 /**
  * Writes the Gaussian weight exp(-((node - θ_j) / h)² / 2) of each person j in `persons`, or of every person without
- * it, into `out`, relative to the nearest one's, which is 1, so that a narrow bandwidth does not underflow them all. A
- * person without responses, whose score is `NaN`, gets 0.
+ * it, into `out`, relative to the nearest one's, which is 1, so that a narrow bandwidth does not underflow them all. The
+ * squared distance beyond the nearest is divided by h twice, as h² underflows to 0 below 1e-154 and would leave the
+ * nearest 0 / 0. A person without responses, whose score is `NaN`, gets 0.
  */
 function relativeWeights(node: number, scores: Float64Array, h: number, out: Float64Array, persons?: Int32Array): void {
   const count = persons === undefined ? scores.length : persons.length;
@@ -205,7 +206,7 @@ function relativeWeights(node: number, scores: Float64Array, h: number, out: Flo
   }
   for (let j = 0; j < count; j++) {
     const distance = (node - scoreOf(j)) ** 2;
-    out[j] = Number.isNaN(distance) ? 0 : Math.exp(-(distance - nearest) / (2 * h * h));
+    out[j] = Number.isNaN(distance) ? 0 : Math.exp(-((distance - nearest) / h / h) / 2);
   }
 }
 

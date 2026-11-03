@@ -1242,6 +1242,10 @@ describe("kernelItemCurves", () => {
     expect(defined(second).probabilities[1]?.[0]).toBe(0);
     expect(defined(second).probabilities[1]?.[4]).toBe(1);
     expect(defined(second).standardErrors.flat().every(Number.isFinite)).toBe(true);
+    // Below 1e-154 the square of the bandwidth underflows to 0: each node still takes its nearest person's response.
+    const [narrowest] = kernelItemCurves(responseMatrix(rows), { points: 5, bandwidth: 1e-200 });
+    expect(defined(narrowest).probabilities[1]).toEqual([0, 0, 1, 1, 1]);
+    expect(defined(narrowest).standardErrors.flat().every(Number.isFinite)).toBe(true);
   });
 
   it("gives a constant item one curve of 1", () => {
