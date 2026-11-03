@@ -40,7 +40,7 @@ const fit = calibrateMultidimensional(matrix, {
 });
 fit.dimensions; // ["verbal", "quantitative"]
 fit.items[0]?.parameters; // { a: [1.17, 0], intercept: -1.34, c: 0, d: 1 }
-fit.items[0]?.standardErrors; // { a1: 0.18, intercept: 0.12 }
+fit.items[0]?.standardErrors; // { a1: 0.18, intercept: 0.11 }
 fit.correlations; // [[1, 0.46], [0.46, 1]]
 fit.converged; // true
 
@@ -550,8 +550,26 @@ calibration, so the rotated `items` with the rotated `correlations` as the prior
 rotated dimensions. The sign of each rotated dimension is chosen so that its largest loading in absolute value is
 positive. The result also holds `rotation` (T), `converged` and `iterations`.
 
-```ts continues
-import { calibrateMultidimensional, rotateLoadings } from "@measurekit/psychometrics/multidimensional";
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  calibrateMultidimensional,
+  multidimensionalTwoParameterLogistic,
+  rotateLoadings,
+} from "@measurekit/psychometrics/multidimensional";
+import { simulateMultidimensionalResponses } from "@measurekit/psychometrics/sim";
+
+// The data of the first sample: eight items, four on each of two dimensions correlated 0.5; 1,000 persons.
+const random = createRandom(11);
+const items = Array.from({ length: 8 }, (_, i) => ({
+  model: multidimensionalTwoParameterLogistic,
+  parameters: { a: [i < 4 ? 1.2 : 0, i < 4 ? 0 : 1.4], intercept: (i % 4) - 1.5, c: 0, d: 1 },
+}));
+const thetas = Array.from({ length: 1000 }, () => {
+  const [z1, z2] = [random.normal(), random.normal()];
+  return [z1, 0.5 * z1 + Math.sqrt(0.75) * z2];
+});
+const matrix = simulateMultidimensionalResponses(items, thetas, random);
 
 const exploratory = calibrateMultidimensional(matrix, { model: multidimensionalTwoParameterLogistic, dimensions: 2 });
 const rotated = rotateLoadings(exploratory, { method: "oblimin" });
