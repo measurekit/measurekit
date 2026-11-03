@@ -1,4 +1,5 @@
 import { checkBoolean, checkPositiveInteger, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkDimensions } from "./items.js";
 import type { LoadingPattern } from "./model.js";
 
 /** The dimensions of a calibration and which of them each item loads on. */
@@ -30,8 +31,8 @@ interface DesignOptions {
  * the items in item order.
  *
  * @throws `DataError` when neither or both of `dimensions` and `loadings` are given, `dimensions` is not a positive
- * integer, there are fewer items than dimensions, `loadings` does not name an array of
- * dimensions for each item, or names an item that is not in the data.
+ * integer, there are fewer items than dimensions, `loadings` does not name an array of dimensions for each item, or names
+ * an item that is not in the data, or there are more than 100 dimensions.
  */
 export function designOf(options: DesignOptions, itemIds: readonly string[]): Design {
   const { dimensions, loadings, correlated = true } = options;
@@ -52,6 +53,7 @@ export function designOf(options: DesignOptions, itemIds: readonly string[]): De
 
 function exploratory(dimensions: number, itemCount: number): Design {
   checkPositiveInteger(dimensions, "The option dimensions");
+  checkDimensions(dimensions, "Calibration");
   if (itemCount < dimensions) {
     throw new DataError(
       `An exploratory model of ${dimensions} dimensions needs at least ${dimensions} items, found ${itemCount}.`,
@@ -83,7 +85,12 @@ function confirmatory(loadings: LoadingPattern, itemIds: readonly string[], corr
     if (new Set(names).size !== names.length) {
       throw new DataError(`Item "${id}" loads on a dimension twice: ${names.join(", ")}.`);
     }
-    for (const name of names) if (!dimensionNames.includes(name)) dimensionNames.push(name);
+    for (const name of names) {
+      if (dimensionNames.includes(name)) continue;
+      dimensionNames.push(name);
+      // Checked as the names come, so that the search for each name stays within the limit.
+      checkDimensions(dimensionNames.length, "Calibration");
+    }
     return names;
   });
   return {

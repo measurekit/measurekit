@@ -3,11 +3,12 @@ import { checkModelledItem, checkModelShape, checkResponses, indexItemsWith } fr
 import type { MultidimensionalItem, MultidimensionalModel } from "./model.js";
 
 /**
- * The most dimensions that scoring, information and adaptive testing take: their matrices grow as the square of the
- * dimensions and their time as the cube, so that the posterior mode of one item of 1,000 slopes took 11 s. Published
- * bifactor and testlet models have far fewer dimensions.
+ * The most dimensions that calibration, scoring, information and adaptive testing take, so that the package never
+ * calibrates items that it cannot score: the matrices of scoring grow as the square of the dimensions and its time as
+ * the cube, so that the posterior mode of one item of 1,000 slopes took 11 s. Published bifactor and testlet models have
+ * far fewer dimensions.
  */
-const MAX_SCORING_DIMENSIONS = 100;
+const MAX_DIMENSIONS = 100;
 
 /** The methods of {@link MultidimensionalModel}, which a model must have. */
 const MODEL_METHODS = [
@@ -79,13 +80,13 @@ export function indexMultidimensionalItems(
 }
 
 /**
- * Checks that `subject` takes no more than {@link MAX_SCORING_DIMENSIONS} dimensions.
+ * Checks that `subject` takes no more than {@link MAX_DIMENSIONS} dimensions.
  *
  * @throws `DataError` when it takes more.
  */
-export function checkScoringDimensions(dimensions: number, subject: string): void {
-  if (dimensions > MAX_SCORING_DIMENSIONS) {
-    throw new DataError(`${subject} takes at most ${MAX_SCORING_DIMENSIONS} dimensions, found ${dimensions}.`);
+export function checkDimensions(dimensions: number, subject: string): void {
+  if (dimensions > MAX_DIMENSIONS) {
+    throw new DataError(`${subject} takes at most ${MAX_DIMENSIONS} dimensions, found ${dimensions}.`);
   }
 }
 
@@ -94,7 +95,7 @@ export function checkScoringDimensions(dimensions: number, subject: string): voi
  * items, the number of `priorDimensions`.
  *
  * @throws `DataError` naming the first invalid item or response, when there are no items and no prior to give the
- * dimensions, or when there are more than {@link MAX_SCORING_DIMENSIONS}.
+ * dimensions, or when there are more than {@link MAX_DIMENSIONS}.
  */
 export function checkMultidimensionalPattern(
   items: readonly MultidimensionalItem[],
@@ -108,7 +109,7 @@ export function checkMultidimensionalPattern(
     Array.isArray(items) && items.length === 0 && priorDimensions !== undefined
       ? priorDimensions
       : checkMultidimensionalItems(items, "Scoring");
-  checkScoringDimensions(dimensions, "Scoring");
+  checkDimensions(dimensions, "Scoring");
   checkResponses(items, responses);
   return dimensions;
 }

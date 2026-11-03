@@ -1,5 +1,6 @@
 import { checkRecord, DataError, describe } from "@measurekit/core";
 import type { Design } from "./design.js";
+import { checkDimensions } from "./items.js";
 import type { LoadingPattern } from "./model.js";
 
 /** The most primary dimensions of a bifactor model: one is a bifactor model and two a two-tier model. */
@@ -37,7 +38,8 @@ interface StructureOptions {
  *
  * @throws `DataError` when `specific` or `primary` is not an object that names every item of the data and no other,
  * an item has more than one specific dimension or a primary dimension twice, a specific dimension has fewer than two
- * items, there are more than two primary dimensions, or a name belongs to a primary and a specific dimension.
+ * items, there are more than two primary dimensions, a name belongs to a primary and a specific dimension, or there are
+ * more than 100 dimensions, primary and specific.
  */
 export function structureOf(options: StructureOptions, itemIds: readonly string[]): BifactorStructure {
   const { specific, primary } = options;
@@ -51,6 +53,7 @@ export function structureOf(options: StructureOptions, itemIds: readonly string[
       `A bifactor model has one primary dimension and a two-tier model two, found ${primaryNames.length}: ${primaryNames.join(", ")}. Use calibrateMultidimensional with the option loadings for more.`,
     );
   }
+  checkDimensions(primaryNames.length + specificNames.length, "A bifactor or two-tier calibration");
   for (const name of specificNames) {
     if (primaryNames.includes(name)) throw new DataError(`"${name}" names a primary and a specific dimension.`);
     if (specificByItem.filter((each) => each === name).length < 2) {

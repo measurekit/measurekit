@@ -548,9 +548,9 @@ export const RULES: readonly Rule[] = [
     titles: "keeps the 8 grids asked for last",
   },
   {
-    rule: "Scoring, information and adaptive tests take at most 100 dimensions, as their time grows as the cube of the dimensions.",
+    rule: "Calibration, scoring, information and adaptive tests take at most 100 dimensions, one shared limit, so that every calibration can be scored and scoring's time, which grows as the cube of the dimensions, stays bounded.",
     file: "packages/psychometrics/src/multidimensional/items.ts",
-    find: "if (dimensions > MAX_SCORING_DIMENSIONS) {",
+    find: "if (dimensions > MAX_DIMENSIONS) {",
     replace: "if (false) {",
     test: "packages/psychometrics/test/multidimensional.test.ts",
     titles: "takes at most 100 dimensions",

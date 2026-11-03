@@ -104,10 +104,11 @@ const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian
  * @see {@link https://doi.org/10.1007/s11336-010-9178-0 | Cai (2010)}
  * @throws `DataError` when the data or an option is invalid, there are no responses, `specific` or `primary` does not
  * name every item of the data and no other, an item has two specific dimensions, a specific dimension has one item,
- * there are more than two primary dimensions, a name is both primary and specific, an item lacks responses in a
- * category up to its highest or has more categories than its model allows, the grid has more than 10⁶ nodes, or the
- * tables of the items' categories at the nodes of their groups, with the pairs of two items' categories for
- * `"hessian"`, would hold more than 2 ** 24 values, or a two-tier model has no more than two persons with a response.
+ * there are more than two primary dimensions or more than 100 in all, a name is both primary and specific, an item
+ * lacks responses in a category up to its highest or has more categories than its model allows, the grid has more than
+ * 10⁶ nodes, or the tables of the items' categories at the nodes of their groups, with the pairs of two items'
+ * categories for `"hessian"`, would hold more than 2 ** 24 values, or a two-tier model has no more than two persons
+ * with a response.
  */
 export function calibrateBifactor(
   data: ResponseMatrix | ResponseRecords,

@@ -153,7 +153,8 @@ dimension, and an item's MDISC and MDIFF, `multidimensionalDiscrimination` and `
 calibration that estimates the correlations of its dimensions, of a group, of all persons or of a two-tier model's
 primary dimensions, needs more persons than those dimensions. An exploratory start correlates the items of sparse data
 over each pair's common respondents. The posterior mean keeps the 8 grids asked for last, within 64 MiB of nodes.
-Scoring, `multidimensionalInformation` and multidimensional adaptive tests take at most 100 dimensions.
+Calibration, scoring, `multidimensionalInformation` and multidimensional adaptive tests take at most 100
+dimensions, one limit, so that every calibration can be scored.
 
 The many-facet Rasch model and the Rasch comparison of an LLTM take at most 1,000 parameters, a rating scale of 255
 categories and 2^24 expected counts. The Mantel test and ordinal logistic regression of DIF take items of at most 255

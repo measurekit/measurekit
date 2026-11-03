@@ -11,10 +11,10 @@ export { type MultidimensionalGradedParameters, multidimensionalGradedResponse }
 export { productGrid } from "./grid.js";
 export { gridLikelihood } from "./grid-likelihood.js";
 export {
+  checkDimensions,
   checkMultidimensionalItem,
   checkMultidimensionalItems,
   checkMultidimensionalModel,
-  checkScoringDimensions,
   indexMultidimensionalItems,
 } from "./items.js";
 export {

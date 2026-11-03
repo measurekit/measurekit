@@ -1,8 +1,8 @@
 import { checkOptions, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import {
+  checkDimensions,
   checkMultidimensionalItems,
-  checkScoringDimensions,
   indexMultidimensionalItems,
   type MultidimensionalEstimate,
   type MultidimensionalEstimator,
@@ -122,7 +122,7 @@ export function multidimensionalAdaptiveTest(
     );
   }
   const dimensions = checkMultidimensionalItems(pool, "A multidimensional adaptive test");
-  checkScoringDimensions(dimensions, "A multidimensional adaptive test");
+  checkDimensions(dimensions, "A multidimensional adaptive test");
   const standardPrior = {
     mean: Array.from({ length: dimensions }, () => 0),
     covariance: Array.from({ length: dimensions }, (_, i) =>

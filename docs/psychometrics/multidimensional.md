@@ -3,7 +3,7 @@
 `@measurekit/psychometrics/multidimensional` models a person by a vector of thetas, one per dimension, and an item by a
 slope on each dimension: a high theta on one dimension makes up for a low one on another (compensatory models). It
 calibrates items and the correlations between dimensions by marginal maximum likelihood, exploratory and confirmatory,
-with EM for up to three dimensions and with MH-RM for any number, and bifactor and two-tier models by dimension
+with EM for up to three dimensions and with MH-RM for up to 100, and bifactor and two-tier models by dimension
 reduction; computes standard errors; rotates exploratory solutions; calibrates several groups of persons on one scale,
 with fixed anchor items; calibrates the same persons over two or three occasions; estimates thetas by EAP and MAP in any
 number of dimensions; and computes information matrices. Every estimate is validated against mirt, GPArotation and base
@@ -82,12 +82,12 @@ flowchart TD
   M{"method"} -->|"em: the default for 1 to 3 dimensions"| E["EM: integrates theta over a grid of points ** D nodes"]
   M -->|"mhrm: the default for 4 or more"| H["MH-RM: draws theta from its posterior, no grid"]
   E --> EO["Deterministic; hessian and cross-product standard errors; at most 3 dimensions"]
-  H --> HO["Seeded, with Monte Carlo error; hessian standard errors; any number of dimensions"]
+  H --> HO["Seeded, with Monte Carlo error; hessian standard errors; up to 100 dimensions"]
 ```
 
 |                      | EM                                                   | MH-RM                                                                               |
 | -------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Dimensions           | 1 to 3                                               | Any number; the default above 3                                                     |
+| Dimensions           | 1 to 3                                               | Up to 100; the default above 3                                                      |
 | Integration of theta | Quadrature on a grid of `points` nodes per dimension | Metropolis-Hastings draws, no grid                                                  |
 | Result               | Deterministic, exact to `tolerance`                  | Seeded, within a Monte Carlo error                                                  |
 | Standard errors      | `"hessian"` and `"cross-product"`                    | `"hessian"`                                                                         |
@@ -102,7 +102,7 @@ nothing. [A recipe](#recipe-responses-missing-not-at-random) models omissions th
 | ---------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `model`          | required                                  | One model, or one per item in item order                                                                             |
 | `method`         | `"em"` up to 3 dimensions, `"mhrm"` above | `"em"` or `"mhrm"`                                                                                                   |
-| `dimensions`     | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, at most 3 for EM; every item loads on each                |
+| `dimensions`     | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, 3 at most for EM, 100 for MH-RM; every item loads on each |
 | `loadings`       | none; one of `dimensions` and `loadings`  | Confirmatory: the names of the dimensions of each item, by item id, of every item                                    |
 | `correlated`     | `true`                                    | Confirmatory: estimate the correlations, in every group. Ignored when exploratory                                    |
 | `groups`         | one group                                 | EM only: each person's group label, aligned with the persons; [several groups on one scale](#groups-and-fixed-items) |
@@ -515,8 +515,8 @@ correlations are the identity, except between two primary dimensions, which are 
 The log-likelihood is exact on the grid, and the number of parameters of `aic` and `bic` counts the estimated slopes,
 intercepts and asymptotes, and that correlation. Scoring needs no new function: `multidimensionalEstimates` works on the
 result, on the grid of all dimensions. The posterior mean integrates over that grid, so it needs a small `points` with
-many specific dimensions; the posterior mode does not. Scoring takes the primary and the specific dimensions together,
-at most 100, so a model of more testlets than that is calibrated but not scored.
+many specific dimensions; the posterior mode does not. A bifactor or two-tier model takes at most 100 dimensions, the
+primary and the specific ones together, as scoring does, so that every calibration can be scored.
 
 | Rule                                | Definition                                                                                           |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -613,9 +613,10 @@ are the identity and it has at least two dimensions.
 | `multidimensionalEstimates(data, items, estimator)`                     | The estimate of every person of a data set, `null` without responses                                           |
 
 `items` are `{ model, parameters }` of one number of dimensions, at most 100; `responses` has one response per item,
-`null` when missing. An estimate has `theta`, `standardErrors` and `covariance`. The limit of dimensions holds for
-`multidimensionalInformation` and adaptive tests as well: the matrices of scoring grow as the square of the dimensions
-and its time as the cube, so that the posterior mode of one item of 1,000 dimensions took 11 s.
+`null` when missing. An estimate has `theta`, `standardErrors` and `covariance`. The limit of dimensions is one for
+calibration, scoring, `multidimensionalInformation` and adaptive tests, so that every calibration can be scored: the
+matrices of scoring grow as the square of the dimensions and its time as the cube, so that the posterior mode of one item
+of 1,000 dimensions took 11 s.
 
 | Option   | Of       | Default                                                     | Meaning                                                                                              |
 | -------- | -------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -787,7 +788,8 @@ multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // [-
 - **Rotation.** GPArotation's default algorithm, Barzilai-Borwein steps with a nonmonotone line search; mirt's
   `summary` and `fscores` rotate to GPArotation's default tolerance, 1e-5.
 - **Priors.** A prior of c is on the probability scale; mirt's `norm` on `g` is on its logit.
-- **Dimensions.** EM calibrates up to three dimensions, MH-RM any number; scoring takes up to 100, and mirt any number.
+- **Dimensions.** EM calibrates up to three dimensions, and MH-RM, bifactor models and scoring take up to 100; mirt
+  takes any number.
 - **Groups.** The options `groups` and `fixed` stand for mirt's `invariance` and the `est` column of `pars`. mirt cannot
   constrain parameters that it does not estimate, so for fixed items it needs the other items named in `invariance`;
   here `fixed` frees the means and covariance of the first group as well. mirt's covariance of a group is free in

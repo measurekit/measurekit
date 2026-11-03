@@ -1,5 +1,5 @@
 import { checkArray, checkFinite, DataError } from "@measurekit/core";
-import { checkMultidimensionalItems, checkScoringDimensions } from "./items.js";
+import { checkDimensions, checkMultidimensionalItems } from "./items.js";
 import type { MultidimensionalItem } from "./model.js";
 
 /**
@@ -17,7 +17,7 @@ export function multidimensionalInformation(
   theta: readonly number[],
 ): number[][] {
   const dimensions = checkMultidimensionalItems(items, "Information");
-  checkScoringDimensions(dimensions, "Information");
+  checkDimensions(dimensions, "Information");
   checkArray(theta, "Theta must be an array");
   if (theta.length !== dimensions) {
     throw new DataError(

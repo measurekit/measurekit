@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   calibrate,
+  calibrateBifactor,
   calibrateLongitudinal,
   calibrateMultidimensional,
   createRandom,
@@ -3697,6 +3698,25 @@ describe("errors", () => {
   const data = responseMatrix(m2pl.responses.slice(0, 40), { itemIds: [...m2pl.itemIds] });
   const loadings: LoadingPattern = m2pl.loadings;
   const model = multidimensionalTwoParameterLogistic;
+
+  it("takes at most 100 dimensions in calibration, so that every calibration can be scored", () => {
+    const message = "Calibration takes at most 100 dimensions, found 101.";
+    expect(() => calibrateMultidimensional(data, { model, dimensions: 101 })).toThrow(message);
+    expect(() => calibrateMultidimensional(data, { model, dimensions: 101, method: "mhrm" })).toThrow(message);
+    const names = Array.from({ length: 101 }, (_, d) => `D${d + 1}`);
+    const wide = Object.fromEntries(m2pl.itemIds.map((id, i) => [id, i === 0 ? names : ["D1"]]));
+    expect(() => calibrateMultidimensional(data, { model, loadings: wide, method: "mhrm" })).toThrow(message);
+    // 100 specific dimensions of two items each, and the general one.
+    const itemIds = Array.from({ length: 200 }, (_, i) => `q${i + 1}`);
+    const testlets = responseMatrix(
+      Array.from({ length: 4 }, (_, p) => itemIds.map((_, i) => (p + i) % 2)),
+      { itemIds },
+    );
+    const specific = Object.fromEntries(itemIds.map((id, i) => [id, `s${Math.floor(i / 2) + 1}`]));
+    expect(() => calibrateBifactor(testlets, { specific })).toThrow(
+      "A bifactor or two-tier calibration takes at most 100 dimensions, found 101.",
+    );
+  });
 
   it("takes at most 100 dimensions in scoring, information and adaptive tests", () => {
     const item = (id: string, dimensions: number) => ({
