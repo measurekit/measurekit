@@ -195,10 +195,7 @@ export function calibrateCdm(
   );
   const logLikelihood = expectedCounts(data, design, state).logLikelihood;
   const covariances = standardErrors === "incomplete" ? incompleteCovariances(data, design, state) : [];
-  const parameters =
-    design.itemAttributes.reduce((sum, indices, j) => sum + parameterCount(models[j], indices.length), 0) +
-    design.profiles.length -
-    1;
+  const parameters = parameterTotal(design, models);
   return {
     attributes: design.attributes,
     items: matrix.itemIds.map((id, j) => {
@@ -252,9 +249,15 @@ function itemErrors(
 }
 
 /** Returns the number of parameters of an item with `attributeCount` attributes: its success probabilities. */
-export function parameterCount(model: CdmModel | undefined, attributeCount: number): number {
+function parameterCount(model: CdmModel | undefined, attributeCount: number): number {
   if (model === "dina" || model === "dino") return 2;
   return model === undefined || model === "gdina" ? 2 ** attributeCount : attributeCount + 1;
+}
+
+/** Returns the parameters of a design's items under their models and the free proportions of its profiles. */
+export function parameterTotal(design: CdmDesign, models: readonly CdmModel[]): number {
+  const items = design.itemAttributes.reduce((sum, indices, j) => sum + parameterCount(models[j], indices.length), 0);
+  return items + design.profiles.length - 1;
 }
 
 /** Returns the coefficients of a G-DINA, DINA or DINO item from its success probabilities. */

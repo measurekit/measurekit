@@ -7,7 +7,7 @@ import {
   countByScore,
   type DifGroup,
   type ItemCases,
-  itemCasesOf,
+  itemStatistics,
   polytomousData,
   type ScoreGroups,
 } from "./groups.js";
@@ -113,10 +113,7 @@ export function mantelTest(
   return purified(
     matrix.itemIds,
     purify,
-    (anchors) => {
-      const casesOf = itemCasesOf(data, anchors);
-      return matrix.itemIds.map((id, item) => ({ id, ...statistics(id, casesOf(item)) }));
-    },
+    (anchors) => itemStatistics(matrix.itemIds, data, anchors, (cases, id) => statistics(id, cases)),
     (item) => significant(item.significance),
   );
 }

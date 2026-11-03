@@ -88,8 +88,7 @@ function forEachCumulativeTable(
     }
   };
   for (let s = 0; s < scoreCount; s++) {
-    const reference = sizes[2 * s] ?? 0;
-    const focal = sizes[2 * s + 1] ?? 0;
+    const [reference = 0, focal = 0] = sizes.subarray(2 * s, 2 * s + 2);
     if (reference === 0 || focal === 0) continue;
     cumulate(2 * s, referenceAtOrBelow);
     cumulate(2 * s + 1, focalAtOrBelow);

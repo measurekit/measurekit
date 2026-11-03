@@ -132,6 +132,17 @@ export function itemCasesOf(data: DifData, anchors: Uint8Array): (item: number) 
   };
 }
 
+/** Returns the statistics of every item, each from its persons and their matching scores on the anchors given. */
+export function itemStatistics<TItem>(
+  itemIds: readonly string[],
+  data: DifData,
+  anchors: Uint8Array,
+  statistics: (cases: ItemCases, id: string) => TItem,
+): ({ readonly id: string } & TItem)[] {
+  const casesOf = itemCasesOf(data, anchors);
+  return itemIds.map((id, item) => ({ id, ...statistics(casesOf(item), id) }));
+}
+
 /** Returns each person's highest possible sum and total over the answered anchors, and the anchors' possible sum. */
 function anchorSums(
   { itemCount, responses, focal, maxScores }: DifData,

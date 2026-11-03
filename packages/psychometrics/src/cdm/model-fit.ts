@@ -16,7 +16,7 @@ import {
   type ScoreMoments,
   sampleMoments,
 } from "../math/internal.js";
-import { type CdmCalibration, type CdmModel, calibratedModel, LINKS, MODELS, parameterCount } from "./calibration.js";
+import { type CdmCalibration, type CdmModel, calibratedModel, LINKS, MODELS, parameterTotal } from "./calibration.js";
 import type { CdmState } from "./expectation.js";
 import { type CdmDesign, profilesOf } from "./q-matrix.js";
 
@@ -85,10 +85,7 @@ export function cdmModelFit(
   const model = checkedModel(matrix, calibration);
   const { design, state, models, sample } = model;
   const itemCount = models.length;
-  const parameters =
-    design.itemAttributes.reduce((sum, indices, j) => sum + parameterCount(models[j], indices.length), 0) +
-    design.profiles.length -
-    1;
+  const parameters = parameterTotal(design, models);
   const moments = (itemCount * (itemCount + 1)) / 2;
   const srmsr = residualCorrelationRoot(sample, profileMoments(design, state));
   const { statistic: m2, rank } =
