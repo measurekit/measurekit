@@ -183,9 +183,10 @@ as mirt.
 | `"cross-product"` | Σ over persons of s sᵀ, s the person's score vector, plus minus the priors' second derivatives    | `SE.type = "crossprod"`  | one pass over the persons, and P³ / 2     |
 
 P is the number of estimated parameters. The gradient is exact by Fisher's identity: the posterior mean of the
-complete-data gradient. On 20,000 persons and 60 2PL items, EM takes about 3.5 s, Hessian standard errors 27 s more
-and cross-product ones 0.2 s more; on 4,000 persons answering 40 of 1,000 items, cross-product standard errors take
-about 3 s. Both methods estimate the same covariance in large samples; the Hessian is the reference for small ones.
+complete-data gradient. On 20,000 persons and 60 2PL items, EM takes 1.3 to 2.0 s, Hessian standard errors 24 to 40 s
+more and cross-product ones 0.5 to 1.2 s more; on 4,000 persons answering 40 of 1,000 items, cross-product standard
+errors take 2.0 to 3.9 s, on a quiet machine and on one under load. Both methods estimate the same covariance in large
+samples; the Hessian is the reference for small ones.
 Standard errors are `null` for fixed items, and for every item when the information cannot be inverted or gives a
 variance that is not positive. They take at most 2,000 estimated parameters, counting a parameter that items share once
 for each of them, as the covariance lists it: the information holds every pair, about 210 MB at the bound, and its
@@ -971,7 +972,7 @@ fit.items.slice(0, 2).map((item, j) => ({
 | Choice                 | Value                                                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Replicates             | 200 to 1,000; the standard deviation of a standard error is about 1 / √(2R) of its value, 5% at 200          |
-| Time                   | One `calibrate` per replicate: 400 replicates of 1,000 persons and 8 items take about 8 seconds              |
+| Time                   | One `calibrate` per replicate: 400 replicates of 1,000 persons and 8 items take 4.6 to 10 s                  |
 | A replicate that fails | Check `converged` and leave it out, reporting how many                                                       |
 | Intervals              | The values at the 2.5% and 97.5% ranks of a parameter's sorted replicates                                    |
 | Fixed settings         | The replicates use the options of the original fit, and the same `fixed` items                               |
