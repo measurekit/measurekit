@@ -253,6 +253,14 @@ export const READERS: readonly ReaderCase[] = [
       psychometrics.localDependenceChiSquare(matrix, items),
   },
   {
+    name: "summedScoreFit: 2 persons, 300 2PL items, the highest total score",
+    budget: 20,
+    input: () => pairItems(300),
+    prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
+    read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
+      psychometrics.summedScoreFit(matrix, items),
+  },
+  {
     name: "yenQ3: 2 persons, 1,000 2PL items, the most",
     budget: 50,
     input: () => pairItems(1000),

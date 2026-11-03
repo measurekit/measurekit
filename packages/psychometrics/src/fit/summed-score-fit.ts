@@ -5,6 +5,12 @@ import { type IrtItem, itemTrace, quadratureRule, summedScoreLikelihoods } from 
 import { collapseCells } from "./collapse.js";
 import { checkItems } from "./inputs.js";
 
+/**
+ * The highest total score of the items that S-X² takes. For each item it sums the scores of the other items at each
+ * node, which costs the items times the square of the total score: 300 dichotomous items take 2 to 3 s.
+ */
+const MAX_TOTAL_SCORE = 300;
+
 /** The S-X² fit of one item. */
 export interface SummedScoreFit {
   /** The item id. */
@@ -32,8 +38,8 @@ export interface SummedScoreFit {
  * @param items - The calibrated items, in the order of the matrix's items.
  * @returns For each item, the S-X² statistic with its degrees of freedom and probability; `null` where the statistic is
  *   undefined.
- * @throws `DataError` when the matrix or the items are invalid, a response is not a category of its item, or no person
- * answered every item.
+ * @throws `DataError` when the matrix or the items are invalid, a response is not a category of its item, the items'
+ * highest total score is above 300, or no person answered every item.
  * @see {@link https://doi.org/10.1177/01466216000241003 | Orlando and Thissen (2000)}
  * @see {@link https://doi.org/10.1111/j.1745-3984.2008.00071.x | Kang and Chen (2008)}
  */
@@ -43,6 +49,11 @@ export function summedScoreFit(matrix: ResponseMatrix, items: readonly IrtItem[]
   if (complete.length === 0) throw new DataError("S-X² needs at least one person who answered every item.");
   const counts = items.map((item) => item.model.categoryCount(item.parameters));
   const maxScore = counts.reduce((sum, count) => sum + count - 1, 0);
+  if (maxScore > MAX_TOTAL_SCORE) {
+    throw new DataError(
+      `S-X² sums the scores of the other items for each item, so it takes items of a highest total score of at most ${MAX_TOTAL_SCORE}, found ${maxScore}; test a part of the form.`,
+    );
+  }
   const totals = complete.map((row) => row.reduce<number>((sum, response) => sum + (response ?? 0), 0));
   const { nodes, weights } = quadratureRule();
   const traces = items.map((item, i) => itemTrace(item, counts[i] ?? 0, nodes));

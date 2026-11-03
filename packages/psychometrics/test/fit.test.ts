@@ -489,6 +489,22 @@ describe("summedScoreFit", () => {
     expect(() => summedScoreFit(responseMatrix([[null, 1]]), HALVES)).toThrow(DataError);
   });
 
+  it("takes items of a highest total score of at most 300, whose sums cost the square of the score for each item", () => {
+    // Two graded items of 151 and of 151 or 152 categories: a highest total score of 300 or 301.
+    const graded = (categories: number): IrtItem => ({
+      model: gradedResponse,
+      parameters: { a: 1, b: Array.from({ length: categories - 1 }, (_, k) => -3 + (6 * k) / (categories - 2)) },
+    });
+    const matrix = responseMatrix([
+      [0, 1],
+      [1, 0],
+    ]);
+    expect(summedScoreFit(matrix, [graded(151), graded(151)])).toHaveLength(2);
+    expect(() => summedScoreFit(matrix, [graded(151), graded(152)])).toThrow(
+      "S-X² sums the scores of the other items for each item, so it takes items of a highest total score of at most 300, found 301; test a part of the form.",
+    );
+  });
+
   it("gives null without degrees of freedom", () => {
     const result = summedScoreFit(
       responseMatrix([

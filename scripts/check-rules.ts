@@ -723,6 +723,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/psychometrics/test/cat.test.ts",
     titles: "assembleForms.*rejects options of other types and invalid ones",
   },
+  {
+    rule: "S-X² takes items of a highest total score of at most 300, so that many items do not cost their cube.",
+    file: "packages/psychometrics/src/fit/summed-score-fit.ts",
+    find: "if (maxScore > MAX_TOTAL_SCORE) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "highest total score of at most 300",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

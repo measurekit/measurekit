@@ -121,6 +121,10 @@ mirt's `itemfit(fit_stats = "S_X2")`:
 The degrees of freedom count every parameter of the item's model as estimated, so for anchor items, which were not
 estimated, they are too few by the anchor's parameters.
 
+For each item the recursion sums the scores of the other items at every node, which costs the items times the square of
+the highest total score, so `summedScoreFit` takes items of a highest total score of at most 300: 300 dichotomous items,
+or 75 of five categories, take 2 to 3 s, where 600 dichotomous items took 17 s.
+
 ## RMSD
 
 `rootMeanSquareDeviation` compares each item's curve with its observed shares at the nodes of the population, as TAM's
@@ -471,6 +475,7 @@ Invalid input throws `DataError` naming the value found.
 | The items or the thetas do not match the matrix           | Give one item for each column and one finite theta for each person                      |
 | A response is not a category of its item                  | Calibrate the item on these data, or give it the categories the data use                |
 | `summedScoreFit` when no person answered every item       | Use `itemFit`, which works from the answered items of each person                       |
+| `summedScoreFit` of a highest total score above 300       | Test a part of the form, such as each section                                           |
 | Several groups, covariates, testlets, or a histogram      | Calibrate one group of a normal distribution; each group alone is a fit                 |
 | More than 60 items                                        | Test a part of the form, or use `summedScoreFit` for each item                          |
 | C2 of more than 1,830 moments                             | Test fewer items, or group the categories of items of many                              |
