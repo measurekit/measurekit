@@ -65,8 +65,8 @@ export interface MultistageCutsOptions {
   readonly population?: ThetaDistribution;
   /**
    * The shares of the population that each module takes, one list for each stage after the first with a positive share
-   * for each of its modules, in the order of the modules; a list is divided by its sum. Only `routing-shares` takes
-   * it.
+   * for each of its modules, in the order of the modules; a list sums to 1 within 1e-6 and is divided by its sum. Only
+   * `routing-shares` takes it.
    *
    * @defaultValue equal shares for the modules of a stage
    */
