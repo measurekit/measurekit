@@ -164,8 +164,8 @@ above 2,000 items, and `calibrateSpeedAccuracy` refuses `standardErrors: "hessia
 `linearChange` takes at most 1,000 effects, and finds an effect without a unique estimate in the cube of the effects.
 
 The readers of data refuse a hole among the rows, ids, records, times or option labels, and check that a first row or
-column is an array before its length sizes anything. The `range` of theta of the estimators, of conversion tables and of
-multistage cuts is at most 10,000 wide. Groups of calibration are checked in time that grows with the persons, and a
+column is an array before its length sizes anything. The `range` of theta of the estimators and of conversion tables is at
+most 10,000 wide. Groups of calibration are checked in time that grows with the persons, and a
 group named as a property of every object, such as `constructor`, takes no distribution it was not given. The residual
 gain refuses pre scores that are all equal however their mean rounds, the normalized gain of a group comes from the sums
 over its persons, and the reliable change index stays finite where the squares of the standard errors would underflow.
