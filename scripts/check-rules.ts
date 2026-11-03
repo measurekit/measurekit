@@ -540,6 +540,14 @@ export const RULES: readonly Rule[] = [
     titles: "keeps the 8 grids asked for last",
   },
   {
+    rule: "Scoring, information and adaptive tests take at most 100 dimensions, as their time grows as the cube of the dimensions.",
+    file: "packages/psychometrics/src/multidimensional/items.ts",
+    find: "if (dimensions > MAX_SCORING_DIMENSIONS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/multidimensional.test.ts",
+    titles: "takes at most 100 dimensions",
+  },
+  {
     rule: "A person with a missing response has no count of Guttman errors, and the counts of the others stay with their rows.",
     file: "packages/psychometrics/src/mokken/guttman-errors.ts",
     find: "(row.includes(null) ? null : (totals[complete++] ?? 0))",

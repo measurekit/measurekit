@@ -14,6 +14,7 @@ export {
   checkMultidimensionalItem,
   checkMultidimensionalItems,
   checkMultidimensionalModel,
+  checkScoringDimensions,
   indexMultidimensionalItems,
 } from "./items.js";
 export {

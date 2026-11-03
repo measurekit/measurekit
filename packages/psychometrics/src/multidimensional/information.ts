@@ -1,5 +1,5 @@
 import { checkArray, checkFinite, DataError } from "@measurekit/core";
-import { checkMultidimensionalItems } from "./items.js";
+import { checkMultidimensionalItems, checkScoringDimensions } from "./items.js";
 import type { MultidimensionalItem } from "./model.js";
 
 /**
@@ -9,14 +9,15 @@ import type { MultidimensionalItem } from "./model.js";
  * @param items - The items of the test.
  * @param theta - The thetas, one for each dimension.
  * @returns The information matrix, by rows.
- * @throws `DataError` when the items are not an array, there are none, an item is invalid or the items differ in their
- * number of dimensions, or theta is not an array of that many finite numbers.
+ * @throws `DataError` when the items are not an array, there are none, an item is invalid, the items differ in their
+ * number of dimensions or have more than 100, or theta is not an array of that many finite numbers.
  */
 export function multidimensionalInformation(
   items: readonly MultidimensionalItem[],
   theta: readonly number[],
 ): number[][] {
   const dimensions = checkMultidimensionalItems(items, "Information");
+  checkScoringDimensions(dimensions, "Information");
   checkArray(theta, "Theta must be an array");
   if (theta.length !== dimensions) {
     throw new DataError(

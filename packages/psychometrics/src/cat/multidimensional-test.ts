@@ -2,6 +2,7 @@ import { checkOptions, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import {
   checkMultidimensionalItems,
+  checkScoringDimensions,
   indexMultidimensionalItems,
   type MultidimensionalEstimate,
   type MultidimensionalEstimator,
@@ -75,10 +76,10 @@ export interface MultidimensionalAdaptiveTest {
  *   testlet order; each option has its default.
  * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when `stopping`, `selection` or `estimator` is not a rule or function, the pool is not an array
- * of at least one valid item with a string id, ids repeat or the items differ in their number of dimensions, an exposure
- * parameter is outside [0, 1], a content target is invalid or missing for an item's area, or an enemy set does not name
- * two or more distinct pool items. An estimator that takes no prior throws, from `start`, as it cannot estimate without
- * items.
+ * of at least one valid item with a string id, ids repeat, the items differ in their number of dimensions or have more
+ * than 100, an exposure parameter is outside [0, 1], a content target is invalid or missing for an item's area, or an
+ * enemy set does not name two or more distinct pool items. An estimator that takes no prior throws, from `start`, as it
+ * cannot estimate without items.
  *
  * @example
  * ```ts
@@ -121,6 +122,7 @@ export function multidimensionalAdaptiveTest(
     );
   }
   const dimensions = checkMultidimensionalItems(pool, "A multidimensional adaptive test");
+  checkScoringDimensions(dimensions, "A multidimensional adaptive test");
   const standardPrior = {
     mean: Array.from({ length: dimensions }, () => 0),
     covariance: Array.from({ length: dimensions }, (_, i) =>

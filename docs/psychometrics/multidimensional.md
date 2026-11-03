@@ -515,7 +515,8 @@ correlations are the identity, except between two primary dimensions, which are 
 The log-likelihood is exact on the grid, and the number of parameters of `aic` and `bic` counts the estimated slopes,
 intercepts and asymptotes, and that correlation. Scoring needs no new function: `multidimensionalEstimates` works on the
 result, on the grid of all dimensions. The posterior mean integrates over that grid, so it needs a small `points` with
-many specific dimensions; the posterior mode does not.
+many specific dimensions; the posterior mode does not. Scoring takes the primary and the specific dimensions together,
+at most 100, so a model of more testlets than that is calibrated but not scored.
 
 | Rule                                | Definition                                                                                           |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -611,8 +612,10 @@ are the identity and it has at least two dimensions.
 | `multidimensionalWeightedLikelihoodEstimate(items, responses, options)` | WLE (Warm): the root of the score plus ½ tr(I⁻¹ J_r) in `range`; the same covariance                           |
 | `multidimensionalEstimates(data, items, estimator)`                     | The estimate of every person of a data set, `null` without responses                                           |
 
-`items` are `{ model, parameters }` of one number of dimensions; `responses` has one response per item, `null` when
-missing. An estimate has `theta`, `standardErrors` and `covariance`.
+`items` are `{ model, parameters }` of one number of dimensions, at most 100; `responses` has one response per item,
+`null` when missing. An estimate has `theta`, `standardErrors` and `covariance`. The limit of dimensions holds for
+`multidimensionalInformation` and adaptive tests as well: the matrices of scoring grow as the square of the dimensions
+and its time as the cube, so that the posterior mode of one item of 1,000 dimensions took 11 s.
 
 | Option   | Of       | Default                                                     | Meaning                                                                                              |
 | -------- | -------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -784,7 +787,7 @@ multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // [-
 - **Rotation.** GPArotation's default algorithm, Barzilai-Borwein steps with a nonmonotone line search; mirt's
   `summary` and `fscores` rotate to GPArotation's default tolerance, 1e-5.
 - **Priors.** A prior of c is on the probability scale; mirt's `norm` on `g` is on its logit.
-- **Dimensions.** EM calibrates up to three dimensions, MH-RM any number; scoring has no limit.
+- **Dimensions.** EM calibrates up to three dimensions, MH-RM any number; scoring takes up to 100, and mirt any number.
 - **Groups.** The options `groups` and `fixed` stand for mirt's `invariance` and the `est` column of `pars`. mirt cannot
   constrain parameters that it does not estimate, so for fixed items it needs the other items named in `invariance`;
   here `fixed` frees the means and covariance of the first group as well. mirt's covariance of a group is free in

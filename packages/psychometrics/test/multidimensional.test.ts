@@ -20,6 +20,7 @@ import {
   type MultidimensionalModel,
   type MultidimensionalTestItem,
   maximumLikelihoodEstimate,
+  multidimensionalAdaptiveTest,
   multidimensionalDifficulty,
   multidimensionalDiscrimination,
   multidimensionalEstimates,
@@ -42,6 +43,7 @@ import {
   responseRecords,
   rotateLoadings,
   simulateMultidimensionalResponses,
+  testLength,
   threeParameterLogistic,
   twoParameterLogistic,
   weightedLikelihoodEstimate,
@@ -3695,6 +3697,39 @@ describe("errors", () => {
   const data = responseMatrix(m2pl.responses.slice(0, 40), { itemIds: [...m2pl.itemIds] });
   const loadings: LoadingPattern = m2pl.loadings;
   const model = multidimensionalTwoParameterLogistic;
+
+  it("takes at most 100 dimensions in scoring, information and adaptive tests", () => {
+    const item = (id: string, dimensions: number) => ({
+      id,
+      model,
+      parameters: { a: new Array<number>(dimensions).fill(0.3), intercept: 0, c: 0, d: 1 },
+    });
+    const wide = [item("q1", 101), item("q2", 101)];
+    const message = "Scoring takes at most 100 dimensions, found 101.";
+    for (const estimate of [
+      multidimensionalPosteriorModeEstimate,
+      multidimensionalPosteriorMeanEstimate,
+      multidimensionalMaximumLikelihoodEstimate,
+      multidimensionalWeightedLikelihoodEstimate,
+    ]) {
+      expect(() => estimate(wide, [1, 0])).toThrow(message);
+    }
+    const prior = {
+      mean: new Array<number>(101).fill(0),
+      covariance: Array.from({ length: 101 }, (_, i) => Array.from({ length: 101 }, (__, j) => (i === j ? 1 : 0))),
+    };
+    expect(() => multidimensionalPosteriorModeEstimate([], [], { prior })).toThrow(message);
+    expect(() => multidimensionalEstimates(responseMatrix([[1, 0]], { itemIds: ["q1", "q2"] }), wide)).toThrow(message);
+    expect(() => multidimensionalInformation(wide, new Array<number>(101).fill(0))).toThrow(
+      "Information takes at most 100 dimensions, found 101.",
+    );
+    expect(() => multidimensionalAdaptiveTest({ pool: wide, stopping: testLength(1) })).toThrow(
+      "A multidimensional adaptive test takes at most 100 dimensions, found 101.",
+    );
+    const limit = [item("q1", 100), item("q2", 100)];
+    expect(multidimensionalPosteriorModeEstimate(limit, [1, 0]).theta).toHaveLength(100);
+    expect(multidimensionalInformation(limit, new Array<number>(100).fill(0))).toHaveLength(100);
+  });
 
   it("needs exactly one of dimensions and loadings", () => {
     expect(() => calibrateMultidimensional(data, { model })).toThrow(

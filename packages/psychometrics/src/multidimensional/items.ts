@@ -2,6 +2,13 @@ import { checkArray, DataError } from "@measurekit/core";
 import { checkModelledItem, checkModelShape, checkResponses, indexItemsWith } from "../irt/internal.js";
 import type { MultidimensionalItem, MultidimensionalModel } from "./model.js";
 
+/**
+ * The most dimensions that scoring, information and adaptive testing take: their matrices grow as the square of the
+ * dimensions and their time as the cube, so that the posterior mode of one item of 1,000 slopes took 11 s. Published
+ * bifactor and testlet models have far fewer dimensions.
+ */
+const MAX_SCORING_DIMENSIONS = 100;
+
 /** The methods of {@link MultidimensionalModel}, which a model must have. */
 const MODEL_METHODS = [
   "categoryCount",
@@ -72,11 +79,22 @@ export function indexMultidimensionalItems(
 }
 
 /**
+ * Checks that `subject` takes no more than {@link MAX_SCORING_DIMENSIONS} dimensions.
+ *
+ * @throws `DataError` when it takes more.
+ */
+export function checkScoringDimensions(dimensions: number, subject: string): void {
+  if (dimensions > MAX_SCORING_DIMENSIONS) {
+    throw new DataError(`${subject} takes at most ${MAX_SCORING_DIMENSIONS} dimensions, found ${dimensions}.`);
+  }
+}
+
+/**
  * Checks the items against one response each, `null` when missing, and returns their number of dimensions: without
  * items, the number of `priorDimensions`.
  *
- * @throws `DataError` naming the first invalid item or response, or when there are no items and no prior to give the
- * dimensions.
+ * @throws `DataError` naming the first invalid item or response, when there are no items and no prior to give the
+ * dimensions, or when there are more than {@link MAX_SCORING_DIMENSIONS}.
  */
 export function checkMultidimensionalPattern(
   items: readonly MultidimensionalItem[],
@@ -90,6 +108,7 @@ export function checkMultidimensionalPattern(
     Array.isArray(items) && items.length === 0 && priorDimensions !== undefined
       ? priorDimensions
       : checkMultidimensionalItems(items, "Scoring");
+  checkScoringDimensions(dimensions, "Scoring");
   checkResponses(items, responses);
   return dimensions;
 }

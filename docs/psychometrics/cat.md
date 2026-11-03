@@ -914,8 +914,8 @@ result.meanLength; // 16.34
 | `withinTestlet`  | `"in-order"`                 | As for [`adaptiveTest`](#testlets): items with a `testlet` are administered together      |
 
 The pool is an array of at least one item with a model of the [multidimensional models](multidimensional.md#models) and
-valid parameters for it, a string id and, as a calibration's `items` have, the same number of dimensions as every other;
-ids are unique. `contentAreas`, `testlet` and `exposure` are as in an [adaptive test's pool](#adaptive-tests). Responses are
+valid parameters for it, a string id and, as a calibration's `items` have, the same number of dimensions as every other,
+at most 100, as in [scoring](multidimensional.md#scoring); ids are unique. `contentAreas`, `testlet` and `exposure` are as in an [adaptive test's pool](#adaptive-tests). Responses are
 categories of the item: 0 or 1 for the logistic models. Before each item the steps are those of `adaptiveTest`.
 
 ### Estimates of multidimensional tests
