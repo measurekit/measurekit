@@ -1227,6 +1227,16 @@ describe("lltm", () => {
     );
   });
 
+  it("refuses a Rasch comparison of more than 1,000 parameters before it reads the features", () => {
+    // Two persons who answer 999 items oppositely: 999 locations, the mean and the SD.
+    const records = Array.from({ length: 999 }, (_, item) =>
+      [0, 1].map((person) => ({ person: `p${person}`, item: `q${item}`, response: (person + item) % 2 })),
+    ).flat();
+    expect(() => lltm(responseRecords(records), JSON.parse("null"))).toThrow(
+      "The Rasch model of an LLTM's comparison takes at most 1000 parameters, as its estimation inverts a matrix of every pair of them; found 1001.",
+    );
+  });
+
   it("rejects features that are missing, collinear or too many for the items", () => {
     const matrix = lltmData(0);
     const reference = defined(lltmFixture.cases[0]);

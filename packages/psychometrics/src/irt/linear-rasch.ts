@@ -1,4 +1,4 @@
-import { largestChange } from "@measurekit/core";
+import { DataError, largestChange } from "@measurekit/core";
 import { type HessianFunction, invert, newton, numericalHessian, type Quadrature } from "../math/internal.js";
 import { type ExpectationItem, type ExpectationStep, expectationStep } from "./expectation.js";
 import type { Population } from "./latent.js";
@@ -72,6 +72,61 @@ export interface LinearRaschFit {
   readonly iterations: number;
   /** The covariance matrix of the parameter vector by rows, or `null` without standard errors or if it is singular. */
   readonly covariance: Float64Array | null;
+}
+
+/**
+ * The most parameters of a linear Rasch model. Its Newton steps hold and invert a dense Hessian of every pair of them,
+ * in time that grows as their cube: a many-facet model of 1,000 takes about 5 minutes with standard errors.
+ */
+const MAX_PARAMETERS = 1000;
+/** The most categories of a set of thresholds: FACETS's 255. */
+const MAX_CATEGORIES = 255;
+/**
+ * The most expected counts, items × quadrature points × categories, which the E-step and the M-step each hold, 128 MB
+ * a table, and whose M-step sums take time with the categories once more.
+ */
+const MAX_EXPECTED_COUNTS = 2 ** 24;
+
+/**
+ * Checks the parameters of a linear Rasch model, which a design can check before it builds the model's locations.
+ *
+ * @param parameters - The location parameters, the free thresholds of every set, and the mean and SD of theta.
+ * @param subject - Names the model in the message, such as "A many-facet model".
+ * @throws `DataError` when there are more than 1,000.
+ */
+export function checkLinearRaschParameters(parameters: number, subject: string): void {
+  if (parameters > MAX_PARAMETERS) {
+    throw new DataError(
+      `${subject} takes at most ${MAX_PARAMETERS} parameters, as its estimation inverts a matrix of every pair of them; found ${parameters}.`,
+    );
+  }
+}
+
+/**
+ * Checks that a linear Rasch model on a rule of `nodeCount` points stays within the parameters, categories and
+ * expected counts that its estimation holds, before it holds any.
+ *
+ * @param subject - Names the model in the messages, such as "A many-facet model".
+ * @throws `DataError` when it has more than 1,000 parameters, a set of more than 255 categories, or more than 2^24
+ * expected counts.
+ */
+export function checkLinearRaschSize(model: LinearRaschModel, nodeCount: number, subject: string): void {
+  checkLinearRaschParameters(layoutOf(model).size, subject);
+  const categories = model.categoryCounts.reduce((most, count) => Math.max(most, count), 0);
+  if (categories > MAX_CATEGORIES) {
+    throw new DataError(
+      `${subject} takes at most ${MAX_CATEGORIES} categories in a rating scale, found ${categories}.`,
+    );
+  }
+  let counts = 0;
+  for (let item = 0; item < model.locations.length; item++) {
+    counts += nodeCount * (model.categoryCounts[model.setOf[item] ?? 0] ?? 0);
+  }
+  if (counts > MAX_EXPECTED_COUNTS) {
+    throw new DataError(
+      `${subject} holds at most ${MAX_EXPECTED_COUNTS} expected counts, its items × quadrature points × categories, found ${counts}.`,
+    );
+  }
 }
 
 /** The M-step stops when the gradient of the expected log-likelihood is this small. */

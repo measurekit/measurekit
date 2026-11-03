@@ -23,7 +23,8 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). So does the time of a statistic of every pair of
   items, which grows with the pairs times the persons, of Mokken's conditional association, with the cube of the items
   times the persons, 14 s at 1,000 items of 8 persons ([mokken](docs/psychometrics/mokken.md)). Run these on data from
-  users in a worker with a deadline, and end the worker when it passes.
+  users in a worker with a deadline, and end the worker when it passes. So does the many-facet Rasch model, whose
+  estimation takes time that grows as the cube of its parameters: 1,000 of them, from 260 KB of scores, take 3.3 minutes.
   An exploratory calibration of several dimensions starts from an eigendecomposition of the items' correlations, whose
   time grows as the cube of the items: about 3 minutes at 2,000 items
   ([multidimensional](docs/psychometrics/multidimensional.md#time)).
@@ -52,6 +53,9 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   | Degree of a log-linear presmoothing, of each score of a table                                      | 20: a table's fit holds 441 terms per cell | [equating](docs/psychometrics/equating.md)                                                                    |
   | Nodes of a grid of several dimensions, in calibration and EAP                                      | 10⁶                                        | [multidimensional](docs/psychometrics/multidimensional.md#calibration)                                        |
   | Values at the nodes of an EM calibration of several dimensions                                     | 2²⁴: 300 MB, 700 MB with standard errors   | [multidimensional](docs/psychometrics/multidimensional.md#calibration)                                        |
+  | Parameters of a many-facet model, or of an LLTM's Rasch comparison                                 | 1,000: 80 MB, 3.3 minutes                  | [rater](docs/psychometrics/rater.md#model)                                                                    |
+  | Categories of a rating scale of a many-facet model                                                 | 255, as FACETS                             | [rater](docs/psychometrics/rater.md#model)                                                                    |
+  | Expected counts of a many-facet model or an LLTM: virtual items × quadrature points × categories   | 2^24: two tables of 128 MB                 | [rater](docs/psychometrics/rater.md#model)                                                                    |
   | Coefficients of a logistic fit without a ridge, or random θ                                        | 5,000: a dense matrix of 200 MB            | [logistic](docs/knowledge-tracing/logistic.md)                                                                |
   | States of a structure built from prerequisites or clauses                                          | `maxStates`, 10,000                        | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
   | Learning paths; cells of the Jacobian of identifiability                                           | `maxPaths`, 10,000; 1e7                    | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |

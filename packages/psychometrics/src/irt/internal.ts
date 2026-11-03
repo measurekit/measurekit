@@ -49,6 +49,8 @@ export {
 export type { PersonEstimate } from "./joint-maximum-likelihood.js";
 export { population } from "./latent.js";
 export {
+  checkLinearRaschParameters,
+  checkLinearRaschSize,
   fitLinearRasch,
   type LinearRaschFit,
   type LinearRaschModel,

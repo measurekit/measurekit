@@ -37,12 +37,14 @@ type Combination = Map<number, number>;
  * @param facets - The two facets, by name and element ids.
  * @param elements - The elements of the two facets at each virtual item, as indices into their ids.
  * @param offset - The index of the first free parameter in the parameter vector.
- * @throws `DataError` when the cells leave no free parameter, because every bias would be 0.
+ * @param checkSize - Checks the parameters the vector holds up to the interaction's last, before its biases are solved.
+ * @throws `DataError` when the cells leave no free parameter, because every bias would be 0, or `checkSize` throws it.
  */
 export function designInteraction(
   facets: readonly [InteractionFacet, InteractionFacet],
   elements: readonly (readonly [number, number])[],
   offset: number,
+  checkSize: (parameters: number) => void,
 ): DesignInteraction {
   const [first, second] = facets;
   const cellIndex = new Map<number, number>();
@@ -58,28 +60,34 @@ export function designInteraction(
     }
     cellOf[item] = cell;
   });
-  const combinations = cellCombinations(first.ids.length, second.ids.length, cellElements);
-  const free = combinations.free;
+  const forest = spanningForest(first.ids.length, second.ids.length, cellElements);
+  const { free, combinations } = forest;
   if (free === 0) {
     throw new DataError(
       `The interaction of the facets "${first.name}" and "${second.name}" cannot be estimated: its ${cellElements.length} cells are fixed by the ${first.ids.length} ${first.name} and ${second.ids.length} ${second.name} elements, so every bias would be 0. It needs elements scored together with at least two elements of the other facet.`,
     );
   }
+  // A cell of the forest may combine every free parameter, so the parameters are checked before they are solved.
+  checkSize(offset + free);
+  solveForest(first.ids.length, first.ids.length + second.ids.length, cellElements, forest.tree, combinations);
   return {
     facets: [first.name, second.name],
     cells: cellElements.map(([a, b]) => [first.ids[a] ?? "", second.ids[b] ?? ""]),
-    rows: combinations.rows.map((combination) => locationRow(combination, offset)),
+    rows: combinations.map((combination) => locationRow(combination, offset)),
     cellOf,
     free,
   };
 }
 
-/** Returns the combination of the free parameters that each cell is, and how many free parameters there are. */
-function cellCombinations(
+/**
+ * Returns a spanning forest of the cells, the free parameter of each cell outside it, and how many free parameters there
+ * are; the combinations of the forest's cells are empty until {@link solveForest} fills them.
+ */
+function spanningForest(
   rows: number,
   columns: number,
   cells: readonly (readonly [number, number])[],
-): { rows: Combination[]; free: number } {
+): { tree: number[]; combinations: Combination[]; free: number } {
   const nodes = rows + columns;
   const parent = Int32Array.from({ length: nodes }, (_, node) => node);
   const root = (node: number): number => {
@@ -100,8 +108,7 @@ function cellCombinations(
       tree.push(cell);
     }
   });
-  solveForest(rows, nodes, cells, tree, combinations);
-  return { rows: combinations, free };
+  return { tree, combinations, free };
 }
 
 /**

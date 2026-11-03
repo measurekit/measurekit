@@ -13,6 +13,7 @@ import {
   type CompressedResponses,
   categoryTallies,
   checkCategories,
+  checkLinearRaschSize,
   compressResponses,
   fitLinearRasch,
   type LinearRaschFit,
@@ -127,6 +128,8 @@ const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
 const STANDARD_ERRORS: readonly LltmStandardErrors[] = ["none", "hessian"];
 const MODELS: readonly LltmModel[] = ["dichotomous", "partial-credit", "rating-scale"];
+/** The model in the messages of the limits of its size. */
+const RASCH_MODEL_NAME = "The Rasch model of an LLTM's comparison";
 
 /**
  * Estimates the linear logistic test model (LLTM): the difficulty of each dichotomous item is a sum of the effects of
@@ -185,8 +188,9 @@ const MODELS: readonly LltmModel[] = ["dichotomous", "partial-credit", "rating-s
  * @returns The effects of the features, the standard deviation of theta, the items with their difficulties and the test
  * against the Rasch model.
  * @throws `DataError` when the responses or the options are invalid, an item has a response above 1 or responses in one
- * category only, an item lacks features, there are not more items than effects, or an effect is a linear combination of
- * those before it.
+ * category only, an item lacks features, there are not more items than effects, an effect is a linear combination of
+ * those before it, or the Rasch model of the comparison has more than 1,000 parameters, its items and free thresholds,
+ * or more than 2^24 expected counts, its items × quadrature points × categories.
  * @see {@link https://doi.org/10.1016/0001-6918(73)90003-6 | Fischer (1973)}
  * @see {@link https://doi.org/10.1007/BF02293801 | Bock and Aitkin (1981)}
  */
@@ -258,6 +262,10 @@ export function lltm(
   const responses = compressResponses(data);
   const scale = scaleOf(responses, model);
   const itemIds = responses.itemIds;
+  const common = { data: responses, setOf: scale.setOf, categoryCounts: scale.categoryCounts };
+  // The Rasch model of the comparison has a location for each item, more parameters than the LLTM's, so it bounds both.
+  const raschModel = { ...common, locations: ownRows(itemIds.length), locationCount: itemIds.length, fixedMean: 0 };
+  checkLinearRaschSize(raschModel, rule.nodes.length, RASCH_MODEL_NAME);
   const design = designMatrix(itemIds, features, intercept);
   const effectCount = design.names.length;
   if (itemIds.length <= effectCount) {
@@ -266,7 +274,6 @@ export function lltm(
     );
   }
   checkFullRank(design);
-  const common = { data: responses, setOf: scale.setOf, categoryCounts: scale.categoryCounts };
   const featureCount = effectCount - (intercept ? 1 : 0);
   const fit = fitLinearRasch(
     {
@@ -277,10 +284,7 @@ export function lltm(
     },
     { rule, tolerance, maxIterations, standardErrors: standardErrors === "hessian" },
   );
-  const rasch = fitLinearRasch(
-    { ...common, locations: ownRows(itemIds.length), locationCount: itemIds.length, fixedMean: 0 },
-    { rule, tolerance, maxIterations, standardErrors: false },
-  );
+  const rasch = fitLinearRasch(raschModel, { rule, tolerance, maxIterations, standardErrors: false });
   const effects = effectsOf(fit, design.names, intercept);
   const parameterCount = effectCount + 1 + scale.freeThresholds;
   const persons = responses.offsets.reduce(

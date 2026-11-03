@@ -578,7 +578,7 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `structureValidity`           | 1,000 items, 200 learners, a chain                             |        14 | 42                          |
 | `surmiseStructure`            | 1,000 elements, 12 free and a class of 988: 8,192 states       |      0.02 | 138                         |
 | `kst`, its masks              | 4,096 sets of 16 skills, 65,536 states                         |      0.33 | 173                         |
-| `manyFacetRasch`              | 1,000 persons, 1 item, 500 raters, each person by two          |      0.13 | 74                          |
+| `manyFacetRasch`              | 1,994 persons, 997 raters: 1,000 parameters, one EM iteration  |      0.26 | 66 to 77 by run             |
 | `personScalability`           | 2 persons, 1,000,000 items, from their response matrix         |       3.8 | 195                         |
 | `localDependenceChiSquare`    | 2 persons, 1,000 2PL items, the most: 499,500 pairs            |     0.028 | 102 to 228 by version, OS   |
 | `localDependenceChiSquare`    | 2 graded items of 4,096 categories, the most cells             |       0.1 | 132 to 262 by version, OS   |
@@ -597,7 +597,8 @@ about 260 MB within their limits: IITA's candidates from 19 MB of responses, and
 kilobytes of sets of skills. A statistic of every pair of items, local dependence, Yen's Q3 or a Mokken scale analysis,
 returns items² values, which their limit of 1,000 items stops at about 210 MB from 28 KB; the standard errors of
 Mokken's scalability add memory in proportion to the items times the persons' patterns. The many-facet Rasch model holds
-matrices of the square of its measures, which no limit bounds: 500 raters take 74 MB from 131 KB of scores.
+matrices of the square of its parameters, which its limit of 1,000 stops at 77 MB from 260 KB of scores; its time grows
+with their cube, 3.3 minutes to converge with standard errors there.
 
 A calibration of several dimensions holds tables over its grid, whose limit stops them at 310 MB, and at 700 MB with the
 standard errors of an exploratory model. The standard errors of a bifactor model keep, for each pattern of the responses

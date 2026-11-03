@@ -8,8 +8,14 @@ import {
   isNonEmptyString,
 } from "@measurekit/core";
 import type { FacetedScore } from "../data/internal.js";
-import { fitLinearRasch, type QuadratureOptions, quadratureRule, type ThetaPrior } from "../irt/internal.js";
-import { facetDesign } from "./facet-design.js";
+import {
+  checkLinearRaschSize,
+  fitLinearRasch,
+  type QuadratureOptions,
+  quadratureRule,
+  type ThetaPrior,
+} from "../irt/internal.js";
+import { facetDesign, MODEL_NAME } from "./facet-design.js";
 import type { FacetSummary } from "./facet-summary.js";
 import { type FacetBias, manyFacetParts, type RatingThresholds } from "./many-facet-result.js";
 
@@ -135,7 +141,9 @@ const STANDARD_ERRORS: readonly FacetStandardErrors[] = ["none", "hessian"];
  *   run.
  * @throws `DataError` when the options are invalid, the scores are not objects { levels, score } with an element of
  * each facet and an integer score from 0 to 2³¹ - 1, fewer than two persons were scored, the design is not connected, a
- * threshold set uses fewer than two categories or skips one, or an interaction has no estimable bias.
+ * threshold set uses fewer than two categories or skips one, an interaction has no estimable bias, or the model has
+ * more than 1,000 parameters, a rating scale of more than 255 categories, or more than 2^24 expected counts, its
+ * virtual items × quadrature points × categories.
  * @see {@link https://doi.org/10.1007/BF02293801 | Bock and Aitkin (1981)}
  */
 export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFacetRaschOptions): ManyFacetRasch {
@@ -157,6 +165,7 @@ export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFac
   checkStopping(tolerance, maxIterations);
   const rule = quadratureRule(quadrature);
   const design = facetDesign(scores, person, facets, thresholdFacet, interactions);
+  checkLinearRaschSize(design.model, rule.nodes.length, MODEL_NAME);
   const fit = fitLinearRasch(design.model, {
     rule,
     tolerance,

@@ -807,6 +807,44 @@ describe("manyFacetRasch", () => {
     expect(model.iterations).toBe(3);
   });
 
+  it("refuses a model of more than 1,000 parameters, a scale of more than 255 categories or 2^24 expected counts", () => {
+    const options = { facets: ["item", "rater"], standardErrors: "none", maxIterations: 1 } as const;
+    // Person p is scored by raters p and p + 1, round 1,000 raters: 999 measures, 1 threshold, the mean and the SD.
+    const raters = Array.from({ length: 1000 }, (_, person) =>
+      [0, 1].map((step) => ({
+        levels: { person: `p${person}`, item: "i1", rater: `r${(person + step) % 1000}` },
+        score: (person + step) % 3,
+      })),
+    ).flat();
+    expect(() => manyFacetRasch(raters, options)).toThrow(
+      "A many-facet model takes at most 1000 parameters, as its estimation inverts a matrix of every pair of them; found 1002.",
+    );
+    // 34 items by 34 raters, every cell scored once, with the 255 categories of the scale: 1,156 virtual items.
+    const cells = Array.from({ length: 34 * 34 }, (_, cell) => ({
+      levels: { person: `p${cell % 2}`, item: `i${Math.floor(cell / 34)}`, rater: `r${cell % 34}` },
+      score: cell % 255,
+    }));
+    expect(() => manyFacetRasch(cells, options)).toThrow(
+      "A many-facet model holds at most 16777216 expected counts, its items × quadrature points × categories, found 17981580.",
+    );
+    const wide = cells.slice(0, 256).map((score, s) => ({ ...score, score: s }));
+    expect(() => manyFacetRasch(wide, options)).toThrow(
+      "A many-facet model takes at most 255 categories in a rating scale, found 256.",
+    );
+  });
+
+  it("refuses an interaction of more biases than a model takes, before it solves them", () => {
+    // 40 items by 30 raters, every cell scored: 39 and 29 measures and 1,131 biases.
+    const scores = Array.from({ length: 40 * 30 }, (_, cell) => ({
+      levels: { person: `p${cell % 3}`, item: `i${Math.floor(cell / 30)}`, rater: `r${cell % 30}` },
+      score: cell % 2,
+    }));
+    const options = { facets: ["item", "rater"], interactions: [["item", "rater"]], standardErrors: "none" } as const;
+    expect(() => manyFacetRasch(scores, { ...options, maxIterations: 1 })).toThrow(
+      "A many-facet model takes at most 1000 parameters, as its estimation inverts a matrix of every pair of them; found 1201.",
+    );
+  });
+
   it("rejects invalid options", () => {
     const scores = simulatedScores(2, 20);
     const facets = ["item", "rater"];

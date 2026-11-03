@@ -211,17 +211,20 @@ export const READERS: readonly ReaderCase[] = [
     read: (parameters: unknown, { "knowledge-tracing": tracing }) => tracing.bkt({ parameters }),
   },
   {
-    name: "manyFacetRasch: 1,000 persons, 1 item, 500 raters, each person by two, with standard errors",
-    budget: 170,
-    // Person j is scored by raters j and j + 1, round the raters, so that the design connects 500 rater measures.
+    name: "manyFacetRasch: 1,994 persons, 1 item, 997 raters, each person by two: 1,000 parameters, one EM iteration",
+    budget: 160,
+    // Person j is scored by raters j and j + 1, round the raters, so that the design connects 997 rater measures: with
+    // the threshold, the mean and the SD, the most parameters. One EM iteration without standard errors holds the
+    // matrices of every pair of them, and keeps the case within the time of a test; a fit to convergence takes 99 s.
     input: () =>
-      Array.from({ length: 1000 }, (_, person) =>
+      Array.from({ length: 1994 }, (_, person) =>
         [0, 1].map((step) => ({
-          levels: { person: `p${person + 1}`, item: "i1", rater: `r${((person + step) % 500) + 1}` },
+          levels: { person: `p${person + 1}`, item: "i1", rater: `r${((person + step) % 997) + 1}` },
           score: (person + step) % 3,
         })),
       ).flat(),
-    read: (scores: unknown[], { psychometrics }) => psychometrics.manyFacetRasch(scores, { facets: ["item", "rater"] }),
+    read: (scores: unknown[], { psychometrics }) =>
+      psychometrics.manyFacetRasch(scores, { facets: ["item", "rater"], standardErrors: "none", maxIterations: 1 }),
   },
   {
     name: "personScalability: 2 persons, 1,000,000 items",

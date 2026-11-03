@@ -1,6 +1,11 @@
 import { DataError, describe } from "@measurekit/core";
 import { checkFacetedScores, type FacetedScore, isResponse, MAX_RESPONSE } from "../data/internal.js";
-import type { CompressedResponses, LinearRaschModel, LocationRow } from "../irt/internal.js";
+import {
+  type CompressedResponses,
+  checkLinearRaschParameters,
+  type LinearRaschModel,
+  type LocationRow,
+} from "../irt/internal.js";
 import { type DesignInteraction, designInteraction } from "./facet-interactions.js";
 
 /** The elements of one facet in a design, with the scores each element has. */
@@ -42,6 +47,8 @@ interface Indexed {
   readonly scores: Int32Array;
 }
 
+/** The model in the messages of the limits of its size. */
+export const MODEL_NAME = "A many-facet model";
 /** How many elements a message about a disconnected design lists for each subset. */
 const LISTED_ELEMENTS = 3;
 /** How many subsets a message about a disconnected design lists. */
@@ -55,7 +62,7 @@ const LISTED_SUBSETS = 3;
  * @param interactions - Pairs of the facets, each with an interaction.
  * @throws `DataError` when the scores are malformed, a score is not an integer from 0, fewer than two persons were
  * scored, the elements do not form one connected design, a threshold set uses fewer than two categories or skips one,
- * or an interaction has no estimable bias.
+ * an interaction has no estimable bias, or the model has more parameters than its estimation takes.
  */
 export function facetDesign(
   scores: readonly FacetedScore[],
@@ -75,7 +82,11 @@ export function facetDesign(
   const items = virtualItems(indexed);
   const sets = thresholdSets(indexed, items, thresholdFacet === undefined ? -1 : facets.indexOf(thresholdFacet) + 1);
   const measureCount = designFacets.reduce((sum, facet) => sum + Math.max(facet.ids.length - 1, 0), 0);
-  const designed = designInteractions(designFacets, items, interactions, measureCount);
+  // The parameters besides the measures and the biases: each set's free thresholds, and the mean and SD of theta.
+  const others = sets.categoryCounts.reduce((sum, categories) => sum + categories - 2, 2);
+  const checkSize = (locations: number): void => checkLinearRaschParameters(locations + others, MODEL_NAME);
+  checkSize(measureCount);
+  const designed = designInteractions(designFacets, items, interactions, measureCount, checkSize);
   const model: LinearRaschModel = {
     data: compressed(indexed, items),
     locations: items.elements.map((elements, item) =>
@@ -216,12 +227,17 @@ function virtualItems(indexed: Indexed): VirtualItems {
   return { elements, itemOf };
 }
 
-/** Returns the interaction of each pair of facets, its parameters following the measures and the earlier interactions. */
+/**
+ * Returns the interaction of each pair of facets, its parameters following the measures and the earlier interactions.
+ *
+ * @param checkSize - Checks the location parameters up to an interaction's last, before its biases are solved.
+ */
 function designInteractions(
   facets: readonly DesignFacet[],
   items: VirtualItems,
   pairs: readonly (readonly [string, string])[],
   start: number,
+  checkSize: (locations: number) => void,
 ): DesignInteraction[] {
   let offset = start;
   return pairs.map((pair) => {
@@ -235,6 +251,7 @@ function designInteractions(
       [first, second],
       items.elements.map((elements) => [elements[f] ?? 0, elements[g] ?? 0]),
       offset,
+      checkSize,
     );
     offset += interaction.free;
     return interaction;
