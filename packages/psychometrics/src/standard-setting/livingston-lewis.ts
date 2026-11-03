@@ -325,7 +325,14 @@ function indices(shape: Beta, binomial: Binomial, cuts: readonly number[]): { ac
     Number.NEGATIVE_INFINITY,
     Number.POSITIVE_INFINITY,
   );
-  return { accuracy, consistency };
+  // Each is an integral of probabilities over a distribution, which the quadrature's rounding can carry a little past
+  // 0 or 1, as where every person falls on one side of a cut.
+  return { accuracy: probability(accuracy), consistency: probability(consistency) };
+}
+
+/** Returns a value within [0, 1], the range of a probability. */
+function probability(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
 /**

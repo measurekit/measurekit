@@ -529,6 +529,21 @@ describe("livingstonLewisClassification", () => {
     expect(shifted.cuts.map(({ cut }) => cut)).toEqual([42, 58]);
   });
 
+  it("keeps accuracy and consistency within [0, 1] where the quadrature's rounding would carry them past 1", () => {
+    // With a cut beyond the highest score every person is below it, and the integrals of the beta came to 1 + 1.2e-13.
+    const scores = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const beyond = livingstonLewisClassification(scores, [50], { reliability: 0.8, maximum: 10 });
+    for (const value of [
+      beyond.accuracy,
+      beyond.consistency,
+      ...beyond.cuts.flatMap((cut) => [cut.accuracy, cut.consistency]),
+    ]) {
+      expect(value).toBeLessThanOrEqual(1);
+      expect(value).toBeGreaterThanOrEqual(0);
+    }
+    expect(beyond.accuracy).toBe(1);
+  });
+
   it("counts a cut a rounding below a whole number of trials as that number", () => {
     // N rounds to 46: a cut at 0.5 of the range scales to 23 trials exactly, so a score of 23 is above it.
     const { scores, reliability } = defined(livingstonLewis.cases["one cut"]);
