@@ -599,8 +599,9 @@ missing. An estimate has `theta`, `standardErrors` and `covariance`.
 
 The covariance of the prior is symmetric and positive definite. EAP weights the grid nodes by the prior density times
 the likelihood. A grid of more than 10⁶ nodes throws, naming MAP, which works in any number of dimensions: a scan of 5
-points per dimension (3 above three dimensions) from -3 to 3 prior standard deviations picks the start of Fisher scoring
-with halved steps, which runs to a gradient below 1e-10. Without responses the estimate is the prior, also without
+points per dimension (3 above three dimensions) from -3 to 3 prior standard deviations, or above five dimensions the
+prior mean and 3 prior standard deviations either side of it on each axis, picks the start of Fisher scoring with halved
+steps, which runs to a gradient below 1e-10. Without responses the estimate is the prior, also without
 items, when a `prior` gives the dimensions: an estimate from no items needs one.
 
 `multidimensionalEstimates` matches the data's item ids to `items`, estimates each person from the person's answered

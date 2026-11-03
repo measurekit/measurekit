@@ -205,10 +205,11 @@ function addScaled(out: Float64Array, values: Float64Array, from: number, weight
  *
  * @remarks
  * A scan of the log posterior on a grid of 5 points per dimension (3 above three dimensions) from -3 to 3 standard
- * deviations of the prior picks the start of Fisher scoring with backtracking, which runs until the gradient is below
- * 1e-10. The covariance is the inverse of the test information plus the inverse of the prior covariance, at the
- * estimate. Missing responses are skipped; without responses the estimate is the prior mean, also without items, when
- * the `prior` gives the dimensions.
+ * deviations of the prior, or above five dimensions at the prior mean and 3 standard deviations either side of it on
+ * each axis, picks the start of Fisher scoring with backtracking, which runs until the gradient is below 1e-10. The
+ * covariance is the inverse of the test information plus the inverse of the prior covariance, at the estimate. Missing
+ * responses are skipped; without responses the estimate is the prior mean, also without items, when the `prior` gives
+ * the dimensions.
  *
  * @param items - The items the person answered, with their parameters.
  * @param responses - The person's response to each item; `null` when missing.

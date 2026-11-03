@@ -3046,6 +3046,40 @@ describe("scoring", () => {
     });
   });
 
+  it("finds the posterior mode in many dimensions with a scan that grows with them, not as a power of them", () => {
+    // Items of one dimension each under N(0, I): the posterior is a product, and its mode the modes of the dimensions.
+    const dimensions = 12;
+    let evaluations = 0;
+    const counted: MultidimensionalModel<MultidimensionalLogisticParameters> = {
+      ...multidimensionalTwoParameterLogistic,
+      probabilities(parameters, theta, out) {
+        evaluations++;
+        multidimensionalTwoParameterLogistic.probabilities(parameters, theta, out);
+      },
+    };
+    const slopes = (j: number, size: number, at: number): number[] =>
+      Array.from({ length: size }, (_, d) => (d === at ? 1 + (j % 3) / 4 : 0));
+    const items = Array.from({ length: 2 * dimensions }, (_, j) => ({
+      model: counted,
+      parameters: { a: slopes(j, dimensions, j % dimensions), intercept: (j % 5) / 2 - 1, c: 0, d: 1 },
+    }));
+    const responses = items.map((_, j) => (j % 3 === 0 ? 0 : 1));
+    const { theta } = multidimensionalPosteriorModeEstimate(items, responses);
+    // A grid of 3 points per dimension would evaluate each item at 3 ** 12 = 531,441 points.
+    expect(evaluations).toBeLessThan(100_000);
+    theta.forEach((value, d) => {
+      const own = [d, d + dimensions].map((j) => ({
+        model: multidimensionalTwoParameterLogistic,
+        parameters: { a: slopes(j, 1, 0), intercept: (j % 5) / 2 - 1, c: 0, d: 1 },
+      }));
+      const alone = multidimensionalPosteriorModeEstimate(
+        own,
+        [d, d + dimensions].map((j) => defined(responses[j])),
+      );
+      expectClose(value, defined(alone.theta[0]), 1e-8, `dimension ${d + 1}`);
+    });
+  });
+
   it("limits the grid of the posterior mean and names the posterior mode instead", () => {
     const item = {
       model: multidimensionalTwoParameterLogistic,
