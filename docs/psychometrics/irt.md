@@ -559,6 +559,8 @@ that items of a model share, as RSM items share a and the steps, takes `priors` 
 | `rectangular`   | `points` equally spaced from -6 to 6, weights proportional to the density: mirt's rule. |
 | `gauss-hermite` | The Gauss-Hermite rule for the normal density: ltm's rule.                              |
 
+`points` defaults to 61 and is at most 1,000.
+
 ### In a browser
 
 Calibration runs synchronously and can take seconds on large data. In a browser, run it in a Web Worker so that the

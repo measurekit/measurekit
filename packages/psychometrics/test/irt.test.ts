@@ -75,6 +75,7 @@ import {
   NO_RESPONSES,
   population,
   rescaledWeights,
+  STANDARD_RULES,
   squarem,
   unfoldingStarts,
 } from "../src/irt/internal.js";
@@ -564,6 +565,17 @@ describe("ability estimation", () => {
     expect(() => posteriorModeEstimate(ITEMS_2PL, responses, { range: JSON.parse('[-6, "6"]') })).toThrow(
       'The upper bound of the range must be a finite number, found "6".',
     );
+  });
+
+  it("rejects more than 1,000 quadrature points, and keeps the 8 rules asked for last", () => {
+    expect(() => posteriorMeanEstimate(ITEMS_2PL, [1, 0, 1, 0], { quadrature: { points: 1001 } })).toThrow(
+      "The quadrature points must be an integer from 2 to 1000, found 1001.",
+    );
+    for (let points = 2; points <= 40; points++)
+      posteriorMeanEstimate(ITEMS_2PL, [1, 0, 1, 0], { quadrature: { points } });
+    expect([...STANDARD_RULES.keys()]).toEqual(Array.from({ length: 8 }, (_, k) => `rectangular ${33 + k}`));
+    const eap = posteriorMeanEstimate(ITEMS_2PL, [1, 0, 1, 0], { quadrature: { points: 1000 } });
+    expect(Number.isFinite(eap.theta) && Number.isFinite(eap.standardError)).toBe(true);
   });
 
   it("rejects a range wider than 10,000, whose scan would not end", () => {

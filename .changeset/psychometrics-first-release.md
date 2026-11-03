@@ -171,3 +171,4 @@ gain refuses pre scores that are all equal however their mean rounds, the normal
 over its persons, and the reliable change index stays finite where the squares of the standard errors would underflow.
 A testlet that no person answered is refused, as the SD of its effect would be 0 / 0, and an unfolding calibration takes
 at most 500 items, as its starts decompose the correlations of every pair.
+A quadrature rule has at most 1,000 points, and the rules kept for reuse are the 8 asked for last.

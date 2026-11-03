@@ -140,6 +140,14 @@ export const RULES: readonly Rule[] = [
     titles: "more than 500 items",
   },
   {
+    rule: "A quadrature rule has at most 1,000 points, as an option of a few bytes would otherwise size every item's table over them.",
+    file: "packages/psychometrics/src/irt/quadrature.ts",
+    find: "if (points > MAX_POINTS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "1,000 quadrature points",
+  },
+  {
     rule: "A range of theta is at most 10,000 wide, as the scan of modal estimation walks it in steps of 0.25.",
     file: "packages/psychometrics/src/irt/ability.ts",
     find: "if (!(upper - lower <= MAX_RANGE_WIDTH)) {",
