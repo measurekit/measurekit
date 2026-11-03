@@ -142,3 +142,10 @@ coefficients first, as `fromMirtIrt` does.
 
 The analyses of the pairs of items, the correlations, factors, parallel analysis, the minimum average partial test and
 the omegas, take at most 1,000 items, as each holds a matrix of every pair.
+
+Multidimensional scoring has maximum likelihood and Warm's weighted likelihood estimates,
+`multidimensionalMaximumLikelihoodEstimate` and `multidimensionalWeightedLikelihoodEstimate`, within a `range` in every
+dimension, and an item's MDISC and MDIFF, `multidimensionalDiscrimination` and `multidimensionalDifficulty`. A
+calibration that estimates the correlations of its dimensions, of a group, of all persons or of a two-tier model's
+primary dimensions, needs more persons than those dimensions. An exploratory start correlates the items of sparse data
+over each pair's common respondents.

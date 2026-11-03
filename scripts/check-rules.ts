@@ -468,6 +468,22 @@ export const RULES: readonly Rule[] = [
     titles: "finds the posterior mode in many dimensions",
   },
   {
+    rule: "The weighted likelihood estimate takes Newton's step where Fisher scoring's does not halve the weighted score, which scoring alone leaves short of the root.",
+    file: "packages/psychometrics/src/multidimensional/likelihood-mode.ts",
+    find: "else moved = newton(theta, values, free, direction) && backtrack(moveTo, current, 0, halving) !== null;",
+    replace: "else moved = false;",
+    test: "packages/psychometrics/test/multidimensional.test.ts",
+    titles: "matches the base R MLE and WLE",
+  },
+  {
+    rule: "A group whose correlations are estimated needs more persons than its correlated dimensions, whose correlations would otherwise run to ±1.",
+    file: "packages/psychometrics/src/multidimensional/groups.ts",
+    find: "if (persons > dimensions) return;",
+    replace: "return;",
+    test: "packages/psychometrics/test/multidimensional.test.ts",
+    titles: "needs more persons than correlated dimensions",
+  },
+  {
     rule: "A person with a missing response has no count of Guttman errors, and the counts of the others stay with their rows.",
     file: "packages/psychometrics/src/mokken/guttman-errors.ts",
     find: "(row.includes(null) ? null : (totals[complete++] ?? 0))",
