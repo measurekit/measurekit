@@ -127,11 +127,12 @@ export function population(
   const names: readonly (string | null)[] = labels ?? [null];
   const distributions = names.map((name) => distributionOf(options.latent, name, labels !== null));
   checkLatentNames(options.latent, labels);
-  names.forEach((name, g) => {
-    if (!answered.some((any, person) => any && groupOf[person] === g)) {
-      throw new DataError(`Group "${name}" has no person with a response.`);
-    }
+  const hasRespondent = new Uint8Array(names.length);
+  answered.forEach((any, person) => {
+    if (any) hasRespondent[groupOf[person] ?? 0] = 1;
   });
+  const silent = hasRespondent.indexOf(0);
+  if (silent >= 0) throw new DataError(`Group "${names[silent]}" has no person with a response.`);
   const estimated = distributions.some((distribution) => distribution !== "standard-normal");
   if (estimated && !rectangular) {
     throw new DataError("Estimating a distribution of theta needs the rectangular quadrature rule.");
@@ -164,7 +165,8 @@ function distributionOf(
 ): LatentDistribution {
   const byGroup = isRecord(latent);
   if (byGroup && !grouped) throw new DataError("Distributions of theta by group need the groups option.");
-  const distribution = byGroup ? latent[name ?? ""] : latent;
+  // An own entry only, so that a group such as "constructor" is not taken for one with a distribution.
+  const distribution = byGroup ? (Object.hasOwn(latent, name ?? "") ? latent[name ?? ""] : undefined) : latent;
   if (distribution === undefined) return "standard-normal";
   checkChoice(
     distribution,
@@ -176,8 +178,9 @@ function distributionOf(
 
 function checkLatentNames(latent: PopulationOptions["latent"], labels: readonly string[] | null): void {
   if (!isRecord(latent) || labels === null) return;
+  const known = new Set(labels);
   for (const name of Object.keys(latent)) {
-    if (!labels.includes(name)) {
+    if (!known.has(name)) {
       throw new DataError(`A distribution of theta is given for group "${name}", which no person is in.`);
     }
   }

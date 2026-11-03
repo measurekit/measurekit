@@ -15,7 +15,7 @@ export function thresholdParameterList(slope: ModelParameter, categoryCount: num
  */
 export function thresholdVector(model: string, parameters: ThresholdItem): Float64Array {
   const { a, b }: Partial<ThresholdItem> = isRecord(parameters) ? parameters : {};
-  if (!(typeof a === "number" && Number.isFinite(a) && Array.isArray(b) && b.length > 0 && b.every(Number.isFinite))) {
+  if (!(typeof a === "number" && Number.isFinite(a) && Array.isArray(b) && b.length > 0 && allFinite(b))) {
     throw new DataError(
       `A ${model} item needs a finite a and at least one finite threshold b, found a = ${describe(a)}, b = ${formatList(b)}.`,
     );
@@ -37,6 +37,15 @@ export function sharesAbove(proportions: ArrayLike<number>): number[] {
     shares.push(above);
   }
   return shares;
+}
+
+/**
+ * Returns whether every index of a parameter list holds a finite number. A hole fails, as `every` would skip it and leave
+ * a NaN in the parameter vector.
+ */
+export function allFinite(values: readonly unknown[]): boolean {
+  for (let index = 0; index < values.length; index++) if (!Number.isFinite(values[index])) return false;
+  return true;
 }
 
 /** Formats a list of numbers for a message, or describes any other value. */

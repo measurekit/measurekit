@@ -1,7 +1,7 @@
 import { DataError, describe, isRecord } from "@measurekit/core";
 import type { IrtModel, ModelParameter } from "./model.js";
 import { writeThresholdDerivatives } from "./partial-credit.js";
-import { formatList } from "./thresholds.js";
+import { allFinite, formatList } from "./thresholds.js";
 import { singleItemStart } from "./unfolding-start.js";
 
 // The GGUM folds a partial credit item of M + 1 = 2C + 2 subjective categories y = 0 to M: category y has the logit
@@ -97,7 +97,7 @@ function checkUnfoldingParameters(model: string, parameters: UnfoldingParameters
     Number.isFinite(b) &&
     Array.isArray(t) &&
     t.length > 0 &&
-    t.every(Number.isFinite);
+    allFinite(t);
   if (!valid) {
     throw new DataError(
       `A ${model} item needs a finite a above 0, a finite b and at least one finite threshold t, found a = ${describe(a)}, b = ${describe(b)}, t = ${formatList(t)}.`,

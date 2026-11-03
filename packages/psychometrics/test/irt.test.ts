@@ -565,6 +565,19 @@ describe("ability estimation", () => {
       'The upper bound of the range must be a finite number, found "6".',
     );
   });
+
+  it("rejects a range wider than 10,000, whose scan would not end", () => {
+    // The width of [-1e308, 1e308] overflows to Infinity, and the scan in steps of 0.25 would never reach its end.
+    for (const range of [
+      [-5000.5, 5000],
+      [-1e308, 1e308],
+    ] as const) {
+      expect(() => maximumLikelihoodEstimate(ITEMS_2PL, [1, 0, 1, 0], { range })).toThrow(
+        `The range must be at most 10000 wide, found [${range[0]}, ${range[1]}].`,
+      );
+    }
+    expect(maximumLikelihoodEstimate(ITEMS_2PL, [1, 1, 1, 1], { range: [-5000, 5000] }).theta).toBeGreaterThan(6);
+  });
 });
 
 describe("thetaPosterior", () => {
@@ -1818,6 +1831,32 @@ describe("distributions of theta", () => {
     expect(result.converged).toBe(false);
   });
 
+  it("takes groups named as the properties of every object as groups without a distribution of their own", () => {
+    const rows = simulate(9, 200, ITEMS_2PL);
+    const groups = rows.map((_, person) => ["constructor", "toString", "reference"][person % 3] ?? "reference");
+    const result = calibrate(responseMatrix(rows), {
+      model: twoParameterLogistic,
+      groups,
+      latent: { reference: "normal" },
+      fixed: { item1: defined(PARAMETERS_2PL[0]) },
+    });
+    expect(result.groups.map(({ group, distribution }) => [group, distribution])).toEqual([
+      ["constructor", "standard-normal"],
+      ["toString", "standard-normal"],
+      ["reference", "normal"],
+    ]);
+  });
+
+  it("checks many groups in time that grows with the persons", () => {
+    // 100,000 persons in 50,000 groups: comparing each person with every group would take 5 billion steps, twice.
+    const rows = simulate(12, 100_000, ITEMS_2PL.slice(0, 2));
+    const groups = rows.map((_, person) => `g${person >> 1}`);
+    const options = { model: twoParameterLogistic, groups, quadrature: { points: 5 }, maxIterations: 1 };
+    const result = calibrate(responseMatrix(rows), options);
+    expect(result.groups).toHaveLength(50_000);
+    expect(result.groups[49_999]?.group).toBe("g49999");
+  }, 3_000);
+
   it("rejects groups and distributions that do not fit the data or leave the scale free", () => {
     const rows = simulate(3, 50, ITEMS_2PL);
     const matrix = responseMatrix(rows);
@@ -1827,6 +1866,11 @@ describe("distributions of theta", () => {
     expect(() =>
       calibrate(matrix, { ...options, groups: JSON.parse(JSON.stringify(labels.map((_, i) => (i === 3 ? 3 : "a")))) }),
     ).toThrow("The group of person 4 must be a string, found 3.");
+    const sparse = [...labels];
+    delete sparse[7];
+    expect(() => calibrate(matrix, { ...options, groups: sparse })).toThrow(
+      "The group of person 8 must be a string, found undefined.",
+    );
     expect(() => calibrate(matrix, { ...options, latent: "normal" })).toThrow(
       "Estimating every group's distribution of theta needs fixed items or a standard normal group to fix the scale.",
     );
@@ -2225,6 +2269,20 @@ describe("partial credit models", () => {
       "A PCM item needs a finite a and at least one finite threshold b, found a = 1, b = [].",
     );
     expect(() => generalizedPartialCredit.toVector({ a: 1, b: [Number.NaN] })).toThrow(DataError);
+  });
+
+  it("reject a hole among the parameters of any model, which every would skip and leave a NaN", () => {
+    const hole = (values: number[]): number[] => {
+      const sparse = [...values];
+      delete sparse[1];
+      return sparse;
+    };
+    expect(() => generalizedPartialCredit.toVector({ a: 1, b: hole([-1, 0, 1]) })).toThrow(DataError);
+    expect(() => gradedResponse.toVector({ a: 1, b: hole([-1, 0, 1]) })).toThrow(DataError);
+    expect(() => ratingScale.toVector({ a: 1, b: 0, steps: hole([-1, 0, 1]) })).toThrow(DataError);
+    expect(() => nominalResponse.toVector({ a: hole([-1, 0, 1]), c: [0, 0, 0] })).toThrow(DataError);
+    expect(() => nominalResponse.toVector({ a: [-1, 0, 1], c: hole([0, 0, 0]) })).toThrow(DataError);
+    expect(() => generalizedGradedUnfolding.toVector({ a: 1, b: 0, t: hole([-1, -0.5, -0.2]) })).toThrow(DataError);
   });
 });
 

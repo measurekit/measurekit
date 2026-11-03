@@ -1,7 +1,7 @@
 import { DataError, isRecord, mean, softmax } from "@measurekit/core";
 import { divideByTotalThetaDerivatives } from "./divide-by-total.js";
 import type { IrtModel } from "./model.js";
-import { formatList } from "./thresholds.js";
+import { allFinite, formatList } from "./thresholds.js";
 
 /**
  * Parameters of a nominal response item: a slope and an intercept per category, in mirt's IRT parameterization. Adding
@@ -41,12 +41,7 @@ export const nominalResponse: IrtModel<NominalParameters> = {
   toVector(parameters) {
     const { a, c }: Partial<NominalParameters> = isRecord(parameters) ? parameters : {};
     const valid =
-      Array.isArray(a) &&
-      Array.isArray(c) &&
-      a.length >= 2 &&
-      a.length === c.length &&
-      a.every(Number.isFinite) &&
-      c.every(Number.isFinite);
+      Array.isArray(a) && Array.isArray(c) && a.length >= 2 && a.length === c.length && allFinite(a) && allFinite(c);
     if (!valid) {
       throw new DataError(
         `An NRM item needs finite slopes a and intercepts c, one of each per category and at least two categories, found a = ${formatList(a)}, c = ${formatList(c)}.`,

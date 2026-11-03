@@ -6,7 +6,7 @@ import {
   partialCreditThetaDerivatives,
   stepStarts,
 } from "./partial-credit.js";
-import { formatList } from "./thresholds.js";
+import { allFinite, formatList } from "./thresholds.js";
 
 /**
  * Parameters of a rating scale item: a partial credit item whose thresholds are its location plus steps that every
@@ -52,7 +52,7 @@ export const ratingScale: IrtModel<RatingScaleParameters> = {
         `An RSM item needs finite a and b and at least one step, found a = ${describe(a)}, b = ${describe(b)}, steps = ${formatList(steps)}.`,
       );
     }
-    if (!steps.every(Number.isFinite)) {
+    if (!allFinite(steps)) {
       throw new DataError(`An RSM item needs finite steps, found ${formatList(steps)}.`);
     }
     // Steps that do not sum to 0 move their mean into the location; the thresholds stay the same.

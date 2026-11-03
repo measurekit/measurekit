@@ -171,13 +171,20 @@ export function personGroups(groups: readonly string[] | undefined, personCount:
   if (!Array.isArray(groups) || groups.length !== personCount) {
     throw new DataError(`Found ${Array.isArray(groups) ? groups.length : "no"} groups for ${personCount} persons.`);
   }
-  groups.forEach((label, person) => {
+  const indices = new Map<string, number>();
+  const groupOf = new Int32Array(personCount);
+  // By index, so that a hole is a label that is not a string, which forEach would skip.
+  for (let person = 0; person < personCount; person++) {
+    const label: unknown = groups[person];
     if (typeof label !== "string") {
       throw new DataError(`The group of person ${person + 1} must be a string, found ${describe(label)}.`);
     }
-  });
-  const labels = [...new Set(groups)];
-  return { labels, groupOf: Int32Array.from(groups, (label) => labels.indexOf(label)) };
+    // A map of the labels, so that the time grows with the persons, not with the persons times the groups.
+    const known = indices.get(label);
+    if (known === undefined) indices.set(label, indices.size);
+    groupOf[person] = known ?? indices.size - 1;
+  }
+  return { labels: [...indices.keys()], groupOf };
 }
 
 /**

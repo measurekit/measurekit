@@ -55,12 +55,12 @@ conversionTable(items, scale);
 
 The items are those of a calibration, `calibrate(...).items`, or any [items](irt.md#models) of any models.
 
-| Option       | Default               | Meaning                                                                                           |
-| ------------ | --------------------- | ------------------------------------------------------------------------------------------------- |
-| `method`     | `"eap-sum"`           | `"eap-sum"` or `"true-score"`: how the theta of a total score is found                            |
-| `prior`      | `{ mean: 0, sd: 1 }`  | The prior of `"eap-sum"`: a finite mean and a positive sd                                         |
-| `quadrature` | 61 rectangular points | The rule of `"eap-sum"`, placed on the prior, as [`summedScoreTable`](irt.md#summed-score-tables) |
-| `range`      | `[-6, 6]`             | The thetas of the total scores that have none: a lower bound below an upper bound                 |
+| Option       | Default               | Meaning                                                                                                 |
+| ------------ | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `method`     | `"eap-sum"`           | `"eap-sum"` or `"true-score"`: how the theta of a total score is found                                  |
+| `prior`      | `{ mean: 0, sd: 1 }`  | The prior of `"eap-sum"`: a finite mean and a positive sd                                               |
+| `quadrature` | 61 rectangular points | The rule of `"eap-sum"`, placed on the prior, as [`summedScoreTable`](irt.md#summed-score-tables)       |
+| `range`      | `[-6, 6]`             | The thetas of the total scores that have none: a lower bound below an upper bound, at most 10,000 apart |
 
 | Method         | Theta of a total score x                                                    | Standard error                                |
 | -------------- | --------------------------------------------------------------------------- | --------------------------------------------- |

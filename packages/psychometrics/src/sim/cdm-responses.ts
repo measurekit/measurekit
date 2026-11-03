@@ -60,7 +60,8 @@ export function simulateCdmResponses(
   });
   const responses = profiles.map((profile, person) => {
     const valid = Array.isArray(profile) && profile.length === attributes.length;
-    if (!(valid && profile.every((value) => value === 0 || value === 1))) {
+    // Array.from reads a hole as undefined, which every would skip.
+    if (!(valid && Array.from(profile).every((value) => value === 0 || value === 1))) {
       throw new DataError(`Profile ${person + 1} needs a 0 or 1 for each of the ${attributes.length} attributes.`);
     }
     return items.map((item, j) => {

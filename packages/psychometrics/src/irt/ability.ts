@@ -26,7 +26,7 @@ export interface AbilityEstimate {
 /** The interval that maximum likelihood, weighted likelihood and MAP estimation search. */
 export interface RangeOptions {
   /**
-   * The lowest and the highest theta.
+   * The lowest and the highest theta, at most 10,000 apart.
    *
    * @defaultValue `[-6, 6]`
    */
@@ -456,9 +456,17 @@ export function modalTheta(
 }
 
 /**
+ * The widest interval of theta that the estimators and the other searches of a range take: the scan of modal estimation
+ * then has 40,000 steps, and the grid of multistage cuts a million points. A range wider than any scale of theta would
+ * otherwise scan without end.
+ */
+const MAX_RANGE_WIDTH = 10_000;
+
+/**
  * Checks the interval of theta that the estimators search, `[-6, 6]` by default, and returns it.
  *
- * @throws `DataError` unless it is an array of two finite numbers with the lower below the upper.
+ * @throws `DataError` unless it is an array of two finite numbers with the lower below the upper and at most 10,000
+ * apart.
  */
 export function checkRange(range: readonly [number, number] = DEFAULT_THETA_RANGE): readonly [number, number] {
   checkArray(range, "The option range must be an array [lower, upper]");
@@ -467,6 +475,9 @@ export function checkRange(range: readonly [number, number] = DEFAULT_THETA_RANG
   checkFinite(upper, "The upper bound of the range");
   if (!(lower < upper)) {
     throw new DataError(`The range needs the lower bound below the upper, found [${lower}, ${upper}].`);
+  }
+  if (!(upper - lower <= MAX_RANGE_WIDTH)) {
+    throw new DataError(`The range must be at most ${MAX_RANGE_WIDTH} wide, found [${lower}, ${upper}].`);
   }
   return range;
 }

@@ -778,7 +778,8 @@ posteriorMeanEstimate(items, [1, 0, null], { prior: { mean: 0, sd: 1 } });
 | `posteriorMeanEstimate`      | EAP: the posterior mean, by quadrature placed on the prior       | Posterior SD     |
 
 I(θ) is the test information of the answered items and J(θ) = Σ P'(θ) P''(θ) / P(θ) over their categories. `range`
-defaults to `[-6, 6]`, `prior` to `{ mean: 0, sd: 1 }` and `quadrature` to 61 rectangular points.
+defaults to `[-6, 6]` and is at most 10,000 wide, `prior` defaults to `{ mean: 0, sd: 1 }` and `quadrature` to 61
+rectangular points.
 
 - **Extreme patterns.** When every response is in its item's lowest or highest category, the likelihood grows
   toward -∞ or +∞, and the MLE is that end of `range`, with the standard error there. So is the MLE of any pattern
