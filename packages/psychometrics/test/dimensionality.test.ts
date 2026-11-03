@@ -381,6 +381,24 @@ describe("polychoricCorrelations", () => {
     expect(value).toBeGreaterThan(0.99);
   });
 
+  it("takes at most 1,000 items, as every analysis holds a matrix of the pairs of items", () => {
+    // Two persons who answer 1,001 items alike or opposite: the items, not the persons, would cost the square.
+    const rows = (items: number) => [
+      Array.from({ length: items }, (_, j) => j % 2),
+      Array.from({ length: items }, (_, j) => (j + 1) % 2),
+    ];
+    const most = polychoricCorrelations(responses(rows(1000)));
+    expect(most.correlations).toHaveLength(1000);
+    const many = responses(rows(1001));
+    const message = (analysis: string) =>
+      `${analysis} holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.`;
+    expect(() => polychoricCorrelations(many)).toThrow(message("Polychoric correlations"));
+    expect(() => parallelAnalysis(many, createRandom(1))).toThrow(message("Parallel analysis"));
+    expect(() => exploratoryFactorAnalysis(many, { factors: 1 })).toThrow(message("Exploratory factor analysis"));
+    expect(() => minimumAveragePartial(many)).toThrow(message("The minimum average partial test"));
+    expect(() => omegaHierarchical(many)).toThrow(message("Omega hierarchical"));
+  });
+
   it("takes items of up to 8 observed categories, as psych's polychoric, and refuses an item of more", () => {
     const eight = Array.from({ length: 16 }, (_, i) => [i % 8, (i + 1) % 8, i % 2]);
     expect(polychoricCorrelations(responses(eight)).thresholds[0]).toHaveLength(7);

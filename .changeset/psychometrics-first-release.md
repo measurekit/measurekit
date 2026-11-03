@@ -139,3 +139,6 @@ and a bifactor model's Louis standard errors count the tables of pairs of items 
 than five dimensions starts from a scan along the axes, so that it and MH-RM's log-likelihood take time in proportion
 to the dimensions. A Gauss-Hermite rule holds for any number of points, and `fromMirtMultidimensional` takes the
 coefficients first, as `fromMirtIrt` does.
+
+The analyses of the pairs of items, the correlations, factors, parallel analysis, the minimum average partial test and
+the omegas, take at most 1,000 items, as each holds a matrix of every pair.

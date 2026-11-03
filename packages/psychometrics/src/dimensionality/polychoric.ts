@@ -57,8 +57,8 @@ const MAX_POLYCHORIC_CATEGORIES = 8;
  * @param matrix - The responses of the persons.
  * @param options - The correction for continuity.
  * @returns The correlations of the items and their thresholds.
- * @throws `DataError` when the matrix is invalid, an item has more than 8 observed categories, or `correction` is not a
- * non-negative number.
+ * @throws `DataError` when the matrix is invalid or has more than 1,000 items, an item has more than 8 observed
+ * categories, or `correction` is not a non-negative number.
  * @see {@link https://doi.org/10.1007/BF02296207 | Olsson (1979)}
  */
 export function polychoricCorrelations(
@@ -68,7 +68,7 @@ export function polychoricCorrelations(
   checkOptions(options);
   const { correction = DEFAULT_CORRECTION } = options;
   checkNonNegative(correction, "The option correction");
-  const items = codeItems(matrix);
+  const items = codeItems(matrix, "Polychoric correlations");
   const size = items.length;
   const values = polychoricMatrix(items, correction);
   return {

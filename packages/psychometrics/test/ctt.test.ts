@@ -249,6 +249,17 @@ describe("reliability", () => {
     expectClose(omega, 0.375, 1e-12);
   });
 
+  it("takes at most 1,000 items for omega, whose correlations hold every pair of items", () => {
+    const rows = (items: number) => [
+      Array.from({ length: items }, (_, j) => j % 2),
+      Array.from({ length: items }, (_, j) => (j + 1) % 2),
+      Array.from({ length: items }, (_, j) => (j % 3 === 0 ? 1 : 0)),
+    ];
+    expect(() => mcdonaldOmega(responseMatrix(rows(1001)))).toThrow(
+      "Omega holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.",
+    );
+  });
+
   it("rejects omega for fewer than three items or an item without variance", () => {
     expect(() =>
       mcdonaldOmega(

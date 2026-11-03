@@ -524,6 +524,22 @@ export const RULES: readonly Rule[] = [
     titles: "refuses an item of more",
   },
   {
+    rule: "An analysis of the pairs of items takes at most 1,000 items, so that a few persons answering many items do not cost a matrix of their square and its decompositions.",
+    file: "packages/psychometrics/src/dimensionality/coded-items.ts",
+    find: "  checkMatrixItems(matrix.itemIds.length, analysis);\n",
+    replace: "",
+    test: "packages/psychometrics/test/dimensionality.test.ts",
+    titles: "takes at most 1,000 items",
+  },
+  {
+    rule: "Omega takes at most 1,000 items, so that a few persons answering many items do not cost a matrix of their square.",
+    file: "packages/psychometrics/src/ctt/omega.ts",
+    find: '  checkMatrixItems(k, "Omega");\n',
+    replace: "",
+    test: "packages/psychometrics/test/ctt.test.ts",
+    titles: "takes at most 1,000 items for omega",
+  },
+  {
     rule: "A G study has at most 6 facets with the object, so that a design of many facets of two elements does not cost 3^k marginal sums.",
     file: "packages/psychometrics/src/generalizability/structure.ts",
     find: "if (names.length > MAX_FACETS) {",

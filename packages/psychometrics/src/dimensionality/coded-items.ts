@@ -1,5 +1,5 @@
 import { normalQuantile } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
+import { checkMatrixItems, checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 
 /** A rank for a missing response. */
 export const MISSING_RANK = -1;
@@ -22,12 +22,14 @@ export interface CodedItem {
 }
 
 /**
- * Checks a response matrix and returns its items coded by observed category.
+ * Checks a response matrix for an analysis of the pairs of its items and returns its items coded by observed category.
  *
- * @throws `DataError` when the matrix is invalid.
+ * @param analysis - Names the analysis in the error message.
+ * @throws `DataError` when the matrix is invalid or has more than 1,000 items.
  */
-export function codeItems(matrix: ResponseMatrix): CodedItem[] {
+export function codeItems(matrix: ResponseMatrix, analysis: string): CodedItem[] {
   checkResponseMatrix(matrix);
+  checkMatrixItems(matrix.itemIds.length, analysis);
   const persons = matrix.responses.length;
   return matrix.itemIds.map((id, column) => {
     const values = new Float64Array(persons);

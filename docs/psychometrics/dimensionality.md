@@ -79,12 +79,15 @@ from all responses.
 | A pair of items that no person answered both    | `null`                                              |
 | A table with one person                         | A number from -1 to 1, which carries no information |
 | An item with more than 8 observed categories    | A `DataError`, as psych's `polychoric` stops        |
+| More than 1,000 items                           | A `DataError`, in every analysis of this module     |
 
 Cost grows with the pairs of items, the persons and the product of the items' categories: the 25 items of `bfi`, with
 six categories and 2,800 persons, take about 20 ms, and a parallel analysis of 100 replications under a second. An item
 has at most 8 observed categories, psych's `max.cat`, as a pair's search takes the bivariate normal distribution at
 every pair of thresholds; items with more, such as scores, suit Pearson correlations, which every function here takes
-with `correlation: "pearson"`.
+with `correlation: "pearson"`. Every analysis here holds matrices of every pair of items, and decomposes them in time
+that grows with the cube of the items, so a matrix has at most 1,000 items: at that size an exploratory factor analysis
+adds about 150 MB to the peak memory and takes minutes.
 
 ## Parallel analysis
 

@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/internal.js";
+import { checkMatrixItems, type ResponseMatrix } from "../data/internal.js";
 import { covariance, minresLoadings, variance } from "../math/internal.js";
 import { itemScores } from "./complete-cases.js";
 import { reliabilityCases } from "./reliability.js";
@@ -27,14 +27,15 @@ export interface McDonaldOmega {
  *
  * @param matrix - The responses of the persons.
  * @returns Omega, the loadings of the items and whether the factor analysis converged.
- * @throws `DataError` when there are fewer than three items, fewer than two persons answered every item, an item's
- * scores have no variance, or the correlations sum to 0, as when the standardized scores of every person sum to the
- * same total.
+ * @throws `DataError` when there are fewer than three items or more than 1,000, fewer than two persons answered every
+ * item, an item's scores have no variance, or the correlations sum to 0, as when the standardized scores of every
+ * person sum to the same total.
  * @see {@link https://doi.org/10.4324/9781410601087 | McDonald (1999)}
  */
 export function mcdonaldOmega(matrix: ResponseMatrix): McDonaldOmega {
   const cases = reliabilityCases(matrix, "Omega");
   const k = cases.itemCount;
+  checkMatrixItems(k, "Omega");
   if (k < 3) throw new DataError("Omega needs at least three items, as one factor is not identified by two.");
   const scores = matrix.itemIds.map((_, item) => itemScores(cases, [item]));
   const variances = scores.map((x, item) => {

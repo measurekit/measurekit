@@ -117,9 +117,9 @@ const DEFAULT_MAX_ITERATIONS = 100;
  *   correction for continuity.
  * @returns The loadings and communalities of the items, the correlations of the factors, whether the extraction
  *   converged, the iterations run and the fit.
- * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
- * categories, a pair of items has too few persons for a correlation, an item has more than 8 observed categories for
- * polychoric correlations, an option is invalid, or `factors` is more than the items identify.
+ * @throws `DataError` when the matrix is invalid, has fewer than three items or more than 1,000, or an item with fewer
+ * than two observed categories, a pair of items has too few persons for a correlation, an item has more than 8 observed
+ * categories for polychoric correlations, an option is invalid, or `factors` is more than the items identify.
  * @see {@link https://doi.org/10.1037/1082-989X.4.3.272 | Fabrigar et al. (1999)}
  * @see {@link https://doi.org/10.1007/BF02289658 | Jöreskog (1967)}
  */

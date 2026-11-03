@@ -322,7 +322,7 @@ data to `null`. A function that returns one statistic throws `DataError` with th
 | Two persons                                          | Defined: correlations are 1, -1 or `null`; each group holds 0.54 of a person                                    |
 | Total scores without variance                        | Correlations `null`; `cronbachAlpha`, `kr20`, `kr21` throw                                                      |
 | A half score without variance, or halves at r = -1   | `splitHalf` throws                                                                                              |
-| An item without variance, or fewer than three items  | `mcdonaldOmega` throws                                                                                          |
+| An item without variance, fewer than 3 or over 1,000 | `mcdonaldOmega` throws: its correlations hold every pair of items                                               |
 | A reliability outside [0, 1]                         | `standardErrorOfMeasurement` throws                                                                             |
 | A section with a constant or negative-alpha subscore | `subscoreValue` gives `null` PRMSEs and `addedValue` `false`                                                    |
 | Fewer than two sections or a section of one item     | `subscoreValue` throws                                                                                          |

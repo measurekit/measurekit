@@ -494,8 +494,8 @@ table.
 What each reader of untrusted input adds to the peak resident memory of a Node.js process, on its worst inputs within
 the limits of [SECURITY.md](../SECURITY.md): the peak of a process that parses the input from JSON and reads it, less
 the peak of the same process that parses it and does not, the median of three pairs run one after the other. Each reader
-grows in proportion to its input, but for the designs of cognitive diagnosis and the analyses of the relations between
-the elements of a knowledge structure, whose limits bound them.
+grows in proportion to its input, but for the designs of cognitive diagnosis, the analyses of the pairs of items, and the
+analyses of the relations between the elements of a knowledge structure, whose limits bound them.
 
 | Reader                        | Input                                                          | JSON (MB) | Peak added (MB)             |
 | ----------------------------- | -------------------------------------------------------------- | --------: | --------------------------- |
@@ -516,6 +516,9 @@ the elements of a knowledge structure, whose limits bound them.
 | `calibrateBifactor`           | 1,000 persons, two-tier, 40 items, standard errors             |      0.09 | 620 to 670 by run           |
 | `generalizabilityStudy`       | 1,000,000 scores of 6 facets of 10 elements                    |        87 | 125                         |
 | `generalizabilityStudy`       | The same with one score missing, `unbalanced`                  |        87 | 301                         |
+| `exploratoryFactorAnalysis`   | 1,000 items of 40 persons, the most a matrix of items takes    |      0.08 | 152                         |
+| `omegaHierarchical`           | 1,000 items of 40 persons                                      |      0.08 | 148                         |
+| `mcdonaldOmega`               | 1,000 items of 40 persons                                      |      0.08 | 118                         |
 | `eventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items             |        72 | 79                          |
 | `eventLog`                    | 1,000,000 events, each of its own learner, item and skill      |        82 | 171                         |
 | `bkt` with stored parameters  | 100,000 skills                                                 |       6.6 | 56                          |

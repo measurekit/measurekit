@@ -89,10 +89,10 @@ const DEFAULT_QUANTILE = 0.95;
  * @param options - The correlation, the comparison, the replications, the quantile and the correction for continuity.
  * @returns The observed and the random eigenvalues of the components and of the factors, with the number of each to
  *   retain.
- * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
- * categories, a pair of items has too few persons for a correlation, an item has more than 8 observed categories for
- * polychoric correlations, an option is invalid, `random` is not a random number generator, or `comparison` is
- * `"normal"` with `correlation` `"polychoric"`.
+ * @throws `DataError` when the matrix is invalid, has fewer than three items or more than 1,000, or an item with fewer
+ * than two observed categories, a pair of items has too few persons for a correlation, an item has more than 8 observed
+ * categories for polychoric correlations, an option is invalid, `random` is not a random number generator, or
+ * `comparison` is `"normal"` with `correlation` `"polychoric"`.
  * @see {@link https://doi.org/10.1007/BF02289447 | Horn (1965)}
  * @see {@link https://doi.org/10.1177/0013164495055003002 | Glorfeld (1995)}
  */
@@ -118,7 +118,7 @@ export function parallelAnalysis(
   if (comparison === "normal" && correlation === "polychoric") {
     throw new DataError('The option comparison "normal" needs the option correlation "pearson", found "polychoric".');
   }
-  const items = codeItems(matrix);
+  const items = codeItems(matrix, "Parallel analysis");
   checkItems(items, "Parallel analysis");
   const size = items.length;
   const persons = matrix.responses.length;

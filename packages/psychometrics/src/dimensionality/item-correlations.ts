@@ -77,8 +77,8 @@ export function checkedMatrix(correlations: Float64Array, items: readonly CodedI
  * Codes the items of a response matrix, checks them and returns their correlations, smoothed if they are not positive
  * definite, for an analysis that needs a matrix that is.
  *
- * @throws `DataError` when the matrix is invalid, has fewer than three items or an item with fewer than two observed
- * categories, or a pair of items has too few persons for a correlation.
+ * @throws `DataError` when the matrix is invalid, has fewer than three items or more than 1,000, or an item with fewer
+ * than two observed categories, or a pair of items has too few persons for a correlation.
  */
 export function positiveDefiniteCorrelations(
   matrix: ResponseMatrix,
@@ -86,7 +86,7 @@ export function positiveDefiniteCorrelations(
   correction: number,
   analysis: string,
 ): ItemCorrelations {
-  const items = codeItems(matrix);
+  const items = codeItems(matrix, analysis);
   checkItems(items, analysis);
   const observed = checkedMatrix(correlateItems(items, correlation, correction), items, "The data");
   const { correlations, smoothed } = smooth(observed, items.length);
