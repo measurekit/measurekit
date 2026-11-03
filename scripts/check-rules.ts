@@ -508,6 +508,14 @@ export const RULES: readonly Rule[] = [
     titles: "standard errors of more than 2,000 items",
   },
   {
+    rule: "The joint calibration of speed and accuracy takes Hessian standard errors of at most 2,000 estimated parameters, by the bound of every calibration.",
+    file: "packages/psychometrics/src/response-time/speed-accuracy.ts",
+    find: 'if (standardErrors === "hessian") checkStandardErrorSize(estimated);',
+    replace: "",
+    test: "packages/psychometrics/test/response-time.test.ts",
+    titles: "refuses standard errors of more than 2,000 estimated parameters",
+  },
+  {
     rule: "Linear change stops at 1,000 effects, before its information holds a matrix of every pair of them.",
     file: "packages/psychometrics/src/explanatory/linear-change.ts",
     find: "if (layoutSize(layout) > MAX_EFFECTS) {",

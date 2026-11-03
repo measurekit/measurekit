@@ -13,6 +13,7 @@ import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import {
   type CalibratedItem,
   type CalibrationOptions,
+  checkStandardErrorSize,
   type IrtModel,
   indexItems,
   logProbability,
@@ -132,11 +133,6 @@ export interface SpeedAccuracyEstimate {
 const DEFAULT_TOLERANCE = 1e-6;
 const DEFAULT_MAX_ITERATIONS = 1000;
 const STANDARD_ERRORS: readonly SpeedAccuracyStandardErrors[] = ["none", "hessian"];
-/**
- * The most estimated parameters whose standard errors the joint calibration computes: their information is a dense
- * matrix of every pair of them, by central differences of two E-steps a parameter, as calibrate's.
- */
-const MAX_STANDARD_ERROR_PARAMETERS = 2000;
 
 /**
  * Calibrates the hierarchical model of speed and accuracy: an IRT model for the responses, ln T_ij ~ N(β_i - τ_j,
@@ -195,11 +191,7 @@ export function calibrateSpeedAccuracy<TParameters>(
   const setup = setUp(timed, irtOptions, answered, rule);
   const itemCount = timed.itemIds.length;
   const estimated = setup.values.length + 2 * itemCount + 2;
-  if (standardErrors === "hessian" && estimated > MAX_STANDARD_ERROR_PARAMETERS) {
-    throw new DataError(
-      `Standard errors take at most ${MAX_STANDARD_ERROR_PARAMETERS} estimated parameters, as their information holds every pair of them; found ${estimated}. Leave standardErrors "none".`,
-    );
-  }
+  if (standardErrors === "hessian") checkStandardErrorSize(estimated);
   const parameters = new Float64Array(2 * itemCount + 2);
   start.items.forEach((item, i) => {
     parameters[i] = item.intensity;

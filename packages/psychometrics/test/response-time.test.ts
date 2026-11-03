@@ -521,7 +521,7 @@ describe("calibrateSpeedAccuracy", () => {
     expect(() =>
       calibrateSpeedAccuracy(responseRecords(records), { model: twoParameterLogistic, standardErrors: "hessian" }),
     ).toThrow(
-      'Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2402. Leave standardErrors "none".',
+      'Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2402. Leave standardErrors "none", or calibrate fewer items at a time.',
     );
   });
 

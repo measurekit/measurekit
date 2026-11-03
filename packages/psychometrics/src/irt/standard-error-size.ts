@@ -9,7 +9,7 @@ const MAX_STANDARD_ERROR_PARAMETERS = 2_000;
 
 /**
  * Checks that a calibration's standard errors are within their bound, before it estimates anything: unidimensional,
- * multidimensional, bifactor, longitudinal and unfolding calibrations alike.
+ * multidimensional, bifactor, longitudinal, unfolding and joint speed and accuracy calibrations alike.
  *
  * @param parameters - The estimated parameters the covariance spans, or the rows it reports where these are more.
  * @throws `DataError` when there are more than {@link MAX_STANDARD_ERROR_PARAMETERS}.
@@ -17,7 +17,7 @@ const MAX_STANDARD_ERROR_PARAMETERS = 2_000;
 export function checkStandardErrorSize(parameters: number): void {
   if (parameters > MAX_STANDARD_ERROR_PARAMETERS) {
     throw new DataError(
-      `Standard errors take at most ${MAX_STANDARD_ERROR_PARAMETERS} estimated parameters, as their information holds every pair of them; found ${parameters}. Leave standardErrors "none", or calibrate the items in sets that share fixed anchors.`,
+      `Standard errors take at most ${MAX_STANDARD_ERROR_PARAMETERS} estimated parameters, as their information holds every pair of them; found ${parameters}. Leave standardErrors "none", or calibrate fewer items at a time.`,
     );
   }
 }
