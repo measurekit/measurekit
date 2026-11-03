@@ -101,21 +101,24 @@ export function coefficientErrors(data: MokkenData, usable: readonly boolean[]):
   const { items, persons: total, categories } = data;
   const patterns = patternsOf(data);
   const counts = Array.from({ length: items }, (_, item) => scoreCounts(data, item));
-  const pairRatios = new Map<number, ErrorRatio>();
+  // The standard error of each pair i < j, by i, then j; NaN where undefined.
+  const pairErrors = new Float64Array(items * items).fill(Number.NaN);
   const itemRatios = Array.from({ length: items }, () => new ErrorRatio(patterns.count));
   const scaleRatio = new ErrorRatio(patterns.count);
+  // One ratio serves every pair in turn: a pair keeps its standard error, and its derivatives go into the sums.
+  const pair = new ErrorRatio(patterns.count);
   for (let i = 0; i < items - 1; i++) {
     for (let j = i + 1; j < items; j++) {
       if (!(usable[i] && usable[j])) continue;
-      const pair = pairContribution(patterns, counts, categories, total, i, j);
-      pairRatios.set(i * items + j, pair);
+      pairContribution(pair, patterns, counts, categories, total, i, j);
+      pairErrors[i * items + j] = pair.standardError(patterns) ?? Number.NaN;
       for (const ratio of [itemRatios[i], itemRatios[j], scaleRatio]) addPair(ratio, pair);
     }
   }
   const pairs = Array.from({ length: items }, (_, i) =>
     Array.from({ length: items }, (_, j) => {
-      if (i === j) return null;
-      return pairRatios.get(Math.min(i, j) * items + Math.max(i, j))?.standardError(patterns) ?? null;
+      const error = i === j ? Number.NaN : (pairErrors[Math.min(i, j) * items + Math.max(i, j)] ?? Number.NaN);
+      return Number.isNaN(error) ? null : error;
     }),
   );
   return {
@@ -165,20 +168,21 @@ function expectedErrors(
   return { expected, forFirst, forSecond };
 }
 
-/** Returns the observed and expected Guttman errors of a pair of items and their derivatives by pattern. */
+/** Writes the observed and expected Guttman errors of a pair of items and their derivatives by pattern to `pair`. */
 function pairContribution(
+  pair: ErrorRatio,
   patterns: Patterns,
   counts: readonly Float64Array[],
   categories: number,
   total: number,
   i: number,
   j: number,
-): ErrorRatio {
+): void {
   const countsI = counts[i] ?? new Float64Array(categories);
   const countsJ = counts[j] ?? new Float64Array(categories);
   const errors = stepPairErrors(countsI, countsJ);
   const { expected, forFirst, forSecond } = expectedErrors(errors, countsI, countsJ, total);
-  const pair = new ErrorRatio(patterns.count);
+  pair.observed = 0;
   pair.expected = expected;
   for (let k = 0; k < patterns.count; k++) {
     const a = patterns.scores[k * patterns.items + i] ?? 0;
@@ -188,5 +192,4 @@ function pairContribution(
     pair.observedDerivative[k] = error;
     pair.expectedDerivative[k] = ((forFirst[a] ?? 0) + (forSecond[b] ?? 0) - expected) / total;
   }
-  return pair;
 }

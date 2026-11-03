@@ -227,6 +227,14 @@ export const READERS: readonly ReaderCase[] = [
       psychometrics.localDependenceChiSquare(matrix, items),
   },
   {
+    name: "scalability: 200 persons of distinct patterns, 1,000 items",
+    budget: 240,
+    input: () =>
+      Array.from({ length: 200 }, (_, person) => Array.from({ length: 1000 }, (_, i) => ((person + 1) * (i + 3)) % 5)),
+    prepare: (rows: number[][], { psychometrics }) => psychometrics.responseMatrix(rows),
+    read: (matrix: unknown, { psychometrics }) => psychometrics.scalability(matrix),
+  },
+  {
     name: "diagnosticAdaptiveTest: 64 items of one of 20 attributes, the most items × 2^K",
     budget: 1940,
     input: () => ({
