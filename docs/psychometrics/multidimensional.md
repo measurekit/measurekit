@@ -132,6 +132,11 @@ nothing. [A recipe](#recipe-responses-missing-not-at-random) models omissions th
   extrapolated along the last two, shortened toward the plain steps where the log-likelihood falls. It reaches the
   fixed points of plain EM in a fraction of the iterations where EM contracts slowly, as for an exploratory model, and
   `iterations` counts every EM iteration.
+- **Memory.** EM keeps each item's probability and expected count of each category at every node of the grid, 16
+  bytes each: about 30 KB for a dichotomous item on the default grid of two dimensions and 110 KB on that of three. A
+  calibration whose tables would hold more than 2²⁴ values, 256 MiB, throws a `DataError`; at the limit of 10⁶ nodes
+  that is 8 dichotomous items. Standard errors add the scores of the items at the nodes of the dimensions they load
+  on: an exploratory model of three dimensions at the limit takes 700 MB in all.
 - **MH-RM.** Each cycle draws every person's theta from its posterior given the current estimates, by 5 random-walk
   Metropolis-Hastings steps whose variance is tuned to an acceptance of 0.35, and moves the estimates by γ Γ⁻¹ g, with g
   the complete-data score at the draws and Γ the observed complete-data information. The stages, gains and tolerance
@@ -417,7 +422,9 @@ MH-RM, seeded, with the cycles of its last stage:
 Differences under 10% are noise. The E-step of EM dominates and grows with the responses times the nodes: a grid of
 `points` nodes in each of D dimensions has `points ** D` nodes. Fewer `points` is faster and, for a calibration, less
 exact. MH-RM has no grid, so its time grows slowly with the dimensions; it runs 250 cycles before the last stage, and
-the importance-sampled log-likelihood is part of every time. Use EM up to three dimensions, where it is exact and
+the importance-sampled log-likelihood is part of every time. Correlated dimensions add their correlations, D (D - 1) / 2
+parameters whose information grows as the square of their number: two persons on 40 correlated dimensions take 170 MB
+and 8 s, on 60 dimensions 300 MB and 45 s. Use EM up to three dimensions, where it is exact and
 faster. The exploratory model of a weak second dimension converges slowly with EM; `maxIterations` bounds it.
 Calibration runs synchronously: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
 
@@ -508,6 +515,7 @@ many specific dimensions; the posterior mode does not.
 | More than two primary dimensions    | `DataError`: `calibrateMultidimensional` with `loadings` fits them by MH-RM                          |
 | A name that is primary and specific | `DataError`                                                                                          |
 | A grid of more than 10⁶ nodes       | `DataError`: use fewer `points`                                                                      |
+| Tables of more than 2²⁴ values      | `DataError`: the items' categories at the nodes, with their pairs for `"hessian"`; use fewer points  |
 
 **How it is fast.** Given the primary dimensions, the groups of items of the specific dimensions are independent, so a
 person's likelihood is a sum over the primary nodes of the weight times a product, over the groups, of a sum over each

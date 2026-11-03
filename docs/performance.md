@@ -511,6 +511,9 @@ the elements of a knowledge structure, whose limits bound them.
 | `calibrateCdm`                | 20 items of one of 20 attributes, two persons                  |    0.0004 | 1,030                       |
 | `calibrateCdm`                | 64 items of one of 20 attributes, the most items × 2^K         |    0.0013 | 1,900 to 2,000 by model     |
 | `calibrateCdm`                | 64 items, one of 19 attributes and 63 of 13                    |    0.0056 | 1,000 to 1,200 by model     |
+| `calibrateMultidimensional`   | 8 dichotomous items, 2 persons, 10⁶ nodes                      |    0.0002 | 310                         |
+| `calibrateMultidimensional`   | The same, 3 dimensions, exploratory, standard errors           |    0.0002 | 650 to 750 by run           |
+| `calibrateBifactor`           | 1,000 persons, two-tier, 40 items, standard errors             |      0.09 | 620 to 670 by run           |
 | `generalizabilityStudy`       | 1,000,000 scores of 6 facets of 10 elements                    |        87 | 125                         |
 | `generalizabilityStudy`       | The same with one score missing, `unbalanced`                  |        87 | 301                         |
 | `eventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items             |        72 | 79                          |
@@ -529,3 +532,8 @@ persons itself, and 2 to 9 times where the input names them. A design of cogniti
 few hundred bytes, which its limits stop there; a host that takes Q-matrices from users sets a lower limit where it
 cannot spare that. The analyses of knowledge structures take up to about 260 MB within their limits: IITA's candidates
 from 19 MB of responses, and the masks of a model from a few hundred kilobytes of sets of skills.
+
+A calibration of several dimensions holds tables over its grid, whose limit stops them at 310 MB, and at 700 MB with the
+standard errors of an exploratory model. The standard errors of a bifactor model keep, for each pattern of the responses
+to a specific dimension's items, the mean scores of its items at each primary node: patterns of long specific dimensions
+on the grid of two primary dimensions take about 7 KB per response.

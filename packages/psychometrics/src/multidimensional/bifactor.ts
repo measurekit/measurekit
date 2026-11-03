@@ -104,7 +104,9 @@ const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian
  * @throws `DataError` when the data or an option is invalid, there are no responses, `specific` or `primary` does not
  * name every item of the data and no other, an item has two specific dimensions, a specific dimension has one item,
  * there are more than two primary dimensions, a name is both primary and specific, an item lacks responses in a
- * category up to its highest or has more categories than its model allows, or the grid has more than 10⁶ nodes.
+ * category up to its highest or has more categories than its model allows, the grid has more than 10⁶ nodes, or the
+ * tables of the items' categories at the nodes of their groups, with the pairs of two items' categories for
+ * `"hessian"`, would hold more than 2 ** 24 values.
  */
 export function calibrateBifactor(
   data: ResponseMatrix | ResponseRecords,
@@ -128,7 +130,7 @@ export function calibrateBifactor(
   checkIntegerFrom(points, "The option points", 2);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   checkStopping(tolerance, maxIterations);
-  const fit = bifactorFit(responses, { model, priors }, structure, points);
+  const fit = bifactorFit(responses, { model, priors }, structure, points, standardErrors === "hessian");
   const solution = solveBifactor(fit, structure.design.dimensionNames.length, {
     tolerance,
     maxIterations,

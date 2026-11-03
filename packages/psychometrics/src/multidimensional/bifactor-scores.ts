@@ -45,11 +45,14 @@ export interface GroupScores {
  * Returns the scores of a group's items at its nodes, with empty means and products.
  *
  * @param slots - The slot of each of the group's entries, its items' entries in item order.
+ * @param withSecond - Whether to make the tables of the persons expected for each pair of responses to two items, which
+ *   only the second moments of the scores need.
  */
 export function groupScores<TParameters>(
   group: GroupNodes<TParameters>,
   slots: Int32Array,
   primaryNodes: number,
+  withSecond: boolean,
 ): GroupScores {
   let start = 0;
   const items = group.items.map((item): ItemScores => {
@@ -62,7 +65,7 @@ export function groupScores<TParameters>(
     start += scores.size;
     return scores;
   });
-  const pairs = items.flatMap((first, j) =>
+  const pairs = (withSecond ? items : []).flatMap((first, j) =>
     items.slice(j + 1).map((second, offset) => ({
       first: j,
       second: j + 1 + offset,

@@ -3345,6 +3345,20 @@ describe("errors", () => {
     );
   });
 
+  it("limits the probabilities of the items' categories that EM keeps at the nodes, before it allocates them", () => {
+    // 17 dichotomous items on a grid of 10⁶ nodes would keep 3.4e7 probabilities, above 2 ** 24: 544 MB of tables.
+    const wide = responseMatrix([
+      Array.from({ length: 17 }, (_, j) => j % 2),
+      Array.from({ length: 17 }, (_, j) => 1 - (j % 2)),
+    ]);
+    const single = Object.fromEntries(wide.itemIds.map((id) => [id, ["F1"]]));
+    expect(() =>
+      calibrateMultidimensional(wide, { model, loadings: single, points: 1_000_000, maxIterations: 1 }),
+    ).toThrow(
+      "The items of the calibration would keep 34000000 values at the nodes of their grids, more than 16777216; use fewer points.",
+    );
+  });
+
   it("limits EM to three dimensions and needs at least as many items as dimensions", () => {
     expect(() => calibrateMultidimensional(data, { model, method: "em", dimensions: 4 })).toThrow(
       "EM calibrates up to 3 dimensions, found 4.",

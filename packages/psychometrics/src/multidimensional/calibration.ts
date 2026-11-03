@@ -130,10 +130,10 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  *   and communalities, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations run.
  * @throws `DataError` when the data or an option is invalid, there are no responses, neither or both of `dimensions`
  * and `loadings` are given, an item is not in `loadings` or lacks responses in a category up to its highest or has more
- * categories than its model allows; with EM, when there are more than 3 dimensions or the grid has more than 10⁶ nodes,
- * a group has no person with a response, the groups share no item or a fixed item is invalid, or the fixed items leave
- * a dimension without a scale; with MH-RM, when `points`, `groups`, `fixed` or the standard errors `"cross-product"`
- * are given.
+ * categories than its model allows; with EM, when there are more than 3 dimensions, the grid has more than 10⁶ nodes or
+ * the items' categories at its nodes more than 2 ** 24, a group has no person with a response, the groups share no item
+ * or a fixed item is invalid, or the fixed items leave a dimension without a scale; with MH-RM, when `points`, `groups`,
+ * `fixed` or the standard errors `"cross-product"` are given.
  */
 export function calibrateMultidimensional<TParameters>(
   data: ResponseMatrix | ResponseRecords,

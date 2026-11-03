@@ -52,7 +52,7 @@ function scoreMoments<TParameters>(
   size: number,
   withSecond: boolean,
 ): { readonly outer: Float64Array; readonly second: Float64Array } {
-  const groups = scoresOf(fit);
+  const groups = scoresOf(fit, withSecond);
   fit.expectation.forEachSubPattern((g, u, conditional, mass) => {
     const scores = groups[g];
     const nodes = fit.groups[g];
@@ -82,7 +82,7 @@ function scoreMoments<TParameters>(
 }
 
 /** Returns the scores of each group of items, and of the correlation when it is estimated. */
-function scoresOf<TParameters>(fit: BifactorFit<TParameters>): GroupScores[] {
+function scoresOf<TParameters>(fit: BifactorFit<TParameters>, withSecond: boolean): GroupScores[] {
   const primaryNodes = fit.latent.logWeights.length;
   const offsets = new Int32Array(fit.items.length);
   let slot = 0;
@@ -94,7 +94,7 @@ function scoresOf<TParameters>(fit: BifactorFit<TParameters>): GroupScores[] {
     const slots = Int32Array.from(
       nodes.patterns.group.items.flatMap((i) => Array.from(fit.items[i]?.free ?? [], (_, l) => (offsets[i] ?? 0) + l)),
     );
-    return groupScores(nodes, slots, primaryNodes);
+    return groupScores(nodes, slots, primaryNodes, withSecond);
   });
   if (fit.correlated) groups.push(correlationScores(fit, slot, primaryNodes));
   return groups;

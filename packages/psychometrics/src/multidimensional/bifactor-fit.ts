@@ -2,13 +2,13 @@ import { largestChange } from "@measurekit/core";
 import { type CompressedResponses, type Iteration, squarem } from "../irt/internal.js";
 import { type BifactorExpectation, bifactorExpectation, type GroupNodes } from "./bifactor-expectation.js";
 import { groupGrid, groupWeights, specificRule } from "./bifactor-nodes.js";
-import { patternsOf } from "./bifactor-patterns.js";
+import { type GroupPatterns, patternsOf } from "./bifactor-patterns.js";
 import { bifactorCovariance } from "./bifactor-standard-errors.js";
 import type { BifactorStructure } from "./bifactor-structure.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { type ItemState, setUp } from "./calibration-setup.js";
 import { type Latent, latentDistribution } from "./correlation.js";
-import { productGrid } from "./grid.js";
+import { checkTables, type Grid, productGrid } from "./grid.js";
 import { type ItemMaximization, itemMaximization } from "./m-step.js";
 import type { Settings, Solution } from "./solution.js";
 
@@ -35,14 +35,17 @@ export interface BifactorFit<TParameters> {
  * Sets up a bifactor calibration: the nodes of every group of items, the items with their starting values, the E-step
  * and the M-step.
  *
- * @throws `DataError` when `points` makes a grid of more nodes than a calibration allows, or an item cannot be
- * estimated from its responses.
+ * @param pairs - Whether the standard errors will need the persons expected at each node of a group for each pair of
+ *   responses to two of its items, which Louis' formula takes: these tables count toward the limit as well.
+ * @throws `DataError` when `points` makes a grid of more nodes than a calibration allows or tables of more than 2 ** 24
+ * entries, or an item cannot be estimated from its responses.
  */
 export function bifactorFit<TParameters>(
   responses: CompressedResponses,
   options: Pick<MultidimensionalCalibrationOptions<TParameters>, "model" | "priors">,
   structure: BifactorStructure,
   points: number,
+  pairs: boolean,
 ): BifactorFit<TParameters> {
   const { design, primaryCount } = structure;
   const dimensions = design.dimensionNames.length;
@@ -54,7 +57,9 @@ export function bifactorFit<TParameters>(
   table.groups.forEach(({ group }, s) => {
     for (const item of group.items) nodesOfItem[item] = grids[s]?.count ?? 0;
   });
-  const items = setUp(responses, options, design, 0).map((item, i) => ({
+  const unplaced = setUp(responses, options, design, 0);
+  checkTables(tableEntries(unplaced, table.groups, grids, pairs));
+  const items = unplaced.map((item, i) => ({
     ...item,
     counts: new Float64Array((nodesOfItem[i] ?? 0) * item.categoryCount),
   }));
@@ -76,6 +81,28 @@ export function bifactorFit<TParameters>(
     maximization: groupMaximization(groups),
     expectation: bifactorExpectation(table, groups, latent.logWeights),
   };
+}
+
+/**
+ * Returns the entries of the tables over the nodes of the groups: each item's categories at the nodes of its group and,
+ * with `pairs`, the products of the categories of each two items of a group.
+ */
+function tableEntries<TParameters>(
+  items: readonly ItemState<TParameters>[],
+  groups: readonly GroupPatterns[],
+  grids: readonly Grid[],
+  pairs: boolean,
+): number {
+  return groups.reduce((sum, { group }, s) => {
+    const categories = group.items.map((i) => items[i]?.categoryCount ?? 0);
+    let entries = categories.reduce((total, count) => total + count, 0);
+    if (pairs) {
+      categories.forEach((count, j) => {
+        for (const other of categories.slice(j + 1)) entries += count * other;
+      });
+    }
+    return sum + entries * (grids[s]?.count ?? 0);
+  }, 0);
 }
 
 /** Returns the M-step of the items, each over the nodes of its group. */

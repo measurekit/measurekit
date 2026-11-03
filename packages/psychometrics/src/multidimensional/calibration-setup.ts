@@ -13,6 +13,7 @@ import {
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import type { Design } from "./design.js";
 import type { ExpectationItem } from "./expectation.js";
+import { checkTables } from "./grid.js";
 import { checkMultidimensionalItem, checkMultidimensionalModel } from "./items.js";
 import type { MultidimensionalModel } from "./model.js";
 import { startingSlopes } from "./starting-slopes.js";
@@ -61,9 +62,9 @@ function priorName(entry: string): string {
  * Checks the models and priors against the data and builds the items with their starting values.
  *
  * @throws `DataError` when the number of models is not the number of items, a model is invalid, a prior is not a prior
- * or names a parameter that no estimated item has, an item cannot be estimated from its responses, or a fixed item is
- * not an item of the data, has invalid parameters, other dimensions than the calibration or fewer categories than its
- * responses.
+ * or names a parameter that no estimated item has, an item cannot be estimated from its responses, a fixed item is not
+ * an item of the data, has invalid parameters, other dimensions than the calibration or fewer categories than its
+ * responses, or the items' tables over `nodeCount` nodes would pass the limit of the tables, 2 ** 24 values.
  */
 export function setUp<TParameters>(
   responses: CompressedResponses,
@@ -87,14 +88,26 @@ export function setUp<TParameters>(
   const anchors = new Map(Object.entries(fixed));
   checkFixedIds(anchors.keys(), itemIds);
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);
-  const slopes = startingSlopes(design, responses);
-  const items = models.map((model, column): ItemState<TParameters> => {
+  // Every item is checked before the starting slopes and the tables over the grid are made, so that invalid data cost
+  // neither their time nor their memory.
+  const checked = models.map((model, column) => {
     const id = itemIds[column] ?? "";
-    const tally = tallies[column] ?? NO_RESPONSES;
     const anchor = anchors.get(id);
-    if (anchor !== undefined) return fixedItem(id, model, anchor, tally.highest + 1, dimensions, nodeCount);
+    const tally = tallies[column] ?? NO_RESPONSES;
+    if (anchor !== undefined) {
+      return { id, model, anchor, categoryCount: checkFixedItem(id, model, anchor, tally.highest + 1, dimensions) };
+    }
     const proportions = checkCategories(id, model, tally);
-    const categoryCount = proportions.length;
+    return { id, model, proportions, categoryCount: proportions.length };
+  });
+  checkTables(checked.reduce((sum, { categoryCount }) => sum + categoryCount * nodeCount, 0));
+  const slopes = startingSlopes(design, responses);
+  const items = checked.map((entry, column): ItemState<TParameters> => {
+    const { id, model, categoryCount } = entry;
+    if (entry.proportions === undefined) {
+      return fixedItem(id, model, entry.anchor, categoryCount, dimensions, nodeCount);
+    }
+    const { proportions } = entry;
     const vector = model.toVector(model.startingValues(proportions, slopes[column] ?? new Float64Array(dimensions)));
     const specifications = model.parameters(categoryCount, dimensions);
     const loads = design.loads[column] ?? [];
@@ -130,19 +143,18 @@ export function setUp<TParameters>(
 }
 
 /**
- * Returns an anchor: an item whose parameters are given and not estimated.
+ * Checks an anchor, an item whose parameters are given and not estimated, and returns its number of categories.
  *
  * @throws `DataError` when the parameters are invalid for the model, span other dimensions than the calibration or have
  * fewer categories than the item's responses.
  */
-function fixedItem<TParameters>(
+function checkFixedItem<TParameters>(
   id: string,
   model: MultidimensionalModel<TParameters>,
   parameters: TParameters,
   responseCategories: number,
   dimensions: number,
-  nodeCount: number,
-): ItemState<TParameters> {
+): number {
   checkMultidimensionalItem({ model, parameters }, `Fixed item "${id}"`);
   const categoryCount = model.categoryCount(parameters);
   if (model.dimensionCount(parameters) !== dimensions) {
@@ -151,6 +163,18 @@ function fixedItem<TParameters>(
     );
   }
   checkFixedCategories(id, responseCategories, categoryCount);
+  return categoryCount;
+}
+
+/** Returns an anchor that {@link checkFixedItem} has checked. */
+function fixedItem<TParameters>(
+  id: string,
+  model: MultidimensionalModel<TParameters>,
+  parameters: TParameters,
+  categoryCount: number,
+  dimensions: number,
+  nodeCount: number,
+): ItemState<TParameters> {
   return {
     id,
     model,

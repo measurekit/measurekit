@@ -4,6 +4,13 @@ import { rectangular } from "../math/internal.js";
 /** The most nodes a grid may have, which bounds the memory and time of an integral over it. */
 export const MAX_GRID_NODES = 1_000_000;
 
+/**
+ * The most values of items at the nodes of a grid that an EM calibration keeps: the probability of each category of
+ * each item, which takes 16 bytes with its expected count, and for Louis' standard errors of a bifactor model the
+ * persons expected for each pair of categories of two items of a group, 8 bytes. The tables take at most 256 MiB.
+ */
+const MAX_TABLE_ENTRIES = 2 ** 24;
+
 /** The number of nodes per dimension that mirt's `quadpts` defaults to for 1 to 5 dimensions, and for more. */
 const DEFAULT_POINTS = [61, 31, 15, 9, 7] as const;
 const DEFAULT_POINTS_ABOVE = 3;
@@ -89,4 +96,18 @@ function quadraticForm(
     }
   }
   return sum;
+}
+
+/**
+ * Checks that the tables of a calibration's items, `entries` values at the nodes of their grids, stay within
+ * {@link MAX_TABLE_ENTRIES}.
+ *
+ * @throws `DataError` when they do not.
+ */
+export function checkTables(entries: number): void {
+  if (entries > MAX_TABLE_ENTRIES) {
+    throw new DataError(
+      `The items of the calibration would keep ${entries} values at the nodes of their grids, more than ${MAX_TABLE_ENTRIES}; use fewer points.`,
+    );
+  }
 }

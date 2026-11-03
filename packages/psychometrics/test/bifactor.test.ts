@@ -574,6 +574,37 @@ describe("calibrateBifactor", () => {
       );
     });
 
+    it("limits the probabilities of the items' categories that EM keeps at the nodes of their groups", () => {
+      // 1,000 points make a group of 10⁶ nodes, which 17 dichotomous items fill with 3.4e7 probabilities, above 2 ** 24.
+      const ids = Array.from({ length: 17 }, (_, j) => `q${j}`);
+      const wide = responseMatrix(
+        [Array.from({ length: 17 }, (_, j) => j % 2), Array.from({ length: 17 }, (_, j) => 1 - (j % 2))],
+        { itemIds: ids },
+      );
+      const specific = Object.fromEntries(ids.map((id) => [id, "passage"]));
+      expect(() => calibrateBifactor(wide, { specific, points: 1000, maxIterations: 1 })).toThrow(
+        "The items of the calibration would keep 34000000 values at the nodes of their grids, more than 16777216; use fewer points.",
+      );
+    });
+
+    it("counts toward the limit the tables of pairs of items that Louis' standard errors take, and only those", () => {
+      // A group of 10⁶ nodes: 5 dichotomous items keep 1e7 probabilities, and their 10 pairs 4e7 more for Louis' formula.
+      const ids = Array.from({ length: 5 }, (_, j) => `q${j}`);
+      const wide = responseMatrix(
+        [Array.from({ length: 5 }, (_, j) => j % 2), Array.from({ length: 5 }, (_, j) => 1 - (j % 2))],
+        { itemIds: ids },
+      );
+      const options = {
+        specific: Object.fromEntries(ids.map((id) => [id, "passage"])),
+        points: 1000,
+        maxIterations: 1,
+      };
+      expect(() => calibrateBifactor(wide, { ...options, standardErrors: "hessian" })).toThrow(
+        "The items of the calibration would keep 50000000 values at the nodes of their grids, more than 16777216; use fewer points.",
+      );
+      expect(calibrateBifactor(wide, { ...options, standardErrors: "cross-product" }).items).toHaveLength(5);
+    });
+
     it("scores persons from its items, as any multidimensional calibration", () => {
       const fit = calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, ...quick });
       const prior = { mean: fit.dimensions.map(() => 0), covariance: fit.correlations };
