@@ -27,13 +27,207 @@ import {
 import { compressResponses } from "../src/irt/internal.js";
 import { createWalk, patternsOf, structureOf } from "../src/multidimensional/internal.js";
 import { defined, expectClose } from "./assertions.js";
-import graded from "./fixtures/bifactor-graded.json" with { type: "json" };
-import incomplete from "./fixtures/bifactor-incomplete.json" with { type: "json" };
-import long from "./fixtures/bifactor-long.json" with { type: "json" };
-import m2pl from "./fixtures/bifactor-m2pl.json" with { type: "json" };
-import m3pl from "./fixtures/bifactor-m3pl.json" with { type: "json" };
-import recovery from "./fixtures/bifactor-recovery.json" with { type: "json" };
-import twoTier from "./fixtures/bifactor-two-tier.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BifactorGradedFixture {
+  graded: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: number[][];
+    specific: Record<string, string>;
+    primary: Record<string, string[]>;
+    items: {
+      id: string;
+      parameters: { a: number[]; intercepts: number[] };
+      standardErrors: {
+        a1: number;
+        a2?: number;
+        intercept1: number;
+        intercept2: number;
+        intercept3: number;
+        a3?: number;
+        a4?: number;
+      };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+    truth: { slopes: number[][]; intercepts: number[][] };
+  };
+}
+const graded = readFixture<BifactorGradedFixture>("bifactor-graded.json");
+
+interface BifactorIncompleteFixture {
+  ungrouped: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: number[][];
+    specific: Record<string, string | null>;
+    primary: Record<string, string[]>;
+    items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+  };
+  missing: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: (number | null)[][];
+    specific: Record<string, string | null>;
+    primary: Record<string, string[]>;
+    items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+  };
+}
+const incomplete = readFixture<BifactorIncompleteFixture>("bifactor-incomplete.json");
+
+interface BifactorLongFixture {
+  long: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: number[][];
+    specific: Record<string, string>;
+    primary: Record<string, string[]>;
+    items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+    truth: { slopes: number[][]; intercepts: number[] };
+  };
+}
+const long = readFixture<BifactorLongFixture>("bifactor-long.json");
+
+interface BifactorM2plFixture {
+  items12: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: number[][];
+    specific: Record<string, string>;
+    primary: Record<string, string[]>;
+    items: {
+      id: string;
+      parameters: { a: number[]; intercept: number; c: number; d: number };
+      standardErrors: { intercept: number };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+    truth: { slopes: number[][]; intercepts: number[] };
+    crossProduct: {
+      items: {
+        id: string;
+        parameters: { a: number[]; intercept: number; c: number; d: number };
+        standardErrors: { intercept: number };
+      }[];
+    };
+  };
+  items40: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: number[][];
+    specific: Record<string, string>;
+    primary: Record<string, string[]>;
+    items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+    truth: { slopes: number[][]; intercepts: number[] };
+  };
+}
+const m2pl = readFixture<BifactorM2plFixture>("bifactor-m2pl.json");
+
+interface BifactorM3plFixture {
+  m3pl: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: number[][];
+    specific: Record<string, string>;
+    primary: Record<string, string[]>;
+    items: {
+      id: string;
+      parameters: { a: number[]; intercept: number; c: number; d: number };
+      standardErrors: { intercept: number; c: number };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+    priors: { c: { type: string; mean: number; sd: number } };
+    truth: { slopes: number[][]; intercepts: number[] };
+  };
+}
+const m3pl = readFixture<BifactorM3plFixture>("bifactor-m3pl.json");
+
+interface BifactorRecoveryFixture {
+  itemIds: string[];
+  responses: number[][];
+  specific: Record<string, string>;
+  primary: Record<string, string[]>;
+  truth: { slopes: number[][]; intercepts: number[]; correlation: number };
+}
+const recovery = readFixture<BifactorRecoveryFixture>("bifactor-recovery.json");
+
+interface BifactorTwoTierFixture {
+  twoTier: {
+    model: string;
+    points: number;
+    dimensions: string[];
+    itemIds: string[];
+    responses: number[][];
+    specific: Record<string, string>;
+    primary: Record<string, string[]>;
+    items: {
+      id: string;
+      parameters: { a: number[]; intercept: number; c: number; d: number };
+      standardErrors: { intercept: number };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    mirt: { iterations: number; converged: boolean };
+    correlations: number[][];
+    correlationStandardErrors: number[][];
+    standardized: { loadings: number[][]; communalities: number[] };
+    truth: { slopes: number[][]; intercepts: number[]; correlation: number };
+  };
+}
+const twoTier = readFixture<BifactorTwoTierFixture>("bifactor-two-tier.json");
 
 type Parameters = MultidimensionalLogisticParameters | MultidimensionalGradedParameters;
 

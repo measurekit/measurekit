@@ -12,8 +12,58 @@ import {
   generalizabilityStudy,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
-import fixture from "./fixtures/generalizability.json" with { type: "json" };
-import unbalancedFixture from "./fixtures/generalizability-unbalanced.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface GeneralizabilityFixture {
+  cases: {
+    name: string;
+    design: { object: string; facets: string[]; nested: { rater?: string[]; item?: string[] } };
+    scores: { levels: { person: string; item: string; rater?: string }; score: number }[];
+    components: {
+      facets: string[];
+      nestedIn: string[];
+      degreesOfFreedom: number;
+      sumOfSquares: number;
+      meanSquare: number;
+      variance: number;
+      reml?: number;
+    }[];
+    studies: {
+      options: { sampleSizes?: { item: number; rater?: number }; fixed?: string[]; nested?: { rater: string[] } };
+      universeScoreVariance: number;
+      relativeErrorVariance: number;
+      absoluteErrorVariance: number;
+      generalizability: number;
+      dependability: number;
+    }[];
+  }[];
+}
+const fixture = readFixture<GeneralizabilityFixture>("generalizability.json");
+
+interface GeneralizabilityUnbalancedFixture {
+  cases: {
+    name: string;
+    design: { object: string; facets: string[]; nested: { rater?: string[]; item?: string[] }; unbalanced: boolean };
+    scores: { levels: { person: string; rater?: string; item?: string }; score: number }[];
+    components: {
+      facets: string[];
+      nestedIn: string[];
+      degreesOfFreedom: number;
+      sumOfSquares: number;
+      meanSquare: number;
+      variance: number;
+    }[];
+    studies: {
+      options: { sampleSizes: { rater: number; item?: number } };
+      universeScoreVariance: number;
+      relativeErrorVariance: number;
+      absoluteErrorVariance: number;
+      generalizability: number;
+      dependability: number;
+    }[];
+  }[];
+}
+const unbalancedFixture = readFixture<GeneralizabilityUnbalancedFixture>("generalizability-unbalanced.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Sums of squares, mean squares and variance components against aov and the expected mean squares, relative. */

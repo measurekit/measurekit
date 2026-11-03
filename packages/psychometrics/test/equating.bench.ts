@@ -23,8 +23,35 @@ import {
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-equating.json" with { type: "json" };
-import linksFixture from "./fixtures/bench-equating-links.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchEquatingFixture {
+  randomGroups: { from: number[]; to: number[] };
+  neat: { from: number[][]; to: number[][] };
+  irt: { forms: { ids: string[]; a: number[]; b: number[]; c: number[] }[]; common: string[]; points: number };
+}
+const fixture = readFixture<BenchEquatingFixture>("bench-equating.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface BenchEquatingLinksFixture {
+  forms: {
+    T1: {
+      items: { id: string; a: number; b: number }[];
+      covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    };
+    T2: {
+      items: { id: string; a: number; b: number }[];
+      covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    };
+    T3: {
+      items: { id: string; a: number; b: number }[];
+      covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    };
+  };
+  points: number;
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const linksFixture = readFixture<BenchEquatingLinksFixture>("bench-equating-links.json");
 
 const SEED = 20261029;
 /** The replications of the bootstrap of the standard errors. */

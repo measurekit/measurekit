@@ -1,7 +1,15 @@
 import { test } from "vitest";
 import { cronbachAlpha, itemStatistics, mcdonaldOmega, responseMatrix, subscoreValue } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-ctt.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchCttFixture {
+  itemIds: string[];
+  responses: number[][];
+  sectionSize: number;
+  omegaItems: number;
+}
+const fixture = readFixture<BenchCttFixture>("bench-ctt.json");
 
 const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
 const omegaMatrix = responseMatrix(

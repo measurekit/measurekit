@@ -8,8 +8,17 @@ import {
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import classificationFixture from "./fixtures/bench-standard-setting.json" with { type: "json" };
+import { type BenchIrtFixture, readFixture } from "./fixtures.js";
+
+const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
+
+interface BenchStandardSettingFixture {
+  scores: number[];
+  reliability: number;
+  maximum: number;
+  cut: number;
+}
+const classificationFixture = readFixture<BenchStandardSettingFixture>("bench-standard-setting.json");
 
 const items: TestItem[] = fixture.items.a.map((a, i) => ({
   id: defined(fixture.binary.itemIds[i]),

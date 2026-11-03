@@ -12,9 +12,23 @@ import {
   standardizedMeanDifference,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-rater.json" with { type: "json" };
-import interactionsFixture from "./fixtures/bench-rater-interactions.json" with { type: "json" };
-import scoringFixture from "./fixtures/rater-automated-scoring.json" with { type: "json" };
+import { type RaterAutomatedScoringFixture, readFixture } from "./fixtures.js";
+
+interface BenchRaterFixture {
+  pair: number[][];
+  panel: number[][];
+  continuous: number[][];
+  smd: number[][];
+  scores: { levels: { item: string; rater: string }; score: number }[];
+}
+const fixture = readFixture<BenchRaterFixture>("bench-rater.json");
+
+interface BenchRaterInteractionsFixture {
+  scores: { levels: { item: string; rater: string }; score: number }[];
+}
+const interactionsFixture = readFixture<BenchRaterInteractionsFixture>("bench-rater-interactions.json");
+
+const scoringFixture = readFixture<RaterAutomatedScoringFixture>("rater-automated-scoring.json");
 
 /** The metrics whose degradation from human-human to machine-human RSMTool reports. */
 const DEGRADED = ["correlation", "kappa", "quadraticKappa", "exact", "adjacent", "smd"] as const;

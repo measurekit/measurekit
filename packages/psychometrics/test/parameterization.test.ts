@@ -28,8 +28,66 @@ import {
 import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { MODELS } from "./fixture-items.js";
-import mirt from "./fixtures/parameterization-mirt.json" with { type: "json" };
-import multidimensional from "./fixtures/parameterization-multidimensional.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface ParameterizationMirtFixture {
+  theta: number[];
+  items: {
+    itemtype: string;
+    model: string;
+    irt: {
+      a?: number;
+      b?: number;
+      g?: number;
+      u?: number;
+      b1?: number;
+      b2?: number;
+      a1?: number;
+      c?: number;
+      a2?: number;
+      a3?: number;
+    };
+    slopeIntercept: {
+      a1: number;
+      d?: number;
+      g?: number;
+      u?: number;
+      d1?: number;
+      d2?: number;
+      ak0?: number;
+      ak1?: number;
+      d0?: number;
+      b1?: number;
+      b2?: number;
+      c?: number;
+    };
+    parameters: { a: number | number[]; b?: number | number[]; c?: number | number[]; d?: number; steps?: number[] };
+    probabilities: number[][];
+  }[];
+}
+const mirt = readFixture<ParameterizationMirtFixture>("parameterization-mirt.json");
+
+interface ParameterizationMultidimensionalFixture {
+  items: {
+    itemtype: string;
+    model: string;
+    dimensions: number;
+    slopeIntercept: {
+      a1: number;
+      a2: number;
+      d?: number;
+      g?: number;
+      u?: number;
+      d1?: number;
+      d2?: number;
+      a3?: number;
+    };
+    parameters: { a: number[]; intercept?: number; c?: number; d?: number; intercepts?: number[] };
+    theta: number[][];
+    probabilities: number[][];
+  }[];
+}
+const multidimensional = readFixture<ParameterizationMultidimensionalFixture>("parameterization-multidimensional.json");
 
 /** Conversions against mirt's coefficients: a few multiplications, divisions and sums. */
 const TOLERANCE = 1e-15;

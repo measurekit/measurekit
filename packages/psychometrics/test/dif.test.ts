@@ -43,12 +43,722 @@ import {
 } from "../src/index.js";
 import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose } from "./assertions.js";
-import fixture from "./fixtures/dif.json" with { type: "json" };
-import irtFixture from "./fixtures/dif-irt.json" with { type: "json" };
-import lordPurification from "./fixtures/dif-lord-purification.json" with { type: "json" };
-import polytomous from "./fixtures/dif-polytomous.json" with { type: "json" };
-import polytomousTests from "./fixtures/dif-polytomous-tests.json" with { type: "json" };
-import sibtestFixture from "./fixtures/dif-sibtest.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface DifFixture {
+  cases: {
+    name: string;
+    responses: number[][];
+    focal: number[];
+    mantelHaenszel: {
+      continuityCorrection: boolean;
+      chiSquare: number[];
+      significance: number[];
+      oddsRatio: number[];
+      delta: number[];
+      deltaStandardError: number[];
+      etsCategory: string[];
+    }[];
+    logistic: {
+      uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+    };
+    purifiedMantelHaenszel: {
+      chiSquare: number[];
+      significance: number[];
+      oddsRatio: number[];
+      delta: number[];
+      deltaStandardError: number[];
+      etsCategory: string[];
+      anchors: number[];
+      iterations: number;
+      converged: boolean;
+    };
+    purifiedLogistic: {
+      uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      anchors: number[];
+      iterations: number;
+      converged: boolean;
+    };
+    sparse: {
+      responses: (number | null)[][];
+      mantelHaenszel: {
+        chiSquare: number[];
+        significance: number[];
+        oddsRatio: number[];
+        delta: number[];
+        deltaStandardError: number[];
+        etsCategory: string[];
+      };
+      logistic: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      };
+      purifiedMantelHaenszel: {
+        chiSquare: number[];
+        significance: number[];
+        oddsRatio: number[];
+        delta: number[];
+        deltaStandardError: number[];
+        etsCategory: string[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedLogistic: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+    };
+    lord: {
+      chiSquare: number[];
+      significance: number[];
+      reference: { a: number[]; b: number[] };
+      focal: { a: number[]; b: number[] };
+      transformation: { slope: number; intercept: number };
+    };
+  }[];
+}
+const fixture = readFixture<DifFixture>("dif.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface DifIrtFixture {
+  tolerance: number;
+  likelihoodRatio: {
+    "verbal, 2PL": {
+      input: { fixture: string; case: string; sparse: boolean };
+      model: string;
+      default: { chiSquare: number[]; degreesOfFreedom: number[]; significance: number[] };
+      logLikelihood: number;
+      focal: { mean: number; sd: number };
+      purified: {
+        chiSquare: number[];
+        degreesOfFreedom: number[];
+        significance: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+        logLikelihood: number;
+      };
+    };
+    "bfi, graded": {
+      input: { fixture: string; case: string; sparse: boolean };
+      model: string;
+      default: { chiSquare: number[]; degreesOfFreedom: number[]; significance: number[] };
+      logLikelihood: number;
+      focal: { mean: number; sd: number };
+      purified: {
+        chiSquare: number[];
+        degreesOfFreedom: number[];
+        significance: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+        logLikelihood: number;
+      };
+    };
+  };
+  raju: {
+    verbal: {
+      input: { fixture: string; case: string; sparse: boolean };
+      default: {
+        signedArea: number[];
+        signedZ: number[];
+        unsignedArea: number[];
+        unsignedZ: number[];
+        significance: number[];
+        difrUnsignedArea: number[];
+        difrSignificance: number[];
+      };
+      purified: {
+        signedArea: number[];
+        signedZ: number[];
+        unsignedArea: number[];
+        unsignedZ: number[];
+        significance: number[];
+        difrUnsignedArea: number[];
+        difrSignificance: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+    };
+    simulated: {
+      input: { fixture: string; case: string; sparse: boolean };
+      default: {
+        signedArea: number[];
+        signedZ: number[];
+        unsignedArea: number[];
+        unsignedZ: number[];
+        significance: number[];
+        difrUnsignedArea: number[];
+        difrSignificance: number[];
+      };
+      purified: {
+        signedArea: number[];
+        signedZ: number[];
+        unsignedArea: number[];
+        unsignedZ: number[];
+        significance: number[];
+        difrUnsignedArea: number[];
+        difrSignificance: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+    };
+  };
+  population: { nodes: number[]; weights: number[] };
+  functioning: {
+    "2PL": {
+      model: string;
+      reference: { a: number; b: number; c: number; d: number }[];
+      focal: { a: number; b: number; c: number; d: number }[];
+      ncdif: number[];
+      cdif: number[];
+      dtf: number;
+    };
+    graded: {
+      model: string;
+      reference: { a: number; b: number[] }[];
+      focal: { a: number; b: number[] }[];
+      ncdif: number[];
+      cdif: number[];
+      dtf: number;
+    };
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const irtFixture = readFixture<DifIrtFixture>("dif-irt.json");
+
+interface DifLordPurificationFixture {
+  cases: {
+    name: string;
+    chiSquare: number[];
+    significance: number[];
+    iterations: number;
+    converged: boolean;
+    anchors: number[];
+    transformation: { slope: number; intercept: number };
+  }[];
+}
+const lordPurification = readFixture<DifLordPurificationFixture>("dif-lord-purification.json");
+
+interface DifPolytomousFixture {
+  cases: {
+    name: string;
+    responses: number[][];
+    focal: number[];
+    theta: number[];
+    complete: {
+      mantel: {
+        chiSquare: number[];
+        significance: number[];
+        generalizedChiSquare: number[];
+        generalizedDegreesOfFreedom: number[];
+        generalizedSignificance: number[];
+        standardizedMeanDifference: number[];
+        effectSize: number[];
+        etsCategory: string[];
+      };
+      ordinal: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+      };
+      ordinalTheta: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+      };
+      purifiedMantel: {
+        chiSquare: number[];
+        significance: number[];
+        generalizedChiSquare: number[];
+        generalizedDegreesOfFreedom: number[];
+        generalizedSignificance: number[];
+        standardizedMeanDifference: number[];
+        effectSize: number[];
+        etsCategory: string[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedOrdinal: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      lordif: {
+        uniform: { significance: number[]; rSquaredChange: number[] };
+        nonuniform: { significance: number[]; rSquaredChange: number[] };
+        both: { significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+      };
+      lordifTheta: {
+        uniform: { significance: number[]; rSquaredChange: number[] };
+        nonuniform: { significance: number[]; rSquaredChange: number[] };
+        both: { significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+      };
+    };
+    sparse: {
+      responses: (number | null)[][];
+      theta: number[];
+      mantel: {
+        chiSquare: number[];
+        significance: number[];
+        generalizedChiSquare: number[];
+        generalizedDegreesOfFreedom: number[];
+        generalizedSignificance: number[];
+        standardizedMeanDifference: number[];
+        effectSize: number[];
+        etsCategory: string[];
+      };
+      ordinal: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+      };
+      ordinalTheta: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+      };
+      purifiedMantel: {
+        chiSquare: number[];
+        significance: number[];
+        generalizedChiSquare: number[];
+        generalizedDegreesOfFreedom: number[];
+        generalizedSignificance: number[];
+        standardizedMeanDifference: number[];
+        effectSize: number[];
+        etsCategory: string[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedOrdinal: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        slopeChange: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+    };
+  }[];
+}
+const polytomous = readFixture<DifPolytomousFixture>("dif-polytomous.json");
+
+interface DifPolytomousTestsFixture {
+  monteCarlo: { spread: number; equation: number; difr: number; difrReversed: number };
+  cases: {
+    verbal: {
+      input: { fixture: string; case: string; sparse: boolean };
+      liuAgresti: {
+        oddsRatio: number[];
+        logStandardError: number[];
+        z: number[];
+        significance: number[];
+        difrStandardError: number[];
+        difrReversedStandardError: number[];
+      };
+      discriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      };
+      purifiedDiscriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+    };
+    simulated: {
+      input: { fixture: string; case: string; sparse: boolean };
+      liuAgresti: {
+        oddsRatio: number[];
+        logStandardError: number[];
+        z: number[];
+        significance: number[];
+        difrStandardError: number[];
+        difrReversedStandardError: number[];
+      };
+      discriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      };
+      purifiedDiscriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+    };
+    bfi: {
+      input: { fixture: string; case: string; sparse: boolean };
+      liuAgresti: {
+        oddsRatio: number[];
+        logStandardError: number[];
+        z: number[];
+        significance: number[];
+        difrStandardError: number[];
+        difrReversedStandardError: number[];
+      };
+      discriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      };
+      purifiedDiscriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedLiuAgresti: {
+        oddsRatio: number[];
+        logStandardError: number[];
+        z: number[];
+        significance: number[];
+        difrStandardError: number[];
+        difrReversedStandardError: number[];
+        anchors: number[];
+      };
+      discriminantTheta: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      };
+    };
+    graded: {
+      input: { fixture: string; case: string; sparse: boolean };
+      liuAgresti: {
+        oddsRatio: number[];
+        logStandardError: number[];
+        z: number[];
+        significance: number[];
+        difrStandardError: number[];
+        difrReversedStandardError: number[];
+      };
+      discriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      };
+      purifiedDiscriminant: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedLiuAgresti: {
+        oddsRatio: number[];
+        logStandardError: number[];
+        z: number[];
+        significance: number[];
+        difrStandardError: number[];
+        difrReversedStandardError: number[];
+        anchors: number[];
+      };
+      discriminantTheta: {
+        uniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        nonuniform: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+        both: { chiSquare: number[]; significance: number[]; rSquaredChange: number[] };
+      };
+    };
+  };
+}
+const polytomousTests = readFixture<DifPolytomousTestsFixture>("dif-polytomous-tests.json");
+
+interface DifSibtestFixture {
+  guessing: number;
+  cases: {
+    verbal: {
+      input: { fixture: string; case: string; sparse: boolean };
+      default: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      uncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      guessing: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      smallCells: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      largeCells: { beta: null[]; standardError: null[]; chiSquare: null[]; significance: null[]; persons: number[] };
+      purified: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedUncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      bundles: {
+        name: string;
+        items: number[];
+        default: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+        purified: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+      }[];
+    };
+    simulated: {
+      input: { fixture: string; case: string; sparse: boolean };
+      default: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      uncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      guessing: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      smallCells: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      largeCells: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      purified: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedUncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      bundles: {
+        name: string;
+        items: number[];
+        default: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+        purified: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+      }[];
+    };
+    bfi: {
+      input: { fixture: string; case: string; sparse: boolean };
+      default: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      uncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      guessing: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      smallCells: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      largeCells: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      purified: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedUncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      bundles: {
+        name: string;
+        items: number[];
+        default: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+        purified: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+      }[];
+    };
+    graded: {
+      input: { fixture: string; case: string; sparse: boolean };
+      default: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      uncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      guessing: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      smallCells: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      largeCells: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+      };
+      purified: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      purifiedUncorrected: {
+        beta: number[];
+        standardError: number[];
+        chiSquare: number[];
+        significance: number[];
+        persons: number[];
+        anchors: number[];
+        iterations: number;
+        converged: boolean;
+      };
+      bundles: {
+        name: string;
+        items: number[];
+        default: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+        purified: { beta: number; standardError: number; chiSquare: number; significance: number; persons: number };
+      }[];
+    };
+  };
+  recipes: {
+    verbal: { standardization: number[]; variance: { standardDeviation: number; shrunken: number[] } };
+    simulated: { standardization: number[]; variance: { standardDeviation: number; shrunken: number[] } };
+  };
+}
+const sibtestFixture = readFixture<DifSibtestFixture>("dif-sibtest.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Mantel-Haenszel statistics against difR and base R. */

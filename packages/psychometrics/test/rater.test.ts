@@ -23,12 +23,94 @@ import {
 import { standardDeviation } from "../src/math/internal.js";
 import { summarizeFacet } from "../src/rater/internal.js";
 import { defined, expectClose } from "./assertions.js";
-import fixture from "./fixtures/rater.json" with { type: "json" };
-import agreementFixture from "./fixtures/rater-agreement.json" with { type: "json" };
-import scoringFixture from "./fixtures/rater-automated-scoring.json" with { type: "json" };
-import biasFixture from "./fixtures/rater-bias.json" with { type: "json" };
-import correlationFixture from "./fixtures/rater-correlation.json" with { type: "json" };
-import manyFacetFixture from "./fixtures/rater-many-facet.json" with { type: "json" };
+import { type RaterAutomatedScoringFixture, readFixture } from "./fixtures.js";
+
+interface RaterFixture {
+  cases: {
+    name: string;
+    ratings: (number | null)[][];
+    cohen: { none: number; linear: number; quadratic: number };
+    fleiss: number;
+    icc: {
+      oneWay: number;
+      agreement: number;
+      consistency: number;
+      oneWayAverage: number;
+      agreementAverage: number;
+      consistencyAverage: number;
+    };
+  }[];
+}
+const fixture = readFixture<RaterFixture>("rater.json");
+
+interface RaterAgreementFixture {
+  agreement: {
+    name: string;
+    ratings: (number | null)[][];
+    subjects: number;
+    exact: number;
+    adjacent: number;
+    widths: { width: number; agreement: number }[];
+  }[];
+  meanDifference: { name: string; ratings: (number | null)[][]; value: number }[];
+}
+const agreementFixture = readFixture<RaterAgreementFixture>("rater-agreement.json");
+
+const scoringFixture = readFixture<RaterAutomatedScoringFixture>("rater-automated-scoring.json");
+
+interface RaterBiasFixture {
+  scores: { levels: { person: string; item: string; rater: string }; score: number }[];
+  cells: { levels: string[]; bias: number; standardError: number; truth: number; tamBias: number }[];
+  logLikelihood: number;
+  tamLogLikelihood: number;
+  mean: number;
+  sd: number;
+}
+const biasFixture = readFixture<RaterBiasFixture>("rater-bias.json");
+
+interface RaterCorrelationFixture {
+  cases: { name: string; ratings: (number | null)[][]; value: number | null }[];
+}
+const correlationFixture = readFixture<RaterCorrelationFixture>("rater-correlation.json");
+
+interface RaterManyFacetFixture {
+  cases: {
+    name: string;
+    scores: { person: string[]; item: string[]; rater: string[]; score: number[] };
+    models: {
+      facets: string[];
+      thresholdFacet: string | null;
+      summaries: {
+        facet: string;
+        ids: string[];
+        measures: number[];
+        standardErrors: number[];
+        counts: number[];
+        observedAverages: number[];
+        fairAverages: number[];
+        separation: number;
+        reliability: number;
+        homogeneity: { chiSquare: number; degreesOfFreedom: number; significance: number };
+      }[];
+      thresholds: { element: string | null; thresholds: number[]; standardErrors: number[] }[];
+      mean: number;
+      sd: number;
+      logLikelihood: number;
+      parameters: number;
+      persons: { id: string[]; theta: number[]; standardError: number[] };
+      fit: {
+        facet: string;
+        id: string;
+        infitMeanSquare: number;
+        outfitMeanSquare: number;
+        infitStandardized: number;
+        outfitStandardized: number;
+      }[];
+      expectedRatings: { theta: number; levels: { item: string; rater?: string }; value: number; fair: number }[];
+    }[];
+  }[];
+}
+const manyFacetFixture = readFixture<RaterManyFacetFixture>("rater-many-facet.json");
 
 /** Kappa and intraclass correlations against irr: closed forms of the same counts and sums. */
 const TOLERANCE = 1e-12;

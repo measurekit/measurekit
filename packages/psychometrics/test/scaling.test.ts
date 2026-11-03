@@ -32,13 +32,163 @@ import { covariance, normalCdf, variance } from "../src/math/internal.js";
 import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureItems, fixtureItems } from "./fixture-items.js";
-import conversions from "./fixtures/scaling-conversion.json" with { type: "json" };
-import growth from "./fixtures/scaling-growth.json" with { type: "json" };
-import joint from "./fixtures/scaling-joint-draws.json" with { type: "json" };
-import normStatisticsFixture from "./fixtures/scaling-norm-statistics.json" with { type: "json" };
-import norms from "./fixtures/scaling-norms.json" with { type: "json" };
-import plausible from "./fixtures/scaling-plausible-values.json" with { type: "json" };
-import predictions from "./fixtures/scaling-prediction.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface ScalingConversionFixture {
+  source: string;
+  forms: {
+    name: string;
+    items: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+  }[];
+  tables: {
+    form: string;
+    method: string;
+    prior: { mean: number; sd: number };
+    scale: { slope: number; intercept: number; lowest?: number; highest?: number; step?: number };
+    rows: {
+      score: number;
+      theta: number;
+      standardError: number | null;
+      scaleScore: number;
+      scaleStandardError: number;
+    }[];
+  }[];
+  scaleConversion: {
+    form: string;
+    scale: { slope: number; intercept: number; lowest?: number; highest?: number; step?: number };
+    conversion: number[];
+    equivalents: number[];
+    scaleScores: number[];
+  }[];
+  conditionalErrors: { form: string; conversion: number[]; thetas: number[]; errors: number[] }[];
+}
+const conversions = readFixture<ScalingConversionFixture>("scaling-conversion.json");
+
+interface ScalingGrowthFixture {
+  source: string;
+  groups: { group: string; mean: number; sd: number }[];
+  growth: { from: string; to: string; meanChange: number; sdRatio: number; effectSize: number }[];
+}
+const growth = readFixture<ScalingGrowthFixture>("scaling-growth.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface ScalingJointDrawsFixture {
+  source: string;
+  margins: {
+    fine: { nodes: number[]; weights: number[] };
+    default: { nodes: number[]; weights: number[] };
+    uneven: { nodes: number[]; weights: number[] };
+    empty_cells: { nodes: number[]; weights: number[] };
+    rounded_sum: { nodes: number[]; weights: number[] };
+    one_node: { nodes: number[]; weights: number[] };
+  };
+  inverse: { name: string; nodes: number[]; weights: number[]; u: number[]; theta: number[] }[];
+  transform: { margins: string[]; correlation: number[][]; scores: number[][]; thetas: number[][] };
+  corners: {
+    margins: string[];
+    correlation: number[][];
+    corners: { corner: number[]; probability: number; error: number }[];
+  }[];
+  spearman: { correlation: number; expected: number; standardError: number; draws: number }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const joint = readFixture<ScalingJointDrawsFixture>("scaling-joint-draws.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface ScalingNormStatisticsFixture {
+  source: string;
+  cases: {
+    name: string;
+    scores: number[];
+    mokkenZErrors: number[];
+    levels: {
+      level: number;
+      mean: { estimate: number; standardError: number; lower: number; upper: number };
+      sd: { estimate: number; standardError: number; lower: number; upper: number };
+      scores: {
+        score: number;
+        z: { estimate: number; standardError: number; lower: number; upper: number };
+        percentile: { estimate: number; standardError: number; lower: number; upper: number };
+      }[];
+      stanines: { estimate: number; standardError: number; lower: number; upper: number }[];
+    }[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const normStatisticsFixture = readFixture<ScalingNormStatisticsFixture>("scaling-norm-statistics.json");
+
+interface ScalingNormsFixture {
+  source: string;
+  cases: { name: string; sample: number[]; scores: number[]; ranks: number[] }[];
+}
+const norms = readFixture<ScalingNormsFixture>("scaling-norms.json");
+
+interface ScalingPlausibleValuesFixture {
+  source: string;
+  itemIds: string[];
+  responses: number[][];
+  covariate: number[];
+  draws: number;
+  withoutCovariates: {
+    mirt: { mean: number; variance: number; slope: number; eap: { variance: number; slope: number } };
+    tam: { mean: number; variance: number; slope: number };
+    exact: { mean: number; variance: number; slope: number };
+  };
+  withCovariates: {
+    coefficient: number;
+    mirt: { mean: number; variance: number; slope: number; eap: { variance: number; slope: number } };
+    tam: { mean: number; variance: number; slope: number; coefficient: number };
+    exact: { mean: number; variance: number; slope: number };
+  };
+  rubin: {
+    plausibleValues: number[][];
+    mean: {
+      estimates: number[];
+      variances: number[];
+      pooled: { estimate: number; within: number; between: number; total: number; degreesOfFreedom: number };
+    };
+    slope: {
+      estimates: number[];
+      variances: number[];
+      pooled: { estimate: number; within: number; between: number; total: number; degreesOfFreedom: number };
+    };
+  };
+}
+const plausible = readFixture<ScalingPlausibleValuesFixture>("scaling-plausible-values.json");
+
+interface ScalingPredictionFixture {
+  source: string;
+  practice: { a: number; b: number }[];
+  posteriors: {
+    responses: (number | null)[];
+    prior: { mean: number; sd: number };
+    nodes: number[];
+    weights: number[];
+  }[];
+  formPredictions: {
+    posterior: number;
+    form: string;
+    conversion: number[];
+    level: number;
+    mean: number;
+    lower: number;
+    upper: number;
+    scores: number[];
+    probabilities: number[];
+  }[];
+  thetaPredictions: {
+    posterior: number;
+    scale: { slope: number; intercept: number; lowest: number; highest: number; step: number };
+    standardError: number;
+    level: number;
+    mean: number;
+    lower: number;
+    upper: number;
+    scores: number[];
+    probabilities: number[];
+  }[];
+}
+const predictions = readFixture<ScalingPredictionFixture>("scaling-prediction.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Thetas and standard errors of the EAP of the summed score against mirt's EAPsum and the base R recursion. */

@@ -75,20 +75,457 @@ import {
 } from "../src/multidimensional/internal.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { MODELS as FIXTURE_MODELS } from "./fixture-items.js";
-import longitudinal from "./fixtures/longitudinal.json" with { type: "json" };
-import longitudinalRecovery from "./fixtures/longitudinal-recovery.json" with { type: "json" };
-import exploratory from "./fixtures/multidimensional-exploratory.json" with { type: "json" };
-import graded from "./fixtures/multidimensional-graded.json" with { type: "json" };
-import graded3 from "./fixtures/multidimensional-graded3.json" with { type: "json" };
-import groups from "./fixtures/multidimensional-groups.json" with { type: "json" };
-import information from "./fixtures/multidimensional-information.json" with { type: "json" };
-import likelihood from "./fixtures/multidimensional-likelihood.json" with { type: "json" };
-import m2pl from "./fixtures/multidimensional-m2pl.json" with { type: "json" };
-import m3pl from "./fixtures/multidimensional-m3pl.json" with { type: "json" };
-import mhrm from "./fixtures/multidimensional-mhrm.json" with { type: "json" };
-import missing from "./fixtures/multidimensional-missing.json" with { type: "json" };
-import notAtRandom from "./fixtures/multidimensional-not-at-random.json" with { type: "json" };
-import rotation from "./fixtures/multidimensional-rotation.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface LongitudinalFixture {
+  two: {
+    source: string;
+    model: string;
+    points: number;
+    occasions: { personIds: string[]; itemIds: string[]; responses: number[][] }[];
+    items: { id: string; parameters: { a: number; b: number; c: number; d: number } }[];
+    standardErrors: number[];
+    crossProductStandardErrors: number[];
+    means: number[];
+    sds: number[];
+    correlations: number[][];
+    covariance: number[][];
+    changes: { from: number; to: number; mean: number; sd: number; correlationWithStart: number }[];
+    logLikelihood: number;
+    iterations: number;
+  };
+  three: {
+    source: string;
+    model: string;
+    points: number;
+    occasions: { personIds: string[]; itemIds: string[]; responses: number[][] }[];
+    items: { id: string; parameters: { a: number; b: number; c: number; d: number } }[];
+    means: number[];
+    sds: number[];
+    correlations: number[][];
+    covariance: number[][];
+    changes: { from: number; to: number; mean: number; sd: number; correlationWithStart: number }[];
+    logLikelihood: number;
+    iterations: number;
+  };
+  anchored: {
+    source: string;
+    model: string;
+    points: number;
+    occasions: { personIds: string[]; itemIds: string[]; responses: number[][] }[];
+    items: { id: string; parameters: { a: number; b: number; c: number; d: number } }[];
+    means: number[];
+    sds: number[];
+    correlations: number[][];
+    covariance: number[][];
+    changes: { from: number; to: number; mean: number; sd: number; correlationWithStart: number }[];
+    logLikelihood: number;
+    iterations: number;
+  };
+  graded: {
+    source: string;
+    model: string;
+    points: number;
+    occasions: { personIds: string[]; itemIds: string[]; responses: number[][] }[];
+    items: { id: string; parameters: { a: number; b: number[] } }[];
+    means: number[];
+    sds: number[];
+    correlations: number[][];
+    covariance: number[][];
+    changes: { from: number; to: number; mean: number; sd: number; correlationWithStart: number }[];
+    logLikelihood: number;
+    iterations: number;
+  };
+  rasch: {
+    source: string;
+    model: string;
+    points: number;
+    occasions: { personIds: string[]; itemIds: string[]; responses: number[][] }[];
+    items: { id: string; parameters: { a: number; b: number; c: number; d: number } }[];
+    tam: {
+      slope: number;
+      difficulties: number[];
+      means: number[];
+      sds: number[];
+      correlations: number[][];
+      logLikelihood: number;
+    };
+    means: number[];
+    sds: number[];
+    correlations: number[][];
+    covariance: number[][];
+    changes: { from: number; to: number; mean: number; sd: number; correlationWithStart: number }[];
+    logLikelihood: number;
+    iterations: number;
+  };
+}
+const longitudinal = readFixture<LongitudinalFixture>("longitudinal.json");
+
+interface LongitudinalRecoveryFixture {
+  source: string;
+  truth: { means: number[]; sds: number[]; rho: number };
+  recovery: {
+    persons: number;
+    occasions: number;
+    points: number;
+    fits: { seed: number; mean: number; sd: number; correlation: number; iterations: number; converged: boolean }[];
+    worst: { mean: number; sd: number; correlation: number };
+  }[];
+  grid: {
+    persons: number;
+    occasions: number;
+    points: number;
+    fits: { seed: number; mean: number; sd: number; correlation: number; iterations: number; converged: boolean }[];
+    worst: { mean: number; sd: number; correlation: number };
+  }[];
+}
+const longitudinalRecovery = readFixture<LongitudinalRecoveryFixture>("longitudinal-recovery.json");
+
+interface MultidimensionalExploratoryFixture {
+  flat: {
+    source: string;
+    model: string;
+    points: number;
+    dimensions: number;
+    itemIds: string[];
+    responses: number[][];
+    items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+    baseMaximum: { slopes: number[][]; intercepts: number[]; logLikelihood: number; gradient: number };
+  };
+}
+const exploratory = readFixture<MultidimensionalExploratoryFixture>("multidimensional-exploratory.json");
+
+interface MultidimensionalGradedFixture {
+  source: string;
+  model: string;
+  points: number;
+  itemIds: string[];
+  responses: number[][];
+  loadings: Record<string, string[]>;
+  items: {
+    id: string;
+    parameters: { a: number[]; intercepts: number[] };
+    standardErrors: {
+      a1?: number;
+      intercept1: number;
+      intercept2: number;
+      intercept3: number;
+      intercept4: number;
+      intercept5: number;
+      a2?: number;
+    };
+  }[];
+  correlations: number[][];
+  correlationStandardErrors: number[][];
+  logLikelihood: number;
+  aic: number;
+  bic: number;
+  iterations: number;
+  standardized: { loadings: number[][]; communalities: number[] };
+  scoring: {
+    patterns: (number | null)[][];
+    points: number;
+    eap: { theta: number[]; standardErrors: number[] }[];
+    map: { theta: number[]; standardErrors: number[]; expectedStandardErrors: number[] }[];
+  };
+}
+const graded = readFixture<MultidimensionalGradedFixture>("multidimensional-graded.json");
+
+interface MultidimensionalGraded3Fixture {
+  source: string;
+  model: string;
+  points: number;
+  itemIds: string[];
+  responses: number[][];
+  loadings: Record<string, string[]>;
+  items: { id: string; parameters: { a: number[]; intercepts: number[] } }[];
+  correlations: number[][];
+  logLikelihood: number;
+  aic: number;
+  bic: number;
+  iterations: number;
+}
+const graded3 = readFixture<MultidimensionalGraded3Fixture>("multidimensional-graded3.json");
+
+interface MultidimensionalGroupsFixture {
+  correlated: {
+    source: string;
+    model: string;
+    points: number;
+    itemIds: string[];
+    responses: number[][];
+    personGroups: string[];
+    loadings: { q02: string[] };
+    items: {
+      id: string;
+      parameters: { a: number[]; intercept: number; c: number; d: number };
+      standardErrors: { a1?: number; intercept: number; a2?: number };
+    }[];
+    groupMoments: { group: string; means: number[]; covariance: number[][] }[];
+    correlations: number[][];
+    correlationStandardErrors: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+  };
+  anchors: {
+    source: string;
+    model: string;
+    points: number;
+    itemIds: string[];
+    responses: number[][];
+    personGroups: string[];
+    loadings: { q02: string[] };
+    fixed: { q02: { a: number[]; intercept: number; c: number; d: number } };
+    items: {
+      id: string;
+      parameters: { a: number[]; intercept: number; c: number; d: number };
+      standardErrors?: { a1?: number; intercept: number; a2?: number };
+    }[];
+    groupMoments: { group: string; means: number[]; covariance: number[][] }[];
+    correlations: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+  };
+  uncorrelated: {
+    source: string;
+    model: string;
+    points: number;
+    itemIds: string[];
+    responses: (number | null)[][];
+    personGroups: string[];
+    loadings: { q02: string[] };
+    correlated: boolean;
+    items: {
+      id: string;
+      parameters: { a: number[]; intercept: number; c: number; d: number };
+      standardErrors: { a1?: number; intercept: number; a2?: number };
+    }[];
+    groupMoments: { group: string; means: number[]; covariance: number[][] }[];
+    correlations: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+  };
+  graded: {
+    source: string;
+    model: string;
+    points: number;
+    itemIds: string[];
+    responses: number[][];
+    personGroups: string[];
+    loadings: { q02: string[] };
+    items: { id: string; parameters: { a: number[]; intercepts: number[] } }[];
+    groupMoments: { group: string; means: number[]; covariance: number[][] }[];
+    correlations: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+  };
+  three: {
+    source: string;
+    model: string;
+    points: number;
+    itemIds: string[];
+    responses: number[][];
+    personGroups: string[];
+    loadings: { q02: string[] };
+    items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+    groupMoments: { group: string; means: number[]; covariance: number[][] }[];
+    correlations: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+  };
+}
+const groups = readFixture<MultidimensionalGroupsFixture>("multidimensional-groups.json");
+
+interface MultidimensionalInformationFixture {
+  source: string;
+  cases: {
+    model: string;
+    dimensions: number;
+    items: { a: number[]; intercept?: number; c?: number; d?: number; intercepts?: number[] }[];
+    thetas: number[][];
+    matrices: number[][][][];
+    discrimination: number[];
+    difficulty: number[][];
+  }[];
+}
+const information = readFixture<MultidimensionalInformationFixture>("multidimensional-information.json");
+
+interface MultidimensionalLikelihoodFixture {
+  source: string;
+  range: number[];
+  cases: {
+    model: string;
+    dimensions: number;
+    items: { a: number[]; intercept?: number; c?: number; d?: number; intercepts?: number[] }[];
+    estimates: {
+      pattern: (number | null)[];
+      ml: number[];
+      mlStandardErrors: number[];
+      wle: number[];
+      wleStandardErrors: number[];
+      mirtMl: (number | null)[];
+      mirtWle: number[];
+    }[];
+  }[];
+}
+const likelihood = readFixture<MultidimensionalLikelihoodFixture>("multidimensional-likelihood.json");
+
+interface MultidimensionalM2plFixture {
+  source: string;
+  model: string;
+  points: number;
+  itemIds: string[];
+  responses: number[][];
+  loadings: { q02: string[] };
+  items: {
+    id: string;
+    parameters: { a: number[]; intercept: number; c: number; d: number };
+    standardErrors: { a1?: number; intercept: number; a2?: number };
+  }[];
+  correlations: number[][];
+  correlationStandardErrors: number[][];
+  logLikelihood: number;
+  aic: number;
+  bic: number;
+  iterations: number;
+  standardized: { loadings: number[][]; communalities: number[] };
+  crossProduct: {
+    standardErrors: { a1?: number; intercept: number; a2?: number }[];
+    correlationStandardErrors: number[][];
+  };
+  scoring: {
+    patterns: (number | null)[][];
+    points: number;
+    eap: { theta: number[]; standardErrors: number[] }[];
+    map: { theta: number[]; standardErrors: number[]; expectedStandardErrors: number[] }[];
+  };
+}
+const m2pl = readFixture<MultidimensionalM2plFixture>("multidimensional-m2pl.json");
+
+interface MultidimensionalM3plFixture {
+  source: string;
+  model: string;
+  points: number;
+  itemIds: string[];
+  responses: number[][];
+  loadings: { q02: string[] };
+  priors: { c: { type: string; mean: number; sd: number } };
+  items: {
+    id: string;
+    parameters: { a: number[]; intercept: number; c: number; d: number };
+    standardErrors: { a1?: number; intercept: number; c: number; a2?: number };
+  }[];
+  correlations: number[][];
+  correlationStandardErrors: number[][];
+  logLikelihood: number;
+  aic: number;
+  bic: number;
+  iterations: number;
+}
+const m3pl = readFixture<MultidimensionalM3plFixture>("multidimensional-m3pl.json");
+
+interface MultidimensionalMhrmFixture {
+  source: string;
+  model: string;
+  itemIds: string[];
+  responses: number[][];
+  loadings: Record<string, string[]>;
+  runs: {
+    seed: number;
+    items: {
+      id: string;
+      parameters: { a: number[]; intercepts: number[] };
+      standardErrors: {
+        a1?: number;
+        intercept1: number;
+        intercept2: number;
+        intercept3: number;
+        intercept4: number;
+        intercept5: number | null;
+        a2?: number;
+        a3?: number;
+        a5?: number;
+      };
+    }[];
+    correlations: number[][];
+    correlationStandardErrors: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+  }[];
+  thetas: number[][];
+  completeData: { item: string; parameters: number[]; responses: number[]; gradient: number[]; hessian: number[][] }[];
+}
+const mhrm = readFixture<MultidimensionalMhrmFixture>("multidimensional-mhrm.json");
+
+interface MultidimensionalMissingFixture {
+  source: string;
+  model: string;
+  points: number;
+  itemIds: string[];
+  responses: (number | null)[][];
+  loadings: { q02: string[] };
+  items: {
+    id: string;
+    parameters: { a: number[]; intercept: number; c: number; d: number };
+    standardErrors: { a1?: number; intercept: number; a2?: number };
+  }[];
+  correlations: number[][];
+  correlationStandardErrors: number[][];
+  logLikelihood: number;
+  aic: number;
+  bic: number;
+  iterations: number;
+}
+const missing = readFixture<MultidimensionalMissingFixture>("multidimensional-missing.json");
+
+interface MultidimensionalNotAtRandomFixture {
+  source: string;
+  model: string;
+  points: number;
+  itemIds: string[];
+  responses: (number | null)[][];
+  loadings: { q02: string[] };
+  items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+  correlations: number[][];
+  logLikelihood: number;
+  aic: number;
+  bic: number;
+  truth: { correlation: number; share: number; slopes: number[]; intercepts: number[] };
+}
+const notAtRandom = readFixture<MultidimensionalNotAtRandomFixture>("multidimensional-not-at-random.json");
+
+interface MultidimensionalRotationFixture {
+  source: string;
+  slopes: number[][];
+  intercepts: number[];
+  loadings: number[][];
+  rotations: {
+    options: { method: string; normalize?: boolean; gamma?: number };
+    loadings: number[][];
+    correlations: number[][];
+    rotation: number[][];
+    iterations: number;
+    slopes: number[][];
+  }[];
+  scoring: { patterns: (number | null)[][]; points: number; eap: { theta: number[]; standardErrors: number[] }[] };
+}
+const rotation = readFixture<MultidimensionalRotationFixture>("multidimensional-rotation.json");
 
 /** The built-in models by the names that fixtures give them. */
 const MODELS = {

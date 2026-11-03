@@ -41,11 +41,51 @@ import {
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-cat.json" with { type: "json" };
-import boundsFixture from "./fixtures/bench-cat-bounds.json" with { type: "json" };
-import formsFixture from "./fixtures/bench-cat-forms.json" with { type: "json" };
-import rulesFixture from "./fixtures/bench-cat-rules.json" with { type: "json" };
-import cdm from "./fixtures/bench-cdm.json" with { type: "json" };
+import { type BenchCdmFixture, readFixture } from "./fixtures.js";
+
+interface BenchCatFixture {
+  length: number;
+  pool: { a: number[]; b: number[]; c: number[] };
+  thetas: number[];
+  testlets: (string | null)[];
+  multidimensional: { length: number; slopes: number[][]; intercepts: number[]; thetas: number[][] };
+  diagnostic: { length: number; persons: number };
+  multistage: { stages: number[][][] };
+}
+const fixture = readFixture<BenchCatFixture>("bench-cat.json");
+
+interface BenchCatBoundsFixture {
+  pool: { a: number[]; b: number[]; c: number[] };
+  areas: string[][];
+  constraints: { area: string; minimum: number; maximum: number }[];
+  length: number;
+  given: number[];
+  responses: number[];
+  theta: number;
+  standardError: number;
+}
+const boundsFixture = readFixture<BenchCatBoundsFixture>("bench-cat-bounds.json");
+
+interface BenchCatFormsFixture {
+  pool: { a: number[]; b: number[]; c: number[] };
+  areas: string[];
+  constraints: { area: string; minimum: number; maximum: number }[];
+  target: { theta: number; information: number }[];
+  enemies: number[][];
+  forms: number;
+  length: number;
+}
+const formsFixture = readFixture<BenchCatFormsFixture>("bench-cat-forms.json");
+
+interface BenchCatRulesFixture {
+  administered: number[];
+  responses: number[];
+  theta: number;
+  standardError: number;
+}
+const rulesFixture = readFixture<BenchCatRulesFixture>("bench-cat-rules.json");
+
+const cdm = readFixture<BenchCdmFixture>("bench-cdm.json");
 
 const SEED = 20261029;
 

@@ -22,10 +22,24 @@ import {
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import conditionalFixture from "./fixtures/bench-irt-conditional.json" with { type: "json" };
-import regressionFixture from "./fixtures/bench-irt-latent-regression.json" with { type: "json" };
-import unfoldingFixture from "./fixtures/bench-irt-unfolding.json" with { type: "json" };
+import { type BenchIrtConditionalFixture, type BenchIrtFixture, readFixture } from "./fixtures.js";
+
+const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
+
+const conditionalFixture = readFixture<BenchIrtConditionalFixture>("bench-irt-conditional.json");
+
+interface BenchIrtLatentRegressionFixture {
+  itemIds: string[];
+  responses: number[][];
+  covariate: number[];
+}
+const regressionFixture = readFixture<BenchIrtLatentRegressionFixture>("bench-irt-latent-regression.json");
+
+interface BenchIrtUnfoldingFixture {
+  itemIds: string[];
+  responses: number[][];
+}
+const unfoldingFixture = readFixture<BenchIrtUnfoldingFixture>("bench-irt-unfolding.json");
 
 const binary = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
 const three = responseMatrix(fixture.three.responses, { itemIds: fixture.three.itemIds });

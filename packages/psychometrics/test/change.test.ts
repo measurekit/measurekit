@@ -10,8 +10,43 @@ import {
   simpleGain,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
-import gains from "./fixtures/change-gain.json" with { type: "json" };
-import reliable from "./fixtures/change-reliable.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface ChangeGainFixture {
+  cases: {
+    maximum: number;
+    pre: number[];
+    post: number[];
+    simple: number[];
+    residual: number[];
+    normalized: { group: number; persons: (number | null)[] };
+  }[];
+  differenceReliability: {
+    pre: { sd: number; reliability: number };
+    post: { sd: number; reliability: number };
+    correlation: number;
+    reliability: number;
+  }[];
+}
+const gains = readFixture<ChangeGainFixture>("change-gain.json");
+
+interface ChangeReliableFixture {
+  scores: {
+    pre: number[];
+    post: number[];
+    sd: number;
+    reliability: number;
+    index: number[];
+    levels: { level: number; classification: string[] }[];
+  }[];
+  theta: {
+    before: { theta: number[]; standardError: number[] };
+    after: { theta: number[]; standardError: number[] };
+    index: number[];
+    levels: { level: number; classification: string[] }[];
+  };
+}
+const reliable = readFixture<ChangeReliableFixture>("change-reliable.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Gains, residuals of lm and Hake's gains, in base R. */

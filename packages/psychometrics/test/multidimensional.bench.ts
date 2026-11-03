@@ -13,8 +13,22 @@ import {
   rotateLoadings,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-multidimensional.json" with { type: "json" };
-import longitudinal from "./fixtures/bench-multidimensional-longitudinal.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchMultidimensionalFixture {
+  points: number;
+  confirmatory: { itemIds: string[]; responses: number[][]; loadings: Record<string, string[]> };
+  graded: { itemIds: string[]; responses: number[][]; loadings: Record<string, string[]> };
+  exploratory: { itemIds: string[]; responses: number[][] };
+  mhrm: { itemIds: string[]; responses: number[][]; loadings: Record<string, string[]> };
+}
+const fixture = readFixture<BenchMultidimensionalFixture>("bench-multidimensional.json");
+
+interface BenchMultidimensionalLongitudinalFixture {
+  points: number;
+  occasions: { personIds: string[]; itemIds: string[]; responses: number[][] }[];
+}
+const longitudinal = readFixture<BenchMultidimensionalLongitudinalFixture>("bench-multidimensional-longitudinal.json");
 
 const { points } = fixture;
 const confirmatory = responseMatrix(fixture.confirmatory.responses, { itemIds: fixture.confirmatory.itemIds });

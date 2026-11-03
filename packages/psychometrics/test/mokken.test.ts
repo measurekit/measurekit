@@ -17,12 +17,133 @@ import {
   twoWayImputation,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
-import residuals from "./fixtures/fit-residuals.json" with { type: "json" };
-import fixture from "./fixtures/mokken.json" with { type: "json" };
-import imputation from "./fixtures/mokken-imputation.json" with { type: "json" };
-import personFixture from "./fixtures/mokken-person-scalability.json" with { type: "json" };
-import reliability from "./fixtures/mokken-reliability.json" with { type: "json" };
-import steps from "./fixtures/mokken-steps.json" with { type: "json" };
+import { type FitResidualsFixture, readFixture } from "./fixtures.js";
+
+const residuals = readFixture<FitResidualsFixture>("fit-residuals.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface MokkenFixture {
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    scalability: {
+      pairs: number[][];
+      pairErrors: number[][];
+      items: number[];
+      itemErrors: number[];
+      scale: number;
+      scaleError: number;
+    };
+    selections: { lowerBound: number; alpha: number; scales: number[] }[];
+    monotonicity: {
+      minimumViolation: number;
+      minimumGroupSize: number | null;
+      items: {
+        id: string;
+        activeComparisons: number;
+        violations: number;
+        maximumViolation: number;
+        violationSum: number;
+        maximumZ: number;
+        significantViolations: number;
+        criterion: number;
+        mokkenRounded?: { significantViolations: number; criterion: number };
+      }[];
+    }[];
+    invariantOrdering: {
+      alpha: number;
+      selection: boolean;
+      minimumViolation: null;
+      minimumGroupSize: number | null;
+      items: {
+        id: string;
+        activeComparisons: number;
+        violations: number;
+        maximumViolation: number;
+        violationSum: number;
+        maximumZ: number;
+        significantViolations: number;
+        criterion: number;
+        mokkenRounded?: { criterion: number };
+      }[];
+      removed: string[];
+      coefficient: number;
+    }[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const fixture = readFixture<MokkenFixture>("mokken.json");
+
+interface MokkenImputationFixture {
+  complete: number[][];
+  cases: {
+    name: string;
+    responses: (number | null)[][];
+    minimum: number | null;
+    maximum: number | null;
+    imputed: number[][];
+    twoWay: number[][];
+    residualVariance: number;
+  }[];
+}
+const imputation = readFixture<MokkenImputationFixture>("mokken-imputation.json");
+
+interface MokkenPersonScalabilityFixture {
+  cases: {
+    name: string;
+    ties: boolean;
+    normedGuttmanErrors: (number | null)[];
+    u3: (number | null)[];
+    ht: (number | null)[];
+  }[];
+}
+const personFixture = readFixture<MokkenPersonScalabilityFixture>("mokken-person-scalability.json");
+
+interface MokkenReliabilityFixture {
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    ms: number;
+    alpha: number;
+    mokkenMs: number;
+    splitTies: number;
+  }[];
+  study: {
+    categories: number;
+    responses: number[][];
+    ms: number;
+    alpha: number;
+    mokkenMs: number;
+    splitTies: number;
+    parallelForms: number;
+  }[];
+}
+const reliability = readFixture<MokkenReliabilityFixture>("mokken-reliability.json");
+
+interface MokkenStepsFixture {
+  errors: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    errors: (number | null)[];
+    upperFence: number;
+    outliers: number[];
+    mokken: { errors: number[]; upperFence: number; ties: boolean };
+  }[];
+  association: {
+    name: string;
+    itemIds: string[];
+    responses: number[][];
+    minimumSize: number;
+    w1: (number | null)[][];
+    w2: number[];
+    w3: (number | null)[][];
+    flagged: { w1: string[][]; w2: string[]; w3: string[][] };
+  }[];
+}
+const steps = readFixture<MokkenStepsFixture>("mokken-steps.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Coefficients and their standard errors against coefH, and H^T against coefHT. */

@@ -22,12 +22,175 @@ import {
   subscoreValue,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
-import augmented from "./fixtures/ctt-augmented-subscores.json" with { type: "json" };
-import bfi from "./fixtures/ctt-bfi-neuroticism.json" with { type: "json" };
-import lsat7 from "./fixtures/ctt-lsat7.json" with { type: "json" };
-import sat12 from "./fixtures/ctt-sat12.json" with { type: "json" };
-import simulated from "./fixtures/ctt-simulated-2pl.json" with { type: "json" };
-import subscores from "./fixtures/ctt-subscores.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface CttAugmentedSubscoresFixture {
+  source: string;
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    sections: { Number?: string[] };
+    sectionNames: string[];
+    persons: number[];
+    scores: number[][];
+    weights: number[][];
+    reliability: number[];
+    augmentedReliability: number[];
+    mean: number[];
+    standardDeviation: number[];
+    truth?: number[][];
+    observedCorrelation?: number[];
+    augmentedCorrelation?: number[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const augmented = readFixture<CttAugmentedSubscoresFixture>("ctt-augmented-subscores.json");
+
+interface CttBfiNeuroticismFixture {
+  source: string;
+  groupFraction: number;
+  itemIds: string[];
+  responses: (number | null)[][];
+  items: {
+    id: string;
+    count: number;
+    mean: number;
+    sd: number;
+    itemTotal: number;
+    itemRest: number;
+    biserial: null;
+    discriminationIndex: number;
+    alphaIfDeleted: number;
+  }[];
+  alpha: number;
+  kr20: null;
+  kr21: null;
+  splitHalf: {
+    oddEven: { correlation: number; spearmanBrown: number; guttman: number };
+    firstSecond: { correlation: number; spearmanBrown: number; guttman: number };
+  };
+  sem: number;
+  omega: { omega: number; loadings: number[] };
+}
+const bfi = readFixture<CttBfiNeuroticismFixture>("ctt-bfi-neuroticism.json");
+
+interface CttLsat7Fixture {
+  source: string;
+  groupFraction: number;
+  itemIds: string[];
+  responses: number[][];
+  items: {
+    id: string;
+    count: number;
+    mean: number;
+    sd: number;
+    itemTotal: number;
+    itemRest: number;
+    biserial: number;
+    discriminationIndex: number;
+    alphaIfDeleted: number;
+  }[];
+  alpha: number;
+  kr20: number;
+  kr21: number;
+  splitHalf: {
+    oddEven: { correlation: number; spearmanBrown: number; guttman: number };
+    firstSecond: { correlation: number; spearmanBrown: number; guttman: number };
+  };
+  sem: number;
+  omega: { omega: number; loadings: number[] };
+}
+const lsat7 = readFixture<CttLsat7Fixture>("ctt-lsat7.json");
+
+interface CttSat12Fixture {
+  source: string;
+  groupFraction: number;
+  itemIds: string[];
+  responses: (number | null)[][];
+  items: {
+    id: string;
+    count: number;
+    mean: number;
+    sd: number;
+    itemTotal: number;
+    itemRest: number;
+    biserial: number;
+    discriminationIndex: number;
+    alphaIfDeleted: number;
+  }[];
+  alpha: number;
+  kr20: number;
+  kr21: number;
+  splitHalf: {
+    oddEven: { correlation: number; spearmanBrown: number; guttman: number };
+    firstSecond: { correlation: number; spearmanBrown: number; guttman: number };
+  };
+  sem: number;
+  omega: { omega: number; loadings: number[] };
+  choices: (string | null)[][];
+  key: string[];
+  optionLabels: string[];
+  options: {
+    id: string;
+    key: string;
+    options: {
+      label: string;
+      count: number;
+      proportion: number;
+      upper: number;
+      lower: number;
+      pointBiserial: number | null;
+    }[];
+  }[];
+}
+const sat12 = readFixture<CttSat12Fixture>("ctt-sat12.json");
+
+interface CttSimulated2plFixture {
+  source: string;
+  groupFraction: number;
+  itemIds: string[];
+  responses: number[][];
+  items: {
+    id: string;
+    count: number;
+    mean: number;
+    sd: number;
+    itemTotal: number;
+    itemRest: number;
+    biserial: number;
+    discriminationIndex: number;
+    alphaIfDeleted: number;
+  }[];
+  alpha: number;
+  kr20: number;
+  kr21: number;
+  splitHalf: {
+    oddEven: { correlation: number; spearmanBrown: number; guttman: number };
+    firstSecond: { correlation: number; spearmanBrown: number; guttman: number };
+  };
+  sem: number;
+  omega: { omega: number; loadings: number[] };
+}
+const simulated = readFixture<CttSimulated2plFixture>("ctt-simulated-2pl.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface CttSubscoresFixture {
+  source: string;
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    sections: { Number?: string[] };
+    sectionNames: string[];
+    subscorePrmse: number[];
+    totalPrmse: number[];
+    addedValue: boolean[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const subscores = readFixture<CttSubscoresFixture>("ctt-subscores.json");
 
 /** Absolute tolerance of CTT statistics against R. */
 const TOLERANCE = 1e-10;

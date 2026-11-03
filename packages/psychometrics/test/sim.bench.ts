@@ -3,7 +3,9 @@ import { test } from "vitest";
 import { type IrtItem, simulateResponses, simulateThetas, twoParameterLogistic } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-irt.json" with { type: "json" };
+import { type BenchIrtFixture, readFixture } from "./fixtures.js";
+
+const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
 
 const PERSONS = 2000;
 const SEED = 20261029;

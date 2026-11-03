@@ -40,12 +40,156 @@ import {
   symmetricEigen,
 } from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";
-import bivariate from "./fixtures/dimensionality-bivariate-normal.json" with { type: "json" };
-import factorFixture from "./fixtures/dimensionality-factors.json" with { type: "json" };
-import fitFixture from "./fixtures/dimensionality-fit.json" with { type: "json" };
-import hierarchyFixture from "./fixtures/dimensionality-hierarchy.json" with { type: "json" };
-import parallel from "./fixtures/dimensionality-parallel.json" with { type: "json" };
-import polychoric from "./fixtures/dimensionality-polychoric.json" with { type: "json" };
+import { type DimensionalityFactorsFixture, readFixture } from "./fixtures.js";
+
+interface DimensionalityBivariateNormalFixture {
+  source: string;
+  cases: { h: number; k: number; rho: number; p: number }[];
+}
+const bivariate = readFixture<DimensionalityBivariateNormalFixture>("dimensionality-bivariate-normal.json");
+
+const factorFixture = readFixture<DimensionalityFactorsFixture>("dimensionality-factors.json");
+
+interface DimensionalityFitFixture {
+  source: string;
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    factors: number;
+    extraction: string;
+    rotation: string;
+    base: {
+      loadings: number[][];
+      phi: number[][];
+      communalities: number[];
+      fit: {
+        chiSquare: number;
+        degreesOfFreedom: number;
+        significance: number | null;
+        rmsea: number | null;
+        rmseaInterval: number[] | null;
+        tli: number | null;
+        bic: number;
+        srmsr: number;
+      };
+    };
+    psych: {
+      loadings: number[][];
+      phi: number[][];
+      communalities: number[];
+      uniquenesses: number[];
+      fit: {
+        chiSquare: number;
+        degreesOfFreedom: number;
+        significance: number | null;
+        rmsea: number | null;
+        rmseaInterval: number[] | null;
+        tli: number | null;
+        bic: number;
+        srmsr: number;
+      };
+      unweightedLeastSquares?: number[][];
+      principalAxis?: number[][];
+    };
+  }[];
+}
+const fitFixture = readFixture<DimensionalityFitFixture>("dimensionality-fit.json");
+
+interface DimensionalityHierarchyFixture {
+  source: string;
+  matrices: {
+    name: string;
+    factors: number;
+    matrix: number[][];
+    base: {
+      loadings: number[][];
+      phi: number[][];
+      general: number[];
+      specific: number[][];
+      communalities: number[];
+      hierarchical: number;
+      total: number;
+    };
+    psych: { general: number[]; specific: number[][]; communalities: number[] };
+  }[];
+  data: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    factors: number;
+    base: {
+      loadings: number[][];
+      phi: number[][];
+      general: number[];
+      specific: number[][];
+      communalities: number[];
+      hierarchical: number;
+      total: number;
+    };
+    psych: { general: number[]; specific: number[][]; communalities: number[]; hierarchical: number; total: number };
+    truth: number | null;
+  }[];
+}
+const hierarchyFixture = readFixture<DimensionalityHierarchyFixture>("dimensionality-hierarchy.json");
+
+interface DimensionalityParallelFixture {
+  source: string;
+  cases: {
+    name: string;
+    correlation: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    observed: { components: number[]; factors: number[]; psychFactors: number[] };
+    psych: {
+      iterations: number;
+      components: number[];
+      factors: number[];
+      resampledComponents: { mean: number[]; sd: number[]; quantile: number[] };
+      resampledFactors: { mean: number[]; sd: number[]; quantile: number[] };
+      normalComponents: { mean: number[]; sd: number[]; quantile: number[] };
+      normalFactors: { mean: number[]; sd: number[]; quantile: number[] };
+      suggested: {
+        resampledComponents: number;
+        resampledFactors: number;
+        normalComponents: number;
+        normalFactors: number;
+      };
+      psychSuggested: { components: number; factors: number };
+    };
+    permutation: {
+      iterations: number;
+      components: { mean: number[]; sd: number[]; quantile: number[] };
+      factors: { mean: number[]; sd: number[]; quantile: number[] };
+    } | null;
+  }[];
+  randomMatrices: {
+    matrix: number[][];
+    components: number[];
+    factors: number[];
+    loadings: number[];
+    psychFactors: number[];
+  }[];
+}
+const parallel = readFixture<DimensionalityParallelFixture>("dimensionality-parallel.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface DimensionalityPolychoricFixture {
+  source: string;
+  cases: {
+    name: string;
+    correction: number;
+    itemIds: string[];
+    responses: (number | null)[][];
+    used: number[];
+    thresholds: number[][];
+    baseR: (number | null)[][];
+    psych: number[][];
+    polycor: (number | null)[][] | null;
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const polychoric = readFixture<DimensionalityPolychoricFixture>("dimensionality-polychoric.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** The bivariate normal distribution function against mvtnorm's Miwa algorithm. */

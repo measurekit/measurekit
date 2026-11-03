@@ -22,8 +22,11 @@ import {
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import conditionalFixture from "./fixtures/bench-irt-conditional.json" with { type: "json" };
+import { type BenchIrtConditionalFixture, type BenchIrtFixture, readFixture } from "./fixtures.js";
+
+const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
+
+const conditionalFixture = readFixture<BenchIrtConditionalFixture>("bench-irt-conditional.json");
 
 /** The data and the 2PL items of the IRT benchmarks: 2,000 persons and 40 items, with the posterior means of the abilities. */
 const matrix = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });

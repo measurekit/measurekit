@@ -13,8 +13,20 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-dif.json" with { type: "json" };
-import irtFixture from "./fixtures/bench-dif-irt.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchDifFixture {
+  dichotomous: { itemIds: string[]; responses: number[][]; focal: number[] };
+  polytomous: { itemIds: string[]; responses: number[][]; focal: number[] };
+}
+const fixture = readFixture<BenchDifFixture>("bench-dif.json");
+
+interface BenchDifIrtFixture {
+  itemIds: string[];
+  responses: number[][];
+  focal: number[];
+}
+const irtFixture = readFixture<BenchDifIrtFixture>("bench-dif-irt.json");
 
 const groupsOf = (focal: readonly number[]): DifGroup[] => focal.map((flag) => (flag === 1 ? "focal" : "reference"));
 

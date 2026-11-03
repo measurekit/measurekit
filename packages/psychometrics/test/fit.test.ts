@@ -41,17 +41,227 @@ import {
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
-import cat3pl from "./fixtures/cat-3pl.json" with { type: "json" };
-import correctedFit from "./fixtures/fit-corrected-person-fit.json" with { type: "json" };
-import kernelCurves from "./fixtures/fit-kernel-curves.json" with { type: "json" };
-import limited from "./fixtures/fit-limited-information.json" with { type: "json" };
-import localDependence from "./fixtures/fit-local-dependence.json" with { type: "json" };
-import rasch from "./fixtures/fit-rasch.json" with { type: "json" };
-import raschTests from "./fixtures/fit-rasch-tests.json" with { type: "json" };
-import residuals from "./fixtures/fit-residuals.json" with { type: "json" };
-import rmsd from "./fixtures/fit-rmsd.json" with { type: "json" };
-import summedScore from "./fixtures/fit-summed-score.json" with { type: "json" };
-import fixedParameters from "./fixtures/irt-fixed-parameters.json" with { type: "json" };
+import {
+  type Cat3plFixture,
+  type FitResidualsFixture,
+  type IrtFixedParametersFixture,
+  readFixture,
+} from "./fixtures.js";
+
+const cat3pl = readFixture<Cat3plFixture>("cat-3pl.json");
+
+interface FitCorrectedPersonFitFixture {
+  threePl: { responses: (number | null)[][] };
+  cases: {
+    name: string;
+    estimator: string;
+    prior: { mean: number; sd: number };
+    thetas: number[];
+    standardized: (number | null)[];
+  }[];
+}
+const correctedFit = readFixture<FitCorrectedPersonFitFixture>("fit-corrected-person-fit.json");
+
+interface FitKernelCurvesFixture {
+  cases: {
+    name: string;
+    data: string;
+    options: { points?: number; bandwidth?: number };
+    bandwidth: number;
+    nodes: number[];
+    probabilities: number[][][];
+    standardErrors: number[][][];
+  }[];
+}
+const kernelCurves = readFixture<FitKernelCurvesFixture>("fit-kernel-curves.json");
+
+interface FitLimitedInformationFixture {
+  binary: {
+    responses: number[][];
+    cases: {
+      name: string;
+      model: string;
+      expected: {
+        statistic: number;
+        degreesOfFreedom: number;
+        significance: number;
+        rmsea: number;
+        rmseaInterval: number[];
+        srmsr: number;
+        tli: number;
+        cfi: number;
+      };
+      mirtStatistic?: number;
+      fixed?: {
+        item1: { a: number; b: number; c: number; d: number };
+        item2: { a: number; b: number; c: number; d: number };
+        item3: { a: number; b: number; c: number; d: number };
+        item4: { a: number; b: number; c: number; d: number };
+      };
+      latent?: string;
+    }[];
+  };
+  polytomous: {
+    responses: number[][];
+    cases: {
+      name: string;
+      model: string;
+      statistic: string;
+      expected: {
+        statistic: number;
+        degreesOfFreedom: number;
+        significance: number;
+        rmsea: number;
+        rmseaInterval: number[];
+        srmsr: number;
+        tli: number;
+        cfi: number;
+      };
+    }[];
+  };
+  level: {
+    level: number;
+    expected: {
+      statistic: number;
+      degreesOfFreedom: number;
+      significance: number;
+      rmsea: number;
+      rmseaInterval: number[];
+      srmsr: number;
+      tli: number;
+      cfi: number;
+    };
+  };
+  rejections: { sets: { responses: string[]; statistic: number }[]; alpha: number; degreesOfFreedom: number };
+  held: {
+    responses: number[][];
+    models: string[];
+    fixedParameters: {
+      item1: { c: number };
+      item2: { c: number };
+      item3: { c: number };
+      item4: { c: number };
+      item5: { c: number };
+      item12: { a: number };
+    };
+    mirtStatistic: number;
+    expected: {
+      statistic: number;
+      degreesOfFreedom: number;
+      significance: number;
+      rmsea: number;
+      rmseaInterval: number[];
+      srmsr: number;
+      tli: number;
+      cfi: number;
+    };
+  };
+}
+const limited = readFixture<FitLimitedInformationFixture>("fit-limited-information.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface FitLocalDependenceFixture {
+  cases: {
+    name: string;
+    responses: (number | null)[][];
+    items: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    chiSquare: number[];
+    cramersV: number[];
+    degreesOfFreedom: number[];
+    significance: number[];
+    population?: { nodes: number[]; weights: number[] };
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const localDependence = readFixture<FitLocalDependenceFixture>("fit-local-dependence.json");
+
+interface FitRaschFixture {
+  cases: {
+    name: string;
+    responses: number[][];
+    items: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    thetas: number[];
+    itemFit: {
+      infitMeanSquare: number[];
+      outfitMeanSquare: number[];
+      infitStandardized: number[];
+      outfitStandardized: number[];
+    };
+    personFit: {
+      infitMeanSquare: (number | null)[];
+      outfitMeanSquare: (number | null)[];
+      infitStandardized: (number | null)[];
+      outfitStandardized: (number | null)[];
+    };
+  }[];
+}
+const rasch = readFixture<FitRaschFixture>("fit-rasch.json");
+
+interface FitRaschTestsFixture {
+  andersen: {
+    name: string;
+    model: string;
+    responses: (number | null)[][];
+    split: string | string[];
+    statistic: number;
+    degreesOfFreedom: number;
+    significance: number;
+    excluded: string[];
+    persons: number;
+    erm?: number;
+  }[];
+  wald: {
+    name: string;
+    model: string;
+    responses: (number | null)[][];
+    split: string | string[];
+    z: (number | null)[];
+    significance: (number | null)[];
+    excluded: string[];
+    persons: number;
+  }[];
+  martinLof: {
+    name: string;
+    model: string;
+    responses: (number | null)[][];
+    split: string | string[][];
+    statistic: number;
+    degreesOfFreedom: number;
+    significance: number;
+    ermDegreesOfFreedom: number;
+    persons: number;
+  }[];
+}
+const raschTests = readFixture<FitRaschTestsFixture>("fit-rasch-tests.json");
+
+const residuals = readFixture<FitResidualsFixture>("fit-residuals.json");
+
+interface FitRmsdFixture {
+  cases: {
+    name: string;
+    responses: (number | null)[][];
+    items: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    population: { nodes: number[]; weights: number[] };
+    rmsd: number[];
+    meanDeviation: number[];
+    tamMeanDeviation: number[];
+  }[];
+}
+const rmsd = readFixture<FitRmsdFixture>("fit-rmsd.json");
+
+interface FitSummedScoreFixture {
+  cases: {
+    name: string;
+    responses: number[][];
+    items: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    chiSquare: number[];
+    degreesOfFreedom: number[];
+    significance: number[];
+  }[];
+}
+const summedScore = readFixture<FitSummedScoreFixture>("fit-summed-score.json");
+
+const fixedParameters = readFixture<IrtFixedParametersFixture>("irt-fixed-parameters.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Every fit statistic against eRm and mirt, from the same items and thetas. */

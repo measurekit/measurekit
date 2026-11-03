@@ -30,10 +30,102 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
-import changeFixture from "./fixtures/explanatory-linear-change.json" with { type: "json" };
-import lltmFixture from "./fixtures/explanatory-lltm.json" with { type: "json" };
-import polytomousFixture from "./fixtures/explanatory-lltm-polytomous.json" with { type: "json" };
-import fixture from "./fixtures/explanatory-regression.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface ExplanatoryLinearChangeFixture {
+  source: string;
+  cases: {
+    name: string;
+    occasions: (number | null)[][][];
+    itemIds: string[];
+    groups: string[] | null;
+    baseline: string | null;
+    itemGroups: { q01: string; q02: string; q03: string } | null;
+    reference: string;
+    effects: { itemGroup: string; occasion: number; group: string; estimate: number; standardError: number }[];
+    logLikelihood: number;
+  }[];
+}
+const changeFixture = readFixture<ExplanatoryLinearChangeFixture>("explanatory-linear-change.json");
+
+interface ExplanatoryLltmFixture {
+  source: string;
+  datasets: { name: string; itemIds: string[]; responses: (number | null)[][] }[];
+  cases: {
+    name: string;
+    dataset: number;
+    intercept: boolean;
+    effects: { name: string; estimate: number; standardError: number }[];
+    sd: number;
+    difficulties: number[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    raschLogLikelihood: number;
+    chiSquare: number;
+    degreesOfFreedom: number;
+    significance: number;
+    features: {
+      q01?: { steps: number; density: number; open: number };
+      q02?: { steps: number; density: number; open: number };
+      q03?: { steps: number; density: number; open: number };
+    };
+  }[];
+}
+const lltmFixture = readFixture<ExplanatoryLltmFixture>("explanatory-lltm.json");
+
+interface ExplanatoryLltmPolytomousFixture {
+  source: string;
+  datasets: { name: string; itemIds: string[]; responses: (number | null)[][] }[];
+  cases: {
+    name: string;
+    model: string;
+    intercept: boolean;
+    effects: { name: string; estimate: number; standardError: number }[];
+    sd: number;
+    steps: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    raschLogLikelihood: number;
+    chiSquare: number;
+    degreesOfFreedom: number;
+    significance: number;
+    tamEstimates: number[];
+    dataset: number;
+    features: {
+      q01: { steps: number; density: number; open: number };
+      q02: { steps: number; density: number; open: number };
+      q03: { steps: number; density: number; open: number };
+    };
+  }[];
+}
+const polytomousFixture = readFixture<ExplanatoryLltmPolytomousFixture>("explanatory-lltm-polytomous.json");
+
+interface ExplanatoryRegressionFixture {
+  source: string;
+  cases: {
+    name: string;
+    parameter: string;
+    intercept: boolean;
+    items: {
+      id: string;
+      parameters: { a: number; b: number; c: number; d: number };
+      standardErrors: { a: number; b: number };
+    }[];
+    features: {
+      q01: { steps: number; density?: number; open?: number };
+      q02: { steps: number; density?: number; open?: number };
+      q03: { steps: number; density?: number; open?: number };
+    };
+    effects: { name: string; estimate: number; standardError: number }[];
+    covariance: number[][];
+    residualSd: number;
+    logLikelihood: number;
+    predictions: { features: { steps: number; density?: number; open?: number }; mean: number; sd: number }[];
+  }[];
+}
+const fixture = readFixture<ExplanatoryRegressionFixture>("explanatory-regression.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Effects, standard errors, covariances, residual variance, log-likelihood and predictions against base R. */

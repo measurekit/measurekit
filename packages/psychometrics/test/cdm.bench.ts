@@ -13,7 +13,9 @@ import {
   validateQMatrix,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-cdm.json" with { type: "json" };
+import { type BenchCdmFixture, readFixture } from "./fixtures.js";
+
+const fixture = readFixture<BenchCdmFixture>("bench-cdm.json");
 
 const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
 const { qMatrix } = fixture;

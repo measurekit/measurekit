@@ -21,12 +21,154 @@ import {
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries } from "./fixture-items.js";
-import fixture from "./fixtures/cdm.json" with { type: "json" };
-import additiveFixture from "./fixtures/cdm-additive.json" with { type: "json" };
-import fitFixture from "./fixtures/cdm-fit.json" with { type: "json" };
-import identifiabilityFixture from "./fixtures/cdm-identifiability.json" with { type: "json" };
-import comparisonFixture from "./fixtures/cdm-item-comparison.json" with { type: "json" };
-import maximumFixture from "./fixtures/cdm-maximum.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface CdmFixture {
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: number[][];
+    qmatrix: { item1: string[]; item2: string[]; item3: string[]; item4: string[]; item5: string[] };
+    attributes: string[];
+    fits: {
+      model: string;
+      items: number[][];
+      guessing: number[];
+      slip: number[];
+      proportions: number[];
+      logLikelihood: number;
+      aic: number;
+      bic: number;
+      classes: number[] | null;
+      persons: { mastery: number[]; map: number[]; eap: number[]; posterior: number[] }[] | null;
+      accuracy:
+        | {
+            classification: string;
+            accuracy: number;
+            profileAccuracy: number[];
+            attributeAccuracy: number[];
+            consistency: number;
+            attributeConsistency: number[];
+          }[]
+        | null;
+      validation: { suggested: string[]; pvaf: number }[] | null;
+    }[];
+    nonparametric: { gate: string; distance: number[]; ties: number[]; profile: (number[] | null)[] }[];
+  }[];
+}
+const fixture = readFixture<CdmFixture>("cdm.json");
+
+interface CdmAdditiveFixture {
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: number[][];
+    qmatrix: { item1: string[]; item2: string[]; item3: string[]; item4: string[]; item5: string[] };
+    attributes: string[];
+    fits: {
+      model: string | string[];
+      items: number[][];
+      guessing: number[];
+      slip: number[];
+      proportions: number[];
+      logLikelihood: number;
+      aic: number;
+      bic: number;
+      classes: null;
+      persons: { mastery: number[]; map: number[]; eap: number[]; posterior: number[] }[];
+      accuracy: {
+        classification: string;
+        accuracy: number;
+        profileAccuracy: number[];
+        attributeAccuracy: number[];
+        consistency: number;
+        attributeConsistency: number[];
+      }[];
+      validation: null;
+      coefficients: number[][];
+    }[];
+  }[];
+}
+const additiveFixture = readFixture<CdmAdditiveFixture>("cdm-additive.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface CdmFitFixture {
+  responses: number[][];
+  items: string[];
+  qMatrix: { item1: string[]; item2: string[]; item3: string[]; item4: string[]; item5: string[] };
+  cases: {
+    name: string;
+    model: string[];
+    gdina: { m2: number; degreesOfFreedom: number; reversed: number } | null;
+    m2: number;
+    degreesOfFreedom: number;
+    significance: number;
+    rmsea: number;
+    rmseaInterval: number[];
+    wideInterval: number[];
+    srmsr: number;
+    exact: {
+      observed: number[];
+      expected: number[];
+      proportionZ: number[];
+      correlationZ: number[];
+      logOddsZ: number[];
+      significance: number[];
+    };
+    resampled: { proportionZ: number[]; correlationZ: number[]; logOddsZ: number[] };
+  }[];
+  din: { srmsr: number; correlationZ: number[] };
+  rejections: { sets: { responses: string[]; statistic: number; degreesOfFreedom: number }[]; alpha: number };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const fitFixture = readFixture<CdmFitFixture>("cdm-fit.json");
+
+interface CdmIdentifiabilityFixture {
+  cases: {
+    qMatrix: { item1: string[]; item2: string[]; item3: string[]; item4: string[]; item5?: string[] };
+    singleItems: { a1: boolean; a2: boolean; a3?: boolean; a4?: boolean; a5?: boolean };
+    threeItems: { a1: boolean; a2: boolean; a3?: boolean; a4?: boolean; a5?: boolean };
+    distinctColumns: boolean;
+    dinaIdentified: boolean;
+  }[];
+}
+const identifiabilityFixture = readFixture<CdmIdentifiabilityFixture>("cdm-identifiability.json");
+
+interface CdmItemComparisonFixture {
+  models: string[];
+  level: number;
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: number[][];
+    qmatrix: { item1: string[]; item2: string[]; item3: string[]; item4: string[]; item5: string[] };
+    probabilities: number[][];
+    compared: string[];
+    covariance: number[][][];
+    statistics: number[][];
+    degreesOfFreedom: number[][];
+    pValues: number[][];
+    selected: string[];
+    truth: string[] | null;
+  }[];
+  recovery: { items: number; rejected: number; selected: number };
+}
+const comparisonFixture = readFixture<CdmItemComparisonFixture>("cdm-item-comparison.json");
+
+interface CdmMaximumFixture {
+  cases: {
+    link: string;
+    attributeCount: number;
+    kind: string;
+    correct: number[];
+    persons: number[];
+    activeBounds: number;
+    delta: number[];
+    probabilities: number[];
+    value: number;
+  }[];
+}
+const maximumFixture = readFixture<CdmMaximumFixture>("cdm-maximum.json");
 
 // Tolerances against GDINA, explained in docs/validation.md.
 /** Success probabilities, proportions and person results: EM stops at a change of 1e-8, within 1e-6 of the maximum. */

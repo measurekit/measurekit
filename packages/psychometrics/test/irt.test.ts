@@ -89,25 +89,581 @@ import {
 } from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { definedEntries, type FixtureErrors, type FixtureParameters, MODELS } from "./fixture-items.js";
-import conditional from "./fixtures/irt-conditional.json" with { type: "json" };
-import covariance from "./fixtures/irt-covariance.json" with { type: "json" };
-import crossProduct from "./fixtures/irt-cross-product.json" with { type: "json" };
-import fixedParameters from "./fixtures/irt-fixed-parameters.json" with { type: "json" };
-import latent from "./fixtures/irt-latent.json" with { type: "json" };
-import latentRegression from "./fixtures/irt-latent-regression.json" with { type: "json" };
-import lsat7 from "./fixtures/irt-lsat7.json" with { type: "json" };
-import nestedModels from "./fixtures/irt-nested-models.json" with { type: "json" };
-import weighted from "./fixtures/irt-person-weights.json" with { type: "json" };
-import posterior from "./fixtures/irt-posterior.json" with { type: "json" };
-import science from "./fixtures/irt-science.json" with { type: "json" };
-import scoring from "./fixtures/irt-scoring.json" with { type: "json" };
-import simulated1pl from "./fixtures/irt-simulated-1pl.json" with { type: "json" };
-import simulated4pl from "./fixtures/irt-simulated-4pl.json" with { type: "json" };
-import simulatedMixed from "./fixtures/irt-simulated-mixed.json" with { type: "json" };
-import simulatedPcm from "./fixtures/irt-simulated-pcm.json" with { type: "json" };
-import testlet from "./fixtures/irt-testlet.json" with { type: "json" };
-import testletGroups from "./fixtures/irt-testlet-groups.json" with { type: "json" };
-import unfolding from "./fixtures/irt-unfolding.json" with { type: "json" };
+import { type IrtFixedParametersFixture, readFixture } from "./fixtures.js";
+
+interface IrtConditionalFixture {
+  source: string;
+  cases: {
+    name: string;
+    model: string;
+    responses: (number | null)[][];
+    logLikelihood: number;
+    parameters: number;
+    thresholds: (number | number[])[];
+    standardErrors: (number | number[])[];
+    locations?: number[];
+    steps?: number[];
+    locationErrors?: number[];
+    stepErrors?: number[];
+    erm?: { logLikelihood: number; atItsEstimates: number; thresholds: (number | number[])[] };
+  }[];
+}
+const conditional = readFixture<IrtConditionalFixture>("irt-conditional.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface IrtCovarianceFixture {
+  source: string;
+  cases: {
+    data: string;
+    name: string;
+    quadrature: { method: string; points: number };
+    models: string[];
+    covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    priors?: { a: { type: string; meanLog: number; sdLog: number } };
+    itemPriors?: {
+      "Item.4": { a: { type: string; meanLog: number; sdLog: number } };
+      "Item.2": { b: { type: string; mean: number; sd: number } };
+    };
+    items?: { parameters: { a: number; b: number; c: number; d: number } }[];
+    logLikelihood?: number;
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const covariance = readFixture<IrtCovarianceFixture>("irt-covariance.json");
+
+interface IrtCrossProductFixture {
+  source: string;
+  cases: {
+    itemIds: string[];
+    responses: (number | null)[][];
+    name: string;
+    quadrature: { method: string; points: number };
+    models: string[];
+    items: {
+      parameters: { a: number; b: number | number[]; c?: number; d?: number };
+      standardErrors: { a: number; b?: number; b1?: number; b2?: number; b3?: number };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+  }[];
+}
+const crossProduct = readFixture<IrtCrossProductFixture>("irt-cross-product.json");
+
+const fixedParameters = readFixture<IrtFixedParametersFixture>("irt-fixed-parameters.json");
+
+interface IrtLatentFixture {
+  source: string;
+  calibrations: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    groups: string[] | null;
+    fixed: {
+      q01?: { a: number; b: number; c: number; d: number };
+      q02?: { a: number; b: number; c: number; d: number };
+      q03?: { a: number; b: number; c: number; d: number };
+      q04?: { a: number; b: number; c: number; d: number };
+      op01?: { a: number; b: number; c: number; d: number };
+      op02?: { a: number; b: number; c: number; d: number };
+      op03?: { a: number; b: number; c: number; d: number };
+      op04?: { a: number; b: number; c: number; d: number };
+      op05?: { a: number; b: number; c: number; d: number };
+      op06?: { a: number; b: number; c: number; d: number };
+      op07?: { a: number; b: number; c: number; d: number };
+      op08?: { a: number; b: number; c: number; d: number };
+      op09?: { a: number; b: number; c: number; d: number };
+      op10?: { a: number; b: number; c: number; d: number };
+      op12?: { a: number; b: number; c: number; d: number };
+      op13?: { a: number; b: number; c: number; d: number };
+      op14?: { a: number; b: number; c: number; d: number };
+      op15?: { a: number; b: number; c: number; d: number };
+      op16?: { a: number; b: number; c: number; d: number };
+      op17?: { a: number; b: number; c: number; d: number };
+      op18?: { a: number; b: number; c: number; d: number };
+      op19?: { a: number; b: number; c: number; d: number };
+      op20?: { a: number; b: number; c: number; d: number };
+      op21?: { a: number; b: number; c: number; d: number };
+      op22?: { a: number; b: number; c: number; d: number };
+      op23?: { a: number; b: number; c: number; d: number };
+      op24?: { a: number; b: number; c: number; d: number };
+      op25?: { a: number; b: number; c: number; d: number };
+      op26?: { a: number; b: number; c: number; d: number };
+      op29?: { a: number; b: number; c: number; d: number };
+      op30?: { a: number; b: number; c: number; d: number };
+      op31?: { a: number; b: number; c: number; d: number };
+      op32?: { a: number; b: number; c: number; d: number };
+      op33?: { a: number; b: number; c: number; d: number };
+      op34?: { a: number; b: number; c: number; d: number };
+      op35?: { a: number; b: number; c: number; d: number };
+      op36?: { a: number; b: number; c: number; d: number };
+      op37?: { a: number; b: number; c: number; d: number };
+      op38?: { a: number; b: number; c: number; d: number };
+      op39?: { a: number; b: number; c: number; d: number };
+      op40?: { a: number; b: number; c: number; d: number };
+    };
+    distributions: { all?: string; reference?: string; focal?: string };
+    items: { parameters: { a: number; b: number; c: number; d: number }; standardErrors?: { a: number; b: number } }[];
+    groupDistributions: { group: string; mean: number; sd: number; standardErrors: { mean: number; sd: number } }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+  }[];
+  histogram: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    fixed: Record<string, { a: number; b: number; c: number; d: number }>;
+    tolerance: number;
+    iterations: number;
+    weights: number[];
+    logLikelihood: number;
+  };
+}
+const latent = readFixture<IrtLatentFixture>("irt-latent.json");
+
+interface IrtLatentRegressionFixture {
+  source: string;
+  cases: {
+    name: string;
+    model: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    covariates: { x?: number[]; z?: number[]; group?: number[] };
+    fixed: {
+      q01?: { a: number; b: number; c: number; d: number };
+      q02?: { a: number; b: number; c: number; d: number };
+      q03?: { a: number; b: number; c: number; d: number };
+      q04?: { a: number; b: number; c: number; d: number };
+      q05?: { a: number; b: number; c: number; d: number };
+      q06?: { a: number; b: number; c: number; d: number };
+    };
+    mirt: {
+      items: { a: number; b: number }[];
+      coefficients: { x?: number; z?: number; group?: number };
+      residualVariance: number;
+      logLikelihood: number;
+    };
+    hessianStandardErrors?: { group: number };
+    tam?: { difficulties: number[]; coefficient: number; residualVariance: number };
+  }[];
+  polytomous: {
+    name: string;
+    model: string;
+    itemIds: string[];
+    responses: number[][];
+    covariates: { x: number[] };
+    fixed: Record<string, never>;
+    mirt: {
+      items: { a: number; b: number[] }[];
+      coefficients: { x: number };
+      residualVariance: number;
+      logLikelihood: number;
+    };
+  };
+}
+const latentRegression = readFixture<IrtLatentRegressionFixture>("irt-latent-regression.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface IrtLsat7Fixture {
+  source: string;
+  itemIds: string[];
+  responses: number[][];
+  calibrations: {
+    name: string;
+    quadrature: { method: string; points: number };
+    models: string[];
+    items: {
+      parameters: { a: number; b: number; c: number; d: number };
+      standardErrors?: { a: number; b: number; c?: number };
+    }[];
+    logLikelihood: number;
+    aic?: number;
+    bic?: number;
+    fixed?: {
+      "Item.1": { a: number; b: number; c: number; d: number };
+      "Item.2": { a: number; b: number; c: number; d: number };
+    };
+    priors?: { c: { type: string; alpha: number; beta: number } };
+  }[];
+  abilities: {
+    models: string[];
+    parameters: { a: number; b: number; c: number; d: number }[];
+    patterns: (number | null)[][];
+    posteriorMean: { theta: number; standardError: number }[];
+    posteriorMode: { theta: number; standardError: number }[];
+    maximumLikelihood: { theta: number; standardError: number }[];
+    weightedLikelihood: { theta: number; standardError: number }[];
+  }[];
+  information: {
+    models: string[];
+    parameters: { a: number; b: number; c: number; d: number }[];
+    theta: number[];
+    items: number[][];
+    test: number[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const lsat7 = readFixture<IrtLsat7Fixture>("irt-lsat7.json");
+
+interface IrtNestedModelsFixture {
+  slopes: {
+    source: string;
+    itemIds: string[];
+    responses: number[][];
+    restricted: { logLikelihood: number; parameters: number };
+    general: { logLikelihood: number; parameters: number };
+    chiSquare: number;
+    degreesOfFreedom: number;
+    pValue: number;
+  };
+  credit: {
+    source: string;
+    itemIds: string[];
+    responses: number[][];
+    restricted: { logLikelihood: number; parameters: number };
+    general: { logLikelihood: number; parameters: number };
+    chiSquare: number;
+    degreesOfFreedom: number;
+    pValue: number;
+  };
+}
+const nestedModels = readFixture<IrtNestedModelsFixture>("irt-nested-models.json");
+
+interface IrtPersonWeightsFixture {
+  source: string;
+  cases: {
+    twoPl: {
+      description: string;
+      itemIds: string[];
+      responses: (number | null)[][];
+      weights: number[];
+      items: { a: number; b: number }[];
+      hessianErrors: { a: number; b: number }[];
+      crossProductErrors: { a: number; b: number }[];
+      logLikelihood: number;
+      bic: number;
+    };
+    graded: {
+      description: string;
+      itemIds: string[];
+      responses: number[][];
+      weights: number[];
+      items: { a: number; b: number[] }[];
+      logLikelihood: number;
+    };
+    groups: {
+      description: string;
+      itemIds: string[];
+      responses: (number | null)[][];
+      weights: number[];
+      groups: string[];
+      items: { a: number; b: number }[];
+      focal: { mean: number; sd: number };
+      logLikelihood: number;
+      mirt: { focal: { mean: number; sd: number }; logLikelihood: number };
+    };
+    rasch: {
+      description: string;
+      itemIds: string[];
+      responses: number[][];
+      weights: number[];
+      covariates: { x: number[] };
+      tam: { difficulties: number[]; coefficient: number; residualVariance: number };
+    };
+    regression: {
+      description: string;
+      itemIds: string[];
+      responses: (number | null)[][];
+      weights: number[];
+      covariates: { x: number[] };
+      items: { a: number; b: number }[];
+      coefficient: number;
+      logLikelihood: number;
+      mirtSurveyWeights: { coefficient: number; logLikelihood: number };
+    };
+  };
+}
+const weighted = readFixture<IrtPersonWeightsFixture>("irt-person-weights.json");
+
+interface IrtPosteriorFixture {
+  source: string;
+  forms: {
+    models: string[];
+    parameters: { a: number; b: number | number[]; c?: number; d?: number }[];
+    patterns: (number | null)[][];
+    priors: { prior: { mean: number; sd: number }; nodes: number[]; weights: number[][] }[];
+  }[];
+}
+const posterior = readFixture<IrtPosteriorFixture>("irt-posterior.json");
+
+interface IrtScienceFixture {
+  source: string;
+  itemIds: string[];
+  responses: number[][];
+  calibrations: {
+    name: string;
+    quadrature: { method: string; points: number };
+    models: string[];
+    items: {
+      parameters: { a: number | number[]; b?: number[] | number; steps?: number[]; c?: number[] };
+      standardErrors: {
+        a?: number;
+        b1?: number;
+        b2?: number;
+        b3?: number;
+        b?: number;
+        step1?: number;
+        step2?: number;
+        a1?: number;
+        a2?: number;
+        c1?: number;
+        c2?: number;
+      };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+  }[];
+  abilities: {
+    models: string[];
+    parameters: { a: number | number[]; b?: number[] | number; steps?: number[]; c?: number[] }[];
+    patterns: (number | null)[][];
+    posteriorMean: { theta: number; standardError: number }[];
+    posteriorMode: { theta: number; standardError: number }[];
+    maximumLikelihood: { theta: number; standardError: number }[];
+    weightedLikelihood: { theta: number; standardError: number }[];
+  }[];
+  information: {
+    models: string[];
+    parameters: { a: number | number[]; b?: number[] | number; steps?: number[]; c?: number[] }[];
+    theta: number[];
+    items: number[][];
+    test: number[];
+  }[];
+}
+const science = readFixture<IrtScienceFixture>("irt-science.json");
+
+interface IrtScoringFixture {
+  source: string;
+  forms: {
+    models: string[];
+    parameters: { a: number; b: number | number[]; c?: number; d?: number }[];
+    tables: {
+      prior: { mean: number; sd: number };
+      estimates: { score: number; theta: number; standardError: number; probability: number }[];
+    }[];
+    marginalReliability: { prior: { mean: number; sd: number }; value: number }[];
+  }[];
+  empiricalReliability: { estimates: { theta: number; standardError: number }[]; value: number };
+}
+const scoring = readFixture<IrtScoringFixture>("irt-scoring.json");
+
+interface IrtSimulated1plFixture {
+  source: string;
+  itemIds: string[];
+  responses: (number | null)[][];
+  calibrations: {
+    name: string;
+    quadrature: { method: string; points: number };
+    models: string[];
+    items: { parameters: { a: number; b: number; c: number; d: number }; standardErrors: { a: number; b: number } }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+  }[];
+  abilities: {
+    models: string[];
+    parameters: { a: number; b: number; c: number; d: number }[];
+    patterns: (number | null)[][];
+    posteriorMean: { theta: number; standardError: number }[];
+    posteriorMode: { theta: number; standardError: number }[];
+    maximumLikelihood: { theta: number; standardError: number }[];
+    weightedLikelihood: { theta: number; standardError: number }[];
+  }[];
+}
+const simulated1pl = readFixture<IrtSimulated1plFixture>("irt-simulated-1pl.json");
+
+interface IrtSimulated4plFixture {
+  source: string;
+  itemIds: string[];
+  responses: number[][];
+  calibrations: {
+    name: string;
+    quadrature: { method: string; points: number };
+    priors: { c: { type: string; mean: number; sd: number }; d: { type: string; mean: number; sd: number } };
+    models: string[];
+    items: {
+      parameters: { a: number; b: number; c: number; d: number };
+      standardErrors: { a: number; b: number; c: number; d: number };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+  }[];
+  abilities: {
+    models: string[];
+    parameters: { a: number; b: number; c: number; d: number }[];
+    patterns: number[][];
+    posteriorMean: { theta: number; standardError: number }[];
+    posteriorMode: { theta: number; standardError: number }[];
+    maximumLikelihood: { theta: number; standardError: number }[];
+    weightedLikelihood: { theta: number; standardError: number }[];
+  }[];
+  information: {
+    models: string[];
+    parameters: { a: number; b: number; c: number; d: number }[];
+    theta: number[];
+    items: number[][];
+    test: number[];
+  }[];
+}
+const simulated4pl = readFixture<IrtSimulated4plFixture>("irt-simulated-4pl.json");
+
+interface IrtSimulatedMixedFixture {
+  source: string;
+  itemIds: string[];
+  responses: number[][];
+  calibrations: {
+    name: string;
+    quadrature: { method: string; points: number };
+    fixed: { q01: { a: number; b: number; c: number; d: number }; q10: { a: number; b: number[] } };
+    priors: { c: { type: string; mean: number; sd: number } };
+    models: string[];
+    items: {
+      parameters: { a: number; b: number | number[]; c?: number; d?: number };
+      standardErrors?: { a: number; b?: number; c?: number; b1?: number; b2?: number; b3?: number };
+    }[];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+  }[];
+  abilities: {
+    models: string[];
+    parameters: { a: number; b: number | number[]; c?: number; d?: number }[];
+    patterns: number[][];
+    posteriorMean: { theta: number; standardError: number }[];
+    posteriorMode: { theta: number; standardError: number }[];
+    maximumLikelihood: { theta: number; standardError: number }[];
+    weightedLikelihood: { theta: number; standardError: number }[];
+  }[];
+  information: {
+    models: string[];
+    parameters: { a: number; b: number | number[]; c?: number; d?: number }[];
+    theta: number[];
+    items: number[][];
+    test: number[];
+  }[];
+}
+const simulatedMixed = readFixture<IrtSimulatedMixedFixture>("irt-simulated-mixed.json");
+
+interface IrtSimulatedPcmFixture {
+  source: string;
+  itemIds: string[];
+  responses: (number | null)[][];
+  jointMaximumLikelihood: {
+    name: string;
+    items: {
+      model: string;
+      parameters: { a: number; b: number | number[]; c?: number; d?: number };
+      standardErrors: { b?: number; b1?: number; b2?: number; b3?: number };
+    }[];
+    persons: { theta: number; standardError: number }[];
+    logLikelihood: number;
+  };
+}
+const simulatedPcm = readFixture<IrtSimulatedPcmFixture>("irt-simulated-pcm.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface IrtTestletFixture {
+  source: string;
+  points: number;
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: number[][];
+    testlets: { t1?: string[]; t2?: string[]; t3?: string[]; A?: string[]; C?: string[] };
+    items: { parameters: { a: number; b: number; c: number; d: number }; standardErrors: { a: number; b: number } }[];
+    sd: number[];
+    sdStandardErrors: number[];
+    logLikelihood: number;
+    abilities: { theta: number; standardError: number }[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const testlet = readFixture<IrtTestletFixture>("irt-testlet.json");
+
+interface IrtTestletGroupsFixture {
+  source: string;
+  points: number;
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: number[][];
+    groups: string[];
+    testlets: { t1: string[]; t2: string[]; t3: string[] };
+    latent: { b: string; c?: string; a?: string };
+    fixed: {
+      q01?: { a: number; b: number; c: number; d: number };
+      q02?: { a: number; b: number; c: number; d: number };
+      q05?: { a: number; b: number; c: number; d: number };
+      q09?: { a: number; b: number; c: number; d: number };
+    };
+    items: {
+      parameters: { a: number; b: number; c: number; d: number };
+      standardErrors: { a: number; b: number } | null;
+    }[];
+    sd: number[];
+    sdStandardErrors: number[];
+    distributions: { mean: number; sd: number; standardErrors: { mean: number; sd: number } | null }[];
+    parameterCount: number;
+    logLikelihood: number;
+    mirtLogLikelihood?: number;
+  }[];
+  histogram: {
+    name: string;
+    itemIds: string[];
+    responses: number[][];
+    groups: string[];
+    testlets: { t1: string[]; t2: string[]; t3: string[] };
+    fixed: Record<string, { a: number; b: number; c: number; d: number }>;
+    tolerance: number;
+    iterations: number;
+    weights: number[];
+    sd: number[];
+    logLikelihood: number;
+  };
+}
+const testletGroups = readFixture<IrtTestletGroupsFixture>("irt-testlet-groups.json");
+
+interface IrtUnfoldingFixture {
+  source: string;
+  cases: {
+    mixed: {
+      responses: string[];
+      truth: { a: number; b: number; t: number[] }[];
+      persons: number;
+      expected: {
+        items: {
+          a: number;
+          b: number;
+          t: number[];
+          standardErrors: { a: number; b: number; t1: number; t2?: number; t3?: number };
+        }[];
+        logLikelihood: number;
+        crossProductErrors: { a: number; b: number; t1: number; t2?: number; t3?: number }[];
+      };
+    };
+  };
+  starts: Record<string, { b: number[]; t: number[][] }>;
+  defaultTolerance: {
+    case: string;
+    items: { a: number; b: number; t: number[] }[];
+    logLikelihood: number;
+    tightLogLikelihood: number;
+  };
+}
+const unfolding = readFixture<IrtUnfoldingFixture>("irt-unfolding.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Item parameters against mirt, ltm and the base R posterior mode. */

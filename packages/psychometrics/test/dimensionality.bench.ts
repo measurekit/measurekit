@@ -10,7 +10,14 @@ import {
   responseMatrix,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-dimensionality.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchDimensionalityFixture {
+  itemIds: string[];
+  responses: (number | null)[][];
+  replications: number;
+}
+const fixture = readFixture<BenchDimensionalityFixture>("bench-dimensionality.json");
 
 const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
 

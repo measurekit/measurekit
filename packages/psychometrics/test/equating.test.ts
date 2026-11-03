@@ -56,19 +56,283 @@ import {
 import { arbitraryItem, arbitraryLocation, arbitraryLocations } from "./arbitraries.js";
 import { defined, expectClose } from "./assertions.js";
 import { fixtureItems, item2pl, MODELS } from "./fixture-items.js";
-import bivariatePresmoothing from "./fixtures/equating-bivariate-presmoothing.json" with { type: "json" };
-import bootstrap from "./fixtures/equating-bootstrap.json" with { type: "json" };
-import chain from "./fixtures/equating-chain.json" with { type: "json" };
-import irtObserved from "./fixtures/equating-irt-observed-score.json" with { type: "json" };
-import standardErrors from "./fixtures/equating-irt-standard-errors.json" with { type: "json" };
-import kernel from "./fixtures/equating-kernel.json" with { type: "json" };
-import linkErrors from "./fixtures/equating-link-errors.json" with { type: "json" };
-import linking from "./fixtures/equating-linking.json" with { type: "json" };
-import neat from "./fixtures/equating-neat.json" with { type: "json" };
-import observed from "./fixtures/equating-observed-score.json" with { type: "json" };
-import presmoothing from "./fixtures/equating-presmoothing.json" with { type: "json" };
-import robust from "./fixtures/equating-robust-z.json" with { type: "json" };
-import trueScore from "./fixtures/equating-true-score.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface EquatingBivariatePresmoothingFixture {
+  cases: {
+    name: string;
+    distribution: number[][];
+    fits: { degrees: number[]; crossDegree: number; distribution: number[][] }[];
+  }[];
+}
+const bivariatePresmoothing = readFixture<EquatingBivariatePresmoothingFixture>("equating-bivariate-presmoothing.json");
+
+interface EquatingBootstrapFixture {
+  replications: number;
+  neat: {
+    from: number[][];
+    to: number[][];
+    errors: {
+      tucker: number[];
+      levine: number[];
+      chainedLinear: number[];
+      chainedEquipercentile: number[];
+      frequencyEstimation: number[];
+    };
+  };
+  randomGroups: { from: number[]; to: number[]; errors: { linear: number[]; equipercentile: number[] } };
+  singleGroup: { joint: number[][]; errors: { linear: number[]; equipercentile: number[] } };
+}
+const bootstrap = readFixture<EquatingBootstrapFixture>("equating-bootstrap.json");
+
+interface EquatingChainFixture {
+  cases: {
+    name: string;
+    links: {
+      from: { model: string; parameters: { a: number; b: number; c: number; d: number } }[];
+      to: { model: string; parameters: { a: number; b: number; c: number; d: number } }[];
+    }[];
+    methods: {
+      meanMean: { links: { slope: number; intercept: number }[]; chain: { slope: number; intercept: number } };
+      meanSigma: { links: { slope: number; intercept: number }[]; chain: { slope: number; intercept: number } };
+      haebara: { links: { slope: number; intercept: number }[]; chain: { slope: number; intercept: number } };
+      stockingLord: { links: { slope: number; intercept: number }[]; chain: { slope: number; intercept: number } };
+    };
+  }[];
+}
+const chain = readFixture<EquatingChainFixture>("equating-chain.json");
+
+interface EquatingIrtObservedScoreFixture {
+  cases: {
+    name: string;
+    from: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    to: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    populations: { from: { nodes: number[]; weights: number[] }; to: { nodes: number[]; weights: number[] } };
+    results: { weight: number; equated: number[] }[];
+  }[];
+}
+const irtObserved = readFixture<EquatingIrtObservedScoreFixture>("equating-irt-observed-score.json");
+
+interface EquatingIrtStandardErrorsFixture {
+  cases: {
+    name: string;
+    items: { id: string; model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    from: string[];
+    to: string[];
+    covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    populations: { from: { nodes: number[]; weights: number[] }; to: { nodes: number[]; weights: number[] } };
+    weight: number;
+    results: { method: string; equated: number[]; standardErrors: number[] }[];
+  }[];
+}
+const standardErrors = readFixture<EquatingIrtStandardErrorsFixture>("equating-irt-standard-errors.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface EquatingKernelFixture {
+  cases: {
+    "single group": {
+      name: string;
+      data: { design: string; joint: number[][]; degrees: number[] };
+      options: Record<string, never>;
+      expected: {
+        equated: number[];
+        standardErrors: number[];
+        bandwidths: { from: number; to: number };
+        percentRelativeError: number[];
+      };
+    };
+    counterbalanced: {
+      name: string;
+      data: { design: string; first: number[][]; second: number[][]; degrees: number[] };
+      options: Record<string, never>;
+      expected: {
+        equated: number[];
+        standardErrors: number[];
+        bandwidths: { from: number; to: number };
+        percentRelativeError: number[];
+      };
+    };
+    chained: {
+      name: string;
+      data: { design: string; from: number[][]; to: number[][]; degrees: number[]; crossDegree: number };
+      options: Record<string, never>;
+      expected: {
+        equated: number[];
+        standardErrors: number[];
+        bandwidths: { from: number; to: number; fromAnchor: number };
+        percentRelativeError: number[];
+        anchorPercentRelativeError: number[];
+      };
+    };
+    "counterbalanced, weighted": {
+      name: string;
+      data: { design: string; first: number[][]; second: number[][]; degrees: number[] };
+      options: { weight: number };
+      expected: {
+        equated: number[];
+        standardErrors: number[];
+        bandwidths: { from: number; to: number };
+        percentRelativeError: number[];
+        kequate: number[];
+      };
+    };
+  };
+  differences: { first: string; second: string; expected: number[] }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const kernel = readFixture<EquatingKernelFixture>("equating-kernel.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface EquatingLinkErrorsFixture {
+  forms: {
+    T1: {
+      items: { id: string; model: string; parameters: { a: number; b: number; c: number; d: number } }[];
+      covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    };
+    T2: {
+      items: { id: string; model: string; parameters: { a: number; b: number; c: number; d: number } }[];
+      covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    };
+    T3: {
+      items: { id: string; model: string; parameters: { a: number; b: number; c: number; d: number } }[];
+      covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+    };
+  };
+  quadrature: { nodes: number[]; weights: number[] };
+  links: {
+    meanMean: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+    meanSigma: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+    haebara: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+    stockingLord: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+  };
+  chains: {
+    meanMean: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+    meanSigma: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+    haebara: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+    stockingLord: {
+      slope: number;
+      intercept: number;
+      standardErrors: { slope: number; intercept: number };
+      covariance: number[];
+    };
+  };
+  trueScore: {
+    meanMean: { scores: number[]; standardErrors: number[] };
+    meanSigma: { scores: number[]; standardErrors: number[] };
+    haebara: { scores: number[]; standardErrors: number[] };
+    stockingLord: { scores: number[]; standardErrors: number[] };
+  };
+  observedScore: {
+    meanMean: { scores: number[]; standardErrors: number[] };
+    meanSigma: { scores: number[]; standardErrors: number[] };
+    haebara: { scores: number[]; standardErrors: number[] };
+    stockingLord: { scores: number[]; standardErrors: number[] };
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const linkErrors = readFixture<EquatingLinkErrorsFixture>("equating-link-errors.json");
+
+interface EquatingLinkingFixture {
+  cases: {
+    name: string;
+    from: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    to: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    transformations: {
+      meanMean: { slope: number; intercept: number };
+      meanSigma: { slope: number; intercept: number };
+      haebara: { slope: number; intercept: number };
+      stockingLord: { slope: number; intercept: number };
+    };
+  }[];
+}
+const linking = readFixture<EquatingLinkingFixture>("equating-linking.json");
+
+interface EquatingNeatFixture {
+  cases: {
+    name: string;
+    anchor: string;
+    share: number;
+    from: number[][];
+    to: number[][];
+    linear: { method: string; weight: number | null; trueScore: boolean; equated: number[] }[];
+    equipercentile: { method: string; weight: number | null; equate: number[]; exact: number[] }[];
+  }[];
+}
+const neat = readFixture<EquatingNeatFixture>("equating-neat.json");
+
+interface EquatingObservedScoreFixture {
+  cases: {
+    name: string;
+    from: number[];
+    to: number[];
+    linear: number[];
+    equipercentile: number[];
+    equipercentileUnrounded: number[];
+  }[];
+}
+const observed = readFixture<EquatingObservedScoreFixture>("equating-observed-score.json");
+
+interface EquatingPresmoothingFixture {
+  cases: { name: string; distribution: number[]; fits: { degree: number; distribution: number[] }[] }[];
+}
+const presmoothing = readFixture<EquatingPresmoothingFixture>("equating-presmoothing.json");
+
+interface EquatingRobustFixture {
+  cases: {
+    name: string;
+    from: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    to: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    differences: number[];
+    z: number[];
+    flagged: boolean[];
+  }[];
+}
+const robust = readFixture<EquatingRobustFixture>("equating-robust-z.json");
+
+interface EquatingTrueScoreFixture {
+  cases: {
+    name: string;
+    from: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    to: { model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    equated: number[];
+  }[];
+}
+const trueScore = readFixture<EquatingTrueScoreFixture>("equating-true-score.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** Moment methods: closed forms. */

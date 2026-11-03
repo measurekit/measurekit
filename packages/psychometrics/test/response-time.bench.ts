@@ -8,7 +8,14 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-response-time.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchResponseTimeFixture {
+  itemIds: string[];
+  responses: number[][];
+  times: number[][];
+}
+const fixture = readFixture<BenchResponseTimeFixture>("bench-response-time.json");
 
 const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds, times: fixture.times });
 

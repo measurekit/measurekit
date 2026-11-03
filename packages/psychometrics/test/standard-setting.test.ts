@@ -27,10 +27,170 @@ import {
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureParameters, item2pl, MODELS } from "./fixture-items.js";
-import fixture from "./fixtures/standard-setting.json" with { type: "json" };
-import borderline from "./fixtures/standard-setting-borderline.json" with { type: "json" };
-import cuts from "./fixtures/standard-setting-cut-scores.json" with { type: "json" };
-import livingstonLewis from "./fixtures/standard-setting-livingston-lewis.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface StandardSettingFixture {
+  angoff: { ratings: number[][]; cutScore: number; panelistCutScores: number[]; sd: number; standardError: number };
+  bookmark: {
+    items: { id: string; model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+    booklets: {
+      responseProbability: number;
+      pages: { id: string; category: number; location: number }[];
+      cutScores: number[];
+    }[];
+  };
+  classification: {
+    estimates: { theta: number; standardError: number }[];
+    cases: { cuts: number[]; accuracy: number; consistency: number; category: number[]; probabilities: number[][] }[];
+  };
+  hofstee: {
+    distribution: number[];
+    cases: {
+      bounds: {
+        minimumCutScore: number;
+        maximumCutScore: number;
+        minimumFailureRate: number;
+        maximumFailureRate: number;
+      };
+      cutScore: number;
+      failureRate: number;
+    }[];
+  };
+}
+const fixture = readFixture<StandardSettingFixture>("standard-setting.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface StandardSettingBorderlineFixture {
+  regression: {
+    "six stations, ratings 1 to 4": {
+      name: string;
+      marks: number[][];
+      ratings: number[][];
+      borderline: number;
+      stations: { cutScore: number; standardError: number; rSquared: number; intercept: number; slope: number }[];
+      cutScore: number;
+      standardError: number;
+    };
+  };
+  group: {
+    "six stations, the mean": {
+      name: string;
+      marks: number[][];
+      ratings: number[][];
+      borderline: number[];
+      statistic: string;
+      stations: { cutScore: number; standardError: number; persons: number }[];
+      cutScore: number;
+    };
+    "six stations, the median": {
+      name: string;
+      marks: number[][];
+      ratings: number[][];
+      borderline: number[];
+      statistic: string;
+      stations: { cutScore: number; standardError: null; persons: number }[];
+      cutScore: number;
+    };
+    "the modified borderline group, grades 2 and 3": {
+      name: string;
+      marks: number[][];
+      ratings: number[][];
+      borderline: number[];
+      statistic: string;
+      stations: { cutScore: number; standardError: number; persons: number }[];
+      cutScore: number;
+    };
+    "a station without a borderline person": {
+      name: string;
+      marks: number[][];
+      ratings: number[][];
+      borderline: number[];
+      statistic: string;
+      stations: { cutScore: number | null; standardError: number | null; persons: number }[];
+      cutScore: null;
+    };
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const borderline = readFixture<StandardSettingBorderlineFixture>("standard-setting-borderline.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface StandardSettingCutScoresFixture {
+  contrasting: {
+    "two groups": {
+      name: string;
+      scores: number[];
+      categories: number[];
+      options: Record<string, never>;
+      cutScores: number[];
+      converged: boolean;
+    };
+    "two groups, probability 0.67": {
+      name: string;
+      scores: number[];
+      categories: number[];
+      options: { probability: number };
+      cutScores: number[];
+      converged: boolean;
+    };
+    "Body of Work, four categories": {
+      name: string;
+      scores: number[];
+      categories: number[];
+      options: Record<string, never>;
+      cutScores: number[];
+      converged: boolean;
+    };
+    "a separated boundary": {
+      name: string;
+      scores: number[];
+      categories: number[];
+      options: Record<string, never>;
+      cutScores: (number | null)[];
+      converged: boolean;
+    };
+  };
+  beuk: {
+    distribution: number[];
+    cases: {
+      judgments: { cutScore: number; passRate: number; cutScoreSd: number; passRateSd: number };
+      expected: { cutScore: number; failureRate: number };
+    }[];
+  };
+  recipes: {
+    nedelsky: { optionsLeft: number[][]; cutScore: number };
+    ebel: { items: number[]; proportions: number[]; cutScore: number };
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const cuts = readFixture<StandardSettingCutScoresFixture>("standard-setting-cut-scores.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface StandardSettingLivingstonLewisFixture {
+  cases: {
+    "one cut": {
+      name: string;
+      scores: number[];
+      reliability: number;
+      cuts: number[];
+      minimum: number;
+      maximum: number;
+      effectiveLength: number;
+      trueScore: { alpha: number; beta: number; lower: number; upper: number };
+      perCut: {
+        cut: number;
+        accuracy: number;
+        consistency: number;
+        package: { accuracy: number; consistency: number };
+      }[];
+      accuracy: number;
+      consistency: number;
+      package: { accuracy: number; consistency: number };
+    };
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const livingstonLewis = readFixture<StandardSettingLivingstonLewisFixture>("standard-setting-livingston-lewis.json");
 
 /** Classification probabilities against R's pnorm: Cody's algorithm on both sides. */
 const CLASSIFICATION_TOLERANCE = 1e-14;

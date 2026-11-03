@@ -13,9 +13,21 @@ import {
   twoWayImputation,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import irtFixture from "./fixtures/bench-irt.json" with { type: "json" };
-import fixture from "./fixtures/bench-mokken.json" with { type: "json" };
-import stepsFixture from "./fixtures/bench-mokken-steps.json" with { type: "json" };
+import { type BenchIrtFixture, readFixture } from "./fixtures.js";
+
+const irtFixture = readFixture<BenchIrtFixture>("bench-irt.json");
+
+interface BenchMokkenFixture {
+  itemIds: string[];
+  responses: number[][];
+}
+const fixture = readFixture<BenchMokkenFixture>("bench-mokken.json");
+
+interface BenchMokkenStepsFixture {
+  itemIds: string[];
+  responses: (number | null)[][];
+}
+const stepsFixture = readFixture<BenchMokkenStepsFixture>("bench-mokken-steps.json");
 
 const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
 

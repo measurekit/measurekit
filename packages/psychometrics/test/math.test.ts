@@ -28,11 +28,42 @@ import {
   transpose,
 } from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";
-import factors from "./fixtures/dimensionality-factors.json" with { type: "json" };
-import eigen from "./fixtures/math-eigen.json" with { type: "json" };
-import functions from "./fixtures/math-functions.json" with { type: "json" };
-import hermite from "./fixtures/math-gauss-hermite.json" with { type: "json" };
-import noncentral from "./fixtures/math-noncentral-chi-square.json" with { type: "json" };
+import { type DimensionalityFactorsFixture, readFixture } from "./fixtures.js";
+
+const factors = readFixture<DimensionalityFactorsFixture>("dimensionality-factors.json");
+
+interface MathEigenFixture {
+  cases: { name: string; size: number; matrix: number[][]; values: number[]; vectors: number[][] | null }[];
+}
+const eigen = readFixture<MathEigenFixture>("math-eigen.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface MathFunctionsFixture {
+  p: number[];
+  normalQuantile: number[];
+  x: number[];
+  normalDensity: number[];
+  cumulativeX: number[];
+  normalDistribution: number[];
+  logistic: number[];
+  chiSquare: { x: number[]; df: number[]; upperTail: number[] };
+  chiSquareLarge: { x: number[]; df: number[]; upperTail: number[] };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const functions = readFixture<MathFunctionsFixture>("math-functions.json");
+
+interface MathGaussHermiteFixture {
+  rules: { count: number; nodes: number[]; weights: number[] }[];
+}
+const hermite = readFixture<MathGaussHermiteFixture>("math-gauss-hermite.json");
+
+interface MathNoncentralChiSquareFixture {
+  x: number[];
+  df: number[];
+  noncentrality: number[];
+  cdf: number[];
+}
+const noncentral = readFixture<MathNoncentralChiSquareFixture>("math-noncentral-chi-square.json");
 
 /** Relative tolerance of the normal and logistic functions against R. */
 const FUNCTION_TOLERANCE = 1e-14;

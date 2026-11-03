@@ -9,8 +9,27 @@ import {
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-explanatory.json" with { type: "json" };
-import changeFixture from "./fixtures/bench-explanatory-change.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchExplanatoryFixture {
+  itemIds: string[];
+  difficulties: number[];
+  standardErrors: number[];
+  features: number[][];
+  lltm: {
+    itemIds: string[];
+    responses: number[][];
+    features: Record<string, { steps: number; density: number; open: number }>;
+  };
+}
+const fixture = readFixture<BenchExplanatoryFixture>("bench-explanatory.json");
+
+interface BenchExplanatoryChangeFixture {
+  itemIds: string[];
+  groups: string[];
+  occasions: number[][][];
+}
+const changeFixture = readFixture<BenchExplanatoryChangeFixture>("bench-explanatory-change.json");
 
 const items: CalibratedItem<unknown>[] = fixture.itemIds.map((id, i) => ({
   id,

@@ -46,7 +46,10 @@ export function item2pl(id: string, a: number, b: number): TestItem {
   return { id, model: twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } };
 }
 
-/** Returns the entries of a record whose values are defined: JSON imports type each record with every key. */
+/**
+ * Returns the entries of a record whose values are defined: a fixture's type makes a key optional that only some of
+ * its cases hold.
+ */
 export function definedEntries<T>(record: Readonly<Record<string, T | undefined>>): Record<string, T> {
   return Object.fromEntries(
     Object.entries(record).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])),

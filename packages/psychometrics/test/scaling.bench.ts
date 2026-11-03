@@ -2,8 +2,15 @@ import { test } from "vitest";
 import { conversionTable, createRandom, drawJointThetas, type IrtItem, twoParameterLogistic } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-irt.json" with { type: "json" };
-import joint from "./fixtures/bench-scaling.json" with { type: "json" };
+import { type BenchIrtFixture, readFixture } from "./fixtures.js";
+
+const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
+
+interface BenchScalingFixture {
+  posteriors: { nodes: number[]; weights: number[] }[];
+  correlation: number[][];
+}
+const joint = readFixture<BenchScalingFixture>("bench-scaling.json");
 
 /** The draws of the joint benchmark. */
 const JOINT_DRAWS = 2_000;

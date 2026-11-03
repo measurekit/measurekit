@@ -27,8 +27,69 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
-import fixture from "./fixtures/response-time.json" with { type: "json" };
-import jointFixture from "./fixtures/response-time-speed-accuracy.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface ResponseTimeFixture {
+  cases: {
+    name: string;
+    itemIds: string[];
+    times: (number | null)[][];
+    residuals: (number | null)[][];
+    statistic: number[];
+    significance: number[];
+    intensity: number[];
+    discrimination: number[];
+    intensityErrors: number[];
+    speedSd: number;
+    logLikelihood: number;
+    speed: number[];
+    speedErrors: number[];
+  }[];
+  rapidGuessing: {
+    itemIds: string[];
+    times: (number | null)[][];
+    responses: number[][];
+    thresholds: { percentage: number; cap: number; values: number[] }[];
+    effort: number[];
+    items: { a: number; b: number; c: number; d: number }[];
+    moderated: { theta: number; standardError: number }[];
+  };
+}
+const fixture = readFixture<ResponseTimeFixture>("response-time.json");
+
+interface ResponseTimeSpeedAccuracyFixture {
+  cases: {
+    name: string;
+    itemIds: string[];
+    responses: (number | null)[][];
+    times: (number | null)[][];
+    a: number[];
+    b: number[];
+    intensity: number[];
+    discrimination: number[];
+    speedSd: number;
+    correlation: number;
+    logLikelihood: number;
+    standardErrors: {
+      a: number[];
+      b: number[];
+      intensity: number[];
+      discrimination: number[];
+      speedSd: number;
+      correlation: number;
+    };
+    estimates: { theta: number[]; thetaSd: number[]; speed: number[]; speedSd: number[] };
+    lnirt: {
+      persons: number;
+      correlation: number;
+      speedSd: number;
+      intensity: number[];
+      discrimination: number[];
+      ogive: { correlation: number; logLikelihood: number; standardError: number };
+    };
+  }[];
+}
+const jointFixture = readFixture<ResponseTimeSpeedAccuracyFixture>("response-time-speed-accuracy.json");
 
 // Tolerances against R, explained in docs/validation.md.
 /** The lognormal calibration against lme's ML fit: EM runs to a change of 1e-13. */

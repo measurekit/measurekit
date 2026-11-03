@@ -116,18 +116,350 @@ import {
 import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose } from "./assertions.js";
 import { item2pl, MODELS } from "./fixture-items.js";
-import cat2pl from "./fixtures/cat-2pl.json" with { type: "json" };
-import cat3pl from "./fixtures/cat-3pl.json" with { type: "json" };
-import catBounds from "./fixtures/cat-bounds.json" with { type: "json" };
-import catCdm from "./fixtures/cat-cdm.json" with { type: "json" };
-import catContent from "./fixtures/cat-content.json" with { type: "json" };
-import catGpcm from "./fixtures/cat-gpcm.json" with { type: "json" };
-import catMirt from "./fixtures/cat-mirt.json" with { type: "json" };
-import cutsFixture from "./fixtures/cat-multistage-cuts.json" with { type: "json" };
-import catSelection from "./fixtures/cat-selection.json" with { type: "json" };
-import catStopping from "./fixtures/cat-stopping.json" with { type: "json" };
-import catTestlets from "./fixtures/cat-testlets.json" with { type: "json" };
-import catForms from "./fixtures/form-assembly.json" with { type: "json" };
+import { type Cat3plFixture, readFixture } from "./fixtures.js";
+
+interface Cat2plFixture {
+  source: string;
+  items: { id: string; a: number; b: number; c: number; d: number }[];
+  strata: number[];
+  perStratum: number;
+  run: {
+    name: string;
+    selection: string;
+    estimators: string[];
+    steps: { method: string | null; theta: number; standardError: number | null; nextItem: string; response: number }[];
+    final: { method: string; theta: number; standardError: number };
+  };
+}
+const cat2pl = readFixture<Cat2plFixture>("cat-2pl.json");
+
+const cat3pl = readFixture<Cat3plFixture>("cat-3pl.json");
+
+interface CatBoundsFixture {
+  source: string;
+  responses: number[][];
+  cases: {
+    name: string;
+    rule: string;
+    within: string;
+    length: number;
+    stopping: { type: string; value?: number; length?: number };
+    constraints: { area: string; minimum: number; maximum: number; weight: number }[];
+    enemies: string[][];
+    items: {
+      id: string;
+      a: number;
+      b: number;
+      c: number;
+      d: number;
+      contentAreas: string[];
+      exposure: number;
+      testlet?: string;
+    }[];
+    persons: {
+      administered: string[];
+      responses: number[];
+      estimates: { theta: number; standardError: number }[];
+      initial: { theta: number; standardError: number };
+      counts: number[];
+    }[];
+  }[];
+  shadowTests: {
+    name: string;
+    bank: { id: string; a: number; b: number; c: number; d: number; contentAreas: string[] }[];
+    constraints: { area: string; minimum: number; maximum: number; weight: number }[];
+    length: number;
+    thetas: number[];
+    answers: number[][];
+    shadow: { rmse: number; bias: number; outside: number };
+  }[];
+}
+const catBounds = readFixture<CatBoundsFixture>("cat-bounds.json");
+
+interface CatCdmFixture {
+  source: string;
+  length: number;
+  thresholds: number[];
+  cases: {
+    name: string;
+    attributes: string[];
+    items: { id: string; attributes: string[]; probabilities: number[] }[];
+    profiles: { profile: number[]; proportion: number }[];
+    responses: number[][];
+    runs: {
+      rule: string;
+      person: number;
+      steps: {
+        posterior: number[];
+        mastery: number[];
+        map: number[];
+        scores: (number | null)[];
+        item: number;
+        response: number;
+      }[];
+      final: { posterior: number[]; mastery: number[]; map: number[] };
+      items: number[];
+      cdcat?: number[];
+    }[];
+    stopping: { administered: number; posterior: boolean[]; mastery: boolean[] }[][];
+    precision: { person: number; items: number[] }[];
+  }[];
+}
+const catCdm = readFixture<CatCdmFixture>("cat-cdm.json");
+
+interface CatContentFixture {
+  source: string;
+  items: { id: string; a: number; b: number; c: number; d: number; contentArea: string }[];
+  targets: { algebra: number; geometry: number; statistics: number };
+  run: {
+    name: string;
+    selection: string;
+    estimators: string[];
+    steps: {
+      method: string | null;
+      theta: number;
+      standardError: number | null;
+      nextItem: string;
+      response: number;
+      administeredProportions: number[];
+    }[];
+    final: { method: string; theta: number; standardError: number };
+  };
+}
+const catContent = readFixture<CatContentFixture>("cat-content.json");
+
+interface CatGpcmFixture {
+  source: string;
+  items: { id: string; a: number; b: number[] }[];
+  runs: {
+    name: string;
+    selection: string;
+    estimators: string[];
+    steps: {
+      method: string | null;
+      theta: number;
+      standardError: number | null;
+      nextItem: string;
+      response: number;
+      scores: (number | null)[];
+    }[];
+    final: { method: string; theta: number; standardError: number };
+  }[];
+}
+const catGpcm = readFixture<CatGpcmFixture>("cat-gpcm.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface CatMirtFixture {
+  source: string;
+  length: number;
+  thresholds: number[];
+  cases: {
+    name: string;
+    dimensions: number;
+    covariance: number[][];
+    items: { id: string; a: number[]; intercept: number; c: number; d: number }[];
+    responses: number[][];
+    runs: {
+      person: number;
+      mirtCAT: number[];
+      stopping: { administered: number; stops: boolean[] }[];
+      steps: {
+        theta: number[];
+        standardErrors: number[];
+        covariance: number[][];
+        scores: (number | null)[];
+        item: number;
+        response: number;
+      }[];
+      final: { theta: number[]; standardErrors: number[]; covariance: number[][] };
+      items: number[];
+    }[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const catMirt = readFixture<CatMirtFixture>("cat-mirt.json");
+
+interface CatMultistageCutsFixture {
+  source: string;
+  items: { id: string; model: string; parameters: { a: number; b: number | number[]; c?: number; d?: number } }[];
+  panels: {
+    name: string;
+    stages: { id: string; items: string[] }[][];
+    cases: {
+      description: string;
+      options: {
+        scale?: string;
+        method?: string;
+        shares?: number[][];
+        population?: { nodes: number[]; weights: number[] };
+      };
+      cuts: number[][];
+    }[];
+  }[];
+  tailCrossings: number[];
+  discretized: { population: { nodes: number[]; weights: number[] }; shares: number[]; density: number[] };
+}
+const cutsFixture = readFixture<CatMultistageCutsFixture>("cat-multistage-cuts.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface CatSelectionFixture {
+  source: string;
+  scores: Record<
+    string,
+    {
+      name: string;
+      fixture: string;
+      run: string;
+      step: number;
+      rule: string;
+      options: { prior?: { mean: number; sd: number }; information?: string };
+      theta: number;
+      scores: (number | null)[];
+    }
+  >;
+  replays: Record<
+    string,
+    { name: string; fixture: string; rule: string; starting: string[]; items: string[]; responses: number[] }
+  >;
+  random: {
+    "cat-3pl, MFI with MAP, after 0 items, length 12, acceleration 1": {
+      name: string;
+      fixture: string;
+      run: string;
+      step: number;
+      length: number;
+      acceleration: number;
+      theta: number;
+      weight: number;
+      uniforms: number[];
+      progressive: number[];
+      proportional: number[];
+      race: number[];
+    };
+    "cat-3pl, MFI with MAP, after 4 items, length 12, acceleration 1": {
+      name: string;
+      fixture: string;
+      run: string;
+      step: number;
+      length: number;
+      acceleration: number;
+      theta: number;
+      weight: number;
+      uniforms: number[];
+      progressive: (number | null)[];
+      proportional: (number | null)[];
+      race: (number | null)[];
+    };
+    "cat-3pl, MFI with MAP, after 9 items, length 12, acceleration 2": {
+      name: string;
+      fixture: string;
+      run: string;
+      step: number;
+      length: number;
+      acceleration: number;
+      theta: number;
+      weight: number;
+      uniforms: number[];
+      progressive: (number | null)[];
+      proportional: (number | null)[];
+      race: (number | null)[];
+    };
+    "cat-gpcm, MFI with MAP, after 6 items, length 15, acceleration 0.5": {
+      name: string;
+      fixture: string;
+      run: string;
+      step: number;
+      length: number;
+      acceleration: number;
+      theta: number;
+      weight: number;
+      uniforms: number[];
+      progressive: (number | null)[];
+      proportional: (number | null)[];
+      race: (number | null)[];
+    };
+  };
+  draws: {
+    items: number[];
+    administered: number[];
+    responses: number[];
+    theta: number;
+    length: number;
+    weight: number;
+    progressive: number[];
+    proportional: number[];
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const catSelection = readFixture<CatSelectionFixture>("cat-selection.json");
+
+interface CatStoppingFixture {
+  source: string;
+  interval: {
+    name: string;
+    cuts: number[];
+    level: number;
+    runs: { run: string; decisions: { administered: number; stops: boolean; category: number | null }[] }[];
+  }[];
+  sprt: {
+    name: string;
+    cuts: { lower: number; upper: number }[];
+    alpha: number;
+    beta: number;
+    runs: { run: string; decisions: { administered: number; stops: boolean; category: number | null }[] }[];
+  }[];
+}
+const catStopping = readFixture<CatStoppingFixture>("cat-stopping.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface CatTestletsFixture {
+  source: string;
+  responses: number[][];
+  cases: {
+    name: string;
+    within: string;
+    stopping: { type: string; value: number };
+    enemies: string[][];
+    items: { id: string; a: number; b: number; c: number; d: number; testlet: string | null; exposure: number }[];
+    persons: {
+      administered: string[];
+      responses: number[];
+      estimates: { theta: number; standardError: number }[];
+      initial: { theta: number; standardError: number };
+      withheld: string[];
+      mirtCAT: string[] | null;
+    }[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const catTestlets = readFixture<CatTestletsFixture>("cat-testlets.json");
+
+interface FormAssemblyFixture {
+  source: string;
+  replays: {
+    name: string;
+    forms: number;
+    overlap: number;
+    length: number;
+    constraints: { area: string; minimum: number; maximum: number; weight: number }[];
+    target: { theta: number; information: number; weight: number }[];
+    enemies: string[][];
+    items: { id: string; a: number; b: number; c: number; d: number; contentAreas: string[]; testlet?: string }[];
+    expected: { items: string[]; counts: number[]; information: number[] }[];
+  }[];
+  forms: number;
+  length: number;
+  pools: {
+    name: string;
+    items: { id: string; a: number; b: number; c: number; d: number; contentAreas: string[] }[];
+    blueprints: {
+      margin: number;
+      constraints: { area: string; minimum: number; maximum: number }[];
+      target: { theta: number; information: number }[];
+    }[];
+  }[];
+}
+const catForms = readFixture<FormAssemblyFixture>("form-assembly.json");
 
 // Tolerances against catR, explained in docs/validation.md.
 /** ML, MAP and WLE theta and standard error: catR finds roots with uniroot's default tolerance, about 1.2e-4. */
