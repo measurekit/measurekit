@@ -582,11 +582,11 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `kst`, its masks              | 4,096 sets of 16 skills, 65,536 states                         |      0.33 | 173                         |
 | `manyFacetRasch`              | 1,000 persons, 1 item, 500 raters, each person by two          |      0.13 | 74                          |
 | `personScalability`           | 2 persons, 1,000,000 items, from their response matrix         |       3.8 | 195                         |
-| `localDependenceChiSquare`    | 2 persons, 1,000 2PL items, the most: 499,500 pairs            |     0.028 | 105 to 214 by version       |
-| `localDependenceChiSquare`    | 2 graded items of 4,096 categories, the most cells             |       0.1 | 243 to 262 by version       |
+| `localDependenceChiSquare`    | 2 persons, 1,000 2PL items, the most: 499,500 pairs            |     0.028 | 102 to 228 by version, OS   |
+| `localDependenceChiSquare`    | 2 graded items of 4,096 categories, the most cells             |       0.1 | 132 to 262 by version, OS   |
 | `summedScoreFit`              | 2 persons, 300 2PL items, the highest total score              |     0.008 | 5 to 9 by version, OS       |
-| `yenQ3`                       | 2 persons, 1,000 2PL items, the most                           |     0.028 | 22                          |
-| `scalability`                 | 200 persons of distinct patterns, 1,000 items, the most        |       0.4 | 117                         |
+| `yenQ3`                       | 2 persons, 1,000 2PL items, the most                           |     0.028 | 14 to 22 by version, OS     |
+| `scalability`                 | 200 persons of distinct patterns, 1,000 items, the most        |       0.4 | 75 to 117 by version, OS    |
 | `conditionalAssociation`      | 8 persons, 1,000 items, the most                               |     0.015 | 141                         |
 | `assembleForms`               | 8,191 forms of the one item of a pool, the most counts         |    0.0001 | 223 to 288 by version, OS   |
 | `diagnosticAdaptiveTest`      | 64 items of one of 20 attributes, the most items × 2^K         |    0.0039 | 740                         |

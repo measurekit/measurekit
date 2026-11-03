@@ -232,7 +232,7 @@ export const READERS: readonly ReaderCase[] = [
   },
   {
     name: "localDependenceChiSquare: 2 persons, 1,000 2PL items, the most, 499,500 pairs",
-    budget: 430,
+    budget: 460,
     input: () => pairItems(1000),
     prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
     read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
