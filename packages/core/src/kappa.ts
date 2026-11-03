@@ -31,15 +31,79 @@ export function kappaOfPairs(
     highest - lowest < n
       ? countInTables(first, second, lowest, highest, agreement)
       : countInMaps(first, second, agreement);
-  // Over the categories that occur, so that the work grows with them, not with the range of the categories.
-  let chance = 0;
-  firstTally.categories.forEach((x, a) => {
-    const firstCount = firstTally.counts[a] ?? 0;
-    secondTally.categories.forEach((y, b) => {
-      chance += (firstCount * (secondTally.counts[b] ?? 0) * agreement(x, y)) / (n * n);
-    });
-  });
+  const range = highest - lowest;
+  const chance =
+    weights === "none" || range === 0
+      ? exactChance(firstTally, secondTally, n)
+      : weights === "linear"
+        ? linearChance(positions(firstTally, lowest, range), positions(secondTally, lowest, range), n)
+        : quadraticChance(positions(firstTally, lowest, range), positions(secondTally, lowest, range), n);
   return chance < 1 ? (observed / n - chance) / (1 - chance) : null;
+}
+
+// The chance agreement Σ_a Σ_b f_a s_b w(x_a, y_b) / n² over the categories that occur, f and s their counts in the two
+// lists, in time that grows with the categories rather than with their pairs: 20,000 categories took 4.6 s by pairs.
+
+/** Returns the chance agreement without weights: Σ f_c s_c / n² over the categories of both lists, by a merge. */
+function exactChance(first: Tally, second: Tally, n: number): number {
+  let sum = 0;
+  for (let a = 0, b = 0; a < first.categories.length && b < second.categories.length; ) {
+    const x = first.categories[a] ?? 0;
+    const y = second.categories[b] ?? 0;
+    if (x === y) sum += (first.counts[a++] ?? 0) * (second.counts[b++] ?? 0);
+    else if (x < y) a++;
+    else b++;
+  }
+  return sum / (n * n);
+}
+
+/** A list's categories as places from 0 to 1 over the range of both lists, with their counts. */
+interface Places {
+  readonly places: Float64Array;
+  readonly counts: Float64Array;
+}
+
+function positions({ categories, counts }: Tally, lowest: number, range: number): Places {
+  return { places: categories.map((category) => (category - lowest) / range), counts };
+}
+
+/**
+ * Returns the chance agreement under the weights 1 - |u - v|: 1 - Σ_a f_a D(u_a) / n² with D(u) = Σ_b s_b |u - v_b|,
+ * which the places in ascending order give by the counts and sums of the places of the second list below u.
+ */
+function linearChance(first: Places, second: Places, n: number): number {
+  let total = 0;
+  for (let b = 0; b < second.places.length; b++) total += (second.counts[b] ?? 0) * (second.places[b] ?? 0);
+  let countBelow = 0;
+  let sumBelow = 0;
+  let distance = 0;
+  for (let a = 0, b = 0; a < first.places.length; a++) {
+    const u = first.places[a] ?? 0;
+    for (; b < second.places.length && (second.places[b] ?? 0) <= u; b++) {
+      countBelow += second.counts[b] ?? 0;
+      sumBelow += (second.counts[b] ?? 0) * (second.places[b] ?? 0);
+    }
+    const away = u * countBelow - sumBelow + (total - sumBelow) - u * (n - countBelow);
+    distance += (first.counts[a] ?? 0) * away;
+  }
+  return 1 - distance / (n * n);
+}
+
+/**
+ * Returns the chance agreement under the weights 1 - (u - v)²: 1 - E[(U - V)²] for independent U and V of the two
+ * lists, Var U + Var V + (E U - E V)², each moment about its mean so that no large squares cancel.
+ */
+function quadraticChance(first: Places, second: Places, n: number): number {
+  const moments = ({ places, counts }: Places): { mean: number; variance: number } => {
+    let mean = 0;
+    for (let k = 0; k < places.length; k++) mean += ((counts[k] ?? 0) * (places[k] ?? 0)) / n;
+    let variance = 0;
+    for (let k = 0; k < places.length; k++) variance += ((counts[k] ?? 0) * ((places[k] ?? 0) - mean) ** 2) / n;
+    return { mean, variance };
+  };
+  const x = moments(first);
+  const y = moments(second);
+  return 1 - (x.variance + y.variance + (x.mean - y.mean) ** 2);
 }
 
 /** The categories that occur in a list, ascending, with the number of times each occurs. */

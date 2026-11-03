@@ -43,6 +43,48 @@ describe("kappaOfPairs", () => {
     }
   });
 
+  it("equals the sum over every pair of categories of their counts times their agreement", () => {
+    const pairs = fc.array(fc.tuple(fc.integer({ min: 0, max: 40 }), fc.integer({ min: 0, max: 40 })), {
+      minLength: 1,
+      maxLength: 60,
+    });
+    fc.assert(
+      fc.property(pairs, fc.constantFrom<KappaWeights>("none", "linear", "quadratic"), (values, weights) => {
+        const first = values.map(([x]) => x);
+        const second = values.map(([, y]) => y);
+        const lowest = Math.min(...first, ...second);
+        const range = Math.max(...first, ...second) - lowest;
+        const agreement = (x: number, y: number): number => {
+          if (weights === "none" || range === 0) return x === y ? 1 : 0;
+          const distance = Math.abs(x - y) / range;
+          return weights === "linear" ? 1 - distance : 1 - distance ** 2;
+        };
+        const n = values.length;
+        let observed = 0;
+        let chance = 0;
+        for (let i = 0; i < n; i++) {
+          observed += agreement(first[i] ?? 0, second[i] ?? 0) / n;
+          for (let j = 0; j < n; j++) chance += agreement(first[i] ?? 0, second[j] ?? 0) / (n * n);
+        }
+        const kappa = kappaOfPairs(first, second, weights);
+        if (chance > 1 - 1e-12) expect(kappa).toBeNull();
+        else expect(kappa).toBeCloseTo((observed - chance) / (1 - chance), 10);
+      }),
+    );
+  });
+
+  it("takes time that grows with the categories, not with their pairs", () => {
+    // 20,000 categories in each list, each once, the second the first reversed: no pair agrees, and chance agreement
+    // without weights is 1 / 20,000. Over every pair of categories, each weight took seconds.
+    const first = Array.from({ length: 20_000 }, (_, i) => i);
+    const second = first.toReversed();
+    expect(kappaOfPairs(first, second)).toBeCloseTo(-1 / 19_999, 15);
+    for (const weights of ["linear", "quadratic"] as const) {
+      const kappa = kappaOfPairs(first, second, weights);
+      expect(Number.isFinite(kappa) && (kappa ?? 0) < 0).toBe(true);
+    }
+  }, 3_000);
+
   it("does not depend on which list is first, on the order of the pairs, or on where the categories start", () => {
     const weights = fc.constantFrom<KappaWeights>("none", "linear", "quadratic");
     const pairs = fc.array(fc.tuple(fc.integer({ min: 0, max: 5 }), fc.integer({ min: 0, max: 5 })), {

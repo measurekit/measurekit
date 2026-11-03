@@ -10,3 +10,5 @@ line search, the Fisher-Yates shuffle, and the category probabilities of logisti
 `checkArray` refuses an array with a hole, such as `new Array(3)` or `[1, , 2]`, which `forEach`, `map` and `every`
 would skip, so that every check of a list reads each of its entries. `chiSquareUpperTail` is 0 at an infinite
 statistic.
+`kappaOfPairs` takes the chance agreement in time that grows with the categories that occur rather than with their
+pairs: 20,000 categories took seconds.
