@@ -506,24 +506,24 @@ library holds only what that name needs: `cronbachAlpha` from `@measurekit/psych
 | Entry point                                  | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own                          |
 | -------------------------------------------- | ---------------: | -----------: | --------------------------------------------------------- |
 | `@measurekit/core`                           |           13,578 |        5,571 | nothing                                                   |
-| `@measurekit/psychometrics`                  |          534,711 |      178,334 | every module of the package, and core                     |
+| `@measurekit/psychometrics`                  |          534,735 |      178,334 | every module of the package, and core                     |
 | `@measurekit/psychometrics/cat`              |           72,752 |       24,236 | core, cdm, checks, data, irt, math, multidimensional, sim |
 | `@measurekit/psychometrics/cdm`              |           43,762 |       15,959 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/change`           |            5,451 |        2,336 | core, checks                                              |
 | `@measurekit/psychometrics/ctt`              |           22,043 |        8,382 | core, data, math                                          |
 | `@measurekit/psychometrics/data`             |            6,694 |        2,354 | core                                                      |
-| `@measurekit/psychometrics/dif`              |           87,893 |       30,270 | core, data, equating, irt, math                           |
+| `@measurekit/psychometrics/dif`              |           87,923 |       30,273 | core, data, equating, irt, math                           |
 | `@measurekit/psychometrics/dimensionality`   |           38,604 |       14,301 | core, data, math                                          |
 | `@measurekit/psychometrics/equating`         |           61,294 |       20,877 | core, checks, irt, math                                   |
 | `@measurekit/psychometrics/explanatory`      |           50,565 |       17,622 | core, data, irt, math                                     |
 | `@measurekit/psychometrics/fit`              |           67,736 |       23,672 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/generalizability` |           14,727 |        5,484 | core, data, math                                          |
-| `@measurekit/psychometrics/irt`              |           84,409 |       28,462 | core, checks, data, math                                  |
+| `@measurekit/psychometrics/irt`              |           84,439 |       28,486 | core, checks, data, math                                  |
 | `@measurekit/psychometrics/mokken`           |           32,971 |       12,182 | core, data, math                                          |
-| `@measurekit/psychometrics/multidimensional` |          135,573 |       44,050 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/multidimensional` |          135,603 |       44,060 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/parameterization` |           18,255 |        5,958 | core, irt, multidimensional                               |
 | `@measurekit/psychometrics/rater`            |           54,657 |       18,784 | core, checks, data, fit, irt, math                        |
-| `@measurekit/psychometrics/response-time`    |           57,736 |       19,418 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/response-time`    |           57,760 |       19,438 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/scaling`          |           31,492 |       11,659 | core, checks, equating, irt, math                         |
 | `@measurekit/psychometrics/sim`              |           20,767 |        6,982 | core, cdm, checks, data, irt, multidimensional            |
 | `@measurekit/psychometrics/standard-setting` |           33,321 |       12,350 | core, checks, equating, irt, math                         |
