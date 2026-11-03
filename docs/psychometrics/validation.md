@@ -1180,7 +1180,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Augmented subscores, reliabilities and weights                                                    | 1e-10 absolute                                                  | 1e-13                    |
 | Molenaar-Sijtsma reliability                                                                      | 1e-10 absolute                                                  | 2e-15                    |
 | Normal quantile and density, logistic function                                                    | 1e-14 relative                                                  | 3e-16                    |
-| Gauss-Hermite nodes and weights                                                                   | 1e-12 absolute                                                  | 3e-14                    |
+| Gauss-Hermite nodes and weights, 1 to 500 points                                                  | 1e-12 absolute                                                  | 6.4e-14                  |
 | Eigenvalues and eigenvectors, up to sign                                                          | 1e-12 absolute                                                  | 2e-14                    |
 | IRT item parameters                                                                               | 1e-5 absolute                                                   | 6e-7                     |
 | IRT standard errors                                                                               | 1e-4 relative                                                   | 9e-6                     |

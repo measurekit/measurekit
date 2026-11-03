@@ -44,9 +44,11 @@ gauss_hermite <- function(count) {
     weights = decomposition$vectors[1, order]^2
   )
 }
+# 200 and 500 points: Newton's method from asymptotic starting values, Numerical Recipes' gauher, returns the largest
+# root again for every other root from about 195 points, and the rules must hold for any number of points.
 write_fixture("math-gauss-hermite", list(
   source = "Golub-Welsch: eigen() of the Jacobi matrix of the probabilists' Hermite polynomials.",
-  rules = lapply(c(1, 2, 5, 21, 61), gauss_hermite)
+  rules = lapply(c(1, 2, 5, 21, 61, 200, 500), gauss_hermite)
 ))
 
 # Symmetric eigendecompositions by base R's eigen(symmetric = TRUE), which calls LAPACK dsyevr, an algorithm other than

@@ -10,75 +10,98 @@ export interface Quadrature {
   readonly weights: Float64Array;
 }
 
-const PI_TO_MINUS_QUARTER = 0.7511255444649425;
 /** The rectangular rule spans [-RECTANGULAR_LIMIT, RECTANGULAR_LIMIT], mirt's default `theta_lim`. */
 const RECTANGULAR_LIMIT = 6;
 /**
- * The Newton step at which a root of the Hermite polynomial is exact to double precision (Numerical Recipes, gauher).
+ * The magnitude at which the recurrence of the orthonormal polynomials divides its two latest terms by itself: at the
+ * outer nodes of a rule of several hundred points they would overflow double precision.
  */
-const TOLERANCE = 1e-14;
-/** The most Newton steps per root, Numerical Recipes' MAXIT. */
-const MAX_ITERATIONS = 10;
+const RESCALE = 1e100;
 
 /**
  * Returns the `count`-point Gauss-Hermite rule for the standard normal density: the sum of `weights[i] * f(nodes[i])`
  * approximates the expectation of `f(X)` for X ~ N(0, 1), exactly for polynomials up to degree 2 * count - 1. The
  * weights sum to 1.
+ *
+ * @remarks
+ * The nodes are the eigenvalues of the Jacobi matrix of the probabilists' Hermite polynomials, 0 on the diagonal and
+ * √k beside it (Golub and Welsch). Each is isolated by bisection on the Sturm count of the eigenvalues below a point,
+ * which finds the k-th eigenvalue whatever the number of points, and a Newton step on the polynomial polishes it. The
+ * weight of a node x is 1 / (count φ(x)²), with φ the orthonormal polynomial of degree count - 1.
+ *
+ * @see {@link https://doi.org/10.1090/S0025-5718-69-99647-1 | Golub and Welsch (1969)}
+ * @see {@link https://doi.org/10.1007/BF02162154 | Barth, Martin and Wilkinson (1967)}
  */
 export function gaussHermite(count: number): Quadrature {
   const nodes = new Float64Array(count);
   const weights = new Float64Array(count);
-  // Roots of the Hermite polynomial for the weight exp(-x^2) by Newton's method from asymptotic starting values
-  // (Numerical Recipes, gauher), largest first, then rescaled to the standard normal density.
-  const roots: number[] = [];
-  let z = 0;
   for (let i = 0; i < Math.floor((count + 1) / 2); i++) {
-    z = startingValue(i, z, count, roots);
-    let derivative = 0;
-    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-      const [value, slope] = hermite(z, count);
-      derivative = slope;
-      const step = value / slope;
-      z -= step;
-      if (Math.abs(step) <= TOLERANCE) break;
-    }
-    roots.push(z);
-    const weight = 2 / (derivative * derivative) / Math.sqrt(Math.PI);
-    nodes[i] = -Math.SQRT2 * z;
-    nodes[count - 1 - i] = Math.SQRT2 * z;
-    weights[i] = weight;
+    const start = jacobiEigenvalue(count - 1 - i, count);
+    const [atStart, belowStart] = orthonormalHermite(start, count);
+    const node = start - atStart / (Math.sqrt(count) * belowStart);
+    const [, below, logScale] = orthonormalHermite(node, count);
+    const weight = Math.exp(-Math.log(count) - 2 * (Math.log(Math.abs(below)) + logScale));
+    nodes[count - 1 - i] = node;
+    nodes[i] = -node;
     weights[count - 1 - i] = weight;
+    weights[i] = weight;
   }
+  if (count % 2 === 1) nodes[(count - 1) / 2] = 0;
   return { nodes, weights };
 }
 
-function startingValue(i: number, previous: number, count: number, roots: readonly number[]): number {
-  const largest = roots[0] ?? 0;
-  const second = roots[1] ?? 0;
-  switch (i) {
-    case 0:
-      return Math.sqrt(2 * count + 1) - 1.85575 * (2 * count + 1) ** -0.16667;
-    case 1:
-      return previous - (1.14 * count ** 0.426) / previous;
-    case 2:
-      return 1.86 * previous - 0.86 * largest;
-    case 3:
-      return 1.91 * previous - 0.91 * second;
-    default:
-      return 2 * previous - (roots[i - 2] ?? 0);
+/**
+ * Returns the eigenvalue of index `index`, from the smallest at 0, of the Jacobi matrix of the probabilists' Hermite
+ * polynomials of degree `count`, by bisection to the rounding of the matrix's norm. Its eigenvalues lie within
+ * ±2 √count, Gershgorin's bound.
+ */
+function jacobiEigenvalue(index: number, count: number): number {
+  let lower = -2 * Math.sqrt(count);
+  let upper = 2 * Math.sqrt(count);
+  const width = 4 * Number.EPSILON * upper;
+  for (;;) {
+    const middle = (lower + upper) / 2;
+    if (!(upper - lower > width && lower < middle && middle < upper)) return middle;
+    if (eigenvaluesBelow(middle, count) > index) upper = middle;
+    else lower = middle;
   }
 }
 
-/** Returns the orthonormal Hermite polynomial of degree `count` at `z` and its derivative. */
-function hermite(z: number, count: number): [number, number] {
-  let p1 = PI_TO_MINUS_QUARTER;
-  let p2 = 0;
-  for (let j = 1; j <= count; j++) {
-    const p3 = p2;
-    p2 = p1;
-    p1 = z * Math.sqrt(2 / j) * p2 - Math.sqrt((j - 1) / j) * p3;
+/**
+ * Returns the number of eigenvalues below `x` of the Jacobi matrix: the negative pivots of the LDLᵀ factorization of
+ * the matrix less x times the identity, Sturm's count for a symmetric tridiagonal matrix.
+ */
+function eigenvaluesBelow(x: number, count: number): number {
+  let below = 0;
+  let pivot = 1;
+  for (let k = 0; k < count; k++) {
+    pivot = -x - (k === 0 ? 0 : k / pivot);
+    // A pivot of exactly 0 is moved off it by rounding, as in the bisection of Barth, Martin and Wilkinson.
+    if (pivot === 0) pivot = -Number.EPSILON * (1 + Math.abs(x));
+    if (pivot < 0) below++;
   }
-  return [p1, Math.sqrt(2 * count) * p2];
+  return below;
+}
+
+/**
+ * Returns the orthonormal probabilists' Hermite polynomials of degree `count` and `count - 1` at x, both divided by
+ * e to the power of the third entry, which keeps them finite.
+ */
+function orthonormalHermite(x: number, count: number): readonly [number, number, number] {
+  let previous = 0;
+  let current = 1;
+  let logScale = 0;
+  for (let k = 0; k < count; k++) {
+    const next = (x * current - Math.sqrt(k) * previous) / Math.sqrt(k + 1);
+    previous = current;
+    current = next;
+    if (Math.abs(current) > RESCALE) {
+      current /= RESCALE;
+      previous /= RESCALE;
+      logScale += Math.log(RESCALE);
+    }
+  }
+  return [current, previous, logScale];
 }
 
 /**
