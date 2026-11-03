@@ -5,8 +5,10 @@ import {
   calibrateMultidimensional,
   multidimensionalEstimates,
   multidimensionalGradedResponse,
+  multidimensionalMaximumLikelihoodEstimate,
   multidimensionalPosteriorMeanEstimate,
   multidimensionalTwoParameterLogistic,
+  multidimensionalWeightedLikelihoodEstimate,
   responseMatrix,
   rotateLoadings,
 } from "../src/index.js";
@@ -100,6 +102,12 @@ test("estimates the abilities of 1,000 persons on 24 items in two dimensions", a
   await benchmark(context, "multidimensional.estimateMode", () => multidimensionalEstimates(confirmatory, items));
   await benchmark(context, "multidimensional.estimateMean", () =>
     multidimensionalEstimates(confirmatory, items, multidimensionalPosteriorMeanEstimate),
+  );
+  await benchmark(context, "multidimensional.estimateLikelihood", () =>
+    multidimensionalEstimates(confirmatory, items, multidimensionalMaximumLikelihoodEstimate),
+  );
+  await benchmark(context, "multidimensional.estimateWeighted", () =>
+    multidimensionalEstimates(confirmatory, items, multidimensionalWeightedLikelihoodEstimate),
   );
 });
 

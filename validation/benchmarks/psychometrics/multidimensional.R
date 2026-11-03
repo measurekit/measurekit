@@ -1,7 +1,8 @@
-# Multidimensional item response theory: confirmatory and exploratory calibration by EM, calibration of five dimensions by
-# Metropolis-Hastings Robbins-Monro, ability estimation, and rotation of the loadings, against mirt's mirt and fscores and
-# GPArotation. mirt runs at its defaults: a tolerance of 1e-4 and a limit of 500 cycles, and 31 quadrature points per
-# dimension, as measurekit does; its MH-RM, at its default tolerance, with one seed.
+# Multidimensional item response theory: confirmatory and exploratory calibration by EM, calibration of five dimensions
+# by Metropolis-Hastings Robbins-Monro, ability estimation by MAP, EAP, ML and WLE, and rotation of the loadings,
+# against mirt's mirt and fscores and GPArotation. mirt runs at its defaults: a tolerance of 1e-4 and a limit of 500
+# cycles, and 31 quadrature points per dimension, as measurekit does; its MH-RM, at its default tolerance, with one
+# seed.
 
 suppressPackageStartupMessages({
   library(mirt)
@@ -116,6 +117,14 @@ bench_task("multidimensional.estimateMode", "Abilities by the posterior mode, in
 bench_task("multidimensional.estimateMean", "Abilities by the posterior mean, in two dimensions",
            sprintf("%s persons, 24 items", count(persons)), reference("mirt", "fscores(method = \"EAP\")"),
            function() fscores(confirmatory_fit, method = "EAP", quadpts = POINTS, verbose = FALSE))
+bench_task("multidimensional.estimateLikelihood", "Abilities by maximum likelihood, in two dimensions",
+           sprintf("%s persons, 24 items", count(persons)), reference("mirt", "fscores(method = \"ML\")"),
+           function() fscores(confirmatory_fit, method = "ML", max_theta = 6, verbose = FALSE),
+           note = "both keep the estimates in [-6, 6]: mirt with `max_theta = 6`")
+bench_task("multidimensional.estimateWeighted", "Abilities by weighted likelihood, in two dimensions",
+           sprintf("%s persons, 24 items", count(persons)), reference("mirt", "fscores(method = \"WLE\")"),
+           function() fscores(confirmatory_fit, method = "WLE", max_theta = 6, verbose = FALSE),
+           note = "both keep the estimates in [-6, 6]: mirt with `max_theta = 6`; for the M2PL, mirt's mode of the likelihood times √det I is Warm's estimator")
 bench_task("multidimensional.rotateOblimin", "Oblimin rotation of the loadings of a calibration",
            "20 items, 2 dimensions", reference("GPArotation", "oblimin"), function() oblimin(loadings))
 bench_task("multidimensional.rotateVarimax", "Varimax rotation of the loadings of a calibration",

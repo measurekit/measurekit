@@ -31,13 +31,13 @@ xychart-beta horizontal
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 558, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Psychometrics: multidimensional"
-  x-axis ["calibrateBifactor12", "calibrateBifactor40", "calibrateLongitudinal", "calibrateConfirmatory", "calibrateGraded", "calibrateExploratory", "calibrateGroups", "calibrateMhrm", "estimateMode", "estimateMean", "rotateOblimin", "rotateVarimax"]
+  x-axis ["calibrateBifactor12", "calibrateBifactor40", "calibrateLongitudinal", "calibrateConfirmatory", "calibrateGraded", "calibrateExploratory", "calibrateGroups", "calibrateMhrm", "estimateMode", "estimateMean", "estimateLikelihood", "estimateWeighted", "rotateOblimin", "rotateVarimax"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.052, 0.088, 0.043, 0.3, 0.16, 0.55, 0.16, 0.7, 0.045, 0.65, 0.13, 0.28]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.052, 0.088, 0.043, 0.3, 0.16, 0.55, 0.16, 0.7, 0.045, 0.65, 0.05, 0.017, 0.13, 0.28]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
@@ -296,6 +296,8 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro                              | 800 persons, 25 items of 6 categories, 5 correlated dimensions                                               |          10,844 | mirt 1.48 `mirt(method = "MHRM")`                                                                         |         15,487 |     0.7× |
 | Abilities by the posterior mode, in two dimensions                                                               | 1,000 persons, 24 items                                                                                      |            33.9 | mirt 1.48 `fscores(method = "MAP")`                                                                       |            746 |   0.045× |
 | Abilities by the posterior mean, in two dimensions                                                               | 1,000 persons, 24 items                                                                                      |            31.1 | mirt 1.48 `fscores(method = "EAP")`                                                                       |           47.5 |    0.65× |
+| Abilities by maximum likelihood, in two dimensions                                                               | 1,000 persons, 24 items                                                                                      |            70.7 | mirt 1.48 `fscores(method = "ML")`                                                                        |          1,404 |    0.05× |
+| Abilities by weighted likelihood, in two dimensions                                                              | 1,000 persons, 24 items                                                                                      |             250 | mirt 1.48 `fscores(method = "WLE")`                                                                       |         15,032 |   0.017× |
 | Oblimin rotation of the loadings of a calibration                                                                | 20 items, 2 dimensions                                                                                       |           0.029 | GPArotation 2026.8.2 `oblimin`                                                                            |          0.220 |    0.13× |
 | Varimax rotation of the loadings of a calibration                                                                | 20 items, 2 dimensions                                                                                       |           0.022 | GPArotation 2026.8.2 `Varimax`                                                                            |          0.077 |    0.28× |
 | Machine-human and human-human metrics, their degradation and the disattenuated correlation                       | 8,859 essays, two human raters                                                                               |            8.01 | RSMTool 12.0.0 `compute_degradation_and_disattenuated_correlations`                                       |           79.2 |     0.1× |
@@ -342,6 +344,8 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 - Calibration of a trait over three occasions by EM: the occasions are dimensions, and the items of each occasion are columns tied by constrain.
 - Calibration of an exploratory two-dimensional 2PL by EM: mirt stops at its limit of 500 cycles when it has not converged.
 - Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro: both draw the abilities, so the time depends on the seed; mirt runs with one.
+- Abilities by maximum likelihood, in two dimensions: both keep the estimates in [-6, 6]: mirt with `max_theta = 6`.
+- Abilities by weighted likelihood, in two dimensions: both keep the estimates in [-6, 6]: mirt with `max_theta = 6`; for the M2PL, mirt's mode of the likelihood times √det I is Warm's estimator.
 - The lognormal model of the response times: measurekit also estimates the item discriminations.
 - Joint draws of theta from separate posteriors by a Gaussian copula: the posteriors' distribution functions are inverted by base R's approx.
 - Livingston and Lewis's accuracy and consistency by one cut: LL.CA integrates by integrate's default relative tolerance, about 1.2e-4, and measurekit to 1e-12; at LL.CA's tolerance measurekit takes about a quarter of LL.CA's time.

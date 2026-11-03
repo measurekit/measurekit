@@ -35,6 +35,8 @@ const BUDGETS = {
   "multidimensional.calibrateMhrm": 200_000,
   "multidimensional.estimateMode": 500,
   "multidimensional.estimateMean": 500,
+  "multidimensional.estimateLikelihood": 600,
+  "multidimensional.estimateWeighted": 3_000,
   "multidimensional.rotateOblimin": 0.4,
   "multidimensional.rotateVarimax": 0.3,
   "cdm.calibrateGdina": 2_000,
