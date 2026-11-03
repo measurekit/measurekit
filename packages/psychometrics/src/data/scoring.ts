@@ -62,7 +62,12 @@ export function scoreResponses(
     }
   });
   const { optionLabels } = options;
-  if (optionLabels !== undefined) checkArray(optionLabels, "The option labels must be an array");
+  if (optionLabels !== undefined) {
+    checkArray(optionLabels, "The option labels must be an array");
+    for (const [index, label] of optionLabels.entries()) {
+      if (!isOptionLabel(label)) throw unexpectedLabel(label, `option label ${index + 1}`);
+    }
+  }
   const accepted = acceptedLabels(optionLabels);
   if (optionLabels !== undefined && new Set(optionLabels).size !== optionLabels.length) {
     throw new DataError("Option labels must be unique.");
@@ -98,7 +103,7 @@ function acceptedLabels(optionLabels: readonly string[] | undefined): {
     labels.add(label);
     if (scanned.length < SCANNED_LABELS) scanned.push(label);
   };
-  for (const label of optionLabels ?? []) if (isOptionLabel(label) && !labels.has(label)) add(label);
+  for (const label of optionLabels ?? []) if (!labels.has(label)) add(label);
   const accepts = (label: unknown): boolean => {
     for (let i = 0; i < scanned.length; i++) if (scanned[i] === label) return true;
     if (typeof label === "string" && labels.has(label)) return true;

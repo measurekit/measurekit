@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkFacetedScores } from "../src/data/internal.js";
+import { checkFacetedScores, checkResponseRecords } from "../src/data/internal.js";
 import {
   DataError,
   type FacetedScore,
@@ -133,7 +133,34 @@ describe("responseMatrix", () => {
     const row: (number | null)[] = [1];
     row.length = 2;
     expect(() => responseMatrix([row])).toThrow("found undefined");
-    expect(() => responseMatrixFromColumns([[1, 0], row])).toThrow("has 1 responses, but there are 2 item ids");
+    expect(() => responseMatrixFromColumns([[1, 0], row])).toThrow(
+      "Column 2 must be an array of responses, found an array with a hole at index 1.",
+    );
+  });
+
+  it("rejects a hole among the rows or the ids, which forEach would skip", () => {
+    const rows: (number | null)[][] = [[1, 0]];
+    rows[2] = [0, 1];
+    expect(() => responseMatrix(rows)).toThrow(
+      "The rows of a response matrix must be an array, found an array with a hole at index 1.",
+    );
+    const matrix = { personIds: ["a", "b", "c"], itemIds: ["q1", "q2"], responses: rows };
+    expect(() => itemStatistics(matrix)).toThrow('The responses of person "b" must be an array.');
+    const personIds: string[] = ["a"];
+    personIds.length = 2;
+    expect(() => responseMatrix([[1], [0]], { personIds })).toThrow(
+      "Every person id must be a string, found undefined.",
+    );
+    const times: (number | null)[][] = [[1]];
+    times.length = 2;
+    expect(() => responseMatrix([[1], [0]], { times })).toThrow('Person "person2" needs one time per item, 1 times.');
+  });
+
+  it("checks that a first row or column is an array before its length sizes the ids or the rows", () => {
+    // A length of 2³² would make an array that JavaScript cannot hold, and a smaller one an array of that many ids.
+    const object = JSON.parse('[{ "length": 4294967296 }]');
+    expect(() => responseMatrix(object)).toThrow('The responses of person "person1" must be an array.');
+    expect(() => responseMatrixFromColumns(object)).toThrow("Column 1 must be an array of responses, found an object.");
   });
 
   it("rejects matrices from JSON that are another value, lack an array or hold ids of another type", () => {
@@ -211,6 +238,23 @@ describe("responseRecords", () => {
       "Record 1 must be an object { person, item, response }, found null.",
     );
   });
+
+  it("rejects a hole among the records or the ids of records from JavaScript", () => {
+    const records = [{ person: "ana", item: "q1", response: 1 }];
+    records.length = 2;
+    expect(() => responseRecords(records)).toThrow(
+      "Response records must be an array, found an array with a hole at index 1.",
+    );
+    const data = { personIds: ["ana"], itemIds: ["q1"], records };
+    expect(() => checkResponseRecords(data)).toThrow(
+      "Record 2 must be an object { person, item, response }, found undefined.",
+    );
+    const itemIds = ["q1"];
+    itemIds.length = 2;
+    expect(() => responseRecords([{ person: "ana", item: "q1", response: 1 }], { itemIds })).toThrow(
+      "Every item id must be a string, found undefined.",
+    );
+  });
 });
 
 describe("scoreResponses", () => {
@@ -286,6 +330,20 @@ describe("scoreResponses", () => {
     ],
     ["a key label that is not a string", [["A"]], JSON.parse("[1]"), undefined, "the key of item 1, found 1."],
     ["option labels that are not an array", choices, ["A", "C", "B"], JSON.parse('"ABCD"'), "must be an array"],
+    [
+      "an empty option label",
+      choices,
+      ["A", "C", "B"],
+      ["A", "B", "C", "D", ""],
+      'Expected an option label in option label 5, found "".',
+    ],
+    [
+      "an option label that is not a string",
+      choices,
+      ["A", "C", "B"],
+      JSON.parse('["A", "B", "C", "D", 5]'),
+      "Expected an option label in option label 5, found 5.",
+    ],
   ])("rejects %s", (_, rows, key, optionLabels, message) => {
     const options = optionLabels ? { optionLabels } : {};
     expect(() => scoreResponses(rows, key, options)).toThrow(DataError);

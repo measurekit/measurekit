@@ -76,7 +76,12 @@ function buildResponseMatrix(
 ): ResponseMatrix {
   checkArray(rows, "The rows of a response matrix must be an array");
   checkOptions(options);
-  const { personIds = defaultIds("person", rows.length), itemIds = defaultIds("item", rows[0]?.length ?? 0) } = options;
+  // A first row that is not an array has no length to count items by: the check of the rows names it.
+  const first = rows[0];
+  const {
+    personIds = defaultIds("person", rows.length),
+    itemIds = defaultIds("item", Array.isArray(first) ? first.length : 0),
+  } = options;
   const matrix: ResponseMatrix = {
     personIds,
     itemIds,
@@ -110,10 +115,13 @@ export function responseMatrixFromColumns(
   options: ResponseMatrixOptions = {},
 ): ResponseMatrix {
   checkArray(columns, "The columns of a response matrix must be an array");
+  // Every column is checked before the length of the first sizes the rows.
+  columns.forEach((column, item) => {
+    checkArray(column, `Column ${item + 1} must be an array of responses`);
+  });
   const personCount = columns[0]?.length ?? 0;
   const rows: (number | null)[][] = Array.from({ length: personCount }, () => []);
   columns.forEach((column, item) => {
-    checkArray(column, `Column ${item + 1} must be an array of responses`);
     if (column.length !== personCount) {
       throw new DataError(`Column ${item + 1} has ${column.length} responses, column 1 has ${personCount}.`);
     }
@@ -145,23 +153,29 @@ function checkMatrix(
   if (!(Array.isArray(personIds) && Array.isArray(itemIds) && Array.isArray(responses))) {
     throw new DataError("A response matrix needs the arrays personIds, itemIds and responses.");
   }
-  if (responses.length === 0 || itemIds.length === 0) {
-    throw new DataError("A response matrix needs at least one person and one item.");
-  }
   if (personIds.length !== responses.length) {
     throw new DataError(`Found ${responses.length} rows of responses and ${personIds.length} person ids.`);
   }
-  if (checkPersonIds) indexIds("person", personIds);
-  if (checkItemIds) indexIds("item", itemIds);
-  responses.forEach((row, person) => {
+  // By index, so that a hole in the rows is a row that is not an array, which forEach would skip.
+  for (let person = 0; person < responses.length; person++) {
+    const row: unknown = responses[person];
     if (!Array.isArray(row)) throw new DataError(`The responses of person "${personIds[person]}" must be an array.`);
     if (row.length !== itemIds.length) {
       throw new DataError(
         `Person "${personIds[person]}" has ${row.length} responses, but there are ${itemIds.length} item ids.`,
       );
     }
-    if (checkCells) checkRow(row, personIds[person], itemIds);
-  });
+  }
+  if (responses.length === 0 || itemIds.length === 0) {
+    throw new DataError("A response matrix needs at least one person and one item.");
+  }
+  if (checkPersonIds) indexIds("person", personIds);
+  if (checkItemIds) indexIds("item", itemIds);
+  if (checkCells) {
+    responses.forEach((row, person) => {
+      checkRow(row, personIds[person], itemIds);
+    });
+  }
   if (matrix.times !== undefined) checkTimes(matrix);
 }
 
@@ -181,23 +195,35 @@ function checkRow(row: readonly unknown[], personId: string | undefined, itemIds
  * Checks that a matrix's times have one row per person and one time per item, each a positive finite number where
  * there is a response, or `null`.
  */
-function checkTimes({ personIds, itemIds, responses, times }: ResponseMatrix): void {
+function checkTimes(matrix: ResponseMatrix): void {
+  const { itemIds, responses, times } = matrix;
   if (!(Array.isArray(times) && times.length === responses.length)) {
     throw new DataError(`A response matrix needs one row of times per person, ${responses.length} rows.`);
   }
-  times.forEach((row, person) => {
+  // By index, so that a hole in the rows of times is a row that is not an array, which forEach would skip.
+  for (let person = 0; person < times.length; person++) {
+    const row: unknown = times[person];
     if (!(Array.isArray(row) && row.length === itemIds.length)) {
-      throw new DataError(`Person "${personIds[person]}" needs one time per item, ${itemIds.length} times.`);
+      throw new DataError(`Person "${matrix.personIds[person]}" needs one time per item, ${itemIds.length} times.`);
     }
-    for (const [item, time] of row.entries()) {
-      if (time === null) continue;
-      const place = `The time of person "${personIds[person]}" on item "${itemIds[item]}"`;
-      if (!isPositive(time)) {
-        throw new DataError(`${place} must be a positive number or null, found ${describe(time)}.`);
-      }
-      if (responses[person]?.[item] === null) throw new DataError(`${place} needs a response, found ${time}.`);
+    checkTimeRow(matrix, person, row);
+  }
+}
+
+/** Checks that each time of a person is a positive finite number where there is a response, or `null`. */
+function checkTimeRow(
+  { personIds, itemIds, responses }: ResponseMatrix,
+  person: number,
+  row: readonly unknown[],
+): void {
+  for (const [item, time] of row.entries()) {
+    if (time === null) continue;
+    const place = `The time of person "${personIds[person]}" on item "${itemIds[item]}"`;
+    if (!isPositive(time)) {
+      throw new DataError(`${place} must be a positive number or null, found ${describe(time)}.`);
     }
-  });
+    if (responses[person]?.[item] === null) throw new DataError(`${place} needs a response, found ${time}.`);
+  }
 }
 
 function copyRows<T>(rows: readonly (readonly T[])[]): T[][] {

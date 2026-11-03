@@ -100,7 +100,9 @@ export function checkResponseRecords(data: ResponseRecords): IndexedRecord[][] {
   const persons = indexIds("person", personIds);
   const items = indexIds("item", itemIds);
   const byPerson = personIds.map((): IndexedRecord[] => []);
-  records.forEach((record, index) => {
+  // By index, so that a hole in the records is a record that is not an object, which forEach would skip.
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index];
     checkRecord(record, `Record ${index + 1} must be an object { person, item, response }`);
     const person = persons.get(record.person);
     const item = items.get(record.item);
@@ -122,7 +124,7 @@ export function checkResponseRecords(data: ResponseRecords): IndexedRecord[][] {
       );
     }
     byPerson[person]?.push({ item, response, time: time ?? 0 });
-  });
+  }
   byPerson.forEach((list, person) => {
     list.sort((x, y) => x.item - y.item);
     for (let r = 1; r < list.length; r++) {
