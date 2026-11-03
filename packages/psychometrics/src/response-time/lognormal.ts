@@ -1,5 +1,6 @@
 import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import { withinStandardErrorSize } from "../irt/internal.js";
 import { invertPositiveDefinite } from "../math/internal.js";
 import { forEachTime, type TimedResponses, type TimeItem, timedResponses } from "./timed-responses.js";
 
@@ -50,11 +51,6 @@ const DEFAULT_TOLERANCE = 1e-6;
 const DEFAULT_MAX_ITERATIONS = 1000;
 /** The starting standard deviation of the speed. */
 const START_SPEED_SD = 0.5;
-/**
- * The most items whose intensities' standard errors are computed: their information holds every pair of the items, 32
- * MB at 2,000, and its inversion takes time with their cube. A calibration of more gives none.
- */
-const MAX_ERROR_ITEMS = 2000;
 
 /**
  * Calibrates the lognormal model of response times: ln T_ij ~ N(β_i - τ_j, 1 / α_i²), with the speed τ_j ~ N(0, σ_τ²),
@@ -111,7 +107,8 @@ export function calibrateResponseTimes(
   const persons = new Set<number>();
   forEachTime(timed, (person) => persons.add(person));
   const logLikelihood = marginalLogLikelihood(timed, state);
-  const errors = itemCount > MAX_ERROR_ITEMS ? null : intensityErrors(timed, state);
+  // The intensities' information holds every pair of the items, 32 MB at the bound, and its inversion takes their cube.
+  const errors = withinStandardErrorSize(itemCount) ? intensityErrors(timed, state) : null;
   const parameters = 2 * itemCount + 1;
   return {
     items: timed.itemIds.map((id, i) => ({

@@ -150,7 +150,7 @@ export const RULES: readonly Rule[] = [
   {
     rule: "Standard errors take at most 2,000 estimated parameters, as their information is a dense matrix of every pair and its inverse takes their cube.",
     file: "packages/psychometrics/src/irt/standard-error-size.ts",
-    find: "if (parameters > MAX_STANDARD_ERROR_PARAMETERS) {",
+    find: "if (!withinStandardErrorSize(parameters)) {",
     replace: "if (false) {",
     test: "packages/psychometrics/test/irt.test.ts",
     titles: "bounds standard errors to 2,000",
@@ -502,7 +502,7 @@ export const RULES: readonly Rule[] = [
   {
     rule: "A lognormal calibration of more than 2,000 items gives no standard errors, whose information holds every pair.",
     file: "packages/psychometrics/src/response-time/lognormal.ts",
-    find: "itemCount > MAX_ERROR_ITEMS ? null : intensityErrors(timed, state)",
+    find: "withinStandardErrorSize(itemCount) ? intensityErrors(timed, state) : null",
     replace: "intensityErrors(timed, state)",
     test: "packages/psychometrics/test/response-time.test.ts",
     titles: "standard errors of more than 2,000 items",
