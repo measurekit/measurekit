@@ -579,6 +579,25 @@ describe("logistic models", () => {
 describe("logistic edge cases", () => {
   const event: Event = { learner: "ana", item: "q", skills: ["s"], time: 10, outcome: 1 };
 
+  it("refuses a feature that overflows, as a power of a short time apart, rather than predict NaN", () => {
+    const log = eventLog([
+      { ...event, time: 0 },
+      { ...event, time: 0.5, outcome: 0 },
+    ]);
+    const message =
+      'The feature recency(1100) is Infinity at the attempt of learner "ana" at item "q", time 0.5: lower its exponent or decay, or give times in larger units.';
+    expect(() => logistic({ features: [{ recency: 1100 }] }).fit(log)).toThrow(message);
+    const model = logistic({
+      features: [{ recency: 1100 }],
+      parameters: { skills: { s: { intercept: 0, coefficients: { "recency(1100)": 0 } } } },
+    });
+    const state = model.update(model.initialState("ana"), defined(log[0]));
+    expect(() => model.predict(state, { ...event, time: 0.5 })).toThrow(message);
+    expect(() => logistic({ features: [{ over: "learner", feature: { recency: 1100 } }] }).fit(log)).toThrow(
+      "The feature recency(1100) is Infinity",
+    );
+  });
+
   it("fit one learner, and logs all correct or all wrong, without NaN", () => {
     const one = eventLog(Array.from({ length: 8 }, (_, time) => ({ ...event, time, outcome: time % 3 === 0 ? 0 : 1 })));
     for (const log of [

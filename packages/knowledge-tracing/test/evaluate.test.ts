@@ -940,7 +940,11 @@ describe("the analysis of learning curves", () => {
     );
     expect(() => powerLawFit([point, point])).toThrow("Point 2 repeats opportunity 1.");
     expect(() => powerLawFit([{ ...point, count: 0 }])).toThrow(
-      "Point 1 needs a count that is an integer from 1, found 0.",
+      "Point 1 needs a count that is a safe integer from 1, found 0.",
+    );
+    // Counts this large would make the sums of the fit overflow, and its results NaN.
+    expect(() => powerLawFit([point, { ...point, opportunity: 2, count: 1e308 }])).toThrow(
+      "Point 2 needs a count that is a safe integer from 1, found 1e+308.",
     );
     expect(() => powerLawFit([{ ...point, errorRate: 1.5 }])).toThrow(
       "Point 1 needs an error rate from 0 to 1, found 1.5.",

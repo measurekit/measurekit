@@ -5,8 +5,8 @@ import type { LearningCurvePoint } from "./learning-curve.js";
 export type ErrorRatePoint = Pick<LearningCurvePoint, "opportunity" | "count" | "errorRate">;
 
 /**
- * Checks the points of a learning curve: integer opportunities from 1, each once, counts above 0 and error rates from
- * 0 to 1.
+ * Checks the points of a learning curve: integer opportunities from 1, each once, counts that are safe integers from 1
+ * and error rates from 0 to 1.
  */
 export function checkCurvePoints(points: readonly ErrorRatePoint[]): void {
   checkArray(points, "The points must be an array of learning curve points");
@@ -20,8 +20,9 @@ export function checkCurvePoints(points: readonly ErrorRatePoint[]): void {
     }
     if (seen.has(opportunity)) throw new DataError(`${label} repeats opportunity ${opportunity}.`);
     seen.add(opportunity);
-    if (!(Number.isInteger(count) && count >= 1)) {
-      throw new DataError(`${label} needs a count that is an integer from 1, found ${describe(count)}.`);
+    // A count of events is a safe integer, and the sums of a fit over such counts stay finite.
+    if (!(Number.isSafeInteger(count) && count >= 1)) {
+      throw new DataError(`${label} needs a count that is a safe integer from 1, found ${describe(count)}.`);
     }
     if (!isUnitInterval(errorRate)) {
       throw new DataError(`${label} needs an error rate from 0 to 1, found ${describe(errorRate)}.`);

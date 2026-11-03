@@ -9,7 +9,7 @@ import {
   readsExposures,
 } from "./features.js";
 import type { ParameterLabels } from "./parameters.js";
-import type { LogisticState, SkillHistory, StateNeeds } from "./state.js";
+import type { ExposureHistory, LogisticState, SkillHistory, StateNeeds } from "./state.js";
 
 /** What a term's history counts over: the learner's attempts at each skill, at the item, or all of them. */
 export type TermScope = "skill" | "item" | "learner";
@@ -246,7 +246,7 @@ export function visitRow(terms: Terms, state: LogisticState, attempt: Attempt, v
   for (const term of terms.shared) {
     if (term.over !== "skill") {
       const history = term.over === "item" ? itemHistory : state.overall;
-      scratch.shared[at] = featureValue(term.feature, history, undefined, attempt.time, state.practice ?? 0);
+      scratch.shared[at] = finiteValue(term.feature, history, undefined, attempt, state.practice ?? 0);
     }
     at++;
   }
@@ -257,7 +257,6 @@ export function visitRow(terms: Terms, state: LogisticState, attempt: Attempt, v
 /** Visits the block of each of the attempt's skills, and adds its terms with shared coefficients to theirs. */
 function visitSkills(terms: Terms, state: LogisticState, attempt: Attempt, visitor: RowVisitor): void {
   const { scratch, skills, shared } = terms;
-  const { time } = attempt;
   const practice = state.practice ?? 0;
   const first = terms.intercepts.skill ? 1 : 0;
   for (const skill of attempt.skills) {
@@ -265,11 +264,12 @@ function visitSkills(terms: Terms, state: LogisticState, attempt: Attempt, visit
     const exposure = entry(state.exposures, skill);
     if (first === 1) scratch.skill[0] = 1;
     let at = first;
-    for (const term of skills) scratch.skill[at++] = featureValue(term.feature, history, exposure, time, practice);
+    for (const term of skills) scratch.skill[at++] = finiteValue(term.feature, history, exposure, attempt, practice);
     at = 0;
     for (const term of shared) {
       if (term.over === "skill") {
-        scratch.shared[at] = (scratch.shared[at] ?? 0) + featureValue(term.feature, history, exposure, time, practice);
+        scratch.shared[at] =
+          (scratch.shared[at] ?? 0) + finiteValue(term.feature, history, exposure, attempt, practice);
       }
       at++;
     }
@@ -291,9 +291,30 @@ function visitItem(
   if (first === 1) scratch.item[0] = 1;
   let at = first;
   for (const term of items) {
-    scratch.item[at++] = featureValue(term.feature, history, undefined, attempt.time, state.practice ?? 0);
+    scratch.item[at++] = finiteValue(term.feature, history, undefined, attempt, state.practice ?? 0);
   }
   visitor.item(attempt.item, scratch.item);
+}
+
+/**
+ * Returns a feature's value for an attempt, from the learner's history before it.
+ *
+ * @throws `DataError` when the value is not finite, as a power of a short time apart can overflow.
+ */
+function finiteValue(
+  feature: FeatureSpec,
+  history: SkillHistory | undefined,
+  exposure: ExposureHistory | undefined,
+  attempt: Attempt,
+  practice: number,
+): number {
+  const value = featureValue(feature, history, exposure, attempt.time, practice);
+  if (!Number.isFinite(value)) {
+    throw new DataError(
+      `The feature ${feature.label} is ${value} at the attempt of learner "${attempt.learner}" at item "${attempt.item}", time ${attempt.time}: lower its exponent or decay, or give times in larger units.`,
+    );
+  }
+  return value;
 }
 
 /**

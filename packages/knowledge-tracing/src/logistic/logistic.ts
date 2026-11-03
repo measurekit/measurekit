@@ -130,7 +130,8 @@ export interface LogisticModel extends LearnerModel<LogisticState, LogisticParam
    * the fit cover the skills, items and learners of the log.
    *
    * @throws `DataError` when the log is malformed, an event has no skills, a covariate is missing from an event with an
-   * outcome, or the fit has more coefficients than a fit without a ridge or with random proficiency solves.
+   * outcome, a feature's value is not finite, or the fit has more coefficients than a fit without a ridge or with random
+   * proficiency solves.
    */
   fit(log: EventLog): LogisticFit;
 }

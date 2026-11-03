@@ -309,6 +309,7 @@ skill; outcomes from 0 to 1 count as partial credit.
 | An event with an outcome, or an attempt to predict, lacks a covariate                                   | Give every attempt each name of `covariates`                                                   |
 | A model with shared coefficients has no `shared` parameters when it predicts                            | Fit it, or pass `parameters` with `shared`                                                     |
 | An attempt is earlier than the learner's last attempt at a skill, item or any item that a term reads    | Give the attempts in time order                                                                |
+| A feature's value is not finite, such as `recency` with a large exponent at a short time apart          | Lower the exponent or decay, or give times in larger units                                     |
 | `searchRates` gets bounds of the wrong length, a start outside them, or a `build` that returns no model | Pass one start, lower and upper bound for each rate `build` takes                              |
 
 ## References
