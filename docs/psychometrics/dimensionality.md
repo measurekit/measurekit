@@ -331,8 +331,8 @@ lowest value, the first when tied, and `smoothed`.
 import { minimumAveragePartial } from "@measurekit/psychometrics/dimensionality";
 
 const { map, factors } = minimumAveragePartial(matrix, { correlation: "polychoric" });
-map.slice(0, 4); // [0.0782, 0.0219, 0.0364, 0.0518]: the lowest is after 2 components
-factors; // 2
+map.slice(0, 4); // [0.0448, 0.0539, 0.063, 0.1071]: the lowest is after 1 component, the general trait
+factors; // 1
 ```
 
 `map` is the `map` of psych's `VSS`, which starts at one component, so the test never answers none; Velicer's original also
