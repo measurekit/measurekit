@@ -415,6 +415,29 @@ describe("borderlineRegressionCutScores", () => {
     expectClose(reflected.standardError, 0, 1e-12);
   });
 
+  it("gives each station without a line a result of its own, null throughout", () => {
+    const result = borderlineRegressionCutScores(
+      [
+        [1, 2],
+        [3, 4],
+      ],
+      [
+        [2, 2],
+        [2, 2],
+      ],
+      2,
+    );
+    expect(result).toEqual({
+      stations: [
+        { cutScore: null, standardError: null, rSquared: null, intercept: null, slope: null },
+        { cutScore: null, standardError: null, rSquared: null, intercept: null, slope: null },
+      ],
+      cutScore: null,
+      standardError: null,
+    });
+    expect(result.stations[0]).not.toBe(result.stations[1]);
+  });
+
   it("refuses more than 2^28 persons × stations² before it sums them", () => {
     const row = new Array<number>(1024).fill(1);
     const rows = Array.from({ length: 257 }, () => row);

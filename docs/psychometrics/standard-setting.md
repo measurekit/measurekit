@@ -237,12 +237,11 @@ persons. Its fields are the quality metrics of Pell et al. (2010):
 
 The test's `standardError` sums the covariances of the stations' cuts. A person's residuals at two stations correlate
 (Homer et al., 2016), so the root of the sum of the squared standard errors, which assumes they do not, is off. Each cut
-is Σᵢ wᵢ yᵢ with
-wᵢ = 1/n + (x₀ - x̄)(xᵢ - x̄) / Sxx, two cuts have the covariance σ_st Σᵢ w_si w_ti, and σ_st is estimated by the
-residuals' cross products over n - 2, as for equations fitted one by one (Zellner, 1962). Like each station's, it holds
-the ratings fixed.
+is Σᵢ wᵢ yᵢ with wᵢ = 1/n + (x₀ - x̄)(xᵢ - x̄) / Sxx, two cuts have the covariance σ_st Σᵢ w_si w_ti, and σ_st is
+estimated by the residuals' cross products over n - 2, as for equations fitted one by one (Zellner, 1962). Like each
+station's, it holds the ratings fixed.
 
-**The borderline group** takes the mark of the persons rated borderline at the station: their mean, with its standard
+**The borderline group** takes the marks of the persons rated borderline at the station: their mean, with its standard
 error sd / √n, or with `statistic: "median"` their median, as Livingston and Zieky's method does. Several grades, such
 as `[2, 3]` for a borderline fail and a borderline pass, give the modified borderline group. Each station's group
 holds different persons, and a group of a few persons gives an unstable cut (McKinley and Norcini, 2014).
@@ -252,7 +251,8 @@ holds different persons, and a group of a few persons gives an unstable cut (McK
 | `statistic` | `"mean"` | `"mean"` or `"median"` of the group's marks |
 
 - **Undefined cuts.** A station whose ratings all agree has no line, and one without a borderline person no group: its
-  fields are `null`, and so is the test's cut. A station whose marks all agree has a cut and no `rSquared`.
+  cut and standard error are `null`, and so is the test's cut. A station whose marks all agree has a cut and no
+  `rSquared`.
 - **Persons.** Every person needs a mark and a rating at every station; leave out those who missed one.
 - **Limit.** Borderline regression sums over the persons for each pair of stations: persons × stations² is at most
   2^28. At the limit, 26,843 persons at 100 stations take 0.3 s and 671,088 persons at 20 stations 1.4 s.

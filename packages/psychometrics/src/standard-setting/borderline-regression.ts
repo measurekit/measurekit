@@ -80,7 +80,8 @@ export function borderlineRegressionCutScores(
     );
   }
   const fits = stations.marks.map((y, s) => stationFit(y, stations.ratings[s] ?? y, borderline, s));
-  const results = fits.map((fit) => fit?.result ?? NO_LINE);
+  // A fresh object for each station without a line, so that no two results alias one.
+  const results = fits.map((fit) => fit?.result ?? { ...NO_LINE });
   const lines = fits.filter((fit): fit is StationFit => fit !== null);
   if (lines.length < fits.length) return { stations: results, cutScore: null, standardError: null };
   const cutScore = lines.reduce((sum, fit) => sum + (fit.result.cutScore ?? 0), 0);
