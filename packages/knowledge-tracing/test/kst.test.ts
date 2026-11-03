@@ -1166,6 +1166,21 @@ describe("KST edge cases", () => {
     );
     expect(() => iita(eventLog([answer("a", "x", 1, 0)]))).toThrow("IITA needs at least 2 items.");
   });
+
+  it("refuses an incomplete table at the cost of its events, without a pattern of every item for every learner", () => {
+    // 40,000 learners with an item each: their patterns over every item would hold 1.6 billion answers.
+    const learners = 40_000;
+    const log = eventLog(
+      Array.from({ length: learners }, (_, k) => ({
+        learner: `l${k}`,
+        item: `i${k}`,
+        skills: [],
+        time: k,
+        outcome: 1,
+      })),
+    );
+    expect(() => iita(log)).toThrow('IITA needs every learner to answer every item; "l0" has no answer to "i1".');
+  });
 });
 
 describe("BLIM constraints and diagnostics", () => {
