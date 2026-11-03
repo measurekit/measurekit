@@ -1,4 +1,4 @@
-import { checkFinite, checkRecord, checkUnitInterval, DataError } from "@measurekit/core";
+import { checkFinite, checkOptions, checkRecord, checkUnitInterval, DataError } from "@measurekit/core";
 
 /** The difficulty class of an item by its p-value. */
 export type DifficultyClass = "difficult" | "moderate" | "easy";
@@ -35,18 +35,28 @@ export interface DiscriminationThresholds {
  */
 export const DISCRIMINATION_THRESHOLDS: DiscriminationThresholds = { veryGood: 0.4, good: 0.3, marginal: 0.2 };
 
+/** Options of {@link classifyDifficulty}. */
+export interface DifficultyClassificationOptions {
+  /**
+   * The p-values that separate the classes.
+   *
+   * @defaultValue {@link DIFFICULTY_THRESHOLDS}
+   */
+  readonly thresholds?: DifficultyThresholds;
+}
+
 /**
  * Classifies a p-value from 0 to 1.
  *
  * @param p - The p-value of an item.
- * @param thresholds - The p-values that separate the classes.
+ * @param options - The p-values that separate the classes.
  * @returns The class.
- * @throws `DataError` when `p` is outside [0, 1] or the thresholds are not numbers ordered within it.
+ * @throws `DataError` when `p` is outside [0, 1], the options are not an object or the thresholds are not numbers
+ * ordered within it.
  */
-export function classifyDifficulty(
-  p: number,
-  thresholds: DifficultyThresholds = DIFFICULTY_THRESHOLDS,
-): DifficultyClass {
+export function classifyDifficulty(p: number, options: DifficultyClassificationOptions = {}): DifficultyClass {
+  checkOptions(options);
+  const { thresholds = DIFFICULTY_THRESHOLDS } = options;
   checkRecord(thresholds, "Difficulty thresholds must be an object { difficult, easy }");
   const { difficult, easy } = thresholds;
   checkUnitInterval(difficult, "The difficult threshold");
@@ -59,18 +69,31 @@ export function classifyDifficulty(
   return p > easy ? "easy" : "moderate";
 }
 
+/** Options of {@link classifyDiscrimination}. */
+export interface DiscriminationClassificationOptions {
+  /**
+   * The values that separate the classes.
+   *
+   * @defaultValue {@link DISCRIMINATION_THRESHOLDS}
+   */
+  readonly thresholds?: DiscriminationThresholds;
+}
+
 /**
  * Classifies a discrimination value, such as the discrimination index D or an item-total correlation.
  *
  * @param value - The discrimination index or correlation.
- * @param thresholds - The values that separate the classes.
+ * @param options - The values that separate the classes.
  * @returns The class.
- * @throws `DataError` when `value` is not a finite number or the thresholds are not finite numbers in order.
+ * @throws `DataError` when `value` is not a finite number, the options are not an object or the thresholds are not
+ * finite numbers in order.
  */
 export function classifyDiscrimination(
   value: number,
-  thresholds: DiscriminationThresholds = DISCRIMINATION_THRESHOLDS,
+  options: DiscriminationClassificationOptions = {},
 ): DiscriminationClass {
+  checkOptions(options);
+  const { thresholds = DISCRIMINATION_THRESHOLDS } = options;
   checkRecord(thresholds, "Discrimination thresholds must be an object { veryGood, good, marginal }");
   const { veryGood, good, marginal } = thresholds;
   checkFinite(veryGood, "The very good threshold");

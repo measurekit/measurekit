@@ -1,12 +1,6 @@
 import { checkOptions, checkPositive, checkRecord } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecord, ResponseRecords } from "../data/internal.js";
-import {
-  type AbilityEstimator,
-  abilityEstimates,
-  type PersonEstimate,
-  posteriorMeanEstimate,
-  type TestItem,
-} from "../irt/internal.js";
+import { type AbilityEstimatesOptions, abilityEstimates, type PersonEstimate, type TestItem } from "../irt/internal.js";
 import { timedResponses } from "./timed-responses.js";
 
 const DEFAULT_PERCENTAGE = 10;
@@ -111,19 +105,19 @@ export function responseTimeEffort(
  * @param data - The responses of the persons with their times.
  * @param items - The calibrated items.
  * @param thresholds - The rapid-guessing threshold of each item by id, in seconds.
- * @param estimator - The estimator of theta from the remaining responses.
+ * @param options - The estimator of theta from the remaining responses.
  * @returns The estimate of each person from the responses that were not rapid guesses.
  * @throws `DataError` when the data are malformed or have no times, a threshold is invalid, or in the cases of
  * {@link abilityEstimates}.
- * @defaultValue `estimator` is `posteriorMeanEstimate`
  * @see {@link https://doi.org/10.1111/j.1745-3984.2006.00002.x | Wise and DeMars (2006)}
  */
 export function effortModeratedEstimates(
   data: ResponseMatrix | ResponseRecords,
   items: readonly TestItem[],
   thresholds: Readonly<Record<string, number>>,
-  estimator: AbilityEstimator = posteriorMeanEstimate,
+  options: AbilityEstimatesOptions = {},
 ): PersonEstimate[] {
+  checkOptions(options);
   const timed = timedResponses(data, "Effort-moderated scoring");
   const limits = thresholdsOf(timed.itemIds, thresholds);
   const records: ResponseRecord[] = [];
@@ -134,7 +128,7 @@ export function effortModeratedEstimates(
       records.push({ person, item: timed.itemIds[item] ?? "", response: timed.codes[r] ?? 0 });
     }
   });
-  return abilityEstimates({ personIds: timed.personIds, itemIds: timed.itemIds, records }, items, estimator);
+  return abilityEstimates({ personIds: timed.personIds, itemIds: timed.itemIds, records }, items, options);
 }
 
 /** Returns whether a response is a rapid guess, or `null` without a time or a threshold to tell. */

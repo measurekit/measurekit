@@ -32,7 +32,7 @@ const items: TestItem[] = fixture.items.a.map((a, i) => ({
   model: twoParameterLogistic,
   parameters: { a, b: defined(fixture.items.b[i]), c: 0, d: 1 },
 }));
-const thetas = abilityEstimates(matrix, items, posteriorMeanEstimate).map(({ theta }) => defined(theta));
+const thetas = abilityEstimates(matrix, items, { estimator: posteriorMeanEstimate }).map(({ theta }) => defined(theta));
 
 test("computes the fit of 40 items to 2,000 persons", async (context) => {
   await benchmark(context, "fit.itemFit", () => itemFit(matrix, items, thetas));
@@ -42,7 +42,9 @@ test("computes the fit of 40 items to 2,000 persons", async (context) => {
 });
 
 test("computes lz*, kernel curves, M2*, the RMSD and local dependence of 40 items and 2,000 persons", async (context) => {
-  const modes = abilityEstimates(matrix, items, posteriorModeEstimate).map(({ theta }) => defined(theta));
+  const modes = abilityEstimates(matrix, items, { estimator: posteriorModeEstimate }).map(({ theta }) =>
+    defined(theta),
+  );
   const calibration = calibrate(matrix, { model: twoParameterLogistic });
   await benchmark(context, "fit.correctedPersonFit", () =>
     correctedPersonFit(matrix, items, modes, { estimator: "posterior-mode" }),

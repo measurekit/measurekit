@@ -28,7 +28,7 @@ calibrate(matrix, { model: twoParameterLogistic }).items; // estimates near item
 
 | Function                                                            | Result                                                                                         |
 | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `simulateThetas(count, random, distribution)`                       | `count` thetas from `distribution`, by default N(0, 1)                                         |
+| `simulateThetas(count, random, options)`                            | `count` thetas from the option `distribution`, by default N(0, 1)                              |
 | `simulateItems(model, count, random, options)`                      | `count` items `{ model, parameters }` of a built-in model                                      |
 | `simulateResponses(items, thetas, random, options)`                 | A response matrix: a row per theta, a column per item, the default ids                         |
 | `simulateMultidimensionalResponses(items, thetas, random, options)` | The same for [multidimensional](multidimensional.md) items, with an array of thetas per person |

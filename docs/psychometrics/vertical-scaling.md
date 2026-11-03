@@ -64,8 +64,11 @@ const grades = [
 ].map(({ group, first, population }) => ({
   group,
   first,
-  responses: simulateResponses(pool.slice(first, first + FORM), simulateThetas(1000, random, population), random)
-    .responses,
+  responses: simulateResponses(
+    pool.slice(first, first + FORM),
+    simulateThetas(1000, random, { distribution: population }),
+    random,
+  ).responses,
 }));
 
 // Design 1: one calibration of all grades, each its own group. Grade 3 is N(0, 1); the others' moments are estimated.

@@ -45,7 +45,7 @@ export function cohenKappa(ratings: readonly (readonly (number | null)[])[], opt
     first[subject] = x;
     second[subject] = y;
   });
-  const kappa = kappaOfPairs(first, second, weights);
+  const kappa = kappaOfPairs(first, second, { weights });
   if (kappa === null) throw undefinedKappa("Cohen's kappa");
   return kappa;
 }

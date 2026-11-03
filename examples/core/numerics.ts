@@ -45,7 +45,7 @@ console.log("The 97.5th percentile of the normal distribution:", normalQuantile(
 const first = [0, 1, 2, 2, 1, 0, 1, 2, 2, 1];
 const second = [0, 1, 2, 1, 1, 0, 2, 2, 2, 1];
 console.log("Cohen's kappa:", kappaOfPairs(first, second)?.toFixed(3));
-console.log("Quadratic weights:", kappaOfPairs(first, second, "quadratic")?.toFixed(3));
+console.log("Quadratic weights:", kappaOfPairs(first, second, { weights: "quadratic" })?.toFixed(3));
 
 // An invalid argument is a DataError, a full sentence that names the value and says what to do.
 try {

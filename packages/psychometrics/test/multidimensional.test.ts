@@ -3180,7 +3180,7 @@ describe("scoring", () => {
     });
 
     it("gives the posterior means of the persons exactly as the estimator gives them one at a time", () => {
-      const results = multidimensionalEstimates(data, items, multidimensionalPosteriorMeanEstimate);
+      const results = multidimensionalEstimates(data, items, { estimator: multidimensionalPosteriorMeanEstimate });
       expect(results[1]?.estimate).toBeNull();
       for (const p of [0, 2]) {
         expect(results[p]?.estimate).toEqual(
@@ -3209,13 +3209,13 @@ describe("scoring", () => {
     it("takes the estimator as an argument and sparse records", () => {
       const estimator = (it: readonly MultidimensionalItem[], responses: readonly (number | null)[]) =>
         multidimensionalPosteriorMeanEstimate(it, responses, { points: 21 });
-      const dense = multidimensionalEstimates(data, items, estimator);
+      const dense = multidimensionalEstimates(data, items, { estimator });
       const records = responseRecords([
         { person: "a", item: defined(m2pl.itemIds[0]), response: 1 },
         { person: "a", item: defined(m2pl.itemIds[7]), response: 0 },
         { person: "b", item: defined(m2pl.itemIds[3]), response: 1 },
       ]);
-      const sparse = multidimensionalEstimates(records, items, estimator);
+      const sparse = multidimensionalEstimates(records, items, { estimator });
       expect(sparse.map(({ id }) => id)).toEqual(["a", "b"]);
       const manual = multidimensionalPosteriorMeanEstimate([defined(items[0]), defined(items[7])], [1, 0], {
         points: 21,
@@ -3228,7 +3228,10 @@ describe("scoring", () => {
       expect(() => multidimensionalEstimates(data, items.slice(1))).toThrow(
         `The data have item "${m2pl.itemIds[0]}", which is not among the items.`,
       );
-      expect(() => multidimensionalEstimates(data, items, JSON.parse("null"))).toThrow(DataError);
+      expect(() => multidimensionalEstimates(data, items, JSON.parse("null"))).toThrow(
+        "The options must be an object, found null.",
+      );
+      expect(() => multidimensionalEstimates(data, items, { estimator: JSON.parse("null") })).toThrow(DataError);
       expect(() => multidimensionalEstimates(data, [...items, defined(items[0])])).toThrow(
         `Item ids must be unique; "${m2pl.itemIds[0]}" appears twice.`,
       );
@@ -3436,7 +3439,7 @@ describe("maximum and weighted likelihood estimates", () => {
       { itemIds: [...m2pl.itemIds] },
     );
     for (const estimator of [multidimensionalMaximumLikelihoodEstimate, multidimensionalWeightedLikelihoodEstimate]) {
-      const results = multidimensionalEstimates(data, items, estimator);
+      const results = multidimensionalEstimates(data, items, { estimator });
       results.forEach(({ estimate }, p) => {
         expect(estimate).toEqual(estimator(items, defined(data.responses[p])));
       });

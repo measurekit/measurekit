@@ -1,6 +1,16 @@
-import { checkFinite, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkFinite, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
 import type { ManyFacetRasch } from "./many-facet-rasch.js";
 import { checkManyFacetRasch, expectedRatingAt, ratingStructure } from "./rating-model.js";
+
+/** Options of {@link expectedRating}. */
+export interface ExpectedRatingOptions {
+  /**
+   * The element of some facets by facet name, such as `{ rater: "r2" }`.
+   *
+   * @defaultValue `{}`: every facet at its mean
+   */
+  readonly levels?: Readonly<Record<string, string>>;
+}
 
 /**
  * Returns the expected rating of a person at `theta` on the elements `levels`: the score a person of that ability would
@@ -13,19 +23,16 @@ import { checkManyFacetRasch, expectedRatingAt, ratingStructure } from "./rating
  *
  * @param model - The many-facet Rasch model.
  * @param theta - The ability of the person.
- * @param levels - The element of some facets by facet name, such as `{ rater: "r2" }`.
+ * @param options - The element of some facets by facet name.
  * @returns The expected rating, in the categories of the model.
- * @defaultValue `levels` is `{}`: every facet at its mean
- * @throws `DataError` when the model is invalid, `theta` is not finite, `levels` names a facet the model does not have
+ * @throws `DataError` when the model is invalid, `theta` is not finite, the options are not an object, `levels` names a facet the model does not have
  * or an element it does not have.
  */
-export function expectedRating(
-  model: ManyFacetRasch,
-  theta: number,
-  levels: Readonly<Record<string, string>> = {},
-): number {
+export function expectedRating(model: ManyFacetRasch, theta: number, options: ExpectedRatingOptions = {}): number {
   checkManyFacetRasch(model);
   checkFinite(theta, "Theta");
+  checkOptions(options);
+  const { levels = {} } = options;
   checkRecord(levels, "The levels must be an object of elements by facet");
   const structure = ratingStructure(model);
   for (const [facet, id] of Object.entries(levels)) {

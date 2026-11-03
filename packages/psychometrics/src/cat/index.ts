@@ -63,7 +63,7 @@ export {
 } from "./form-assembly.js";
 export type { PoolControls, PoolItem } from "./items.js";
 export { kullbackLeibler, posteriorKullbackLeibler } from "./kullback-leibler.js";
-export { maximumDeterminant } from "./maximum-determinant.js";
+export { type MaximumDeterminantOptions, maximumDeterminant } from "./maximum-determinant.js";
 export type { MultidimensionalPoolItem } from "./multidimensional-items.js";
 export {
   type MultidimensionalTestSimulation,

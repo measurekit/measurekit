@@ -77,7 +77,7 @@ import { normalDistribution, simulateThetas } from "@measurekit/psychometrics/si
 // 300 persons answer 3 items; ln T = β - τ + ε / α with β = 4, 3.5 and 3, α = 2 and speeds τ ~ N(0, 0.3²).
 const random = createRandom(2026);
 const intensities = [4, 3.5, 3];
-const speeds = simulateThetas(300, random, normalDistribution(0, 0.3));
+const speeds = simulateThetas(300, random, { distribution: normalDistribution(0, 0.3) });
 const times = speeds.map((speed) => intensities.map((intensity) => Math.exp(intensity - speed + random.normal() / 2)));
 const data = responseMatrix(
   times.map((row) => row.map(() => 1)),
@@ -204,11 +204,11 @@ and, for each response, a category of its item.
 
 A rapid guess is a response faster than its item's threshold: too fast to have read and solved the item.
 
-| Function                                                       | Result                                                                                                                   |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `normativeThresholds(data, { percentage, cap })`               | Each item's threshold: `percentage` of its mean time, at most `cap` seconds (Wise and Ma, 2012)                          |
-| `responseTimeEffort(data, thresholds)`                         | Per person: `effort`, the share of timed responses at or above their threshold (Wise and Kong, 2005), and `rapidGuesses` |
-| `effortModeratedEstimates(data, items, thresholds, estimator)` | Per person: theta with rapid guesses treated as missing (Wise and DeMars, 2006)                                          |
+| Function                                                     | Result                                                                                                                   |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `normativeThresholds(data, { percentage, cap })`             | Each item's threshold: `percentage` of its mean time, at most `cap` seconds (Wise and Ma, 2012)                          |
+| `responseTimeEffort(data, thresholds)`                       | Per person: `effort`, the share of timed responses at or above their threshold (Wise and Kong, 2005), and `rapidGuesses` |
+| `effortModeratedEstimates(data, items, thresholds, options)` | Per person: theta with rapid guesses treated as missing (Wise and DeMars, 2006)                                          |
 
 | Option       | Default | Meaning                                 |
 | ------------ | ------- | --------------------------------------- |
@@ -217,7 +217,7 @@ A rapid guess is a response faster than its item's threshold: too fast to have r
 
 `thresholds` maps item ids to seconds, such as the result of `normativeThresholds`; items without one count every
 response. `effortModeratedEstimates` estimates theta as `abilityEstimates` ([IRT](irt.md#ability-estimation)) does,
-with `posteriorMeanEstimate` by default, from the person's responses that are not rapid guesses. Persons with low
+with the option `estimator`, `posteriorMeanEstimate` by default, from the person's responses that are not rapid guesses. Persons with low
 effort, such as below 0.9, are often reported or left out of calibration.
 
 ```ts

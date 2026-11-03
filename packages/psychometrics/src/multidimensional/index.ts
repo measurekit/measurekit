@@ -41,6 +41,7 @@ export type { MultivariateNormalPrior } from "./prior.js";
 export { type RotatedLoadings, rotateLoadings } from "./rotation.js";
 export {
   type MultidimensionalEstimate,
+  type MultidimensionalEstimatesOptions,
   type MultidimensionalEstimator,
   type MultidimensionalPersonEstimate,
   type MultidimensionalPosteriorMeanOptions,

@@ -351,8 +351,8 @@ const model = manyFacetRasch(scores, { facets: ["item", "rater"] });
 model.facets[1]?.elements.map(({ id, measure }) => [id, measure]); // [["r1", 0.77], ["r2", -0.31], ["r3", -0.46]]
 model.facets[1]?.elements.map(({ fairAverage }) => fairAverage); // [1.15, 1.87, 1.96]: r1 is the severe rater
 model.facets[1]?.reliability; // 0.68
-expectedRating(model, 0.5, { rater: "r1" }); // 1.35: the score of a person of theta 0.5 from the severest rater
-expectedRating(model, 0.5, { rater: "r3" }); // 2.12
+expectedRating(model, 0.5, { levels: { rater: "r1" } }); // 1.35: the score of a person of theta 0.5 from the severest rater
+expectedRating(model, 0.5, { levels: { rater: "r3" } }); // 2.12
 const persons = manyFacetEstimates(scores, model); // EAP: e1 { theta: 0.03, standardError: 0.42 }
 manyFacetFit(scores, model, persons).find(({ id }) => id === "r3")?.infitMeanSquare; // 1.22
 
@@ -449,16 +449,16 @@ a two-category scale, has the standard error 0.
 
 ### Persons, fair scores and fit
 
-| Function                                       | Returns                                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| `manyFacetEstimates(scores, model, estimator)` | A `PersonEstimate` for each person in the scores, in order of first appearance |
-| `expectedRating(model, theta, levels)`         | The expected rating of a person at θ on the elements in `levels`               |
-| `manyFacetFit(scores, model, persons)`         | A `FacetFit` for each element of each facet                                    |
+| Function                                     | Returns                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| `manyFacetEstimates(scores, model, options)` | A `PersonEstimate` for each person in the scores, in order of first appearance |
+| `expectedRating(model, theta, options)`      | The expected rating of a person at θ on the elements of the option `levels`    |
+| `manyFacetFit(scores, model, persons)`       | A `FacetFit` for each element of each facet                                    |
 
 `manyFacetEstimates` turns each of a person's scores into a response to a partial credit item with a = 1, whose steps are
 the sum of the measures of the score's elements plus the thresholds of its set, and passes them to an
-[ability estimator](irt.md): the default is the posterior mean under the normal population of the model; any other,
-such as `maximumLikelihoodEstimate`, works. The estimates account for the raters' and items' measures, so a person
+[ability estimator](irt.md), the option `estimator`: the default is the posterior mean under the normal population of
+the model; any other, such as `maximumLikelihoodEstimate`, works. The estimates account for the raters' and items' measures, so a person
 rated by severe raters is not penalized. Scores need elements the model has, in categories its thresholds give.
 
 `expectedRating` is the fair score, the severity-adjusted score that a platform reports for an essay: the rating a

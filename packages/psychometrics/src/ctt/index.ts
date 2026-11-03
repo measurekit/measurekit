@@ -11,8 +11,10 @@ export {
   DIFFICULTY_THRESHOLDS,
   DISCRIMINATION_THRESHOLDS,
   type DifficultyClass,
+  type DifficultyClassificationOptions,
   type DifficultyThresholds,
   type DiscriminationClass,
+  type DiscriminationClassificationOptions,
   type DiscriminationThresholds,
 } from "./classification.js";
 export { distractorAnalysis, type OptionAnalysis, type OptionStatistics } from "./distractors.js";
@@ -26,6 +28,7 @@ export {
   type SplitHalf,
   type SplitHalfOptions,
   type SplitMethod,
+  type StandardErrorOfMeasurementOptions,
   splitHalf,
   standardErrorOfMeasurement,
 } from "./reliability.js";

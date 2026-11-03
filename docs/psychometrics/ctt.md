@@ -65,7 +65,7 @@ correlation. The key's `pointBiserial` equals the item's `itemTotal`.
 | `kr21`                       | k / (k - 1) · (1 - M (k - M) / (k σ²)), with the total score mean M and variance σ² (denominator n); 0/1 items only |
 | `splitHalf`                  | `correlation` r of the half totals, `spearmanBrown` 2r / (1 + r), `guttman` 4 cov(A, B) / var(A + B)                |
 | `mcdonaldOmega`              | McDonald's omega total of one factor, 1 - Σ (1 - λ²) / Σ r, below                                                   |
-| `standardErrorOfMeasurement` | s √(1 - reliability), in total score points; the reliability defaults to `cronbachAlpha`                            |
+| `standardErrorOfMeasurement` | s √(1 - reliability), in total score points; the option `reliability` defaults to `cronbachAlpha`                   |
 
 `splitHalf` splits the items by its option `split`: `odd-even` (items 1, 3, 5, ... against 2, 4, 6, ...; the default) or `first-second`
 (the first k / 2 items, rounded down, against the rest). The Spearman-Brown value assumes halves of equal variance;
@@ -283,8 +283,8 @@ correlate 0.744 with the true ones and the augmented 0.824 ([validation](validat
 
 ## Classification
 
-`classifyDifficulty(p)` and `classifyDiscrimination(value)` label items. Both take optional thresholds; the defaults
-are exported.
+`classifyDifficulty(p)` and `classifyDiscrimination(value)` label items. Both take the option `thresholds`; the
+defaults are exported.
 
 | `DIFFICULTY_THRESHOLDS` | Class       |
 | ----------------------- | ----------- |
@@ -302,7 +302,7 @@ are exported.
 ```ts
 import { classifyDifficulty, DIFFICULTY_THRESHOLDS } from "@measurekit/psychometrics/ctt";
 
-classifyDifficulty(0.75, { ...DIFFICULTY_THRESHOLDS, easy: 0.8 }); // "moderate"
+classifyDifficulty(0.75, { thresholds: { ...DIFFICULTY_THRESHOLDS, easy: 0.8 } }); // "moderate"
 ```
 
 Ebel's bounds were set for D; they are often applied to `itemTotal` and `itemRest` as well.

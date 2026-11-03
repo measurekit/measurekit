@@ -4439,7 +4439,7 @@ function multidimensionalTest(
     pool: multidimensionalPool(reference),
     stopping,
     ...(prior !== undefined && {
-      selection: maximumDeterminant(prior),
+      selection: maximumDeterminant({ prior }),
       estimator: (items, answers) => multidimensionalPosteriorModeEstimate(items, answers, { prior }),
     }),
   });
@@ -4568,7 +4568,7 @@ describe("multidimensionalAdaptiveTest", () => {
 
     it(`scores the items as the written-out D-rule does on ${reference.name}`, () => {
       const pool = multidimensionalPool(reference);
-      const rule = maximumDeterminant(priorOf(reference));
+      const rule = maximumDeterminant({ prior: priorOf(reference) });
       for (const run of reference.runs) {
         run.steps.forEach((step, k) => {
           const administered = run.items.slice(0, k).map((item) => item - 1);
@@ -4616,7 +4616,7 @@ describe("multidimensionalAdaptiveTest", () => {
     const centered = multidimensionalAdaptiveTest({
       pool,
       stopping: testLength(2),
-      selection: maximumDeterminant(prior),
+      selection: maximumDeterminant({ prior }),
       estimator: (items, answers) => multidimensionalPosteriorModeEstimate(items, answers, { prior }),
     }).start(createRandom(1));
     expect(centered.estimate.theta).toEqual([0.5, -1]);
@@ -4667,7 +4667,7 @@ describe("multidimensionalAdaptiveTest", () => {
     const mean = multidimensionalAdaptiveTest({
       pool,
       stopping: testLength(1),
-      selection: maximumDeterminant(prior),
+      selection: maximumDeterminant({ prior }),
       estimator: (items, answers) => multidimensionalPosteriorMeanEstimate(items, answers, { prior }),
     }).start(createRandom(1));
     expectClose(defined(mean.estimate.theta[0]), 0.2, 1e-12);
@@ -4879,7 +4879,7 @@ describe("maximumDeterminant", () => {
       ],
     };
     const out = new Float64Array(3);
-    maximumDeterminant(prior).scores(multidimensionalContext(pool, 1, estimateAt(0, 0)), out);
+    maximumDeterminant({ prior }).scores(multidimensionalContext(pool, 1, estimateAt(0, 0)), out);
     // The precision is I / 4 and a adds diag(1/4, 0), giving diag(1/2, 1/4);
     // b adds diag(0, 1/4) and c adds [[1, 1], [1, 1]] / 4.
     expectClose(defined(out[1]), 0.5 * 0.5, 1e-15);
@@ -4918,29 +4918,34 @@ describe("maximumDeterminant", () => {
 
   it("rejects priors of other types and invalid ones, and priors of other dimensions in a test", () => {
     const parse = (json: string) => JSON.parse(json);
-    expect(() => maximumDeterminant(parse('"prior"'))).toThrow(
+    expect(() => maximumDeterminant({ prior: parse('"prior"') })).toThrow(
       "The option prior must be an object { mean, covariance }",
     );
-    expect(() => maximumDeterminant(parse("null"))).toThrow(DataError);
-    expect(() => maximumDeterminant(parse('{"mean":[0,0],"covariance":"x"}'))).toThrow(
+    expect(() => maximumDeterminant(parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => maximumDeterminant({ prior: parse("null") })).toThrow(DataError);
+    expect(() => maximumDeterminant({ prior: parse('{"mean":[0,0],"covariance":"x"}') })).toThrow(
       "The covariance of the prior must be an array of rows",
     );
     expect(() =>
       maximumDeterminant({
-        mean: [0, 0],
-        covariance: [
-          [1, 2],
-          [2, 1],
-        ],
+        prior: {
+          mean: [0, 0],
+          covariance: [
+            [1, 2],
+            [2, 1],
+          ],
+        },
       }),
     ).toThrow("The covariance of the prior must be a symmetric positive definite matrix.");
     const three = maximumDeterminant({
-      mean: [0, 0, 0],
-      covariance: [
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 0, 1],
-      ],
+      prior: {
+        mean: [0, 0, 0],
+        covariance: [
+          [1, 0, 0],
+          [0, 1, 0],
+          [0, 0, 1],
+        ],
+      },
     });
     const pool = [multidimensionalItem("a", [1, 0], 0)];
     expect(() => three.scores(multidimensionalContext(pool, 0, estimateAt(0, 0)), new Float64Array(1))).toThrow(

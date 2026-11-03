@@ -373,7 +373,7 @@ const items = simulateItems(twoParameterLogistic, 20, random);
 const raw = simulateThetas(1500, random);
 const center = raw.reduce((sum, value) => sum + value, 0) / raw.length;
 const x = raw.map((value) => value - center);
-const noise = simulateThetas(1500, random, normalDistribution(0, 0.8));
+const noise = simulateThetas(1500, random, { distribution: normalDistribution(0, 0.8) });
 const thetas = x.map((value, person) => 0.6 * value + (noise[person] ?? 0));
 const responses = simulateResponses(items, thetas, random);
 

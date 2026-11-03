@@ -4,6 +4,16 @@
  */
 export type KappaWeights = "none" | "linear" | "quadratic";
 
+/** Options of {@link kappaOfPairs}. */
+export interface KappaOptions {
+  /**
+   * The weights of partial agreement.
+   *
+   * @defaultValue `"none"`
+   */
+  readonly weights?: KappaWeights;
+}
+
 /**
  * Returns Cohen's kappa of paired categories, (p_o - p_e) / (1 - p_e), with p_o the observed and p_e the chance
  * agreement from the margins, or `null` when p_e is 1, as when every category is the same.
@@ -14,7 +24,7 @@ export type KappaWeights = "none" | "linear" | "quadratic";
  *
  * @param first - The category each pair has in the first list.
  * @param second - The category each pair has in the second list.
- * @param weights - The weights of partial agreement.
+ * @param options - The weights of partial agreement.
  * @returns Kappa, at most 1; `null` where chance agreement is complete, so that kappa is undefined.
  * @see {@link https://doi.org/10.1177/001316446002000104 | Cohen (1960)}
  * @see {@link https://doi.org/10.1037/h0026256 | Cohen (1968)}
@@ -22,8 +32,9 @@ export type KappaWeights = "none" | "linear" | "quadratic";
 export function kappaOfPairs(
   first: ArrayLike<number>,
   second: ArrayLike<number>,
-  weights: KappaWeights = "none",
+  options: KappaOptions = {},
 ): number | null {
+  const { weights = "none" } = options;
   const { lowest, highest } = categoryRange(first, second);
   const agreement = agreementOf(weights, highest - lowest);
   const n = first.length;

@@ -1,4 +1,4 @@
-import { cholesky } from "@measurekit/core";
+import { checkOptions, cholesky } from "@measurekit/core";
 import {
   checkedPrior,
   type MultidimensionalEstimate,
@@ -7,6 +7,16 @@ import {
 } from "../multidimensional/internal.js";
 import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
 import type { ItemSelectionRule } from "./selection.js";
+
+/** Options of {@link maximumDeterminant}. */
+export interface MaximumDeterminantOptions {
+  /**
+   * The prior of the thetas.
+   *
+   * @defaultValue N(0, I) of the items' dimensions
+   */
+  readonly prior?: MultivariateNormalPrior;
+}
 
 /**
  * Returns D-optimality selection: scores each item by the determinant of the posterior precision of theta after it,
@@ -20,16 +30,17 @@ import type { ItemSelectionRule } from "./selection.js";
  * `correlations`, to both. The cost of a selection is a Cholesky factorization of a matrix of the dimensions per eligible
  * item.
  *
- * @param prior - The prior of the thetas; N(0, I) without one.
+ * @param options - The prior of the thetas.
  * @returns The selection rule.
- * @defaultValue `prior` is N(0, I) of the items' dimensions
- * @throws `DataError` when `prior` is not an object with a finite mean and a symmetric positive definite covariance of
+ * @throws `DataError` when the options are not an object, `prior` is not an object with a finite mean and a symmetric positive definite covariance of
  * as many rows as the mean has values, or, in a test, when the items have another number of dimensions.
  * @see {@link https://doi.org/10.1007/BF02294343 | Segall (1996)}
  */
 export function maximumDeterminant(
-  prior?: MultivariateNormalPrior,
+  options: MaximumDeterminantOptions = {},
 ): ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate> {
+  checkOptions(options);
+  const { prior } = options;
   if (prior !== undefined) checkedPrior(prior, priorDimensions(prior) ?? 0);
   return {
     scores({ pool, administered, estimate, eligible }, out) {

@@ -112,19 +112,34 @@ export function splitHalf(matrix: ResponseMatrix, options: SplitHalfOptions = {}
   };
 }
 
+/** Options of {@link standardErrorOfMeasurement}. */
+export interface StandardErrorOfMeasurementOptions {
+  /**
+   * A reliability coefficient from 0 to 1.
+   *
+   * @defaultValue {@link cronbachAlpha} of the matrix
+   */
+  readonly reliability?: number;
+}
+
 /**
  * Returns the standard error of measurement, s √(1 - reliability), where s is the standard deviation of the total
  * scores of the persons who answered every item.
  *
  * @param matrix - The responses of the persons.
- * @param reliability - A reliability coefficient from 0 to 1.
+ * @param options - A reliability coefficient from 0 to 1.
  * @returns The standard error, in score points.
- * @throws `DataError` when `reliability` is outside [0, 1], or in the cases listed for {@link cronbachAlpha}.
- * @defaultValue `reliability` is {@link cronbachAlpha} of `matrix`
+ * @throws `DataError` when the options are not an object, `reliability` is outside [0, 1], or in the cases listed for
+ * {@link cronbachAlpha}.
  */
-export function standardErrorOfMeasurement(matrix: ResponseMatrix, reliability?: number): number {
+export function standardErrorOfMeasurement(
+  matrix: ResponseMatrix,
+  options: StandardErrorOfMeasurementOptions = {},
+): number {
   const statistic = "The standard error of measurement";
   const cases = reliabilityCases(matrix, statistic);
+  checkOptions(options);
+  const { reliability } = options;
   const coefficient = reliability === undefined ? alpha(cases, statistic) : reliability;
   checkUnitInterval(coefficient, "A reliability");
   return Math.sqrt(variance(cases.totals) * (1 - coefficient));

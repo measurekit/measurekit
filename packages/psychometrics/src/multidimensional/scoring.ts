@@ -356,6 +356,16 @@ function informationEstimate(
   return estimateOf(theta, covariance, dimensions);
 }
 
+/** Options of {@link multidimensionalEstimates}. */
+export interface MultidimensionalEstimatesOptions {
+  /**
+   * The estimator of each person.
+   *
+   * @defaultValue `multidimensionalPosteriorModeEstimate`
+   */
+  readonly estimator?: MultidimensionalEstimator;
+}
+
 /**
  * Returns the estimate of the thetas of every person, in the order of the data's person ids, from the person's answered
  * items only, so that sparse data, such as adaptive tests on a large pool, need no row per person over all items.
@@ -363,17 +373,19 @@ function informationEstimate(
  *
  * @param data - The responses of the persons, as a matrix or as records.
  * @param items - The items, matched to the data by id.
- * @param estimator - The estimator of each person.
+ * @param options - The estimator of each person.
  * @returns The estimate of each person, with `null` for a person without responses.
- * @defaultValue `estimator` is `multidimensionalPosteriorModeEstimate`
  * @throws `DataError` when the data are malformed, an item is invalid, item ids repeat, an item of the data has no item
- * with its id, a response is not a category of its item, the estimator is not a function, or it throws it.
+ * with its id, a response is not a category of its item, the options are not an object, the estimator is not a
+ * function, or it throws it.
  */
 export function multidimensionalEstimates(
   data: ResponseMatrix | ResponseRecords,
   items: readonly MultidimensionalTestItem[],
-  estimator: MultidimensionalEstimator = multidimensionalPosteriorModeEstimate,
+  options: MultidimensionalEstimatesOptions = {},
 ): MultidimensionalPersonEstimate[] {
+  checkOptions(options);
+  const { estimator = multidimensionalPosteriorModeEstimate } = options;
   checkFunction(
     estimator,
     "The estimator must be a function of items and responses, such as multidimensionalPosteriorModeEstimate",

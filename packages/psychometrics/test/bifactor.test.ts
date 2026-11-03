@@ -625,9 +625,9 @@ describe("calibrateBifactor", () => {
     it("scores persons from its items, as any multidimensional calibration", () => {
       const fit = calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, ...quick });
       const prior = { mean: fit.dimensions.map(() => 0), covariance: fit.correlations };
-      const scored = multidimensionalEstimates(matrixOf(fixture), fit.items, (items, responses) =>
-        multidimensionalPosteriorModeEstimate(items, responses, { prior }),
-      );
+      const scored = multidimensionalEstimates(matrixOf(fixture), fit.items, {
+        estimator: (items, responses) => multidimensionalPosteriorModeEstimate(items, responses, { prior }),
+      });
       expect(scored).toHaveLength(fixture.responses.length);
       const totals = fixture.responses.map((row) => row.reduce<number>((sum, response) => sum + (response ?? 0), 0));
       const general = scored.map((person) => defined(person.estimate?.theta[0]));
@@ -668,9 +668,9 @@ describe("calibrateBifactor", () => {
     expect(fit.logLikelihood.toFixed(2)).toBe("-14468.29");
     expect(fit.converged).toBe(true);
     const prior = { mean: [0, 0, 0, 0], covariance: fit.correlations };
-    const scores = multidimensionalEstimates(matrix, fit.items, (calibrated, responses) =>
-      multidimensionalPosteriorModeEstimate(calibrated, responses, { prior }),
-    );
+    const scores = multidimensionalEstimates(matrix, fit.items, {
+      estimator: (calibrated, responses) => multidimensionalPosteriorModeEstimate(calibrated, responses, { prior }),
+    });
     expect(defined(scores[0]?.estimate).theta.map((value) => Number(value.toFixed(2)))).toEqual([
       0.63, 0.14, 0.14, 0.22,
     ]);

@@ -455,8 +455,8 @@ describe("ability estimation", () => {
       { id: "person2", theta: null, standardError: null },
       { id: "person3", ...weightedLikelihoodEstimate([items[3], items[2], items[1]].map(defined), [0, 0, 1]) },
     ];
-    expect(abilityEstimates(matrix, items, weightedLikelihoodEstimate)).toEqual(expected);
-    expect(abilityEstimates(records, items, weightedLikelihoodEstimate)).toEqual(expected);
+    expect(abilityEstimates(matrix, items, { estimator: weightedLikelihoodEstimate })).toEqual(expected);
+    expect(abilityEstimates(records, items, { estimator: weightedLikelihoodEstimate })).toEqual(expected);
     expect(abilityEstimates(matrix, items)[0]).toEqual({
       id: "person1",
       ...posteriorMeanEstimate([items[3], items[2], items[0]].map(defined), [1, 0, 1]),
@@ -524,6 +524,9 @@ describe("ability estimation", () => {
       "Item 1 needs a model such as twoParameterLogistic, found undefined.",
     );
     expect(() => abilityEstimates(responseMatrix([[1]]), [], JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => abilityEstimates(responseMatrix([[1]]), [], { estimator: JSON.parse("null") })).toThrow(
       "The estimator must be a function of items and responses, such as posteriorMeanEstimate, found null.",
     );
   });
@@ -2029,7 +2032,7 @@ describe("latent regression", () => {
     const random = createRandom(11);
     const items = simulateItems(twoParameterLogistic, 25, random);
     const x = simulateThetas(1500, random);
-    const noise = simulateThetas(1500, random, normalDistribution(0, 0.8));
+    const noise = simulateThetas(1500, random, { distribution: normalDistribution(0, 0.8) });
     const responses = simulateResponses(
       items,
       x.map((value, person) => 0.6 * value + (noise[person] ?? 0)),
@@ -3174,9 +3177,9 @@ describe("testlets", () => {
       [1, 1, 1, 1],
     ];
     const testlets = [{ items: ["item1", "item2"], sd: 1.5 }];
-    const estimates = abilityEstimates(responseMatrix(rows), named, (items, responses) =>
-      posteriorMeanEstimate(items, responses, { testlets }),
-    );
+    const estimates = abilityEstimates(responseMatrix(rows), named, {
+      estimator: (items, responses) => posteriorMeanEstimate(items, responses, { testlets }),
+    });
     rows.forEach((row, person) => {
       const expected = posteriorMeanEstimate(named, row, { testlets });
       expect(estimates[person]).toEqual({ id: `person${person + 1}`, ...expected });

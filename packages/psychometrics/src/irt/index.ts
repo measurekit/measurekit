@@ -22,7 +22,7 @@ export {
   thetaPosterior,
   weightedLikelihoodEstimate,
 } from "./ability.js";
-export { abilityEstimates } from "./ability-estimates.js";
+export { type AbilityEstimatesOptions, abilityEstimates } from "./ability-estimates.js";
 export {
   type CalibratedItem,
   type Calibration,

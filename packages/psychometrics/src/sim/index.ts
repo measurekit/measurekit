@@ -14,4 +14,4 @@ export {
 export { type ItemSimulationOptions, simulateItems } from "./items.js";
 export { simulateMultidimensionalResponses } from "./multidimensional-responses.js";
 export { type ResponseSimulationOptions, simulateResponses } from "./responses.js";
-export { simulateThetas } from "./thetas.js";
+export { simulateThetas, type ThetaSimulationOptions } from "./thetas.js";

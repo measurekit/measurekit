@@ -60,7 +60,7 @@ describe("classification", () => {
       "moderate",
       "easy",
     ]);
-    expect(classifyDifficulty(0.75, { ...DIFFICULTY_THRESHOLDS, easy: 0.8 })).toBe("moderate");
+    expect(classifyDifficulty(0.75, { thresholds: { ...DIFFICULTY_THRESHOLDS, easy: 0.8 } })).toBe("moderate");
   });
 
   it("classifies discrimination by Ebel's bounds", () => {
@@ -72,14 +72,18 @@ describe("classification", () => {
       "poor",
       "poor",
     ]);
-    expect(classifyDiscrimination(0.35, { veryGood: 0.35, good: 0.25, marginal: 0.15 })).toBe("very-good");
+    expect(classifyDiscrimination(0.35, { thresholds: { veryGood: 0.35, good: 0.25, marginal: 0.15 } })).toBe(
+      "very-good",
+    );
   });
 
   it("rejects values and thresholds out of range", () => {
     expect(() => classifyDifficulty(1.2)).toThrow("A p-value must be a number from 0 to 1, found 1.2.");
-    expect(() => classifyDifficulty(0.5, { difficult: 0.8, easy: 0.2 })).toThrow(DataError);
+    expect(() => classifyDifficulty(0.5, { thresholds: { difficult: 0.8, easy: 0.2 } })).toThrow(DataError);
     expect(() => classifyDiscrimination(Number.NaN)).toThrow(DataError);
-    expect(() => classifyDiscrimination(0.5, { veryGood: 0.2, good: 0.3, marginal: 0.1 })).toThrow(DataError);
+    expect(() => classifyDiscrimination(0.5, { thresholds: { veryGood: 0.2, good: 0.3, marginal: 0.1 } })).toThrow(
+      DataError,
+    );
     expect(() => classifyDiscrimination(Number.POSITIVE_INFINITY)).toThrow(
       "A discrimination value must be a finite number, found Infinity.",
     );
@@ -89,11 +93,12 @@ describe("classification", () => {
     expect(() => classifyDifficulty(JSON.parse('"0.5"'))).toThrow(
       'A p-value must be a number from 0 to 1, found "0.5".',
     );
-    expect(() => classifyDifficulty(0.5, JSON.parse("null"))).toThrow(
+    expect(() => classifyDifficulty(0.5, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => classifyDifficulty(0.5, { thresholds: JSON.parse("null") })).toThrow(
       "Difficulty thresholds must be an object { difficult, easy }, found null.",
     );
     expect(() =>
-      classifyDiscrimination(0.5, JSON.parse('{ "veryGood": "0.4", "good": 0.3, "marginal": 0.2 }')),
+      classifyDiscrimination(0.5, { thresholds: JSON.parse('{ "veryGood": "0.4", "good": 0.3, "marginal": 0.2 }') }),
     ).toThrow('The very good threshold must be a finite number, found "0.4".');
   });
 });
@@ -312,11 +317,14 @@ describe("reliability", () => {
   });
 
   it("uses a given reliability for the standard error of measurement and checks its range", () => {
-    expect(standardErrorOfMeasurement(polytomous, 0.75)).toBeCloseTo(Math.sqrt(4 / 3) / 2, 15);
-    expect(() => standardErrorOfMeasurement(polytomous, 1.2)).toThrow(
+    expect(standardErrorOfMeasurement(polytomous, { reliability: 0.75 })).toBeCloseTo(Math.sqrt(4 / 3) / 2, 15);
+    expect(() => standardErrorOfMeasurement(polytomous, { reliability: 1.2 })).toThrow(
       "A reliability must be a number from 0 to 1, found 1.2.",
     );
     expect(() => standardErrorOfMeasurement(polytomous, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => standardErrorOfMeasurement(polytomous, { reliability: JSON.parse("null") })).toThrow(
       "A reliability must be a number from 0 to 1, found null.",
     );
   });

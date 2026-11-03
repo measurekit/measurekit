@@ -508,16 +508,22 @@ describe("simulateMultidimensionalResponses", () => {
 describe("simulateThetas", () => {
   it("draws N(0, 1) by default, or from the distribution given", () => {
     expectMoments(simulateThetas(DRAWS, createRandom(19)), 0, 1, "default");
-    expectMoments(simulateThetas(DRAWS, createRandom(20), normalDistribution(-0.5, 1.5)), -0.5, 1.5, "given");
+    expectMoments(
+      simulateThetas(DRAWS, createRandom(20), { distribution: normalDistribution(-0.5, 1.5) }),
+      -0.5,
+      1.5,
+      "given",
+    );
   });
 
   it("rejects counts and draws that are not finite", () => {
     const random = createRandom(21);
     expect(() => simulateThetas(1.5, random)).toThrow("The number of thetas must be a positive integer, found 1.5.");
-    expect(() => simulateThetas(2, random, () => Number.POSITIVE_INFINITY)).toThrow(
+    expect(() => simulateThetas(2, random, { distribution: () => Number.POSITIVE_INFINITY })).toThrow(
       "Theta 1 must be a finite number, found Infinity.",
     );
-    expect(() => simulateThetas(2, random, JSON.parse("null"))).toThrow(
+    expect(() => simulateThetas(2, random, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => simulateThetas(2, random, { distribution: JSON.parse("null") })).toThrow(
       "The distribution must be a function of a random number generator, found null.",
     );
     expect(() => simulateThetas(2, JSON.parse("{}"))).toThrow(

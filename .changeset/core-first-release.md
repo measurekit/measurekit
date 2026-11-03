@@ -11,4 +11,4 @@ line search, the Fisher-Yates shuffle, and the category probabilities of logisti
 would skip, so that every check of a list reads each of its entries. `chiSquareUpperTail` is 0 at an infinite
 statistic.
 `kappaOfPairs` takes the chance agreement in time that grows with the categories that occur rather than with their
-pairs: 20,000 categories took seconds.
+pairs: 20,000 categories took seconds. It takes its weights as the option `weights`.

@@ -13,7 +13,7 @@ export {
   type ThetaIntegrationOptions,
   type ThetaPrior,
 } from "./ability.js";
-export { abilityEstimates } from "./ability-estimates.js";
+export { type AbilityEstimatesOptions, abilityEstimates } from "./ability-estimates.js";
 export { fromUnbounded, toUnbounded, unboundedDerivative } from "./bounds.js";
 export {
   type CalibratedItem,

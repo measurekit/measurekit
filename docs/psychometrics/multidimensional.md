@@ -495,9 +495,9 @@ fit.converged; // true
 
 // A person's thetas on all dimensions, with the calibration's correlations as the prior.
 const prior = { mean: [0, 0, 0, 0], covariance: fit.correlations };
-const scores = multidimensionalEstimates(matrix, fit.items, (calibrated, responses) =>
-  multidimensionalPosteriorModeEstimate(calibrated, responses, { prior }),
-);
+const scores = multidimensionalEstimates(matrix, fit.items, {
+  estimator: (calibrated, responses) => multidimensionalPosteriorModeEstimate(calibrated, responses, { prior }),
+});
 scores[0]?.estimate?.theta; // [0.63, 0.14, 0.14, 0.22]
 ```
 
@@ -613,7 +613,7 @@ are the identity and it has at least two dimensions.
 | `multidimensionalPosteriorModeEstimate(items, responses, options)`      | MAP: the posterior mode; the covariance is the inverse of the test information plus the precision of the prior |
 | `multidimensionalMaximumLikelihoodEstimate(items, responses, options)`  | MLE: the maximum of the likelihood in `range`; the covariance is the inverse of the test information           |
 | `multidimensionalWeightedLikelihoodEstimate(items, responses, options)` | WLE (Warm): the root of the score plus ½ tr(I⁻¹ J_r) in `range`; the same covariance                           |
-| `multidimensionalEstimates(data, items, estimator)`                     | The estimate of every person of a data set, `null` without responses                                           |
+| `multidimensionalEstimates(data, items, options)`                       | The estimate of every person of a data set, `null` without responses                                           |
 
 `items` are `{ model, parameters }` of one number of dimensions, at most 100; `responses` has one response per item,
 `null` when missing. An estimate has `theta`, `standardErrors` and `covariance`. The limit of dimensions is one for

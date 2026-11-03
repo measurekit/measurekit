@@ -881,7 +881,7 @@ const prior = {
 const test = multidimensionalAdaptiveTest({
   pool,
   stopping: anyOf(testLength(20), standardErrorThreshold(0.5)),
-  selection: maximumDeterminant(prior),
+  selection: maximumDeterminant({ prior }),
   estimator: (items, responses) => multidimensionalPosteriorModeEstimate(items, responses, { prior }),
 });
 
@@ -939,16 +939,16 @@ as the covariance of the prior to the estimator and to `maximumDeterminant`.
 
 ### Selection of multidimensional tests
 
-`maximumDeterminant(prior)` scores each eligible item k by det(Σ⁻¹ + Σ_j I_j(θ̂) + I_k(θ̂)): Σ is the covariance of the
+`maximumDeterminant({ prior })` scores each eligible item k by det(Σ⁻¹ + Σ_j I_j(θ̂) + I_k(θ̂)): Σ is the covariance of the
 prior, the sum is over the administered items, I_j is the information matrix of item j and θ̂ the current estimate
 (Segall, 1996). The matrix is the precision of the posterior of theta after item k, and its determinant is the inverse
 of the volume of the confidence ellipsoid, so the highest score shrinks it the most. A rule that takes the prior into
 account chooses well from the first item: the information of one item alone is singular on two dimensions or more, and
 the inverse of the prior covariance makes the matrix positive definite.
 
-| Argument | Default | Meaning                                                                                                       |
-| -------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| `prior`  | N(0, I) | `{ mean, covariance }` with a symmetric positive definite covariance of as many rows as the items' dimensions |
+| Option  | Default | Meaning                                                                                                       |
+| ------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `prior` | N(0, I) | `{ mean, covariance }` with a symmetric positive definite covariance of as many rows as the items' dimensions |
 
 The rule is an `ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate>`, so `randomesque(rule, count)`
 wraps it. A custom rule reads the [context of a selection rule](#item-selection) with these types: `context.pool` holds

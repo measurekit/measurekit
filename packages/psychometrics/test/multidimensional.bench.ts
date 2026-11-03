@@ -101,13 +101,13 @@ test("estimates the abilities of 1,000 persons on 24 items in two dimensions", a
   const { items } = calibrateMultidimensional(confirmatory, confirmatoryOptions);
   await benchmark(context, "multidimensional.estimateMode", () => multidimensionalEstimates(confirmatory, items));
   await benchmark(context, "multidimensional.estimateMean", () =>
-    multidimensionalEstimates(confirmatory, items, multidimensionalPosteriorMeanEstimate),
+    multidimensionalEstimates(confirmatory, items, { estimator: multidimensionalPosteriorMeanEstimate }),
   );
   await benchmark(context, "multidimensional.estimateLikelihood", () =>
-    multidimensionalEstimates(confirmatory, items, multidimensionalMaximumLikelihoodEstimate),
+    multidimensionalEstimates(confirmatory, items, { estimator: multidimensionalMaximumLikelihoodEstimate }),
   );
   await benchmark(context, "multidimensional.estimateWeighted", () =>
-    multidimensionalEstimates(confirmatory, items, multidimensionalWeightedLikelihoodEstimate),
+    multidimensionalEstimates(confirmatory, items, { estimator: multidimensionalWeightedLikelihoodEstimate }),
   );
 });
 

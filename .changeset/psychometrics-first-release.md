@@ -175,3 +175,7 @@ A quadrature rule has at most 1,000 points, and the rules kept for reuse are the
 Standard errors take at most 2,000 estimated parameters, in calibrations of one or more dimensions alike, as their
 information holds every pair of them.
 Conditional maximum likelihood checks the categories that occur before an item's highest response sizes its parameters.
+`abilityEstimates`, `multidimensionalEstimates`, `manyFacetEstimates` and `effortModeratedEstimates` take their
+estimator as the option `estimator`, `simulateThetas` its distribution as `distribution`, `maximumDeterminant` its prior
+as `prior`, `classifyDifficulty` and `classifyDiscrimination` their thresholds as `thresholds`,
+`standardErrorOfMeasurement` its reliability as `reliability`, and `expectedRating` its elements as `levels`.

@@ -276,7 +276,10 @@ import { normalDistribution, simulateItems, simulateResponses, simulateThetas } 
 // 500 persons of 2025 from N(0, 1) and 500 of 2026 from N(0.5, 1.2²) answer the same 20 items.
 const random = createRandom(2026);
 const items = simulateItems(twoParameterLogistic, 20, random);
-const thetas = [...simulateThetas(500, random), ...simulateThetas(500, random, normalDistribution(0.5, 1.2))];
+const thetas = [
+  ...simulateThetas(500, random),
+  ...simulateThetas(500, random, { distribution: normalDistribution(0.5, 1.2) }),
+];
 const result = calibrate(simulateResponses(items, thetas, random), {
   model: twoParameterLogistic,
   groups: thetas.map((_, person) => (person < 500 ? "2025" : "2026")),
@@ -320,7 +323,7 @@ const items = simulateItems(twoParameterLogistic, 20, random);
 const raw = simulateThetas(1500, random);
 const mean = raw.reduce((sum, value) => sum + value, 0) / raw.length;
 const x = raw.map((value) => value - mean);
-const noise = simulateThetas(1500, random, normalDistribution(0, 0.8));
+const noise = simulateThetas(1500, random, { distribution: normalDistribution(0, 0.8) });
 const thetas = x.map((value, person) => 0.6 * value + (noise[person] ?? 0));
 const responses = simulateResponses(items, thetas, random);
 
@@ -371,7 +374,7 @@ import { normalDistribution, simulateItems, simulateResponses, simulateThetas } 
 // item, from a population N(0.3, 1.1²).
 const random = createRandom(2026);
 const items = simulateItems(twoParameterLogistic, 22, random);
-const thetas = simulateThetas(2000, random, normalDistribution(0.3, 1.1));
+const thetas = simulateThetas(2000, random, { distribution: normalDistribution(0.3, 1.1) });
 const data = responseRecords(
   simulateResponses(items, thetas, random).responses.flatMap((row, person) =>
     row.flatMap((response, j) => {
@@ -451,7 +454,9 @@ const result = calibrate(matrix, {
 });
 const { testlets } = result;
 posteriorMeanEstimate(result.items, [1, 0, 1, 1, null, 0], { testlets });
-abilityEstimates(matrix, result.items, (items, responses) => posteriorMeanEstimate(items, responses, { testlets }));
+abilityEstimates(matrix, result.items, {
+  estimator: (items, responses) => posteriorMeanEstimate(items, responses, { testlets }),
+});
 ```
 
 The testlet EM converges slowly when a testlet has few items, as variance components do; a tight `tolerance` takes
@@ -803,8 +808,8 @@ rectangular points.
 
 Estimates are never `NaN`. A standard error is `Infinity` only where the items give no information.
 
-`abilityEstimates(data, items, estimator)` estimates every person of a response matrix or response records from the
-person's answered items, matched to `items` by id, as a calibration's items are; `estimator` defaults to
+`abilityEstimates(data, items, options)` estimates every person of a response matrix or response records from the
+person's answered items, matched to `items` by id, as a calibration's items are; the option `estimator` defaults to
 `posteriorMeanEstimate` and can be any of the four or `untilMixed` of two. It returns `{ id, theta, standardError }` per
 person, `null` for a person without responses.
 

@@ -105,13 +105,17 @@ test("calibrates the testlet model of 1,000 persons and 6 testlets of 5 items", 
 });
 
 test("estimates the ability of 2,000 persons on 40 items", async (context) => {
-  await benchmark(context, "irt.abilityPosteriorMean", () => abilityEstimates(binary, items, posteriorMeanEstimate));
-  await benchmark(context, "irt.abilityPosteriorMode", () => abilityEstimates(binary, items, posteriorModeEstimate));
+  await benchmark(context, "irt.abilityPosteriorMean", () =>
+    abilityEstimates(binary, items, { estimator: posteriorMeanEstimate }),
+  );
+  await benchmark(context, "irt.abilityPosteriorMode", () =>
+    abilityEstimates(binary, items, { estimator: posteriorModeEstimate }),
+  );
   await benchmark(context, "irt.abilityMaximumLikelihood", () =>
-    abilityEstimates(binary, items, maximumLikelihoodEstimate),
+    abilityEstimates(binary, items, { estimator: maximumLikelihoodEstimate }),
   );
   await benchmark(context, "irt.abilityWeightedLikelihood", () =>
-    abilityEstimates(binary, items, weightedLikelihoodEstimate),
+    abilityEstimates(binary, items, { estimator: weightedLikelihoodEstimate }),
   );
 });
 

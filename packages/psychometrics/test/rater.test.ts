@@ -1111,14 +1111,19 @@ describe("manyFacetRasch with interactions", () => {
     const shifted = storedModel([], 0.9);
     const unbiased = storedModel([]);
     const cell = { item: "i1", rater: "r1" };
-    expectClose(expectedRating(biased, 0.2, cell), expectedRating(shifted, 0.2, cell), 1e-12, "the biased cell");
     expectClose(
-      expectedRating(biased, 0.2, { item: "i1", rater: "r2" }),
-      expectedRating(unbiased, 0.2, { item: "i1", rater: "r2" }),
+      expectedRating(biased, 0.2, { levels: cell }),
+      expectedRating(shifted, 0.2, { levels: cell }),
+      1e-12,
+      "the biased cell",
+    );
+    expectClose(
+      expectedRating(biased, 0.2, { levels: { item: "i1", rater: "r2" } }),
+      expectedRating(unbiased, 0.2, { levels: { item: "i1", rater: "r2" } }),
       1e-12,
       "another cell",
     );
-    expect(expectedRating(biased, 0.2, cell)).toBeLessThan(expectedRating(unbiased, 0.2, cell));
+    expect(expectedRating(biased, 0.2, { levels: cell })).toBeLessThan(expectedRating(unbiased, 0.2, { levels: cell }));
     expectClose(expectedRating(biased, 0.2), expectedRating(unbiased, 0.2), 1e-12, "the fair score fills no cell");
     const scores = [
       { levels: { person: "a", ...cell }, score: 2 },
@@ -1186,10 +1191,12 @@ describe("manyFacetEstimates", () => {
     if (dataset === undefined || reference === undefined) return;
     const scores = scoresOf(dataset.scores);
     const seen = new Map<string, number>();
-    const estimates = manyFacetEstimates(scores, modelOf(reference), (items, responses) => {
-      expect(items).toHaveLength(responses.length);
-      seen.set(String(seen.size), items.length);
-      return { theta: items.length, standardError: 1 };
+    const estimates = manyFacetEstimates(scores, modelOf(reference), {
+      estimator: (items, responses) => {
+        expect(items).toHaveLength(responses.length);
+        seen.set(String(seen.size), items.length);
+        return { theta: items.length, standardError: 1 };
+      },
     });
     const answered = new Map<string, number>();
     for (const { levels } of scores) answered.set(levels.person ?? "", (answered.get(levels.person ?? "") ?? 0) + 1);
@@ -1202,16 +1209,17 @@ describe("manyFacetEstimates", () => {
     if (dataset === undefined || reference === undefined) return;
     const model = modelOf(reference);
     const scores = scoresOf(dataset.scores);
-    const estimates = manyFacetEstimates(scores, model, (items, responses) =>
-      maximumLikelihoodEstimate(items, responses),
-    );
+    const estimates = manyFacetEstimates(scores, model, {
+      estimator: (items, responses) => maximumLikelihoodEstimate(items, responses),
+    });
     estimates.forEach(({ id, theta }) => {
       const own = scores.filter(({ levels }) => levels.person === id);
       const raw = own.reduce((sum, { score }) => sum + score, 0);
       const maximum = own.length * (reference.thresholds[0]?.thresholds.length ?? 0);
       if (theta === null || raw === 0 || raw === maximum) return;
       const expected = own.reduce(
-        (sum, { levels }) => sum + expectedRating(model, theta, { item: levels.item ?? "", rater: levels.rater ?? "" }),
+        (sum, { levels }) =>
+          sum + expectedRating(model, theta, { levels: { item: levels.item ?? "", rater: levels.rater ?? "" } }),
         0,
       );
       expect(Math.abs(expected - raw), id).toBeLessThan(1e-4);
@@ -1231,6 +1239,9 @@ describe("manyFacetEstimates", () => {
     const beyond = scores.map((entry, i) => (i === 1 ? { ...entry, score: 9 } : entry));
     expect(() => manyFacetEstimates(beyond, model)).toThrow("Score 2 is 9, but its thresholds give categories 0 to 3.");
     expect(() => manyFacetEstimates(scores, model, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => manyFacetEstimates(scores, model, { estimator: JSON.parse("null") })).toThrow(
       "The estimator must be a function of items and responses, such as posteriorMeanEstimate, found null.",
     );
     expect(() => manyFacetEstimates(JSON.parse("null"), model)).toThrow(DataError);
@@ -1293,7 +1304,7 @@ describe("expectedRating", () => {
         const model = modelOf(reference);
         for (const probe of reference.expectedRatings) {
           const levels: Record<string, string> = Object.fromEntries(Object.entries(probe.levels));
-          expectClose(expectedRating(model, probe.theta, levels), probe.value, DERIVED_TOLERANCE, "levels");
+          expectClose(expectedRating(model, probe.theta, { levels }), probe.value, DERIVED_TOLERANCE, "levels");
           expectClose(expectedRating(model, probe.theta), probe.fair, DERIVED_TOLERANCE, "fair score");
         }
       });
@@ -1311,8 +1322,8 @@ describe("expectedRating", () => {
     const raters = model.facets[1]?.elements ?? [];
     const harshest = raters.reduce((worst, rater) => (rater.measure > worst.measure ? rater : worst));
     const mildest = raters.reduce((best, rater) => (rater.measure < best.measure ? rater : best));
-    expect(expectedRating(model, 0, { rater: mildest.id })).toBeGreaterThan(
-      expectedRating(model, 0, { rater: harshest.id }),
+    expect(expectedRating(model, 0, { levels: { rater: mildest.id } })).toBeGreaterThan(
+      expectedRating(model, 0, { levels: { rater: harshest.id } }),
     );
     let previous = -1;
     for (let theta = -4; theta <= 4; theta += 0.5) {
@@ -1328,16 +1339,17 @@ describe("expectedRating", () => {
     if (dataset === undefined || reference === undefined) return;
     const model = modelOf(reference);
     expect(() => expectedRating(model, Number.NaN)).toThrow("Theta must be a finite number, found NaN.");
-    expect(() => expectedRating(model, 0, { task: "t1" })).toThrow(
+    expect(() => expectedRating(model, 0, { levels: { task: "t1" } })).toThrow(
       'The levels name the facet "task", but the model has "item", "rater".',
     );
-    expect(() => expectedRating(model, 0, { rater: "nobody" })).toThrow(
+    expect(() => expectedRating(model, 0, { levels: { rater: "nobody" } })).toThrow(
       'The facet "rater" of the model has no element "nobody".',
     );
-    expect(() => expectedRating(model, 0, JSON.parse('{"rater": 3}'))).toThrow(
+    expect(() => expectedRating(model, 0, { levels: JSON.parse('{"rater": 3}') })).toThrow(
       'The level of the facet "rater" must be an element id, found 3.',
     );
-    expect(() => expectedRating(model, 0, JSON.parse("null"))).toThrow(
+    expect(() => expectedRating(model, 0, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => expectedRating(model, 0, { levels: JSON.parse("null") })).toThrow(
       "The levels must be an object of elements by facet, found null.",
     );
     expect(() => expectedRating(JSON.parse("null"), 0)).toThrow(DataError);

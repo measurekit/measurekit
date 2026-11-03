@@ -15,14 +15,14 @@ describe("kappaOfPairs", () => {
     // chance agreements are 1/3, 1/2 and 7/12.
     const first = [0, 1, 2];
     const second = [0, 2, 2];
-    expect(kappaOfPairs(first, second, "none")).toBeCloseTo(0.5, 14);
-    expect(kappaOfPairs(first, second, "linear")).toBeCloseTo(2 / 3, 14);
-    expect(kappaOfPairs(first, second, "quadratic")).toBeCloseTo(0.8, 14);
+    expect(kappaOfPairs(first, second, { weights: "none" })).toBeCloseTo(0.5, 14);
+    expect(kappaOfPairs(first, second, { weights: "linear" })).toBeCloseTo(2 / 3, 14);
+    expect(kappaOfPairs(first, second, { weights: "quadratic" })).toBeCloseTo(0.8, 14);
   });
 
   it("is 1 for equal lists, whatever the weights", () => {
     for (const weights of ["none", "linear", "quadratic"] as const) {
-      expect(kappaOfPairs([0, 3, 1, 2, 2], [0, 3, 1, 2, 2], weights)).toBe(1);
+      expect(kappaOfPairs([0, 3, 1, 2, 2], [0, 3, 1, 2, 2], { weights })).toBe(1);
     }
   });
 
@@ -32,14 +32,14 @@ describe("kappaOfPairs", () => {
 
   it("is null when chance agreement is 1, as when both lists use one category", () => {
     expect(kappaOfPairs([2, 2, 2], [2, 2, 2])).toBeNull();
-    expect(kappaOfPairs([0], [0], "quadratic")).toBeNull();
+    expect(kappaOfPairs([0], [0], { weights: "quadratic" })).toBeNull();
   });
 
   it("takes the categories that occur, however far apart, without a table over their range", () => {
     const far = Number.MAX_SAFE_INTEGER;
     // p_o = 2/3 and p_e = 2/3 * 1/3 + 1/3 * 2/3 = 4/9, with no partial credit between categories a range apart.
     for (const weights of ["none", "linear", "quadratic"] as const) {
-      expect(kappaOfPairs([0, far, 0], [0, far, far], weights)).toBeCloseTo(0.4, 14);
+      expect(kappaOfPairs([0, far, 0], [0, far, far], { weights })).toBeCloseTo(0.4, 14);
     }
   });
 
@@ -66,7 +66,7 @@ describe("kappaOfPairs", () => {
           observed += agreement(first[i] ?? 0, second[i] ?? 0) / n;
           for (let j = 0; j < n; j++) chance += agreement(first[i] ?? 0, second[j] ?? 0) / (n * n);
         }
-        const kappa = kappaOfPairs(first, second, weights);
+        const kappa = kappaOfPairs(first, second, { weights });
         if (chance > 1 - 1e-12) expect(kappa).toBeNull();
         else expect(kappa).toBeCloseTo((observed - chance) / (1 - chance), 10);
       }),
@@ -80,7 +80,7 @@ describe("kappaOfPairs", () => {
     const second = first.toReversed();
     expect(kappaOfPairs(first, second)).toBeCloseTo(-1 / 19_999, 15);
     for (const weights of ["linear", "quadratic"] as const) {
-      const kappa = kappaOfPairs(first, second, weights);
+      const kappa = kappaOfPairs(first, second, { weights });
       expect(Number.isFinite(kappa) && (kappa ?? 0) < 0).toBe(true);
     }
   }, 3_000);
@@ -95,13 +95,13 @@ describe("kappaOfPairs", () => {
       fc.property(pairs, weights, fc.integer({ min: 0, max: 7 }), (values, weight, shift) => {
         const first = values.map(([x]) => x);
         const second = values.map(([, y]) => y);
-        const kappa = kappaOfPairs(first, second, weight);
-        const swapped = kappaOfPairs(second, first, weight);
-        const reversed = kappaOfPairs([...first].reverse(), [...second].reverse(), weight);
+        const kappa = kappaOfPairs(first, second, { weights: weight });
+        const swapped = kappaOfPairs(second, first, { weights: weight });
+        const reversed = kappaOfPairs([...first].reverse(), [...second].reverse(), { weights: weight });
         const shifted = kappaOfPairs(
           first.map((x) => x + shift),
           second.map((y) => y + shift),
-          weight,
+          { weights: weight },
         );
         if (kappa === null) {
           expect([swapped, reversed, shifted]).toEqual([null, null, null]);
