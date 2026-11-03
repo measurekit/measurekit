@@ -1226,6 +1226,7 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | Situation                                                                                | Result                                                |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | An invalid `forms`, `overlap`, `enemies` or `random`, or an invalid constraint or target | `DataError`                                           |
+| Two constraints on one content area                                                      | `DataError`                                           |
 | An item whose `contentAreas` is not an array of distinct non-empty strings               | `DataError`                                           |
 | The pool, the enemies or `overlap` leave a form short                                    | The form has fewer than `length` items                |
 | The bounds are not met                                                                   | The counts and the information are returned, to check |

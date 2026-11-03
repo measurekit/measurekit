@@ -45,7 +45,7 @@ export interface ContentBounds {
  * @throws `DataError` unless it is an object with a string area, finite bounds with the minimum at most the maximum, and
  * a weight that is a positive number.
  */
-export function readConstraint(constraint: ContentConstraint): Required<ContentConstraint> {
+function readConstraint(constraint: ContentConstraint): Required<ContentConstraint> {
   checkRecord(constraint, "A content constraint must be an object { area, minimum, maximum }");
   const { area, minimum, maximum, weight = 1 } = constraint;
   if (typeof area !== "string") {
@@ -67,7 +67,7 @@ export function readConstraint(constraint: ContentConstraint): Required<ContentC
  *
  * @throws `DataError` when they are not an array of constraints, or two are on one area.
  */
-function readConstraints(constraints: readonly ContentConstraint[]): readonly Required<ContentConstraint>[] {
+export function readConstraints(constraints: readonly ContentConstraint[]): readonly Required<ContentConstraint>[] {
   checkArray(constraints, "The content constraints must be an array of { area, minimum, maximum }");
   const read = constraints.map(readConstraint);
   const seen = new Set<string>();

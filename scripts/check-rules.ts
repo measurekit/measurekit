@@ -715,6 +715,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/psychometrics/test/fit.test.ts",
     titles: "beyond the persons of a group",
   },
+  {
+    rule: "Form assembly takes one constraint for each content area, so that a second is not read with no item counted for the first.",
+    file: "packages/psychometrics/src/cat/form-assembly.ts",
+    find: "const constraints = readConstraints(content);",
+    replace: "const constraints = content.flatMap((constraint) => readConstraints([constraint]));",
+    test: "packages/psychometrics/test/cat.test.ts",
+    titles: "assembleForms.*rejects options of other types and invalid ones",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

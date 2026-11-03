@@ -13,7 +13,7 @@ import {
   shuffle,
 } from "@measurekit/core";
 import { indexItems } from "../irt/internal.js";
-import { type ContentConstraint, poolAreas, readConstraint } from "./content-constraints.js";
+import { type ContentConstraint, poolAreas, readConstraints } from "./content-constraints.js";
 import { enemyIndices } from "./enemies.js";
 import type { PoolItem } from "./items.js";
 import { poolTestlets } from "./testlets.js";
@@ -155,7 +155,7 @@ interface Assembly {
  * @returns The forms, in the order of the rotation's first round.
  * @throws `DataError` when an item's id or parameters are invalid, ids repeat, the length is not an integer from 1 to
  * the pool size, `forms` is not a positive integer, `overlap` is not an integer from 0, a constraint has bounds that are
- * not finite numbers with minimum ≤ maximum or a weight that is not positive, an item's `contentAreas` is not an array of
+ * not finite numbers with minimum ≤ maximum or a weight that is not positive, two constraints are on one area, an item's `contentAreas` is not an array of
  * distinct non-empty strings, a target has a theta or information that is not finite or a weight that is not positive,
  * an enemy set does not name two or more distinct pool items, or `random` is not a random number generator.
  * @see {@link https://doi.org/10.1177/014662169301700205 | Swanson and Stocking (1993)}
@@ -170,14 +170,15 @@ export function assembleForms(options: FormAssemblyOptions): AssembledForm[] {
     );
   }
   checkArray(content, "The option content must be an array of content constraints");
+  const constraints = readConstraints(content);
   checkArray(target, "The option target must be an array of information targets");
   checkPositiveInteger(forms, "The option forms");
   checkIntegerFrom(overlap, "The option overlap", 0);
   if (random !== undefined) checkRandom(random);
   const conflicts = enemyIndices(pool, indices, enemies);
-  const itemAreas = poolAreas(content.map(({ area }) => area))(pool);
+  const itemAreas = poolAreas(constraints.map(({ area }) => area))(pool);
   const properties = [
-    ...content.map((constraint, k) => contentProperty(itemAreas, k, constraint)),
+    ...constraints.map((constraint, k) => contentProperty(itemAreas, k, constraint)),
     ...target.map((point) => informationProperty(pool, point)),
   ];
   const units = poolUnits(pool, conflicts, random);
@@ -190,8 +191,8 @@ export function assembleForms(options: FormAssemblyOptions): AssembledForm[] {
   rotate(forms, step);
   return assembly.forms.map(({ chosen, totals }) => ({
     items: chosen.flatMap((index) => pool[index] ?? []),
-    contentCounts: Object.fromEntries(content.map(({ area }, k) => [area, totals[k] ?? 0])),
-    information: target.map((_, t) => totals[content.length + t] ?? 0),
+    contentCounts: Object.fromEntries(constraints.map(({ area }, k) => [area, totals[k] ?? 0])),
+    information: target.map((_, t) => totals[constraints.length + t] ?? 0),
   }));
 }
 
@@ -386,9 +387,8 @@ function projectedDeviation(properties: readonly Property[], progress: Progress,
 function contentProperty(
   itemAreas: readonly (readonly number[])[],
   area: number,
-  constraint: ContentConstraint,
+  { minimum, maximum, weight }: Required<ContentConstraint>,
 ): Property {
-  const { minimum, maximum, weight } = readConstraint(constraint);
   return {
     values: Float64Array.from(itemAreas, (areas) => (areas.includes(area) ? 1 : 0)),
     lower: minimum,

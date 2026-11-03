@@ -2123,6 +2123,14 @@ describe("assembleForms", () => {
     expect(() => assembleForms({ ...base, content: [{ area: "algebra", minimum: 1, maximum: 2, weight: 0 }] })).toThrow(
       'The weight of the constraint on "algebra" must be a positive number, found 0.',
     );
+    // Two constraints on one area would count its items for the second alone, and leave the first's minimum unmet.
+    const twice = [
+      { area: "algebra", minimum: 3, maximum: 3 },
+      { area: "algebra", minimum: 0, maximum: 6 },
+    ];
+    expect(() => assembleForms({ ...base, content: twice })).toThrow(
+      'Content area "algebra" has two constraints; give it one.',
+    );
     expect(() => assembleForms({ ...base, target: [{ theta: 0, information: Number.NaN }] })).toThrow(
       "The information of the target at theta 0 must be a finite number, found NaN.",
     );
