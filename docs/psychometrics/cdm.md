@@ -22,7 +22,7 @@ const qMatrix: QMatrix = {
 ```
 
 Every item of the response matrix needs at least one attribute. The attributes take the order in which they first
-appear over the items, which orders every profile in the results; K attributes give 2^K profiles, up to 20 attributes.
+appear over the items, which orders every profile in the results; K attributes give 2^K profiles, up to 15 attributes.
 A profile is an array of 0 and 1 per attribute, 1 when mastered. Profiles come in GDINA's order: by the number mastered,
 then those mastering earlier attributes first, 00, 10, 01, 11.
 
@@ -101,17 +101,17 @@ the machine epsilon. Responses are 0 or 1; missing ones are skipped.
 | `converged`     | Whether EM reached `tolerance`                                                                                                                                                   |
 | `iterations`    | EM iterations run                                                                                                                                                                |
 
-| Limit                                       | Value                    | Why                                                                                                                                |
-| ------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Attributes of a Q-matrix                    | 20                       | K attributes give 2^K profiles, and a fit's memory and time grow with them: 1.0 GB for 20 items of one of 20 attributes            |
-| Items × 2^K                                 | 2^26, 64 items at K = 20 | A fit holds a table from the profiles to the latent groups of each item: 2.0 GB for 64 items at 20 attributes, the most it reaches |
-| Latent groups, 2^k for an item of k         | 2^20 over all items      | A fit holds each group's success probability, with the model's work on it: 1.2 GB for 64 items, one of 19 attributes and 63 of 13  |
-| Success probabilities with `standardErrors` | 3,162 over all items     | An item of k attributes has 2^k, and their information matrix has p² cells: 80 MB at the limit                                     |
+| Limit                                       | Value                     | Why                                                                                                                                                               |
+| ------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Attributes of a Q-matrix                    | 15                        | K attributes give 2^K profiles, and a fit's memory and time grow with them. The Q-matrices of GDINA's and CDM's data sets have at most 15, most fewer than 10     |
+| Items × 2^K                                 | 2^22, 128 items at K = 15 | A fit holds a table from the profiles to the latent groups of each item, about 40 bytes a cell: 190 MB for 128 items of one of 15 attributes                      |
+| Latent groups, 2^k for an item of k         | 2^18 over all items       | A fit holds each group's success probability, with the model's work on it: 230 to 290 MB by model for 128 items of 11 of 15 attributes, the most the limits reach |
+| Success probabilities with `standardErrors` | 3,162 over all items      | An item of k attributes has 2^k, and their information matrix has p² cells: 80 MB at the limit                                                                    |
 
 The memory is the rise of the peak of a process over two iterations of EM on two persons, measured as
 [performance](../performance.md#peak-memory) says; persons add no more, as the posteriors are summed person by person. A
-Q-matrix of a few hundred bytes reaches these limits, so a server that takes Q-matrices from users needs room for
-the 2 GB, or a lower limit of its own.
+Q-matrix of a few hundred bytes reaches these limits. Applications fall well within them: TIMSS 2007's 25 items of 15
+attributes (Lee, Park and Taylan, 2011), as CDM ships them, hold 819,200 cells and 262 latent groups.
 
 `coefficients` are GDINA's `coef(what = "delta")`:
 
@@ -423,6 +423,8 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 - de la Torre, J., & Chiu, C.-Y. (2016). A general method of empirical Q-matrix validation. Psychometrika, 81, 253-273.
 - Iaconangelo, C. (2017). Uses of classification error probabilities in the three-step approach to estimating
   cognitive diagnosis models. Rutgers University.
+- Lee, Y.-S., Park, Y. S., & Taylan, D. (2011). A cognitive diagnostic modeling of attribute mastery in Massachusetts,
+  Minnesota, and the U.S. national sample using the TIMSS 2007. International Journal of Testing, 11, 144-177.
 - Ma, W., Iaconangelo, C., & de la Torre, J. (2016). Model similarity, model selection, and attribute classification.
   Applied Psychological Measurement, 40, 200-217.
 - Hansen, M., Cai, L., Monroe, S., & Li, Z. (2016). Limited-information goodness-of-fit testing of diagnostic

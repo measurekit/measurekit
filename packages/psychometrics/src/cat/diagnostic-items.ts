@@ -37,7 +37,7 @@ export interface CheckedPool {
  *
  * @throws `DataError` when the pool is not an array of objects, an id is not a string or repeats, an item has no
  * attributes, repeats one or names one that is not an attribute of the test, an item does not have one probability
- * from 0 to 1 per latent group, or the pool has more than 2^26 cells of items by profiles or more than 2^20 latent
+ * from 0 to 1 per latent group, or the pool has more than 2^22 cells of items by profiles or more than 2^18 latent
  * groups over all items.
  */
 export function checkPool(pool: readonly DiagnosticPoolItem[], attributes: readonly string[]): CheckedPool {

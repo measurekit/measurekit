@@ -49,15 +49,21 @@ export function bitPattern(profile: readonly number[], positions: Iterable<numbe
   return pattern;
 }
 
-/** The most attributes of a design: 2^20 profiles. */
-export const MAX_ATTRIBUTES = 20;
 /**
- * The most cells of the items' tables from the profiles to their latent groups, items × 2^K: 256 MB of 32-bit integers,
- * 64 items at 20 attributes.
+ * The most attributes of a design: 2^15 profiles. The Q-matrices of GDINA's and CDM's data sets have at most 15, those
+ * of TIMSS 2007 (Lee, Park and Taylan, 2011), and most fewer than 10.
  */
-const MAX_PROFILE_CELLS = 2 ** 26;
-/** The most latent groups over all items, 2^k for an item of k attributes: the success probabilities of the G-DINA. */
-const MAX_LATENT_GROUPS = 2 ** 20;
+export const MAX_ATTRIBUTES = 15;
+/**
+ * The most cells of the items' tables from the profiles to their latent groups, items × 2^K: 128 items at 15
+ * attributes. A fit holds about 40 bytes per cell.
+ */
+const MAX_PROFILE_CELLS = 2 ** 22;
+/**
+ * The most latent groups over all items, 2^k for an item of k attributes: the success probabilities of the G-DINA, and
+ * an additive model's work on each, about 300 bytes per group.
+ */
+const MAX_LATENT_GROUPS = 2 ** 18;
 
 /**
  * Checks an item's attributes: at least one, each a non-empty string, none twice.
@@ -115,12 +121,12 @@ export function designAttributes(
  * Checks that items of `itemAttributes` attributes each, over `attributes` attributes, stay within the cells of items by
  * profiles and the latent groups that a design holds.
  *
- * @throws `DataError` when there are more than 2^26 cells of items by profiles, items × 2^K, or more than 2^20 latent
+ * @throws `DataError` when there are more than 2^22 cells of items by profiles, items × 2^K, or more than 2^18 latent
  * groups over all items, 2^k for an item of k attributes.
  */
 export function checkDesignSize(attributes: number, itemAttributes: readonly number[]): void {
   // A few hundred bytes of Q-matrix can name these, and a fit or an adaptive test holds each of them: the limits keep
-  // its memory within about 2 GB.
+  // its memory within about 300 MB.
   const cells = itemAttributes.length * 2 ** attributes;
   if (cells > MAX_PROFILE_CELLS) {
     throw new DataError(
@@ -138,8 +144,8 @@ export function checkDesignSize(attributes: number, itemAttributes: readonly num
 /**
  * Checks a Q-matrix against item ids and returns its design.
  *
- * @throws `DataError` as {@link designAttributes} does, or when there are more than 20 attributes, more than 2^26 cells
- * of items by profiles or more than 2^20 latent groups over all items.
+ * @throws `DataError` as {@link designAttributes} does, or when there are more than 15 attributes, more than 2^22 cells
+ * of items by profiles or more than 2^18 latent groups over all items.
  */
 export function cdmDesign(itemIds: readonly string[], qMatrix: QMatrix): CdmDesign {
   const { attributes, itemAttributes } = designAttributes(itemIds, qMatrix);

@@ -180,12 +180,15 @@ export const READERS: readonly ReaderCase[] = [
     read: (qMatrix: unknown, { psychometrics }) => psychometrics.qMatrixIdentifiability(qMatrix),
   },
   {
-    name: "calibrateCdm: 64 items of one of 20 attributes, the most items × 2^K, two persons",
-    budget: 4120,
+    name: "calibrateCdm: 128 items of 11 of 15 attributes, the most items × 2^K and latent groups, two persons, LLM",
+    budget: 460,
+    // Item i measures the 11 attributes from the i-th, round the 15: 2^22 cells and 2^18 latent groups, both limits.
     input: () => ({
-      itemIds: ids("item", 64),
-      rows: [Array(64).fill(0), Array(64).fill(1)],
-      qMatrix: Object.fromEntries(ids("item", 64).map((id, i) => [id, [`a${(i % 20) + 1}`]])),
+      itemIds: ids("item", 128),
+      rows: [Array(128).fill(0), Array(128).fill(1)],
+      qMatrix: Object.fromEntries(
+        ids("item", 128).map((id, i) => [id, Array.from({ length: 11 }, (_, k) => `a${((i + k) % 15) + 1}`)]),
+      ),
     }),
     prepare: (
       { itemIds, rows, qMatrix }: { itemIds: string[]; rows: number[][]; qMatrix: unknown },
@@ -195,7 +198,7 @@ export const READERS: readonly ReaderCase[] = [
       qMatrix,
     }),
     read: ({ matrix, qMatrix }: { matrix: unknown; qMatrix: unknown }, { psychometrics }) =>
-      psychometrics.calibrateCdm(matrix, qMatrix, { maxIterations: 2 }),
+      psychometrics.calibrateCdm(matrix, qMatrix, { maxIterations: 2, model: "llm" }),
   },
   {
     name: "bkt: the stored parameters of 100,000 skills",
@@ -287,14 +290,14 @@ export const READERS: readonly ReaderCase[] = [
       psychometrics.assembleForms({ pool, length: 1, forms: 8191, overlap: 1 }),
   },
   {
-    name: "diagnosticAdaptiveTest: 64 items of one of 20 attributes, the most items × 2^K",
-    budget: 1940,
+    name: "diagnosticAdaptiveTest: 128 items of 11 of 15 attributes, the most items × 2^K and latent groups",
+    budget: 180,
     input: () => ({
-      attributes: ids("a", 20),
-      pool: Array.from({ length: 64 }, (_, j) => ({
+      attributes: ids("a", 15),
+      pool: Array.from({ length: 128 }, (_, j) => ({
         id: `q${j + 1}`,
-        attributes: [`a${(j % 20) + 1}`],
-        probabilities: [0.2, 0.8],
+        attributes: Array.from({ length: 11 }, (_, k) => `a${((j + k) % 15) + 1}`),
+        probabilities: Array.from({ length: 2 ** 11 }, (_, g) => (g === 2 ** 11 - 1 ? 0.8 : 0.2)),
       })),
     }),
     read: (options: { attributes: string[]; pool: unknown[] }, { psychometrics }) =>

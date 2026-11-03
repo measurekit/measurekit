@@ -17,7 +17,7 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   times the replications. In `@measurekit/knowledge-tracing`, a log is checked and replayed in time proportional to its
   events, and cross-validation fits the model once per fold. Limit the size of data accepted from untrusted sources
   before analyzing it on a server: a response matrix or a log takes at most about 50 times the bytes of its JSON, a
-  Q-matrix or a diagnostic pool of a few hundred bytes up to 2 GB within the limits below
+  Q-matrix or a diagnostic pool of a few hundred bytes up to 300 MB within the limits below
   ([peak memory](docs/performance.md#peak-memory)). The time of inductive item tree analysis grows faster than its
   limits bound: 1,000 learners take 10 ms at 12 items and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items
   ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). So does the time of a statistic of every pair of
@@ -34,9 +34,9 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   | Input                                                                                              | Limit                                      | Guide                                                                                                         |
   | -------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
   | A response, or the score of a faceted score                                                        | An integer from 0 to 2³¹ - 1               | [data](docs/psychometrics/data.md)                                                                            |
-  | Attributes of a Q-matrix; of a diagnostic adaptive test                                            | 20: a fit holds 2^K profiles, 1.0 GB       | [cdm](docs/psychometrics/cdm.md#calibration)                                                                  |
-  | Items × 2^K of a diagnosis model; of a diagnostic adaptive test                                    | 2^26: 2.0 GB at 64 items of 20 attributes  | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
-  | Latent groups of a diagnosis model; of a diagnostic adaptive test                                  | 2^20 over all items, 2^k for k attributes  | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
+  | Attributes of a Q-matrix; of a diagnostic adaptive test                                            | 15: the most in GDINA's and CDM's data     | [cdm](docs/psychometrics/cdm.md#calibration)                                                                  |
+  | Items × 2^K of a diagnosis model; of a diagnostic adaptive test                                    | 2^22: 300 MB with 2^18 latent groups       | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
+  | Latent groups of a diagnosis model; of a diagnostic adaptive test                                  | 2^18 over all items, 2^k for k attributes  | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
   | Success probabilities with incomplete standard errors                                              | 3,162 over all items: 80 MB of information | [cdm](docs/psychometrics/cdm.md#calibration)                                                                  |
   | Items of a limited-information statistic, of IRT or diagnosis; its moments, of C2 with categories  | 60 and 1,830: a covariance matrix of 27 MB | [fit](docs/psychometrics/fit.md#limited-information-fit), [cdm](docs/psychometrics/cdm.md#model-and-item-fit) |
   | Categories of a Mokken scale                                                                       | 10                                         | [mokken](docs/psychometrics/mokken.md)                                                                        |

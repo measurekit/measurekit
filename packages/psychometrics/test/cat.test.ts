@@ -3948,11 +3948,11 @@ describe("diagnosticAdaptiveTest", () => {
     const attributes = (value: unknown) => () =>
       diagnosticAdaptiveTest({ ...options, attributes: parse(JSON.stringify(value)) });
     expect(attributes("add")).toThrow('The option attributes must be an array of attribute names, found "add".');
-    expect(attributes([])).toThrow("The option attributes must list from 1 to 20 distinct non-empty names");
+    expect(attributes([])).toThrow("The option attributes must list from 1 to 15 distinct non-empty names");
     expect(attributes(["add", "add"])).toThrow("distinct non-empty names");
     expect(attributes(["add", ""])).toThrow("distinct non-empty names");
     expect(attributes(["add", 2])).toThrow("distinct non-empty names");
-    expect(attributes(Array.from({ length: 21 }, (_, k) => `a${k}`))).toThrow("from 1 to 20 distinct");
+    expect(attributes(Array.from({ length: 16 }, (_, k) => `a${k}`))).toThrow("from 1 to 15 distinct");
     const prior = (value: unknown) => () =>
       diagnosticAdaptiveTest({ ...options, attributes: SKILLS, prior: parse(JSON.stringify(value)) });
     const entries = [
@@ -3977,22 +3977,22 @@ describe("diagnosticAdaptiveTest", () => {
     );
   });
 
-  it("refuses a pool of more than 2^26 cells of items by profiles or 2^20 latent groups, before it holds the profiles", () => {
-    const attributes = Array.from({ length: 20 }, (_, k) => `a${k}`);
+  it("refuses a pool of more than 2^22 cells of items by profiles or 2^18 latent groups, before it holds the profiles", () => {
+    const attributes = Array.from({ length: 15 }, (_, k) => `a${k}`);
     const options = { attributes, stopping: testLength(2) };
-    // 65 items of one of 20 attributes, and 2 items of all 20: each within the other limit.
-    const short = Array.from({ length: 65 }, (_, j) => ({
+    // 129 items of one of 15 attributes, and 9 items of all 15: each within the other limit.
+    const short = Array.from({ length: 129 }, (_, j) => ({
       id: `q${j}`,
-      attributes: [attributes[j % 20] ?? ""],
+      attributes: [attributes[j % 15] ?? ""],
       probabilities: [0.2, 0.8],
     }));
     expect(() => diagnosticAdaptiveTest({ ...options, pool: short })).toThrow(
-      "A design has at most 67108864 cells of items by profiles, items × 2^attributes, found 68157440 of 65 items and 20 attributes.",
+      "A design has at most 4194304 cells of items by profiles, items × 2^attributes, found 4227072 of 129 items and 15 attributes.",
     );
-    const probabilities = Array.from({ length: 2 ** 20 }, (_, g) => (g === 0 ? 0.2 : 0.8));
-    const long = ["q1", "q2"].map((id) => ({ id, attributes, probabilities }));
+    const probabilities = Array.from({ length: 2 ** 15 }, (_, g) => (g === 0 ? 0.2 : 0.8));
+    const long = Array.from({ length: 9 }, (_, j) => ({ id: `q${j}`, attributes, probabilities }));
     expect(() => diagnosticAdaptiveTest({ ...options, pool: long })).toThrow(
-      "A design has at most 1048576 latent groups over all items, 2^k for an item of k attributes, found 2097152.",
+      "A design has at most 262144 latent groups over all items, 2^k for an item of k attributes, found 294912.",
     );
   });
 

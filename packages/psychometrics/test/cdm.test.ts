@@ -570,25 +570,24 @@ describe("calibrateCdm", () => {
     );
   }, 5_000);
 
-  it("refuses more than 20 attributes, 2^26 cells of items by profiles or 2^20 latent groups, before it calibrates", () => {
+  it("refuses more than 15 attributes, 2^22 cells of items by profiles or 2^18 latent groups, before it calibrates", () => {
     const attributes = (count: number) => Array.from({ length: count }, (_, k) => `a${k}`);
     const design = (entries: readonly (readonly string[])[]) => {
       const qMatrix = Object.fromEntries(entries.map((listed, j) => [`item${j}`, listed]));
       const itemIds = Object.keys(qMatrix);
       return [responseMatrix([itemIds.map(() => 0), itemIds.map(() => 1)], { itemIds }), qMatrix] as const;
     };
-    // 40 items of one of 21 attributes, 65 items of one of 20, and 2 items of all 20: each passes the other limits but
-    // the cells, which a fit without the first limit would meet at once.
-    const twentyOne = attributes(21);
-    expect(() => calibrateCdm(...design(Array.from({ length: 40 }, (_, j) => [twentyOne[j % 21] ?? ""])))).toThrow(
-      "A design has at most 20 attributes, found 21.",
+    // 20 items of one of 16 attributes, 129 items of one of 15, and 9 items of all 15: each passes the other limits.
+    const sixteen = attributes(16);
+    expect(() => calibrateCdm(...design(Array.from({ length: 20 }, (_, j) => [sixteen[j % 16] ?? ""])))).toThrow(
+      "A design has at most 15 attributes, found 16.",
     );
-    const twenty = attributes(20);
-    expect(() => calibrateCdm(...design(Array.from({ length: 65 }, (_, j) => [twenty[j % 20] ?? ""])))).toThrow(
-      "A design has at most 67108864 cells of items by profiles, items × 2^attributes, found 68157440 of 65 items and 20 attributes.",
+    const fifteen = attributes(15);
+    expect(() => calibrateCdm(...design(Array.from({ length: 129 }, (_, j) => [fifteen[j % 15] ?? ""])))).toThrow(
+      "A design has at most 4194304 cells of items by profiles, items × 2^attributes, found 4227072 of 129 items and 15 attributes.",
     );
-    expect(() => calibrateCdm(...design([twenty, twenty]))).toThrow(
-      "A design has at most 1048576 latent groups over all items, 2^k for an item of k attributes, found 2097152.",
+    expect(() => calibrateCdm(...design(Array.from({ length: 9 }, () => fifteen)))).toThrow(
+      "A design has at most 262144 latent groups over all items, 2^k for an item of k attributes, found 294912.",
     );
   });
 
@@ -846,8 +845,8 @@ describe("nonparametricClassification", () => {
     expect(result[1]).toEqual({ id: "person2", profile: [0, 1], distance: 0, ties: 2 });
   });
 
-  it("classifies over 17 attributes, more profiles than a spread of arguments holds", () => {
-    const attributes = Array.from({ length: 17 }, (_, k) => `a${k}`);
+  it("classifies over 15 attributes, the most a design takes", () => {
+    const attributes = Array.from({ length: 15 }, (_, k) => `a${k}`);
     const qMatrix = Object.fromEntries(attributes.map((attribute, k) => [`item${k + 1}`, [attribute]]));
     const pattern = attributes.map((_, k) => k % 2);
     const [person] = nonparametricClassification(responseMatrix([pattern]), qMatrix);

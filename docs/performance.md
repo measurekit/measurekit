@@ -559,9 +559,7 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `responseRecords`             | 1,000,000 records, each of its own person and item             |        48 | 421                         |
 | `scoreResponses`              | 1,000 persons, 1,000 items of 4 options                        |       3.8 | 8                           |
 | `qMatrixIdentifiability`      | A Q-matrix of 100,000 items of 20 attributes                   |        12 | 62                          |
-| `calibrateCdm`                | 20 items of one of 20 attributes, two persons                  |    0.0004 | 1,030                       |
-| `calibrateCdm`                | 64 items of one of 20 attributes, the most items × 2^K         |    0.0013 | 1,900 to 2,000 by model     |
-| `calibrateCdm`                | 64 items, one of 19 attributes and 63 of 13                    |    0.0056 | 1,000 to 1,200 by model     |
+| `calibrateCdm`                | 128 items of 11 of 15 attributes, the most cells and groups    |     0.010 | 160 to 230 by run           |
 | `calibrateMultidimensional`   | 8 dichotomous items, 2 persons, 10⁶ nodes                      |    0.0002 | 310                         |
 | `calibrateMultidimensional`   | The same, 3 dimensions, exploratory, standard errors           |    0.0002 | 650 to 750 by run           |
 | `calibrateBifactor`           | 1,000 persons, two-tier, 40 items, standard errors             |      0.09 | 620 to 670 by run           |
@@ -589,12 +587,12 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `scalability`                 | 200 persons of distinct patterns, 1,000 items, the most        |       0.4 | 75 to 117 by version, OS    |
 | `conditionalAssociation`      | 8 persons, 1,000 items, the most                               |     0.015 | 141                         |
 | `assembleForms`               | 8,191 forms of the one item of a pool, the most counts         |    0.0001 | 223 to 288 by version, OS   |
-| `diagnosticAdaptiveTest`      | 64 items of one of 20 attributes, the most items × 2^K         |    0.0039 | 740                         |
+| `diagnosticAdaptiveTest`      | 128 items of 11 of 15 attributes, the most cells and groups    |       1.0 | 55 to 90 by run             |
 
 A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or
 persons itself, and 2 to 9 times where the input names them. A design of cognitive diagnosis, of a calibration or of an
-adaptive test's pool, takes up to 2 GB from a few hundred bytes, which its limits stop there; a host that takes
-Q-matrices from users sets a lower limit where it cannot spare that. The analyses of knowledge structures take up to
+adaptive test's pool, takes up to about 300 MB from a few hundred bytes, which its limits stop there, by model and run:
+an additive model works on each latent group. The analyses of knowledge structures take up to
 about 260 MB within their limits: IITA's candidates from 19 MB of responses, and the masks of a model from a few hundred
 kilobytes of sets of skills. A statistic of every pair of items, local dependence, Yen's Q3 or a Mokken scale analysis,
 returns items² values, which their limit of 1,000 items stops at about 210 MB from 28 KB; the standard errors of
