@@ -1,4 +1,5 @@
 import { checkChoice, checkOptions } from "@measurekit/core";
+import { compositeKey } from "./composite-key.js";
 import type { Event } from "./event.js";
 import { checkLog, type EventLog } from "./event-log.js";
 
@@ -44,7 +45,7 @@ export function firstAttempts(log: EventLog, options: FirstAttemptsOptions = {})
       kept.push(event);
       continue;
     }
-    const key = `${event.learner}\u0000${event.item}`;
+    const key = compositeKey([event.learner, event.item]);
     const first = event.attemptNumber === undefined ? !seen.has(key) : event.attemptNumber === 1;
     seen.add(key);
     if (first) kept.push(recode(event, hinted));

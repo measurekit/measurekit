@@ -520,6 +520,22 @@ describe("bkt constraints and pairs", () => {
     expect(JSON.parse(JSON.stringify(paired))).toEqual(paired);
   });
 
+  it("fits a rate for each pair of resources whatever characters their ids hold", () => {
+    const events = Array.from({ length: 60 }, (_, k) => ({
+      learner: `l${Math.floor(k / 6)}`,
+      item: k % 2 === 0 ? "x" : "x\u0000y",
+      skills: ["s"],
+      time: k,
+      outcome: k % 3 === 0 ? 0 : 1,
+    }));
+    const pairs = bkt({ pairLearning: true, restarts: 1 }).fit(eventLog(events)).model.parameters.skills.s
+      ?.pairLearning;
+    expect(Object.entries(pairs ?? {}).map(([before, rates]) => [before, Object.keys(rates)])).toEqual([
+      ["x", ["x\u0000y"]],
+      ["x\u0000y", ["x"]],
+    ]);
+  });
+
   it("reads a state stored without previous resources as one with none, and writes none without pairs", () => {
     const skill: BktSkill = { ...rates, pairLearning: { q1: { q2: { learn: 0.6, forget: 0 } } } };
     const model = bkt({ pairLearning: true, parameters: { skills: { s: skill } } });

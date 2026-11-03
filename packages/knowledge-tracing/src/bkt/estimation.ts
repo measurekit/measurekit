@@ -1,5 +1,5 @@
 import { createRandom, DataError, type Random, type Stopping } from "@measurekit/core";
-import { type EventLog, entry, mapRecord, resourceOf } from "../data/internal.js";
+import { compositeKey, type EventLog, entry, mapRecord, resourceOf } from "../data/internal.js";
 import { expectationMaximization, forwardBackward } from "../math/internal.js";
 import { type BktBounds, type BktFixedRates, constrain } from "./constraints.js";
 import { type BktGuessSlip, type BktLearning, type BktSkill, guessSlipOf, learningOf, priorOf } from "./parameters.js";
@@ -61,11 +61,8 @@ function learningKey(
   resource: string,
 ): string | undefined {
   if (kind === "resource") return resource;
-  return kind === "pair" && previous !== undefined ? `${previous}${PAIR_SEPARATOR}${resource}` : undefined;
+  return kind === "pair" && previous !== undefined ? compositeKey([previous, resource]) : undefined;
 }
-
-/** Separates the resource before an attempt from its own in the key of a pair; no id has a null character. */
-const PAIR_SEPARATOR = "\u0000";
 
 /**
  * Returns the sequences of each skill, by skill id in the order the skills first appear in the log. A sequence without
@@ -112,7 +109,8 @@ export function structureOf(
     ),
   );
   const learningKind = options.resourceLearning ? "resource" : options.pairLearning ? "pair" : "none";
-  const learningClasses = distinct(followed.flatMap(({ learning }) => learning ?? []));
+  const keys = distinct(followed.flatMap(({ learning }) => learning ?? []));
+  const learningClasses = learningKind === "pair" ? keys.sort(comparePairs) : keys;
   const answered = sequences.flatMap(({ steps }) =>
     steps.filter(({ outcome }) => outcome !== null).map(({ item }) => item),
   );
@@ -165,8 +163,16 @@ export function startFrom(
 
 /** Returns the resource before and the resource that the key of a pair names. */
 function splitPair(key: string): [string, string] {
-  const [previous = "", resource = ""] = key.split(PAIR_SEPARATOR);
-  return [previous, resource];
+  const [previous = "", resource = ""]: unknown[] = JSON.parse(key);
+  return [String(previous), String(resource)];
+}
+
+/** Orders the keys of pairs by the resource before, then the resource, so that random starts draw for them in that order. */
+function comparePairs(x: string, y: string): number {
+  const [[before, resource], [otherBefore, otherResource]] = [splitPair(x), splitPair(y)];
+  if (before !== otherBefore) return before < otherBefore ? -1 : 1;
+  if (resource === otherResource) return 0;
+  return resource < otherResource ? -1 : 1;
 }
 
 /**
@@ -429,7 +435,7 @@ function maximization(skill: BktSkill, counts: Expectation, forgetting: boolean)
     }),
     ...(skill.pairLearning !== undefined && {
       pairLearning: mapRecord(skill.pairLearning, (pairs, previous) =>
-        mapRecord(pairs, (rates, resource) => learning(rates, `${previous}${PAIR_SEPARATOR}${resource}`)),
+        mapRecord(pairs, (rates, resource) => learning(rates, compositeKey([previous, resource]))),
       ),
     }),
     ...(skill.itemGuessSlip !== undefined && {

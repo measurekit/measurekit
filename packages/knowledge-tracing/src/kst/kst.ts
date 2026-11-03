@@ -9,6 +9,7 @@ import {
   checkLearnerId,
   checkLog,
   checkObservedEvents,
+  compositeKey,
   type EventLog,
   entry,
   isObserved,
@@ -391,7 +392,7 @@ function attemptMasks(compiled: CompiledStructure, over: "skills" | "items"): (a
   const masks = new Map<string, Uint8Array>();
   return (attempt) => {
     const elements = over === "items" ? [attempt.item] : [...new Set(attempt.skills)].sort();
-    const key = elements.join("\u0000");
+    const key = compositeKey(elements);
     let mask = masks.get(key);
     if (mask === undefined) {
       if (over === "skills") checkHasSkills(attempt, `The attempt at item "${attempt.item}"`, "KST model over skills");

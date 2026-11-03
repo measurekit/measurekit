@@ -523,6 +523,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/knowledge-tracing/test/elo.test.ts",
     titles: "the state of another learner",
   },
+  {
+    rule: "Ids joined into one key stay apart, whatever characters they hold, so that two lists of ids never share an entry.",
+    file: "packages/knowledge-tracing/src/data/composite-key.ts",
+    find: "JSON.stringify(ids)",
+    replace: 'ids.join("\\u0000")',
+    test: "packages/knowledge-tracing/test/data.test.ts",
+    titles: "whatever characters their ids hold",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

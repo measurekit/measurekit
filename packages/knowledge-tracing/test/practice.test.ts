@@ -308,6 +308,17 @@ describe("mastery criteria of the moving average, the window and the prediction"
     expect(movingAverageMastery(log, { decay: 0, threshold: 1 })).toEqual({ ana: { s: 1, t: 1 }, budi: { s: 2 } });
   });
 
+  it("tells learners and skills apart whatever characters their ids hold", () => {
+    const log = eventLog([
+      { learner: "a\u0000b", item: "q", skills: ["c"], time: 0, outcome: 1 },
+      { learner: "a", item: "q", skills: ["b\u0000c"], time: 1, outcome: 1 },
+    ]);
+    const apart = { "a\u0000b": { c: null }, a: { "b\u0000c": null } };
+    expect(streakMastery(log, { length: 2 })).toEqual(apart);
+    expect(windowMastery(log, { correct: 2, window: 2 })).toEqual(apart);
+    expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.7 })).toEqual(apart);
+  });
+
   it("predicts the attempt after its own outcome, for each of its skills, and never for an event without one", () => {
     const predictions: string[] = [];
     const model: LearnerModel<number> = {

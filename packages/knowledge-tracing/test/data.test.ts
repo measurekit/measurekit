@@ -265,6 +265,14 @@ describe("firstAttempts", () => {
     expect(firstAttempts(log).map((event) => event.time)).toEqual([0, 1]);
   });
 
+  it("tells learners and items apart whatever characters their ids hold", () => {
+    const log = eventLog([
+      { learner: "a\u0000b", item: "c", time: 0, outcome: 1 },
+      { learner: "a", item: "b\u0000c", time: 1, outcome: 0 },
+    ]);
+    expect(firstAttempts(log)).toEqual(log);
+  });
+
   it("reads the attempt number the host records, and leaves the log it was given alone", () => {
     const log = eventLog([
       { learner: "a", item: "q", time: 0, outcome: 0, attemptNumber: 2 },

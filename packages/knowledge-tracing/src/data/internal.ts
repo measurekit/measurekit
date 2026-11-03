@@ -1,5 +1,6 @@
 // Helpers that the modules and tests of this package share. They are not exported from the package.
 
+export { compositeKey } from "./composite-key.js";
 export {
   type Attempt,
   checkAttempt,

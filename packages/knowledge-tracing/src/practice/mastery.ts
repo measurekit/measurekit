@@ -7,7 +7,14 @@ import {
   DataError,
   describe,
 } from "@measurekit/core";
-import { checkLog, checkObservedHasSkills, type Event, type EventLog, isObserved } from "../data/internal.js";
+import {
+  checkLog,
+  checkObservedHasSkills,
+  compositeKey,
+  type Event,
+  type EventLog,
+  isObserved,
+} from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
 /** A learner model that defines mastery, such as BKT. */
@@ -98,7 +105,7 @@ export function streakMastery(log: EventLog, options: StreakOptions = {}): Maste
   checkLog(log);
   const runs = new Map<string, number>();
   return firstOpportunities(log, (event) => (skill, outcome) => {
-    const key = `${event.learner}\u0000${skill}`;
+    const key = compositeKey([event.learner, skill]);
     const run = outcome === 1 ? (runs.get(key) ?? 0) + 1 : 0;
     runs.set(key, run);
     return run >= length;
@@ -124,7 +131,7 @@ export function movingAverageMastery(log: EventLog, options: MovingAverageOption
   checkLog(log);
   const averages = new Map<string, number>();
   return firstOpportunities(log, (event) => (skill, outcome) => {
-    const key = `${event.learner}\u0000${skill}`;
+    const key = compositeKey([event.learner, skill]);
     const average = decay * (averages.get(key) ?? 0) + (1 - decay) * outcome;
     averages.set(key, average);
     return average >= threshold;
@@ -154,7 +161,7 @@ export function windowMastery(log: EventLog, options: WindowOptions): MasteryTab
   checkLog(log);
   const recent = new Map<string, number[]>();
   return firstOpportunities(log, (event) => (skill, outcome) => {
-    const key = `${event.learner}\u0000${skill}`;
+    const key = compositeKey([event.learner, skill]);
     const latest = [...(recent.get(key) ?? []), outcome === 1 ? 1 : 0].slice(-window);
     recent.set(key, latest);
     return latest.reduce((sum, flag) => sum + flag, 0) >= correct;
@@ -279,7 +286,7 @@ function firstOpportunities(
     const skills = table.get(event.learner) ?? new Map<string, number | null>();
     table.set(event.learner, skills);
     for (const skill of event.skills) {
-      const key = `${event.learner}\u0000${skill}`;
+      const key = compositeKey([event.learner, skill]);
       const count = (counts.get(key) ?? 0) + 1;
       counts.set(key, count);
       const reached = met(skill, event.outcome);

@@ -1081,6 +1081,18 @@ describe("KST model", () => {
 });
 
 describe("KST edge cases", () => {
+  it("tells sets of skills apart whatever characters their ids hold", () => {
+    const joined = "a\u0000b";
+    const structure = unionClosure(["a", "b", joined], [["a"], ["b"], [joined]]);
+    const items = { q: { guess: 0, slip: 0 }, r: { guess: 0, slip: 0 } };
+    const probabilities = structure.states.map((state) => (state.length === 1 ? 0.3 : 0.02));
+    const at = (item: string, skills: string[]) => ({ learner: "ana", item, skills, time: 0 });
+    const model = kst({ structure, parameters: { probabilities, items } });
+    const state = model.initialState("ana");
+    expectClose(model.predict(state, at("q", [joined])), 0.36, 1e-15);
+    expectClose(model.predict(state, at("r", ["a", "b"])), 0.04, 1e-15);
+  });
+
   it("rejects malformed structures and too many states, suggesting a split by unit", () => {
     expect(() => isKnowledgeSpace({ domain: ["a", "b"], states: [[], ["a"]] })).toThrow(
       "A knowledge structure needs the state of the whole domain.",
