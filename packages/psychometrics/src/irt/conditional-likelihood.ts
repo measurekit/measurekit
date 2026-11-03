@@ -140,9 +140,12 @@ export function conditionalFit(matrix: ResponseMatrix, options: ConditionalCalib
   if (itemIds.length < 2) {
     throw new DataError(`Conditional maximum likelihood needs at least two items, found ${itemIds.length}.`);
   }
-  const highest = highestResponses(matrix);
+  const { highest, tallies: everyPerson } = responseTallies(matrix);
   const { model = highest.every((category) => category <= 1) ? "rasch" : "partial-credit" } = options;
   checkChoice(model, "The option model", MODELS);
+  // The categories of every person's responses first, from tables of the categories that occur, so that a response far
+  // above the others is refused before the highest responses size the parameters and their sums.
+  checkItems(matrix.itemIds, highest, model, everyPerson);
   const data = conditionalData(matrix, highest, model);
   const layout = parameterLayout(highest, model);
   const maximum = maximize(data, layout, tolerance, maxIterations);
@@ -160,15 +163,21 @@ export function conditionalFit(matrix: ResponseMatrix, options: ConditionalCalib
   };
 }
 
-/** Returns each item's highest response, at least 0. */
-function highestResponses({ itemIds, responses }: ResponseMatrix): Int32Array {
+/** Returns each item's highest response, at least 0, and the number of its responses in each category that has one. */
+function responseTallies({ itemIds, responses }: ResponseMatrix): {
+  readonly highest: Int32Array;
+  readonly tallies: Map<number, number>[];
+} {
   const highest = new Int32Array(itemIds.length);
+  const tallies = itemIds.map(() => new Map<number, number>());
   for (const row of responses) {
     row.forEach((response, item) => {
-      if (response !== null && response > (highest[item] ?? 0)) highest[item] = response;
+      if (response === null) return;
+      if (response > (highest[item] ?? 0)) highest[item] = response;
+      tallies[item]?.set(response, (tallies[item]?.get(response) ?? 0) + 1);
     });
   }
-  return highest;
+  return { highest, tallies };
 }
 
 /** The persons who answered the same items. */

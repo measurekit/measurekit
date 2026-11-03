@@ -174,3 +174,4 @@ at most 500 items, as its starts decompose the correlations of every pair.
 A quadrature rule has at most 1,000 points, and the rules kept for reuse are the 8 asked for last.
 Standard errors take at most 2,000 estimated parameters, in calibrations of one or more dimensions alike, as their
 information holds every pair of them.
+Conditional maximum likelihood checks the categories that occur before an item's highest response sizes its parameters.

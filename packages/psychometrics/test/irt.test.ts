@@ -1400,6 +1400,14 @@ describe("conditionalMaximumLikelihood", () => {
       [1, 0, 0],
     ]);
     expect(() => conditionalMaximumLikelihood(allRight)).toThrow('Item "item1" has no response in category 0');
+    // Item 1's one wrong response is the extreme person's, whom the conditional likelihood leaves out.
+    const rightAmongUsed = responseMatrix([
+      [0, 0, 0],
+      [1, 0, 1],
+      [1, 1, 0],
+      [1, 0, 0],
+    ]);
+    expect(() => conditionalMaximumLikelihood(rightAmongUsed)).toThrow('Item "item1" has no response in category 0');
     expect(() => conditionalMaximumLikelihood(responseMatrix([[0], [1]]))).toThrow(
       "Conditional maximum likelihood needs at least two items, found 1.",
     );
@@ -1420,6 +1428,17 @@ describe("conditionalMaximumLikelihood", () => {
       'The rating scale model needs items with the same number of categories; item "item1" has 2 and item "item3" has 3.',
     );
   });
+
+  it("refuses a response far above the others from the categories that occur, before it sizes the parameters", () => {
+    // A response of 2³¹ - 1 overflowed the 32-bit offsets of the parameters, and one of 2³⁰ sized gigabytes for them.
+    for (const far of [2 ** 31 - 1, 2 ** 30]) {
+      const rows = Array.from({ length: 50 }, (_, p) => Array.from({ length: 5 }, (_, i) => (p + i) % 2));
+      defined(rows[0])[0] = far;
+      expect(() => conditionalMaximumLikelihood(responseMatrix(rows))).toThrow(
+        'Item "item1" has no response in category 2; calibration needs responses in every category up to the highest.',
+      );
+    }
+  }, 5_000);
 
   it("rejects options of other types", () => {
     const matrix = responseMatrix(defined(conditional.cases[0]).responses);

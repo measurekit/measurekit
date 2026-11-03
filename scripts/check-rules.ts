@@ -164,6 +164,14 @@ export const RULES: readonly Rule[] = [
     titles: "wider than 10,000",
   },
   {
+    rule: "Conditional maximum likelihood checks the categories that occur before an item's highest response sizes its parameters, which a far response would overflow.",
+    file: "packages/psychometrics/src/irt/conditional-likelihood.ts",
+    find: "checkItems(matrix.itemIds, highest, model, everyPerson);",
+    replace: "",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "far above the others from the categories",
+  },
+  {
     rule: "Every category below an item's highest response has a response.",
     file: "packages/psychometrics/src/irt/responses.ts",
     find: "if (counts.size <= highest) {",
