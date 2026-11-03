@@ -162,6 +162,8 @@ has a posterior on the profiles that the responses contradict least.
 (default) or `"eap"` classification: `accuracy` τ = Σ_c π_c τ_c, the probability that a person lands in the
 true profile, with `profileAccuracy` τ_c, and `attributeAccuracy` τ_k; `consistency` γ, the mean of Σ_c post(c)²,
 the chance that two measurements agree, and `attributeConsistency` γ_k. They use the persons with a response.
+`attributeProfiles` returns 2^K posterior probabilities for each person, 260 KB a person at 15 attributes;
+`cdmClassificationAccuracy` sums each person's posterior as it forms it and holds none of them.
 
 ```ts
 import { attributeProfiles, calibrateCdm, cdmClassificationAccuracy } from "@measurekit/psychometrics/cdm";

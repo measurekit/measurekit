@@ -1,7 +1,8 @@
 import { checkChoice, checkOptions, DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import type { CdmCalibration } from "./calibration.js";
-import { attributeProfiles } from "./persons.js";
+import { type CdmCalibration, calibratedModel } from "./calibration.js";
+import { forEachPosterior } from "./expectation.js";
+import { estimate, tableOf } from "./persons.js";
 
 /** Options of {@link cdmClassificationAccuracy}. */
 export interface CdmAccuracyOptions {
@@ -51,38 +52,41 @@ export function cdmClassificationAccuracy(
   checkOptions(options);
   const { classification = "map" } = options;
   checkChoice(classification, "The option classification", CLASSIFICATIONS);
-  const profiles = attributeProfiles(matrix, calibration);
-  const persons = profiles.filter((_, i) => matrix.responses[i]?.some((response) => response !== null));
-  if (persons.length === 0) throw new DataError("Classification accuracy needs at least one person with a response.");
-  const keys = calibration.profiles.map(({ profile }) => profile.join(""));
-  const profileCount = keys.length;
+  const { data, design, state } = calibratedModel(matrix, calibration);
+  const table = tableOf(design.profiles);
+  const profileOf = new Map(design.profiles.map((profile, c) => [profile.join(""), c]));
+  const profileCount = design.profiles.length;
   const posteriorTotals = new Float64Array(profileCount);
   const classified = new Float64Array(profileCount);
   let consistency = 0;
-  const attributeCount = calibration.attributes.length;
+  const attributeCount = design.attributes.length;
   const attributeAccuracy = new Float64Array(attributeCount);
   const attributeConsistency = new Float64Array(attributeCount);
-  for (const person of persons) {
-    const assigned = person[classification];
-    const c = keys.indexOf(assigned.join(""));
-    person.posterior.forEach((p, profile) => {
+  let n = 0;
+  // Each person's posterior is summed as it is formed, so that the persons' posteriors over 2^K profiles are never held.
+  forEachPosterior(data, design, state, (_, posterior) => {
+    n++;
+    const estimates = estimate(posterior, design.profiles, table);
+    const assigned = estimates[classification];
+    const c = profileOf.get(assigned.join("")) ?? -1;
+    posterior.forEach((p, profile) => {
       posteriorTotals[profile] = (posteriorTotals[profile] ?? 0) + p;
       consistency += p * p;
     });
-    classified[c] = (classified[c] ?? 0) + (person.posterior[c] ?? 0);
-    person.mastery.forEach((p, k) => {
+    classified[c] = (classified[c] ?? 0) + (posterior[c] ?? 0);
+    estimates.mastery.forEach((p, k) => {
       const m = assigned[k] ?? 0;
       attributeAccuracy[k] = (attributeAccuracy[k] ?? 0) + p * m + (1 - p) * (1 - m);
       attributeConsistency[k] = (attributeConsistency[k] ?? 0) + p * p + (1 - p) * (1 - p);
     });
-  }
+  });
+  if (n === 0) throw new DataError("Classification accuracy needs at least one person with a response.");
   const profileAccuracy = Array.from(
     classified,
     (value, c) => value / Math.max(posteriorTotals[c] ?? 0, Number.EPSILON),
   );
-  const n = persons.length;
   return {
-    accuracy: profileAccuracy.reduce((sum, tau, c) => sum + tau * (calibration.profiles[c]?.proportion ?? 0), 0),
+    accuracy: profileAccuracy.reduce((sum, tau, c) => sum + tau * (state.proportions[c] ?? 0), 0),
     profileAccuracy,
     attributeAccuracy: Array.from(attributeAccuracy, (sum) => sum / n),
     consistency: consistency / n,

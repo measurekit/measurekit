@@ -30,7 +30,7 @@ export function profileEstimate(
 }
 
 /** Returns the profiles in one array, by profile and then attribute, which the sums over the profiles read in order. */
-function tableOf(profiles: readonly (readonly number[])[]): Float64Array {
+export function tableOf(profiles: readonly (readonly number[])[]): Float64Array {
   const attributeCount = profiles[0]?.length ?? 0;
   const table = new Float64Array(profiles.length * attributeCount);
   for (let c = 0; c < profiles.length; c++) {
@@ -43,7 +43,7 @@ function tableOf(profiles: readonly (readonly number[])[]): Float64Array {
 /**
  * Returns the estimates of a posterior over `profiles`, whose attributes `table` holds as {@link tableOf} returns them.
  */
-function estimate(
+export function estimate(
   posterior: ArrayLike<number>,
   profiles: readonly (readonly number[])[],
   table: Float64Array,
