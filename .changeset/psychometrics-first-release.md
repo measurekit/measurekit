@@ -160,3 +160,4 @@ categories and 2^24 expected counts. The Mantel test and ordinal logistic regres
 categories, and the Mantel test's counts grow with the persons alone. `calibrateResponseTimes` gives no standard errors
 above 2,000 items, and `calibrateSpeedAccuracy` refuses `standardErrors: "hessian"` above 2,000 estimated parameters.
 `validateQMatrix` takes time that grows as 3^K for K attributes, and a profile of proportion 0 leaves the PVAF defined.
+`linearChange` takes at most 1,000 effects, and finds an effect without a unique estimate in the cube of the effects.
