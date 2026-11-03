@@ -365,7 +365,7 @@ describe("observed-score equating", () => {
       "The from score distribution must be an array of counts, found null.",
     );
     expect(() => logLinearPresmoothing([1, 2, 3], JSON.parse('"1"'))).toThrow(
-      'A log-linear degree must be an integer from 1 to 2, one less than the number of scores, found "1".',
+      'A log-linear degree must be an integer from 1 to 2, one less than the number of scores and at most 20, found "1".',
     );
   });
 });
@@ -406,10 +406,25 @@ describe("logLinearPresmoothing", () => {
 
   it("rejects a degree outside 1 to the number of scores less 1", () => {
     expect(() => logLinearPresmoothing([1, 2, 3], 3)).toThrow(
-      "A log-linear degree must be an integer from 1 to 2, one less than the number of scores, found 3.",
+      "A log-linear degree must be an integer from 1 to 2, one less than the number of scores and at most 20, found 3.",
     );
     expect(() => logLinearPresmoothing([1, 2, 3], 0.5)).toThrow(DataError);
     expect(() => logLinearPresmoothing([0, 0, 0], 1)).toThrow(DataError);
+  });
+
+  it("fits degrees up to 20, as a degree near a long distribution's length costs the cube of its terms", () => {
+    const counts = Array.from({ length: 101 }, (_, x) => 1 + ((x * 7) % 5));
+    expect(logLinearPresmoothing(counts, 20).distribution).toHaveLength(101);
+    const message =
+      "A log-linear degree must be an integer from 1 to 20, one less than the number of scores and at most 20, found 21.";
+    expect(() => logLinearPresmoothing(counts, 21)).toThrow(message);
+    expect(() => kernelEquating({ design: "equivalent-groups", from: counts, to: counts, degrees: [21, 3] })).toThrow(
+      message,
+    );
+    const table = Array.from({ length: 30 }, (_, x) => Array.from({ length: 30 }, (__, v) => 1 + ((x + 2 * v) % 3)));
+    expect(() => bivariateLogLinearPresmoothing(table, { degrees: [21, 2] })).toThrow(
+      "The degree of the total scores must be an integer from 1 to 20, one less than the number of scores and at most 20, found 21.",
+    );
   });
 });
 
@@ -846,10 +861,10 @@ describe("bivariateLogLinearPresmoothing", () => {
       [2, 2, 2],
     ];
     expect(() => bivariateLogLinearPresmoothing(groups, { degrees: [4, 2] })).toThrow(
-      "The degree of the total scores must be an integer from 1 to 3, one less than the number of scores, found 4.",
+      "The degree of the total scores must be an integer from 1 to 3, one less than the number of scores and at most 20, found 4.",
     );
     expect(() => bivariateLogLinearPresmoothing(groups, { degrees: [2, 3] })).toThrow(
-      "The degree of the anchor scores must be an integer from 1 to 2, one less than the number of scores, found 3.",
+      "The degree of the anchor scores must be an integer from 1 to 2, one less than the number of scores and at most 20, found 3.",
     );
     expect(() => bivariateLogLinearPresmoothing(groups, { degrees: [2, 2], crossDegree: 3 })).toThrow(
       "The option crossDegree must be an integer from 0 to 2, the smaller of the degrees, found 3.",

@@ -101,7 +101,8 @@ Thayer, 2000): the maximum likelihood fit of ln m_x = β0 + β1 x + ... + β_C x
 as the equate package's `presmoothing(smoothmethod = "loglinear")`. The fit keeps the number of persons and the first
 C moments of the scores, and fills scores without persons. It returns the fitted `distribution`, `converged` and
 `iterations`; pass the distribution to `equipercentileEquating`. Degrees from 2 to 6 are usual: compare the fits'
-moments and plots, or the AIC of the Poisson fits, to choose one.
+moments and plots, or the AIC of the Poisson fits, to choose one. A degree is at most 20, and less than the number of
+scores: each Newton step of a fit takes the cube of its terms.
 
 ```ts
 import { equipercentileEquating, logLinearPresmoothing } from "@measurekit/psychometrics/equating";
@@ -236,7 +237,7 @@ the cross moments E[xⁱ vʲ]. It fills cells without persons, which frequency e
 
 | Option        | Default | Meaning                                                                                                           |
 | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `degrees`     | none    | `[total, anchor]`: integers from 1 to one less than the number of total scores and of anchor scores               |
+| `degrees`     | none    | `[total, anchor]`: integers from 1 to one less than the number of total scores and of anchor scores, at most 20   |
 | `crossDegree` | `1`     | The highest power of each score in the cross products, an integer from 0, for none, to the smaller of the degrees |
 
 It returns the fitted `distribution`, `converged` and `iterations`, as `logLinearPresmoothing`. `converged` is `false`

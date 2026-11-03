@@ -14,6 +14,12 @@ export interface LogLinearPresmoothing {
 
 const MAX_ITERATIONS = 200;
 const STEP_TOLERANCE = 1e-6;
+/**
+ * The highest degree of a log-linear model, twice the 1 to 10 among which Kolen and Brennan choose: a fit holds a row
+ * of its terms for each score and takes the cube of the terms in each Newton step, so a degree near a long distribution's
+ * length would cost minutes and gigabytes.
+ */
+export const MAX_LOG_LINEAR_DEGREE = 20;
 
 /**
  * Returns a score distribution smoothed by the log-linear model of degree C.
@@ -29,14 +35,15 @@ const STEP_TOLERANCE = 1e-6;
  * @param degree - The degree of the log-linear model: the number of moments of the distribution that the fit keeps.
  * @returns The smoothed distribution, whether the fit converged and the iterations run.
  * @throws `DataError` when the distribution is invalid, or the degree is not an integer from 1 to the number of scores
- * less 1.
+ * less 1 and at most 20.
  * @see {@link https://doi.org/10.3102/10769986025002133 | Holland and Thayer (2000)}
  */
 export function logLinearPresmoothing(distribution: readonly number[], degree: number): LogLinearPresmoothing {
   const total = checkDistribution(distribution, "presmoothed");
-  if (!(Number.isSafeInteger(degree) && degree >= 1 && degree < distribution.length)) {
+  const highest = Math.min(distribution.length - 1, MAX_LOG_LINEAR_DEGREE);
+  if (!(Number.isSafeInteger(degree) && degree >= 1 && degree <= highest)) {
     throw new DataError(
-      `A log-linear degree must be an integer from 1 to ${distribution.length - 1}, one less than the number of scores, found ${describe(degree)}.`,
+      `A log-linear degree must be an integer from 1 to ${highest}, one less than the number of scores and at most ${MAX_LOG_LINEAR_DEGREE}, found ${describe(degree)}.`,
     );
   }
   const basis = orthonormalPolynomials(distribution.length, degree);

@@ -516,6 +516,14 @@ export const RULES: readonly Rule[] = [
     titles: "reports at most 10,000 scores",
   },
   {
+    rule: "A log-linear presmoothing has a degree of at most 20, so that a degree near a long distribution's length does not cost the cube of its terms.",
+    file: "packages/psychometrics/src/equating/presmoothing.ts",
+    find: "const highest = Math.min(distribution.length - 1, MAX_LOG_LINEAR_DEGREE);",
+    replace: "const highest = distribution.length - 1;",
+    test: "packages/psychometrics/test/equating.test.ts",
+    titles: "fits degrees up to 20",
+  },
+  {
     rule: "Kappa takes a table of the range only where the range is no wider than the pairs.",
     file: "packages/core/src/kappa.ts",
     find: "highest - lowest < n",

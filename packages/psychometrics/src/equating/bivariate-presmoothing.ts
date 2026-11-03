@@ -1,12 +1,12 @@
 import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
 import { type BivariateDistribution, bivariateTable } from "./bivariate.js";
-import { orthonormalPolynomials, poissonFit } from "./presmoothing.js";
+import { MAX_LOG_LINEAR_DEGREE, orthonormalPolynomials, poissonFit } from "./presmoothing.js";
 
 /** Options of {@link bivariateLogLinearPresmoothing}. */
 export interface BivariatePresmoothingOptions {
   /**
    * The degrees C of the polynomials of the total and the anchor scores: integers from 1 to one less than the number of
-   * scores of each.
+   * scores of each, and at most 20.
    */
   readonly degrees: readonly [total: number, anchor: number];
   /**
@@ -82,12 +82,13 @@ export function bivariateLogLinearPresmoothing(
 /**
  * Checks the degree of one score's polynomial.
  *
- * @throws `DataError` unless it is an integer from 1 to one less than the number of scores.
+ * @throws `DataError` unless it is an integer from 1 to one less than the number of scores, and at most 20.
  */
 function checkDegree(degree: unknown, scores: number, label: string): void {
-  if (!(typeof degree === "number" && Number.isSafeInteger(degree) && degree >= 1 && degree < scores)) {
+  const highest = Math.min(scores - 1, MAX_LOG_LINEAR_DEGREE);
+  if (!(typeof degree === "number" && Number.isSafeInteger(degree) && degree >= 1 && degree <= highest)) {
     throw new DataError(
-      `The degree of ${label} must be an integer from 1 to ${scores - 1}, one less than the number of scores, found ${describe(degree)}.`,
+      `The degree of ${label} must be an integer from 1 to ${highest}, one less than the number of scores and at most ${MAX_LOG_LINEAR_DEGREE}, found ${describe(degree)}.`,
     );
   }
 }
