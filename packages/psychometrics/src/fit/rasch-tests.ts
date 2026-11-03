@@ -327,7 +327,13 @@ function testedItems(matrix: ResponseMatrix, groups: PersonGroups): Int32Array {
   const highest = Int32Array.from(itemIds, (_, item) =>
     responses.reduce((top, row) => Math.max(top, row[item] ?? 0), 0),
   );
-  let kept = Int32Array.from(itemIds.keys()).filter((item) => (highest[item] ?? 0) >= 1);
+  // A group shows an item's categories only if it has more persons than the item's highest score, so an item of a far
+  // higher score leaves at once, before its categories take room.
+  const smallest = groups.reduce((least, rows) => Math.min(least, rows.length), Number.POSITIVE_INFINITY);
+  let kept = Int32Array.from(itemIds.keys()).filter((item) => {
+    const top = highest[item] ?? 0;
+    return top >= 1 && top < smallest;
+  });
   for (;;) {
     const seen = groups.map((rows) => categoriesSeen(responses, rows, kept, highest));
     const next = kept.filter((item) => seen.every((counts) => counts[item] === (highest[item] ?? 0) + 1));
@@ -344,7 +350,7 @@ function testedItems(matrix: ResponseMatrix, groups: PersonGroups): Int32Array {
 
 /**
  * Returns, for each item, how many of its categories have a response from the persons of `rows` whom a conditional
- * likelihood of the `kept` items uses.
+ * likelihood of the `kept` items uses; 0 for an item not kept.
  */
 function categoriesSeen(
   responses: ResponseMatrix["responses"],
@@ -352,9 +358,11 @@ function categoriesSeen(
   kept: Int32Array,
   highest: Int32Array,
 ): Int32Array {
+  const isKept = new Uint8Array(highest.length);
+  for (const item of kept) isKept[item] = 1;
   const offsets = new Int32Array(highest.length + 1);
   highest.forEach((top, item) => {
-    offsets[item + 1] = (offsets[item] ?? 0) + top + 1;
+    offsets[item + 1] = (offsets[item] ?? 0) + (isKept[item] === 1 ? top + 1 : 0);
   });
   const flags = new Uint8Array(offsets[highest.length] ?? 0);
   for (const row of rows) {

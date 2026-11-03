@@ -707,6 +707,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/psychometrics/test/fit.test.ts",
     titles: "refuses C2 of more than 1,830 moments",
   },
+  {
+    rule: "A Rasch test leaves out an item whose highest score is beyond the persons of a group before its categories take room, so that one far response costs no table of its categories.",
+    file: "packages/psychometrics/src/fit/rasch-tests.ts",
+    find: "return top >= 1 && top < smallest;",
+    replace: "return top >= 1;",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "beyond the persons of a group",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

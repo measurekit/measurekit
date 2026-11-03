@@ -889,6 +889,17 @@ describe("Rasch tests", () => {
       expectClose(result.statistic, 0, 1e-9);
     });
 
+    it("leaves out an item whose highest score is beyond the persons of a group, before its categories take room", () => {
+      // A fifth item that one person scores 2³¹ - 1: a table of its categories would take 2 GB and overflow 32 bits.
+      const far = responseMatrix(Cascade.responses.map((row, person) => [...row, person === 0 ? 2 ** 31 - 1 : 0]));
+      const result = andersenTest(far, { split: cascadeSplit });
+      expect(result).toEqual({
+        ...andersenTest(Cascade, { split: cascadeSplit }),
+        excluded: ["item1", "item2", "item5"],
+      });
+      expect(raschWaldTest(far, { split: cascadeSplit }).excluded).toEqual(["item1", "item2", "item5"]);
+    });
+
     it("takes the model and the stopping rules of conditional maximum likelihood", () => {
       const expected = caseNamed(raschTests.andersen, "pcmdat2, median");
       const matrix = responseMatrix(expected.responses);
