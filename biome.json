@@ -683,6 +683,26 @@
       }
     },
     {
+      "includes": ["packages/*/test/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/*.json"],
+                    "message": "Read a fixture with readFixture of test/fixtures.ts: the type checker builds a type for every element of an imported JSON file."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/test/**"],
       "linter": {
         "rules": {

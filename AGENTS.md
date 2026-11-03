@@ -148,8 +148,8 @@ workflow opens pull requests, and Dependabot version updates are off. Changesets
 
 ## Dependencies
 
-- No package uses a platform API: no `node:*`, `fetch`, DOM or `process`. `@measurekit/core` has no dependencies, and
-  the libraries depend on it alone. The libraries do not import each other.
+- No package's `src/` uses a platform API: no `node:*`, `fetch`, DOM or `process`. `@measurekit/core` has no
+  dependencies, and the libraries depend on it alone. The libraries do not import each other.
 - A module imports only the modules in its row; every module may import `@measurekit/core`. Biome enforces the rows,
   and imports never form cycles.
 - Code goes into `@measurekit/core` only if both libraries use it. What one library uses stays in that library, so that
@@ -313,6 +313,9 @@ others. A new clone is merged into a helper of the module that owns the concept,
   from public datasets (mirt, psych, difR, pyBKT) or simulations with a fixed seed, and the test compares within the
   tolerance in `docs/<package>/validation.md`. Expected values are never typed by hand, except for edge cases small enough
   to derive exactly.
+- A test reads a fixture with `readFixture<T>("name.json")` of its package's `test/fixtures.ts` and declares `T` for the
+  fields it reads; a type that several files use goes in `fixtures.ts`. It never imports a JSON file: the type checker
+  builds a type for every element, and `pnpm lint` fails on the import.
 - The numerics of `@measurekit/core` are validated by the fixtures of the packages that use them; core's tests cover its
   edge cases. Psychometrics `sim/` has no R reference, as R's generator differs from `createRandom`: seeded tests check its
   distributions, and a calibration recovers the items it simulates. A knowledge tracing model without a package of
