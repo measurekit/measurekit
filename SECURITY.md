@@ -12,12 +12,12 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   users or files can be passed in directly. The learner models of `@measurekit/knowledge-tracing` also check the states
   and parameters they are given, so states from a database or browser storage can be passed in directly. A learner can
   edit a state kept in browser storage; keep states on a server where estimates matter.
-- **Resource use.** Time and memory grow with the size of the input. In `@measurekit/psychometrics`, item
-  statistics take time proportional to persons × items. In `@measurekit/knowledge-tracing`, a log is checked
-  and replayed in time proportional to its events, and cross-validation fits the model once per fold. Limit the size
-  of data accepted from untrusted sources before analyzing it on a server: a response matrix or a log takes at most
-  about 50 times the bytes of its JSON, and a Q-matrix of a few hundred bytes up to 2 GB within the limits below
-  ([peak memory](docs/performance.md#peak-memory)).
+- **Resource use.** Time and memory grow with the size of the input. In `@measurekit/psychometrics`, item statistics
+  take time proportional to persons × items, and `bootstrapEquating` time proportional to the persons its counts hold
+  times the replications. In `@measurekit/knowledge-tracing`, a log is checked and replayed in time proportional to its
+  events, and cross-validation fits the model once per fold. Limit the size of data accepted from untrusted sources
+  before analyzing it on a server: a response matrix or a log takes at most about 50 times the bytes of its JSON, and a
+  Q-matrix of a few hundred bytes up to 2 GB within the limits below ([peak memory](docs/performance.md#peak-memory)).
 - **Limits.** Tables are sized by the values that occur in the data, not by the highest value, so that a small input
   with one large response costs no more than another of its size. What would grow faster than the input has a limit,
   and passing it throws `DataError`:

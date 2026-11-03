@@ -511,6 +511,8 @@ the elements of a knowledge structure, whose limits bound them.
 | `calibrateCdm`                | 20 items of one of 20 attributes, two persons                  |    0.0004 | 1,030                       |
 | `calibrateCdm`                | 64 items of one of 20 attributes, the most items × 2^K         |    0.0013 | 1,900 to 2,000 by model     |
 | `calibrateCdm`                | 64 items, one of 19 attributes and 63 of 13                    |    0.0056 | 1,000 to 1,200 by model     |
+| `generalizabilityStudy`       | 1,000,000 scores of 6 facets of 10 elements                    |        87 | 125                         |
+| `generalizabilityStudy`       | The same with one score missing, `unbalanced`                  |        87 | 301                         |
 | `eventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items             |        72 | 79                          |
 | `eventLog`                    | 1,000,000 events, each of its own learner, item and skill      |        82 | 171                         |
 | `bkt` with stored parameters  | 100,000 skills                                                 |       6.6 | 56                          |
