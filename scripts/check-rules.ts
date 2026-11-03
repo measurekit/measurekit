@@ -436,6 +436,14 @@ export const RULES: readonly Rule[] = [
     titles: "more than 255 categories",
   },
   {
+    rule: "A lognormal calibration of more than 2,000 items gives no standard errors, whose information holds every pair.",
+    file: "packages/psychometrics/src/response-time/lognormal.ts",
+    find: "itemCount > MAX_ERROR_ITEMS ? null : intensityErrors(timed, state)",
+    replace: "intensityErrors(timed, state)",
+    test: "packages/psychometrics/test/response-time.test.ts",
+    titles: "standard errors of more than 2,000 items",
+  },
+  {
     rule: "A many-facet model stops at 1,000 parameters, before its Newton steps hold a matrix of every pair of them.",
     file: "packages/psychometrics/src/irt/linear-rasch.ts",
     find: "if (parameters > MAX_PARAMETERS) {",

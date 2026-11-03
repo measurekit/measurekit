@@ -21,7 +21,10 @@ export interface ResponseTimeCalibrationOptions {
 
 /** A calibrated time item. */
 export interface CalibratedTimeItem extends TimeItem {
-  /** The standard error of the intensity; `null` when its information cannot be inverted. */
+  /**
+   * The standard error of the intensity; `null` when its information cannot be inverted, or for more than 2,000 items,
+   * whose information holds every pair of them.
+   */
   readonly standardError: number | null;
 }
 
@@ -47,6 +50,11 @@ const DEFAULT_TOLERANCE = 1e-6;
 const DEFAULT_MAX_ITERATIONS = 1000;
 /** The starting standard deviation of the speed. */
 const START_SPEED_SD = 0.5;
+/**
+ * The most items whose intensities' standard errors are computed: their information holds every pair of the items, 32
+ * MB at 2,000, and its inversion takes time with their cube. A calibration of more gives none.
+ */
+const MAX_ERROR_ITEMS = 2000;
 
 /**
  * Calibrates the lognormal model of response times: ln T_ij ~ N(β_i - τ_j, 1 / α_i²), with the speed τ_j ~ N(0, σ_τ²),
@@ -56,8 +64,8 @@ const START_SPEED_SD = 0.5;
  * τ integrates out in closed form, so the log-likelihood is exact; it is the linear mixed model of nlme's `lme(log(t) ~
  * 0 + item, random = ~ 1 | person, weights = varIdent(form = ~ 1 | item), method = "ML")`. The E-step gives each
  * person's normal posterior of τ, the M-step each β_i, α_i and σ_τ in closed form. The intensities' standard errors
- * come from their information, Σ_j X_jᵀ V_j⁻¹ X_j. Uses the responses with times; persons and items without them change
- * nothing.
+ * come from their information, Σ_j X_jᵀ V_j⁻¹ X_j, for at most 2,000 items, as it holds every pair of them. Uses the
+ * responses with times; persons and items without them change nothing.
  *
  * @param data - The responses of the persons with their times.
  * @param options - The stopping rules.
@@ -103,7 +111,7 @@ export function calibrateResponseTimes(
   const persons = new Set<number>();
   forEachTime(timed, (person) => persons.add(person));
   const logLikelihood = marginalLogLikelihood(timed, state);
-  const errors = intensityErrors(timed, state);
+  const errors = itemCount > MAX_ERROR_ITEMS ? null : intensityErrors(timed, state);
   const parameters = 2 * itemCount + 1;
   return {
     items: timed.itemIds.map((id, i) => ({

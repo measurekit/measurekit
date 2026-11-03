@@ -91,6 +91,21 @@ describe("calibrateResponseTimes", () => {
     expect(calibrateResponseTimes(records)).toEqual(calibrateResponseTimes(matrix));
   });
 
+  it("leaves out the standard errors of more than 2,000 items, whose information holds every pair", () => {
+    // 2,001 items, each answered by four of a ring of persons in times that differ.
+    const records = Array.from({ length: 2001 }, (_, item) =>
+      [0, 1, 2, 3].map((k) => ({
+        person: `p${(item + k) % 50}`,
+        item: `i${item}`,
+        response: 1,
+        time: 5 + k + (item % 3),
+      })),
+    ).flat();
+    const calibration = calibrateResponseTimes(responseRecords(records));
+    expect(calibration.items).toHaveLength(2001);
+    for (const item of calibration.items) expect(item.standardError).toBeNull();
+  });
+
   it("rejects data without times or with an item of fewer than two times", () => {
     expect(() => calibrateResponseTimes(responseMatrix([[1, 0]]))).toThrow(
       "Response time calibration needs response times.",
@@ -491,6 +506,23 @@ describe("calibrateSpeedAccuracy", () => {
     });
     const times = calibrateResponseTimes(matrix, { tolerance: 1e-10 });
     expect(Math.abs(joint.speedSd - times.speedSd)).toBeLessThan(0.01);
+  });
+
+  it("refuses standard errors of more than 2,000 estimated parameters, before it calibrates", () => {
+    // 600 2PL items of four persons: 1,200 item parameters, 1,200 time parameters, σ_τ and ρ.
+    const records = Array.from({ length: 600 }, (_, item) =>
+      [0, 1, 2, 3].map((k) => ({
+        person: `p${k}`,
+        item: `i${item}`,
+        response: (item + k) % 2,
+        time: 5 + k + (item % 3),
+      })),
+    ).flat();
+    expect(() =>
+      calibrateSpeedAccuracy(responseRecords(records), { model: twoParameterLogistic, standardErrors: "hessian" }),
+    ).toThrow(
+      'Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2402. Leave standardErrors "none".',
+    );
   });
 
   it("shrinks the estimates with a prior, and leaves the standard errors out unless asked", () => {

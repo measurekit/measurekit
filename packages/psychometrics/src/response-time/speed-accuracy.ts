@@ -132,6 +132,11 @@ export interface SpeedAccuracyEstimate {
 const DEFAULT_TOLERANCE = 1e-6;
 const DEFAULT_MAX_ITERATIONS = 1000;
 const STANDARD_ERRORS: readonly SpeedAccuracyStandardErrors[] = ["none", "hessian"];
+/**
+ * The most estimated parameters whose standard errors the joint calibration computes: their information is a dense
+ * matrix of every pair of them, by central differences of two E-steps a parameter, as calibrate's.
+ */
+const MAX_STANDARD_ERROR_PARAMETERS = 2000;
 
 /**
  * Calibrates the hierarchical model of speed and accuracy: an IRT model for the responses, ln T_ij ~ N(β_i - τ_j,
@@ -158,7 +163,8 @@ const STANDARD_ERRORS: readonly SpeedAccuracyStandardErrors[] = ["none", "hessia
  * @returns The items with their parameters, the standard deviation of the speed, the correlation of speed and ability
  *   with its standard error, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations run.
  * @throws `DataError` when the data are malformed or have no times, an item has fewer than two times or times that do
- * not differ, an item cannot be calibrated as `calibrate` requires, or an option is invalid.
+ * not differ, an item cannot be calibrated as `calibrate` requires, an option is invalid, or `standardErrors` is
+ * `"hessian"` with more than 2,000 estimated parameters.
  * @see {@link https://doi.org/10.3102/1076998607300422 | van der Linden (2007)}
  * @see {@link https://doi.org/10.1080/00273171.2014.1003701 | Molenaar, Tuerlinckx and van der Maas (2015)}
  */
@@ -188,6 +194,12 @@ export function calibrateSpeedAccuracy<TParameters>(
   };
   const setup = setUp(timed, irtOptions, answered, rule);
   const itemCount = timed.itemIds.length;
+  const estimated = setup.values.length + 2 * itemCount + 2;
+  if (standardErrors === "hessian" && estimated > MAX_STANDARD_ERROR_PARAMETERS) {
+    throw new DataError(
+      `Standard errors take at most ${MAX_STANDARD_ERROR_PARAMETERS} estimated parameters, as their information holds every pair of them; found ${estimated}. Leave standardErrors "none".`,
+    );
+  }
   const parameters = new Float64Array(2 * itemCount + 2);
   start.items.forEach((item, i) => {
     parameters[i] = item.intensity;

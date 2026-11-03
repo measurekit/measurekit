@@ -56,14 +56,14 @@ at least two times that differ: with equal times its variance would be 0 and the
 | `tolerance`     | `1e-6`  | EM stops when no parameter changes by more than this in an iteration |
 | `maxIterations` | `1000`  | The most EM iterations                                               |
 
-| Result          | Meaning                                                                                    |
-| --------------- | ------------------------------------------------------------------------------------------ |
-| `items`         | Per item: `id`, `intensity` β, `discrimination` α and the `standardError` of the intensity |
-| `speedSd`       | σ_τ                                                                                        |
-| `logLikelihood` | The marginal log-likelihood of the log times                                               |
-| `aic`, `bic`    | With 2 parameters per item and σ_τ; n the persons with times                               |
-| `converged`     | Whether EM reached `tolerance`                                                             |
-| `iterations`    | EM iterations run                                                                          |
+| Result          | Meaning                                                                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`         | Per item: `id`, `intensity` β, `discrimination` α and the `standardError` of the intensity, `null` above 2,000 items, as its information holds every pair of them |
+| `speedSd`       | σ_τ                                                                                                                                                               |
+| `logLikelihood` | The marginal log-likelihood of the log times                                                                                                                      |
+| `aic`, `bic`    | With 2 parameters per item and σ_τ; n the persons with times                                                                                                      |
+| `converged`     | Whether EM reached `tolerance`                                                                                                                                    |
+| `iterations`    | EM iterations run                                                                                                                                                 |
 
 The intensities' standard errors are the square roots of the diagonal of (Σ_j X_jᵀ V_j⁻¹ X_j)⁻¹, as lme's `vcov`. Each
 item needs two times or more; responses without times are skipped.
@@ -157,14 +157,14 @@ The E-step is that of `calibrate` with each person's density of the times at eac
 items' M-step is `calibrate`'s, and β, α, σ_τ and ρ follow in closed form from the expected moments of τ. The scale of
 θ is N(0, 1), as in `calibrate` with one group; the scale of τ has mean 0.
 
-| Option           | Default               | Meaning                                                                                                                 |
-| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `model`          | required              | An [IRT model](irt.md#models) for every item, or one for each item in the data's item order                             |
-| `priors`         | none                  | Priors of the items' parameters by name, as [calibrate](irt.md#calibration)                                             |
-| `quadrature`     | 61 rectangular points | The rule over θ, as `calibrate`                                                                                         |
-| `standardErrors` | `"none"`              | `"hessian"` computes them from the Hessian of the marginal log-likelihood, by central differences of its exact gradient |
-| `tolerance`      | `1e-6`                | EM stops when no parameter changes by more than this in an iteration                                                    |
-| `maxIterations`  | `1000`                | The most EM iterations                                                                                                  |
+| Option           | Default               | Meaning                                                                                                                                                         |
+| ---------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`          | required              | An [IRT model](irt.md#models) for every item, or one for each item in the data's item order                                                                     |
+| `priors`         | none                  | Priors of the items' parameters by name, as [calibrate](irt.md#calibration)                                                                                     |
+| `quadrature`     | 61 rectangular points | The rule over θ, as `calibrate`                                                                                                                                 |
+| `standardErrors` | `"none"`              | `"hessian"` computes them from the Hessian of the marginal log-likelihood, by central differences of its exact gradient, for at most 2,000 estimated parameters |
+| `tolerance`      | `1e-6`                | EM stops when no parameter changes by more than this in an iteration                                                                                            |
+| `maxIterations`  | `1000`                | The most EM iterations                                                                                                                                          |
 
 | Result                    | Meaning                                                                                                                                   |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
