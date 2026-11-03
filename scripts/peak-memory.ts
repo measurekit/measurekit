@@ -239,6 +239,20 @@ export const READERS: readonly ReaderCase[] = [
       psychometrics.localDependenceChiSquare(matrix, items),
   },
   {
+    name: "localDependenceChiSquare: 2 graded items of 4,096 categories, the most cells of its tables",
+    budget: 530,
+    input: () => Array.from({ length: 4095 }, (_, k) => -3 + (6 * k) / 4094),
+    prepare: (thresholds: number[], { psychometrics }) => ({
+      matrix: psychometrics.responseMatrix([
+        [0, 1],
+        [1, 0],
+      ]),
+      items: [0, 1].map(() => ({ model: psychometrics.gradedResponse, parameters: { a: 1, b: thresholds } })),
+    }),
+    read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
+      psychometrics.localDependenceChiSquare(matrix, items),
+  },
+  {
     name: "yenQ3: 2 persons, 1,000 2PL items, the most",
     budget: 50,
     input: () => pairItems(1000),

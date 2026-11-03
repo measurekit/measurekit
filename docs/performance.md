@@ -583,6 +583,7 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `manyFacetRasch`              | 1,000 persons, 1 item, 500 raters, each person by two          |      0.13 | 74                          |
 | `personScalability`           | 2 persons, 1,000,000 items, from their response matrix         |       3.8 | 195                         |
 | `localDependenceChiSquare`    | 2 persons, 1,000 2PL items, the most: 499,500 pairs            |     0.028 | 105 to 214 by version       |
+| `localDependenceChiSquare`    | 2 graded items of 4,096 categories, the most cells             |       0.1 | 243 to 262 by version       |
 | `yenQ3`                       | 2 persons, 1,000 2PL items, the most                           |     0.028 | 22                          |
 | `scalability`                 | 200 persons of distinct patterns, 1,000 items, the most        |       0.4 | 117                         |
 | `conditionalAssociation`      | 8 persons, 1,000 items, the most                               |     0.015 | 141                         |

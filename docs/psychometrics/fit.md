@@ -243,7 +243,9 @@ the model expects, as items that share a stimulus, has a large chi-square and a 
 Both statistics give every pair of items, so each takes at most 1,000 items, the limit of the analyses of pairs of items
 in [dimensionality](dimensionality.md#correlations): at that limit `localDependenceChiSquare` returns 499,500 pairs, about
 200 MB, and `yenQ3` a matrix of a million entries ([peak memory](../performance.md#peak-memory)). Their time grows with
-the pairs times the persons.
+the pairs times the persons. The tables of `localDependenceChiSquare` hold a cell for each pair of categories of each
+pair of items, at most 2^24 cells in all: two items of 4,096 categories, or 579 items of 10, which take about a second
+and, for the two items, 260 MB.
 
 ## Limited-information fit
 
@@ -470,6 +472,7 @@ Invalid input throws `DataError` naming the value found.
 | Several groups, covariates, testlets, or a histogram      | Calibrate one group of a normal distribution; each group alone is a fit                 |
 | More than 60 items                                        | Test a part of the form, or use `summedScoreFit` for each item                          |
 | More than 1,000 items for `yenQ3` or local dependence     | Test the pairs of a part of the items, such as those that share a stimulus              |
+| Tables of local dependence of more than 2^24 cells        | Test fewer items, or group the categories of items of many                              |
 | `"m2"` with a polytomous item                             | Use `"m2-star"` or `"c2"`                                                               |
 | A nominal item                                            | Its categories have no order for the mean products to read                              |
 | Parameters that differ from the calibration's AIC         | Give the anchors' ids in `fixed`                                                        |

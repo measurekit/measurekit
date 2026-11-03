@@ -11,6 +11,7 @@ import {
   createRandom,
   DataError,
   generalizedPartialCredit,
+  gradedResponse,
   type IrtItem,
   type IrtModel,
   type ItemSplit,
@@ -298,6 +299,22 @@ describe("localDependenceChiSquare", () => {
       `${analysis} holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.`;
     expect(() => localDependenceChiSquare(responseMatrix(rows(1001)), pool(1001))).toThrow(message("Local dependence"));
     expect(() => yenQ3(responseMatrix(rows(1001)), pool(1001), [0, 0])).toThrow(message("Yen's Q3"));
+  });
+
+  it("refuses tables of the categories of the pairs of more than 2^24 cells in all, so that items of many do not cost their square", () => {
+    // Two graded items of 4,097 categories: a pair's table of 16,785,409 cells, from 66 KB of thresholds.
+    const graded = (categories: number): IrtItem => ({
+      model: gradedResponse,
+      parameters: { a: 1, b: Array.from({ length: categories - 1 }, (_, k) => -3 + (6 * k) / (categories - 2)) },
+    });
+    const matrix = responseMatrix([
+      [0, 1],
+      [1, 0],
+    ]);
+    expect(localDependenceChiSquare(matrix, [graded(100), graded(100)])[0]?.degreesOfFreedom).toBe(99 * 99);
+    expect(() => localDependenceChiSquare(matrix, [graded(4097), graded(4097)])).toThrow(
+      "Local dependence holds a table of the categories of every pair of items, 16785409 cells, and takes at most 16777216; test fewer items, or items of fewer categories.",
+    );
   });
 
   it("refuses arguments of other types", () => {

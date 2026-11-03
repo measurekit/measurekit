@@ -1,7 +1,13 @@
-import { chiSquareUpperTail } from "@measurekit/core";
+import { chiSquareUpperTail, DataError } from "@measurekit/core";
 import { checkMatrixItems, type ResponseMatrix } from "../data/internal.js";
 import { type IrtItem, itemTrace, largestCategoryCount } from "../irt/internal.js";
 import { checkItems, checkPersonThetas, type ResidualFitOptions, residualPopulation, scoreMoments } from "./inputs.js";
+
+/**
+ * The most cells of the tables of the pairs of items, a cell for each pair of their categories: each cell of the expected
+ * tables sums over the nodes, so 2^24 cells take about a second, and a pair's two tables at most 256 MB.
+ */
+const MAX_TABLE_CELLS = 2 ** 24;
 
 /** Chen and Thissen's local-dependence statistic of a pair of items. */
 export interface LocalDependencePair {
@@ -51,6 +57,7 @@ export function localDependenceChiSquare(
   checkMatrixItems(items.length, "Local dependence");
   const { nodes, weights } = residualPopulation(options);
   const counts = items.map((item) => item.model.categoryCount(item.parameters));
+  checkTableCells(counts);
   const traces = items.map((item, i) => itemTrace(item, counts[i] ?? 0, nodes));
   const pairs: LocalDependencePair[] = [];
   for (let i = 0; i < items.length; i++) {
@@ -64,6 +71,26 @@ export function localDependenceChiSquare(
     }
   }
   return pairs;
+}
+
+/**
+ * Checks that the tables of the pairs of items have at most {@link MAX_TABLE_CELLS} cells in all.
+ *
+ * @throws `DataError` when they have more.
+ */
+function checkTableCells(counts: readonly number[]): void {
+  let sum = 0;
+  let squares = 0;
+  for (const count of counts) {
+    sum += count;
+    squares += count * count;
+  }
+  const cells = (sum * sum - squares) / 2;
+  if (cells > MAX_TABLE_CELLS) {
+    throw new DataError(
+      `Local dependence holds a table of the categories of every pair of items, ${cells} cells, and takes at most ${MAX_TABLE_CELLS}; test fewer items, or items of fewer categories.`,
+    );
+  }
 }
 
 /** An item of a pair: its column, its number of categories and its probabilities at the nodes, by node, then category. */
@@ -121,29 +148,28 @@ function pairStatistic(
 
 /**
  * Returns Goodman and Kruskal's gamma of a table by rows, (C - D) / (C + D) for C the pairs of persons ordered alike on
- * both items and D those ordered oppositely; NaN when there are none.
+ * both items and D those ordered oppositely; NaN when there are none. The sums of the cells below and to the right of
+ * each cell come from the rows below it, summed once from the last row up, so that a table costs its cells.
  */
 function goodmanKruskalGamma(table: Float64Array, columns: number): number {
   const rows = table.length / columns;
+  // below[l]: the sum of the rows below the current one in the columns from l on; below[columns] is 0.
+  const below = new Float64Array(columns + 1);
   let concordant = 0;
   let discordant = 0;
-  for (let k = 0; k < rows - 1; k++) {
+  for (let k = rows - 1; k >= 0; k--) {
     for (let l = 0; l < columns; l++) {
       const cell = table[k * columns + l] ?? 0;
-      concordant += cell * blockSum(table, columns, k + 1, l + 1, columns);
-      discordant += cell * blockSum(table, columns, k + 1, 0, l);
+      concordant += cell * (below[l + 1] ?? 0);
+      discordant += cell * ((below[0] ?? 0) - (below[l] ?? 0));
+    }
+    let suffix = 0;
+    for (let l = columns - 1; l >= 0; l--) {
+      suffix += table[k * columns + l] ?? 0;
+      below[l] = (below[l] ?? 0) + suffix;
     }
   }
   return (concordant - discordant) / (concordant + discordant);
-}
-
-/** Returns the sum of a table's cells in the rows from `row` on and the columns from `start` to before `end`. */
-function blockSum(table: Float64Array, columns: number, row: number, start: number, end: number): number {
-  let sum = 0;
-  for (let index = row * columns; index < table.length; index += columns) {
-    for (let l = start; l < end; l++) sum += table[index + l] ?? 0;
-  }
-  return sum;
 }
 
 /**

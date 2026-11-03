@@ -691,6 +691,14 @@ export const RULES: readonly Rule[] = [
     test: "packages/psychometrics/test/mokken.test.ts",
     titles: "1,000 item steps",
   },
+  {
+    rule: "The tables of local dependence hold at most 2^24 cells, so that items of many categories do not cost the square of them.",
+    file: "packages/psychometrics/src/fit/local-dependence.ts",
+    find: "if (cells > MAX_TABLE_CELLS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "more than 2\\^24 cells in all",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */
