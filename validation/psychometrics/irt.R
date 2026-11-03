@@ -18,8 +18,9 @@ TOL <- 1e-10 # mirt's EM tolerance, tight so that its estimates are the optimum
 RANGE <- c(-6, 6) # measurekit's default theta range for ML, WLE and MAP
 INFORMATION_THETA <- seq(-6, 6, by = 0.5)
 LOGISTIC <- c("1pl", "2pl", "3pl", "4pl")
-# Models whose Jeffreys prior gives Warm's estimator, so that mirt's WLE is a reference: the exponential family.
-EXPONENTIAL_FAMILY <- c("1pl", "2pl", "pcm", "gpcm", "rsm", "nrm")
+# Models whose Jeffreys prior gives Warm's estimator, so that mirt's WLE is a reference: the exponential family, and the
+# GRM, whose categories have Σ P'³ / P² = Σ P' P'' / P, so that ½ d ln I / dθ is Warm's J / (2 I).
+WARM_MODELS <- c("1pl", "2pl", "pcm", "gpcm", "rsm", "nrm", "grm")
 
 fit_mirt <- function(data, model, itemtype, se_type, ...) {
   fit <- mirt(data, model, itemtype = itemtype, SE = TRUE, SE.type = se_type, TOL = TOL, quadpts = POINTS,
@@ -320,7 +321,7 @@ abilities <- function(fit, models, patterns, items = psychometrics_items(fit, mo
     catr <- sapply(rows[single], function(r) thetaEst(pars, patterns[r, ], method = "WL", range = RANGE))
     stopifnot(max(abs(catr - wle_theta[single])) < 1e-3)
   }
-  if (all(models %in% EXPONENTIAL_FAMILY)) {
+  if (all(models %in% WARM_MODELS)) {
     mirt_wle <- scores("WLE")[, 1]
     stopifnot(max(abs(mirt_wle - wle_theta)) < 1e-4)
   }

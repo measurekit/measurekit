@@ -371,7 +371,7 @@ psych enumerates splits only up to 15,000 of them, so for SAT12's 32 items the G
 - The 1PL and mirt's Rasch model, and the PCM and RSM and mirt's `Rasch` and `rsm` with a free latent variance, have
   the same likelihood up to quadrature.
 - mirt's GRM, GPCM, PCM and NRM estimates in this library's parameters equal `coef(IRTpars = TRUE)` within 1e-12.
-- mirt's WLE equals the base R WLE for the 1PL, 2PL, PCM, GPCM, RSM and NRM, and catR's `thetaEst(method = "WL")`
+- mirt's WLE equals the base R WLE for the 1PL, 2PL, GRM, PCM, GPCM, RSM and NRM, and catR's `thetaEst(method = "WL")`
   agrees wherever Warm's equation has a single root.
 - The diagonal of the covariance matrix of the item parameters reproduces the standard errors above within 1e-6
   relative, the written-out 2PL likelihood reproduces mirt's log-likelihood at mirt's estimates within 1e-6, and the
@@ -706,9 +706,10 @@ Several results of the reference packages are not references:
   short of the posterior mode it reports: on LSAT7 with Beta(5, 17) on g, its log-posterior is -2651.687, the base R
   mode's -2651.614. The 3PL is therefore validated against base R, and the 4PL and the mixed format against mirt with
   `norm` priors on logit g and logit u, which the test implements as a custom `ParameterPrior`.
-- **mirt's WLE for the 3PL, 4PL and GRM.** mirt maximizes ln L + ½ ln I, which equals Warm's estimator only for
-  exponential-family models: the 1PL, 2PL, PCM, GPCM, RSM and NRM. `weightedLikelihoodEstimate` solves Warm's
-  equation, as catR does.
+- **mirt's WLE for the 3PL and 4PL.** mirt maximizes ln L + ½ ln I, which equals Warm's estimator for the
+  exponential-family models, the 1PL, 2PL, PCM, GPCM, RSM and NRM, and for the GRM, whose categories have
+  Σ P'³ / P² = Σ P' P'' / P, but not for the 3PL and 4PL. `weightedLikelihoodEstimate` solves Warm's equation, as catR
+  does.
 - **mirt's polytomous IRT standard errors.** mirt 1.48's `coef(IRTpars = TRUE, printSE = TRUE)` gives Science's
   Comfort item a GPCM b1 standard error of 1.111; the delta method on mirt's own covariance matrix gives 0.651, as
   `calibrate` does. Polytomous standard errors therefore come from the delta method.
