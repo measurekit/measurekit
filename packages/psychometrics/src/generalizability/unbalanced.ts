@@ -2,12 +2,6 @@ import { DataError, multiplyVector } from "@measurekit/core";
 import { invert } from "../math/internal.js";
 import { type Effect, effectsOf, facetsOf, namesOf, type Structure } from "./structure.js";
 
-/**
- * The most facets, the object of measurement included, that an unbalanced design may have: its estimator reads the scores
- * once for each pair of the up to 2^6 - 1 effects, and a design of more facets has more effects than any study lists.
- */
-const MAX_UNBALANCED_FACETS = 6;
-
 /** One effect of a design with the quantities of its analysis of variance and its estimated variance component. */
 export interface EffectEstimate {
   readonly effect: Effect;
@@ -41,8 +35,8 @@ interface Cells {
  * @param coordinates - For each score, the numbers of its elements by facet.
  * @param sizes - The most elements a facet has in any combination of the elements it is nested in.
  * @param describeCell - Names the combination of elements of a score for an error message.
- * @throws `DataError` when the design has more than 6 facets, two scores are in one cell, or an effect has no degrees
- * of freedom, which is when its variance component is confounded with others.
+ * @throws `DataError` when two scores are in one cell, or an effect has no degrees of freedom, which is when its variance
+ * component is confounded with others.
  */
 export function unbalancedEstimates(
   values: readonly number[],
@@ -51,11 +45,6 @@ export function unbalancedEstimates(
   structure: Structure,
   describeCell: (cell: readonly number[]) => string,
 ): EffectEstimate[] {
-  if (structure.names.length > MAX_UNBALANCED_FACETS) {
-    throw new DataError(
-      `An unbalanced design has at most ${MAX_UNBALANCED_FACETS} facets with the object of measurement, found ${structure.names.length}.`,
-    );
-  }
   const effects = effectsOf(structure);
   const cells = cellsOfEffects(effects, coordinates, sizes, structure);
   rejectRepeated(cells[cells.length - 1], coordinates, describeCell);

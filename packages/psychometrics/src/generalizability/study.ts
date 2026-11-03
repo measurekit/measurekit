@@ -84,33 +84,34 @@ export interface GeneralizabilityStudy {
  *
  * @remarks
  * By default the design is balanced: every combination of the facets' elements has one score, and a nested facet has
- * the same number of elements in each element it is nested in. `scores` are in long format, one `FacetedScore` for each,
- * with a string element of the object and of every facet in `levels`, other entries of `levels` being ignored. Each
- * facet needs at least 2 elements, so a design of k facets has at least 2^k scores. Sums of squares come from the
- * marginal means of each effect, and the variance components from the expected mean squares of a random-effects model,
- * solved from the highest-order effect down: each mean square is a sum of the variance components of the effects that
- * include its facets, each multiplied by the product of the sizes of the facets it does not include. The highest-order
- * effect is confounded with error. A component is negative when its mean square is below that of the effects it is
- * confounded with; it is reported as estimated, and a decision study treats it as 0.
+ * the same number of elements in each element it is nested in. `scores` are in long format, one `FacetedScore` for
+ * each, with a string element of the object and of every facet in `levels`, other entries of `levels` being ignored. A
+ * design has at most 6 facets with the object, as GENOVA and urGENOVA, and each facet needs at least 2 elements, so a
+ * design of k facets has at least 2^k scores. Sums of squares come from the marginal means of each effect, and the
+ * variance components from the expected mean squares of a random-effects model, solved from the highest-order effect
+ * down: each mean square is a sum of the variance components of the effects that include its facets, each multiplied by
+ * the product of the sizes of the facets it does not include. The highest-order effect is confounded with error. A
+ * component is negative when its mean square is below that of the effects it is confounded with; it is reported as
+ * estimated, and a decision study treats it as 0.
  *
- * With `unbalanced` the design may have empty cells and unequal numbers of nested elements, up to 6 facets with the
- * object. The components are Henderson's Method 1, the analogous analysis of variance of Brennan (2001, chapters 7 and
- * 8) and the estimator of urGENOVA: each effect's T, the sum over its cells of the squared sum of the cell's scores over
- * their count, has an expectation that is linear in the variance components with coefficients from the counts alone, and
- * the system of one equation for each effect is solved. Data that are balanced give the estimates of the balanced
- * analysis. The sums of squares and mean squares are the analogous ones, and a decision study needs the sizes given.
- * Measures of raters from incomplete designs are the many-facet Rasch model's, of the rater module.
+ * With `unbalanced` the design may have empty cells and unequal numbers of nested elements. The components are
+ * Henderson's Method 1, the analogous analysis of variance of Brennan (2001, chapters 7 and 8) and the estimator of
+ * urGENOVA: each effect's T, the sum over its cells of the squared sum of the cell's scores over their count, has an
+ * expectation that is linear in the variance components with coefficients from the counts alone, and the system of one
+ * equation for each effect is solved. Data that are balanced give the estimates of the balanced analysis. The sums of
+ * squares and mean squares are the analogous ones, and a decision study needs the sizes given. Measures of raters from
+ * incomplete designs are the many-facet Rasch model's, of the rater module.
  *
  * @param scores - The scores in long format, each with the element of every facet in `levels`.
  * @param design - The object of measurement, the facets and how they are nested.
  * @returns The sample size of each facet, whether the design is balanced, and the variance components, each with its
  *   degrees of freedom, mean square and variance.
- * @throws `DataError` when the design is not an object with distinct non-empty facet names and a nesting of the facets
- * that is acyclic and leaves the object crossed, `unbalanced` is not a boolean, the scores are not an array of objects
- * with a finite `score` and the elements of the design's facets, or a facet has fewer than 2 elements. Without
- * `unbalanced` also when the design is not balanced, naming the first combination of elements with more than one score
- * or with none. With it when the design has more than 6 facets, a combination has more than one score, or an effect has
- * no degrees of freedom or a component cannot be told apart from the others, naming the effect.
+ * @throws `DataError` when the design is not an object with distinct non-empty facet names, at most 6 with the object,
+ * and a nesting of the facets that is acyclic and leaves the object crossed, `unbalanced` is not a boolean, the scores
+ * are not an array of objects with a finite `score` and the elements of the design's facets, or a facet has fewer than
+ * 2 elements. Without `unbalanced` also when the design is not balanced, naming the first combination of elements with
+ * more than one score or with none. With it when a combination has more than one score, or an effect has no degrees of
+ * freedom or a component cannot be told apart from the others, naming the effect.
  * @see {@link https://doi.org/10.1007/978-1-4757-3456-0 | Brennan (2001)}
  * @see {@link https://doi.org/10.2307/3001853 | Henderson (1953)}
  */

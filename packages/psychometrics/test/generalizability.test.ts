@@ -407,7 +407,7 @@ describe("generalizabilityStudy", () => {
     );
     const many = Array.from({ length: 20 }, (_, k) => `facet${k}`);
     expect(() => generalizabilityStudy(scores, { facets: many })).toThrow(
-      "A design has at most 20 facets with the object of measurement, found 21.",
+      "A design has at most 6 facets with the object of measurement, found 21.",
     );
     expect(() => study({ facets: ["item"], unbalanced: "yes" })).toThrow(
       'The option unbalanced of the design must be a boolean, found "yes".',
@@ -479,19 +479,28 @@ describe("generalizabilityStudy", () => {
     );
   });
 
-  it("rejects an unbalanced design of more than 6 facets", () => {
-    const facets = Array.from({ length: 6 }, (_, k) => `facet${k}`);
-    const levels = (element: string): Record<string, string> =>
-      Object.fromEntries(["person", ...facets].map((name) => [name, element]));
-    expect(() =>
-      generalizabilityStudy(
-        [
-          { levels: levels("a"), score: 1 },
-          { levels: levels("b"), score: 2 },
-        ],
-        { facets, unbalanced: true },
-      ),
-    ).toThrow("An unbalanced design has at most 6 facets with the object of measurement, found 7.");
+  it("rejects a design of more than 6 facets, balanced or not, as GENOVA and urGENOVA", () => {
+    /** Every combination of two elements of each facet, one score each: a balanced design of `count` facets. */
+    const crossed = (
+      count: number,
+    ): { facets: string[]; scores: { levels: Record<string, string>; score: number }[] } => {
+      const facets = Array.from({ length: count - 1 }, (_, k) => `facet${k}`);
+      const names = ["person", ...facets];
+      const scores = Array.from({ length: 2 ** count }, (_, cell) => ({
+        levels: Object.fromEntries(names.map((name, f) => [name, String((cell >> f) & 1)])),
+        score: (cell * 7) % 5,
+      }));
+      return { facets, scores };
+    };
+    const six = crossed(6);
+    expect(generalizabilityStudy(six.scores, { facets: six.facets }).components).toHaveLength(63);
+    // A balanced design of 16 facets of two elements takes about 20 seconds, and of 20 facets tens of gigabytes.
+    const seven = crossed(7);
+    const message = "A design has at most 6 facets with the object of measurement, found 7.";
+    expect(() => generalizabilityStudy(seven.scores, { facets: seven.facets })).toThrow(message);
+    expect(() => generalizabilityStudy(seven.scores.slice(1), { facets: seven.facets, unbalanced: true })).toThrow(
+      message,
+    );
   });
 });
 

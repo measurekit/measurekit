@@ -500,6 +500,14 @@ export const RULES: readonly Rule[] = [
     titles: "refuses an item of more",
   },
   {
+    rule: "A G study has at most 6 facets with the object, so that a design of many facets of two elements does not cost 3^k marginal sums.",
+    file: "packages/psychometrics/src/generalizability/structure.ts",
+    find: "if (names.length > MAX_FACETS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/generalizability.test.ts",
+    titles: "more than 6 facets",
+  },
+  {
     rule: "Kappa takes a table of the range only where the range is no wider than the pairs.",
     file: "packages/core/src/kappa.ts",
     find: "highest - lowest < n",

@@ -1,6 +1,7 @@
 /**
- * Generalizability theory for balanced crossed and nested designs: variance components by the analysis of variance, and
- * decision studies with the generalizability and dependability coefficients.
+ * Generalizability theory for crossed and nested designs: variance components by the analysis of variance, balanced or
+ * with empty cells by Henderson's Method 1, and decision studies with the generalizability and dependability
+ * coefficients.
  *
  * @module @measurekit/psychometrics/generalizability
  */

@@ -30,7 +30,7 @@ The design must be balanced, unless the design has `unbalanced: true` ([unbalanc
 - every combination of elements has exactly one score;
 - every facet has the same number of elements, at least 2, in each combination of the elements it is nested in;
 - the object of measurement is not nested, and nesting is not circular;
-- a design of k facets, the object included, has at least 2^k scores, and at most 20 facets are allowed;
+- a design of k facets, the object included, has at least 2^k scores, and at most 6 facets are allowed, as in GENOVA;
 - `levels` has a string element for the object and every facet; other entries are ignored.
 
 An element of a nested facet is identified within the elements it is nested in. Raters may be labeled `r1` and `r2` for
@@ -222,7 +222,7 @@ decisionStudy(study, { sampleSizes: { rater: 3 } }).generalizability; // 0.922, 
 | `decisionStudy`    | Needs `sampleSizes` for every facet but the object when the study is not balanced                                                                                                   |
 | Scores per cell    | At most 1; a second score for a combination throws a `DataError` naming it                                                                                                          |
 | Degrees of freedom | Every effect needs some. A design whose scores only chain its facets, as 5 scores of 3 persons and 3 raters, leaves the person by rater effect none: a `DataError` names the effect |
-| Facets             | At most 6 with the object, 63 effects; the scores are read once for each pair of effects, so 7 effects and a million scores make 49 passes                                          |
+| Facets             | At most 6 with the object, as in urGENOVA, 63 effects; the scores are read once for each pair of effects, so 7 effects and a million scores make 49 passes                          |
 
 The many-facet Rasch model of the [rater](rater.md) module remains the tool for measures of the raters themselves.
 

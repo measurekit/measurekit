@@ -1,10 +1,11 @@
 import { checkArray, checkRecord, DataError, describe, isNonEmptyString } from "@measurekit/core";
 
 /**
- * The most facets, the object of measurement included, that a design may have: a balanced design of 21 facets has over
- * two million scores, and its effects, 2^21 - 1 of them, are more than any analysis lists.
+ * The most facets, the object of measurement included, that a design may have: GENOVA's and urGENOVA's six. The effects
+ * grow as 2^k and the marginal sums of a balanced design as 3^k for facets of two elements, so that 16 facets take
+ * minutes and 20 tens of gigabytes; the unbalanced estimator reads the scores once for each pair of the effects.
  */
-const MAX_FACETS = 20;
+const MAX_FACETS = 6;
 
 /** One effect of a balanced random-effects design, as sets of facets in bitmasks over the design's facets. */
 export interface Effect {
@@ -41,7 +42,7 @@ export function namesOf(structure: Structure, mask: number): string[] {
  *
  * @param subject - Names the nesting in error messages, such as `The option nested of the design`.
  * @throws `DataError` when the object is not a non-empty string, the facets are not an array of distinct non-empty
- * strings other than the object, there are none or more than 20 with the object, or the nesting is not an object that
+ * strings other than the object, there are none or more than 6 with the object, or the nesting is not an object that
  * names facets of the design, nests the object or a facet in itself, or is circular.
  */
 export function buildStructure(
