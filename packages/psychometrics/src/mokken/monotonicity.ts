@@ -28,9 +28,9 @@ const ALL = 0.999999999999;
  * @param matrix - The responses of the persons.
  * @param options - The smallest violation and group size that count, and the level of the tests.
  * @returns For each item, its violations of monotonicity.
- * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every
- * item, the scores span more than 10 categories, an option is invalid, or the minimum group size is more than half of
- * the persons or than all of them.
+ * @throws `DataError` when the matrix is invalid, has fewer than two items or more than 1,000, fewer than two persons
+ * answered every item, the scores span more than 10 categories, an option is invalid, or the minimum group size is more
+ * than half of the persons or than all of them.
  * @see {@link https://doi.org/10.18637/jss.v048.i05 | van der Ark (2012)}
  * @see {@link https://doi.org/10.4135/9781412984676 | Sijtsma and Molenaar (2002)}
  */

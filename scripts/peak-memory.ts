@@ -41,6 +41,30 @@ interface ReaderCase {
 
 const ids = (prefix: string, count: number): string[] => Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
 
+/** Two persons who answer the items alike or opposite, and the parameters of 2PL items. */
+interface PairItems {
+  readonly rows: number[][];
+  readonly items: { readonly a: number; readonly b: number }[];
+}
+
+/** The input of a statistic of every pair of items: two persons and `count` 2PL items. */
+const pairItems = (count: number): PairItems => {
+  const row = Array.from({ length: count }, (_, i) => i % 2);
+  return {
+    rows: [row, row.map((response) => 1 - response)],
+    items: Array.from({ length: count }, (_, i) => ({ a: 1, b: (i % 7) / 3 - 1 })),
+  };
+};
+
+/** Reads the input of {@link pairItems} into a response matrix and 2PL items. */
+const pairInput = ({ rows, items }: PairItems, psychometrics: Libraries["psychometrics"]) => ({
+  matrix: psychometrics.responseMatrix(rows),
+  items: items.map((parameters) => ({
+    model: psychometrics.twoParameterLogistic,
+    parameters: { ...parameters, c: 0, d: 1 },
+  })),
+});
+
 /** The cases, the worst input of each reader within its limits. */
 export const READERS: readonly ReaderCase[] = [
   {
@@ -207,27 +231,23 @@ export const READERS: readonly ReaderCase[] = [
     read: (matrix: unknown, { psychometrics }) => psychometrics.personScalability(matrix),
   },
   {
-    name: "localDependenceChiSquare: 2 persons, 2,000 2PL items, 1,999,000 pairs",
-    budget: 1110,
-    input: () => {
-      const row = Array.from({ length: 2000 }, (_, i) => i % 2);
-      return {
-        rows: [row, row.map((response) => 1 - response)],
-        items: Array.from({ length: 2000 }, (_, i) => ({ a: 1, b: (i % 7) / 3 - 1 })),
-      };
-    },
-    prepare: ({ rows, items }: { rows: number[][]; items: { a: number; b: number }[] }, { psychometrics }) => ({
-      matrix: psychometrics.responseMatrix(rows),
-      items: items.map((parameters) => ({
-        model: psychometrics.twoParameterLogistic,
-        parameters: { ...parameters, c: 0, d: 1 },
-      })),
-    }),
+    name: "localDependenceChiSquare: 2 persons, 1,000 2PL items, the most, 499,500 pairs",
+    budget: 430,
+    input: () => pairItems(1000),
+    prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
     read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
       psychometrics.localDependenceChiSquare(matrix, items),
   },
   {
-    name: "scalability: 200 persons of distinct patterns, 1,000 items",
+    name: "yenQ3: 2 persons, 1,000 2PL items, the most",
+    budget: 50,
+    input: () => pairItems(1000),
+    prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
+    read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
+      psychometrics.yenQ3(matrix, items, [0, 0]),
+  },
+  {
+    name: "scalability: 200 persons of distinct patterns, 1,000 items, the most",
     budget: 240,
     input: () =>
       Array.from({ length: 200 }, (_, person) => Array.from({ length: 1000 }, (_, i) => ((person + 1) * (i + 3)) % 5)),

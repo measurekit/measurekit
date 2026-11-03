@@ -217,7 +217,8 @@ fit[217]; // { id: "person218", standardized: -2.66 }: that guide's outlier
 
 On 5,000 seeded persons and 30 2PL items that fit, at their maximum likelihood estimates, lz* has a standard deviation of
 0.998 where lz has 0.914; its mean is 0.098, falling as items are added, to 0.073 at 60 and 0.045 at 100, as the
-correction is of the first order. The nonparametric indices normed G, U3 and Ht are in [mokken](mokken.md#person-fit).
+correction is of the first order. The mean is that of Snijders' correction, not of this implementation: PerFit's
+`lzstar` gives the same values, to its 4 decimals ([validation](validation.md)). The nonparametric indices normed G, U3 and Ht are in [mokken](mokken.md#person-fit).
 
 ## Local dependence
 
@@ -238,6 +239,11 @@ under local independence:
 
 The pairs come in item order: the first item with each later one, then the second. A pair whose items agree more than
 the model expects, as items that share a stimulus, has a large chi-square and a positive V.
+
+Both statistics give every pair of items, so each takes at most 1,000 items, the limit of the analyses of pairs of items
+in [dimensionality](dimensionality.md#correlations): at that limit `localDependenceChiSquare` returns 499,500 pairs, about
+200 MB, and `yenQ3` a matrix of a million entries ([peak memory](../performance.md#peak-memory)). Their time grows with
+the pairs times the persons.
 
 ## Limited-information fit
 
@@ -463,6 +469,7 @@ Invalid input throws `DataError` naming the value found.
 | `summedScoreFit` when no person answered every item       | Use `itemFit`, which works from the answered items of each person                       |
 | Several groups, covariates, testlets, or a histogram      | Calibrate one group of a normal distribution; each group alone is a fit                 |
 | More than 60 items                                        | Test a part of the form, or use `summedScoreFit` for each item                          |
+| More than 1,000 items for `yenQ3` or local dependence     | Test the pairs of a part of the items, such as those that share a stimulus              |
 | `"m2"` with a polytomous item                             | Use `"m2-star"` or `"c2"`                                                               |
 | A nominal item                                            | Its categories have no order for the mean products to read                              |
 | Parameters that differ from the calibration's AIC         | Give the anchors' ids in `fixed`                                                        |

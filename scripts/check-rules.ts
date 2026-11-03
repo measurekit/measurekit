@@ -659,6 +659,38 @@ export const RULES: readonly Rule[] = [
     test: "packages/knowledge-tracing/test/kst.test.ts",
     titles: "past 2\\^28 cells",
   },
+  {
+    rule: "Local dependence takes at most 1,000 items, so that a few persons answering many items do not cost a statistic of each of their pairs.",
+    file: "packages/psychometrics/src/fit/local-dependence.ts",
+    find: '  checkMatrixItems(items.length, "Local dependence");\n',
+    replace: "",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "takes at most 1,000 items, as it and Yen's Q3",
+  },
+  {
+    rule: "Yen's Q3 takes at most 1,000 items, so that a few persons answering many items do not cost a matrix of their square.",
+    file: "packages/psychometrics/src/fit/local-dependence.ts",
+    find: '  checkMatrixItems(items.length, "Yen\'s Q3");\n',
+    replace: "",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "takes at most 1,000 items, as it and Yen's Q3",
+  },
+  {
+    rule: "A Mokken scale analysis takes at most 1,000 items, so that a few persons answering many items do not cost every pair of them.",
+    file: "packages/psychometrics/src/mokken/scores.ts",
+    find: "if (items > MAX_MATRIX_ITEMS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/mokken.test.ts",
+    titles: "every analysis of their pairs",
+  },
+  {
+    rule: "Molenaar-Sijtsma reliability takes at most 1,000 item steps, so that items of many categories do not cost a matrix of the square of their steps.",
+    file: "packages/psychometrics/src/mokken/reliability.ts",
+    find: "if (size > MAX_MATRIX_ITEMS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/mokken.test.ts",
+    titles: "1,000 item steps",
+  },
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */

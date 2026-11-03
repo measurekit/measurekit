@@ -24,7 +24,12 @@ The steps follow Sijtsma and van der Ark's (2017) ten, whose ninth, norms of the
 Items may be dichotomous or polytomous: scores are integers, and the lowest score of all items is taken as 0, so scores
 from 1 to 5 work as scores from 0 to 4. Scores may span at most 10 categories, as in mokken. Every function but
 `personScalability` uses the persons who answered every item, and needs at least two of them. The functions take a
-`ResponseMatrix`.
+`ResponseMatrix`. Every function but `twoWayImputation` and `personScalability` compares every pair of items, so it takes
+at most 1,000 items, the limit of the analyses of pairs of items in [dimensionality](dimensionality.md#correlations):
+at that limit the coefficients of `scalability` and the indices of `conditionalAssociation` hold a million entries, up
+to about 150 MB ([peak memory](../performance.md#peak-memory)). Their time grows with the pairs times the persons, and
+that of `conditionalAssociation`, whose W1 conditions every pair on a third item, with the cube of the items times the
+persons, 14 s for 1,000 items of 8 persons: on matrices from users, run them in a worker with a deadline.
 
 | Function                                    | Result                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------- |
@@ -416,7 +421,8 @@ Under local independence, the variance of the true score is the sum over all pai
 one) P(pass the other), the pairs of steps of one item included; the reliability is that variance over the variance of the
 total score. The pairs of steps of one item are never observed together, so the method estimates each from the pairs of that step with the steps next to it
 in the order of the proportions, which double monotonicity fixes for every person, and bounds it by the product of the two
-proportions and the smaller of them. Steps that every person or no person passes drop out.
+proportions and the smaller of them. Steps that every person or no person passes drop out. The method holds a matrix of
+every pair of the steps left, so it takes at most 1,000 of them, as 111 items of 10 categories have.
 
 ```ts
 import { createRandom, responseMatrix } from "@measurekit/psychometrics";
@@ -487,6 +493,8 @@ Invalid input throws `DataError` naming the value found.
 | Error                                                                                           | What to do                                                                                               |
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Fewer than two items, or fewer than three for the item ordering and the conditional association | Give the items the method compares: two for the coefficients, three for the ordering and the association |
+| More than 1,000 items                                                                           | Analyse a part of the items; a Mokken scale has far fewer                                                |
+| More than 1,000 item steps for the reliability                                                  | Group the scores into fewer categories, or analyse fewer items                                           |
 | Fewer than two persons answered every item                                                      | Keep the persons who answered every item, or the items they all answered                                 |
 | The scores span more than 10 categories                                                         | Group the scores into at most 10 categories                                                              |
 | The minimum group size is more than half of the persons                                         | Lower `minimumGroupSize`, or give more persons                                                           |

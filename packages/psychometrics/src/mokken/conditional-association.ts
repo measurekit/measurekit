@@ -69,9 +69,9 @@ const FLAG_MULTIPLE = 3;
  * @param matrix - The responses of the persons.
  * @param options - The smallest group of a rest score.
  * @returns The indices by item and pair, and the items and pairs they flag.
- * @throws `DataError` when the matrix is invalid, has fewer than three items, fewer than two persons answered every
- * item, the scores span more than 10 categories, or `minimumSize` is not a positive integer or exceeds the persons who
- * answered every item.
+ * @throws `DataError` when the matrix is invalid, has fewer than three items or more than 1,000, fewer than two persons
+ * answered every item, the scores span more than 10 categories, or `minimumSize` is not a positive integer or exceeds
+ * the persons who answered every item.
  * @see {@link https://doi.org/10.1111/bmsp.12078 | Sijtsma and van der Ark (2017)}
  */
 export function conditionalAssociation(

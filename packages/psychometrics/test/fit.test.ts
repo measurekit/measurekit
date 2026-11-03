@@ -285,6 +285,21 @@ describe("localDependenceChiSquare", () => {
     expect(constant?.chiSquare).not.toBeNull();
   });
 
+  it("takes at most 1,000 items, as it and Yen's Q3 hold a statistic of every pair of items", () => {
+    // Two persons who answer the items alike or opposite: the items, not the persons, would cost the square.
+    const rows = (items: number) => [
+      Array.from({ length: items }, (_, j) => j % 2),
+      Array.from({ length: items }, (_, j) => (j + 1) % 2),
+    ];
+    const pool = (items: number) => Array.from({ length: items }, () => defined(HALVES[0]));
+    expect(localDependenceChiSquare(responseMatrix(rows(1000)), pool(1000))).toHaveLength(499_500);
+    expect(yenQ3(responseMatrix(rows(1000)), pool(1000), [0, 0])).toHaveLength(1000);
+    const message = (analysis: string) =>
+      `${analysis} holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.`;
+    expect(() => localDependenceChiSquare(responseMatrix(rows(1001)), pool(1001))).toThrow(message("Local dependence"));
+    expect(() => yenQ3(responseMatrix(rows(1001)), pool(1001), [0, 0])).toThrow(message("Yen's Q3"));
+  });
+
   it("refuses arguments of other types", () => {
     const { matrix, items: pool } = simulated(44, 20, 3);
     expect(() => localDependenceChiSquare(JSON.parse("null"), pool)).toThrow(DataError);

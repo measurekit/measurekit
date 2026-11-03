@@ -1,5 +1,5 @@
 import { DataError } from "@measurekit/core";
-import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
+import { checkResponseMatrix, MAX_MATRIX_ITEMS, type ResponseMatrix } from "../data/internal.js";
 import { covariance } from "../math/internal.js";
 
 /** The most categories an item may have: the mokken package handles scores from 0 to 9. */
@@ -25,13 +25,18 @@ export interface MokkenData {
  * @param subject - Names the analysis in error messages, such as `Scalability`.
  * @param itemsNeeded - The fewest items the analysis needs.
  * @throws `DataError` when the matrix is invalid, fewer than two persons answered every item, there are fewer items
- * than the analysis needs, or scores span more than 10 categories.
+ * than the analysis needs or more than 1,000, or scores span more than 10 categories.
  */
 export function mokkenData(matrix: ResponseMatrix, subject: string, itemsNeeded = 2): MokkenData {
   checkResponseMatrix(matrix);
   const items = matrix.itemIds.length;
   if (items < itemsNeeded) {
     throw new DataError(`${subject} needs at least ${itemsNeeded} items, found ${items}.`);
+  }
+  if (items > MAX_MATRIX_ITEMS) {
+    throw new DataError(
+      `${subject} compares every pair of items, so it takes at most ${MAX_MATRIX_ITEMS} items, found ${items}.`,
+    );
   }
   const complete = matrix.responses.filter((row) => !row.includes(null));
   if (complete.length < 2) {

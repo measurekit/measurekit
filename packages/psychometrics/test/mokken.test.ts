@@ -1088,6 +1088,37 @@ describe("molenaarSijtsmaReliability", () => {
     ).toThrow("needs scores from at most 10 categories, as the mokken package does, found 11.");
     expect(() => molenaarSijtsmaReliability(JSON.parse("null"))).toThrow(DataError);
   });
+
+  it("takes at most 1,000 item steps, whose pairs its matrix holds", () => {
+    // Ten persons who score 0 to 9 on every item: each item has 9 steps that some but not all persons pass.
+    const rows = (items: number) =>
+      Array.from({ length: 10 }, (_, score) => Array.from({ length: items }, () => score));
+    expect(molenaarSijtsmaReliability(responseMatrix(rows(111)))).toBeGreaterThan(0.99);
+    expect(() => molenaarSijtsmaReliability(responseMatrix(rows(112)))).toThrow(
+      "Molenaar-Sijtsma reliability holds a matrix of every pair of item steps, a step for each score above an item's lowest, so it takes at most 1000 steps that some but not all persons pass, found 1008.",
+    );
+  });
+});
+
+describe("item limit", () => {
+  it("takes at most 1,000 items in every analysis of their pairs, so that a few persons do not cost their square", () => {
+    // Two persons who answer the items alike or opposite: the items, not the persons, would cost the square.
+    const rows = (items: number) => [
+      Array.from({ length: items }, (_, j) => j % 2),
+      Array.from({ length: items }, (_, j) => (j + 1) % 2),
+    ];
+    expect(scalability(responseMatrix(rows(1000))).pairs).toHaveLength(1000);
+    const many = responseMatrix(rows(1001));
+    const message = (analysis: string) =>
+      `${analysis} compares every pair of items, so it takes at most 1000 items, found 1001.`;
+    expect(() => scalability(many)).toThrow(message("Scalability"));
+    expect(() => guttmanErrors(many)).toThrow(message("Guttman errors"));
+    expect(() => automatedItemSelection(many)).toThrow(message("Automated item selection"));
+    expect(() => monotonicity(many)).toThrow(message("The monotonicity check"));
+    expect(() => invariantItemOrdering(many)).toThrow(message("The invariant item ordering check"));
+    expect(() => conditionalAssociation(many)).toThrow(message("Conditional association"));
+    expect(() => molenaarSijtsmaReliability(many)).toThrow(message("Molenaar-Sijtsma reliability"));
+  });
 });
 
 describe("properties", () => {

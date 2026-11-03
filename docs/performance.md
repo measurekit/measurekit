@@ -546,7 +546,7 @@ the limits of [SECURITY.md](../SECURITY.md): the peak of a process that parses t
 the peak of the same process that parses it and does not, the median of three pairs run one after the other. Each reader
 grows in proportion to its input, but for the designs of cognitive diagnosis, the analyses of the pairs of items that
 hold a matrix of them, and the analyses of the relations between the elements of a knowledge structure, whose limits
-bound them, and the statistics of pairs of items of fit and of Mokken scales, which grow with their square.
+bound them, and the statistics of pairs of items of fit and of Mokken scales, which their limit of 1,000 items bounds.
 
 | Reader                        | Input                                                          | JSON (MB) | Peak added (MB)             |
 | ----------------------------- | -------------------------------------------------------------- | --------: | --------------------------- |
@@ -582,8 +582,10 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `kst`, its masks              | 4,096 sets of 16 skills, 65,536 states                         |      0.33 | 173                         |
 | `manyFacetRasch`              | 1,000 persons, 1 item, 500 raters, each person by two          |      0.13 | 74                          |
 | `personScalability`           | 2 persons, 1,000,000 items, from their response matrix         |       3.8 | 195                         |
-| `localDependenceChiSquare`    | 2 persons, 2,000 2PL items: 1,999,000 pairs                    |     0.057 | 430                         |
-| `scalability`                 | 200 persons of distinct patterns, 1,000 items                  |       0.4 | 117                         |
+| `localDependenceChiSquare`    | 2 persons, 1,000 2PL items, the most: 499,500 pairs            |     0.028 | 105 to 214 by version       |
+| `yenQ3`                       | 2 persons, 1,000 2PL items, the most                           |     0.028 | 22                          |
+| `scalability`                 | 200 persons of distinct patterns, 1,000 items, the most        |       0.4 | 117                         |
+| `conditionalAssociation`      | 8 persons, 1,000 items, the most                               |     0.015 | 141                         |
 | `diagnosticAdaptiveTest`      | 64 items of one of 20 attributes, the most items × 2^K         |    0.0039 | 740                         |
 
 A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or
@@ -591,11 +593,10 @@ persons itself, and 2 to 9 times where the input names them. A design of cogniti
 adaptive test's pool, takes up to 2 GB from a few hundred bytes, which its limits stop there; a host that takes
 Q-matrices from users sets a lower limit where it cannot spare that. The analyses of knowledge structures take up to
 about 260 MB within their limits: IITA's candidates from 19 MB of responses, and the masks of a model from a few hundred
-kilobytes of sets of skills. A statistic of every pair of items that no limit bounds, local dependence, Yen's Q3 or the
-scalability of Mokken pairs, returns items² values, so 2,000 items take 0.4 GB from 57 KB; a host that takes matrices of
-many items from users limits the items. The standard errors of Mokken's scalability add memory in proportion to the
-items times the persons' patterns. The many-facet Rasch model holds matrices of the square of its measures, which
-no limit bounds: 500 raters take 74 MB from 131 KB of scores.
+kilobytes of sets of skills. A statistic of every pair of items, local dependence, Yen's Q3 or a Mokken scale analysis,
+returns items² values, which their limit of 1,000 items stops at about 210 MB from 28 KB; the standard errors of
+Mokken's scalability add memory in proportion to the items times the persons' patterns. The many-facet Rasch model holds
+matrices of the square of its measures, which no limit bounds: 500 raters take 74 MB from 131 KB of scores.
 
 A calibration of several dimensions holds tables over its grid, whose limit stops them at 310 MB, and at 700 MB with the
 standard errors of an exploratory model. The standard errors of a bifactor model keep, for each pattern of the responses

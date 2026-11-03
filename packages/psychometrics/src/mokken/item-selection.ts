@@ -51,8 +51,8 @@ const ROW_EPSILON = 1e-10;
  * @param matrix - The responses of the persons.
  * @param options - The lower bound of H and the level of the tests.
  * @returns The scales, each a list of items, and the items that belong to none.
- * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every
- * item, the scores span more than 10 categories, or an option is invalid.
+ * @throws `DataError` when the matrix is invalid, has fewer than two items or more than 1,000, fewer than two persons
+ * answered every item, the scores span more than 10 categories, or an option is invalid.
  * @see {@link https://doi.org/10.18637/jss.v020.i11 | van der Ark (2007)}
  * @see {@link https://doi.org/10.4135/9781412984676 | Sijtsma and Molenaar (2002)}
  */

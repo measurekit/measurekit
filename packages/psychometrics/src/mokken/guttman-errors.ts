@@ -35,8 +35,8 @@ export interface GuttmanErrors {
  *
  * @param matrix - The responses of the persons.
  * @returns G+ of each person, the upper fence and the indices of the outliers.
- * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every item,
- * or the scores span more than 10 categories.
+ * @throws `DataError` when the matrix is invalid, has fewer than two items or more than 1,000, fewer than two persons
+ * answered every item, or the scores span more than 10 categories.
  * @see {@link https://doi.org/10.1111/bmsp.12078 | Sijtsma and van der Ark (2017)}
  */
 export function guttmanErrors(matrix: ResponseMatrix): GuttmanErrors {

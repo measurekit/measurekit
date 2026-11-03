@@ -1,5 +1,5 @@
 import { DataError, mean } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/internal.js";
+import { MAX_MATRIX_ITEMS, type ResponseMatrix } from "../data/internal.js";
 import { variance } from "../math/internal.js";
 import { type MokkenData, mokkenData, scoreOf } from "./scores.js";
 
@@ -42,8 +42,9 @@ interface StepMatrix {
  *
  * @param matrix - The responses of the persons.
  * @returns The coefficient MS, at most 1.
- * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every item,
- * the scores span more than 10 categories, or the total scores have no variance.
+ * @throws `DataError` when the matrix is invalid, has fewer than two items or more than 1,000, fewer than two persons
+ * answered every item, the scores span more than 10 categories, the items have more than 1,000 steps that some but not
+ * all persons pass, or the total scores have no variance.
  * @see {@link https://doi.org/10.1007/BF02293957 | Sijtsma and Molenaar (1987)}
  * @see {@link https://doi.org/10.1111/bmsp.12078 | Sijtsma and van der Ark (2017)}
  */
@@ -78,6 +79,11 @@ function stepMatrix(data: MokkenData): StepMatrix {
     .filter((id) => (counts[id] ?? 0) > 0 && (counts[id] ?? 0) < data.persons)
     .sort((a, b) => (counts[a] ?? 0) - (counts[b] ?? 0) || a - b);
   const size = order.length;
+  if (size > MAX_MATRIX_ITEMS) {
+    throw new DataError(
+      `Molenaar-Sijtsma reliability holds a matrix of every pair of item steps, a step for each score above an item's lowest, so it takes at most ${MAX_MATRIX_ITEMS} steps that some but not all persons pass, found ${size}.`,
+    );
+  }
   const position = new Int32Array(counts.length).fill(-1);
   order.forEach((id, rank) => {
     position[id] = rank;

@@ -1,5 +1,5 @@
 import { chiSquareUpperTail } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/internal.js";
+import { checkMatrixItems, type ResponseMatrix } from "../data/internal.js";
 import { type IrtItem, itemTrace, largestCategoryCount } from "../irt/internal.js";
 import { checkItems, checkPersonThetas, type ResidualFitOptions, residualPopulation, scoreMoments } from "./inputs.js";
 
@@ -38,8 +38,8 @@ export interface LocalDependencePair {
  * @param items - The calibrated items, in the order of the matrix's items.
  * @param options - The population.
  * @returns For each pair of items, the statistic, its degrees of freedom and significance, and the signed Cramér's V.
- * @throws `DataError` when the matrix, the items or the population are invalid, or a response is not a category of
- * its item.
+ * @throws `DataError` when the matrix, the items or the population are invalid, there are more than 1,000 items, or a
+ * response is not a category of its item.
  * @see {@link https://doi.org/10.3102/10769986022003265 | Chen and Thissen (1997)}
  */
 export function localDependenceChiSquare(
@@ -48,6 +48,7 @@ export function localDependenceChiSquare(
   options: ResidualFitOptions = {},
 ): LocalDependencePair[] {
   checkItems(matrix, items);
+  checkMatrixItems(items.length, "Local dependence");
   const { nodes, weights } = residualPopulation(options);
   const counts = items.map((item) => item.model.categoryCount(item.parameters));
   const traces = items.map((item, i) => itemTrace(item, counts[i] ?? 0, nodes));
@@ -158,8 +159,8 @@ function blockSum(table: Float64Array, columns: number, row: number, start: numb
  * @param items - The calibrated items, in the order of the matrix's items.
  * @param thetas - The estimate of theta of each person, in the order of the matrix.
  * @returns The matrix of Q3 by rows, with `null` for a pair that has no persons with both items.
- * @throws `DataError` when the matrix, the items or the thetas are invalid, or a response is not a category of its
- * item.
+ * @throws `DataError` when the matrix, the items or the thetas are invalid, there are more than 1,000 items, or a
+ * response is not a category of its item.
  */
 export function yenQ3(
   matrix: ResponseMatrix,
@@ -167,6 +168,7 @@ export function yenQ3(
   thetas: readonly number[],
 ): (number | null)[][] {
   checkItems(matrix, items);
+  checkMatrixItems(items.length, "Yen's Q3");
   checkPersonThetas(matrix, thetas);
   const itemCount = items.length;
   const residuals = residualTable(matrix, items, thetas);

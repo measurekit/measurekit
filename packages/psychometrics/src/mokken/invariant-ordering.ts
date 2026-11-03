@@ -53,9 +53,9 @@ export interface InvariantItemOrdering {
  *   tests.
  * @returns For each item, its violations; the items removed to reach an ordering; and the scalability coefficient of
  *   what is left.
- * @throws `DataError` when the matrix is invalid, has fewer than three items, fewer than two persons answered every
- * item, the scores span more than 10 categories, an option is invalid, or fewer persons answered every item than the
- * minimum group size.
+ * @throws `DataError` when the matrix is invalid, has fewer than three items or more than 1,000, fewer than two persons
+ * answered every item, the scores span more than 10 categories, an option is invalid, or fewer persons answered every
+ * item than the minimum group size.
  * @see {@link https://doi.org/10.1177/0013164409355697 | Ligtvoet, van der Ark, te Marvelde and Sijtsma (2010)}
  */
 export function invariantItemOrdering(

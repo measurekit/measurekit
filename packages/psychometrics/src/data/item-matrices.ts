@@ -5,7 +5,7 @@ import { DataError } from "@measurekit/core";
  * the worst of them, an exploratory factor analysis, adds about 150 MB to the peak memory and its eigendecompositions
  * take minutes, while each matrix grows with the square of the items and its decompositions with their cube.
  */
-const MAX_MATRIX_ITEMS = 1000;
+export const MAX_MATRIX_ITEMS = 1000;
 
 /**
  * Checks that an analysis that holds a matrix of every pair of items has at most 1,000 items.

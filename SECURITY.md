@@ -17,12 +17,13 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   times the replications. In `@measurekit/knowledge-tracing`, a log is checked and replayed in time proportional to its
   events, and cross-validation fits the model once per fold. Limit the size of data accepted from untrusted sources
   before analyzing it on a server: a response matrix or a log takes at most about 50 times the bytes of its JSON, a
-  Q-matrix or a diagnostic pool of a few hundred bytes up to 2 GB within the limits below, and a statistic of every pair
-  of items, such as local dependence or Yen's Q3, memory that grows with the square of the items, 0.4 GB at 2,000
+  Q-matrix or a diagnostic pool of a few hundred bytes up to 2 GB within the limits below
   ([peak memory](docs/performance.md#peak-memory)). The time of inductive item tree analysis grows faster than its
   limits bound: 1,000 learners take 10 ms at 12 items and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items
-  ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). Run `iita` on logs from users in a worker with a
-  deadline, and end the worker when it passes.
+  ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). So does the time of a statistic of every pair of
+  items, which grows with the pairs times the persons, of Mokken's conditional association, with the cube of the items
+  times the persons, 14 s at 1,000 items of 8 persons ([mokken](docs/psychometrics/mokken.md)). Run these on data from
+  users in a worker with a deadline, and end the worker when it passes.
   An exploratory calibration of several dimensions starts from an eigendecomposition of the items' correlations, whose
   time grows as the cube of the items: about 3 minutes at 2,000 items
   ([multidimensional](docs/psychometrics/multidimensional.md#time)).
@@ -41,6 +42,8 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   | Categories of a Mokken scale                                                                       | 10                                         | [mokken](docs/psychometrics/mokken.md)                                                                        |
   | Observed categories of an item in a polychoric correlation                                         | 8, as psych's `polychoric`                 | [dimensionality](docs/psychometrics/dimensionality.md#correlations)                                           |
   | Items of an analysis of their pairs: correlations, factors, omega                                  | 1,000: an analysis adds up to about 150 MB | [dimensionality](docs/psychometrics/dimensionality.md#correlations)                                           |
+  | Items of a statistic of every pair: local dependence, Yen's Q3, a Mokken scale analysis            | 1,000: up to about 210 MB                  | [fit](docs/psychometrics/fit.md#local-dependence), [mokken](docs/psychometrics/mokken.md)                     |
+  | Item steps of Molenaar-Sijtsma reliability, which holds a matrix of their pairs                    | 1,000: 9 MB                                | [mokken](docs/psychometrics/mokken.md#reliability)                                                            |
   | Facets of a G study, with the object                                                               | 6, as GENOVA and urGENOVA                  | [generalizability](docs/psychometrics/generalizability.md)                                                    |
   | Reportable scores of the scale of a predicted theta score                                          | 10,000                                     | [scaling](docs/psychometrics/scaling.md)                                                                      |
   | Degree of a log-linear presmoothing, of each score of a table                                      | 20: a table's fit holds 441 terms per cell | [equating](docs/psychometrics/equating.md)                                                                    |

@@ -40,8 +40,8 @@ export interface Scalability {
  *
  * @param matrix - The responses of the persons.
  * @returns H of the scale, H_i of each item and H_ij of each pair, with their standard errors.
- * @throws `DataError` when the matrix is invalid, has fewer than two items, fewer than two persons answered every item,
- * or the scores span more than 10 categories.
+ * @throws `DataError` when the matrix is invalid, has fewer than two items or more than 1,000, fewer than two persons
+ * answered every item, or the scores span more than 10 categories.
  * @see {@link https://doi.org/10.1177/0081175013481958 | Kuijpers, van der Ark and Croon (2013)}
  * @see {@link https://doi.org/10.4135/9781412984676 | Sijtsma and Molenaar (2002)}
  */
