@@ -11,9 +11,10 @@
 #
 # Shadow test: mirtCAT's findNextItem with the integer program of van der Linden (2005), maximizing the information at
 # the current estimate subject to the length and the bounds of every area, with the items given fixed. Two blueprints
-# built from a hidden feasible form of 30 items out of a bank of 300, 2,000 persons each. The test of measurekit
-# simulates the same persons with the rules, and expects no test outside the bounds and a root mean square error at most
-# 1.05 times the shadow test's. The final estimate of both is the EAP of this script.
+# built from a hidden feasible form of 30 items out of a bank of 300, 250 persons each, whose answers to every item the
+# fixture holds. The test of measurekit gives the same persons the same answers with the rules, so that the two differ by
+# their selection alone, and expects no test outside the bounds and a root mean square error at most 1.05 times the
+# shadow test's. The final estimate of both is the EAP of this script.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -379,7 +380,7 @@ stopifnot(all(vapply(cases[[which(vapply(cases, function(case) case$name, "") ==
 # ---- The shadow test ----------------------------------------------------------------------------------------------------
 
 SHADOW_BANK <- 300
-SHADOW_PERSONS <- 2000
+SHADOW_PERSONS <- 250
 SHADOW_LENGTH <- 30
 
 # A blueprint of facets, each with levels in the given shares, from a hidden feasible form of 30 items drawn from a bank of
@@ -441,12 +442,12 @@ shadow_blueprint <- function(name, facets, margin, seed) {
     list(id = item_id(i), a = shadow_bank[i, "a"], b = shadow_bank[i, "b"], c = shadow_bank[i, "c"], d = 1,
          contentAreas = I(areas[i, ]))
   }), constraints = lapply(seq_len(nrow(constraints)), function(k) as.list(constraints[k, ])),
-  length = SHADOW_LENGTH, thetas = I(thetas), shadow = list(
+  length = SHADOW_LENGTH, thetas = I(thetas), answers = answers, shadow = list(
     rmse = sqrt(mean((estimates[, 1] - thetas)^2)), bias = mean(estimates[, 1] - thetas), outside = outside,
     meanStandardError = mean(estimates[, 2])))
 }
 
-# The two blueprints run in two processes: each takes about five minutes.
+# The two blueprints run in two processes: each takes about 30 s.
 shadow <- parallel::mclapply(
   list(
     list(name = "two facets", facets = list(domain = c(0.3, 0.25, 0.25, 0.2), type = c(0.4, 0.35, 0.25)), seed = SEED + 710),

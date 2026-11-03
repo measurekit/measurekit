@@ -789,7 +789,7 @@ describe("content bounds", () => {
     }
   });
 
-  describe("on persons simulated against the shadow test of mirtCAT", () => {
+  describe("on the persons and answers of the shadow test of mirtCAT", () => {
     for (const blueprint of catBounds.shadowTests) {
       it(`holds every bound of the ${blueprint.name} blueprint with the precision of the shadow test`, () => {
         const pool: PoolItem[] = blueprint.bank.map(({ id, a, b, c, d, contentAreas }) => ({
@@ -804,17 +804,29 @@ describe("content bounds", () => {
           selection: contentBounds(maximumPriorityIndex(maximumInformation, constraints, length), constraints, length),
           stopping: testLength(length),
         });
-        const simulation = simulateAdaptiveTest(test, blueprint.thetas, createRandom(SEED_BOUNDS));
-        expect(simulation.persons).toHaveLength(blueprint.thetas.length);
-        const outside = simulation.persons.filter(({ state }) =>
+        // Each person answers every item as in the shadow test, so that the two differ by their selection alone.
+        const index = new Map(pool.map(({ id }, i) => [id, i]));
+        const random = createRandom(SEED_BOUNDS);
+        const states = blueprint.thetas.map((_, p) => {
+          const answers = defined(blueprint.answers[p]);
+          let state = test.start(random);
+          while (state.next !== null)
+            state = test.answer(state, defined(answers[defined(index.get(state.next))]), random);
+          return state;
+        });
+        const outside = states.filter(({ items }) =>
           constraints.some(({ area, minimum, maximum }) => {
-            const count = countIn(state.items, pool, area);
+            const count = countIn(items, pool, area);
             return count < minimum || count > maximum;
           }),
         );
         expect(outside).toHaveLength(0);
-        expect(simulation.meanLength).toBe(length);
-        expect(simulation.rootMeanSquareError).toBeLessThanOrEqual(1.05 * blueprint.shadow.rmse);
+        expect(states.every(({ items }) => items.length === length)).toBe(true);
+        const squares = states.reduce(
+          (sum, { estimate }, p) => sum + (estimate.theta - defined(blueprint.thetas[p])) ** 2,
+          0,
+        );
+        expect(Math.sqrt(squares / states.length)).toBeLessThanOrEqual(1.05 * blueprint.shadow.rmse);
       });
     }
   });

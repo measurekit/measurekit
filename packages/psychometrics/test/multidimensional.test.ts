@@ -1065,9 +1065,13 @@ describe("MH-RM", () => {
     const options = { model: multidimensionalTwoParameterLogistic, loadings: m2pl.loadings, method: "mhrm" } as const;
 
     it("gives the same calibration for the same seed and another for another seed", () => {
-      const first = calibrateMultidimensional(data, { ...options, seed: 5, standardErrors: "hessian" });
-      expect(calibrateMultidimensional(data, { ...options, seed: 5, standardErrors: "hessian" })).toEqual(first);
-      const other = calibrateMultidimensional(data, { ...options, seed: 6 });
+      // 50 persons and 10 cycles of the last stage: the seed fixes the draws of every stage and of the standard errors.
+      const few = responseMatrix(rows.slice(0, 50), { itemIds: [...m2pl.itemIds] });
+      const short = { ...options, maxIterations: 10 };
+      const first = calibrateMultidimensional(few, { ...short, seed: 5, standardErrors: "hessian" });
+      expect(first.items[0]?.standardErrors).not.toBeNull();
+      expect(calibrateMultidimensional(few, { ...short, seed: 5, standardErrors: "hessian" })).toEqual(first);
+      const other = calibrateMultidimensional(few, { ...short, seed: 6 });
       expect(other.items[0]?.parameters).not.toEqual(first.items[0]?.parameters);
     });
 
