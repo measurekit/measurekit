@@ -28,6 +28,10 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   An exploratory calibration of several dimensions starts from an eigendecomposition of the items' correlations, whose
   time grows as the cube of the items: about 3 minutes at 2,000 items
   ([multidimensional](docs/psychometrics/multidimensional.md#time)).
+  Conditional maximum likelihood, and the Rasch tests that run it, takes time in proportion to the patterns of answered
+  items times about the fourth power of their items: a Newton step takes 0.1 s on complete responses to 100 items, 1.3 s
+  to 200, and 5 s on 2,000 persons with a fifth of 50 items missing at random; bound the items and the patterns of
+  missing responses accepted for it.
 - **Limits.** Tables are sized by the values that occur in the data, not by the highest value, so that a small input
   with one large response costs no more than another of its size. What would grow faster than the input has a limit,
   and passing it throws `DataError`:
@@ -60,6 +64,7 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   | Effects of linear change: item groups × occasions after the first × groups                         | 1,000, as the Rasch comparison's           | [explanatory](docs/psychometrics/explanatory.md)                                                              |
   | Items of the standard errors of a lognormal calibration; parameters of those of the joint model    | 2,000: above, none, or the joint throws    | [response-time](docs/psychometrics/response-time.md)                                                          |
   | Dimensions of a multidimensional calibration, scoring, information or adaptive test                | 100: one item of 1,000 took 11 s           | [multidimensional](docs/psychometrics/multidimensional.md#scoring)                                            |
+  | Items of an unfolding calibration                                                                  | 500: its starts take 5 s, as items cubed   | [irt](docs/psychometrics/irt.md#unfolding-calibration)                                                        |
   | Coefficients of a logistic fit without a ridge, or random θ                                        | 5,000: a dense matrix of 200 MB            | [logistic](docs/knowledge-tracing/logistic.md)                                                                |
   | States of a structure built from prerequisites or clauses                                          | `maxStates`, 10,000                        | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
   | Learning paths; cells of the Jacobian of identifiability                                           | `maxPaths`, 10,000; 1e7                    | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |

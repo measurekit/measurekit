@@ -3026,6 +3026,14 @@ describe("testlets", () => {
     }
   });
 
+  it("rejects a testlet of fixed items that no person answered, whose SD would be 0 / 0", () => {
+    const rows = simulate(5, 100, ITEMS_2PL).map((row) => [...row, null, null]);
+    const fixed = { item5: { a: 1, b: 0, c: 0, d: 1 }, item6: { a: 1.2, b: 0.5, c: 0, d: 1 } };
+    expect(() =>
+      calibrate(responseMatrix(rows), { model: twoParameterLogistic, fixed, testlets: { t: ["item5", "item6"] } }),
+    ).toThrow('Testlet "t" has no response, so the SD of its effect has nothing to be estimated from.');
+  });
+
   it("keeps a testlet's SD finite when the data leave no room for testlet effects", () => {
     const matrix = responseMatrix([
       [1, 1, 0, 1, 0, 1],
@@ -3351,6 +3359,16 @@ describe("calibrateUnfolding", () => {
     const result = calibrate(matrix, { model: generalizedGradedUnfolding, maxIterations: 50 });
     expect(nonFinite(result)).toEqual([]);
     expect(result.items.every((item) => item.parameters.a > 0)).toBe(true);
+  });
+
+  it("rejects more than 500 items, whose starts would take minutes from data of a few kilobytes", () => {
+    // Four persons answer each of 501 items in each of its four categories: a design of 2,004 records.
+    const records = Array.from({ length: 501 }, (_, j) =>
+      Array.from({ length: 4 }, (_, k) => ({ person: `p${4 * j + k}`, item: `i${j}`, response: k })),
+    ).flat();
+    expect(() => calibrateUnfolding(responseRecords(records))).toThrow(
+      "Unfolding calibration takes at most 500 items, as its starts decompose the correlations of every pair of items; found 501.",
+    );
   });
 
   it("rejects invalid options and data, and an item with responses in one category", () => {

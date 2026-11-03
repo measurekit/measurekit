@@ -132,6 +132,14 @@ export const RULES: readonly Rule[] = [
     titles: "many groups",
   },
   {
+    rule: "An unfolding calibration takes at most 500 items, as its starts decompose the correlations of every pair in time that grows with their cube.",
+    file: "packages/psychometrics/src/irt/unfolding-calibration.ts",
+    find: "if (all.itemIds.length > MAX_ITEMS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "more than 500 items",
+  },
+  {
     rule: "A range of theta is at most 10,000 wide, as the scan of modal estimation walks it in steps of 0.25.",
     file: "packages/psychometrics/src/irt/ability.ts",
     find: "if (!(upper - lower <= MAX_RANGE_WIDTH)) {",

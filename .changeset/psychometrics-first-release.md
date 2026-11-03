@@ -169,3 +169,5 @@ multistage cuts is at most 10,000 wide. Groups of calibration are checked in tim
 group named as a property of every object, such as `constructor`, takes no distribution it was not given. The residual
 gain refuses pre scores that are all equal however their mean rounds, the normalized gain of a group comes from the sums
 over its persons, and the reliable change index stays finite where the squares of the standard errors would underflow.
+A testlet that no person answered is refused, as the SD of its effect would be 0 / 0, and an unfolding calibration takes
+at most 500 items, as its starts decompose the correlations of every pair.

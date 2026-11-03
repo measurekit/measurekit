@@ -109,9 +109,9 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * invalid or do not fit its responses, an estimated item lacks responses in a category up to its highest or has more
  * categories than its model allows, estimated items of a model that share parameters, as RSM items share the steps,
  * have different numbers of categories, a group has no person with a response, distributions are estimated without
- * the rectangular rule or without fixed items or a standard normal group, or covariates are not a finite number for each
- * person, come with groups, `latent`, testlets or the standard errors `"cross-product"`, or are collinear, or the person
- * weights are not a positive number for each person.
+ * the rectangular rule or without fixed items or a standard normal group, a testlet has no response, or covariates
+ * are not a finite number for each person, come with groups, `latent`, testlets or the standard errors
+ * `"cross-product"`, or are collinear, or the person weights are not a positive number for each person.
  *
  * @example
  * ```ts

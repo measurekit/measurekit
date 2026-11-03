@@ -13,7 +13,7 @@ import {
   NO_RESPONSES,
   rescaledWeights,
 } from "./responses.js";
-import { type TestletDesign, testletDesign, testletWeights } from "./testlets.js";
+import { checkTestletResponses, type TestletDesign, testletDesign, testletWeights } from "./testlets.js";
 
 /** An item during calibration. */
 export interface ItemState<TParameters> extends ExpectationItem {
@@ -140,6 +140,7 @@ export function setUp<TParameters>(
   const groups = population(options, answered, rule, rectangular, Object.keys(fixed).length > 0, addFree, weights);
   if (design !== null) {
     checkTestletOptions(options);
+    checkTestletResponses(design, tallies);
     testletWeights(design, Float64Array.from(values), rule.nodes);
   }
   return { items, population: groups, design, free, values: Float64Array.from(values) };

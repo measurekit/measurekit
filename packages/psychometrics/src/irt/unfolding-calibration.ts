@@ -56,6 +56,12 @@ export interface UnfoldingCalibration extends Calibration<UnfoldingParameters> {
 
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
+/**
+ * The most items of an unfolding calibration: its starts decompose the correlations of every pair of items by the
+ * Jacobi method, whose time grows with the cube of the items, about 5 seconds at 500 and 40 at 1,000, from data of any
+ * size.
+ */
+const MAX_ITEMS = 500;
 const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
 
 /**
@@ -76,8 +82,8 @@ const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian
  * @param options - The quadrature, standard errors and stopping rules; each option has its default.
  * @returns The items with their parameters of {@link generalizedGradedUnfolding}, the group, the log-likelihood, AIC
  *   and BIC of the persons used, whether the last stage converged, its iterations, and the persons used.
- * @throws `DataError` when the data or an option is invalid, an item has responses in fewer than two categories or none
- * in a category below its highest.
+ * @throws `DataError` when the data or an option is invalid, there are more than 500 items, or an item has responses in
+ * fewer than two categories or none in a category below its highest.
  *
  * @see {@link https://doi.org/10.1177/01466216000241001 | Roberts, Donoghue and Laughlin (2000)}
  * @see {@link https://doi.org/10.1177/014662169602000305 | Roberts and Laughlin (1996)}
@@ -98,6 +104,11 @@ export function calibrateUnfolding(
   // Checks the quadrature before any stage runs.
   quadratureRule(quadrature);
   const all = compressResponses(data);
+  if (all.itemIds.length > MAX_ITEMS) {
+    throw new DataError(
+      `Unfolding calibration takes at most ${MAX_ITEMS} items, as its starts decompose the correlations of every pair of items; found ${all.itemIds.length}.`,
+    );
+  }
   const allTallies = categoryTallies(all);
   const categoryCounts = all.itemIds.map(
     (id, i) => checkCategories(id, generalizedGradedUnfolding, allTallies[i] ?? NO_RESPONSES).length,

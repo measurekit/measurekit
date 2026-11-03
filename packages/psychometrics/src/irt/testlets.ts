@@ -1,5 +1,6 @@
 import { checkRecord, DataError, describe } from "@measurekit/core";
 import { findRoot, type Quadrature } from "../math/internal.js";
+import type { CategoryTally } from "./responses.js";
 
 /** The estimated spread of a testlet's effects. */
 export interface TestletEstimate {
@@ -76,6 +77,21 @@ export function testletDesign(
   const step = (nodes[1] ?? 0) - lowest;
   const sums = Float64Array.from({ length: 2 * nodeCount - 1 }, (_, m) => 2 * lowest + m * step);
   return { testlets: states, testletOf, sums };
+}
+
+/**
+ * Checks that some person answered an item of each testlet, as the SD of its effect is estimated from those responses
+ * alone.
+ *
+ * @param tallies - The responses to each item by category.
+ * @throws `DataError` when no person answered any item of a testlet.
+ */
+export function checkTestletResponses({ testlets }: TestletDesign, tallies: readonly CategoryTally[]): void {
+  for (const { id, items } of testlets) {
+    if (items.every((item) => (tallies[item]?.highest ?? -1) < 0)) {
+      throw new DataError(`Testlet "${id}" has no response, so the SD of its effect has nothing to be estimated from.`);
+    }
+  }
 }
 
 /** Sets each testlet's weights from its σ in `values`: ∝ φ(γ_g / σ) on the nodes, summing to 1. */

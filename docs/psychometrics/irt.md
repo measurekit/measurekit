@@ -398,8 +398,8 @@ Bolt and Fu, 2006), and it works for items of any model. Use it when local depen
 Yen's Q3 ([fit](fit.md#local-dependence)) well above the average for their pairs: ignoring it overstates the information of the
 passage's items and the precision of theta.
 
-`testlets` declares the testlets, `{ passage1: ["q1", "q2", "q3"], passage2: [...] }`, two items or more each; items in
-none are ordinary. Calibration integrates by the bifactor dimension reduction (Gibbons and Hedeker, 1992): at each node
+`testlets` declares the testlets, `{ passage1: ["q1", "q2", "q3"], passage2: [...] }`, two items or more each, some of
+them answered; items in none are ordinary. Calibration integrates by the bifactor dimension reduction (Gibbons and Hedeker, 1992): at each node
 of theta, each testlet contributes Σ_g w_g Π_j P_j(x_j | θ + γ_g), so the quadrature is two-dimensional whatever the
 number of testlets. γ's nodes are those of theta with weights ∝ φ(γ / σ_d), as mirt's `bfactor`; θ + γ falls on a grid
 of 2Q - 1 points, at which each testlet item's probabilities are computed once per iteration. Each σ_d is updated, as a
@@ -632,6 +632,7 @@ any; linking, equating, the Bookmark method, `simulateItems` and the conversions
 
 | `DataError`                                                                 | What to do                                                                            |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| More than 500 items: the starts decompose the correlations of every pair    | Calibrate the items in sets of up to 500 that share anchors, or a sample of them      |
 | An item has responses in fewer than two categories                          | Leave the item out                                                                    |
 | An item has no response in a category below its highest                     | Merge the empty category with a neighbor                                              |
 | An item has no response in a category from a person who agrees with an item | Merge the category with a neighbor: only persons who disagree with every item used it |
@@ -733,6 +734,9 @@ P(x | r) = Π_i e^(-η_(i x_i)) / γ_r(A).
   factor so that long tests stay finite; those with one or two items left out give the gradient and the Hessian.
   Newton's method starts from thresholds of 0, halves a step that lowers the log-likelihood, and stops when no parameter
   changes by more than `tolerance`. The standard errors come from the inverse of the Hessian at the estimates.
+- **Cost.** Each group of persons who answered the same items takes its own functions, two items left out for every pair,
+  so a Newton step takes time in proportion to the groups times about the fourth power of their items: 0.1 s on complete
+  responses to 100 items, 1.3 s to 200, and 5 s on 2,000 persons with a fifth of 50 items missing at random.
 
 | Option          | Default                                                          | Meaning                |
 | --------------- | ---------------------------------------------------------------- | ---------------------- |
