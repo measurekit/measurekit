@@ -40,6 +40,7 @@ import {
   twoParameterLogistic,
 } from "../src/index.js";
 import { compressResponses } from "../src/irt/internal.js";
+import { pearsonMatrix } from "../src/math/internal.js";
 import {
   createChain,
   createCorrelations,
@@ -48,6 +49,7 @@ import {
   type ExpectationItem,
   expectationStep,
   gridLikelihood,
+  itemCorrelations,
   itemMoments,
   latentDistribution,
   latentObservedInformation,
@@ -839,6 +841,24 @@ describe("calibration", () => {
     expect(fit.converged).toBe(false);
     expect(fit.items[0]?.parameters.a[1]).toBe(0);
     expect(fit.items[1]?.parameters.a[1]).not.toBe(0);
+  });
+
+  it("correlates the items of sparse data over their common respondents, as the pairwise correlations of a matrix", () => {
+    const cell = fc.oneof(fc.constant(null), fc.integer({ min: 0, max: 3 }));
+    const rows = fc
+      .integer({ min: 2, max: 7 })
+      .chain((items) =>
+        fc.array(fc.array(cell, { minLength: items, maxLength: items }), { minLength: 1, maxLength: 30 }),
+      );
+    fc.assert(
+      fc.property(rows, (responses) => {
+        const columns = Array.from(defined(responses[0]).keys(), (j) =>
+          Float64Array.from(responses, (row) => row[j] ?? Number.NaN),
+        );
+        const dense = pearsonMatrix(columns).map((value) => (Number.isNaN(value) ? 0 : value));
+        expect(itemCorrelations(compressResponses(responseMatrix(responses)))).toEqual(dense);
+      }),
+    );
   });
 
   it("names the dimensions of a confirmatory model in order of first appearance among the items", () => {

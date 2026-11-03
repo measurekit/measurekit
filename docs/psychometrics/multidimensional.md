@@ -428,6 +428,12 @@ and 8 s, on 60 dimensions 300 MB and 45 s. Use EM up to three dimensions, where 
 faster. The exploratory model of a weak second dimension converges slowly with EM; `maxIterations` bounds it.
 Calibration runs synchronously: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
 
+An exploratory model starts from the leading eigenvectors of the items' correlations, which the cyclic Jacobi method
+finds with all the others, in time that grows as the cube of the items: 3 minutes at 2,000 items, where base R's
+`eigen` takes a second. The correlations take the responses to each pair of items: 20 s for 1,000 persons who answered
+all 2,000, and 0.2 s for 20,000 persons who answered 2 of them each. mirt's start, which smooths the correlations by
+eigendecompositions until none of their eigenvalues is negative, took more than 20 minutes on the first of these.
+
 ## Bifactor and two-tier models
 
 `calibrateBifactor(data, options)` calibrates models in which every item loads on the primary dimensions, one for a
