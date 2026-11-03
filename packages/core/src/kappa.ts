@@ -32,12 +32,14 @@ export function kappaOfPairs(
       ? countInTables(first, second, lowest, highest, agreement)
       : countInMaps(first, second, agreement);
   const range = highest - lowest;
+  // Each category as its place from 0 to 1 over the range of both lists, the distance that the weights take.
+  const place = (category: number): number => (category - lowest) / range;
   const chance =
     weights === "none" || range === 0
       ? exactChance(firstTally, secondTally, n)
       : weights === "linear"
-        ? linearChance(positions(firstTally, lowest, range), positions(secondTally, lowest, range), n)
-        : quadraticChance(positions(firstTally, lowest, range), positions(secondTally, lowest, range), n);
+        ? linearChance(firstTally, secondTally, place, n)
+        : quadraticChance(firstTally, secondTally, place, n);
   return chance < 1 ? (observed / n - chance) / (1 - chance) : null;
 }
 
@@ -47,58 +49,48 @@ export function kappaOfPairs(
 /** Returns the chance agreement without weights: Σ f_c s_c / n² over the categories of both lists, by a merge. */
 function exactChance(first: Tally, second: Tally, n: number): number {
   let sum = 0;
-  for (let a = 0, b = 0; a < first.categories.length && b < second.categories.length; ) {
-    const x = first.categories[a] ?? 0;
-    const y = second.categories[b] ?? 0;
-    if (x === y) sum += (first.counts[a++] ?? 0) * (second.counts[b++] ?? 0);
-    else if (x < y) a++;
-    else b++;
+  let b = 0;
+  for (const { category, count } of first) {
+    while ((second[b]?.category ?? Number.POSITIVE_INFINITY) < category) b++;
+    const match = second[b];
+    if (match?.category === category) sum += count * match.count;
   }
   return sum / (n * n);
 }
 
-/** A list's categories as places from 0 to 1 over the range of both lists, with their counts. */
-interface Places {
-  readonly places: Float64Array;
-  readonly counts: Float64Array;
-}
-
-function positions({ categories, counts }: Tally, lowest: number, range: number): Places {
-  return { places: categories.map((category) => (category - lowest) / range), counts };
-}
-
 /**
- * Returns the chance agreement under the weights 1 - |u - v|: 1 - Σ_a f_a D(u_a) / n² with D(u) = Σ_b s_b |u - v_b|,
- * which the places in ascending order give by the counts and sums of the places of the second list below u.
+ * Returns the chance agreement under the weights 1 - |u - v| of places u and v: 1 - Σ_a f_a D(u_a) / n² with
+ * D(u) = Σ_b s_b |u - v_b|, which the categories in ascending order give by the counts and sums of the places of the
+ * second list's categories up to u's.
  */
-function linearChance(first: Places, second: Places, n: number): number {
+function linearChance(first: Tally, second: Tally, place: (category: number) => number, n: number): number {
   let total = 0;
-  for (let b = 0; b < second.places.length; b++) total += (second.counts[b] ?? 0) * (second.places[b] ?? 0);
+  for (const { category, count } of second) total += count * place(category);
   let countBelow = 0;
   let sumBelow = 0;
   let distance = 0;
-  for (let a = 0, b = 0; a < first.places.length; a++) {
-    const u = first.places[a] ?? 0;
-    for (; b < second.places.length && (second.places[b] ?? 0) <= u; b++) {
-      countBelow += second.counts[b] ?? 0;
-      sumBelow += (second.counts[b] ?? 0) * (second.places[b] ?? 0);
+  let b = 0;
+  for (const { category, count } of first) {
+    for (let next = second[b]; next !== undefined && next.category <= category; next = second[++b]) {
+      countBelow += next.count;
+      sumBelow += next.count * place(next.category);
     }
-    const away = u * countBelow - sumBelow + (total - sumBelow) - u * (n - countBelow);
-    distance += (first.counts[a] ?? 0) * away;
+    const u = place(category);
+    distance += count * (u * countBelow - sumBelow + (total - sumBelow) - u * (n - countBelow));
   }
   return 1 - distance / (n * n);
 }
 
 /**
- * Returns the chance agreement under the weights 1 - (u - v)²: 1 - E[(U - V)²] for independent U and V of the two
- * lists, Var U + Var V + (E U - E V)², each moment about its mean so that no large squares cancel.
+ * Returns the chance agreement under the weights 1 - (u - v)² of places u and v: 1 - E[(U - V)²] for independent U
+ * and V of the two lists, Var U + Var V + (E U - E V)², each moment about its mean so that no large squares cancel.
  */
-function quadraticChance(first: Places, second: Places, n: number): number {
-  const moments = ({ places, counts }: Places): { mean: number; variance: number } => {
+function quadraticChance(first: Tally, second: Tally, place: (category: number) => number, n: number): number {
+  const moments = (tally: Tally): { readonly mean: number; readonly variance: number } => {
     let mean = 0;
-    for (let k = 0; k < places.length; k++) mean += ((counts[k] ?? 0) * (places[k] ?? 0)) / n;
+    for (const { category, count } of tally) mean += (count * place(category)) / n;
     let variance = 0;
-    for (let k = 0; k < places.length; k++) variance += ((counts[k] ?? 0) * ((places[k] ?? 0) - mean) ** 2) / n;
+    for (const { category, count } of tally) variance += (count * (place(category) - mean) ** 2) / n;
     return { mean, variance };
   };
   const x = moments(first);
@@ -106,11 +98,8 @@ function quadraticChance(first: Places, second: Places, n: number): number {
   return 1 - (x.variance + y.variance + (x.mean - y.mean) ** 2);
 }
 
-/** The categories that occur in a list, ascending, with the number of times each occurs. */
-interface Tally {
-  readonly categories: Float64Array;
-  readonly counts: Float64Array;
-}
+/** The categories that occur in a list, ascending, each with the number of times it occurs. */
+type Tally = readonly { readonly category: number; readonly count: number }[];
 
 /** The observed agreement of the pairs and the tally of each list. */
 interface PairCounts {
@@ -161,23 +150,16 @@ function countInMaps(
 
 /** Returns the categories of a table of counts from `lowest` that occur, with their counts. */
 function tableTally(counts: Float64Array, lowest: number): Tally {
-  const categories: number[] = [];
-  const occurring: number[] = [];
+  const tally: { category: number; count: number }[] = [];
   counts.forEach((count, at) => {
-    if (count === 0) return;
-    categories.push(lowest + at);
-    occurring.push(count);
+    if (count > 0) tally.push({ category: lowest + at, count });
   });
-  return { categories: Float64Array.from(categories), counts: Float64Array.from(occurring) };
+  return tally;
 }
 
 /** Returns the categories of a map of counts, ascending, with their counts. */
 function mapTally(counts: ReadonlyMap<number, number>): Tally {
-  const sorted = [...counts.entries()].sort(([x], [y]) => x - y);
-  return {
-    categories: Float64Array.from(sorted, ([category]) => category),
-    counts: Float64Array.from(sorted, ([, count]) => count),
-  };
+  return [...counts.entries()].sort(([x], [y]) => x - y).map(([category, count]) => ({ category, count }));
 }
 
 /** Returns the lowest and the highest category of both lists. */
