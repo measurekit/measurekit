@@ -505,34 +505,34 @@ library holds only what that name needs: `cronbachAlpha` from `@measurekit/psych
 
 | Entry point                                  | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own                          |
 | -------------------------------------------- | ---------------: | -----------: | --------------------------------------------------------- |
-| `@measurekit/core`                           |           13,532 |        5,560 | nothing                                                   |
-| `@measurekit/psychometrics`                  |          534,871 |      178,379 | every module of the package, and core                     |
+| `@measurekit/core`                           |           13,578 |        5,571 | nothing                                                   |
+| `@measurekit/psychometrics`                  |          534,711 |      178,334 | every module of the package, and core                     |
 | `@measurekit/psychometrics/cat`              |           72,752 |       24,236 | core, cdm, checks, data, irt, math, multidimensional, sim |
 | `@measurekit/psychometrics/cdm`              |           43,762 |       15,959 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/change`           |            5,451 |        2,336 | core, checks                                              |
 | `@measurekit/psychometrics/ctt`              |           22,043 |        8,382 | core, data, math                                          |
 | `@measurekit/psychometrics/data`             |            6,694 |        2,354 | core                                                      |
-| `@measurekit/psychometrics/dif`              |           87,889 |       30,271 | core, data, equating, irt, math                           |
+| `@measurekit/psychometrics/dif`              |           87,893 |       30,270 | core, data, equating, irt, math                           |
 | `@measurekit/psychometrics/dimensionality`   |           38,604 |       14,301 | core, data, math                                          |
-| `@measurekit/psychometrics/equating`         |           61,269 |       20,862 | core, checks, irt, math                                   |
-| `@measurekit/psychometrics/explanatory`      |           50,540 |       17,623 | core, data, irt, math                                     |
-| `@measurekit/psychometrics/fit`              |           67,711 |       23,657 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/equating`         |           61,294 |       20,877 | core, checks, irt, math                                   |
+| `@measurekit/psychometrics/explanatory`      |           50,565 |       17,622 | core, data, irt, math                                     |
+| `@measurekit/psychometrics/fit`              |           67,736 |       23,672 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/generalizability` |           14,727 |        5,484 | core, data, math                                          |
-| `@measurekit/psychometrics/irt`              |           84,405 |       28,459 | core, checks, data, math                                  |
+| `@measurekit/psychometrics/irt`              |           84,409 |       28,462 | core, checks, data, math                                  |
 | `@measurekit/psychometrics/mokken`           |           32,971 |       12,182 | core, data, math                                          |
-| `@measurekit/psychometrics/multidimensional` |          135,594 |       44,062 | core, checks, data, irt, math                             |
-| `@measurekit/psychometrics/parameterization` |           18,230 |        5,954 | core, irt, multidimensional                               |
-| `@measurekit/psychometrics/rater`            |           54,632 |       18,780 | core, checks, data, fit, irt, math                        |
-| `@measurekit/psychometrics/response-time`    |           57,675 |       19,390 | core, checks, data, irt, math                             |
-| `@measurekit/psychometrics/scaling`          |           31,466 |       11,646 | core, checks, equating, irt, math                         |
-| `@measurekit/psychometrics/sim`              |           20,741 |        6,977 | core, cdm, checks, data, irt, multidimensional            |
-| `@measurekit/psychometrics/standard-setting` |           33,290 |       12,336 | core, checks, equating, irt, math                         |
-| `@measurekit/knowledge-tracing`              |          139,255 |       47,112 | every module of the package, and core                     |
+| `@measurekit/psychometrics/multidimensional` |          135,573 |       44,050 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/parameterization` |           18,255 |        5,958 | core, irt, multidimensional                               |
+| `@measurekit/psychometrics/rater`            |           54,657 |       18,784 | core, checks, data, fit, irt, math                        |
+| `@measurekit/psychometrics/response-time`    |           57,736 |       19,418 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/scaling`          |           31,492 |       11,659 | core, checks, equating, irt, math                         |
+| `@measurekit/psychometrics/sim`              |           20,767 |        6,982 | core, cdm, checks, data, irt, multidimensional            |
+| `@measurekit/psychometrics/standard-setting` |           33,321 |       12,350 | core, checks, equating, irt, math                         |
+| `@measurekit/knowledge-tracing`              |          139,280 |       47,118 | every module of the package, and core                     |
 | `@measurekit/knowledge-tracing/bkt`          |           23,282 |        8,302 | core, data, math                                          |
 | `@measurekit/knowledge-tracing/data`         |            5,818 |        2,297 | core, math                                                |
 | `@measurekit/knowledge-tracing/elo`          |            6,638 |        2,326 | core, data, math                                          |
 | `@measurekit/knowledge-tracing/evaluate`     |           17,192 |        6,294 | core, data, math, model                                   |
-| `@measurekit/knowledge-tracing/irt`          |           13,884 |        5,432 | core, data, math                                          |
+| `@measurekit/knowledge-tracing/irt`          |           13,907 |        5,436 | core, data, math                                          |
 | `@measurekit/knowledge-tracing/kst`          |           44,310 |       15,692 | core, data, math                                          |
 | `@measurekit/knowledge-tracing/logistic`     |           48,974 |       16,162 | core, data, math, model                                   |
 | `@measurekit/knowledge-tracing/practice`     |            6,222 |        2,323 | core, data, model                                         |
