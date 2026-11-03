@@ -1498,5 +1498,6 @@ Fixtures store 17 significant digits, so they reproduce R's doubles exactly.
 [validation/README.md](../../validation/README.md) lists the scripts and the R packages they need. Update the versions
 above when they change. A regeneration writes every fixture again byte for byte, except two kinds of values that depend
 on the load of the machine: the seconds that `longitudinal-recovery.json` records for each fit of mirt, and the minimax
-gaps of `form-assembly.json`, which highs finds within a time limit. A new statistic needs a reference in an R script, a fixture, a test that loads it, and a row in
+gaps of `form-assembly.json`, which highs finds within a time limit. The scripts run with one BLAS thread, as [validation/README.md](../../validation/README.md) says, so that
+sums keep their order. A new statistic needs a reference in an R script, a fixture, a test that loads it, and a row in
 the tables above.

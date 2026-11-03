@@ -1,6 +1,9 @@
 # validation
 
-Scripts that write the reference fixtures in `packages/<package>/test/fixtures/`. Run them from the repository root.
+Scripts that write the reference fixtures in `packages/<package>/test/fixtures/`. Run them from the repository root,
+with one BLAS thread (`OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1`): a BLAS of several threads sums in an order that
+changes from run to run, which moves the last digits of some fixtures, such as the exploratory cases of
+`multidimensional.R` and TAM's estimates in `longitudinal.R`.
 References, datasets, versions and tolerances are listed in
 [psychometrics](../docs/psychometrics/validation.md) and [knowledge tracing](../docs/knowledge-tracing/validation.md).
 
