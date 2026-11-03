@@ -195,7 +195,8 @@ interface DesignMargins {
  *   the moments, and whether every step converged.
  * @throws `DataError` when the data or the options are invalid: a distribution as the equating and presmoothing
  * functions refuse it, a degree out of its range, fewer than two persons or scores without variance, tables of a design
- * that do not fit together, or a centered log-linear basis that is singular.
+ * that do not fit together, a centered log-linear basis that is singular, or bandwidths so small that an equated score
+ * or its standard error is not finite.
  * @see {@link https://doi.org/10.1007/b97446 | von Davier, Holland and Thayer (2004)}
  * @see {@link https://doi.org/10.1007/978-3-319-51824-4 | González and Wiberg (2017)}
  */
@@ -217,7 +218,7 @@ export function kernelEquating(data: KernelData, options: KernelEquatingOptions 
     const from = choose(margins.from, "from", bandwidths.from);
     const to = choose(margins.to, "to", bandwidths.to);
     return {
-      ...singleLink(margins, from.continuized, to.continuized),
+      ...checkFinite(singleLink(margins, from.continuized, to.continuized)),
       bandwidths: { from: from.bandwidth, to: to.bandwidth },
       converged: tablesConverged && from.converged && to.converged,
     };
@@ -229,9 +230,11 @@ export function kernelEquating(data: KernelData, options: KernelEquatingOptions 
     choose(margins.to, "to", bandwidths.to),
   ];
   return {
-    ...chainedLink(
-      margins,
-      chain.map(({ continuized }) => continuized),
+    ...checkFinite(
+      chainedLink(
+        margins,
+        chain.map(({ continuized }) => continuized),
+      ),
     ),
     bandwidths: {
       from: chain[0].bandwidth,
@@ -439,6 +442,22 @@ function chainedLink(margins: DesignMargins, chain: readonly Continuized[]): Lin
     anchorPercentRelativeError: percentRelativeError(anchorToForm, anchors[1].probabilities, margins.to.probabilities),
     errorVectors,
   };
+}
+
+/**
+ * Returns a link whose equated scores and standard errors are finite.
+ *
+ * @throws `DataError` when one is not, as when a bandwidth so small that the density vanishes between the scores leaves
+ * a standard error without a density to divide by.
+ */
+function checkFinite(link: Link): Link {
+  const score = [...link.equated, ...link.standardErrors].findIndex((value) => !Number.isFinite(value));
+  if (score >= 0) {
+    throw new DataError(
+      "Kernel equating gives a value that is not finite with these bandwidths: the continuized density vanishes at an equated score. Use larger bandwidths, or omit them to minimize the penalty.",
+    );
+  }
+  return link;
 }
 
 /** Starts and adds to error vectors, with one entry for each column of C of each table, in the order of the tables. */

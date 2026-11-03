@@ -44,7 +44,8 @@ export function continuize(probabilities: Float64Array, moments: [number, number
     mean,
     variance,
     bandwidth,
-    shrinkage: Math.sqrt(variance / (variance + bandwidth * bandwidth)),
+    // σ / hypot(σ, h) is √(σ² / (σ² + h²)) without the square of a large bandwidth overflowing.
+    shrinkage: Math.sqrt(variance) / Math.hypot(Math.sqrt(variance), bandwidth),
   };
 }
 

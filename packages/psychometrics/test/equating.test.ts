@@ -1249,6 +1249,19 @@ describe("kernelEquating", () => {
     expect(fixed.bandwidths).not.toHaveProperty("fromAnchor");
   });
 
+  it("takes any large bandwidth as the linear limit, and refuses one so small that the density vanishes", () => {
+    const linear = kernelEquating(kernelData(groups), { linear: true });
+    // The square of 1e200 overflows; the shrinkage √(σ² / (σ² + h²)) is taken without it.
+    const huge = kernelEquating(kernelData(groups), { bandwidths: { from: 1e200, to: 1e200 } });
+    huge.equated.forEach((score, x) => {
+      expectClose(score, defined(linear.equated[x]), 1e-5, `score ${x}`);
+      expectClose(defined(huge.standardErrors[x]), defined(linear.standardErrors[x]), 1e-5, `error ${x}`);
+    });
+    expect(() => kernelEquating(kernelData(groups), { bandwidths: { from: 1e-300, to: 1e-300 } })).toThrow(
+      "Kernel equating gives a value that is not finite with these bandwidths",
+    );
+  });
+
   it("reports a bandwidth whose search stops at its upper bound as not converged", () => {
     // A binomial distribution of five scores, presmoothed at degree 2, is so near the normal that the penalty keeps
     // falling as the bandwidth grows.

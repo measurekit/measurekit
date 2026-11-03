@@ -379,7 +379,9 @@ design composes the two links.
 
 A bandwidth minimizes the penalty PEN₁(h) + K PEN₂(h) over (0, 4] by Brent's search, as kequate: PEN₁ = Σ_j (r_j -
 f_h(x_j))² compares the density with the probabilities at the scores, and PEN₂ counts the scores whose density turns
-between x_j - 1/4 and x_j + 1/4. With K > 0 the second search starts above the minimum of PEN₁.
+between x_j - 1/4 and x_j + 1/4. With K > 0 the second search starts above the minimum of PEN₁. A bandwidth given may be
+as large as a number goes, which is linear equating; one so small that the density vanishes at an equated score leaves
+its standard error without a density to divide by, and throws a `DataError`.
 
 | Field                        | Meaning                                                                                                                                                       |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
