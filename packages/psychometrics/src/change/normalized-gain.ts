@@ -1,4 +1,4 @@
-import { checkFinite, checkOptions, DataError, mean } from "@measurekit/core";
+import { checkFinite, checkOptions, DataError } from "@measurekit/core";
 import { checkPairedScores } from "./paired-scores.js";
 
 /** Options of {@link normalizedGain}. */
@@ -55,12 +55,18 @@ export function normalizedGain(
     checkAtMost(score, maximum, `The pre score of person ${person + 1}`);
     checkAtMost(post[person] ?? 0, maximum, `The post score of person ${person + 1}`);
   });
-  const persons = pre.map((score, person) =>
-    score === maximum ? null : ((post[person] ?? 0) - score) / (maximum - score),
-  );
-  const preMean = mean(pre);
-  const group = persons.every((gain) => gain === null) ? null : (mean(post) - preMean) / (maximum - preMean);
-  return { group, persons };
+  let gained = 0;
+  let possible = 0;
+  const persons = pre.map((score, person) => {
+    const change = (post[person] ?? 0) - score;
+    gained += change;
+    possible += maximum - score;
+    return score === maximum ? null : change / (maximum - score);
+  });
+  // (mean post - mean pre) / (maximum - mean pre) as sums over the persons: each maximum - pre is above 0 unless the
+  // person started at the maximum, so the denominator is 0 only when everyone did, where the mean of pre scores just
+  // below the maximum can round to it and leave 0 / 0.
+  return { group: possible > 0 ? gained / possible : null, persons };
 }
 
 /** Checks that a score does not exceed the maximum. */

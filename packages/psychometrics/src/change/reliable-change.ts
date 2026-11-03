@@ -69,7 +69,8 @@ export function reliableChange(
   }
   const critical = criticalValue(options);
   const standardErrorOfMeasurement = input.sd * Math.sqrt(1 - input.reliability);
-  return classify(post - pre, Math.sqrt(2 * standardErrorOfMeasurement ** 2), critical);
+  // √(SEM² + SEM²) by hypot, which neither underflows to 0 nor overflows where the squares would.
+  return classify(post - pre, Math.hypot(standardErrorOfMeasurement, standardErrorOfMeasurement), critical);
 }
 
 /**
@@ -99,11 +100,7 @@ export function reliableChangeFromTheta(
   checkEstimate(before, "before");
   checkEstimate(after, "after");
   const critical = criticalValue(options);
-  return classify(
-    after.theta - before.theta,
-    Math.sqrt(before.standardError ** 2 + after.standardError ** 2),
-    critical,
-  );
+  return classify(after.theta - before.theta, Math.hypot(before.standardError, after.standardError), critical);
 }
 
 /** Checks an ability estimate. */

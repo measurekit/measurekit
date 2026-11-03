@@ -119,6 +119,10 @@ describe("residualGain", () => {
     expect(() => residualGain([3, 3, 3], [1, 2, 3])).toThrow(
       new DataError("The pre scores are all 3, so the post scores cannot be regressed on them."),
     );
+    // The mean of three 0.1s is not 0.1, so their squares about it are a rounding error, not 0.
+    expect(() => residualGain([0.1, 0.1, 0.1], [1, 2, 4.1])).toThrow(
+      new DataError("The pre scores are all 0.1, so the post scores cannot be regressed on them."),
+    );
     expect(() => residualGain([3], [1])).toThrow(new DataError("The scores need at least 2 persons, found 1."));
     expect(() => residualGain(JSON.parse('"abc"'), [1, 2])).toThrow(
       new DataError('The pre scores must be an array of scores, found "abc".'),
@@ -155,6 +159,15 @@ describe("normalizedGain", () => {
 
   it("is 1 for a person who reaches the maximum and negative for a decline", () => {
     expect(normalizedGain([20, 20], [50, 10], { maximum: 50 }).persons).toEqual([1, -1 / 3]);
+  });
+
+  it("gives the group's gain where the mean of pre scores just below the maximum rounds to it", () => {
+    // The pre scores' mean, (4 - 2⁻⁵³) / 4, rounds to 1: the gain of the means would be 0 / 0.
+    const nearly = 1 - 2 ** -53;
+    expect(normalizedGain([1, 1, 1, nearly], [1, 1, 1, 1], { maximum: 1 })).toEqual({
+      group: 1,
+      persons: [null, null, null, 1],
+    });
   });
 
   it("has no gain for a group that starts at the maximum", () => {
@@ -291,6 +304,12 @@ describe("reliableChange", () => {
     expect(reliableChange(12, 21, TEST)).toEqual(reliableChange(12, 21, TEST, { level: 0.95 }));
   });
 
+  it("gives a finite index for standard deviations whose squares underflow or overflow", () => {
+    expect(reliableChange(5, 5, { sd: 1e-200, reliability: 0.5 })).toEqual({ index: 0, classification: "unchanged" });
+    expectClose(reliableChange(0, 1e-200, { sd: 1e-200, reliability: 0.5 }).index, 1, 1e-14);
+    expectClose(reliableChange(0, 1e200, { sd: 1e200, reliability: 0.5 }).index, 1, 1e-14);
+  });
+
   it("uses the whole standard deviation when the test is not reliable at all", () => {
     expectClose(reliableChange(0, 5, { sd: 2, reliability: 0 }).index, 5 / Math.sqrt(2 * 4), 1e-15);
   });
@@ -349,6 +368,13 @@ describe("reliableChangeFromTheta", () => {
       index: -result.index,
       classification: "declined",
     });
+  });
+
+  it("gives a finite index for standard errors whose squares underflow or overflow", () => {
+    const tiny = { theta: 1, standardError: 1e-200 };
+    expect(reliableChangeFromTheta(tiny, tiny)).toEqual({ index: 0, classification: "unchanged" });
+    const huge = { theta: 0, standardError: 1e200 };
+    expectClose(reliableChangeFromTheta(huge, { theta: Math.SQRT2 * 1e200, standardError: 1e200 }).index, 1, 1e-14);
   });
 
   it("reads only the theta and the standard error of an estimate", () => {

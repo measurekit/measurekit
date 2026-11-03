@@ -22,6 +22,12 @@ import { checkPairedScores } from "./paired-scores.js";
  */
 export function residualGain(pre: readonly number[], post: readonly number[]): number[] {
   checkPairedScores(pre, post, 2);
+  // Equal scores are tested as equal: their mean need not be one of them, as that of three 0.1s is not, and the sum of
+  // squares about it is then a rounding error that would give the regression a slope.
+  const first = pre[0];
+  if (pre.every((score) => score === first)) {
+    throw new DataError(`The pre scores are all ${first}, so the post scores cannot be regressed on them.`);
+  }
   const preMean = mean(pre);
   const postMean = mean(post);
   let preSquares = 0;
@@ -31,9 +37,6 @@ export function residualGain(pre: readonly number[], post: readonly number[]): n
     preSquares += centered * centered;
     products += centered * ((post[person] ?? 0) - postMean);
   });
-  if (preSquares === 0) {
-    throw new DataError(`The pre scores are all ${preMean}, so the post scores cannot be regressed on them.`);
-  }
   const slope = products / preSquares;
   return post.map((score, person) => score - postMean - slope * ((pre[person] ?? 0) - preMean));
 }
