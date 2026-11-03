@@ -148,4 +148,4 @@ Multidimensional scoring has maximum likelihood and Warm's weighted likelihood e
 dimension, and an item's MDISC and MDIFF, `multidimensionalDiscrimination` and `multidimensionalDifficulty`. A
 calibration that estimates the correlations of its dimensions, of a group, of all persons or of a two-tier model's
 primary dimensions, needs more persons than those dimensions. An exploratory start correlates the items of sparse data
-over each pair's common respondents.
+over each pair's common respondents. The posterior mean keeps the 8 grids asked for last, within 64 MiB of nodes.

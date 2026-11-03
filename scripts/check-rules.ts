@@ -484,6 +484,14 @@ export const RULES: readonly Rule[] = [
     titles: "needs more persons than correlated dimensions",
   },
   {
+    rule: "The grids that the posterior mean keeps for reuse are the 8 asked for last, within 2^23 coordinates, so that grids of many sizes do not accumulate.",
+    file: "packages/psychometrics/src/multidimensional/scoring.ts",
+    find: "STANDARD_GRIDS.delete(oldest);",
+    replace: "continue;",
+    test: "packages/psychometrics/test/multidimensional.test.ts",
+    titles: "keeps the 8 grids asked for last",
+  },
+  {
     rule: "A person with a missing response has no count of Guttman errors, and the counts of the others stay with their rows.",
     file: "packages/psychometrics/src/mokken/guttman-errors.ts",
     find: "(row.includes(null) ? null : (totals[complete++] ?? 0))",

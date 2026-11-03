@@ -621,11 +621,12 @@ missing. An estimate has `theta`, `standardErrors` and `covariance`.
 | `range`  | MLE, WLE | `[-6, 6]`                                                   | The lowest and the highest theta in every dimension, as for `maximumLikelihoodEstimate`              |
 
 The covariance of the prior is symmetric and positive definite. EAP weights the grid nodes by the prior density times
-the likelihood. A grid of more than 10⁶ nodes throws, naming MAP, which works in any number of dimensions: a scan of 5
-points per dimension (3 above three dimensions) from -3 to 3 prior standard deviations, or above five dimensions the
-prior mean and 3 prior standard deviations either side of it on each axis, picks the start of Fisher scoring with halved
-steps, which runs to a gradient below 1e-10. Without responses the estimate is the prior, also without
-items, when a `prior` gives the dimensions: an estimate from no items needs one.
+the likelihood, and keeps the 8 grids asked for last for reuse, within 64 MiB of nodes. A grid of more than 10⁶ nodes
+throws, naming MAP, which works in any number of dimensions: a scan of 5 points per dimension (3 above three dimensions)
+from -3 to 3 prior standard deviations, or above five dimensions the prior mean and 3 prior standard deviations either
+side of it on each axis, picks the start of Fisher scoring with halved steps, which runs to a gradient below 1e-10.
+Without responses the estimate is the prior, also without items, when a `prior` gives the dimensions: an estimate from
+no items needs one.
 
 The MLE and the WLE need a response, and answered items whose slopes span the dimensions: along a dimension they leave
 out the likelihood is flat, and they throw `DataError`. The MLE starts from the point of the largest likelihood on the

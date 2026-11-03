@@ -67,8 +67,19 @@ export interface MultidimensionalPersonEstimate {
   readonly estimate: MultidimensionalEstimate | null;
 }
 
-/** The grids of the standard rule computed so far, by dimensions and points: scoring asks for one per person. */
-const STANDARD_GRIDS = new Map<string, Grid>();
+/** The most grids kept for reuse, the latest asked for, so that grids of many sizes do not accumulate. */
+const MAX_CACHED_GRIDS = 8;
+/**
+ * The most coordinates of nodes that the grids kept for reuse hold, 8 bytes each: 64 MiB. The grid asked for last stays
+ * whatever its size, at most 80 MB within the limit of nodes.
+ */
+const MAX_CACHED_COORDINATES = 2 ** 23;
+
+/**
+ * The grids of the standard rule computed lately, by dimensions and points, in the order they were last asked for:
+ * scoring asks for one per person.
+ */
+export const STANDARD_GRIDS = new Map<string, Grid>();
 
 /**
  * The most log probabilities of items over a grid that the posterior means of the persons of one call keep, 8 bytes
@@ -371,12 +382,19 @@ export function multidimensionalEstimates(
   return estimatePersons(data, items, indexMultidimensionalItems, posteriorMeans ? sharedPosteriorMean() : estimator);
 }
 
+/** Returns the grid of the standard rule, kept for reuse with the grids asked for last within the limits above. */
 function standardGrid(dimensions: number, points: number): Grid {
   const key = `${dimensions} ${points}`;
-  let grid = STANDARD_GRIDS.get(key);
-  if (grid === undefined) {
-    grid = productGrid(dimensions, points);
-    STANDARD_GRIDS.set(key, grid);
+  const grid = STANDARD_GRIDS.get(key) ?? productGrid(dimensions, points);
+  // Moved to the end of the order, as the latest asked for; the earliest asked for leave past the limits.
+  STANDARD_GRIDS.delete(key);
+  STANDARD_GRIDS.set(key, grid);
+  let coordinates = 0;
+  for (const cached of STANDARD_GRIDS.values()) coordinates += cached.nodes.length;
+  for (const [oldest, cached] of STANDARD_GRIDS) {
+    if (oldest === key || (STANDARD_GRIDS.size <= MAX_CACHED_GRIDS && coordinates <= MAX_CACHED_COORDINATES)) break;
+    STANDARD_GRIDS.delete(oldest);
+    coordinates -= cached.nodes.length;
   }
   return grid;
 }

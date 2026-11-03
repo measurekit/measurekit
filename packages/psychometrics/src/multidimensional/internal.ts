@@ -36,5 +36,6 @@ export {
   type MultidimensionalEstimate,
   type MultidimensionalEstimator,
   multidimensionalPosteriorModeEstimate,
+  STANDARD_GRIDS,
 } from "./scoring.js";
 export { itemCorrelations } from "./starting-slopes.js";
