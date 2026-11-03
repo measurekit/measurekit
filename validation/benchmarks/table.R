@@ -36,8 +36,9 @@ milliseconds <- function(x) {
   formatC(x, format = "f", digits = digits, big.mark = ",")
 }
 
-# The medians of the references in r.json and python.json: python.json holds those that R does not time. Copies of r.json
-# from runs that alternate with those of measurekit, r-1.json, r-2.json and so on, give each task the median of their medians.
+# The medians of the references in r.json and the Python files: python.json of benchmarks.py and python-scoring.json of
+# automated-scoring.py hold those that R does not time. Copies of r.json from runs that alternate with those of measurekit,
+# r-1.json, r-2.json and so on, give each task the median of their medians.
 reference_files <- list.files(RESULTS_DIR, pattern = "^r-[0-9]+\\.json$", full.names = TRUE)
 references <- fromJSON(file.path(RESULTS_DIR, "r.json"), simplifyVector = FALSE)
 runs <- lapply(reference_files, fromJSON, simplifyVector = FALSE)
@@ -47,8 +48,8 @@ for (package in names(references)) {
     if (length(medians) > 0) references[[package]][[key]]$median <- median(medians)
   }
 }
-python_file <- file.path(RESULTS_DIR, "python.json")
-if (file.exists(python_file)) {
+for (python_file in file.path(RESULTS_DIR, c("python.json", "python-scoring.json"))) {
+  if (!file.exists(python_file)) next
   timed <- fromJSON(python_file, simplifyVector = FALSE)
   for (package in names(timed)) {
     for (key in names(timed[[package]])) references[[package]][[key]]$median <- timed[[package]][[key]]$median

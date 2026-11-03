@@ -7,11 +7,13 @@ import {
   guttmanErrors,
   invariantItemOrdering,
   monotonicity,
+  personScalability,
   responseMatrix,
   scalability,
   twoWayImputation,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
+import irtFixture from "./fixtures/bench-irt.json" with { type: "json" };
 import fixture from "./fixtures/bench-mokken.json" with { type: "json" };
 import stepsFixture from "./fixtures/bench-mokken-steps.json" with { type: "json" };
 
@@ -29,4 +31,9 @@ test("finds the Guttman errors and the conditional association of the 20 items o
   await benchmark(context, "mokken.guttmanErrors", () => guttmanErrors(matrix));
   await benchmark(context, "mokken.conditionalAssociation", () => conditionalAssociation(matrix));
   await benchmark(context, "mokken.twoWayImputation", () => twoWayImputation(missing, createRandom(1)));
+});
+
+test("finds the normed Guttman errors, U3 and Ht of 2,000 persons on 40 dichotomous items", async (context) => {
+  const binary = responseMatrix(irtFixture.binary.responses, { itemIds: irtFixture.binary.itemIds });
+  await benchmark(context, "mokken.personScalability", () => personScalability(binary));
 });

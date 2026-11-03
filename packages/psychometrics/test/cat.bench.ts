@@ -3,19 +3,35 @@ import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
   adaptiveTest,
+  anyOf,
   assembleForms,
   attributeProfiles,
   calibrateCdm,
+  classificationThreshold,
+  closestDifficulty,
   contentBounds,
   diagnosticAdaptiveTest,
+  discriminationIndex,
+  expectedInformation,
+  expectedPosteriorVariance,
+  type ItemSelectionRule,
+  kullbackLeibler,
+  likelihoodWeightedInformation,
   maximumInformation,
   maximumPriorityIndex,
   multidimensionalAdaptiveTest,
   multidimensionalTwoParameterLogistic,
   multistageCuts,
   type PoolItem,
+  posteriorDiscriminationIndex,
+  posteriorKullbackLeibler,
   posteriorMeanEstimate,
+  posteriorWeightedInformation,
+  progressive,
+  proportional,
   responseMatrix,
+  type StoppingRule,
+  sequentialProbabilityRatio,
   simulateAdaptiveTest,
   simulateDiagnosticTest,
   simulateMultidimensionalAdaptiveTest,
@@ -28,16 +44,19 @@ import { benchmark } from "./budgets.js";
 import fixture from "./fixtures/bench-cat.json" with { type: "json" };
 import boundsFixture from "./fixtures/bench-cat-bounds.json" with { type: "json" };
 import formsFixture from "./fixtures/bench-cat-forms.json" with { type: "json" };
+import rulesFixture from "./fixtures/bench-cat-rules.json" with { type: "json" };
 import cdm from "./fixtures/bench-cdm.json" with { type: "json" };
 
 const SEED = 20261029;
 
+/** The 3PL pool of 500 items of the simulations. */
+const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
+  id: `item${i + 1}`,
+  model: threeParameterLogistic,
+  parameters: { a, b: defined(fixture.pool.b[i]), c: defined(fixture.pool.c[i]), d: 1 },
+}));
+
 test("simulates adaptive tests of 30 items for 200 persons on a pool of 500 3PL items", async (context) => {
-  const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
-    id: `item${i + 1}`,
-    model: threeParameterLogistic,
-    parameters: { a, b: defined(fixture.pool.b[i]), c: defined(fixture.pool.c[i]), d: 1 },
-  }));
   const test = adaptiveTest({
     pool,
     selection: maximumInformation,
@@ -54,14 +73,8 @@ test("simulates adaptive tests of 30 items for 200 persons on a pool of 500 3PL 
 });
 
 test("simulates adaptive tests of 30 items that select testlets, for 200 persons on a pool of 500 3PL items", async (context) => {
-  const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
-    id: `item${i + 1}`,
-    model: threeParameterLogistic,
-    parameters: { a, b: defined(fixture.pool.b[i]), c: defined(fixture.pool.c[i]), d: 1 },
-    ...(fixture.testlets[i] !== null && { testlet: fixture.testlets[i] }),
-  }));
   const test = adaptiveTest({
-    pool,
+    pool: pool.map((item, i) => ({ ...item, ...(fixture.testlets[i] !== null && { testlet: fixture.testlets[i] }) })),
     selection: maximumInformation,
     estimator: posteriorMeanEstimate,
     stopping: testLength(fixture.length),
@@ -76,11 +89,6 @@ test("simulates adaptive tests of 30 items that select testlets, for 200 persons
 });
 
 test("derives the routing cuts of a panel of 1-3-3-3 modules of 20 items from a pool of 500 3PL items", async (context) => {
-  const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
-    id: `item${i + 1}`,
-    model: threeParameterLogistic,
-    parameters: { a, b: defined(fixture.pool.b[i]), c: defined(fixture.pool.c[i]), d: 1 },
-  }));
   const stages = fixture.multistage.stages.map((modules, stage) =>
     modules.map((items, module) => ({
       id: `stage${stage + 1}module${module + 1}`,
@@ -167,4 +175,58 @@ test("assembles 4 forms of 40 items from a pool of 1,000 3PL items in 5 content 
   };
   expect(assembleForms(options)).toHaveLength(forms);
   await benchmark(context, "cat.assembleForms", () => assembleForms(options));
+});
+
+test("selects one item of a test of 30 after 15, by each rule, from a pool of 500 3PL items", async (context) => {
+  const { administered, responses, theta, standardError } = rulesFixture;
+  const eligible = new Uint8Array(pool.length).fill(1);
+  for (const index of administered) eligible[index] = 0;
+  const selection = { pool, administered, responses, estimate: { theta, standardError }, eligible };
+  const scores = new Float64Array(pool.length);
+  const rules: readonly (readonly [Parameters<typeof benchmark>[1], ItemSelectionRule])[] = [
+    ["cat.likelihoodWeightedInformation", likelihoodWeightedInformation],
+    ["cat.posteriorWeightedInformation", posteriorWeightedInformation()],
+    ["cat.expectedInformation", expectedInformation()],
+    ["cat.expectedPosteriorVariance", expectedPosteriorVariance()],
+    ["cat.kullbackLeibler", kullbackLeibler],
+    ["cat.posteriorKullbackLeibler", posteriorKullbackLeibler()],
+    ["cat.discriminationIndex", discriminationIndex],
+    ["cat.posteriorDiscriminationIndex", posteriorDiscriminationIndex()],
+    ["cat.closestDifficulty", closestDifficulty],
+    ["cat.progressive", progressive({ length: fixture.length })],
+    ["cat.proportional", proportional({ length: fixture.length })],
+  ];
+  for (const [name, rule] of rules) {
+    const random = createRandom(SEED);
+    rule.scores({ ...selection, random }, scores);
+    expect(scores.filter((score, index) => eligible[index] === 1 && Number.isFinite(score)).length).toBe(
+      pool.length - administered.length,
+    );
+    await benchmark(context, name, () => rule.scores({ ...selection, random }, scores));
+  }
+});
+
+test("simulates adaptive tests of at most 30 items for 200 persons that stop on a classification at a cut", async (context) => {
+  const classifying = (stopping: StoppingRule) =>
+    adaptiveTest({
+      pool,
+      selection: maximumInformation,
+      estimator: posteriorMeanEstimate,
+      stopping: anyOf(stopping, testLength(fixture.length)),
+    });
+  const interval = classifying(classificationThreshold([0]));
+  const sprt = classifying(sequentialProbabilityRatio([{ lower: -0.3, upper: 0.3 }]));
+  expect(simulateAdaptiveTest(sprt, fixture.thetas, createRandom(SEED)).persons).toHaveLength(fixture.thetas.length);
+  await benchmark(
+    context,
+    "cat.simulateClassification",
+    () => simulateAdaptiveTest(interval, fixture.thetas, createRandom(SEED)),
+    SLOW_OPTIONS,
+  );
+  await benchmark(
+    context,
+    "cat.simulateSprt",
+    () => simulateAdaptiveTest(sprt, fixture.thetas, createRandom(SEED)),
+    SLOW_OPTIONS,
+  );
 });
