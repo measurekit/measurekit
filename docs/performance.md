@@ -106,7 +106,7 @@ xychart-beta horizontal
   title "Psychometrics: sim, standardSetting"
   x-axis ["simulateResponses", "livingstonLewis"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.37, 1.3]
+  bar [0.37, 0.81]
   line [1, 1]
 ```
 
@@ -275,7 +275,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Conversion of 2PL items to mirt's slope-intercept form                                                           | 10,000 items                                                                                                 |            1.16 | none                                                                                                      |                |          |
 | Conversion of 2PL items to mirt's IRT form                                                                       | 10,000 items                                                                                                 |            1.21 | none                                                                                                      |                |          |
 | Simulation of the abilities of persons and their responses to 2PL items                                          | 2,000 persons, 40 items                                                                                      |            2.21 | mirt 1.48 `simdata(itemtype = "dich")`                                                                    |           6.00 |    0.37× |
-| Livingston and Lewis's accuracy and consistency by one cut                                                       | 3,000 scores of 40 items                                                                                     |           0.490 | betafunctions 2.0.0 `LL.CA`                                                                               |          0.364 |     1.3× |
+| Livingston and Lewis's accuracy and consistency by one cut                                                       | 3,000 scores of 40 items                                                                                     |           0.296 | betafunctions 2.0.0 `LL.CA`                                                                               |          0.364 |    0.81× |
 
 - Simulation of adaptive tests that select testlets as units, by their mean information: catR has no testlets, so no reference does this task.
 - Assembly of parallel forms with enemies, by weighted deviations in rotation: highs finds the forms whose largest gap from the target is smallest (minimax), to its limit of 10 seconds..
@@ -298,6 +298,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 - Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro: both draw the abilities, so the time depends on the seed; mirt runs with one.
 - The lognormal model of the response times: measurekit also estimates the item discriminations.
 - Joint draws of theta from separate posteriors by a Gaussian copula: the posteriors' distribution functions are inverted by base R's approx.
+- Livingston and Lewis's accuracy and consistency by one cut: LL.CA integrates by integrate's default relative tolerance, about 1.2e-4, and measurekit to 1e-12; at LL.CA's tolerance measurekit takes about a quarter of LL.CA's time.
 
 ### Knowledge tracing
 

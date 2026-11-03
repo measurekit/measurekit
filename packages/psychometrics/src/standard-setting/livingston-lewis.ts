@@ -141,15 +141,17 @@ export function livingstonLewisClassification(
 function checkScores(scores: readonly number[], minimum: number, maximum: number): Float64Array {
   checkArray(scores, "Livingston and Lewis need an array of scores");
   if (scores.length < 2) throw new DataError(`Livingston and Lewis need at least two scores, found ${scores.length}.`);
-  const proportions = Float64Array.from(scores, (score, i) => {
+  const proportions = new Float64Array(scores.length);
+  let varies = false;
+  for (let i = 0; i < scores.length; i++) {
+    const score = scores[i];
     if (!(typeof score === "number" && score >= minimum && score <= maximum)) {
       throw new DataError(`Score ${i + 1} must be a number from ${minimum} to ${maximum}, found ${describe(score)}.`);
     }
-    return (score - minimum) / (maximum - minimum);
-  });
-  if (proportions.every((proportion) => proportion === proportions[0])) {
-    throw new DataError("Livingston and Lewis need scores that vary; every score is the same.");
+    proportions[i] = (score - minimum) / (maximum - minimum);
+    varies ||= proportions[i] !== proportions[0];
   }
+  if (!varies) throw new DataError("Livingston and Lewis need scores that vary; every score is the same.");
   return proportions;
 }
 
@@ -253,7 +255,7 @@ function binomialProbabilities(trials: number): Binomial {
  * and at or above the last.
  */
 function categoryProbabilities(
-  { trials, logCoefficients }: Binomial,
+  binomial: Binomial,
   thresholds: readonly number[],
   proportion: number,
   out: Float64Array,
@@ -262,16 +264,36 @@ function categoryProbabilities(
   const logSuccess = Math.log(proportion);
   const logFailure = Math.log1p(-proportion);
   let category = 0;
-  for (let s = 0; s <= trials; s++) {
+  for (let s = 0; s <= binomial.trials; s++) {
     while (category < thresholds.length && s >= (thresholds[category] ?? 0)) category++;
-    const mass =
-      proportion <= 0
-        ? Number(s === 0)
-        : proportion >= 1
-          ? Number(s === trials)
-          : Math.exp((logCoefficients[s] ?? 0) + s * logSuccess + (trials - s) * logFailure);
-    out[category] = (out[category] ?? 0) + mass;
+    out[category] = (out[category] ?? 0) + binomialMass(binomial, s, proportion, logSuccess, logFailure);
   }
+}
+
+/**
+ * Returns the probability of the observed scores from `low` up to `high`, excluded: the terms of
+ * {@link categoryProbabilities} of one category alone, summed in the same order.
+ */
+function categoryProbability(binomial: Binomial, low: number, high: number, proportion: number): number {
+  const logSuccess = Math.log(proportion);
+  const logFailure = Math.log1p(-proportion);
+  let sum = 0;
+  const last = Math.min(binomial.trials, high - 1);
+  for (let s = Math.max(0, low); s <= last; s++) sum += binomialMass(binomial, s, proportion, logSuccess, logFailure);
+  return sum;
+}
+
+/** Returns the binomial probability of s successes, from the logarithms of the proportion and of its complement. */
+function binomialMass(
+  { trials, logCoefficients }: Binomial,
+  s: number,
+  proportion: number,
+  logSuccess: number,
+  logFailure: number,
+): number {
+  if (proportion <= 0) return Number(s === 0);
+  if (proportion >= 1) return Number(s === trials);
+  return Math.exp((logCoefficients[s] ?? 0) + s * logSuccess + (trials - s) * logFailure);
 }
 
 /** Returns the accuracy and the consistency of the classification by cuts on the proportion scale. */
@@ -282,14 +304,14 @@ function indices(shape: Beta, binomial: Binomial, cuts: readonly number[]): { ac
   });
   const categories = new Float64Array(cuts.length + 1);
   const bounds = [Number.NEGATIVE_INFINITY, ...cuts, Number.POSITIVE_INFINITY];
+  const scores = [Number.NEGATIVE_INFINITY, ...thresholds, Number.POSITIVE_INFINITY];
   let accuracy = 0;
   for (let k = 0; k < categories.length; k++) {
+    const low = scores[k] ?? 0;
+    const high = scores[k + 1] ?? 0;
     accuracy += betaIntegral(
       shape,
-      (proportion) => {
-        categoryProbabilities(binomial, thresholds, proportion, categories);
-        return categories[k] ?? 0;
-      },
+      (proportion) => categoryProbability(binomial, low, high, proportion),
       bounds[k] ?? 0,
       bounds[k + 1] ?? 0,
     );

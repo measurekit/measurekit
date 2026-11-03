@@ -26,4 +26,6 @@ bench_fixture("psychometrics", "standard-setting", list(
 
 bench_task("standardSetting.livingstonLewis", "Livingston and Lewis's accuracy and consistency by one cut",
            sprintf("%s scores of %d items", count(persons), item_count), reference("betafunctions", "LL.CA"),
-           function() suppressWarnings(LL.CA(scores, reliability, CUT, min = 0, max = item_count, modelfit = NULL)))
+           function() suppressWarnings(LL.CA(scores, reliability, CUT, min = 0, max = item_count, modelfit = NULL)),
+           note = paste("LL.CA integrates by integrate's default relative tolerance, about 1.2e-4, and measurekit to 1e-12;",
+                        "at LL.CA's tolerance measurekit takes about a quarter of LL.CA's time"))
