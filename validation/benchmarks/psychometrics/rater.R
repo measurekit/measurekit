@@ -79,7 +79,11 @@ bench_task("rater.manyFacetRasch", "The many-facet Rasch model of items and rate
            function() invisible(capture.output(tam.mml.mfr(resp = responses, facets = facets, pid = wide$person,
                                                            formulaA = ~ item + rater + step, constraint = "items",
                                                            control = list(nodes = nodes, conv = 1e-4, convD = 1e-4),
-                                                           verbose = FALSE))))
+                                                           verbose = FALSE))),
+           note = paste("TAM takes its standard errors from the diagonal of the second derivatives of its last M-step,",
+                        "with no E-step more, and measurekit from the Hessian of the marginal log-likelihood by central",
+                        "differences of its exact gradient, two E-steps for each parameter, which take about half its",
+                        "time: its estimates alone take about 0.6 times as long as TAM's"))
 
 # --- Interactions ---------------------------------------------------------------------------------------------------
 # Every person scored by every rater on every item, with a bias of 0.8 logits in two cells of items by raters.

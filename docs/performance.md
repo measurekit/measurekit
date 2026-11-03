@@ -346,6 +346,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 - Calibration of a five-dimensional graded model by Metropolis-Hastings Robbins-Monro: both draw the abilities, so the time depends on the seed; mirt runs with one.
 - Abilities by maximum likelihood, in two dimensions: both keep the estimates in [-6, 6]: mirt with `max_theta = 6`.
 - Abilities by weighted likelihood, in two dimensions: both keep the estimates in [-6, 6]: mirt with `max_theta = 6`; for the M2PL, mirt's mode of the likelihood times √det I is Warm's estimator.
+- The many-facet Rasch model of items and raters, with standard errors: TAM takes its standard errors from the diagonal of the second derivatives of its last M-step, with no E-step more, and measurekit from the Hessian of the marginal log-likelihood by central differences of its exact gradient, two E-steps for each parameter, which take about half its time: its estimates alone take about 0.6 times as long as TAM's.
 - The lognormal model of the response times: measurekit also estimates the item discriminations.
 - Joint draws of theta from separate posteriors by a Gaussian copula: the posteriors' distribution functions are inverted by base R's approx.
 - Livingston and Lewis's accuracy and consistency by one cut: LL.CA integrates by integrate's default relative tolerance, about 1.2e-4, and measurekit to 1e-12; at LL.CA's tolerance measurekit takes about a quarter of LL.CA's time.
