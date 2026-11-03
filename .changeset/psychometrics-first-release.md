@@ -133,3 +133,9 @@ a polychoric correlation takes items of at most 8 observed categories, as psych;
 of at most 20; a predicted theta score reports at most 10,000 scores; and contrasting groups need persons in every
 category up to the highest. The errors of links and of IRT equating take one Newton step from each link's minimum and
 each score's theta for a moved parameter, and a scale score of a decimal step is the double nearest the decimal.
+
+An EM calibration of several dimensions keeps at most 2^24 values of its items at the nodes of its grids, about 300 MB,
+and a bifactor model's Louis standard errors count the tables of pairs of items toward it. The posterior mode of more
+than five dimensions starts from a scan along the axes, so that it and MH-RM's log-likelihood take time in proportion
+to the dimensions. A Gauss-Hermite rule holds for any number of points, and `fromMirtMultidimensional` takes the
+coefficients first, as `fromMirtIrt` does.
