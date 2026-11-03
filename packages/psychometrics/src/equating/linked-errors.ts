@@ -1,6 +1,6 @@
 import { checkChoice } from "@measurekit/core";
 import type { CheckedThetaDistribution, IrtItem } from "../irt/internal.js";
-import { observedScoreEquivalents, observedScoreSetup } from "./irt-observed-score.js";
+import { type ObservedScoreSetup, observedScoreEquivalents, observedScoreSetup } from "./irt-observed-score.js";
 import {
   checkedVariance,
   differenceGradient,
@@ -9,15 +9,18 @@ import {
 } from "./irt-standard-errors.js";
 import {
   type CalibratedForm,
+  type CommonPositions,
   checkForm,
   commonPositions,
+  type Link,
   type LinkErrorOptions,
   linker,
   linkOf,
   movedForm,
+  nearbyLink,
 } from "./link-covariance.js";
-import { transformItem } from "./linking.js";
-import { trueScoreEquating } from "./true-score.js";
+import { type ScaleTransformation, transformItem } from "./linking.js";
+import { trueScoreThetas } from "./true-score.js";
 
 /** Options of {@link linkedEquatingErrors}. */
 export interface LinkedEquatingOptions extends IrtEquatingErrorOptions, LinkErrorOptions {}
@@ -53,21 +56,14 @@ export function linkedEquatingErrors(
   const link = linker(options);
   const { method = "true-score" } = options;
   checkChoice(method, "The option method", METHODS);
-  const forms = [checkForm(from, "The from form"), checkForm(to, "The to form")];
-  const [source, target] = forms;
-  if (source === undefined || target === undefined) return [];
+  const source = checkForm(from, "The from form");
+  const target = checkForm(to, "The to form");
+  const forms = [source, target];
   const common = commonPositions(source, target, "from and to forms");
   const setup = method === "observed-score" ? observedScoreSetup(options) : null;
-  const equate = (items: readonly (readonly IrtItem[])[]): number[] => {
-    const [fromItems = [], toItems = []] = items;
-    const transformation = linkOf(fromItems, toItems, common, link);
-    const linked = fromItems.map((item) => transformItem(item, transformation));
-    if (setup === null) return trueScoreEquating(linked, toItems);
-    const population = movedPopulation(setup.from, transformation.slope, transformation.intercept);
-    return observedScoreEquivalents(linked, toItems, { ...setup, from: population });
-  };
   const items = forms.map((form) => form.items);
-  const scores = equate(items).length;
+  const base = linkOf(source.items, target.items, common, link);
+  const { scores, equate } = equator(base, source.items, target.items, common, setup);
   const variances = new Float64Array(scores);
   forms.forEach((form, f) => {
     const targets = parameterTargets([form.items], [form.indices], form.labels);
@@ -81,6 +77,43 @@ export function linkedEquatingErrors(
     }
   });
   return Array.from(variances, Math.sqrt);
+}
+
+/** The number of equated scores, and the equating of the forms with a parameter moved by a small step. */
+interface Equator {
+  readonly scores: number;
+  equate(moved: readonly (readonly IrtItem[])[]): number[];
+}
+
+/**
+ * Returns the equating at a moved parameter: the link a Newton step from the base link and, for true scores, the theta
+ * of each score a Newton step from its theta in the base equating, so that no step minimizes or solves again.
+ */
+function equator(
+  base: Link,
+  fromItems: readonly IrtItem[],
+  toItems: readonly IrtItem[],
+  common: CommonPositions,
+  setup: ObservedScoreSetup | null,
+): Equator {
+  const linked = (items: readonly IrtItem[], transformation: ScaleTransformation): IrtItem[] =>
+    items.map((item) => transformItem(item, transformation));
+  if (setup === null) {
+    const trueScores = trueScoreThetas(linked(fromItems, base.transformation), toItems);
+    return {
+      scores: trueScores.equated.length,
+      equate: ([from = [], to = []]) => trueScores.nearby(linked(from, nearbyLink(base, from, to, common)), to),
+    };
+  }
+  const observed = (transformation: ScaleTransformation, from: readonly IrtItem[], to: readonly IrtItem[]): number[] =>
+    observedScoreEquivalents(linked(from, transformation), to, {
+      ...setup,
+      from: movedPopulation(setup.from, transformation.slope, transformation.intercept),
+    });
+  return {
+    scores: observed(base.transformation, fromItems, toItems).length,
+    equate: ([from = [], to = []]) => observed(nearbyLink(base, from, to, common), from, to),
+  };
 }
 
 /** Returns a population with each node θ at slope θ + intercept, its weights kept. */

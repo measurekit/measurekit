@@ -1,6 +1,6 @@
 import { checkArray, checkChoice, checkOptions, checkRecord, DataError } from "@measurekit/core";
 import { type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
-import { haebaraLinking, type LinkingOptions, stockingLordLinking } from "./characteristic-curve.js";
+import { curveLink, type LinkingOptions } from "./characteristic-curve.js";
 import {
   bilinearForm,
   checkCovariance,
@@ -68,8 +68,18 @@ export interface CheckedForm {
   readonly matrix: readonly (readonly number[])[];
 }
 
-/** The link of the common items of one scale to another. */
-export type Linker = (from: readonly IrtItem[], to: readonly IrtItem[]) => ScaleTransformation;
+/** The link of the common items of one scale to another, and the link of the same items a small step away. */
+export interface Link {
+  readonly transformation: ScaleTransformation;
+  /**
+   * Returns the link of the common items with parameters moved by a small step: the moment methods' own, and one Newton
+   * step from the minimum for the characteristic curve methods, so that a central difference does not minimize again.
+   */
+  nearby(from: readonly IrtItem[], to: readonly IrtItem[]): ScaleTransformation;
+}
+
+/** Links the common items of one scale to another. */
+export type Linker = (from: readonly IrtItem[], to: readonly IrtItem[]) => Link;
 
 /**
  * Returns the standard errors and covariance of the transformation that links a chain of separately calibrated forms,
@@ -80,7 +90,8 @@ export type Linker = (from: readonly IrtItem[], to: readonly IrtItem[]) => Scale
  * into the transformation of the last form to the first form's scale, as {@link chainTransformations}; two forms are a
  * chain of one link. The transformation is a function of the item parameters of every form, differentiated by central
  * differences in each parameter of each form's covariance, so that a form between two links counts once, as
- * `equateIRT::chainec` does. Forms are calibrated apart, so the covariance of (A, B) is the sum over the forms of J Σ
+ * `equateIRT::chainec` does; a characteristic curve link at a moved parameter is one Newton step from its minimum, the
+ * implicit function's derivative, rather than a second minimization. Forms are calibrated apart, so the covariance of (A, B) is the sum over the forms of J Σ
  * Jᵀ, J the transformation's Jacobian in the form's parameters and Σ their covariance. A parameter that the covariance
  * lacks, such as one of a fixed item, is known; one of an item that no neighboring form shares does not enter a link.
  *
@@ -90,7 +101,8 @@ export type Linker = (from: readonly IrtItem[], to: readonly IrtItem[]) => Scale
  *   its slope and intercept.
  * @throws `DataError` when there are fewer than two forms, a form or the options are invalid, neighboring forms share
  * no item, no parameter of a covariance belongs to a common item, a parameter lies on a bound of its range, a linking
- * method throws for the common items, or a covariance gives a negative variance.
+ * method throws for the common items, a characteristic curve criterion has no strict minimum at the link, or a
+ * covariance gives a negative variance.
  * @see {@link https://doi.org/10.1177/01466216010251004 | Ogasawara (2001)}
  * @see {@link https://doi.org/10.18637/jss.v068.i07 | Battauz (2015)}
  */
@@ -105,7 +117,7 @@ export function linkCovariance(forms: readonly CalibratedForm[], options: LinkEr
     .map((form, k) => commonPositions(form, checked[k] ?? form, `forms ${k + 1} and ${k + 2}`));
   const items = checked.map((form) => form.items);
   const links = pairs.map((pair, k) => linkOf(items[k + 1] ?? [], items[k] ?? [], pair, link));
-  const transformation = chainTransformations([...links].reverse());
+  const transformation = chainTransformations(links.map((base) => base.transformation).reverse());
   const covariance = [0, 0, 0];
   let parameters = 0;
   checked.forEach((form, f) => {
@@ -121,16 +133,16 @@ export function linkCovariance(forms: readonly CalibratedForm[], options: LinkEr
       const moved = links.map((base, k) => {
         const pair = pairs[k];
         const changed = pair !== undefined && ((k === f - 1 && moves(pair.from)) || (k === f && moves(pair.to)));
-        return changed ? linkOf(current[k + 1] ?? [], current[k] ?? [], pair, link) : base;
+        return changed ? nearbyLink(base, current[k + 1] ?? [], current[k] ?? [], pair) : base.transformation;
       });
       const { slope, intercept } = chainTransformations(moved.reverse());
       return [slope, intercept];
     });
     const slopes = gradient.subarray(0, used.length);
     const intercepts = gradient.subarray(used.length);
-    covariance[0] = (covariance[0] ?? 0) + checkedVariance(slopes, used, form.matrix, "the slope");
+    covariance[0] = (covariance[0] ?? 0) + checkedVariance(slopes, used, form.matrix, "the slope of the link");
     covariance[1] = (covariance[1] ?? 0) + bilinearForm(slopes, intercepts, used, form.matrix).value;
-    covariance[2] = (covariance[2] ?? 0) + checkedVariance(intercepts, used, form.matrix, "the intercept");
+    covariance[2] = (covariance[2] ?? 0) + checkedVariance(intercepts, used, form.matrix, "the intercept of the link");
   });
   if (parameters === 0) {
     throw new DataError("No covariance has a parameter of a common item; their labels must name the items by id.");
@@ -155,15 +167,19 @@ export function linker(options: LinkErrorOptions): Linker {
   const { linking = "stocking-lord", quadrature } = options;
   checkChoice(linking, "The option linking", LINK_METHODS);
   const curves = quadrature === undefined ? {} : { quadrature };
+  const moments =
+    (method: (from: readonly IrtItem[], to: readonly IrtItem[]) => ScaleTransformation): Linker =>
+    (from, to) => ({ transformation: method(from, to), nearby: method });
   switch (linking) {
     case "mean-mean":
-      return meanMeanLinking;
+      return moments(meanMeanLinking);
     case "mean-sigma":
-      return meanSigmaLinking;
-    case "haebara":
-      return (from, to) => haebaraLinking(from, to, curves);
+      return moments(meanSigmaLinking);
     default:
-      return (from, to) => stockingLordLinking(from, to, curves);
+      return (from, to) => {
+        const { linking: transformation, nearby } = curveLink(from, to, curves, linking);
+        return { transformation, nearby };
+      };
   }
 }
 
@@ -204,18 +220,26 @@ export function commonPositions(from: CheckedForm, to: CheckedForm, label: strin
 }
 
 /** Returns the link of the common items of `from` to their scale in `to`. */
-export function linkOf(
+export function linkOf(from: readonly IrtItem[], to: readonly IrtItem[], common: CommonPositions, link: Linker): Link {
+  return link(pick(from, common.from), pick(to, common.to));
+}
+
+/** Returns the link of the common items of `from` and `to`, moved by a small step from those of `base`. */
+export function nearbyLink(
+  base: Link,
   from: readonly IrtItem[],
   to: readonly IrtItem[],
   common: CommonPositions,
-  link: Linker,
 ): ScaleTransformation {
-  const pick = (items: readonly IrtItem[], positions: readonly number[]): IrtItem[] =>
-    positions.flatMap((position) => {
-      const item = items[position];
-      return item === undefined ? [] : [item];
-    });
-  return link(pick(from, common.from), pick(to, common.to));
+  return base.nearby(pick(from, common.from), pick(to, common.to));
+}
+
+/** Returns the items at the positions. */
+function pick(items: readonly IrtItem[], positions: readonly number[]): IrtItem[] {
+  return positions.flatMap((position) => {
+    const item = items[position];
+    return item === undefined ? [] : [item];
+  });
 }
 
 /** Returns the forms' items with a parameter of form `f`, in each place it sits, moved by `step`. */

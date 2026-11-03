@@ -1870,6 +1870,32 @@ describe("linkCovariance and linkedEquatingErrors", () => {
       'The option method must be "true-score" or "observed-score", found "kernel".',
     );
     expect(() => linkedEquatingErrors(first, JSON.parse("null"))).toThrow("The to form must be an object");
+    const negative = {
+      ...second,
+      covariance: { ...second.covariance, matrix: second.covariance.matrix.map((row) => row.map((value) => -value)) },
+    };
+    expect(() => linkCovariance([first, negative], { linking: "mean-mean" })).toThrow(
+      /The covariance matrix is not positive semidefinite: the slope of the link has a negative variance/,
+    );
+  });
+
+  it("refuses the errors of a characteristic curve link whose criterion is flat at its minimum", () => {
+    // Slopes of 1e-300 give probabilities of 1/2 at every theta, whatever the link: no curvature to invert.
+    const flat = (shift: number): CalibratedForm => ({
+      items: [item2pl("x", 1e-300, shift), item2pl("y", 1e-300, 1 + shift)],
+      covariance: {
+        parameters: ["x", "y"].flatMap((id) => [
+          { item: id, name: "a" },
+          { item: id, name: "b" },
+        ]),
+        matrix: Array.from({ length: 4 }, (_, i) => Array.from({ length: 4 }, (__, j) => (i === j ? 0.01 : 0))),
+      },
+    });
+    for (const linking of ["haebara", "stocking-lord"] as const) {
+      expect(() => linkCovariance([flat(0), flat(0.2)], { linking })).toThrow(
+        "The linking criterion has no strict minimum at the link: its common items do not determine the slope and the intercept apart.",
+      );
+    }
   });
 });
 

@@ -38,7 +38,7 @@ bench_task("equating.linkCovariance", "The link of a chain of three forms by Hae
            function() chainec(r = 3, direclist = alldirec(mods = mods, method = "Haebara", nq = POINTS)),
            note = paste("alldirec links each pair of forms both ways, twice the links of the chain, as chainec takes no other",
                         "list; equateIRT differentiates the links analytically, and measurekit, for items of any model, by",
-                        "central differences, which minimize a link twice for each parameter of a common item"))
+                        "central differences of one Newton step from each link's minimum"))
 bench_task("equating.linkedErrors", "The standard errors of true-score equating through a mean-mean link",
            sprintf("2 forms of %d items", length(mods$T1$coef) / 2), reference("equateIRT", "score(se = TRUE)"),
            function() invisible(capture.output(score(direc(mods = mods, which = c("T2", "T1"), method = "mean-mean", nq = POINTS),

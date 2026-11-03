@@ -7,13 +7,13 @@
 ### Where measurekit is slower
 
 ```mermaid
-%%{init: {"xyChart": {"height": 286, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 252, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Tasks that take more than 1.5 times as long as the reference"
-  x-axis ["cdm.attributeProfiles", "numerics.cholesky", "equating.linkCovariance", "logistic.fitItems"]
+  x-axis ["cdm.attributeProfiles", "numerics.cholesky", "logistic.fitItems"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 3
-  bar [2.7, 2.3, 2.2, 1.6]
-  line [1, 1, 1, 1]
+  bar [2.7, 2.3, 1.6]
+  line [1, 1, 1]
 ```
 
 A bar above the line takes longer than the reference, and md stands for multidimensional.
@@ -66,7 +66,7 @@ xychart-beta horizontal
   title "Psychometrics: equating, explanatory"
   x-axis ["kernel", "linkCovariance", "linkedErrors", "linear", "equipercentile", "presmoothing", "bootstrapLinear", "tucker", "frequencyEstimation", "chainedEquipercentile", "stockingLordLinking", "haebaraLinking", "trueScore", "irtObservedScore", "linearChange", "itemFeatureRegression", "lltm"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 3
-  bar [0.0098, 2.2, 1.2, 0.00083, 0.008, 0.031, 0.097, 0.0044, 0.0039, 0.015, 0.04, 0.032, 0.018, 0.13, 0.0031, 0.017, 0.24]
+  bar [0.0098, 0.22, 0.52, 0.00083, 0.008, 0.031, 0.097, 0.0044, 0.0039, 0.015, 0.04, 0.032, 0.018, 0.13, 0.0031, 0.017, 0.24]
   line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
@@ -197,8 +197,8 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Five factors by minimum residuals with oblimin rotation, from Pearson correlations                               | 2,800 persons, 25 items of 6 categories                                                                      |            10.6 | psych 2.6.9 `fa(nfactors = 5, fm = "minres", rotate = "oblimin")`                                         |           32.0 |    0.33× |
 | Velicer's minimum average partial test of 8 components, from Pearson correlations                                | 2,800 persons, 25 items of 6 categories                                                                      |            8.97 | psych 2.6.9 `VSS(n = 8)`                                                                                  |           90.0 |     0.1× |
 | Kernel equating with its standard errors, from log-linear fits of degree 3                                       | 41 scores, two forms                                                                                         |            1.59 | kequate 1.6.4 `kequate("EG")`                                                                             |            162 |  0.0098× |
-| **The link of a chain of three forms by Haebara's method, with its covariance**                                  | 3 forms of 20 items                                                                                          |            34.0 | equateIRT 2.5.2 `alldirec, chainec`                                                                       |           15.3 | **2.2×** |
-| The standard errors of true-score equating through a mean-mean link                                              | 2 forms of 20 items                                                                                          |            14.5 | equateIRT 2.5.2 `score(se = TRUE)`                                                                        |           12.0 |     1.2× |
+| The link of a chain of three forms by Haebara's method, with its covariance                                      | 3 forms of 20 items                                                                                          |            3.43 | equateIRT 2.5.2 `alldirec, chainec`                                                                       |           15.3 |    0.22× |
+| The standard errors of true-score equating through a mean-mean link                                              | 2 forms of 20 items                                                                                          |            6.23 | equateIRT 2.5.2 `score(se = TRUE)`                                                                        |           12.0 |    0.52× |
 | Linear equating, random groups                                                                                   | 4,329 and 4,152 persons, 40 items                                                                            |           0.000 | equate 2.0.9 `equate(type = "linear")`                                                                    |          0.400 | 0.00083× |
 | Equipercentile equating, random groups                                                                           | 4,329 and 4,152 persons, 40 items                                                                            |           0.002 | equate 2.0.9 `equate(type = "equipercentile")`                                                            |          0.280 |   0.008× |
 | Log-linear presmoothing of a score distribution, degree 3                                                        | 41 scores                                                                                                    |           0.020 | equate 2.0.9 `presmoothing(smoothmethod = "loglinear")`                                                   |          0.660 |   0.031× |
@@ -287,7 +287,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 - Omega hierarchical and total from five group factors by minimum residuals: omega also computes the fit of the general factor and of the group factors, which measurekit leaves out.
 - Five factors by minimum residuals with oblimin rotation, from Pearson correlations: fa also computes fit statistics, and this task leaves them out.
 - Velicer's minimum average partial test of 8 components, from Pearson correlations: VSS also fits 8 factor solutions with their very simple structure and fit statistics, which this task leaves out.
-- The link of a chain of three forms by Haebara's method, with its covariance: alldirec links each pair of forms both ways, twice the links of the chain, as chainec takes no other list; equateIRT differentiates the links analytically, and measurekit, for items of any model, by central differences, which minimize a link twice for each parameter of a common item.
+- The link of a chain of three forms by Haebara's method, with its covariance: alldirec links each pair of forms both ways, twice the links of the chain, as chainec takes no other list; equateIRT differentiates the links analytically, and measurekit, for items of any model, by central differences of one Newton step from each link's minimum.
 - The Rasch model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
 - The partial credit model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
 - The rating scale model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.

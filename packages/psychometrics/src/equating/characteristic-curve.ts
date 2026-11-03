@@ -1,4 +1,4 @@
-import { bfgs, checkOptions, type OptimizerOptions } from "@measurekit/core";
+import { bfgs, checkOptions, DataError, type OptimizerOptions } from "@measurekit/core";
 import { type IrtItem, largestCategoryCount, type QuadratureOptions, quadratureRule } from "../irt/internal.js";
 
 import type { Quadrature } from "../math/internal.js";
@@ -25,7 +25,7 @@ export interface LinkingOptions {
   readonly quadrature?: QuadratureOptions;
 }
 
-/** BFGS on ln A and B, from A = 1 and B = 0. */
+/** BFGS on ln A and B to a gradient of 1e-10. */
 const OPTIMIZER: OptimizerOptions = { tolerance: 1e-10, maxIterations: 200 };
 
 /**
@@ -51,7 +51,7 @@ export function haebaraLinking(
   to: readonly IrtItem[],
   options: LinkingOptions = {},
 ): CharacteristicCurveLinking {
-  return minimize(from, to, options, "haebara");
+  return curveLink(from, to, options, "haebara").linking;
 }
 
 /**
@@ -74,37 +74,108 @@ export function stockingLordLinking(
   to: readonly IrtItem[],
   options: LinkingOptions = {},
 ): CharacteristicCurveLinking {
-  return minimize(from, to, options, "stocking-lord");
+  return curveLink(from, to, options, "stocking-lord").linking;
 }
 
-function minimize(
+/** A characteristic curve criterion. */
+export type CurveCriterion = "haebara" | "stocking-lord";
+
+/** A characteristic curve link, and the link of common items a small step away from its own. */
+export interface CurveLink {
+  readonly linking: CharacteristicCurveLinking;
+  /**
+   * Returns the link of the same common items with parameters moved by a small step, such as that of a central
+   * difference: one Newton step from this link's minimum, which leaves an error of the order of the step squared.
+   */
+  nearby(from: readonly IrtItem[], to: readonly IrtItem[]): ScaleTransformation;
+}
+
+/**
+ * The step in ln A and B of the central differences of the criterion's gradient that give its Hessian at the minimum,
+ * where the gradient's third derivatives leave an error of the order of its square.
+ */
+const HESSIAN_STEP = 1e-4;
+
+/**
+ * Returns the link that minimizes a criterion, by BFGS on ln A and B from A = 1 and B = 0, with the links of nearby items.
+ *
+ * @throws `DataError` as {@link haebaraLinking} does.
+ */
+export function curveLink(
   from: readonly IrtItem[],
   to: readonly IrtItem[],
   options: LinkingOptions,
-  criterion: "haebara" | "stocking-lord",
-): CharacteristicCurveLinking {
+  criterion: CurveCriterion,
+): CurveLink {
   checkCommonItems(from, to);
   checkOptions(options);
-  const curves = characteristicCurves(from, to, quadratureRule(options.quadrature));
-  const term = criterion === "haebara" ? haebaraTerm : stockingLordTerm;
-  const result = bfgs(
-    (x, gradient) => {
-      const slope = Math.exp(x[0] ?? 0);
-      const intercept = x[1] ?? 0;
-      gradient.fill(0);
-      let value = 0;
-      for (let q = 0; q < curves.nodes.length; q++) value += term(curves, q, slope, intercept, gradient);
-      return value;
-    },
-    [0, 0],
-    OPTIMIZER,
-  );
+  const rule = quadratureRule(options.quadrature);
+  const curves = characteristicCurves(from, to, rule);
+  const result = bfgs((x, gradient) => criterionAt(curves, criterion, x, gradient), [0, 0], OPTIMIZER);
+  const minimum = Float64Array.from(result.x);
+  let inverse: Float64Array | null = null;
   return {
-    slope: Math.exp(result.x[0] ?? 0),
-    intercept: result.x[1] ?? 0,
-    converged: result.converged,
-    iterations: result.iterations,
+    linking: {
+      slope: Math.exp(minimum[0] ?? 0),
+      intercept: minimum[1] ?? 0,
+      converged: result.converged,
+      iterations: result.iterations,
+    },
+    nearby(movedFrom, movedTo) {
+      inverse ??= inverseHessian(curves, criterion, minimum);
+      const gradient = new Float64Array(2);
+      criterionAt(characteristicCurves(movedFrom, movedTo, rule), criterion, minimum, gradient);
+      const [h00 = 0, h01 = 0, h11 = 0] = inverse;
+      const slope = (minimum[0] ?? 0) - h00 * (gradient[0] ?? 0) - h01 * (gradient[1] ?? 0);
+      const intercept = (minimum[1] ?? 0) - h01 * (gradient[0] ?? 0) - h11 * (gradient[1] ?? 0);
+      return { slope: Math.exp(slope), intercept };
+    },
   };
+}
+
+/** Returns a criterion at x = (ln A, B), writing its gradient. */
+function criterionAt(
+  curves: CharacteristicCurves,
+  criterion: CurveCriterion,
+  x: Float64Array,
+  gradient: Float64Array,
+): number {
+  const term = criterion === "haebara" ? haebaraTerm : stockingLordTerm;
+  const slope = Math.exp(x[0] ?? 0);
+  const intercept = x[1] ?? 0;
+  gradient.fill(0);
+  let value = 0;
+  for (let q = 0; q < curves.nodes.length; q++) value += term(curves, q, slope, intercept, gradient);
+  return value;
+}
+
+/**
+ * Returns the inverse of the criterion's Hessian in ln A and B at x, as its entries (0, 0), (0, 1) and (1, 1), from
+ * central differences of the gradient.
+ *
+ * @throws `DataError` when the Hessian is not positive definite.
+ */
+function inverseHessian(curves: CharacteristicCurves, criterion: CurveCriterion, x: Float64Array): Float64Array {
+  const above = new Float64Array(2);
+  const below = new Float64Array(2);
+  const hessian = new Float64Array(4);
+  for (let j = 0; j < 2; j++) {
+    const moved = Float64Array.from(x);
+    moved[j] = (x[j] ?? 0) + HESSIAN_STEP;
+    criterionAt(curves, criterion, moved, above);
+    moved[j] = (x[j] ?? 0) - HESSIAN_STEP;
+    criterionAt(curves, criterion, moved, below);
+    for (let i = 0; i < 2; i++) hessian[i * 2 + j] = ((above[i] ?? 0) - (below[i] ?? 0)) / (2 * HESSIAN_STEP);
+  }
+  const [a = 0, b = 0, c = 0, d = 0] = hessian;
+  const off = (b + c) / 2;
+  const determinant = a * d - off * off;
+  if (!(a > 0 && determinant > 0)) {
+    throw new DataError(
+      "The linking criterion has no strict minimum at the link: its common items do not determine the slope and the intercept apart.",
+    );
+  }
+  return Float64Array.of(d / determinant, -off / determinant, a / determinant);
 }
 
 /** The common items with their probabilities on the `to` scale at the nodes, and scratch space for the `from` items. */

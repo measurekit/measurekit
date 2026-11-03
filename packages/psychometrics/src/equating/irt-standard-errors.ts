@@ -1,7 +1,12 @@
 import { checkArray, checkChoice, checkFinite, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
 import { type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
-import { type IrtObservedScoreOptions, observedScoreEquivalents, observedScoreSetup } from "./irt-observed-score.js";
-import { trueScoreEquating } from "./true-score.js";
+import {
+  type IrtObservedScoreOptions,
+  type ObservedScoreSetup,
+  observedScoreEquivalents,
+  observedScoreSetup,
+} from "./irt-observed-score.js";
+import { trueScoreThetas } from "./true-score.js";
 
 /** Options of {@link irtEquatingStandardErrors}. */
 export interface IrtEquatingErrorOptions extends IrtObservedScoreOptions {
@@ -75,11 +80,7 @@ export function irtEquatingStandardErrors(
   const indices = forms.map((items) => indexItems(items));
   checkCommonItems(forms, indices);
   const labels = checkCovariance(covariance);
-  const setup = method === "observed-score" ? observedScoreSetup(options) : null;
-  const equate = (items: readonly (readonly IrtItem[])[]): number[] => {
-    const [first = [], second = []] = items;
-    return setup === null ? trueScoreEquating(first, second) : observedScoreEquivalents(first, second, setup);
-  };
+  const { scores, equate } = equator(from, to, method === "observed-score" ? observedScoreSetup(options) : null);
   const targets = parameterTargets(forms, indices, labels);
   const used = targets.flatMap((found, k) => (found.length > 0 ? [k] : []));
   if (used.length === 0) {
@@ -87,11 +88,32 @@ export function irtEquatingStandardErrors(
       "The covariance has no parameter of the items of the forms; its labels must name the items by id.",
     );
   }
-  const scores = equate([from, to]).length;
   const gradient = differenceGradient(forms, targets, used, scores, (found, step) => equate(moved(forms, found, step)));
   return Array.from({ length: scores }, (_, x) =>
     Math.sqrt(checkedVariance(gradient.subarray(x * used.length, (x + 1) * used.length), used, covariance.matrix, x)),
   );
+}
+
+/**
+ * Returns the number of equated scores and the equating of the forms with a parameter moved by a small step: for true
+ * scores, one Newton step from the theta of each score of the forms' equating, so that no step solves again.
+ */
+function equator(
+  from: readonly IrtItem[],
+  to: readonly IrtItem[],
+  setup: ObservedScoreSetup | null,
+): { readonly scores: number; equate(moved: readonly (readonly IrtItem[])[]): number[] } {
+  if (setup === null) {
+    const trueScores = trueScoreThetas(from, to);
+    return {
+      scores: trueScores.equated.length,
+      equate: ([first = [], second = []]) => trueScores.nearby(first, second),
+    };
+  }
+  return {
+    scores: observedScoreEquivalents(from, to, setup).length,
+    equate: ([first = [], second = []]) => observedScoreEquivalents(first, second, setup),
+  };
 }
 
 /**
@@ -282,19 +304,21 @@ export function bilinearForm(
 /**
  * Returns gᵀ Σ g for a gradient over the parameters `used` of the covariance, at least 0.
  *
- * @param score - Names the equated score in the error message.
+ * @param subject - Names the estimate in the error message: an equated score's score, or a phrase such as `the slope of
+ *   the link`.
  * @throws `DataError` when the variance is negative beyond rounding.
  */
 export function checkedVariance(
   gradient: ArrayLike<number>,
   used: readonly number[],
   matrix: readonly (readonly number[])[],
-  score: number | string,
+  subject: number | string,
 ): number {
   const { value, size } = bilinearForm(gradient, gradient, used, matrix);
   if (value < -VARIANCE_ROUNDING * size) {
+    const estimate = typeof subject === "number" ? `the equated score of ${subject}` : subject;
     throw new DataError(
-      `The covariance matrix is not positive semidefinite: the equated score of ${score} has a negative variance, ${value}.`,
+      `The covariance matrix is not positive semidefinite: ${estimate} has a negative variance, ${value}.`,
     );
   }
   return Math.max(0, value);

@@ -1250,7 +1250,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Livingston-Lewis accuracy and consistency against base R's integrals                              | 1e-6 absolute                                                   | 1.6e-13                  |
 | Livingston-Lewis accuracy and consistency against betafunctions' own                              | 1e-4 absolute                                                   | 7e-5                     |
 | Links of separate calibrations against direc and chainec                                          | 1e-7 absolute                                                   | 1.1e-9                   |
-| Standard errors and covariances of links                                                          | 1e-5 absolute                                                   | 5.3e-7                   |
+| Standard errors and covariances of links                                                          | 1e-5 absolute                                                   | 1.6e-10                  |
 | Standard errors of equating through a link, against score and numDeriv over nlminb's links        | 5e-4 absolute                                                   | 9.6e-5                   |
 | Cut scores, Bookmark locations                                                                    | 1e-12 absolute                                                  | 4e-15                    |
 | Gains, normalized gains and the reliability of a difference                                       | 1e-12 absolute                                                  | 2.2e-16                  |

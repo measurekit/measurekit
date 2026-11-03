@@ -495,7 +495,9 @@ irtObservedScoreEquating(formX, formY, {
 `irtEquatingStandardErrors(from, to, covariance, options)` returns the standard error of the equated score at each
 score of the form to equate, by the delta method (Lord, 1982; Ogasawara, 2001). The equated score e(x) is a function of
 the item parameters of both forms, so with g its gradient with respect to the parameters and Σ their covariance
-matrix, the standard error is √(gᵀ Σ g). The gradient comes from central differences.
+matrix, the standard error is √(gᵀ Σ g). The gradient comes from central differences; a true-score equating at a moved
+parameter takes one Newton step from the theta of each score rather than solving for it again, which leaves an error of
+the order of the step squared.
 
 | Option        | Default        | Meaning                                                                                   |
 | ------------- | -------------- | ----------------------------------------------------------------------------------------- |
@@ -563,7 +565,9 @@ flowchart LR
 
 Both differentiate their result by central differences in each parameter of each form's covariance, as
 `irtEquatingStandardErrors` does, and add J Σ Jᵀ over the forms, which are independent: a form between two links counts
-once, as `equateIRT::chainec` does (Ogasawara, 2001; Battauz, 2015). Two forms are a chain of one link. A parameter that
+once, as `equateIRT::chainec` does (Ogasawara, 2001; Battauz, 2015). A Haebara or Stocking-Lord link at a moved
+parameter is one Newton step from its minimum, the derivative of the implicit function that the minimum defines, so no
+step minimizes again; the errors agree with equateIRT's analytic derivatives to 2e-10. Two forms are a chain of one link. A parameter that
 a covariance lacks, such as one of a fixed item, is known; in `linkCovariance`, one of an item that no neighboring form
 shares does not enter a link.
 
