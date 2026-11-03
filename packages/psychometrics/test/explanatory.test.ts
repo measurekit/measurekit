@@ -431,6 +431,21 @@ describe("itemFeatureRegression", () => {
     expect(itemFeatureRegression(four, { q1: {}, q2: {}, q3: {}, q4: {} }).effects).toHaveLength(1);
   });
 
+  it("names the first of many effects that the effects before it determine", () => {
+    // 200 items of 120 features, a square modulo 1009 of the item and the feature; feature 77 is twice feature 31.
+    const items = Array.from({ length: 200 }, (_, i) => calibrated(`q${i + 1}`, (i % 17) / 8 - 1, 0.1));
+    const value = (i: number, k: number): number => ((i + 1) * (2 * k + 3) + k * k) ** 2 % 1009;
+    const features = Object.fromEntries(
+      items.map(({ id }, i) => [
+        id,
+        Object.fromEntries(Array.from({ length: 120 }, (_, k) => [`f${k}`, k === 77 ? 2 * value(i, 31) : value(i, k)])),
+      ]),
+    );
+    expect(() => itemFeatureRegression(items, features)).toThrow(
+      'The effect "f77" is all zeros or a linear combination',
+    );
+  });
+
   it("rejects features that a regressed item lacks or that are not finite numbers", () => {
     const items = [0.1, 0.5, 0.9, 1.4, 1.8].map((b, i) => calibrated(`q${i + 1}`, b, 0.1));
     const features = oneFeature([1, 2, 3, 4, 5]);

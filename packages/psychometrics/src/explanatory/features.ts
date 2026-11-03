@@ -74,6 +74,11 @@ export function designMatrix(ids: readonly string[], features: ItemFeatures, int
  * Checks that the columns of the design are linearly independent: that XᵀX of each leading set of columns is positive
  * definite.
  *
+ * @remarks
+ * A leading set factors when every smaller one does: the Cholesky factor of the smaller is the leading part of the
+ * larger's, and the least pivot that passes grows with the size. So the first set that does not factor is found by
+ * bisection, in time that grows as the cube of the effects, where trying every set took their fourth power.
+ *
  * @param design - The design of the effects.
  * @throws `DataError` naming the first effect that is a linear combination of those before it.
  */
@@ -81,15 +86,22 @@ export function checkFullRank({ names, matrix }: Design): void {
   const columns = names.length;
   const rows = matrix.length / columns;
   const gram = designCrossProducts(matrix, rows, columns);
-  for (let size = 1; size <= columns; size++) {
+  const factors = (size: number): boolean => {
     const leading = new Float64Array(size * size);
     for (let j = 0; j < size; j++) {
       for (let k = 0; k < size; k++) leading[j * size + k] = gram[j * columns + k] ?? 0;
     }
-    if (cholesky(leading, size) === null) {
-      throw new DataError(
-        `The effect "${names[size - 1]}" is all zeros or a linear combination of the effects before it, so the effects have no unique estimates.`,
-      );
-    }
+    return cholesky(leading, size) !== null;
+  };
+  if (factors(columns)) return;
+  let factored = 0;
+  let failed = columns;
+  while (failed - factored > 1) {
+    const size = Math.floor((factored + failed) / 2);
+    if (factors(size)) factored = size;
+    else failed = size;
   }
+  throw new DataError(
+    `The effect "${names[failed - 1]}" is all zeros or a linear combination of the effects before it, so the effects have no unique estimates.`,
+  );
 }
