@@ -11,6 +11,12 @@ import {
 import { type CheckedScale, checkScale, type ScoreScale } from "./score-scale.js";
 
 const DEFAULT_STANDARD_ERROR = 0;
+/**
+ * The most scores a scale may report: the scales of tests report tens to hundreds, and each node of the distribution
+ * takes the normal distribution at every boundary between them, so a bound and step of a few bytes cannot ask for
+ * billions.
+ */
+const MAX_REPORTABLE_SCORES = 10_000;
 
 /**
  * Returns the prediction of a person's reported scale score when the official test scores theta directly, from a
@@ -25,9 +31,9 @@ const DEFAULT_STANDARD_ERROR = 0;
  * share a theta scale, and treats theta as constant between practice and the official test.
  *
  * Valid input: a distribution of finite nodes and non-negative weights that sum to 1 within 1e-6; a scale with a positive
- * slope, a finite intercept, finite `lowest` and `highest`, and a `step` above 0, since the reportable scores are
- * (`highest` - `lowest`) / `step` + 2 at most, the size of the result, so a scale of a few thousand scores or fewer;
- * a standard error from 0 and a level between 0 and 1.
+ * slope, a finite intercept, finite `lowest` and `highest`, and a `step` above 0 that gives at most 10,000 reportable
+ * scores, about (`highest` - `lowest`) / `step`, the size of the result; a standard error from 0 and a level between 0
+ * and 1.
  *
  * @param posterior - The distribution of the person's theta.
  * @param scale - The slope, intercept and rounding of the reported score.
@@ -43,7 +49,7 @@ const DEFAULT_STANDARD_ERROR = 0;
  * predictThetaScore(posterior, scale, { standardError: 0.3 }).mean; // 500
  * ```
  * @throws `DataError` when the distribution, the scale or the options are invalid, or the scale lacks finite bounds or
- * a step above 0.
+ * a step above 0, or reports more than 10,000 scores.
  */
 export function predictThetaScore(
   posterior: ThetaDistribution,
@@ -91,7 +97,8 @@ interface ReportableScores {
  * reports the lowest, at or above the highest the highest; so with k₀ the largest k with k · step at most the lowest,
  * the j-th score reports for v from (k₀ + j - 1/2) step to (k₀ + j + 1/2) step.
  *
- * @throws `DataError` when `lowest` or `highest` is not finite or `step` is not above 0.
+ * @throws `DataError` when `lowest` or `highest` is not finite, `step` is not above 0, or the scores are more than
+ * 10,000.
  */
 function reportableScores({ lowest, highest, step, slope, intercept }: CheckedScale): ReportableScores {
   if (!(Number.isFinite(lowest) && Number.isFinite(highest) && step > 0)) {
@@ -101,6 +108,11 @@ function reportableScores({ lowest, highest, step, slope, intercept }: CheckedSc
   }
   const firstMultiple = Math.floor(lowest / step);
   const length = Math.ceil(highest / step) - firstMultiple + 1;
+  if (!(length <= MAX_REPORTABLE_SCORES)) {
+    throw new DataError(
+      `Predicting a theta score needs a scale of at most ${MAX_REPORTABLE_SCORES} reportable scores, found ${length} from ${lowest} to ${highest} by ${step}; use a larger step.`,
+    );
+  }
   return {
     scores: Array.from({ length }, (_, j) =>
       j === 0 ? lowest : j === length - 1 ? highest : (firstMultiple + j) * step,

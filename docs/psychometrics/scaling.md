@@ -212,8 +212,8 @@ predictThetaScore(posterior, scale, { standardError: 0.3, level: 0.9 }); // mean
 - **Theta scores.** The reportable scores are `lowest`, `highest` and the multiples of `step` between them; the estimates
   that round and bound to a score s form an interval of theta, so that P(s) = Σ_q w_q [Φ((t_hi - θ_q) / se) - Φ((t_lo
   - θ_q) / se)]. With `standardError` 0 each node's weight goes to the score of its own theta. The scale needs finite
-  `lowest` and `highest` and a `step` above 0, and `distribution` has (`highest` - `lowest`) / `step` + 2 entries at most:
-  scales of a few thousand scores or fewer.
+  `lowest` and `highest` and a `step` above 0 that give at most 10,000 reportable scores, about (`highest` - `lowest`) /
+  `step`, the entries of `distribution`; a scale of more throws a `DataError`.
 - **Posteriors.** Any distribution with finite `nodes` and non-negative `weights` that sum to 1 within 1e-6 serves. Its
   probabilities are scaled to sum to 1.
 

@@ -939,6 +939,18 @@ describe("predictThetaScore", () => {
     expect(() => predictThetaScore(posterior, { ...SCALE, lowest: Number.NEGATIVE_INFINITY })).toThrow(message);
   });
 
+  it("reports at most 10,000 scores, whose boundaries each node takes, so that a scale of a few bytes asks no billions", () => {
+    const posterior = { nodes: [0], weights: [1] };
+    const widest = { slope: 1, intercept: 0, lowest: 0, highest: 9998, step: 1 };
+    expect(predictThetaScore(posterior, widest, { standardError: 1 }).distribution).toHaveLength(9999);
+    expect(predictThetaScore(posterior, { ...widest, highest: 9999 }).distribution).toHaveLength(10_000);
+    expect(() => predictThetaScore(posterior, { ...widest, highest: 10_000 })).toThrow(
+      "Predicting a theta score needs a scale of at most 10000 reportable scores, found 10001 from 0 to 10000 by 1; use a larger step.",
+    );
+    // Without the limit this scale asks for an array of a trillion scores, which JavaScript refuses with a RangeError.
+    expect(() => predictThetaScore(posterior, { ...widest, highest: 1e12 })).toThrow(DataError);
+  });
+
   it("rejects an invalid posterior, scale or options", () => {
     const posterior = { nodes: [0], weights: [1] };
     expect(() => predictThetaScore(posterior, SCALE, { standardError: -0.1 })).toThrow(

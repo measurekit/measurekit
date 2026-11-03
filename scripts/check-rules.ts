@@ -508,6 +508,14 @@ export const RULES: readonly Rule[] = [
     titles: "more than 6 facets",
   },
   {
+    rule: "A predicted theta score reports at most 10,000 scores, so that a scale of a few bytes does not ask for billions of boundaries.",
+    file: "packages/psychometrics/src/scaling/predict-theta-score.ts",
+    find: "if (!(length <= MAX_REPORTABLE_SCORES)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/scaling.test.ts",
+    titles: "reports at most 10,000 scores",
+  },
+  {
     rule: "Kappa takes a table of the range only where the range is no wider than the pairs.",
     file: "packages/core/src/kappa.ts",
     find: "highest - lowest < n",
