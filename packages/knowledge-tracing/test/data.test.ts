@@ -17,9 +17,66 @@ import {
   splitByTime,
 } from "../src/index.js";
 import { defined } from "./assertions.js";
-import firstAttemptFixture from "./fixtures/data-first-attempts.json" with { type: "json" };
-import rowFixture from "./fixtures/data-rows.json" with { type: "json" };
-import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
+import { type EloHoldoutFixture, readFixture } from "./fixtures.js";
+
+interface DataFirstAttemptsFixture {
+  numbered: {
+    learner: string;
+    item: string;
+    skills: never[];
+    time: number;
+    outcome: number | null;
+    hints: number;
+    attemptNumber: number;
+  }[];
+  unnumbered: { learner: string; item: string; skills: never[]; time: number; outcome: number | null; hints: number }[];
+  expected: {
+    numbered: {
+      incorrect: { positions: number[]; outcomes: (number | null)[] };
+      null: { positions: number[]; outcomes: (number | null)[] };
+      keep: { positions: number[]; outcomes: (number | null)[] };
+    };
+    unnumbered: {
+      incorrect: { positions: number[]; outcomes: (number | null)[] };
+      null: { positions: number[]; outcomes: (number | null)[] };
+      keep: { positions: number[]; outcomes: (number | null)[] };
+    };
+  };
+}
+const firstAttemptFixture = readFixture<DataFirstAttemptsFixture>("data-first-attempts.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface DataRowsFixture {
+  assistments: {
+    rows: { order_id: number; user_id: number; problem_id: number; skill_name: string; correct: number }[];
+    sequences: {
+      Addition: Record<string, number[]>;
+      "Place value": Record<string, number[]>;
+      Rounding: Record<string, number[]>;
+      Subtraction: Record<string, number[]>;
+    };
+  };
+  dataShop: {
+    rows: {
+      Row: number;
+      "Anon Student Id": string;
+      "Problem Name": string;
+      "Step Name": string;
+      "KC (Default)": string;
+      "First Attempt": string;
+    }[];
+    sequences: {
+      Addition: Record<string, number[]>;
+      "Place value": Record<string, number[]>;
+      Rounding: Record<string, number[]>;
+      Subtraction: Record<string, number[]>;
+    };
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const rowFixture = readFixture<DataRowsFixture>("data-rows.json");
+
+const holdout = readFixture<EloHoldoutFixture>("elo-holdout.json");
 
 const events: EventInput[] = [
   { learner: "ana", item: "q2", time: 3, outcome: 1 },

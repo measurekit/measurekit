@@ -1,7 +1,9 @@
 import { test } from "vitest";
 import { eventLog } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-elo.json" with { type: "json" };
+import { type BenchEloFixture, readFixture } from "./fixtures.js";
+
+const fixture = readFixture<BenchEloFixture>("bench-elo.json");
 
 /** The 100,000 events of the Elo benchmark, as input to `eventLog`. */
 const events = fixture.learner.map((learner, i) => ({

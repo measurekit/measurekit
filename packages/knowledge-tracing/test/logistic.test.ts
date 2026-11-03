@@ -31,13 +31,241 @@ import {
   type SkillHistory,
 } from "../src/logistic/internal.js";
 import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
-import exposureFixture from "./fixtures/logistic-exposures.json" with { type: "json" };
-import glm from "./fixtures/logistic-glm.json" with { type: "json" };
-import lkt from "./fixtures/logistic-lkt.json" with { type: "json" };
-import lktFeaturesFixture from "./fixtures/logistic-lkt-features.json" with { type: "json" };
-import rates from "./fixtures/logistic-rates.json" with { type: "json" };
-import termsFixture from "./fixtures/logistic-terms.json" with { type: "json" };
+import { type LogisticLktFeaturesFixture, type LogisticRatesFixture, readFixture } from "./fixtures.js";
 import { expectUnaffectedByLessons, online } from "./logs.js";
+
+interface LogisticExposuresFixture {
+  decay: number;
+  exponent: number;
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number | null }[];
+  features: { exposures: number[]; decayedExposures: number[]; recencyExposure: number[] };
+  skills: {
+    s1: { intercept: number; coefficients: { exposures: number } };
+    s2: { intercept: number; coefficients: { exposures: number } };
+  };
+  logLikelihood: number;
+}
+const exposureFixture = readFixture<LogisticExposuresFixture>("logistic-exposures.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface LogisticGlmFixture {
+  decays: { proportion: number; logit: number; recency: number; counts: number };
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
+  singleSkill: number[];
+  fits: {
+    name: string;
+    features: (string | { decayedLogit?: number; recency?: number })[];
+    proficiency: string;
+    expected: {
+      skills: {
+        s1: {
+          intercept: number;
+          coefficients: {
+            opportunities?: number;
+            successes?: number;
+            failures?: number;
+            "decayedLogit(0.8)"?: number;
+            "recency(0.5)"?: number;
+          };
+        };
+        s2: {
+          intercept: number;
+          coefficients: {
+            opportunities?: number;
+            successes?: number;
+            failures?: number;
+            "decayedLogit(0.8)"?: number;
+            "recency(0.5)"?: number;
+          };
+        };
+        s3: {
+          intercept: number;
+          coefficients: {
+            opportunities?: number;
+            successes?: number;
+            failures?: number;
+            "decayedLogit(0.8)"?: number;
+            "recency(0.5)"?: number;
+          };
+        };
+      };
+      learners: {
+        learner01: number;
+        learner02: number;
+        learner03: number;
+        learner04: number;
+        learner05: number;
+        learner06: number;
+        learner07: number;
+        learner08: number;
+        learner09: number;
+        learner10: number;
+        learner11: number;
+        learner12: number;
+        learner13: number;
+        learner14: number;
+        learner15: number;
+        learner16: number;
+        learner17: number;
+        learner18: number;
+        learner19: number;
+        learner20: number;
+        learner21: number;
+        learner22: number;
+        learner23: number;
+        learner24: number;
+        learner25: number;
+        learner26: number;
+        learner27: number;
+        learner28: number;
+        learner29: number;
+        learner30: number;
+        learner31: number;
+        learner32: number;
+        learner33: number;
+        learner34: number;
+        learner35: number;
+        learner36: number;
+        learner37: number;
+        learner38: number;
+        learner39: number;
+        learner40: number;
+        learner41: number;
+        learner42: number;
+        learner43: number;
+        learner44: number;
+        learner45: number;
+        learner46: number;
+        learner47?: number;
+        learner48: number;
+        learner49: number;
+        learner50: number;
+        learner51: number;
+        learner52: number;
+        learner53: number;
+        learner54: number;
+        learner55: number;
+        learner56: number;
+        learner57: number;
+        learner58: number;
+        learner59: number;
+        learner60: number;
+        learner61: number;
+        learner62: number;
+        learner63: number;
+        learner64: number;
+        learner65: number;
+        learner66: number;
+        learner67: number;
+        learner68: number;
+        learner69: number;
+        learner70: number;
+        learner71: number;
+        learner72: number;
+        learner73: number;
+        learner74: number;
+        learner75: number;
+        learner76: number;
+        learner77: number;
+        learner78: number;
+        learner79: number;
+        learner80: number;
+      } | null;
+      logLikelihood: number;
+      learnerSd?: number;
+    };
+    singleSkill?: boolean;
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const glm = readFixture<LogisticGlmFixture>("logistic-glm.json");
+
+interface LogisticLktFixture {
+  decays: { proportion: number; logit: number; recency: number; counts: number };
+  ridge: number;
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
+  features: {
+    opportunities: number[];
+    successes: number[];
+    failures: number[];
+    logOpportunities: number[];
+    logSuccesses: number[];
+    logFailures: number[];
+    decayedProportion: number[];
+    decayedLogit: number[];
+    recency: number[];
+    decayedOpportunities: number[];
+    decayedSuccesses: number[];
+    decayedFailures: number[];
+  };
+  afm: {
+    skills: Record<string, { intercept: number; coefficients: { opportunities: number } }>;
+    learners: Record<string, number>;
+  };
+  pfa: { skills: Record<string, { intercept: number; coefficients: { successes: number; failures: number } }> };
+  lkt: { columns: number[]; logLikelihood: number };
+}
+const lkt = readFixture<LogisticLktFixture>("logistic-lkt.json");
+
+const lktFeaturesFixture = readFixture<LogisticLktFeaturesFixture>("logistic-lkt-features.json");
+
+const rates = readFixture<LogisticRatesFixture>("logistic-rates.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface LogisticTermsFixture {
+  events: {
+    learner: string;
+    item: string;
+    skills: string[];
+    time: number;
+    outcome: number;
+    covariates: { x: number };
+  }[];
+  fits: {
+    name: string;
+    options: {
+      features: { feature: string; over: string; coefficient: string }[];
+      intercepts: string[];
+      proficiency: string;
+      covariates?: string[];
+      ridge?: number;
+    };
+    expected: {
+      skills: {
+        s1: {
+          intercept: number;
+          coefficients: { opportunities?: number; logSuccesses?: number; logFailures?: number };
+        };
+        s2: {
+          intercept: number;
+          coefficients: { opportunities?: number; logSuccesses?: number; logFailures?: number };
+        };
+        s3: {
+          intercept: number;
+          coefficients: { opportunities?: number; logSuccesses?: number; logFailures?: number };
+        };
+      };
+      items?: { i01: { intercept: number; coefficients: { opportunities?: number } } };
+      logLikelihood: number;
+      learners?: Record<string, number>;
+      shared?: { "item:opportunities"?: number; "learner:logFailures"?: number; "covariate:x"?: number };
+      learnerSd?: number;
+    };
+    standardErrors?: {
+      skills: {
+        s1: { intercept: number; coefficients: { opportunities?: number } };
+        s2: { intercept: number; coefficients: { opportunities?: number } };
+        s3: { intercept: number; coefficients: { opportunities?: number } };
+      };
+      items?: { i01: { intercept: number; coefficients: Record<string, never> } };
+      learners?: Record<string, number>;
+      shared?: { "item:opportunities"?: number; "learner:logFailures"?: number; "covariate:x"?: number };
+    };
+    subset?: number[];
+  }[];
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const termsFixture = readFixture<LogisticTermsFixture>("logistic-terms.json");
 
 /** Absolute tolerance of features against LKT's. */
 const FEATURE_TOLERANCE = 1e-12;

@@ -2,8 +2,10 @@ import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import { bkt } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-bkt.json" with { type: "json" };
+import { type BenchBktFixture, readFixture } from "./fixtures.js";
 import { columnsLog, online } from "./logs.js";
+
+const fixture = readFixture<BenchBktFixture>("bench-bkt.json");
 
 /** 200 learners at 5 skills, 20 attempts at each: 20,000 attempts. */
 const log = columnsLog(fixture);

@@ -18,7 +18,18 @@ import {
   thresholdMastery,
   windowMastery,
 } from "../src/index.js";
-import fixture from "./fixtures/practice-mastery.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface PracticeMasteryFixture {
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number | null }[];
+  pfa: { intercepts: { s1: number; s4: number }; successes: number; failures: number };
+  tables: {
+    criterion: string;
+    options: { length?: number; decay?: number; threshold?: number; correct?: number; window?: number };
+    table: Record<string, { s1: number | null; s4: number | null }>;
+  }[];
+}
+const fixture = readFixture<PracticeMasteryFixture>("practice-mastery.json");
 
 /** A model written outside the package: a fixed prediction per item. */
 function fixed(predictions: Record<string, number>): LearnerModel<string, null> {

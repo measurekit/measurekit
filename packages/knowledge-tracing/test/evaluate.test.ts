@@ -33,14 +33,230 @@ import {
   splitByTime,
 } from "../src/index.js";
 import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
-import holdout from "./fixtures/elo-holdout.json" with { type: "json" };
-import agreement from "./fixtures/evaluate-agreement.json" with { type: "json" };
-import comparison from "./fixtures/evaluate-comparison.json" with { type: "json" };
-import powerLaws from "./fixtures/evaluate-curves.json" with { type: "json" };
-import curves from "./fixtures/evaluate-learning-curve.json" with { type: "json" };
-import fixture from "./fixtures/evaluate-metrics.json" with { type: "json" };
-import opportunities from "./fixtures/evaluate-opportunity.json" with { type: "json" };
-import unseen from "./fixtures/evaluate-unseen.json" with { type: "json" };
+import { type EloHoldoutFixture, readFixture } from "./fixtures.js";
+
+const holdout = readFixture<EloHoldoutFixture>("elo-holdout.json");
+
+interface EvaluateAgreementFixture {
+  cases: {
+    name: string;
+    predictions: number[];
+    outcomes: number[];
+    count: number;
+    auc: number | null;
+    rmse: number;
+    logLoss: number;
+    accuracy: number | null;
+    rSquared: number | null;
+    kappa: number | null;
+  }[];
+}
+const agreement = readFixture<EvaluateAgreementFixture>("evaluate-agreement.json");
+
+interface EvaluateComparisonFixture {
+  events: { learner: string; item: string; skills: never[]; time: number; outcome: number | null }[];
+  predictions: { first: (number | null)[]; second: (number | null)[] };
+  cases: {
+    name: string;
+    folds: { train: number[]; test: number[] }[];
+    tests: {
+      loss: string;
+      learners: number;
+      meanDifference: number;
+      standardError: number;
+      statistic: number;
+      degreesOfFreedom: number;
+      pValue: number;
+    }[];
+  }[];
+}
+const comparison = readFixture<EvaluateComparisonFixture>("evaluate-comparison.json");
+
+interface EvaluateCurvesFixture {
+  cases: {
+    name: string;
+    points: { opportunity: number; count: number; errorRate: number }[];
+    powerLaw: { scale: number; exponent: number; rSquared: number | null } | null;
+    categories: {
+      options: {
+        minLearners: number;
+        minPoints: number;
+        slope: number;
+        minSlope: number;
+        lowError?: number;
+        highError?: number;
+      };
+      category: string;
+    }[];
+  }[];
+}
+const powerLaws = readFixture<EvaluateCurvesFixture>("evaluate-curves.json");
+
+interface EvaluateLearningCurveFixture {
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
+  predictions: number[];
+  overall: { opportunity: number; count: number; errorRate: number; predictedErrorRate: number }[];
+  skills: {
+    a: { opportunity: number; count: number; errorRate: number; predictedErrorRate: number }[];
+    b: { opportunity: number; count: number; errorRate: number; predictedErrorRate: number }[];
+    c: { opportunity: number; count: number; errorRate: number; predictedErrorRate: number }[];
+  };
+}
+const curves = readFixture<EvaluateLearningCurveFixture>("evaluate-learning-curve.json");
+
+interface EvaluateMetricsFixture {
+  cases: {
+    name: string;
+    predictions: number[];
+    outcomes: number[];
+    auc: number | null;
+    rmse: number;
+    logLoss: number;
+    accuracy: number | null;
+    calibration: {
+      lower: number;
+      upper: number;
+      count: number;
+      meanPrediction: number | null;
+      meanOutcome: number | null;
+    }[];
+    calibration4: {
+      lower: number;
+      upper: number;
+      count: number;
+      meanPrediction: number | null;
+      meanOutcome: number | null;
+    }[];
+  }[];
+}
+const fixture = readFixture<EvaluateMetricsFixture>("evaluate-metrics.json");
+
+interface EvaluateOpportunityFixture {
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number | null }[];
+  predictions: (number | null)[];
+  curves: {
+    minOpportunities: number;
+    curve: {
+      overall: {
+        opportunity: number;
+        count: number;
+        errorRate: number;
+        predictedErrorRate: number;
+        metrics: {
+          count: number;
+          auc: number | null;
+          rmse: number;
+          logLoss: number;
+          accuracy: number;
+          rSquared: number | null;
+          kappa: number;
+        };
+      }[];
+      skills: {
+        a: {
+          opportunity: number;
+          count: number;
+          errorRate: number;
+          predictedErrorRate: number;
+          metrics: {
+            count: number;
+            auc: number | null;
+            rmse: number;
+            logLoss: number;
+            accuracy: number;
+            rSquared: number | null;
+            kappa: number | null;
+          };
+        }[];
+        b: {
+          opportunity: number;
+          count: number;
+          errorRate: number;
+          predictedErrorRate: number;
+          metrics: {
+            count: number;
+            auc: number | null;
+            rmse: number;
+            logLoss: number;
+            accuracy: number;
+            rSquared: number | null;
+            kappa: number;
+          };
+        }[];
+        c: {
+          opportunity: number;
+          count: number;
+          errorRate: number;
+          predictedErrorRate: number;
+          metrics: {
+            count: number;
+            auc: number | null;
+            rmse: number;
+            logLoss: number;
+            accuracy: number;
+            rSquared: number | null;
+            kappa: number;
+          };
+        }[];
+      };
+    };
+  }[];
+}
+const opportunities = readFixture<EvaluateOpportunityFixture>("evaluate-opportunity.json");
+
+interface EvaluateUnseenFixture {
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number | null }[];
+  folds: { train: number[]; test: number[] }[];
+  throw: {
+    folds: {
+      predictions: (number | null)[];
+      skipped: number;
+      metrics: {
+        count: number;
+        auc: number;
+        rmse: number;
+        logLoss: number;
+        accuracy: number;
+        rSquared: number;
+        kappa: number;
+      };
+    }[];
+    metrics: {
+      count: number;
+      auc: number;
+      rmse: number;
+      logLoss: number;
+      accuracy: number;
+      rSquared: number;
+      kappa: number;
+    };
+  };
+  skip: {
+    folds: {
+      predictions: (number | null)[];
+      skipped: number;
+      metrics: {
+        count: number;
+        auc: number;
+        rmse: number;
+        logLoss: number;
+        accuracy: number;
+        rSquared: number;
+        kappa: number;
+      };
+    }[];
+    metrics: {
+      count: number;
+      auc: number;
+      rmse: number;
+      logLoss: number;
+      accuracy: number;
+      rSquared: number;
+      kappa: number;
+    };
+  };
+}
+const unseen = readFixture<EvaluateUnseenFixture>("evaluate-unseen.json");
 
 /** Absolute tolerance of metrics, calibration bins and learning curves against R. */
 const METRIC_TOLERANCE = 1e-12;

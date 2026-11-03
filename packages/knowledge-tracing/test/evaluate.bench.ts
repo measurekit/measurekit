@@ -1,9 +1,23 @@
 import { test } from "vitest";
 import { auc, metrics, metricsByOpportunity } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-evaluate.json" with { type: "json" };
-import opportunity from "./fixtures/bench-evaluate-opportunity.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
 import { columnsLog } from "./logs.js";
+
+interface BenchEvaluateFixture {
+  predictions: number[];
+  outcomes: number[];
+}
+const fixture = readFixture<BenchEvaluateFixture>("bench-evaluate.json");
+
+interface BenchEvaluateOpportunityFixture {
+  learner: string[];
+  skill: string[];
+  time: number[];
+  outcome: (number | null)[];
+  prediction: (number | null)[];
+}
+const opportunity = readFixture<BenchEvaluateOpportunityFixture>("bench-evaluate-opportunity.json");
 
 test("scores 100,000 predictions", async (context) => {
   await benchmark(context, "evaluate.auc", () => auc(fixture.predictions, fixture.outcomes));

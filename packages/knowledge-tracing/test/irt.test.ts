@@ -21,10 +21,56 @@ import {
 import { categoryCount, categoryTerms, differences, expectedOutcome } from "../src/irt/internal.js";
 import { reflectedWalk } from "../src/math/internal.js";
 import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
-import reference from "./fixtures/irt-abilities.json" with { type: "json" };
-import drifting from "./fixtures/irt-drift.json" with { type: "json" };
-import stored from "./fixtures/stored-state.json" with { type: "json" };
+import { readFixture, type StoredStateFixture } from "./fixtures.js";
 import { expectUnaffectedByLessons } from "./logs.js";
+
+interface IrtAbilitiesFixture {
+  items: { i1: { a: number; b: number }; g1: { model: string; a: number; b: number[] } };
+  events: { learner: string; item: string; skills: never[]; time: number; outcome: number }[];
+  standard: {
+    prior: { mean: number; sd: number };
+    points: number;
+    trace: {
+      prediction: number[];
+      logProbability: number[];
+      eap: number[];
+      eapStandardError: number[];
+      map: number[];
+      mapStandardError: number[];
+    };
+  };
+  shifted: {
+    prior: { mean: number; sd: number };
+    points: number;
+    trace: {
+      prediction: number[];
+      logProbability: number[];
+      eap: number[];
+      eapStandardError: number[];
+      map: number[];
+      mapStandardError: number[];
+    };
+  };
+  mirt: { eap: number[]; eapStandardError: number[]; map: number[]; mapStandardError: number[] };
+}
+const reference = readFixture<IrtAbilitiesFixture>("irt-abilities.json");
+
+interface IrtDriftFixture {
+  drift: { variance: number; per: number };
+  points: number;
+  cases: {
+    name: string;
+    kind: string;
+    events: { time: number[]; a: number[]; b: number[]; outcome: number[] };
+    checkpoints: number[];
+    sameGrid: { mean: number[]; sd: number[]; logLikelihood: number; depth: number };
+    fine: { mean: number[]; sd: number[]; mode: number[] };
+  }[];
+  particleFilter: { case: string; mean: number; sd: number; meanError: number };
+}
+const drifting = readFixture<IrtDriftFixture>("irt-drift.json");
+
+const stored = readFixture<StoredStateFixture>("stored-state.json");
 
 /** Absolute tolerance of EAP estimates, predictions and log-probabilities against the written-out grid posterior. */
 const GRID_TOLERANCE = 1e-10;

@@ -34,18 +34,319 @@ import {
   unionClosure,
 } from "../src/index.js";
 import { defined, expectAllClose, expectClose } from "./assertions.js";
-import assessmentFixture from "./fixtures/kst-assessment.json" with { type: "json" };
-import blimFixture from "./fixtures/kst-blim.json" with { type: "json" };
-import constraintFixture from "./fixtures/kst-blim-constraints.json" with { type: "json" };
-import diffTestFixture from "./fixtures/kst-diff-test.json" with { type: "json" };
-import gradedFixture from "./fixtures/kst-graded.json" with { type: "json" };
-import identifiabilityFixture from "./fixtures/kst-identifiability.json" with { type: "json" };
-import iitaFixture from "./fixtures/kst-iita.json" with { type: "json" };
-import clauseFixture from "./fixtures/kst-structure-clauses.json" with { type: "json" };
-import toolFixture from "./fixtures/kst-structure-tools.json" with { type: "json" };
-import structureFixture from "./fixtures/kst-structures.json" with { type: "json" };
-import validityFixture from "./fixtures/kst-validity.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
 import { expectUnaffectedByLessons, online, withLessons } from "./logs.js";
+
+interface KstAssessmentFixture {
+  threshold: number;
+  assessments: { truth: string[]; questions: string[]; outcomes: number[]; probabilities: number[] }[];
+  deterministic: { patterns: string[][]; states: string[][] };
+}
+const assessmentFixture = readFixture<KstAssessmentFixture>("kst-assessment.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+type KstBlimFixture = {
+  name: string;
+  method: string;
+  structure: { domain: string[]; states: string[][] };
+  patterns: { "10000"?: number };
+  probabilities: number[];
+  guess: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+  slip: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+  logLikelihood: number;
+  iterations: number;
+}[];
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const blimFixture = readFixture<KstBlimFixture>("kst-blim.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+interface KstBlimConstraintsFixture {
+  cases: {
+    name: string;
+    method: string;
+    structure: { domain: string[]; states: string[][] };
+    patterns: { "10000"?: number };
+    fixed: { guess: { a?: number; b?: number }; slip: { e?: number } };
+    equal: { guess: string[][]; slip: string[][] };
+    probabilities: number[];
+    guess: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+    slip: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+    logLikelihood: number;
+    parameters: number;
+    g2: number;
+    degreesOfFreedom: number;
+    pValue: number;
+    discrepancy: number;
+  }[];
+  comparisons: {
+    name: string;
+    restricted: {
+      name: string;
+      method: string;
+      structure: { domain: string[]; states: string[][] };
+      patterns: { "10000"?: number };
+      fixed: { guess: Record<string, never>; slip: Record<string, never> };
+      equal: { guess: string[][]; slip: string[][] };
+      probabilities: number[];
+      guess: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+      slip: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+      logLikelihood: number;
+      parameters: number;
+      g2: number;
+      degreesOfFreedom: number;
+      pValue: number;
+      discrepancy: number;
+    };
+    general: {
+      name: string;
+      method: string;
+      structure: { domain: string[]; states: string[][] };
+      patterns: { "10000"?: number };
+      fixed: { guess: Record<string, never>; slip: Record<string, never> };
+      equal: { guess: never[]; slip: never[] };
+      probabilities: number[];
+      guess: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+      slip: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number };
+      logLikelihood: number;
+      parameters: number;
+      g2: number;
+      degreesOfFreedom: number;
+      pValue: number;
+      discrepancy: number;
+    };
+    g2: number;
+    degreesOfFreedom: number;
+    pValue: number;
+  }[];
+  recovery: {
+    structure: { domain: string[]; states: string[][] };
+    slip: number;
+    guess: number;
+    sets: {
+      patterns: {
+        "000000": number;
+        "000010"?: number;
+        "001000"?: number;
+        "001100"?: number;
+        "001111"?: number;
+        "010000": number;
+        "010001"?: number;
+        "011000"?: number;
+        "011010"?: number;
+        "011011"?: number;
+        "011100": number;
+        "011110": number;
+        "011111"?: number;
+        "100000": number;
+        "100001": number;
+        "100010"?: number;
+        "100100"?: number;
+        "100111"?: number;
+        "101000": number;
+        "101010"?: number;
+        "101100": number;
+        "101110"?: number;
+        "101111": number;
+        "110000": number;
+        "110001"?: number;
+        "110010"?: number;
+        "110100": number;
+        "110101"?: number;
+        "110110": number;
+        "110111"?: number;
+        "111000": number;
+        "111001": number;
+        "111010": number;
+        "111011": number;
+        "111100": number;
+        "111101": number;
+        "111110": number;
+        "111111": number;
+        "000001"?: number;
+        "010010"?: number;
+        "011101"?: number;
+        "101101"?: number;
+        "000100"?: number;
+        "000110"?: number;
+        "001010"?: number;
+        "010111"?: number;
+        "101001"?: number;
+        "010110"?: number;
+        "010100"?: number;
+        "011001"?: number;
+        "001110"?: number;
+        "100011"?: number;
+        "000101"?: number;
+        "100110"?: number;
+        "101011"?: number;
+        "100101"?: number;
+        "110011"?: number;
+        "001001"?: number;
+        "010011"?: number;
+        "001101"?: number;
+      };
+      slip: number;
+      guess: number;
+      probabilities: number[];
+      logLikelihood: number;
+    }[];
+  };
+}
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const constraintFixture = readFixture<KstBlimConstraintsFixture>("kst-blim-constraints.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+type KstDiffTestFixture = {
+  name: string;
+  items: string[];
+  patterns: { "10000"?: number };
+  version: string;
+  prerequisites: { i1: string[] };
+  alternative: { i1: never[] } | null;
+  mean: number;
+  confidence: number;
+  estimate: number;
+  variance: number;
+  z: number;
+  pValue: { "two-sided": number; less: number; greater: number };
+  interval: { "two-sided": number[]; less: number; greater: number };
+}[];
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const diffTestFixture = readFixture<KstDiffTestFixture>("kst-diff-test.json");
+
+type KstGradedFixture = {
+  name: string;
+  structure: { domain: string[]; states: string[][] };
+  forward: { a?: boolean; b?: boolean; c?: boolean; d?: boolean; e?: boolean; s?: boolean };
+  backward: { a?: boolean; b?: boolean; c?: boolean; d?: boolean; e?: boolean; s?: boolean };
+}[];
+const gradedFixture = readFixture<KstGradedFixture>("kst-graded.json");
+
+type KstIdentifiabilityFixture = {
+  name: string;
+  structure: { domain: string[]; states: string[][] };
+  probabilities: number[];
+  guess: {
+    a?: number;
+    b?: number;
+    c?: number;
+    d?: number;
+    e?: number;
+    q1?: number;
+    q2?: number;
+    q3?: number;
+    q4?: number;
+    q5?: number;
+    s?: number;
+  };
+  slip: {
+    a?: number;
+    b?: number;
+    c?: number;
+    d?: number;
+    e?: number;
+    q1?: number;
+    q2?: number;
+    q3?: number;
+    q4?: number;
+    q5?: number;
+    s?: number;
+  };
+  fixed: { guess: { a?: number; b?: number; q1?: number }; slip: { q6?: number } };
+  parameters: number;
+  rank: number;
+}[];
+const identifiabilityFixture = readFixture<KstIdentifiabilityFixture>("kst-identifiability.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+type KstIitaFixture = {
+  name: string;
+  items: string[];
+  patterns: { "10000"?: number };
+  selection: { a?: string[]; b?: string[]; c?: string[]; d?: string[]; e?: string[]; i1?: string[] }[];
+  versions: {
+    minimized: {
+      diff: number[];
+      selected: number;
+      errorRate: number;
+      prerequisites: { a?: never[]; b?: string[]; c?: string[]; d?: string[]; e?: string[]; i1?: string[] };
+    };
+    corrected: {
+      diff: number[];
+      selected: number;
+      errorRate: number;
+      prerequisites: { a?: never[]; b?: string[]; c?: string[]; d?: string[]; e?: string[]; i1?: string[] };
+    };
+    original: {
+      diff: number[];
+      selected: number;
+      errorRate: number;
+      prerequisites: { a?: never[]; b?: never[]; c?: never[]; d?: string[]; e?: string[]; i1?: string[] };
+    };
+  };
+}[];
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const iitaFixture = readFixture<KstIitaFixture>("kst-iita.json");
+
+type KstStructureClausesFixture = {
+  name: string;
+  clauses: { a: string[][]; b: string[][]; c?: string[][]; d?: string[][]; e?: string[][] };
+  unreachable: string[];
+  structure: { domain: string[]; states: string[][] } | null;
+}[];
+const clauseFixture = readFixture<KstStructureClausesFixture>("kst-structure-clauses.json");
+
+interface KstStructureToolsFixture {
+  structures: {
+    name: string;
+    structure: { domain: string[]; states: string[][] };
+    knowledgeSpace: boolean;
+    base: string[][] | null;
+    atoms: { a?: string[][]; b?: string[][]; c?: string[][]; d?: string[][]; e?: string[][] };
+    wellGraded: boolean | null;
+    paths: string[][] | null;
+    neighbourhoods: { state: string[]; distance1: string[][]; distance2: string[][]; distance3: string[][] }[];
+    traces: { elements: string[]; structure: { domain: string[]; states: string[][] } }[];
+    notions: string[][];
+  }[];
+  closures: { domain: string[]; generators: string[][]; space: { domain: string[]; states: string[][] } }[];
+}
+const toolFixture = readFixture<KstStructureToolsFixture>("kst-structure-tools.json");
+
+interface KstStructuresFixture {
+  surmise: { name: string; prerequisites: { i1: string[] }; structure: { domain: string[]; states: string[][] } }[];
+  spaces: {
+    name: string;
+    structure: { domain: string[]; states: string[][] };
+    knowledgeSpace: boolean;
+    learningSpace: boolean;
+    inner: string[][];
+    outer: string[][];
+  }[];
+  delineation: {
+    structure: { domain: string[]; states: string[][] };
+    qMatrix: { p1: string[]; p2: string[]; p3: string[]; p4: string[]; p5: string[] };
+    items: { domain: string[]; states: string[][] };
+  };
+}
+const structureFixture = readFixture<KstStructuresFixture>("kst-structures.json");
+
+// biome-ignore-start lint/style/useNamingConvention: the keys are those of the fixture file.
+type KstValidityFixture = {
+  name: string;
+  structure: { domain: string[]; states: string[][] };
+  patterns: { "10000"?: number; "1100"?: number; "1001"?: number };
+  gamma: number | null;
+  concordant: number;
+  discordant: number;
+  violationalCoefficient: number | null;
+  discrepancyIndex: number;
+  distances: { "0": number; "1"?: number; "2"?: number; "3"?: number; "4"?: number };
+  distanceAgreement: number | null;
+  solutionRates: { a?: number; b?: number; c?: number; d?: number; e?: number; s?: number; i1?: number };
+}[];
+// biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
+const validityFixture = readFixture<KstValidityFixture>("kst-validity.json");
 
 /** Absolute tolerance of BLIM parameters fitted by EM against pks, which stops on a change of the parameters. */
 const ML_TOLERANCE = 1e-6;

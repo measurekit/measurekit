@@ -3,11 +3,25 @@ import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import { afm, type Event, eventLog, logistic, searchRates } from "../src/index.js";
 import { checkTerms } from "../src/logistic/internal.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-bkt.json" with { type: "json" };
-import itemsFixture from "./fixtures/bench-logistic-items.json" with { type: "json" };
-import lktFeatures from "./fixtures/logistic-lkt-features.json" with { type: "json" };
-import ratesFixture from "./fixtures/logistic-rates.json" with { type: "json" };
+import {
+  type BenchBktFixture,
+  type LogisticLktFeaturesFixture,
+  type LogisticRatesFixture,
+  readFixture,
+} from "./fixtures.js";
 import { columnsLog, online } from "./logs.js";
+
+const fixture = readFixture<BenchBktFixture>("bench-bkt.json");
+
+interface BenchLogisticItemsFixture {
+  small: { learner: number[]; item: number[]; skill: number[]; outcome: number[]; gradient: number };
+  large: { learner: number[]; item: number[]; skill: number[]; outcome: number[]; gradient: number };
+}
+const itemsFixture = readFixture<BenchLogisticItemsFixture>("bench-logistic-items.json");
+
+const lktFeatures = readFixture<LogisticLktFeaturesFixture>("logistic-lkt-features.json");
+
+const ratesFixture = readFixture<LogisticRatesFixture>("logistic-rates.json");
 
 /** The log of the BKT benchmark: 20,000 attempts of 200 learners at 5 skills. */
 const log = columnsLog(fixture);

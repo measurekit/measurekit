@@ -2,8 +2,14 @@ import { test } from "vitest";
 import { eventLog, irt } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-irt.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
 import { online } from "./logs.js";
+
+interface BenchIrtFixture {
+  responses: number[][];
+  items: { a: number[]; b: number[] };
+}
+const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
 
 /** 2,000 learners answer 40 items in turn: 80,000 responses. */
 const DRIFT_LEARNERS = 200;

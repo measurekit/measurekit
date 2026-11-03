@@ -19,9 +19,34 @@ import {
   type SparseMatrix,
 } from "../src/math/internal.js";
 import { defined, expectAllClose, expectClose } from "./assertions.js";
-import hiddenMarkov from "./fixtures/math-forward-backward.json" with { type: "json" };
-import functions from "./fixtures/math-functions.json" with { type: "json" };
-import regressions from "./fixtures/math-logistic-regression.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface MathForwardBackwardFixture {
+  sequences: {
+    stateCount: number;
+    initial: number[];
+    transitions: number[];
+    emissions: number[];
+    logLikelihood: number;
+    posteriors: number[];
+    transitionPosteriors: number[];
+    predictions: number[];
+  }[];
+}
+const hiddenMarkov = readFixture<MathForwardBackwardFixture>("math-forward-backward.json");
+
+interface MathFunctionsFixture {
+  p: number[];
+  normalQuantile: number[];
+  x: number[];
+  logistic: number[];
+}
+const functions = readFixture<MathFunctionsFixture>("math-functions.json");
+
+interface MathLogisticRegressionFixture {
+  regressions: { design: number[][]; outcomes: number[]; coefficients: number[]; logLikelihood: number }[];
+}
+const regressions = readFixture<MathLogisticRegressionFixture>("math-logistic-regression.json");
 
 /** Relative tolerance of the normal quantile and the logistic function against R. */
 const FUNCTION_TOLERANCE = 1e-14;

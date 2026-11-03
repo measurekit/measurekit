@@ -13,9 +13,51 @@ import {
   eventLog,
 } from "../src/index.js";
 import { allPredicted, correlation, defined, expectAllClose, expectClose } from "./assertions.js";
-import recovery from "./fixtures/elo-recovery.json" with { type: "json" };
-import worked from "./fixtures/elo-worked.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
 import { expectUnaffectedByLessons } from "./logs.js";
+
+interface EloRecoveryFixture {
+  thresholds: { ability: number; difficulty: number };
+  learners: number[];
+  items: number[];
+  outcomes: number[];
+  trueAbility: number[];
+  trueDifficulty: number[];
+  ability: number[];
+  difficulty: number[];
+}
+const recovery = readFixture<EloRecoveryFixture>("elo-recovery.json");
+
+interface EloWorkedFixture {
+  cases: {
+    name: string;
+    options: { uncertainty: { a: number; b: number }; skills: boolean; skillWeight?: number };
+    parameters: { items: { q1?: { difficulty: number; count: number }; q3?: { difficulty: number; count: number } } };
+    events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
+    predictions: number[];
+    states: {
+      ana: {
+        learner: string;
+        ability: number;
+        count: number;
+        skills: { fractions?: { ability: number; count: number }; decimals?: { ability: number; count: number } };
+      };
+      budi: {
+        learner: string;
+        ability: number;
+        count: number;
+        skills: { fractions?: { ability: number; count: number }; decimals?: { ability: number; count: number } };
+      };
+    };
+    items: {
+      q1: { difficulty: number; count: number };
+      q2: { difficulty: number; count: number };
+      q3: { difficulty: number; count: number };
+    };
+    logLikelihood: number;
+  }[];
+}
+const worked = readFixture<EloWorkedFixture>("elo-worked.json");
 
 /** Absolute tolerance of Elo estimates and predictions against the R replay. */
 const ELO_TOLERANCE = 1e-12;

@@ -19,15 +19,533 @@ import {
   splitByLearner,
 } from "../src/index.js";
 import { allPredicted, defined, expectClose } from "./assertions.js";
-import bounded from "./fixtures/bkt-bounds.json" with { type: "json" };
-import fixedFixture from "./fixtures/bkt-fixed.json" with { type: "json" };
-import lessons from "./fixtures/bkt-lessons.json" with { type: "json" };
-import opportunities from "./fixtures/bkt-opportunities.json" with { type: "json" };
-import pairFixture from "./fixtures/bkt-pairs.json" with { type: "json" };
-import practice from "./fixtures/bkt-practice.json" with { type: "json" };
-import recovery from "./fixtures/bkt-recovery.json" with { type: "json" };
-import skillFixture from "./fixtures/bkt-skills.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
 import { online } from "./logs.js";
+
+interface BktBoundsFixture {
+  tolerance: number;
+  start: { prior: number; learn: number; forget: number; guess: number; slip: number };
+  truth: { prior: number; learn: number; forget: number; guess: number; slip: number };
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
+  fits: {
+    name: string;
+    forgetting: boolean;
+    bounds: { guess?: number[]; slip?: number[]; learn?: number[]; forget?: number[]; prior?: number[] };
+    parameters: { prior: number; learn: number; forget: number; guess: number; slip: number };
+    logLikelihood: number;
+  }[];
+}
+const bounded = readFixture<BktBoundsFixture>("bkt-bounds.json");
+
+interface BktFixedFixture {
+  tolerance: number;
+  maxIterations: number;
+  fits: {
+    name: string;
+    options: { resourceLearning?: boolean; itemGuessSlip?: boolean };
+    log: string;
+    fixed: {
+      a?: { learn?: number; guess?: number; slip?: number };
+      b?: { learn?: number; guess?: number; slip?: number };
+      c?: { learn?: number; guess?: number; slip?: number };
+      s?: { resources: { lesson: { learn: number } } };
+    };
+    start: {
+      skills: {
+        a?: { prior: number; learn: number; forget: number; guess: number; slip: number };
+        b?: { prior: number; learn: number; forget: number; guess: number; slip: number };
+        c?: { prior: number; learn: number; forget: number; guess: number; slip: number };
+        s?: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          resourceLearning: { lesson: { learn: number; forget: number }; practice: { learn: number; forget: number } };
+          itemGuessSlip: {
+            p1: { guess: number; slip: number };
+            p2: { guess: number; slip: number };
+            p3: { guess: number; slip: number };
+          };
+        };
+      };
+    };
+    parameters: {
+      skills: {
+        a?: { prior: number; learn: number; forget: number; guess: number; slip: number };
+        b?: { prior: number; learn: number; forget: number; guess: number; slip: number };
+        c?: { prior: number; learn: number; forget: number; guess: number; slip: number };
+        s?: {
+          prior: number;
+          resourceLearning: { lesson: { learn: number; forget: number }; practice: { learn: number; forget: number } };
+          learn: number;
+          forget: number;
+          itemGuessSlip: {
+            p1: { guess: number; slip: number };
+            p2: { guess: number; slip: number };
+            p3: { guess: number; slip: number };
+          };
+          guess: number;
+          slip: number;
+        };
+      };
+    };
+    iterations: number;
+    logLikelihood: number;
+  }[];
+}
+const fixedFixture = readFixture<BktFixedFixture>("bkt-fixed.json");
+
+interface BktLessonsFixture {
+  tolerance: number;
+  maxIterations: number;
+  truth: {
+    skills: {
+      s: {
+        prior: number;
+        resourceLearning: { lesson: { learn: number; forget: number }; practice: { learn: number; forget: number } };
+      };
+    };
+  };
+  events: { learner: string; item: string; resource: string; skills: string[]; time: number; outcome: number | null }[];
+  inference: {
+    name: string;
+    options: { resourceLearning?: boolean; itemGuessSlip?: boolean; forgetting?: boolean };
+    parameters: {
+      skills: {
+        s: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          resourceLearning?: { lesson: { learn: number; forget: number }; practice: { learn: number; forget: number } };
+          itemGuessSlip?: {
+            p1: { guess: number; slip: number };
+            p2: { guess: number; slip: number };
+            p3: { guess: number; slip: number };
+          };
+        };
+      };
+    };
+    predictions: (number | null)[];
+    mastery: number[];
+  }[];
+  fits: {
+    name: string;
+    options: { resourceLearning?: boolean; itemGuessSlip?: boolean; forgetting?: boolean };
+    start: {
+      skills: {
+        s: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          resourceLearning?: { lesson: { learn: number; forget: number }; practice: { learn: number; forget: number } };
+          itemGuessSlip?: {
+            p1: { guess: number; slip: number };
+            p2: { guess: number; slip: number };
+            p3: { guess: number; slip: number };
+          };
+        };
+      };
+    };
+    parameters: {
+      skills: {
+        s: {
+          prior: number;
+          resourceLearning?: { lesson: { learn: number; forget: number }; practice: { learn: number; forget: number } };
+          learn: number;
+          forget: number;
+          itemGuessSlip?: {
+            p1: { guess: number; slip: number };
+            p2: { guess: number; slip: number };
+            p3: { guess: number; slip: number };
+          };
+          guess: number;
+          slip: number;
+        };
+      };
+    };
+    iterations: number;
+    logLikelihood: number;
+  }[];
+}
+const lessons = readFixture<BktLessonsFixture>("bkt-lessons.json");
+
+interface BktOpportunitiesFixture {
+  cases: { mastery: number; learn: number; forget: number; threshold: number; opportunities: number | null }[];
+}
+const opportunities = readFixture<BktOpportunitiesFixture>("bkt-opportunities.json");
+
+interface BktPairsFixture {
+  tolerance: number;
+  maxIterations: number;
+  options: { pairLearning: boolean; itemGuessSlip: boolean; forgetting: boolean };
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
+  inference: {
+    parameters: {
+      skills: {
+        p: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          pairLearning: {
+            i1: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i2: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i3: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i4: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+          };
+          itemGuessSlip: {
+            i1: { guess: number; slip: number };
+            i2: { guess: number; slip: number };
+            i3: { guess: number; slip: number };
+            i4: { guess: number; slip: number };
+          };
+        };
+      };
+    };
+    predictions: number[];
+    mastery: number[];
+  };
+  fit: {
+    start: {
+      skills: {
+        p: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          pairLearning: {
+            i1: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i2: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i3: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i4: {
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+          };
+          itemGuessSlip: {
+            i1: { guess: number; slip: number };
+            i2: { guess: number; slip: number };
+            i3: { guess: number; slip: number };
+            i4: { guess: number; slip: number };
+          };
+        };
+      };
+    };
+    parameters: {
+      skills: {
+        p: {
+          prior: number;
+          learn: number;
+          forget: number;
+          pairLearning: {
+            i4: {
+              i3: { learn: number; forget: number };
+              i1: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i3: {
+              i1: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i2: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+            };
+            i1: {
+              i2: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+              i1: { learn: number; forget: number };
+            };
+            i2: {
+              i2: { learn: number; forget: number };
+              i4: { learn: number; forget: number };
+              i1: { learn: number; forget: number };
+              i3: { learn: number; forget: number };
+            };
+          };
+          itemGuessSlip: {
+            i1: { guess: number; slip: number };
+            i2: { guess: number; slip: number };
+            i3: { guess: number; slip: number };
+            i4: { guess: number; slip: number };
+          };
+          guess: number;
+          slip: number;
+        };
+      };
+    };
+    iterations: number;
+    logLikelihood: number;
+  };
+}
+const pairFixture = readFixture<BktPairsFixture>("bkt-pairs.json");
+
+interface BktPracticeFixture {
+  tolerance: number;
+  maxIterations: number;
+  events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
+  priorGroups: Record<string, string>;
+  inference: {
+    name: string;
+    options: { forgetting?: boolean; itemGuessSlip?: boolean; resourceLearning?: boolean; priorGroups?: boolean };
+    parameters: {
+      skills: {
+        a: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: {
+            a1: { guess: number; slip: number };
+            a2: { guess: number; slip: number };
+            a3: { guess: number; slip: number };
+            ab: { guess: number; slip: number };
+          };
+          resourceLearning?: {
+            a1: { learn: number; forget: number };
+            a2: { learn: number; forget: number };
+            a3: { learn: number; forget: number };
+            ab: { learn: number; forget: number };
+          };
+          groupPriors?: { high: number };
+        };
+        b: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: {
+            ab: { guess: number; slip: number };
+            b1: { guess: number; slip: number };
+            b2: { guess: number; slip: number };
+            b3: { guess: number; slip: number };
+          };
+          resourceLearning?: {
+            ab: { learn: number; forget: number };
+            b1: { learn: number; forget: number };
+            b2: { learn: number; forget: number };
+            b3: { learn: number; forget: number };
+          };
+          groupPriors?: { high: number };
+        };
+        c: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: { c1: { guess: number; slip: number }; c2: { guess: number; slip: number } };
+          resourceLearning?: { c1: { learn: number; forget: number }; c2: { learn: number; forget: number } };
+          groupPriors?: { high: number };
+        };
+      };
+    };
+    predictions: number[];
+    mastery: number[][];
+  }[];
+  fits: {
+    name: string;
+    options: { forgetting?: boolean; itemGuessSlip?: boolean; resourceLearning?: boolean; priorGroups?: boolean };
+    start: {
+      skills: {
+        a: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: {
+            a1: { guess: number; slip: number };
+            a2: { guess: number; slip: number };
+            a3: { guess: number; slip: number };
+            ab: { guess: number; slip: number };
+          };
+          resourceLearning?: {
+            a1: { learn: number; forget: number };
+            a2: { learn: number; forget: number };
+            a3: { learn: number; forget: number };
+            ab: { learn: number; forget: number };
+          };
+          groupPriors?: { high: number };
+        };
+        b: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: {
+            ab: { guess: number; slip: number };
+            b1: { guess: number; slip: number };
+            b2: { guess: number; slip: number };
+            b3: { guess: number; slip: number };
+          };
+          resourceLearning?: {
+            ab: { learn: number; forget: number };
+            b1: { learn: number; forget: number };
+            b2: { learn: number; forget: number };
+            b3: { learn: number; forget: number };
+          };
+          groupPriors?: { high: number };
+        };
+        c: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: { c1: { guess: number; slip: number }; c2: { guess: number; slip: number } };
+          resourceLearning?: { c1: { learn: number; forget: number }; c2: { learn: number; forget: number } };
+          groupPriors?: { high: number };
+        };
+      };
+    };
+    parameters: {
+      skills: {
+        a: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: {
+            a1: { guess: number; slip: number };
+            a2: { guess: number; slip: number };
+            a3: { guess: number; slip: number };
+            ab: { guess: number; slip: number };
+          };
+          resourceLearning?: {
+            a1: { learn: number; forget: number };
+            a2: { learn: number; forget: number };
+            a3: { learn: number; forget: number };
+            ab: { learn: number; forget: number };
+          };
+          groupPriors?: { high: number };
+        };
+        b: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: {
+            ab: { guess: number; slip: number };
+            b1: { guess: number; slip: number };
+            b2: { guess: number; slip: number };
+            b3: { guess: number; slip: number };
+          };
+          resourceLearning?: {
+            ab: { learn: number; forget: number };
+            b1: { learn: number; forget: number };
+            b2: { learn: number; forget: number };
+            b3: { learn: number; forget: number };
+          };
+          groupPriors?: { high: number };
+        };
+        c: {
+          prior: number;
+          learn: number;
+          forget: number;
+          guess: number;
+          slip: number;
+          itemGuessSlip?: { c1: { guess: number; slip: number }; c2: { guess: number; slip: number } };
+          resourceLearning?: { c1: { learn: number; forget: number }; c2: { learn: number; forget: number } };
+          groupPriors?: { high: number };
+        };
+      };
+    };
+    iterations: number;
+    logLikelihood: number;
+  }[];
+  restarts: {
+    a: {
+      parameters: { prior: number; learn: number; forget: number; guess: number; slip: number };
+      logLikelihood: number;
+    };
+    b: {
+      parameters: { prior: number; learn: number; forget: number; guess: number; slip: number };
+      logLikelihood: number;
+    };
+    c: {
+      parameters: { prior: number; learn: number; forget: number; guess: number; slip: number };
+      logLikelihood: number;
+    };
+  };
+}
+const practice = readFixture<BktPracticeFixture>("bkt-practice.json");
+
+interface BktRecoveryFixture {
+  thresholds: { prior: number; rate: number };
+  truth: {
+    s1: { prior: number; learn: number; forget: number; guess: number; slip: number };
+    s2: { prior: number; learn: number; forget: number; guess: number; slip: number };
+  };
+  learners: number[];
+  skills: number[];
+  outcomes: number[];
+  trueLogLikelihood: number;
+}
+const recovery = readFixture<BktRecoveryFixture>("bkt-recovery.json");
+
+interface BktSkillsFixture {
+  tolerance: number;
+  maxIterations: number;
+  fits: {
+    name: string;
+    skills: {
+      a: { iterations: number; logLikelihood: number; events: number };
+      b: { iterations: number; logLikelihood: number; events: number };
+      c: { iterations: number; logLikelihood: number; events: number };
+    };
+  }[];
+}
+const skillFixture = readFixture<BktSkillsFixture>("bkt-skills.json");
 
 /** Absolute tolerance of P(correct) and P(L) against pyBKT at fixed parameters. */
 const INFERENCE_TOLERANCE = 1e-13;

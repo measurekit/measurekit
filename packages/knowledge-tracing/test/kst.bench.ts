@@ -12,8 +12,20 @@ import {
   unionClosure,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
-import fixture from "./fixtures/bench-kst.json" with { type: "json" };
-import structureFixture from "./fixtures/bench-kst-structure.json" with { type: "json" };
+import { readFixture } from "./fixtures.js";
+
+interface BenchKstFixture {
+  itemIds: string[];
+  responses: number[][];
+}
+const fixture = readFixture<BenchKstFixture>("bench-kst.json");
+
+interface BenchKstStructureFixture {
+  domain: string[];
+  states: string[][];
+  clauses: Record<string, string[][]>;
+}
+const structureFixture = readFixture<BenchKstStructureFixture>("bench-kst-structure.json");
 
 /** 1,000 persons answer 12 items: 12,000 responses. */
 const log = eventLog(
