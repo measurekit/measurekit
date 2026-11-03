@@ -47,9 +47,9 @@ bench_task("kst.mdml", "Fit of the basic local independence model of a chain of 
 bench_task("kst.identifiability", "Rank of the Jacobian of the pattern probabilities of the model of a chain of 12 items",
            sprintf("%d items, %d states, %d parameters", item_count, nrow(states), nrow(states) - 1 + 2 * item_count),
            reference("pks", "jacobian` and `qr"), function() qr(jacobian(list(K = states)))$rank,
-           note = paste("pks's `jacobian` takes 10 ms and `qr` 1 ms, measurekit's Jacobian 5 ms and its rank 10 ms: the rank",
-                        "orthogonalizes each column twice by Gram-Schmidt in JavaScript, where `qr` runs LINPACK's Householder",
-                        "in Fortran"))
+           note = paste("pks's `jacobian` takes 10 ms and `qr` 1 ms, measurekit's Jacobian 5 ms and its rank",
+                        "10 ms: the rank orthogonalizes each column twice by Gram-Schmidt in JavaScript, where `qr`",
+                        "runs Householder reflections in compiled Fortran"))
 
 chain <- kstructure(as.set(lapply(seq_len(nrow(states)), function(r) as.set(colnames(states)[states[r, ] == 1]))))
 bench_task("kst.validity", "Validity of the chain against the responses: gamma, violational coefficient, solution rates, discrepancy index and distance agreement",
