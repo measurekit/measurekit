@@ -172,6 +172,14 @@ export const RULES: readonly Rule[] = [
     titles: "far above the others from the categories",
   },
   {
+    rule: "Conditional maximum likelihood takes at most 2^29 products of its functions with two items left out in a Newton step, as they grow with the patterns of answered items times about the fourth power of their items.",
+    file: "packages/psychometrics/src/irt/conditional-likelihood.ts",
+    find: "if (products > MAX_PAIR_PRODUCTS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "products of the functions with two items left out",
+  },
+  {
     rule: "Every category below an item's highest response has a response.",
     file: "packages/psychometrics/src/irt/responses.ts",
     find: "if (counts.size <= highest) {",

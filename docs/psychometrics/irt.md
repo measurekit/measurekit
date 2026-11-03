@@ -745,8 +745,15 @@ P(x | r) = Π_i e^(-η_(i x_i)) / γ_r(A).
   Newton's method starts from thresholds of 0, halves a step that lowers the log-likelihood, and stops when no parameter
   changes by more than `tolerance`. The standard errors come from the inverse of the Hessian at the estimates.
 - **Cost.** Each group of persons who answered the same items takes its own functions, two items left out for every pair,
-  so a Newton step takes time in proportion to the groups times about the fourth power of their items: 0.1 s on complete
-  responses to 100 items, 1.3 s to 200, and 5 s on 2,000 persons with a fifth of 50 items missing at random.
+  so a Newton step takes time in proportion to the groups times about the fourth power of their items. The products of
+  those functions are at most 2^29 in a step, or the fit throws `DataError`. Near the limit, on a quiet machine and on
+  one under load:
+
+| Responses near the limit                            | Newton step  | Fit, 6 or 7 steps |
+| --------------------------------------------------- | ------------ | ----------------- |
+| 2,000 persons, 283 items, complete                  | 0.6 to 1.1 s | 4.6 to 8.6 s      |
+| 2,000 persons, 50 items, a fifth missing at random  | 1.4 to 3.4 s | 13 to 26 s        |
+| 40,000 persons, 25 items, a fifth missing at random | 4.6 to 8.5 s | 34 to 60 s        |
 
 | Option          | Default                                                          | Meaning                |
 | --------------- | ---------------------------------------------------------------- | ---------------------- |

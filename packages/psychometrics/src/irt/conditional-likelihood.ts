@@ -79,6 +79,12 @@ const DEFAULT_MAX_ITERATIONS = 100;
 const MAX_HALVES = 30;
 /** The relative decrease of the log-likelihood a step may show: the rounding error of a sum over all persons. */
 const LIKELIHOOD_SLACK = 1e-12;
+/**
+ * The most products that the functions with two items left out take in one evaluation, over the groups of persons who
+ * answered the same items. They grow with the groups times about the fourth power of their items: 2^29 is about 290
+ * dichotomous items that every person answered, or 2,000 persons who each miss a fifth of 50 items at random.
+ */
+const MAX_PAIR_PRODUCTS = 2 ** 29;
 
 /**
  * Estimates the Rasch, partial credit or rating scale model by conditional maximum likelihood (CML), as eRm's `RM`,
@@ -95,7 +101,8 @@ const LIKELIHOOD_SLACK = 1e-12;
  *
  * A person who answered fewer than two items, or whose total is 0 or the highest possible on the items answered, adds
  * nothing to the conditional likelihood and is left out. An item's categories run from 0 to its highest response in
- * the matrix, and the persons used need a response in each.
+ * the matrix, and the persons used need a response in each. The functions with two items left out take products that
+ * grow with the groups times about the fourth power of their items, at most 2^29 in a Newton step.
  *
  * @param matrix - The responses of the persons.
  * @param options - The model and the stopping rules.
@@ -103,7 +110,8 @@ const LIKELIHOOD_SLACK = 1e-12;
  *   method converged and the steps taken.
  * @throws `DataError` when the matrix or an option is invalid, there are fewer than two items, the Rasch model meets a
  * response above 1, an item has no response from the persons used in a category up to its highest, as an item every
- * person answered right or wrong, or the items of the rating scale model differ in their number of categories.
+ * person answered right or wrong, the items of the rating scale model differ in their number of categories, or the
+ * functions with two items left out would take more than 2^29 products in a Newton step.
  * @see {@link https://doi.org/10.1111/j.2517-6161.1972.tb00887.x | Andersen (1972)}
  * @see {@link https://doi.org/10.1007/978-1-4612-4230-7_3 | Molenaar (1995)}
  * @see {@link https://doi.org/10.18637/jss.v020.i09 | Mair and Hatzinger (2007)}
@@ -147,6 +155,12 @@ export function conditionalFit(matrix: ResponseMatrix, options: ConditionalCalib
   // above the others is refused before the highest responses size the parameters and their sums.
   checkItems(matrix.itemIds, highest, model, everyPerson);
   const data = conditionalData(matrix, highest, model);
+  const products = pairProducts(data.groups, highest);
+  if (products > MAX_PAIR_PRODUCTS) {
+    throw new DataError(
+      `Conditional maximum likelihood would take ${products} products of the functions with two items left out in each Newton step, more than ${MAX_PAIR_PRODUCTS}, as they grow with the patterns of answered items times about the fourth power of their items; calibrate fewer items, or by marginal maximum likelihood with calibrate.`,
+    );
+  }
   const layout = parameterLayout(highest, model);
   const maximum = maximize(data, layout, tolerance, maxIterations);
   const { values, covariance } = reportedValues(layout, maximum.estimates, maximum.covariance);
@@ -232,6 +246,27 @@ function conditionalData(matrix: ResponseMatrix, highest: Int32Array, model: Con
   }
   checkItems(matrix.itemIds, highest, model, tallies);
   return { offsets, groups: [...groups.values()], responseCounts, persons };
+}
+
+/**
+ * Returns the products that {@link leaveOut}'s pairs take over the groups: for the pair of a group's items i < j, the
+ * scores of the items before j but i times those of the items after j, each plus 1, summed over i as j (1 + P_j) - P_j,
+ * with P_j the highest scores before j.
+ */
+function pairProducts(groups: readonly PatternGroup[], highest: Int32Array): number {
+  let products = 0;
+  for (const { items } of groups) {
+    let before = 0;
+    let after = 0;
+    for (const item of items) after += highest[item] ?? 0;
+    for (let j = 0; j < items.length; j++) {
+      const categories = highest[items[j] ?? 0] ?? 0;
+      after -= categories;
+      products += (j * (1 + before) - before) * (1 + after);
+      before += categories;
+    }
+  }
+  return products;
 }
 
 /** Returns the items a person answered, the total over them and its highest possible value. */

@@ -1443,6 +1443,14 @@ describe("conditionalMaximumLikelihood", () => {
     }
   }, 5_000);
 
+  it("takes at most 2^29 products of the functions with two items left out in a Newton step", () => {
+    // Three persons answer 284 items: the pairs of one group take Σ j² (284 - j) products, 0.7 s a step at 283 items.
+    const rows = [0, 1, 2].map((k) => Array.from({ length: 284 }, (_, j) => (j + k) % 2));
+    expect(() => conditionalMaximumLikelihood(responseMatrix(rows), { maxIterations: 1 })).toThrow(
+      "Conditional maximum likelihood would take 542109140 products of the functions with two items left out in each Newton step, more than 536870912,",
+    );
+  });
+
   it("rejects options of other types", () => {
     const matrix = responseMatrix(defined(conditional.cases[0]).responses);
     expect(() => conditionalMaximumLikelihood(matrix, JSON.parse("null"))).toThrow(
