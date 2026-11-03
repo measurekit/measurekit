@@ -36,13 +36,22 @@ export interface CorrectedPersonFit {
   readonly standardized: number | null;
 }
 
-/** One answered item at a person's theta: its response, P and Q, and the derivatives of P. */
+/**
+ * A person's answered items at the person's theta, in item order: each response, P and Q, the derivatives of P and the
+ * log-odds w = ln(P / Q), in arrays that every person reuses; `count` items are the person's.
+ */
 interface ItemTerms {
-  readonly response: number;
-  readonly p: number;
-  readonly q: number;
-  readonly first: number;
-  readonly second: number;
+  count: number;
+  readonly responses: Float64Array;
+  readonly p: Float64Array;
+  readonly q: Float64Array;
+  readonly first: Float64Array;
+  readonly second: Float64Array;
+  readonly logOdds: Float64Array;
+  /** Room for one item's probabilities and their first and second derivatives, by category. */
+  readonly probabilities: Float64Array;
+  readonly derivatives: Float64Array;
+  readonly curvatures: Float64Array;
 }
 
 /**
@@ -85,31 +94,62 @@ export function correctedPersonFit(
       throw new DataError(`lz* needs dichotomous items, but item "${matrix.itemIds[column]}" has ${count} categories.`);
     }
   });
-  const probabilities = new Float64Array(2);
-  const first = new Float64Array(2);
-  const second = new Float64Array(2);
+  const terms = itemTerms(items.length);
   return matrix.responses.map((row, person) => {
     const id = matrix.personIds[person] ?? "";
     const theta = thetas[person] ?? 0;
     if (isExtreme(items, row)) return { id, standardized: null };
-    const terms = row.flatMap((response, column): ItemTerms[] => {
-      const item = items[column];
-      if (response === null || item === undefined) return [];
-      item.model.probabilities(item.parameters, theta, probabilities);
-      item.model.thetaDerivatives(item.parameters, theta, first, second);
-      const [q = 0, p = 0] = probabilities;
-      return [{ response, p, q, first: first[1] ?? 0, second: second[1] ?? 0 }];
-    });
+    fillTerms(terms, items, row, theta);
     const correction = estimatorTerm(estimator, terms, theta, mean, sd);
     const standardized = lzStar(terms, correction);
     return { id, standardized: Number.isFinite(standardized) ? standardized : null };
   });
 }
 
+/** Returns room for the terms of `size` items. */
+function itemTerms(size: number): ItemTerms {
+  const room = (length = size): Float64Array => new Float64Array(length);
+  return {
+    count: 0,
+    responses: room(),
+    p: room(),
+    q: room(),
+    first: room(),
+    second: room(),
+    logOdds: room(),
+    probabilities: room(2),
+    derivatives: room(2),
+    curvatures: room(2),
+  };
+}
+
+/** Writes the terms of a person's answered items at theta into `terms`. */
+function fillTerms(terms: ItemTerms, items: readonly IrtItem[], row: readonly (number | null)[], theta: number): void {
+  const { probabilities, derivatives, curvatures } = terms;
+  let count = 0;
+  for (let column = 0; column < row.length; column++) {
+    const response = row[column] ?? null;
+    const item = items[column];
+    if (response === null || item === undefined) continue;
+    item.model.probabilities(item.parameters, theta, probabilities);
+    item.model.thetaDerivatives(item.parameters, theta, derivatives, curvatures);
+    const q = probabilities[0] ?? 0;
+    const p = probabilities[1] ?? 0;
+    terms.responses[count] = response;
+    terms.p[count] = p;
+    terms.q[count] = q;
+    terms.first[count] = derivatives[1] ?? 0;
+    terms.second[count] = curvatures[1] ?? 0;
+    terms.logOdds[count] = logProbability(p) - logProbability(q);
+    count++;
+  }
+  terms.count = count;
+}
+
 /** Returns r₀, the term of the estimator in Snijders' correction. */
 function estimatorTerm(
   estimator: PersonFitEstimator,
-  terms: readonly ItemTerms[],
+  { count, p, q, first, second }: ItemTerms,
   theta: number,
   mean: number,
   sd: number,
@@ -118,29 +158,33 @@ function estimatorTerm(
   if (estimator === "maximum-likelihood") return 0;
   let curvature = 0;
   let information = 0;
-  for (const { p, q, first, second } of terms) {
-    curvature += (first * second) / (p * q);
-    information += (first * first) / (p * q);
+  for (let j = 0; j < count; j++) {
+    const pq = (p[j] ?? 0) * (q[j] ?? 0);
+    const slope = first[j] ?? 0;
+    curvature += (slope * (second[j] ?? 0)) / pq;
+    information += (slope * slope) / pq;
   }
   return curvature / (2 * information);
 }
 
 /** Returns lz*, (W + c r₀) / √(Σ w̃² P Q), from the terms of the answered items and r₀. */
-function lzStar(terms: readonly ItemTerms[], correction: number): number {
+function lzStar({ count, responses, p, q, first, logOdds }: ItemTerms, correction: number): number {
   let residual = 0;
   let weighted = 0;
   let scaled = 0;
-  for (const { response, p, q, first } of terms) {
-    const w = logProbability(p) - logProbability(q);
-    residual += (response - p) * w;
-    weighted += first * w;
-    scaled += (first * first) / (p * q);
+  for (let j = 0; j < count; j++) {
+    const w = logOdds[j] ?? 0;
+    const slope = first[j] ?? 0;
+    residual += ((responses[j] ?? 0) - (p[j] ?? 0)) * w;
+    weighted += slope * w;
+    scaled += (slope * slope) / ((p[j] ?? 0) * (q[j] ?? 0));
   }
   const c = weighted / scaled;
   let variance = 0;
-  for (const { p, q, first } of terms) {
-    const tilde = logProbability(p) - logProbability(q) - (c * first) / (p * q);
-    variance += tilde * tilde * p * q;
+  for (let j = 0; j < count; j++) {
+    const pq = (p[j] ?? 0) * (q[j] ?? 0);
+    const tilde = (logOdds[j] ?? 0) - (c * (first[j] ?? 0)) / pq;
+    variance += tilde * tilde * (p[j] ?? 0) * (q[j] ?? 0);
   }
   return (residual + c * correction) / Math.sqrt(variance);
 }

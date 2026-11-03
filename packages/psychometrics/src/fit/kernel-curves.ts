@@ -221,6 +221,12 @@ interface NodeWeights {
   readonly shares: Float64Array;
 }
 
+/** The sums of an item's weights at a node: their total and the total of their squares. */
+interface WeightSums {
+  total: number;
+  squares: number;
+}
+
 /**
  * Writes an item's shares and their standard errors at node `q`. The persons' weights serve every item; where those of
  * the item's persons underflow, as when they are far from the node and others near it, they are taken again relative to
@@ -232,20 +238,13 @@ function smooth(
   curve: CurveRows,
   q: number,
 ): void {
-  let sum = 0;
-  for (const person of persons) sum += weights[person] ?? 0;
-  const relative = sum >= MIN_NORMAL;
-  if (!relative) relativeWeights(node, scores, h, own, persons);
-  let total = 0;
-  let squares = 0;
-  shares.fill(0);
-  persons.forEach((person, j) => {
-    const w = (relative ? weights[person] : own[j]) ?? 0;
-    total += w;
-    squares += w * w;
-    const k = responses[j] ?? 0;
-    shares[k] = (shares[k] ?? 0) + w;
-  });
+  const sums: WeightSums = { total: 0, squares: 0 };
+  addShares(persons, responses, (j) => weights[persons[j] ?? 0] ?? 0, shares, sums);
+  if (!(sums.total >= MIN_NORMAL)) {
+    relativeWeights(node, scores, h, own, persons);
+    addShares(persons, responses, (j) => own[j] ?? 0, shares, sums);
+  }
+  const { total, squares } = sums;
   for (let k = 0; k < categories; k++) {
     const p = (shares[k] ?? 0) / total;
     // 1 - p as the share of the other categories, which keeps its digits where p is within rounding of 1.
@@ -256,4 +255,29 @@ function smooth(
     if (probabilities !== undefined) probabilities[q] = p;
     if (errors !== undefined) errors[q] = Math.sqrt(p * (others / total) * squares) / total;
   }
+}
+
+/**
+ * Sums an item's weights, their squares and the weights of each category, in the order of the item's persons, into
+ * `sums` and `shares`, both reset first.
+ */
+function addShares(
+  persons: Int32Array,
+  responses: Int32Array,
+  weightOf: (j: number) => number,
+  shares: Float64Array,
+  sums: WeightSums,
+): void {
+  let total = 0;
+  let squares = 0;
+  shares.fill(0);
+  for (let j = 0; j < persons.length; j++) {
+    const w = weightOf(j);
+    total += w;
+    squares += w * w;
+    const k = responses[j] ?? 0;
+    shares[k] = (shares[k] ?? 0) + w;
+  }
+  sums.total = total;
+  sums.squares = squares;
 }

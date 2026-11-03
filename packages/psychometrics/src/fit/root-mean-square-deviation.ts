@@ -83,28 +83,36 @@ interface PosteriorSums {
  * answered item in the category of the response. A person without responses adds nothing.
  */
 function addPerson(row: readonly (number | null)[], tables: readonly ItemTable[], sums: PosteriorSums): void {
-  const answered = row.flatMap((response, i) => {
-    const table = tables[i];
-    return response === null || table === undefined ? [] : [{ table, response }];
-  });
-  if (answered.length === 0) return;
   const { posterior, shares } = sums;
-  const nodeCount = posterior.length;
   posterior.set(sums.logWeights);
-  for (const { table, response } of answered) {
-    for (let q = 0; q < nodeCount; q++) {
-      posterior[q] = (posterior[q] ?? 0) + (table.logTrace[q * table.count + response] ?? 0);
-    }
-  }
+  if (addLogTraces(row, tables, posterior) === 0) return;
   normalizeLogs(posterior);
   sums.persons++;
-  for (let q = 0; q < nodeCount; q++) shares[q] = (shares[q] ?? 0) + (posterior[q] ?? 0);
-  for (const { table, response } of answered) {
-    for (let q = 0; q < nodeCount; q++) {
+  for (let q = 0; q < posterior.length; q++) shares[q] = (shares[q] ?? 0) + (posterior[q] ?? 0);
+  for (let i = 0; i < row.length; i++) {
+    const response = row[i] ?? null;
+    const table = tables[i];
+    if (response === null || table === undefined) continue;
+    for (let q = 0; q < posterior.length; q++) {
       const cell = q * table.count + response;
       table.observed[cell] = (table.observed[cell] ?? 0) + (posterior[q] ?? 0);
     }
   }
+}
+
+/** Adds the log-probability of each answered item's response at each node to `posterior`; returns the items answered. */
+function addLogTraces(row: readonly (number | null)[], tables: readonly ItemTable[], posterior: Float64Array): number {
+  let answered = 0;
+  for (let i = 0; i < row.length; i++) {
+    const response = row[i] ?? null;
+    const table = tables[i];
+    if (response === null || table === undefined) continue;
+    answered++;
+    for (let q = 0; q < posterior.length; q++) {
+      posterior[q] = (posterior[q] ?? 0) + (table.logTrace[q * table.count + response] ?? 0);
+    }
+  }
+  return answered;
 }
 
 /** Returns an item's RMSD and mean deviation, weighting each node by `distribution`. */
