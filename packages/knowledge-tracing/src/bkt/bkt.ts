@@ -194,6 +194,8 @@ export interface BktSkillFit {
 export interface BktFit extends ModelFit<BktState, BktParameters> {
   /** The model with the estimated parameters. */
   readonly model: BktModel;
+  /** Each learner's state after their events in the log, by learner id. */
+  readonly states: Readonly<Record<string, BktState>>;
   /**
    * The fit of each skill the log estimated, by skill id: a skill met only through events without an outcome is not
    * there. The skills fit apart, so the fit of a log equals that of the log's events at each skill alone; with one

@@ -999,7 +999,16 @@ describe("KST model", () => {
     const fit = model.fit(log);
     const run = online(fit.model, log);
     expect(run.predictions).toEqual(fit.predictions);
-    expect(Object.fromEntries(run.states)).toEqual(fit.states);
+    const likely = Object.fromEntries(
+      [...run.states].map(([learner, state]) => [learner, fit.model.mostLikelyState(state)]),
+    );
+    expect(fit.mostLikelyStates).toEqual(likely);
+    expect(Object.keys(fit.mostLikelyStates)).toEqual([...run.states.keys()]);
+    expect(fit.states).toBeUndefined();
+    const withPosteriors = kst({ structure, posteriors: true }).fit(log);
+    expect(Object.fromEntries(run.states)).toEqual(withPosteriors.states);
+    expect(withPosteriors.mostLikelyStates).toEqual(fit.mostLikelyStates);
+    expect(withPosteriors.predictions).toEqual(fit.predictions);
     expect(fit.aic).not.toBeNull();
     const folds = splitByLearner(log, 3, createRandom(1));
     expect(crossValidate(model, folds).metrics.count).toBe(log.length);
@@ -1679,6 +1688,9 @@ describe("KST options from JavaScript", () => {
     ]) {
       expect(use).toThrow("The options must be an object, found null.");
     }
+    expect(() => kst({ structure, posteriors: JSON.parse('"yes"') })).toThrow(
+      'The option posteriors must be a boolean, found "yes".',
+    );
   });
 
   it("rejects structures and logs of other types", () => {

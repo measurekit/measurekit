@@ -70,8 +70,11 @@ export interface LearnerModel<TState = unknown, TParameters = unknown> {
 export interface ModelFit<TState = unknown, TParameters = unknown> {
   /** The model with the estimated parameters. */
   readonly model: LearnerModel<TState, TParameters>;
-  /** Each learner's state after their events in the log, by learner id. */
-  readonly states: Readonly<Record<string, TState>>;
+  /**
+   * Each learner's state after their events in the log, by learner id. A model whose states are large leaves them out
+   * unless asked, as KST does without its option `posteriors`; every other model of the package gives them.
+   */
+  readonly states?: Readonly<Record<string, TState>>;
   /**
    * The prediction of each event of the log, in log order, made before the event's outcome was known: `null` for an
    * event without an outcome.

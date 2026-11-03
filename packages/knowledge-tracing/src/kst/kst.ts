@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, checkStopping, DataError, describe } from "@measurekit/core";
+import { checkBoolean, checkChoice, checkOptions, checkStopping, DataError, describe } from "@measurekit/core";
 import {
   type Attempt,
   checkAttempt,
@@ -15,7 +15,7 @@ import {
   isObserved,
   type ObservedEvent,
   parametersOf,
-  replay,
+  put,
   type Steps,
 } from "../data/internal.js";
 import { indexOfMax } from "../math/internal.js";
@@ -101,6 +101,14 @@ export interface KstOptions {
    * @defaultValue none: every rate is estimated apart
    */
   readonly equal?: EqualRates;
+  /**
+   * Whether `fit` gives each learner's posterior over the knowledge states, `states`, which takes learners × states × 8
+   * bytes, beside the most likely state of each, `mostLikelyStates`. pks's `predict` gives the most likely state unless
+   * asked for the probabilities.
+   *
+   * @defaultValue `false`
+   */
+  readonly posteriors?: boolean;
 }
 
 /** A knowledge state with its probability. */
@@ -180,6 +188,13 @@ export interface KstModel extends LearnerModel<KstState, KstParameters> {
 export interface KstFit extends ModelFit<KstState, KstParameters> {
   /** The model with the estimated parameters. */
   readonly model: KstModel;
+  /**
+   * Each learner's state after their events in the log, the posterior of every knowledge state, by learner id: with the
+   * option `posteriors`, and absent without it, as it takes learners × states × 8 bytes.
+   */
+  readonly states?: Readonly<Record<string, KstState>>;
+  /** Each learner's most likely knowledge state after their events in the log, with its probability, by learner id. */
+  readonly mostLikelyStates: Readonly<Record<string, LikelyState>>;
   /**
    * G² against the model that gives each response pattern its own probability, with pks's degrees of freedom; `null`
    * unless every learner answered every item once with 0 or 1.
@@ -289,8 +304,7 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
     },
     mostLikelyState(state) {
       checkState(state, compiled.count);
-      const best = indexOfMax(state.probabilities);
-      return { state: elementsOf(compiled, best), probability: state.probabilities[best] ?? 0 };
+      return likelyOf(compiled, state.probabilities);
     },
     identifiability() {
       if (settings.over !== "items") {
@@ -357,13 +371,14 @@ function fitLog({ options, settings, compiled, parameters, maskOf }: FitContext,
       },
     },
   });
-  const { states, predictions } = replay(log, fitted.steps);
+  const { predictions, mostLikelyStates, states } = replayByLearner(log, fitted.steps, compiled, settings.posteriors);
   const k = parameterCount(compiled.count, constraints);
   const ml = settings.method === "ml";
   const complete = answeredOnce(observed, items.length);
   return {
     model: fitted.model,
-    states,
+    ...(states !== undefined && { states }),
+    mostLikelyStates,
     predictions,
     logLikelihood: result.logLikelihood,
     aic: ml ? 2 * k - 2 * result.logLikelihood : null,
@@ -373,6 +388,46 @@ function fitLog({ options, settings, compiled, parameters, maskOf }: FitContext,
     goodnessOfFit: complete ? goodnessOfFit(design, result.logLikelihood, k, items.length) : null,
     discrepancy: complete ? meanDiscrepancy(design, result.parameters, constraints) : null,
   };
+}
+
+/**
+ * Replays a log through a model's steps, as `replay` does, one learner at a time: the learners are independent at
+ * given parameters, so that the predictions and states are those of the log in time order, and only one learner's
+ * posterior is held, unless `posteriors` keeps each.
+ */
+function replayByLearner(
+  log: EventLog,
+  steps: Steps<KstState>,
+  compiled: CompiledStructure,
+  posteriors: boolean,
+): Pick<KstFit, "predictions" | "mostLikelyStates" | "states"> {
+  const positions = new Map<string, number[]>();
+  log.forEach((event, position) => {
+    const own = positions.get(event.learner);
+    if (own === undefined) positions.set(event.learner, [position]);
+    else own.push(position);
+  });
+  const predictions: (number | null)[] = log.map(() => null);
+  const mostLikelyStates: Record<string, LikelyState> = {};
+  const states: Record<string, KstState> = {};
+  for (const [learner, own] of positions) {
+    let state = steps.initialState(learner);
+    for (const position of own) {
+      const event = log[position];
+      if (event === undefined) continue;
+      if (isObserved(event)) predictions[position] = steps.predict(state, event);
+      state = steps.update(state, event);
+    }
+    put(mostLikelyStates, learner, likelyOf(compiled, state.probabilities));
+    if (posteriors) put(states, learner, state);
+  }
+  return { predictions, mostLikelyStates, ...(posteriors && { states }) };
+}
+
+/** Returns the most likely knowledge state of a distribution over them, the first on ties, with its probability. */
+function likelyOf(compiled: CompiledStructure, probabilities: readonly number[]): LikelyState {
+  const best = indexOfMax(probabilities);
+  return { state: elementsOf(compiled, best), probability: probabilities[best] ?? 0 };
 }
 
 /** Fits the BLIM by the method of the settings. */
@@ -496,6 +551,7 @@ interface Settings {
   readonly tolerance: number;
   readonly maxIterations: number;
   readonly restrictions: Restrictions;
+  readonly posteriors: boolean;
 }
 
 function settingsOf(options: KstOptions): Settings {
@@ -507,9 +563,11 @@ function settingsOf(options: KstOptions): Settings {
     maxIterations = DEFAULT_MAX_ITERATIONS,
     fixed = {},
     equal = {},
+    posteriors = false,
   } = options;
   checkChoice(over, "The option over", ["skills", "items"]);
   checkChoice(method, "The option method", ["ml", "md", "mdml"]);
   checkStopping(tolerance, maxIterations);
-  return { over, method, tolerance, maxIterations, restrictions: checkRestrictions(fixed, equal) };
+  checkBoolean(posteriors, "The option posteriors");
+  return { over, method, tolerance, maxIterations, restrictions: checkRestrictions(fixed, equal), posteriors };
 }

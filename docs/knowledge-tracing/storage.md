@@ -86,7 +86,7 @@ recalibrate when the item bank changes, and keep learners' states, which stay on
 it is linked to the previous one. Other refits run offline, on a schedule, from the log: on a recent time window, or
 on a sample of learners when the log is large. A refit writes new parameters; learner states continue from where
 they are. To rebase states on the new parameters, take them from the fit, `fit.states`, for the learners whose
-whole history the fitted log holds.
+whole history the fitted log holds; a KST model gives them when built with `posteriors: true`.
 
 Elo's `fit` replays the log in time order, a logistic model's learner proficiency ties every skill of a learner
 together, and a KST state spans the structure's skills, so these take the log of all skills at once. BKT's skills are
@@ -156,7 +156,7 @@ attempts that the largest window reaches, and all of them with a window of `Infi
 proportional to the attempts at the skill, and a fit of a log, to the square of the attempts of a learner at a skill.
 
 A KST fit takes time proportional to the learners with different answers, the items and the knowledge states, and keeps
-one learner's posterior at a time. Near the default limit, with about 9,000 states over 40 items:
+one learner's posterior at a time, unless `posteriors` asks the fit for each of them. Near the default limit, with about 9,000 states over 40 items:
 
 | Operation                                                    | Time                     |
 | ------------------------------------------------------------ | ------------------------ |

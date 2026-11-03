@@ -106,7 +106,7 @@ online. `LearnerModel<TState, TParameters>`:
 | Field                     | Meaning                                                                                                                                                                 |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`                   | The model with the estimated parameters                                                                                                                                 |
-| `states`                  | Each learner's state after their events, by learner id                                                                                                                  |
+| `states`                  | Each learner's state after their events, by learner id; a KST fit gives them with `posteriors: true`, and each learner's most likely state otherwise                    |
 | `predictions`             | Each event's prediction, made before its outcome, in log order; `null` for an event without an outcome                                                                  |
 | `logLikelihood`           | Σ y ln p + (1 - y) ln(1 - p) over the events with an outcome, from `predictions`; for learners drawn from a distribution, the marginal log-likelihood, θ integrated out |
 | `aic`, `bic`              | 2k - 2 ln L and k ln n - 2 ln L with k estimated parameters and n events with an outcome; `null` for a model without k: fitted in one pass, with a penalty or elsewhere |

@@ -130,6 +130,8 @@ export interface IrtModel extends LearnerModel<IrtState, IrtParameters> {
 export interface IrtFit extends ModelFit<IrtState, IrtParameters> {
   /** The model, unchanged. */
   readonly model: IrtModel;
+  /** Each learner's state after their events in the log, by learner id. */
+  readonly states: Readonly<Record<string, IrtState>>;
 }
 
 /** The half-width of the grid in prior standard deviations. */

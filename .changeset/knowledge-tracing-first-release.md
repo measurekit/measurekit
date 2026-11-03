@@ -62,6 +62,8 @@ keep them apart. `iita`, `diffTest` and `structureValidity` refuse an incomplete
 events, `surmiseStructure` closes prerequisites in time proportional to the elements times their prerequisites, and a
 logistic feature whose value overflows throws `DataError`.
 These analyses and `surmiseStructure` take at most 1,000 elements, IITA's candidates hold at most 24 million cells, and
-the masks of a KST model at most 2^28, each refused with `DataError` past its limit.
+the masks of a KST model at most 2^28, each refused with `DataError` past its limit. A KST fit gives each learner's most
+likely state in `mostLikelyStates`, and their posteriors in `states` only with `posteriors: true`, as they take learners
+× states × 8 bytes; `ModelFit.states` is optional for that, and every other model gives it.
 
 Every function documents each parameter and its result.

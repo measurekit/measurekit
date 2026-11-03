@@ -125,16 +125,17 @@ A learner is in one knowledge state K, with probability π(K) in the population.
 item that K masters is answered correctly with probability 1 - slip, β, the careless error; one it does not, with
 probability guess, η, the lucky guess. Outcomes between 0 and 1 count as partial credit.
 
-| Option          | Default           | Meaning                                                                                                       |
-| --------------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
-| `structure`     | required          | The knowledge structure                                                                                       |
-| `over`          | `"skills"`        | `"skills"`: a state masters an item when it holds all the attempt's skills; `"items"`: when it holds the item |
-| `method`        | `"ml"`            | `"ml"`, maximum likelihood by EM; `"md"`, minimum discrepancy; `"mdml"`, maximum likelihood subject to it     |
-| `tolerance`     | `1e-8`            | The change of the log-likelihood at which EM stops                                                            |
-| `maxIterations` | `10000`           | The most EM iterations                                                                                        |
-| `parameters`    | equal π, no items | `{ probabilities, items: { [item]: { guess, slip } } }`, π in the structure's order                           |
-| `fixed`         | none              | `{ guess, slip }`, each an object of rates by item that a fit holds: [constraints](#constraints)              |
-| `equal`         | none              | `{ guess, slip }`, each a list of groups of items that a fit gives one rate: [constraints](#constraints)      |
+| Option          | Default           | Meaning                                                                                                                           |
+| --------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `structure`     | required          | The knowledge structure                                                                                                           |
+| `over`          | `"skills"`        | `"skills"`: a state masters an item when it holds all the attempt's skills; `"items"`: when it holds the item                     |
+| `method`        | `"ml"`            | `"ml"`, maximum likelihood by EM; `"md"`, minimum discrepancy; `"mdml"`, maximum likelihood subject to it                         |
+| `tolerance`     | `1e-8`            | The change of the log-likelihood at which EM stops                                                                                |
+| `maxIterations` | `10000`           | The most EM iterations                                                                                                            |
+| `parameters`    | equal π, no items | `{ probabilities, items: { [item]: { guess, slip } } }`, π in the structure's order                                               |
+| `fixed`         | none              | `{ guess, slip }`, each an object of rates by item that a fit holds: [constraints](#constraints)                                  |
+| `equal`         | none              | `{ guess, slip }`, each a list of groups of items that a fit gives one rate: [constraints](#constraints)                          |
+| `posteriors`    | `false`           | Whether `fit` gives each learner's posterior over the states, `states`, at learners × states × 8 bytes, beside `mostLikelyStates` |
 
 ## Fitting
 
@@ -159,7 +160,10 @@ without prerequisites, its guess trades off with π, and when every state with i
 requires, its slip does. Their estimates depend on the start; the fit's predictions do not. Learners
 with the same answers are computed once. An EM iteration takes time proportional to the learners with different
 answers, the items and the states: on 2,000 learners and 40 items, about 0.07 s with 385 states and 1 s with 5,896.
-The fit's states and predictions are those of online inference with the fitted parameters.
+The fit's predictions are those of online inference with the fitted parameters. Its `mostLikelyStates` give each
+learner's most likely state after the log with its probability, as pks's `predict` does unless asked for the
+probabilities; with `posteriors: true`, `states` give each learner's posterior too, the state from which online
+inference continues, at learners × states × 8 bytes: 1 GB for 12,500 learners over 10,000 states.
 
 ### Constraints
 
@@ -188,10 +192,12 @@ nearest states of `"md"` and `"mdml"` leave them out, as pks's `betafix` and `et
 
 Each `KstFit` has the fields of any model's fit, and these:
 
-| Field           | Value                                                                                                                                                                            |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `goodnessOfFit` | `{ g2, degreesOfFreedom, pValue }`: G² against the model that gives each response pattern its own probability; `null` unless every learner answered every item once, with 0 or 1 |
-| `discrepancy`   | The mean number of items by which a learner's answers differ from the nearest state; `null` where `goodnessOfFit` is                                                             |
+| Field              | Value                                                                                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `goodnessOfFit`    | `{ g2, degreesOfFreedom, pValue }`: G² against the model that gives each response pattern its own probability; `null` unless every learner answered every item once, with 0 or 1 |
+| `discrepancy`      | The mean number of items by which a learner's answers differ from the nearest state; `null` where `goodnessOfFit` is                                                             |
+| `mostLikelyStates` | `{ [learner]: { state, probability } }`: each learner's most likely state after the log, the first on ties                                                                       |
+| `states`           | `{ [learner]: { learner, probabilities } }`: each learner's posterior, with `posteriors: true`; absent without it                                                                |
 
 The degrees of freedom are pks's: `min(2^items - 1, learners) - parameters` up to 16 items, and `min(patterns that
 occur, learners) - parameters` above. They can reach 0 or below, and `pValue` is then `null`.
@@ -232,6 +238,8 @@ const log = eventLog(
 const free = kst({ structure, over: "items" }).fit(log);
 free.goodnessOfFit; // { g2: 2.535, degreesOfFreedom: 2, pValue: 0.282 }
 free.discrepancy; // 0.068
+const partway = `l${answers.findIndex(({ pattern }) => pattern === "1100")}`;
+free.mostLikelyStates[partway]; // { state: ["add", "subtract"], probability: 0.816 }: a learner who answered 1100
 
 const equal = kst({ structure, over: "items", equal: { guess: [structure.domain], slip: [structure.domain] } }).fit(
   log,

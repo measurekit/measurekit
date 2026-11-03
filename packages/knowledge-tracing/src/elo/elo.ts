@@ -92,6 +92,8 @@ export interface EloModel extends LearnerModel<EloState, EloParameters> {
 export interface EloFit extends ModelFit<EloState, EloParameters> {
   /** The model with the item ratings at the end of the replay. */
   readonly model: EloModel;
+  /** Each learner's state after their events in the log, by learner id. */
+  readonly states: Readonly<Record<string, EloState>>;
 }
 
 /**

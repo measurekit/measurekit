@@ -140,6 +140,8 @@ export interface LogisticModel extends LearnerModel<LogisticState, LogisticParam
 export interface LogisticFit extends ModelFit<LogisticState, LogisticParameters> {
   /** The model with the estimated parameters. */
   readonly model: LogisticModel;
+  /** Each learner's state after their events in the log, by learner id. */
+  readonly states: Readonly<Record<string, LogisticState>>;
   /**
    * The standard errors in the shape of the parameters, from the inverse of the Hessian at the estimates, with the
    * binomial variance p (1 - p) as `glm` has it. `null` unless the option `standardErrors` is set, with a ridge, and
