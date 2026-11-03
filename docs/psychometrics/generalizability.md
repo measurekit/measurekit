@@ -427,6 +427,23 @@ code on the seeded scores and compares it with the mean products to 1e-9.
 - **Facets in the object of measurement.** No reference: no package that fits an object nested in another facet, such as
   persons within schools, was found.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
+
+| Function                | Error                                                                                                                                 | What to do                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `generalizabilityStudy` | A design without distinct non-empty facet names, or with more than 6 facets with the object                                           | Name each facet once; a design has at most 6 facets, as GENOVA and urGENOVA                             |
+| `generalizabilityStudy` | A nesting that names an unknown facet, nests the object or a facet in itself, or is circular                                          | Nest facets of the design in others, never the object                                                   |
+| `generalizabilityStudy` | A score without a finite `score` or a string element for every facet of the design                                                    | Give each score its value and the element of each facet in `levels`                                     |
+| `generalizabilityStudy` | A facet with fewer than 2 elements, or a balanced design of fewer scores than 2^k for k facets                                        | Each facet needs two elements in each element it is nested in                                           |
+| `generalizabilityStudy` | Without `unbalanced`: a combination of elements with two scores or none, named                                                        | Give one score for each combination, or set `unbalanced: true` for empty cells                          |
+| `generalizabilityStudy` | With `unbalanced`: a combination with two scores, or an effect without degrees of freedom, named                                      | Give at most one score for each combination; a facet whose elements always occur together is confounded |
+| `decisionStudy`         | A study that is not the result of `generalizabilityStudy`, such as one edited after JSON                                              | Pass the study as `generalizabilityStudy` returns it                                                    |
+| `decisionStudy`         | A size that is not a positive integer, or a facet of `sampleSizes`, `fixed` or `nested` that is not one of the study's but the object | Name the study's facets, with whole numbers of elements                                                 |
+| `decisionStudy`         | A study that is not balanced and `sampleSizes` without a facet                                                                        | Give the number of elements of every facet but the object                                               |
+| `decisionStudy`         | A universe score and relative error variance both 0                                                                                   | The coefficients are undefined: check the components and the fixed facets                               |
+
 ## Differences from the references
 
 | Topic                         | This package                                                   | Reference                                                     |

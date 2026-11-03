@@ -470,6 +470,25 @@ included](#not-included)).
 - **Rubin's combining rules.** No fit: a few lines over the plausible values, [a recipe](#recipe-rubins-rules).
 - **Replicate weights.** No fit: a loop over `calibrate` that the program's design sets.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
+
+| Function                                                   | Error                                                                                                                                    | What to do                                                                       |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `scaleScore`, `conversionTable`, `predictThetaScore`       | A scale without a positive finite slope and a finite intercept, `lowest` not below `highest`, or a negative `step`                       | Give the scale's slope, intercept and rounding                                   |
+| `scaleScore`, `conditionalScaleError`                      | A theta that is not finite                                                                                                               | Give an estimate of theta                                                        |
+| `conversionTable`                                          | No items, an invalid item, an invalid prior, quadrature or range, or `"true-score"` for a form whose curve does not rise                 | Use `"eap-sum"` for an NRM item or a slope a ≤ 0                                 |
+| `conditionalScaleError`, `predictFormScore`                | A conversion other than one finite scale score for each total score of the form                                                          | Give the scale scores of the totals 0 to the highest, as a conversion table does |
+| `scaleConversion`                                          | Equivalents or a conversion that are not finite numbers, or an empty conversion                                                          | Give the equated scores and the form's unrounded scale scores                    |
+| `scaleGrowth`                                              | Fewer than two groups, a label that is empty or repeats, a mean that is not finite, or a standard deviation not above 0                  | Give each grade its own label and moments, in the order of the scale             |
+| `percentileRanks`, `normStatistics`                        | A sample without finite scores, or, for norms, fewer than two scores or scores that do not vary                                          | Give the norm sample's scores                                                    |
+| `normStatistics`, `predictFormScore`, `predictThetaScore`  | A `level` not between 0 and 1                                                                                                            | Give a probability such as 0.95                                                  |
+| `predictFormScore`, `predictThetaScore`, `drawJointThetas` | A distribution of theta whose nodes are not finite or whose weights do not sum to 1 within 1e-6                                          | Pass a posterior such as `thetaPosterior` returns                                |
+| `predictThetaScore`                                        | A scale without finite `lowest` and `highest` and a `step` above 0, or of more than 10,000 reportable scores                             | Bound the scale and use a step that reports at most 10,000 scores                |
+| `drawJointThetas`                                          | No posteriors, nodes that do not ascend, or a correlation that is not a symmetric matrix of one row per posterior with 1 on the diagonal | Give the correlation of the normal scores, one row per posterior                 |
+| `drawJointThetas`                                          | A correlation with an eigenvalue below -1e-10                                                                                            | Pass it through `smoothCorrelations` of the dimensionality module                |
+
 ## Differences from the references
 
 | Topic                       | This package                                                    | Reference                                                                                                  |

@@ -334,6 +334,28 @@ angoffCutScore([ratings]).cutScore; // 14.35
 - **Nonparametric classification (Lathrop and Cheng).** Outside the sources: a research method beside Rudner's and
   Livingston-Lewis.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
+
+| Function                                 | Error                                                                                                              | What to do                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `angoffCutScore`                         | No panelists or items, panelists who rate different numbers of items, or a rating below 0                          | Give each panelist a rating of every item, from 0 to the item's highest score                     |
+| `orderedItemBooklet`, `bookmarkCutScore` | No items, ids that are not strings or repeat, an NRM item or a slope a ≤ 0                                         | Give each item its own id, and models whose expected score rises with theta                       |
+| `orderedItemBooklet`, `bookmarkCutScore` | `responseProbability` not between 0 and 1, or a logistic item with c ≥ RP or d ≤ RP                                | Choose a response probability that every item's curve passes, such as 0.67                        |
+| `bookmarkCutScore`                       | A `page` that is not a whole number from 1 to the pages of the booklet                                             | Count the pages of `orderedItemBooklet` and place the bookmark after one of them                  |
+| `hofsteeCutScore`                        | Bounds not ordered, 0 ≤ k_min < k_max ≤ the highest score and 0 ≤ f_min < f_max ≤ 1                                | Give the panel's bounds in order, on the scale of the distribution                                |
+| `hofsteeCutScore`, `beukCutScore`        | A line that does not cross the observed failure rates                                                              | Widen the bounds, or check the panel's judgments against the distribution                         |
+| `beukCutScore`                           | A mean cut score outside the scores, a pass rate outside [0, 1], or a standard deviation not above 0               | Give the means and the standard deviations of the panelists' answers                              |
+| `hofsteeCutScore`, `beukCutScore`        | A distribution of fewer than two scores, a negative count, or no persons                                           | Give the persons at each score from 0 to the highest                                              |
+| `contrastingGroupsCutScores`             | Scores and categories of different lengths, a category that is not an integer from 0, or fewer than two categories | Give each person a score and a category of 0 up                                                   |
+| `contrastingGroupsCutScores`             | A category from 0 to the highest that has no person                                                                | Number the categories that persons hold from 0 without gaps                                       |
+| `classificationAccuracy`                 | No estimates or cuts, a theta that is not finite, a standard error not above 0, or cuts that do not increase       | Give each estimate with its standard error, and the cuts in increasing order                      |
+| `livingstonLewisClassification`          | Fewer than two scores, a score outside `minimum` to `maximum`, or scores that do not vary                          | Give the total scores of the persons and the range of the test                                    |
+| `livingstonLewisClassification`          | A `reliability` not between 0 and 1, or cuts that are not finite and increasing                                    | Give a reliability such as `cronbachAlpha` of the items, and the cuts in increasing order         |
+| `livingstonLewisClassification`          | An effective test length that rounds to below 1 or above 10,000 trials                                             | Check the reliability: a value near 1 or far too low for the scores' variance gives such a length |
+| `livingstonLewisClassification`          | No permissible beta for the true scores                                                                            | Check the reliability against the scores' variance; use Rudner's indices on theta instead         |
+
 ## Differences from betafunctions
 
 | Topic               | This package                                                                                    | betafunctions                                                                         |

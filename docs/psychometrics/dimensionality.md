@@ -392,6 +392,22 @@ negative.
 - **Weights of persons.** Outside the sources: the functions take responses.
 - **A correlation matrix as input.** Outside the sources: the functions take responses.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
+
+| Function                                                                                      | Error                                                                                                                                  | What to do                                                                                  |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Every function of a matrix                                                                    | A matrix that is not one `responseMatrix` returns, or more than 1,000 items                                                            | Build the matrix with `responseMatrix`; each analysis holds a matrix of every pair of items |
+| `parallelAnalysis`, `exploratoryFactorAnalysis`, `omegaHierarchical`, `minimumAveragePartial` | Fewer than three items, an item with fewer than two observed categories, or a pair of items that too few persons answered              | Remove constant items; the correlations use the persons who answered both items             |
+| Every function of polychoric correlations                                                     | An item of more than 8 observed categories, or a `correction` below 0                                                                  | Use `correlation: "pearson"` for items of more categories, as psych advises                 |
+| `parallelAnalysis`                                                                            | `comparison: "normal"` with polychoric correlations, `replications` below 1, or a `quantile` outside [0, 1]                            | Compare normal data with Pearson correlations                                               |
+| `exploratoryFactorAnalysis`, `omegaHierarchical`                                              | More factors than the items identify, an unknown rotation or extraction, or invalid stopping rules                                     | Fit fewer factors, at most what the items' correlations identify                            |
+| `omegaHierarchical`, `schmidLeiman`                                                           | Fewer than 3 group factors                                                                                                             | Two group factors do not identify the general factor                                        |
+| `schmidLeiman`                                                                                | A solution without item ids, loadings of one width, finite communalities and a correlation matrix of the factors                       | Pass an oblique solution as `exploratoryFactorAnalysis` returns it                          |
+| `minimumAveragePartial`                                                                       | `maxFactors` above the items less 1, or components that leave an item no variance                                                      | Test fewer components; an item uncorrelated with every other ends the test                  |
+| `smoothCorrelations`                                                                          | A matrix that is not a `Float64Array` of `size` squared finite numbers, symmetric with 1 on the diagonal, or a `tolerance` not above 0 | Give the correlations by rows with their size                                               |
+
 ## Differences from psych
 
 | Topic                                   | This package                                                                      | psych                                                                                                                    |
