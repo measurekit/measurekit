@@ -142,7 +142,7 @@ section <- function(package) {
     slow <- !is.na(entry$ratio) && entry$ratio > SLOW
     cell <- function(text) if (slow) paste0("**", text, "**") else text
     rows <- c(rows, sprintf("| %s | %s | %s | %s | %s | %s |", cell(entry$task), entry$size, milliseconds(entry$own),
-                            if (is.null(entry$reference)) "none" else entry$reference,
+                            if (is.null(entry$reference)) "none" else gsub("|", "\\|", entry$reference, fixed = TRUE),
                             if (is.null(entry$theirs)) "" else milliseconds(entry$theirs),
                             if (is.na(entry$ratio)) "" else cell(sprintf("%s×", format(signif(entry$ratio, 2), scientific = FALSE, trim = TRUE)))))
     if (!is.null(entry$note)) notes <- c(notes, sprintf("- %s: %s.", entry$task, entry$note))
