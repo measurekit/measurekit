@@ -563,6 +563,7 @@ bound them, and the statistics of pairs of items of fit and of Mokken scales, wh
 | `responseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items             |        43 | 106                         |
 | `responseRecords`             | 1,000,000 records, each of its own person and item             |        48 | 421                         |
 | `scoreResponses`              | 1,000 persons, 1,000 items of 4 options                        |       3.8 | 8                           |
+| `calibrate` of records        | 200,000 records of 100,000 items, two persons each             |       9.9 | 440                         |
 | `qMatrixIdentifiability`      | A Q-matrix of 100,000 items of 20 attributes                   |        12 | 62                          |
 | `calibrateCdm`                | 128 items of 11 of 15 attributes, the most cells and groups    |     0.010 | 160 to 230 by run           |
 | `calibrateMultidimensional`   | 8 dichotomous items, 2 persons, 10⁶ nodes                      |    0.0002 | 310                         |
