@@ -16,10 +16,11 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   take time proportional to persons × items, and `bootstrapEquating` time proportional to the persons its counts hold
   times the replications. In `@measurekit/knowledge-tracing`, a log is checked and replayed in time proportional to its
   events, and cross-validation fits the model once per fold. Limit the size of data accepted from untrusted sources
-  before analyzing it on a server: a response matrix or a log takes at most about 50 times the bytes of its JSON, and a
-  Q-matrix of a few hundred bytes up to 2 GB within the limits below ([peak memory](docs/performance.md#peak-memory)).
-  The time of inductive item tree analysis grows faster than its limits bound: 1,000 learners take 10 ms at 12 items
-  and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items
+  before analyzing it on a server: a response matrix or a log takes at most about 50 times the bytes of its JSON, a
+  Q-matrix or a diagnostic pool of a few hundred bytes up to 2 GB within the limits below, and a statistic of every pair
+  of items, such as local dependence or Yen's Q3, memory that grows with the square of the items, 0.4 GB at 2,000
+  ([peak memory](docs/performance.md#peak-memory)). The time of inductive item tree analysis grows faster than its
+  limits bound: 1,000 learners take 10 ms at 12 items and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items
   ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). Run `iita` on logs from users in a worker with a
   deadline, and end the worker when it passes.
 - **Limits.** Tables are sized by the values that occur in the data, not by the highest value, so that a small input

@@ -104,7 +104,8 @@ validation/<package>/         R and Python scripts that write the fixtures; vali
 validation/benchmarks/        the inputs of the benchmarks and the timing of their references; bench/ their harness
 examples/<package>/           runnable examples; examples/test/ runs each of them
 scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts and their tests; entry-sizes.ts
-                              bundles each entry point alone, against the budgets of size-budgets.ts in test/entry-sizes.test.ts
+                              bundles each entry point alone, against the budgets of size-budgets.ts in test/entry-sizes.test.ts;
+                              peak-memory.ts measures the readers of untrusted input, against their budgets in test/peak-memory.test.ts
 biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
 ```
 
@@ -329,8 +330,9 @@ others. A new clone is merged into a helper of the module that owns the concept,
 - A module has benchmarks of its hot path in `test/<module>.bench.ts`, the size of the input in the title of each, a budget
   in `test/budgets.ts` and, where a reference does the task, the same task timed in
   `validation/benchmarks/<package>/<module>.R`, or a `<module>-<topic>.R` beside it, on the same data. Each entry point has
-  a size budget in `scripts/size-budgets.ts`. `docs/performance.md` explains the method and the budgets, and gives the
-  sizes and the peak memory of the readers of untrusted input.
+  a size budget in `scripts/size-budgets.ts`, and the readers of untrusted input of the largest peaks, at the limits or
+  past the size of their input, a case with a budget in `scripts/peak-memory.ts`. `docs/performance.md` explains the method and the budgets, and
+  gives the sizes and the peak memory of the readers of untrusted input.
 - A bug fix comes with a test that fails without it, in the test file of the fixed folder. A rule that keeps untrusted
   input from being misread, or from costing what its size does not, has an entry in `scripts/check-rules.ts`.
 
