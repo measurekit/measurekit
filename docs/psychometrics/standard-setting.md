@@ -1,12 +1,13 @@
 # Standard setting
 
 `@measurekit/psychometrics/standard-setting` turns a panel's judgments into cut scores by the modified Angoff,
-Bookmark, Hofstee and Beuk methods, and the judgments of persons or of their work into cut scores by contrasting groups
-and Body of Work, and reports how accurately and consistently cuts classify persons: on theta by Rudner's method, and on
-total scores by Livingston and Lewis's. No R package among the references implements the cut-score methods; each is
-validated against its definition written out in base R, with mirt's probabilities and expected test scores for the
-Bookmark method and R's `glm` for contrasting groups. The classification indices are validated against cacIRT and
-betafunctions ([validation](validation.md)).
+Bookmark, Hofstee and Beuk methods, the judgments of persons or of their work into cut scores by contrasting groups
+and Body of Work, and examiners' global ratings at the stations of a performance test, such as an OSCE, into cut scores
+by borderline regression and the borderline group. It reports how accurately and consistently cuts classify persons: on
+theta by Rudner's method, and on total scores by Livingston and Lewis's. No R package among the references implements
+the cut-score methods; each is validated against its definition written out in base R, with mirt's probabilities and
+expected test scores for the Bookmark method, R's `glm` for contrasting groups and `lm` for borderline regression. The
+classification indices are validated against cacIRT and betafunctions ([validation](validation.md)).
 
 ```mermaid
 flowchart LR
@@ -15,11 +16,13 @@ flowchart LR
   H["Bounds on the cut score and the failure rate"] --> HC["hofsteeCutScore"]
   K["Means and SDs of cut scores and pass rates"] --> KC["beukCutScore"]
   G["Scores and the categories judged"] --> GC["contrastingGroupsCutScores"]
+  O["Checklist marks and global ratings at stations"] --> OC["borderlineRegressionCutScores, borderlineGroupCutScores"]
   AC --> C["Cut score on the total score"]
   BC --> C
   HC --> C
   KC --> C
   GC --> C
+  OC --> C
   E["Estimates of theta and cuts on theta"] --> Q["classificationAccuracy"]
   T["Total scores, their reliability and cuts on them"] --> L["livingstonLewisClassification"]
 ```
@@ -168,6 +171,94 @@ Categories are integers from 0, and every category from 0 to the highest needs p
 persons on both sides. Where the scores of the two sides of a boundary do not overlap, the likelihood has no maximum:
 that cut is `null` and `converged` is `false`. A cut need not be a score.
 
+## Borderline regression and the borderline group
+
+At each station of a performance test, such as an OSCE, an examiner gives each person a checklist mark and a global
+rating of the whole performance, such as 1 fail, 2 borderline, 3 pass and 4 superior. Both methods set each station's
+cut from those two after the test, and the test's cut is the sum of the stations' cuts: a person meets the standard with
+a sum of marks at or above it. A cut on the mean of the stations' marks is that sum divided by the stations, and
+classifies alike.
+
+```mermaid
+flowchart LR
+  M["Marks and ratings, by person, then station"] --> R["Per station: lm of marks on ratings"]
+  R --> RC["Mark on the line at the borderline grade,<br/>its standard error, R², slope"]
+  M --> G["Per station: persons at a borderline grade"]
+  G --> GC["Their mean or median mark"]
+  RC --> T["Test's cut: the sum of the stations' cuts"]
+  GC --> T
+```
+
+```ts
+import { borderlineGroupCutScores, borderlineRegressionCutScores } from "@measurekit/psychometrics/standard-setting";
+
+// Ten persons at three stations: each one's checklist marks and global ratings, 1 fail to 4 superior.
+const marks = [
+  [8, 11, 6],
+  [12, 14, 9],
+  [15, 13, 12],
+  [11, 9, 10],
+  [18, 17, 14],
+  [14, 16, 11],
+  [6, 8, 5],
+  [16, 15, 13],
+  [10, 12, 8],
+  [13, 10, 12],
+];
+const ratings = [
+  [1, 2, 1],
+  [2, 3, 2],
+  [3, 3, 3],
+  [2, 2, 2],
+  [4, 4, 4],
+  [3, 3, 2],
+  [1, 1, 1],
+  [3, 4, 3],
+  [2, 2, 2],
+  [3, 2, 3],
+];
+const regression = borderlineRegressionCutScores(marks, ratings, 2);
+regression.stations[0]; // { cutScore: 10.833, standardError: 0.369, rSquared: 0.925, intercept: 3.5, slope: 3.667 }
+regression.cutScore; // 30.730, with standardError 0.686
+borderlineGroupCutScores(marks, ratings, 2).cutScore; // 31: the means 11, 10.5 and 9.5
+```
+
+**Borderline regression** (Kramer et al., 2003) fits each station's least-squares line of the marks on the ratings, as
+R's `lm`, and reads the mark at the borderline grade x₀. Every person counts, so no station needs many borderline
+persons. Its fields are the quality metrics of Pell et al. (2010):
+
+| Field           | Meaning                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `cutScore`      | ȳ + b (x₀ - x̄), the line's mark at the borderline grade                                                                     |
+| `standardError` | s √(1/n + (x₀ - x̄)² / Sxx), s² = RSS / (n - 2), as `predict(se.fit = TRUE)` (Wood et al., 2006); `null` below three persons |
+| `rSquared`      | 1 - RSS / TSS, how closely marks follow ratings; Pell et al. take above 0.5 as a reasonable relationship                    |
+| `slope`         | The inter-grade discrimination b, the rise in marks per grade; Pell et al. recommend about a tenth of the station's maximum |
+| `intercept`     | The line's mark at a rating of 0                                                                                            |
+
+The test's `standardError` sums the covariances of the stations' cuts. A person's residuals at two stations correlate
+(Homer et al., 2016), so the root of the sum of the squared standard errors, which assumes they do not, is off. Each cut
+is Σᵢ wᵢ yᵢ with
+wᵢ = 1/n + (x₀ - x̄)(xᵢ - x̄) / Sxx, two cuts have the covariance σ_st Σᵢ w_si w_ti, and σ_st is estimated by the
+residuals' cross products over n - 2, as for equations fitted one by one (Zellner, 1962). Like each station's, it holds
+the ratings fixed.
+
+**The borderline group** takes the mark of the persons rated borderline at the station: their mean, with its standard
+error sd / √n, or with `statistic: "median"` their median, as Livingston and Zieky's method does. Several grades, such
+as `[2, 3]` for a borderline fail and a borderline pass, give the modified borderline group. Each station's group
+holds different persons, and a group of a few persons gives an unstable cut (McKinley and Norcini, 2014).
+
+| Option      | Default  | Meaning                                     |
+| ----------- | -------- | ------------------------------------------- |
+| `statistic` | `"mean"` | `"mean"` or `"median"` of the group's marks |
+
+- **Undefined cuts.** A station whose ratings all agree has no line, and one without a borderline person no group: its
+  fields are `null`, and so is the test's cut. A station whose marks all agree has a cut and no `rSquared`.
+- **Persons.** Every person needs a mark and a rating at every station; leave out those who missed one.
+- **Limit.** Borderline regression sums over the persons for each pair of stations: persons × stations² is at most
+  2^28. At the limit, 26,843 persons at 100 stations take 0.3 s and 671,088 persons at 20 stations 1.4 s.
+- **A margin of error.** Programs that guard against false passes raise the cut by a multiple of the standard error of
+  measurement of the total, `standardErrorOfMeasurement` of [classical test theory](ctt.md) (Homer et al., 2016).
+
 ## Classification accuracy
 
 `classificationAccuracy(estimates, cuts)` takes ability estimates, `{ theta, standardError }` each, and cuts on theta in
@@ -281,7 +372,7 @@ step up in the reliability can lower it by a few ten-thousandths, in betafunctio
 
 ## Recipes
 
-Three methods are one line over the functions above.
+Two methods are one line over the functions above.
 
 **Nedelsky.** Each panelist strikes the options of each multiple-choice item that a borderline person would rule out;
 the item's rating is 1 over the options left, and the cut is the Angoff cut score of those ratings (Nedelsky, 1954):
@@ -313,15 +404,18 @@ const ratings = cells.flatMap(({ items, proportion }) => new Array<number>(items
 angoffCutScore([ratings]).cutScore; // 14.35
 ```
 
-**The borderline group.** The cut is the median of the scores of the persons the panel judges borderline.
-
 ## Not included
 
 - **Nedelsky.** No fit: `angoffCutScore` of the reciprocals of the options left, a recipe.
 - **Ebel.** No fit: a sum of items times proportions over the cells, a recipe.
-- **The borderline group.** No fit: the median of the group's scores, a recipe.
-- **A standard error of the borderline group's cut.** Outside the sources: not confirmed in the chapter; a bootstrap
-  over the group gives one.
+- **A standard error of the borderline group's cut over stations.** Outside the sources: the stations' groups hold
+  different persons, and no source gives the error of their sum; a bootstrap over the persons gives one.
+- **A standard error of the borderline group's median.** Outside the sources: no source gives one; a bootstrap over the
+  group gives one.
+- **The bootstrap standard errors of borderline regression (Homer et al., 2016).** No fit: a resampling of the persons
+  that calls `borderlineRegressionCutScores`, which also counts the variation of the ratings.
+- **The objective borderline method (Shulruf et al., 2013).** Outside the sources: a recent variant whose assumption,
+  that higher grades always bring higher marks, Homer, Pell and Fuller (2017) question.
 - **Direct consensus.** No fit: `angoffCutScore` takes the sums of clusters.
 - **Item-descriptor matching.** No fit: a panel procedure with no statistic beyond the Bookmark's.
 - **The analytic judgment and other holistic methods.** Outside the sources: variants of Body of Work.
@@ -350,6 +444,11 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `hofsteeCutScore`, `beukCutScore`        | A distribution of fewer than two scores, a negative count, or no persons                                           | Give the persons at each score from 0 to the highest                                              |
 | `contrastingGroupsCutScores`             | Scores and categories of different lengths, a category that is not an integer from 0, or fewer than two categories | Give each person a score and a category of 0 up                                                   |
 | `contrastingGroupsCutScores`             | A category from 0 to the highest that has no person                                                                | Number the categories that persons hold from 0 without gaps                                       |
+| Both borderline functions                | Marks or ratings that are not finite numbers, a row of another length than the first, or no person or station      | Give each person a mark and a rating at every station, by person, then station                    |
+| Both borderline functions                | A borderline grade that is not a finite number, or an empty list of grades                                         | Give the grade on the scale of the ratings, such as 2                                             |
+| `borderlineRegressionCutScores`          | More than 2^28 persons × stations²                                                                                 | Set the standard of fewer persons or stations at a time                                           |
+| Both borderline functions                | A result that is not finite                                                                                        | Rescale the marks, the ratings or the grade, which are too large                                  |
+| `borderlineGroupCutScores`               | A `statistic` other than `"mean"` and `"median"`                                                                   | Choose one of them                                                                                |
 | `classificationAccuracy`                 | No estimates or cuts, a theta that is not finite, a standard error not above 0, or cuts that do not increase       | Give each estimate with its standard error, and the cuts in increasing order                      |
 | `livingstonLewisClassification`          | Fewer than two scores, a score outside `minimum` to `maximum`, or scores that do not vary                          | Give the total scores of the persons and the range of the test                                    |
 | `livingstonLewisClassification`          | A `reliability` not between 0 and 1, or cuts that are not finite and increasing                                    | Give a reliability such as `cronbachAlpha` of the items, and the cuts in increasing order         |
@@ -371,9 +470,15 @@ Invalid input throws `DataError` naming the value found, also input of another t
   ed., pp. 508-600). American Council on Education.
 - Beuk, C. H. (1984). A method for reaching a compromise between absolute and relative standards in examinations.
   Journal of Educational Measurement, 21(2), 147-152.
+- Cizek, G. J., & Bunch, M. B. (2007). Standard setting: A guide to establishing and evaluating performance standards
+  on tests. Sage.
 - Ebel, R. L. (1972). Essentials of educational measurement. Prentice-Hall.
 - Hofstee, W. K. B. (1983). The case for compromise in educational selection and grading. In S. B. Anderson & J. S.
   Helmick (Eds.), On educational testing (pp. 109-127). Jossey-Bass.
+- Homer, M., Pell, G., & Fuller, R. (2017). Problematizing the concept of the "borderline" group in performance
+  assessments. Medical Teacher, 39(5), 469-475.
+- Homer, M., Pell, G., Fuller, R., & Patterson, J. (2016). Quantifying error in OSCE standard setting for varying cohort
+  sizes: A resampling approach to measuring assessment quality. Medical Teacher, 38(2), 181-188.
 - Huynh, H. (1998). On score locations of binary and partial credit items and their applications to item mapping and
   criterion-referenced interpretation. Journal of Educational and Behavioral Statistics, 23, 35-56.
 - Huynh, H. (2006). A clarification on the response probability criterion RP67 for standard settings based on
@@ -382,11 +487,25 @@ Invalid input throws `DataError` naming the value found, also input of another t
   calculation of classification consistency indexes. American College Testing.
 - Kingston, N. M., Kahl, S. R., Sweeney, K. P., & Bay, L. (2001). Setting performance standards using the body of work
   method. In G. J. Cizek (Ed.), Setting performance standards (pp. 219-248). Lawrence Erlbaum.
+- Kramer, A., Muijtjens, A., Jansen, K., Düsman, H., Tan, L., & van der Vleuten, C. (2003). Comparison of a rational
+  and an empirical standard setting procedure for an OSCE. Medical Education, 37(2), 132-139.
 - Livingston, S. A., & Lewis, C. (1995). Estimating the consistency and accuracy of classifications based on test
   scores. Journal of Educational Measurement, 32(2), 179-197.
 - Livingston, S. A., & Zieky, M. J. (1982). Passing scores. Educational Testing Service.
+- McKinley, D. W., & Norcini, J. J. (2014). How to set standards on performance-based examinations: AMEE Guide No. 85.
+  Medical Teacher, 36(2), 97-110.
 - Mitzel, H. C., Lewis, D. M., Patz, R. J., & Green, D. R. (2001). The Bookmark procedure: Psychological perspectives.
   In G. J. Cizek (Ed.), Setting performance standards (pp. 249-281). Lawrence Erlbaum.
 - Nedelsky, L. (1954). Absolute grading standards for objective tests. Educational and Psychological Measurement, 14(1),
   3-19.
+- Pell, G., Fuller, R., Homer, M., & Roberts, T. (2010). How to measure the quality of the OSCE: A review of metrics.
+  AMEE guide no. 49. Medical Teacher, 32(10), 802-811.
 - Rudner, L. M. (2005). Expected classification accuracy. Practical Assessment, Research & Evaluation, 10(13).
+- Shulruf, B., Turner, R., Poole, P., & Wilkinson, T. (2013). The Objective Borderline method (OBM): A probability-based
+  model for setting up an objective pass/fail cut-off score in medical programme assessments. Advances in Health
+  Sciences Education, 18(2), 231-244.
+- Wood, T. J., Humphrey-Murto, S. M., & Norman, G. R. (2006). Standard setting in a small scale OSCE: A comparison of
+  the modified borderline-group method and the borderline regression method. Advances in Health Sciences Education,
+  11(2), 115-122.
+- Zellner, A. (1962). An efficient method of estimating seemingly unrelated regressions and tests for aggregation bias.
+  Journal of the American Statistical Association, 57(298), 348-368.

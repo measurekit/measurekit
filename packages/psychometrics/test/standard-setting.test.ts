@@ -5,6 +5,8 @@ import {
   angoffCutScore,
   beukCutScore,
   bookmarkCutScore,
+  borderlineGroupCutScores,
+  borderlineRegressionCutScores,
   classificationAccuracy,
   contrastingGroupsCutScores,
   createRandom,
@@ -26,6 +28,7 @@ import {
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureParameters, item2pl, MODELS } from "./fixture-items.js";
 import fixture from "./fixtures/standard-setting.json" with { type: "json" };
+import borderline from "./fixtures/standard-setting-borderline.json" with { type: "json" };
 import cuts from "./fixtures/standard-setting-cut-scores.json" with { type: "json" };
 import livingstonLewis from "./fixtures/standard-setting-livingston-lewis.json" with { type: "json" };
 
@@ -34,6 +37,9 @@ const CLASSIFICATION_TOLERANCE = 1e-14;
 
 /** Cut scores and Bookmark locations against R, explained in docs/validation.md: closed forms and uniroot to 1e-14. */
 const TOLERANCE = 1e-12;
+
+/** Borderline cut scores, standard errors and R² against lm and base R: closed forms of the same sums. */
+const BORDERLINE_TOLERANCE = 1e-12;
 
 /** Contrasting-groups cut scores against glm, which stops at a deviance change of 1e-14. */
 const LOGISTIC_TOLERANCE = 1e-6;
@@ -269,6 +275,174 @@ describe("bookmarkCutScore", () => {
   });
 });
 
+describe("borderlineGroupCutScores", () => {
+  for (const reference of Object.values(borderline.group)) {
+    it(`matches base R's mean, median and sd for ${reference.name}`, () => {
+      const result = borderlineGroupCutScores(reference.marks, reference.ratings, reference.borderline, {
+        statistic: reference.statistic === "median" ? "median" : "mean",
+      });
+      expect(result.stations).toHaveLength(reference.stations.length);
+      reference.stations.forEach((expected, s) => {
+        const station = defined(result.stations[s]);
+        expectClose(station.cutScore, expected.cutScore, BORDERLINE_TOLERANCE, `cut ${s + 1}`);
+        expectClose(station.standardError, expected.standardError, BORDERLINE_TOLERANCE, `standard error ${s + 1}`);
+        expect(station.persons).toBe(expected.persons);
+      });
+      expectClose(result.cutScore, reference.cutScore, BORDERLINE_TOLERANCE, "test");
+    });
+  }
+
+  it("takes the mean of the persons at the borderline grade by default", () => {
+    // Station 1's borderline persons have 10 and 14; station 2's have 6, 8 and 13.
+    const marks = [
+      [10, 6],
+      [14, 8],
+      [20, 13],
+      [5, 2],
+    ];
+    const ratings = [
+      [2, 2],
+      [2, 2],
+      [3, 2],
+      [1, 1],
+    ];
+    const result = borderlineGroupCutScores(marks, ratings, 2);
+    expect(result.stations.map((station) => station.cutScore)).toEqual([12, 9]);
+    expect(result.stations.map((station) => station.persons)).toEqual([2, 3]);
+    expect(result.cutScore).toBe(21);
+    expect(borderlineGroupCutScores(marks, ratings, 2, { statistic: "median" }).cutScore).toBe(20);
+    expect(borderlineGroupCutScores(marks, ratings, [1, 2]).stations[0]?.cutScore).toBeCloseTo(29 / 3, 12);
+  });
+
+  it("gives one borderline person a cut without a standard error", () => {
+    const result = borderlineGroupCutScores([[7], [9]], [[2], [3]], 2);
+    expect(result.stations).toEqual([{ cutScore: 7, standardError: null, persons: 1 }]);
+    expect(result.cutScore).toBe(7);
+  });
+
+  it("rejects marks, ratings and grades that are not numbers, and too large marks", () => {
+    expect(() => borderlineGroupCutScores([[1, 2]], [[2]], 2)).toThrow(
+      "Person 1 needs 2 ratings, one per station, found 1.",
+    );
+    expect(() => borderlineGroupCutScores([[1]], [[2], [3]], 2)).toThrow(
+      "The marks and the ratings need a row for each person, found 1 and 2.",
+    );
+    expect(() => borderlineGroupCutScores([], [], 2)).toThrow(
+      "A borderline method needs the marks of at least one person.",
+    );
+    expect(() => borderlineGroupCutScores([[]], [[]], 2)).toThrow("A borderline method needs at least one station.");
+    expect(() => borderlineGroupCutScores(JSON.parse('[["1"]]'), [[2]], 2)).toThrow(
+      'Person 1 needs a finite mark at station 1, found "1".',
+    );
+    expect(() => borderlineGroupCutScores([[1]], JSON.parse("[[null]]"), 2)).toThrow(
+      "Person 1 needs a finite rating at station 1, found null.",
+    );
+    expect(() => borderlineGroupCutScores(JSON.parse("{}"), [[2]], 2)).toThrow("The marks must be an array");
+    expect(() => borderlineGroupCutScores([[1]], JSON.parse("[{}]"), 2)).toThrow(
+      "The ratings of person 1 must be an array, one per station",
+    );
+    expect(() => borderlineGroupCutScores([[1]], [[2]], [])).toThrow("The borderline grades need at least one grade.");
+    expect(() => borderlineGroupCutScores([[1]], [[2]], JSON.parse('"2"'))).toThrow(
+      "The borderline grades must be a number or an array of numbers",
+    );
+    expect(() => borderlineGroupCutScores([[1]], [[2]], [2, Number.NaN])).toThrow(
+      "Borderline grade 2 must be a finite number, found NaN.",
+    );
+    expect(() => borderlineGroupCutScores([[1]], [[2]], 2, JSON.parse('{ "statistic": "mode" }'))).toThrow(
+      'The option statistic must be "mean" or "median", found "mode".',
+    );
+    expect(() => borderlineGroupCutScores([[1]], [[2]], 2, JSON.parse("null"))).toThrow(
+      "The options must be an object",
+    );
+    expect(() => borderlineGroupCutScores([[1e308], [1e308]], [[2], [2]], 2)).toThrow(
+      "The borderline group's cut of station 1 is not finite: the marks are too large; rescale them.",
+    );
+    expect(() => borderlineGroupCutScores([[1e308, 1e308]], [[2, 2]], 2)).toThrow(
+      "The borderline group's cut of the test is not finite: the marks are too large; rescale them.",
+    );
+  });
+});
+
+describe("borderlineRegressionCutScores", () => {
+  for (const reference of Object.values(borderline.regression)) {
+    it(`matches lm, predict and the covariance of the stations' cuts for ${reference.name}`, () => {
+      const result = borderlineRegressionCutScores(reference.marks, reference.ratings, reference.borderline);
+      expect(result.stations).toHaveLength(reference.stations.length);
+      reference.stations.forEach((expected, s) => {
+        const station = defined(result.stations[s]);
+        for (const name of ["cutScore", "standardError", "rSquared", "intercept", "slope"] as const) {
+          expectClose(station[name], expected[name], BORDERLINE_TOLERANCE, `${name} ${s + 1}`);
+        }
+      });
+      expectClose(result.cutScore, reference.cutScore, BORDERLINE_TOLERANCE, "cut");
+      expectClose(result.standardError, reference.standardError, BORDERLINE_TOLERANCE, "standard error");
+    });
+  }
+
+  it("reads the line at the borderline grade, and gives one station's test its standard error", () => {
+    // Marks 10 + 5 x exactly: the line passes through every person, so the cut at 2 is 20 with no error.
+    const exact = borderlineRegressionCutScores([[15], [20], [25], [30]], [[1], [2], [3], [4]], 2);
+    expect(exact.stations[0]).toEqual({ cutScore: 20, standardError: 0, rSquared: 1, intercept: 10, slope: 5 });
+    const { marks, ratings } = defined(borderline.regression["six stations, ratings 1 to 4"]);
+    const first = borderlineRegressionCutScores(
+      marks.map((row) => [defined(row[0])]),
+      ratings.map((row) => [defined(row[0])]),
+      2,
+    );
+    expectClose(first.standardError, defined(first.stations[0]?.standardError), 1e-15);
+    const station = defined(first.stations[0]);
+    expectClose(defined(station.intercept) + 2 * defined(station.slope), station.cutScore, 1e-12);
+  });
+
+  it("adds the stations' covariances to the test's variance", () => {
+    // Two copies of a station have residuals that agree, so the test's cut has twice the station's standard error;
+    // the station and its marks reflected about their mean have opposite residuals and opposite lines, so their sum
+    // holds the mean mark of both at every grade and its standard error is 0.
+    const marks = [12, 15, 14, 19, 22, 21];
+    const ratings = [1, 2, 2, 3, 4, 4];
+    const twice = borderlineRegressionCutScores(
+      marks.map((mark) => [mark, mark]),
+      ratings.map((rating) => [rating, rating]),
+      2,
+    );
+    expectClose(twice.standardError, 2 * defined(twice.stations[0]?.standardError), 1e-12);
+    const reflected = borderlineRegressionCutScores(
+      marks.map((mark) => [mark, 40 - mark]),
+      ratings.map((rating) => [rating, rating]),
+      2,
+    );
+    expectClose(reflected.cutScore, 40, 1e-12);
+    expectClose(reflected.standardError, 0, 1e-12);
+  });
+
+  it("refuses more than 2^28 persons × stations² before it sums them", () => {
+    const row = new Array<number>(1024).fill(1);
+    const rows = Array.from({ length: 257 }, () => row);
+    expect(() => borderlineRegressionCutScores(rows, rows, 2)).toThrow(
+      "Borderline regression sums over the persons for each pair of stations, so it takes at most 268435456 persons × stations², found 257 × 1024²; set the standard of fewer persons or stations at a time.",
+    );
+  });
+
+  it("rejects input of other types and results that are not finite", () => {
+    expect(() => borderlineRegressionCutScores([[1]], [[2]], JSON.parse('"2"'))).toThrow(
+      'The borderline grade must be a finite number, found "2".',
+    );
+    expect(() => borderlineRegressionCutScores(JSON.parse("null"), [[2]], 2)).toThrow("The marks must be an array");
+    expect(() => borderlineRegressionCutScores([[1], [2]], JSON.parse("[[1], 2]"), 2)).toThrow(
+      "The ratings of person 2 must be an array, one per station",
+    );
+    expect(() => borderlineRegressionCutScores([[1e200], [-1e200], [0]], [[1], [2], [3]], 2)).toThrow(
+      "The borderline regression of station 1 is not finite: the marks, the ratings or the borderline grade are too large; rescale them.",
+    );
+    // Each station's cut is 5e307, and four of them pass the largest double.
+    const large = Array.from({ length: 3 }, () => new Array<number>(4).fill(5e307));
+    const grades = [1, 2, 3].map((grade) => new Array<number>(4).fill(grade));
+    expect(() => borderlineRegressionCutScores(large, grades, 2)).toThrow(
+      "The borderline regression of the test is not finite: the marks, the ratings or the borderline grade are too large; rescale them.",
+    );
+  });
+});
+
 describe("classificationAccuracy", () => {
   const { estimates, cases } = fixture.classification;
   for (const expected of cases) {
@@ -389,15 +563,6 @@ describe("recipes", () => {
     const { items: counts, proportions, cutScore } = cuts.recipes.ebel;
     const ratings = counts.flatMap((count, cell) => new Array<number>(count).fill(defined(proportions[cell])));
     expectClose(angoffCutScore([ratings]).cutScore, cutScore, TOLERANCE);
-  });
-
-  it("gives the borderline group's cut score as the median of its scores", () => {
-    const sorted = [...cuts.recipes.borderline.scores].sort((a, b) => a - b);
-    const middle = sorted.length / 2;
-    const median = Number.isInteger(middle)
-      ? (defined(sorted[middle - 1]) + defined(sorted[middle])) / 2
-      : defined(sorted[Math.floor(middle)]);
-    expect(median).toBe(cuts.recipes.borderline.cutScore);
   });
 });
 

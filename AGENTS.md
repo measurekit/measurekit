@@ -47,6 +47,7 @@ Use these words with these meanings in code, comments and docs.
 | unit               | An item, or a testlet that has not begun, which an adaptive test administers whole.                                        |
 | response time      | Seconds a person spent on an item, aligned with the response: `times` of a matrix, `time` of a record.                     |
 | subject, rater     | In rater agreement, what is rated, such as an essay, and who rates it: a row and a column of ratings.                      |
+| station            | A task of a performance test, such as an OSCE's: an examiner gives each person a checklist mark and a global rating.       |
 | plausible value    | A random draw from a person's posterior distribution of theta; a statistic of several sets of them describes a group.      |
 | anchor             | An item taken to work the same in two groups, forms or calibrations: a link's common items, DIF's matching items, `fixed`. |
 | link               | The `ScaleTransformation` `{ slope, intercept }` that puts the thetas and items of one calibration on another's scale.     |

@@ -1,7 +1,7 @@
 # Cut-score fixtures (standard-setting-cut-scores.json). No package implements the contrasting-groups, Body of Work or
 # Beuk methods, so the script writes each out in base R: per boundary between adjacent categories, glm's logistic
 # regression of "at or above" on the score and the score where it reaches the probability; the Beuk crossing by uniroot
-# on the interpolated failure rates; and the recipes of standard-setting.md: Nedelsky, Ebel and the borderline group.
+# on the interpolated failure rates; and the recipes of standard-setting.md: Nedelsky and Ebel.
 
 source("validation/psychometrics/common.R")
 
@@ -76,18 +76,15 @@ nedelsky <- rowSums(1 / options_left)
 # Ebel: items in cells of relevance by difficulty, each cell with the panel's proportion a borderline person answers.
 ebel_items <- c(6, 9, 4, 5, 8, 3, 2, 4, 3)
 ebel_proportions <- c(0.9, 0.75, 0.55, 0.8, 0.6, 0.4, 0.6, 0.45, 0.25)
-# The borderline group: the scores of the persons the panel judged borderline.
-borderline <- sample(14:30, 37, replace = TRUE)
 
 write_fixture("standard-setting-cut-scores", list(
   source = paste("Base R, set.seed(20261102): glm(binomial) per boundary to a deviance change of 1e-14; the Beuk",
-                 "crossing by uniroot; the recipes of Nedelsky, Ebel and the borderline group."),
+                 "crossing by uniroot; the recipes of Nedelsky and Ebel."),
   contrasting = contrasting,
   beuk = list(distribution = beuk_distribution, cases = beuk_cases),
   recipes = list(
     nedelsky = list(optionsLeft = unname(lapply(seq_len(nrow(options_left)), function(i) options_left[i, ])),
                     cutScore = mean(nedelsky)),
-    ebel = list(items = ebel_items, proportions = ebel_proportions, cutScore = sum(ebel_items * ebel_proportions)),
-    borderline = list(scores = borderline, cutScore = median(borderline))
+    ebel = list(items = ebel_items, proportions = ebel_proportions, cutScore = sum(ebel_items * ebel_proportions))
   )
 ))

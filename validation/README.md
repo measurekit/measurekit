@@ -66,7 +66,8 @@ Rscript validation/psychometrics/mokken-preparation.R  # two-way imputation and 
 Rscript validation/psychometrics/scaling.R           # score reporting and prediction, joint draws of theta: mirt, equate, mvtnorm and base R
 Rscript validation/psychometrics/plausible-values.R  # plausible values and Rubin's rules of the recipes: mirt's fscores, TAM's tam.pv, their expectation and the rules in base R, about 20 seconds
 Rscript validation/psychometrics/standard-setting.R  # Angoff, Bookmark and Hofstee cut scores, classification accuracy: base R, mirt, cacIRT
-Rscript validation/psychometrics/cut-scores.R        # contrasting groups and Body of Work by glm per boundary, Beuk, and the recipes of Nedelsky, Ebel and the borderline group: base R
+Rscript validation/psychometrics/cut-scores.R        # contrasting groups and Body of Work by glm per boundary, Beuk, and the recipes of Nedelsky and Ebel: base R
+Rscript validation/psychometrics/borderline.R        # borderline regression by lm per station, the covariance of the stations' cuts, and the borderline group: base R
 Rscript validation/psychometrics/classification-livingston-lewis.R  # Livingston and Lewis's accuracy and consistency: betafunctions, and the indices by base R's integrate
 Rscript validation/psychometrics/rater.R             # rater agreement: irr, psych and effsize; the many-facet Rasch model: base R, with TAM and sirt data
 Rscript validation/psychometrics/rater-bias.R        # rater bias analysis: base R and TAM's tam.mml.mfr with the interaction of items and raters

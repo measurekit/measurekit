@@ -38,6 +38,12 @@ of them, from each form's covariance, counting a form between two links once, as
 the score, which gives the contrasting-groups and Body of Work methods, and `beukCutScore` the Beuk compromise, which
 crosses the observed failure rate as `hofsteeCutScore` does.
 
+`borderlineRegressionCutScores` sets the cut of each station of a performance test, such as an OSCE, by regressing its
+checklist marks on its global ratings and reading the line at the borderline grade, with the cut's standard error, R²
+and the inter-grade discrimination; the test's cut is the sum of the stations' and its standard error counts the
+covariances of their cuts. `borderlineGroupCutScores` takes the mean, or the median, of the marks of the persons at one
+or several borderline grades.
+
 Adaptive tests select by catR's other rules: `closestDifficulty` (bOpt), `expectedInformation` (MEI),
 `likelihoodWeightedInformation` and `posteriorWeightedInformation` (MLWI, MPWI), `posteriorKullbackLeibler` (KLP),
 `discriminationIndex` and `posteriorDiscriminationIndex` (GDI, GDIP), `expectedPosteriorVariance` (MEPV), and the
