@@ -55,4 +55,4 @@ bench_task("kst.structureBase", "Base of a space",
            function() kbase(space))
 bench_task("kst.clauseStructure", "Space of clauses, by enumeration of the subsets in base R",
            sprintf("%d elements, %d subsets", item_count, 2^item_count), "base R `expand.grid` and `apply`",
-           enumerate_states, note = "No package takes clauses.")
+           enumerate_states, note = "no package takes clauses")
