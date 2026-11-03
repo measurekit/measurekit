@@ -58,7 +58,12 @@ export function speedEstimates(
   options: SpeedOptions = {},
 ): SpeedEstimate[] {
   const timed = timedResponses(data, "Speed estimation");
-  return estimatesOf(timed, items, options).map(({ id, speed, standardError }) => ({ id, speed, standardError }));
+  const { means, variances, answered } = speedPosteriors(timed, items, options);
+  return timed.personIds.map((id, person) =>
+    (answered[person] ?? 0) === 0
+      ? { id, speed: null, standardError: null }
+      : { id, speed: means[person] ?? 0, standardError: Math.sqrt(variances[person] ?? 0) },
+  );
 }
 
 /**
@@ -87,7 +92,25 @@ export function responseTimeFit(
   return estimatesOf(timed, items, options);
 }
 
-function estimatesOf(timed: TimedResponses, timeItems: readonly TimeItem[], options: SpeedOptions): PersonTimeFit[] {
+/** Each person's posterior mean and variance of speed, the items' parameters, and the times each person has. */
+interface SpeedPosteriors {
+  readonly means: Float64Array;
+  readonly variances: Float64Array;
+  readonly answered: Int32Array;
+  readonly intensity: Float64Array;
+  readonly discrimination: Float64Array;
+}
+
+/**
+ * Returns each person's posterior of speed and the number of times it rests on, in time that grows with the times: the
+ * persons' residuals over every item, which a sparse log of many persons and items would make their product, are
+ * {@link responseTimeFit}'s alone.
+ */
+function speedPosteriors(
+  timed: TimedResponses,
+  timeItems: readonly TimeItem[],
+  options: SpeedOptions,
+): SpeedPosteriors {
   checkOptions(options);
   const { sd } = options;
   if (sd !== undefined) checkPositive(sd, "The option sd");
@@ -98,7 +121,16 @@ function estimatesOf(timed: TimedResponses, timeItems: readonly TimeItem[], opti
   const means = new Float64Array(personCount);
   const variances = new Float64Array(personCount);
   posteriors(timed, intensity, discrimination, sd === undefined ? Number.POSITIVE_INFINITY : sd * sd, means, variances);
-  const residuals = timed.personIds.map(() => new Array<number | null>(items.length).fill(null));
+  const answered = new Int32Array(personCount);
+  forEachTime(timed, (person) => {
+    answered[person] = (answered[person] ?? 0) + 1;
+  });
+  return { means, variances, answered, intensity, discrimination };
+}
+
+function estimatesOf(timed: TimedResponses, timeItems: readonly TimeItem[], options: SpeedOptions): PersonTimeFit[] {
+  const { means, variances, intensity, discrimination } = speedPosteriors(timed, timeItems, options);
+  const residuals = timed.personIds.map(() => new Array<number | null>(intensity.length).fill(null));
   forEachTime(timed, (person, item, logTime) => {
     const row = residuals[person];
     if (row !== undefined) {

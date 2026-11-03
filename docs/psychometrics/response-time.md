@@ -111,7 +111,9 @@ likelihood estimate Σ α_i² (β_i - y_i) / Σ α_i² and 1 / √Σ α_i². A p
 
 Under the model, each z_i is about N(0, 1) and the statistic about chi-square; with τ estimated from the same times
 both are approximate. Large negative residuals flag times much shorter than the person's speed predicts, as from
-preknowledge or rapid guessing; a large statistic flags a person's whole pattern.
+preknowledge or rapid guessing; a large statistic flags a person's whole pattern. The residuals hold a value for each
+person and item, so response records of many persons and items take their product; `speedEstimates` takes time and
+memory that grow with the times alone.
 
 ## Speed and accuracy
 

@@ -230,6 +230,35 @@ describe("speed and time fit", () => {
     });
   }
 
+  it("estimates the speeds of a sparse log in time that grows with its times, as responseTimeFit's speeds", () => {
+    // 40,000 persons who each answered an item of their own: a table of residuals would hold 1.6 billion values.
+    const count = 40_000;
+    const records = responseRecords(
+      Array.from({ length: count }, (_, k) => ({
+        person: `p${k}`,
+        item: `i${k}`,
+        response: k % 2,
+        time: 10 + (k % 7),
+      })),
+    );
+    const items = records.itemIds.map((id, k) => ({ id, intensity: 2 + (k % 3) / 2, discrimination: 1.5 }));
+    const estimates = speedEstimates(records, items, { sd: 0.5 });
+    expect(estimates).toHaveLength(count);
+    const small = responseRecords(
+      Array.from({ length: 30 }, (_, k) => ({
+        person: `p${k % 6}`,
+        item: `i${k % 5}`,
+        response: 1,
+        time: 3 + (k % 4),
+      })),
+    );
+    const smallItems = small.itemIds.map((id, k) => ({ id, intensity: 1 + k / 4, discrimination: 1 + k / 10 }));
+    const fit = responseTimeFit(small, smallItems, { sd: 0.5 });
+    speedEstimates(small, smallItems, { sd: 0.5 }).forEach((estimate, p) => {
+      expect(estimate).toEqual({ id: fit[p]?.id, speed: fit[p]?.speed, standardError: fit[p]?.standardError });
+    });
+  });
+
   it("estimates speed by maximum likelihood without a prior, and gives nothing to a person without times", () => {
     const items = [
       { id: "item1", intensity: 4, discrimination: 2 },
