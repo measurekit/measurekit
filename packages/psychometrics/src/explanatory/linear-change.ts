@@ -81,6 +81,11 @@ const DEFAULT_TOLERANCE = 1e-8;
 const DEFAULT_MAX_ITERATIONS = 100;
 /** The most occasions: the conditional likelihood of a person and an item sums over the 2ᵀ patterns of T responses. */
 const MAX_OCCASIONS = 12;
+/**
+ * The most effects, item sets × occasions after the first × groups: Newton's method and the check of the effects hold
+ * and invert a matrix of every pair of them, in time that grows with their cube.
+ */
+const MAX_EFFECTS = 1000;
 /** The group of everyone when none are given. */
 const EVERYONE = "all";
 /**
@@ -144,8 +149,9 @@ const LIKELIHOOD_ROUNDING = 1e-12;
  * @param options - The groups of persons, the baseline group, the sets of items and the stopping rules.
  * @returns The effects with their standard errors, and the conditional log-likelihood.
  * @throws `DataError` when the matrices or options are invalid, the occasions differ in persons or items, a response is
- * not 0, 1 or `null`, a group or a set is missing for a person or an item, or an effect has no unique estimate: no person
- * changed on it, or those who did make it a combination of the effects before it.
+ * not 0, 1 or `null`, a group or a set is missing for a person or an item, there are more than 1,000 effects, or an
+ * effect has no unique estimate: no person changed on it, or those who did make it a combination of the effects before
+ * it.
  * @see {@link https://doi.org/10.1007/978-1-4612-4230-7_9 | Fischer (1995)}
  */
 export function linearChange(occasions: readonly ResponseMatrix[], options: LinearChangeOptions = {}): LinearChange {
@@ -156,6 +162,11 @@ export function linearChange(occasions: readonly ResponseMatrix[], options: Line
   const people = groupsOf(data.personIds.length, options);
   const sets = itemGroupsOf(data.itemIds, options.itemGroups);
   const layout = { sets: sets.names, groups: people.names, occasions: occasions.length };
+  if (layoutSize(layout) > MAX_EFFECTS) {
+    throw new DataError(
+      `Linear change takes at most ${MAX_EFFECTS} effects, item groups × occasions after the first × groups, as its estimation inverts a matrix of every pair of them; found ${layoutSize(layout)}.`,
+    );
+  }
   const strata = strataOf(occasions, people.slotOf, sets.setOf, layout);
   const problem = conditionalLikelihood(strata, layoutSize(layout), occasions.length);
   checkEstimable(problem, layout);
@@ -247,7 +258,8 @@ function groupsOf(persons: number, { groups, baseline }: LinearChangeOptions): {
     throw new DataError(`The baseline ${describe(first)} is not the group of any person.`);
   }
   const names = [first, ...appearing.filter((name) => name !== first)];
-  return { names, slotOf: Int32Array.from(given, (name) => names.indexOf(name)) };
+  const slots = new Map(names.map((name, slot) => [name, slot]));
+  return { names, slotOf: Int32Array.from(given, (name) => slots.get(name) ?? 0) };
 }
 
 /**
@@ -262,9 +274,9 @@ function itemGroupsOf(
 ): { names: string[]; setOf: Int32Array } {
   if (itemGroups === undefined) return { names: [...itemIds], setOf: Int32Array.from(itemIds, (_, i) => i) };
   checkRecord(itemGroups, "The option itemGroups must be an object of set names by item id");
+  const known = new Set(itemIds);
   for (const id of Object.keys(itemGroups)) {
-    if (!itemIds.includes(id))
-      throw new DataError(`The option itemGroups names ${describe(id)}, which is not an item.`);
+    if (!known.has(id)) throw new DataError(`The option itemGroups names ${describe(id)}, which is not an item.`);
   }
   const named = itemIds.map((id) => {
     const name: unknown = Object.hasOwn(itemGroups, id) ? itemGroups[id] : undefined;
@@ -274,7 +286,8 @@ function itemGroupsOf(
     return name;
   });
   const names = [...new Set(named)];
-  return { names, setOf: Int32Array.from(named, (name) => names.indexOf(name)) };
+  const sets = new Map(names.map((name, set) => [name, set]));
+  return { names, setOf: Int32Array.from(named, (name) => sets.get(name) ?? 0) };
 }
 
 /**
@@ -467,21 +480,34 @@ function addDerivatives(
 /**
  * Checks that the information at no effects is positive definite, so that every effect has a unique estimate.
  *
+ * @remarks
+ * A leading block factors when every smaller one does, as the smaller's Cholesky factor is the larger's leading part and
+ * the least passing pivot grows with the size, so the first block that does not is found by bisection, in time that
+ * grows as the cube of the effects.
+ *
  * @throws `DataError` naming the first effect that is all zeros or a combination of those before it.
  */
 function checkEstimable(problem: ConditionalLikelihood, layout: Layout): void {
   const size = layoutSize(layout);
   const { information } = problem.evaluate(new Float64Array(size));
-  for (let leading = 1; leading <= size; leading++) {
+  const factors = (leading: number): boolean => {
     const block = new Float64Array(leading * leading);
     for (let j = 0; j < leading; j++)
       for (let k = 0; k < leading; k++) block[j * leading + k] = information[j * size + k] ?? 0;
-    if (cholesky(block, leading) !== null) continue;
-    const { itemGroup, occasion, group } = describeEffect(layout, leading - 1);
-    throw new DataError(
-      `The effect of item group ${describe(itemGroup)} at occasion ${occasion} in group ${describe(group)} has no unique estimate: no person changed on it, or those who did make it a combination of the effects before it.`,
-    );
+    return cholesky(block, leading) !== null;
+  };
+  if (factors(size)) return;
+  let factored = 0;
+  let failed = size;
+  while (failed - factored > 1) {
+    const leading = Math.floor((factored + failed) / 2);
+    if (factors(leading)) factored = leading;
+    else failed = leading;
   }
+  const { itemGroup, occasion, group } = describeEffect(layout, failed - 1);
+  throw new DataError(
+    `The effect of item group ${describe(itemGroup)} at occasion ${occasion} in group ${describe(group)} has no unique estimate: no person changed on it, or those who did make it a combination of the effects before it.`,
+  );
 }
 
 /** Returns the set, the occasion and the group of the effect at `index`. */

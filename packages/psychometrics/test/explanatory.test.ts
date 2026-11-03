@@ -764,6 +764,34 @@ describe("linearChange", () => {
       'The effect of item group "item2" at occasion 2 in group "all" has no unique estimate',
     );
   });
+
+  it("names the first of many effects that no person changed on, and refuses more than 1,000 effects", () => {
+    // Groups of 8 persons who change both ways on 2 items; group 300 changes on neither: 600 effects, 2 without changes.
+    const patterns = [
+      [0, 1],
+      [1, 0],
+    ];
+    const before: number[][] = [];
+    const after: number[][] = [];
+    const groups: string[] = [];
+    for (let group = 0; group < 300; group++) {
+      for (let p = 0; p < 8; p++) {
+        const [x = 0, y = 0] = patterns[p % 2] ?? [];
+        before.push(group === 299 ? [x, x] : [x, 1 - x]);
+        after.push(group === 299 ? [x, x] : [y, 1 - y]);
+        groups.push(`g${group}`);
+      }
+    }
+    expect(() => linearChange([responseMatrix(before), responseMatrix(after)], { groups })).toThrow(
+      'The effect of item group "item1" at occasion 2 in group "g299" has no unique estimate',
+    );
+    // 501 groups of two persons on 2 items: 1,002 effects, refused before the persons' patterns are read.
+    const pairs = Array.from({ length: 1002 }, (_, person) => [person % 2, 1 - (person % 2)]);
+    const pairGroups = pairs.map((_, person) => `g${Math.floor(person / 2)}`);
+    expect(() => linearChange([responseMatrix(pairs), responseMatrix(pairs)], { groups: pairGroups })).toThrow(
+      "Linear change takes at most 1000 effects, item groups × occasions after the first × groups, as its estimation inverts a matrix of every pair of them; found 1002.",
+    );
+  });
 });
 
 interface PolytomousReference {

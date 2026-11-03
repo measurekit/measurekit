@@ -444,6 +444,14 @@ export const RULES: readonly Rule[] = [
     titles: "standard errors of more than 2,000 items",
   },
   {
+    rule: "Linear change stops at 1,000 effects, before its information holds a matrix of every pair of them.",
+    file: "packages/psychometrics/src/explanatory/linear-change.ts",
+    find: "if (layoutSize(layout) > MAX_EFFECTS) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/explanatory.test.ts",
+    titles: "refuses more than 1,000 effects",
+  },
+  {
     rule: "A many-facet model stops at 1,000 parameters, before its Newton steps hold a matrix of every pair of them.",
     file: "packages/psychometrics/src/irt/linear-rasch.ts",
     find: "if (parameters > MAX_PARAMETERS) {",
