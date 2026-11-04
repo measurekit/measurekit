@@ -1,6 +1,6 @@
-import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
+import { checkOptions, chiSquareUpperTail, invertPositiveDefinite } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { invertPositiveDefinite, standardDeviation } from "../math/internal.js";
+import { standardDeviation } from "../math/internal.js";
 import {
   checkCategoryCount,
   countByScore,

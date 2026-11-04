@@ -1,5 +1,6 @@
+import { invertPositiveDefinite } from "@measurekit/core";
 import { type CompressedResponses, covarianceFromInformation } from "../irt/internal.js";
-import { invertPositiveDefinite, symmetrized } from "../math/internal.js";
+import { symmetrized } from "../math/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Latent } from "./correlation.js";
 import type { ExpectationStep } from "./expectation.js";

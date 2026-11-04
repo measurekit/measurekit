@@ -1,5 +1,5 @@
-import { bfgs, cholesky } from "@measurekit/core";
-import { identity, invertPositiveDefinite } from "../math/internal.js";
+import { bfgs, cholesky, invertPositiveDefinite } from "@measurekit/core";
+import { identity } from "../math/internal.js";
 
 import { type Grid, normalLogWeights } from "./grid.js";
 

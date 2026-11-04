@@ -6,6 +6,7 @@ import {
   cholesky,
   type DescentPoint,
   dot,
+  invertPositiveDefinite,
   iterateToConvergence,
   largestChange,
   logistic,
@@ -83,6 +84,44 @@ describe("normalCdf and normalDensity", () => {
     expect(normalDensity(0)).toBe(0.3989422804014327);
     expect(Math.abs(normalDensity(1) - 0.24197072451914337)).toBeLessThan(1e-16);
     expect(normalDensity(-1)).toBe(normalDensity(1));
+  });
+});
+
+describe("invertPositiveDefinite", () => {
+  it("gives the matrix whose product with a symmetric positive definite matrix is the identity", () => {
+    const factors = fc
+      .integer({ min: 1, max: 6 })
+      .chain((size) =>
+        fc.array(fc.double({ min: -1, max: 1, noNaN: true }), { minLength: size * size, maxLength: size * size }),
+      );
+    fc.assert(
+      fc.property(factors, (values) => {
+        const size = Math.sqrt(values.length);
+        // B Bᵀ plus the identity is symmetric positive definite.
+        const a = new Float64Array(size * size);
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            let sum = i === j ? 1 : 0;
+            for (let k = 0; k < size; k++) sum += (values[i * size + k] ?? 0) * (values[j * size + k] ?? 0);
+            a[i * size + j] = sum;
+          }
+        }
+        const inverse = invertPositiveDefinite(a, size) ?? new Float64Array(size * size);
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            let product = 0;
+            for (let k = 0; k < size; k++) product += (a[i * size + k] ?? 0) * (inverse[k * size + j] ?? 0);
+            expect(Math.abs(product - (i === j ? 1 : 0))).toBeLessThan(1e-10);
+            expect(inverse[i * size + j]).toBe(inverse[j * size + i]);
+          }
+        }
+      }),
+    );
+  });
+
+  it("returns null for a matrix that is not positive definite", () => {
+    expect(invertPositiveDefinite(Float64Array.of(1, 2, 2, 1), 2)).toBeNull();
+    expect(invertPositiveDefinite(Float64Array.of(1, 1, 1, 1), 2)).toBeNull();
   });
 });
 

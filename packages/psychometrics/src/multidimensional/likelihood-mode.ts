@@ -1,5 +1,5 @@
-import { type BacktrackOptions, backtrack } from "@measurekit/core";
-import { invert, invertPositiveDefinite } from "../math/internal.js";
+import { type BacktrackOptions, backtrack, invertPositiveDefinite } from "@measurekit/core";
+import { invert } from "../math/internal.js";
 import type { AnsweredPattern } from "./pattern.js";
 import { posteriorMode, SCAN_SPAN, scanStart } from "./posterior-mode.js";
 import { checkedPrior } from "./prior.js";

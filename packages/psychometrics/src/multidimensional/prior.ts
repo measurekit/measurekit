@@ -5,9 +5,10 @@ import {
   checkRecord,
   DataError,
   type FieldNames,
+  invertPositiveDefinite,
   isRecord,
 } from "@measurekit/core";
-import { identity, invertPositiveDefinite } from "../math/internal.js";
+import { identity } from "../math/internal.js";
 
 /** A multivariate normal prior distribution of theta. */
 export interface MultivariateNormalPrior {

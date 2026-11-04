@@ -22,7 +22,7 @@ export {
   sampleMoments,
   tableMoments,
 } from "./limited-information.js";
-export { invert, invertPositiveDefinite } from "./linear-algebra.js";
+export { invert } from "./linear-algebra.js";
 export {
   addOuterProduct,
   identity,

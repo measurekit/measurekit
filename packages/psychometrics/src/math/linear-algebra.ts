@@ -1,5 +1,3 @@
-import { cholesky } from "@measurekit/core";
-
 /**
  * Returns the inverse of the `size` by `size` matrix `a`, stored by rows, or `null` when it is singular to working
  * precision. Uses Gauss-Jordan elimination with partial pivoting; meant for the small matrices of item parameters.
@@ -64,46 +62,4 @@ export function forwardSolve(factor: Float64Array, size: number, right: Float64A
     for (let k = 0; k < i; k++) subtractRow(right, columns, i, k, factor[i * size + k] ?? 0);
     scaleRow(right, columns, i, 1 / (factor[i * size + i] ?? 1));
   }
-}
-
-/**
- * Returns the inverse of the symmetric positive definite `size` by `size` matrix `a`, stored by rows, or `null` when it
- * is not positive definite to working precision. Uses the Cholesky factor L of a: the inverse is L⁻ᵀ L⁻¹, about half
- * the work of {@link invert}.
- */
-export function invertPositiveDefinite(a: Float64Array, size: number): Float64Array | null {
-  const factor = cholesky(a, size);
-  return factor === null ? null : crossProductOfColumns(invertedTranspose(factor, size), size);
-}
-
-/**
- * Returns M = L⁻¹ of a lower triangular L, by forward substitution, stored transposed, by columns of M, so that the
- * columns are contiguous.
- */
-function invertedTranspose(factor: Float64Array, size: number): Float64Array {
-  const transposed = new Float64Array(size * size);
-  for (let j = 0; j < size; j++) {
-    const columnJ = j * size;
-    transposed[columnJ + j] = 1 / (factor[j * size + j] ?? 1);
-    for (let i = j + 1; i < size; i++) {
-      let sum = 0;
-      for (let k = j; k < i; k++) sum -= (factor[i * size + k] ?? 0) * (transposed[columnJ + k] ?? 0);
-      transposed[columnJ + i] = sum / (factor[i * size + i] ?? 1);
-    }
-  }
-  return transposed;
-}
-
-/** Returns Mᵀ M of a lower triangular M stored by columns: entry (i, j) sums M[k][i] M[k][j] over k ≥ max(i, j). */
-function crossProductOfColumns(transposed: Float64Array, size: number): Float64Array {
-  const product = new Float64Array(size * size);
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j <= i; j++) {
-      let sum = 0;
-      for (let k = i; k < size; k++) sum += (transposed[i * size + k] ?? 0) * (transposed[j * size + k] ?? 0);
-      product[i * size + j] = sum;
-      product[j * size + i] = sum;
-    }
-  }
-  return product;
 }

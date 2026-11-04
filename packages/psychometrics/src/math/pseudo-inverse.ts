@@ -1,5 +1,5 @@
+import { invertPositiveDefinite } from "@measurekit/core";
 import { symmetricEigen } from "./eigen.js";
-import { invertPositiveDefinite } from "./linear-algebra.js";
 import { trace } from "./matrix.js";
 
 /** The relative size below which an eigenvalue counts as 0: the square root of the machine epsilon, as R's `MASS::ginv`. */

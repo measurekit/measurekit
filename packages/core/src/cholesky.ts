@@ -131,3 +131,48 @@ function rowProduct(m: Float64Array, size: number, i: number, j: number, count: 
   for (let k = 0; k < count; k++) sum += (m[i * size + k] ?? 0) * (m[j * size + k] ?? 0);
   return sum;
 }
+
+/**
+ * Returns the inverse of a symmetric positive definite `size` by `size` matrix, from its Cholesky factor L: the inverse
+ * is L⁻ᵀ L⁻¹, about half the work of Gauss-Jordan elimination.
+ *
+ * @param a - The symmetric matrix, by rows.
+ * @param size - The number of rows and columns of `a`.
+ * @returns The inverse by rows; `null` when `a` is not positive definite to working precision.
+ */
+export function invertPositiveDefinite(a: Float64Array, size: number): Float64Array | null {
+  const factor = cholesky(a, size);
+  return factor === null ? null : crossProductOfColumns(invertedTranspose(factor, size), size);
+}
+
+/**
+ * Returns M = L⁻¹ of a lower triangular L, by forward substitution, stored transposed, by columns of M, so that the
+ * columns are contiguous.
+ */
+function invertedTranspose(factor: Float64Array, size: number): Float64Array {
+  const transposed = new Float64Array(size * size);
+  for (let j = 0; j < size; j++) {
+    const columnJ = j * size;
+    transposed[columnJ + j] = 1 / (factor[j * size + j] ?? 1);
+    for (let i = j + 1; i < size; i++) {
+      let sum = 0;
+      for (let k = j; k < i; k++) sum -= (factor[i * size + k] ?? 0) * (transposed[columnJ + k] ?? 0);
+      transposed[columnJ + i] = sum / (factor[i * size + i] ?? 1);
+    }
+  }
+  return transposed;
+}
+
+/** Returns Mᵀ M of a lower triangular M stored by columns: entry (i, j) sums M[k][i] M[k][j] over k ≥ max(i, j). */
+function crossProductOfColumns(transposed: Float64Array, size: number): Float64Array {
+  const product = new Float64Array(size * size);
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j <= i; j++) {
+      let sum = 0;
+      for (let k = i; k < size; k++) sum += (transposed[i * size + k] ?? 0) * (transposed[j * size + k] ?? 0);
+      product[i * size + j] = sum;
+      product[j * size + i] = sum;
+    }
+  }
+  return product;
+}

@@ -1,6 +1,6 @@
-import { DataError, describe, mean } from "@measurekit/core";
+import { DataError, describe, invertPositiveDefinite, mean } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { covariance, invertPositiveDefinite, multiply, standardDeviation } from "../math/internal.js";
+import { covariance, multiply, standardDeviation } from "../math/internal.js";
 import { type SectionStatistics, sectionCases, sectionStatistics } from "./sections.js";
 
 /** One section of {@link AugmentedSubscores}. */

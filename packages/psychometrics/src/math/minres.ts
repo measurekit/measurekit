@@ -1,6 +1,5 @@
-import { ARMIJO, backtrack, dot } from "@measurekit/core";
+import { ARMIJO, backtrack, dot, invertPositiveDefinite } from "@measurekit/core";
 import { symmetricEigen } from "./eigen.js";
-import { invertPositiveDefinite } from "./linear-algebra.js";
 import { identity } from "./matrix.js";
 
 /** The one-factor minimum residual solution of a correlation matrix. */

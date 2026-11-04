@@ -1,5 +1,13 @@
-import { checkArray, checkChoice, checkRecordById, DataError, describe, isRecord } from "@measurekit/core";
-import { invertPositiveDefinite, newton, type Quadrature } from "../math/internal.js";
+import {
+  checkArray,
+  checkChoice,
+  checkRecordById,
+  DataError,
+  describe,
+  invertPositiveDefinite,
+  isRecord,
+} from "@measurekit/core";
+import { newton, type Quadrature } from "../math/internal.js";
 import { personGroups } from "./responses.js";
 
 /**

@@ -1,4 +1,4 @@
-import { invertPositiveDefinite } from "../math/internal.js";
+import { invertPositiveDefinite } from "@measurekit/core";
 import type { ExpectationStep } from "./expectation.js";
 import type { Population } from "./latent.js";
 import type { IrtModel } from "./model.js";

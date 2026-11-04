@@ -1,6 +1,5 @@
-import { cholesky, normalizeLogs, type Random } from "@measurekit/core";
+import { cholesky, invertPositiveDefinite, normalizeLogs, type Random } from "@measurekit/core";
 import { type CompressedResponses, logProbability } from "../irt/internal.js";
-import { invertPositiveDefinite } from "../math/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Correlations } from "./mhrm-latent.js";
 import { answeredPattern } from "./pattern.js";

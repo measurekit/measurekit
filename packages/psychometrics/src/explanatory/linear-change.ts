@@ -8,12 +8,12 @@ import {
   DataError,
   describe,
   type FieldNames,
+  invertPositiveDefinite,
   isNonEmptyString,
   iterateToConvergence,
   maxAbs,
 } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { invertPositiveDefinite } from "../math/internal.js";
 
 /** Options of {@link linearChange}. */
 export interface LinearChangeOptions {

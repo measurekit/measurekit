@@ -1,5 +1,5 @@
-import { chiSquareUpperTail, cholesky } from "@measurekit/core";
-import { invertPositiveDefinite, rmseaInterval } from "../math/internal.js";
+import { chiSquareUpperTail, cholesky, invertPositiveDefinite } from "@measurekit/core";
+import { rmseaInterval } from "../math/internal.js";
 
 /** The fit of exploratory factors to the correlations of the items, as psych's `fa` reports it. */
 export interface FactorFit {

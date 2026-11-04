@@ -1,3 +1,4 @@
+import { invertPositiveDefinite } from "@measurekit/core";
 import {
   type CompressedResponses,
   derivativeRatios,
@@ -5,7 +6,7 @@ import {
   unboundedCoordinates,
   unboundedScales,
 } from "../irt/internal.js";
-import { addOuterProduct, invert, invertPositiveDefinite, mirror, numericalHessian } from "../math/internal.js";
+import { addOuterProduct, invert, mirror, numericalHessian } from "../math/internal.js";
 import type { LongitudinalFit } from "./longitudinal-em.js";
 
 /**

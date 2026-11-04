@@ -1,5 +1,4 @@
-import { backtrack, maxAbs } from "@measurekit/core";
-import { invertPositiveDefinite } from "../math/internal.js";
+import { backtrack, invertPositiveDefinite, maxAbs } from "@measurekit/core";
 import type { AnsweredPattern } from "./pattern.js";
 import type { CheckedPrior } from "./prior.js";
 

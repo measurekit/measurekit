@@ -1,4 +1,12 @@
-import { chiSquareUpperTail, createRandom, logistic, normalCdf, normalDensity, normalQuantile } from "@measurekit/core";
+import {
+  chiSquareUpperTail,
+  createRandom,
+  invertPositiveDefinite,
+  logistic,
+  normalCdf,
+  normalDensity,
+  normalQuantile,
+} from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,7 +16,6 @@ import {
   gaussHermite,
   identity,
   invert,
-  invertPositiveDefinite,
   limitedInformationStatistic,
   mirror,
   multiply,
@@ -472,11 +479,6 @@ describe("invertPositiveDefinite", () => {
         });
       }),
     );
-  });
-
-  it("returns null for a matrix that is not positive definite", () => {
-    expect(invertPositiveDefinite(Float64Array.of(1, 2, 2, 1), 2)).toBeNull();
-    expect(invertPositiveDefinite(Float64Array.of(1, 1, 1, 1), 2)).toBeNull();
   });
 });
 

@@ -1,4 +1,4 @@
-import { cholesky, dot } from "@measurekit/core";
+import { dot, invertPositiveDefinite } from "@measurekit/core";
 import { addOuter, assemble, createSystem, type FlatDirection, type Problem, type System } from "./arrow-system.js";
 
 /** The standard errors of a logistic regression's coefficients and group intercepts. */
@@ -54,7 +54,7 @@ export function standardErrors(
   const system = createSystem(p, intercepts.length);
   assemble(problem, beta, intercepts, 0, groupPenalty, system);
   for (const { coefficients } of flats) addOuter(system.schur, coefficients, 1 / dot(coefficients, coefficients));
-  const inverse = inverseOf(system.schur, p);
+  const inverse = invertPositiveDefinite(system.schur, p);
   if (inverse === null) return null;
   const variances = Float64Array.from({ length: p }, (_, j) => inverse[j * p + j] ?? 0);
   const groupVariances = new Float64Array(groups ? intercepts.length : 0);
@@ -190,47 +190,4 @@ function coupling(
     }
   }
   return flat === undefined ? sum : sum - (along * along) / flat.norm;
-}
-
-/**
- * Returns the inverse of a symmetric positive definite matrix stored by rows, from its Cholesky factor, or `null` when it
- * is not positive definite to working precision.
- */
-function inverseOf(matrix: Float64Array, size: number): Float64Array | null {
-  const lower = cholesky(matrix, size);
-  return lower === null ? null : gram(invertLower(lower, size), size);
-}
-
-/** Returns the inverse of a lower triangular matrix stored by rows, solved by column: L x = e_j for x below j. */
-function invertLower(lower: Float64Array, size: number): Float64Array {
-  const inverse = new Float64Array(size * size);
-  const column = new Float64Array(size);
-  for (let j = 0; j < size; j++) {
-    for (let i = j; i < size; i++) {
-      let sum = i === j ? 1 : 0;
-      for (let k = j; k < i; k++) sum -= (lower[i * size + k] ?? 0) * (column[k] ?? 0);
-      column[i] = sum / (lower[i * size + i] ?? 1);
-      inverse[i * size + j] = column[i] ?? 0;
-    }
-  }
-  return inverse;
-}
-
-/** Returns Mᵀ M of a lower triangular matrix stored by rows: each row k adds its outer product. */
-function gram(lower: Float64Array, size: number): Float64Array {
-  const product = new Float64Array(size * size);
-  for (let k = 0; k < size; k++) addRowOuter(product, lower, size, k);
-  for (let i = 0; i < size; i++) for (let j = 0; j < i; j++) product[j * size + i] = product[i * size + j] ?? 0;
-  return product;
-}
-
-/** Adds the outer product of row k of a lower triangular matrix with itself to the lower triangle of `product`. */
-function addRowOuter(product: Float64Array, lower: Float64Array, size: number, k: number): void {
-  for (let i = 0; i <= k; i++) {
-    const factor = lower[k * size + i] ?? 0;
-    if (factor === 0) continue;
-    for (let j = 0; j <= i; j++) {
-      product[i * size + j] = (product[i * size + j] ?? 0) + factor * (lower[k * size + j] ?? 0);
-    }
-  }
 }

@@ -1,8 +1,15 @@
-import { checkIntegerFrom, checkOptions, DataError, type FieldNames, normalizeLogs } from "@measurekit/core";
+import {
+  checkIntegerFrom,
+  checkOptions,
+  DataError,
+  type FieldNames,
+  invertPositiveDefinite,
+  normalizeLogs,
+} from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { checkRange, estimatePersons, RANGE_OPTIONS, type RangeOptions } from "../irt/internal.js";
-import { addOuterProduct, invertPositiveDefinite, mirror } from "../math/internal.js";
+import { addOuterProduct, mirror } from "../math/internal.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
 import { type GridLikelihood, gridLikelihood } from "./grid-likelihood.js";
 import { checkMultidimensionalPattern, indexMultidimensionalItems } from "./items.js";

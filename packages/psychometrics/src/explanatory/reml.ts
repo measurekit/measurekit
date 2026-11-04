@@ -1,5 +1,5 @@
-import { backtrack, cholesky, DataError, multiplyVector } from "@measurekit/core";
-import { invertPositiveDefinite, multiply, trace, traceOfProduct } from "../math/internal.js";
+import { backtrack, cholesky, DataError, invertPositiveDefinite, multiplyVector } from "@measurekit/core";
+import { multiply, trace, traceOfProduct } from "../math/internal.js";
 import { designCrossProducts } from "./cross-products.js";
 
 /** The estimates of a regression with a random residual and known sampling variances. */
