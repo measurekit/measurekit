@@ -236,6 +236,8 @@ Evaluation, practice and simulation check that a model passed in is an object wi
   α_t(i) A(i, j) / p_(t+1)(j) · γ_(t+1)(j), from probabilities and shares of them only: a sequence of thousands of
   attempts, where a state's filtered probability underflows to 0, gives no `NaN`.
 - AUC comes from midranks, exact for ties; calibration bins compare predictions with the bounds k / K as computed.
+- The numerics are written here rather than taken from `ml-matrix` or `@stdlib`, for the reasons that core's
+  [README](../../packages/core/README.md#why-the-numerics-are-written-here) gives.
 
 ## Not included
 
