@@ -171,7 +171,14 @@ Every statistic is compared with a reference in tests, within the tolerance that
 Simulation has no reference, as R's generator differs from `createRandom`: seeded tests check its distributions, and a
 calibration recovers the items it simulates.
 
+[Supported](https://measurekit.wakan.dev/_measurekit/psychometrics/supported/) lists what each module includes and what it leaves out, and
+[evidence](https://measurekit.wakan.dev/_measurekit/psychometrics/evidence/) what shows that it is right.
+
 ## Documentation
+
+[Choosing](https://measurekit.wakan.dev/_measurekit/psychometrics/choosing/) says when the package fits, when another library fits better, and what each has
+that the package lacks. [Coming from R](https://measurekit.wakan.dev/_measurekit/psychometrics/coming-from-r/) puts the calls of mirt, TAM, catR,
+GDINA, equate, difR, psych and mokken beside the package's, with the tolerance and the time of each.
 
 - [Data](https://measurekit.wakan.dev/_measurekit/psychometrics/data/): response matrices,
   response records for sparse data, missing responses, scoring against a key.

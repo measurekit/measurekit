@@ -2,7 +2,13 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { basename, dirname, extname, join, posix, resolve } from "node:path";
 import ts from "typescript";
-import { checkClaimWords, checkIdentity, checkReadmeLinks, checkTrademarks } from "./check-identity.ts";
+import {
+  checkClaimWords,
+  checkEvidencePages,
+  checkIdentity,
+  checkReadmeLinks,
+  checkTrademarks,
+} from "./check-identity.ts";
 
 /** One breach of the standards: the file, the 1-based line (0 for the whole file), the rule and what to do. */
 export interface Violation {
@@ -311,7 +317,17 @@ export function checkConsole(files: Files): Violation[] {
 }
 
 /** The pages of `docs/<package>/` that are not the guide of a module. */
-const OTHER_PAGES = new Set(["architecture", "performance", "storage", "validation"]);
+const OTHER_PAGES = new Set([
+  "architecture",
+  "choosing",
+  "coming-from-pybkt",
+  "coming-from-r",
+  "evidence",
+  "performance",
+  "storage",
+  "supported",
+  "validation",
+]);
 /** The sections that the guide of every module has, by the text of their `##` heading. */
 const GUIDE_SECTIONS = ["Quick start", "Errors", "Not included", "Differences from the references"];
 /** The first row of the table of what a page leaves out, as every page writes it. */
@@ -611,6 +627,7 @@ export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkTrademarks,
   checkClaimWords,
   checkReadmeLinks,
+  checkEvidencePages,
 ];
 
 /** Runs every check over the files. */

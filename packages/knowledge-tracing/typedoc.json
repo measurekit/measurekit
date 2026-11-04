@@ -22,6 +22,6 @@
   "readme": "README.md",
   "excludePrivate": true,
   "projectDocuments": ["../../docs/knowledge-tracing/*.md"],
-  "ignoredHighlightLanguages": ["r"],
+  "ignoredHighlightLanguages": ["python", "r"],
   "treatWarningsAsErrors": true
 }

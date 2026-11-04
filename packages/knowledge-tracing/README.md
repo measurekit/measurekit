@@ -136,7 +136,14 @@ references:
 
 Simulations check that Elo and BKT recover the parameters they simulate.
 
+[Supported](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/supported/) lists what each module includes and what it leaves out, and
+[evidence](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/evidence/) what shows that it is right.
+
 ## Documentation
+
+[Choosing](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/choosing/) says when the package fits, when another library fits better, and what each has
+that the package lacks. [Coming from pyBKT](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/coming-from-pybkt/) maps pyBKT's data, options
+and calls to the package's.
 
 - [Data](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/data/): events, with and without an
   outcome, logs, Q-matrices, first attempts, splits by learner, item and time.

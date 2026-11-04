@@ -2,7 +2,7 @@
 "@measurekit/psychometrics": major
 ---
 
-Psychometrics for JavaScript and TypeScript, validated against R: classical test theory with the value of subscores,
+Psychometrics for JavaScript and TypeScript, validated against R and RSMTool: classical test theory with the value of subscores,
 item response theory, including conditional maximum likelihood of the Rasch family and multidimensional models with exploratory and confirmatory calibration by EM and MH-RM,
 rotation and scoring, cognitive diagnosis (G-DINA, DINA, DINO, A-CDM, LLM and R-RUM), adaptive, diagnostic adaptive, multidimensional
 adaptive and multistage testing with testlets, classification by a confidence interval or the sequential probability ratio test and the derivation of routing cuts, item and person fit, with Snijders' lz* and the normed G, U3 and Ht of persons, the RMSD of items, Chen and Thissen's local-dependence chi-square, the Andersen, Martin-Löf and Wald tests of the Rasch family and kernel-smoothed item curves, differential item functioning for dichotomous and

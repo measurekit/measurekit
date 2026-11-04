@@ -62,6 +62,9 @@ the tolerances of the [psychometrics](https://measurekit.wakan.dev/_measurekit/p
 [knowledge tracing](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/validation/) validation. The tests of core
 cover their edge cases.
 
+[Supported](https://measurekit.wakan.dev/_measurekit/core/supported/) lists what the package holds and what each part is
+checked against, and [evidence](https://measurekit.wakan.dev/_measurekit/core/evidence/) what shows that it is right.
+
 ## Why the numerics are written here
 
 The numerics are written here rather than taken from `ml-matrix` 6.15.1 or the `@stdlib/stats-base-dists-*` packages
@@ -79,6 +82,9 @@ well. What one library alone needs, such as an eigendecomposition, stays in its 
 ([psychometrics](https://measurekit.wakan.dev/_measurekit/psychometrics/architecture/#why-the-numerics-are-written-here)).
 
 ## Documentation
+
+[Choosing](https://measurekit.wakan.dev/_measurekit/core/choosing/) says when the package fits, when another library fits better, and what each has
+that the package lacks.
 
 [Performance](https://measurekit.wakan.dev/_measurekit/core/performance/) gives the speed of the numerics against base R
 and stats, and what the entry point adds to a bundle.

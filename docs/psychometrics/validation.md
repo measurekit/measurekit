@@ -1,10 +1,10 @@
 # Validation of psychometrics
 
-Every statistic of `@measurekit/psychometrics` is compared with an R reference; [simulation](#simulation) is checked
-by its properties instead. R scripts in [`validation/`](../../validation/README.md) load public datasets or
-simulate data with a fixed seed, run the reference, and write the inputs and expected results as JSON fixtures
-to `packages/psychometrics/test/fixtures/`. The tests compare the results with the fixtures. CI runs only the
-TypeScript tests; R runs when fixtures change.
+Every statistic of `@measurekit/psychometrics` is compared with an R reference, or RSMTool's for the evaluation of
+automated scores; [simulation](#simulation) is checked by its properties instead. R and Python scripts in
+[`validation/`](../../validation/README.md) load public datasets or simulate data with a fixed seed, run the reference,
+and write the inputs and expected results as JSON fixtures to `packages/psychometrics/test/fixtures/`. The tests compare
+the results with the fixtures. CI runs only the TypeScript tests; R and Python run when fixtures change.
 
 ```mermaid
 flowchart LR
