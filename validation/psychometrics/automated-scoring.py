@@ -12,10 +12,11 @@ human scores' mean and SD, as RSMTool's scaled predictions are, and written unro
 them to the scale. The script checks that no prediction lies within 1e-6 of a half,
 so that rounding half to even, as numpy does, and half up, as JavaScript does, agree.
 
-Expected values come from RSMTool's own functions: Analyzer.metrics_helper for each pair of scores, with the SMD pooled
-over the whole sample and Williamson's for each group on the population's SDs; Analyzer.compute_metrics for the
-human-human row and compute_degradation_and_disattenuated_correlations for the degradation and the disattenuated
-correlation. RSMTool's degradation of the SMD takes the human-system SMD unpooled, its default, and the human-human SMD
+Expected values come from RSMTool's own functions: Analyzer.metrics_helper for each pair of scores and each group, with
+the SMD pooled over the whole sample and Williamson's for each group on the population's SDs; Analyzer.compute_metrics for
+the human-human row and compute_degradation_and_disattenuated_correlations for the degradation and the disattenuated
+correlation, also with the second score of one essay in three, where the human-human metrics are of those essays and
+the rest of all of them. RSMTool's degradation of the SMD takes the human-system SMD unpooled, its default, and the human-human SMD
 pooled, so the fixture holds both pooled SMDs and the recipe's degradation is their difference.
 
 Run from the repository root, in the environment of automated-scoring-requirements.txt:
@@ -67,6 +68,8 @@ METRICS = {
     "h_sd": "humanSd",
 }
 DEGRADED = ["corr", "kappa", "wtkappa", "exact_agr", "adj_agr"]
+# The essays of ELLIPSE whose second score the partly double-scored case keeps: one in this many.
+SECOND_EVERY = 3
 
 
 def fetch(source: dict) -> Path:
@@ -115,7 +118,7 @@ def persuade_case() -> dict:
         values = Analyzer.metrics_helper(
             pd.Series(human[rows]), pd.Series(machine[rows]), human_sd, machine_sd, smd_method="williamson"
         )
-        groups.append({"group": group, "subjects": int(values["N"]), "smd": number(values["SMD"])})
+        groups.append({"group": group, "subjects": int(values["N"]), **metrics(values)})
     return {
         "scale": [1, 6],
         "human": human.astype(int).tolist(),
@@ -142,6 +145,12 @@ def ellipse_case() -> dict:
     human_pair = Analyzer.metrics_helper(pd.Series(first), pd.Series(second), smd_method="pooled")
     for metric in DEGRADED:
         assert abs(human_pair[metric] - human_human[metric].iloc[0]) < 1e-15
+    # A third of the essays keep their second score: the human-human metrics are of those, the human-system metrics and
+    # the degradation of all essays, RSMTool's use_all_responses.
+    kept = np.arange(len(second)) % SECOND_EVERY == 0
+    partial = frame.assign(sc2=np.where(kept, second, np.nan))
+    partial_degradation, partial_correlations = analyzer.compute_degradation_and_disattenuated_correlations(partial)
+    _, _, partial_human_human = analyzer.compute_metrics(partial, include_second_score=True)
     return {
         "scale": [1, 5],
         "first": first.astype(int).tolist(),
@@ -151,6 +160,16 @@ def ellipse_case() -> dict:
         "humanHuman": metrics(human_pair),
         "degradation": {METRICS[metric]: number(degradation[metric].loc["raw_trim_round"]) for metric in DEGRADED},
         "disattenuated": number(correlations["corr_disattenuated"].loc["raw_trim_round"]),
+        "partlyDoubleScored": {
+            "secondEvery": SECOND_EVERY,
+            "humanHuman": {
+                METRICS[metric]: number(partial_human_human[metric].iloc[0]) for metric in DEGRADED + ["SMD"]
+            },
+            "degradation": {
+                METRICS[metric]: number(partial_degradation[metric].loc["raw_trim_round"]) for metric in DEGRADED
+            },
+            "disattenuated": number(partial_correlations["corr_disattenuated"].loc["raw_trim_round"]),
+        },
     }
 
 

@@ -106,7 +106,20 @@ export interface RaterAutomatedScoringFixture {
         machineSd: number;
         humanSd: number;
       };
-      byGroup: { group: string; subjects: number; smd: number }[];
+      byGroup: {
+        group: string;
+        subjects: number;
+        kappa: number | null;
+        quadraticKappa: number | null;
+        exactPercent: number;
+        adjacentPercent: number;
+        smd: number | null;
+        correlation: number | null;
+        rSquared: number | null;
+        rmse: number;
+        machineSd: number | null;
+        humanSd: number | null;
+      }[];
     };
     ELLIPSE: {
       scale: number[];
@@ -145,6 +158,25 @@ export interface RaterAutomatedScoringFixture {
         adjacentPercent: number;
       };
       disattenuated: number;
+      partlyDoubleScored: {
+        secondEvery: number;
+        humanHuman: {
+          correlation: number;
+          kappa: number;
+          quadraticKappa: number;
+          exactPercent: number;
+          adjacentPercent: number;
+          smd: number;
+        };
+        degradation: {
+          correlation: number;
+          kappa: number;
+          quadraticKappa: number;
+          exactPercent: number;
+          adjacentPercent: number;
+        };
+        disattenuated: number;
+      };
     };
   };
 }

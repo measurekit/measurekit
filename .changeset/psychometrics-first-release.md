@@ -232,3 +232,13 @@ matrix of" it.
 percentile rank is the weighted share below plus half the weighted share at the score, as Hmisc's `wtd.Ecdf` gives it,
 and the norms' standard errors are the delta method over the weights, the survey package's linearization of `svymean`
 and `svyvar` without its factor n / (n - 1), which reduces to `check.norms`' multinomial delta method for equal weights.
+
+The evaluation of automated scores against human scores is a set of functions of the rater module, where the guide had
+a recipe. `automatedScoreAgreement` gives RSMTool's machine-human and human-human statistics, their degradation, the
+disattenuated correlation and each subgroup's statistics with its SMD on the population's standard deviations, after
+rounding and trimming the machine scores to a `scale`. `validateAutomatedScores` judges them against
+`ACCEPTANCE_THRESHOLDS`, Williamson, Xi and Breyer's, or a program's own, and lists each rule broken. `automatedScoreDrift`
+gives the agreement by window of time, `routingCurve` the coverage and agreement at each confidence of the scorer,
+`scoreMapping` and `mappedScore` a line to the human mean and SD or an isotonic regression from machine to human scores,
+and `replayShift` the shift of responses scored again from their locked scores in SDs, with its standard error and whether
+it stays within `maxShiftSd`.

@@ -1,7 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  ACCEPTANCE_THRESHOLDS,
+  type AutomatedScore,
   adjacentAgreement,
+  automatedScoreAgreement,
+  automatedScoreDrift,
   cohenKappa,
   createRandom,
   DataError,
@@ -15,10 +19,16 @@ import {
   manyFacetEstimates,
   manyFacetFit,
   manyFacetRasch,
+  mappedScore,
   maximumLikelihoodEstimate,
   type PersonEstimate,
   ratingCorrelation,
+  replayShift,
+  routingCurve,
+  type ScoreAgreement,
+  scoreMapping,
   standardizedMeanDifference,
+  validateAutomatedScores,
 } from "../src/index.js";
 import { standardDeviation } from "../src/math/internal.js";
 import { summarizeFacet } from "../src/rater/internal.js";
@@ -57,6 +67,42 @@ interface RaterAgreementFixture {
 const agreementFixture = readFixture<RaterAgreementFixture>("rater-agreement.json");
 
 const scoringFixture = readFixture<RaterAutomatedScoringFixture>("rater-automated-scoring.json");
+
+interface ScoringStatistics {
+  subjects: number;
+  exactAgreement: number;
+  adjacentAgreement: number;
+  kappa: number | null;
+  quadraticKappa: number | null;
+  correlation: number | null;
+  smd: number | null;
+  rmse: number;
+}
+interface RaterScoringFixture {
+  routing: { confidence: number[]; points: (ScoringStatistics & { minConfidence: number; coverage: number })[] };
+  drift: { time: number[]; width: number; windows: { start: number; end: number; agreement: ScoringStatistics }[] };
+  mapping: {
+    knots: { machine: number[]; human: number[] };
+    at: number[];
+    mapped: number[];
+    linear: { machine: number[]; human: number[]; slope: number; intercept: number };
+  };
+  replay: {
+    maxShiftSd: number;
+    cases: {
+      shift: number;
+      locked: number[];
+      replayed: number[];
+      meanShift: number;
+      lockedSd: number;
+      standardizedShift: number;
+      standardError: number;
+      correlation: number;
+      passed: boolean;
+    }[];
+  };
+}
+const scoringReferences = readFixture<RaterScoringFixture>("rater-scoring.json");
 
 interface RaterBiasFixture {
   scores: { levels: { person: string; item: string; rater: string }; score: number }[];
@@ -155,38 +201,9 @@ const PERSUADE = scoringFixture.cases["PERSUADE 2.0"];
 /** The ELLIPSE case of the fixture: two human scores and a machine score per essay. */
 const ELLIPSE = scoringFixture.cases.ELLIPSE;
 
-/** The recipe of rater.md: machine scores rounded and trimmed to the scale. */
+/** Machine scores rounded and trimmed to the scale, as the option scale of automatedScoreAgreement does. */
 function toScale(scores: readonly number[], [low = 0, high = 0]: readonly number[]): number[] {
   return scores.map((score) => Math.min(high, Math.max(low, Math.round(score))));
-}
-
-/** The recipe of rater.md: the metrics of a second rating against the first, the human, as rows [second, first]. */
-function evaluate(human: readonly number[], machine: readonly number[]): ScoringMetrics {
-  const pairs = machine.map((score, i) => [score, human[i] ?? null]);
-  const squares = machine.reduce((sum, score, i) => sum + (score - (human[i] ?? 0)) ** 2, 0);
-  const humanMean = human.reduce((sum, score) => sum + score, 0) / human.length;
-  const spread = human.reduce((sum, score) => sum + (score - humanMean) ** 2, 0);
-  return {
-    kappa: cohenKappa(pairs),
-    quadraticKappa: cohenKappa(pairs, { weights: "quadratic" }),
-    exactPercent: 100 * exactAgreement(pairs),
-    adjacentPercent: 100 * adjacentAgreement(pairs),
-    smd: standardizedMeanDifference(pairs),
-    correlation: ratingCorrelation(pairs),
-    rSquared: 1 - squares / spread,
-    rmse: Math.sqrt(squares / human.length),
-    machineSd: standardDeviation(Float64Array.from(machine)),
-    humanSd: standardDeviation(Float64Array.from(human)),
-  };
-}
-
-/** Expects the recipe's metrics to be RSMTool's, agreement in percent at 100 times the tolerance. */
-function expectMetrics(actual: ScoringMetrics, expected: ScoringMetrics, label: string): void {
-  for (const [name, value] of Object.entries(expected)) {
-    const found: unknown = Object.entries(actual).find(([key]) => key === name)?.[1];
-    const scale = name.endsWith("Percent") ? 100 : 1;
-    expectClose(typeof found === "number" ? found : null, value, scale * SCORING_TOLERANCE, `${label} ${name}`);
-  }
 }
 
 /** Ratings of 2 to 20 subjects by `raters` raters in categories 0 to 4. */
@@ -617,25 +634,477 @@ describe("standardizedMeanDifference", () => {
   });
 });
 
-describe("the recipe for evaluating automated scores", () => {
-  it("gives RSMTool's metrics of machine against human scores on PERSUADE 2.0", () => {
-    expectMetrics(evaluate(PERSUADE.human, toScale(PERSUADE.machine, PERSUADE.scale)), PERSUADE.overall, "PERSUADE");
+/** Builds the subjects of an evaluation from columns of scores. */
+function subjectsOf(
+  machine: readonly number[],
+  human: readonly number[],
+  extra: (subject: number) => Partial<AutomatedScore> = () => ({}),
+): AutomatedScore[] {
+  return machine.map((score, subject) => ({ machine: score, human: defined(human[subject]), ...extra(subject) }));
+}
+
+/** Expects the agreement of a scoring with another to be RSMTool's metrics, agreement in percent at 100 times the tolerance. */
+function expectAgreement(actual: ScoreAgreement, expected: Partial<ScoringMetrics>, label: string): void {
+  const own: Record<string, number | null> = {
+    kappa: actual.kappa,
+    quadraticKappa: actual.quadraticKappa,
+    exactPercent: 100 * actual.exactAgreement,
+    adjacentPercent: 100 * actual.adjacentAgreement,
+    smd: actual.smd,
+    correlation: actual.correlation,
+    rSquared: actual.rSquared,
+    rmse: actual.rmse,
+    machineSd: actual.firstSd,
+    humanSd: actual.secondSd,
+  };
+  for (const [name, value] of Object.entries(expected)) {
+    const scale = name.endsWith("Percent") ? 100 : 1;
+    expectClose(own[name] ?? null, value ?? null, scale * SCORING_TOLERANCE, `${label} ${name}`);
+  }
+}
+
+describe("automatedScoreAgreement", () => {
+  const persuade = subjectsOf(PERSUADE.machine, PERSUADE.human, (subject) => ({ group: PERSUADE.groups[subject] }));
+  const ellipse = subjectsOf(ELLIPSE.machine, ELLIPSE.first, (subject) => ({ second: ELLIPSE.second[subject] }));
+  const scale = (range: readonly number[]) => ({ lowest: defined(range[0]), highest: defined(range[1]) });
+
+  it("gives RSMTool's metrics of machine against human scores, overall and in each subgroup, on PERSUADE 2.0", () => {
+    const result = automatedScoreAgreement(persuade, { scale: scale(PERSUADE.scale) });
+    expectAgreement(result.machineHuman, PERSUADE.overall, "overall");
+    expect(result.groups.map(({ group }) => group).sort()).toEqual(PERSUADE.byGroup.map(({ group }) => group));
+    for (const { group, subjects, ...metrics } of PERSUADE.byGroup) {
+      const found = defined(result.groups.find((candidate) => candidate.group === group));
+      expect(found.subjects).toBe(subjects);
+      expectAgreement(found, metrics, group);
+    }
+    expect(result.humanHuman).toBeNull();
+    expect(result.degradation).toBeNull();
+    expect(result.disattenuatedCorrelation).toBeNull();
   });
 
-  it("gives RSMTool's metrics, human-human agreement, degradation and disattenuated correlation on ELLIPSE", () => {
-    const { first, second, machine, scale, humanSystem, humanHuman, degradation, disattenuated } = ELLIPSE;
-    const system = evaluate(first, toScale(machine, scale));
-    const humans = evaluate(first, second);
-    expectMetrics(system, humanSystem, "human-system");
-    expectMetrics(humans, humanHuman, "human-human");
-    for (const [name, value] of Object.entries(degradation)) {
-      const lost = (metrics: ScoringMetrics): number =>
-        defined(Object.entries(metrics).find(([key]) => key === name)?.[1]);
-      const scale = name.endsWith("Percent") ? 100 : 1;
-      expectClose(lost(system) - lost(humans), value, scale * SCORING_TOLERANCE, `degradation of ${name}`);
+  it("gives RSMTool's human-human metrics, degradation and disattenuated correlation on ELLIPSE", () => {
+    const result = automatedScoreAgreement(ellipse, { scale: scale(ELLIPSE.scale) });
+    expectAgreement(result.machineHuman, ELLIPSE.humanSystem, "human-system");
+    expectAgreement(defined(result.humanHuman), ELLIPSE.humanHuman, "human-human");
+    const degradation = defined(result.degradation);
+    expectClose(degradation.correlation, ELLIPSE.degradation.correlation, SCORING_TOLERANCE, "r");
+    expectClose(degradation.kappa, ELLIPSE.degradation.kappa, SCORING_TOLERANCE, "kappa");
+    expectClose(degradation.quadraticKappa, ELLIPSE.degradation.quadraticKappa, SCORING_TOLERANCE, "QWK");
+    expectClose(100 * degradation.exactAgreement, ELLIPSE.degradation.exactPercent, 100 * SCORING_TOLERANCE, "exact");
+    expectClose(100 * degradation.adjacentAgreement, ELLIPSE.degradation.adjacentPercent, 100 * SCORING_TOLERANCE);
+    expectClose(result.disattenuatedCorrelation, ELLIPSE.disattenuated, SCORING_TOLERANCE, "disattenuated r");
+  });
+
+  it("takes the human-human metrics from the subjects with a second score and the rest from all, as RSMTool", () => {
+    const { secondEvery, humanHuman, degradation, disattenuated } = ELLIPSE.partlyDoubleScored;
+    const partly = subjectsOf(ELLIPSE.machine, ELLIPSE.first, (subject) => ({
+      second: subject % secondEvery === 0 ? ELLIPSE.second[subject] : null,
+    }));
+    const result = automatedScoreAgreement(partly, { scale: scale(ELLIPSE.scale) });
+    expectAgreement(result.machineHuman, ELLIPSE.humanSystem, "human-system");
+    expect(result.humanHuman?.subjects).toBe(Math.ceil(ELLIPSE.first.length / secondEvery));
+    expectAgreement(defined(result.humanHuman), humanHuman, "human-human");
+    expectClose(result.degradation?.quadraticKappa ?? null, degradation.quadraticKappa, SCORING_TOLERANCE, "QWK");
+    expectClose(result.degradation?.correlation ?? null, degradation.correlation, SCORING_TOLERANCE, "r");
+    expectClose(result.degradation?.kappa ?? null, degradation.kappa, SCORING_TOLERANCE, "kappa");
+    expectClose(100 * (result.degradation?.exactAgreement ?? 0), degradation.exactPercent, 100 * SCORING_TOLERANCE);
+    expectClose(
+      100 * (result.degradation?.adjacentAgreement ?? 0),
+      degradation.adjacentPercent,
+      100 * SCORING_TOLERANCE,
+    );
+    expectClose(result.disattenuatedCorrelation, disattenuated, SCORING_TOLERANCE, "disattenuated r");
+  });
+
+  it("trims machine scores to the scale and rounds them half up before every statistic, derived by hand", () => {
+    // 0.4 and 7.2 trim to 1 and 6; 2.5 rounds to 3 and 4.49 to 4: every rounded score equals the human one.
+    const scores = subjectsOf([0.4, 2.5, 4.49, 7.2], [1, 3, 4, 6]);
+    const result = automatedScoreAgreement(scores, { scale: { lowest: 1, highest: 6 } });
+    expect(result.machineHuman.exactAgreement).toBe(1);
+    expect(result.machineHuman.quadraticKappa).toBe(1);
+    expect(result.machineHuman.rmse).toBe(0);
+  });
+
+  it("leaves subjects without a group out of the subgroups, which keep the order of their first subject", () => {
+    const scores = subjectsOf([1, 2, 2, 3, 1, 3], [1, 2, 3, 3, 2, 2], (subject) => ({
+      group: ["b", null, "a", "b", "a", undefined][subject],
+    }));
+    const { groups, machineHuman } = automatedScoreAgreement(scores);
+    expect(groups.map(({ group, subjects }) => [group, subjects])).toEqual([
+      ["b", 2],
+      ["a", 2],
+    ]);
+    // Group a: machine 2, 1 against human 3, 2, a mean difference of -1 over the population's pooled SD.
+    const pooled = Math.sqrt(((machineHuman.firstSd ?? 0) ** 2 + (machineHuman.secondSd ?? 0) ** 2) / 2);
+    expectClose(groups[1]?.smd ?? null, -1 / pooled, 1e-15);
+  });
+
+  it("gives null statistics where the scores leave them undefined", () => {
+    const constant = automatedScoreAgreement(subjectsOf([2, 2, 2], [2, 2, 2], () => ({ second: 2 })));
+    expect(constant.machineHuman.kappa).toBeNull();
+    expect(constant.machineHuman.quadraticKappa).toBeNull();
+    expect(constant.machineHuman.correlation).toBeNull();
+    expect(constant.machineHuman.smd).toBeNull();
+    expect(constant.machineHuman.rSquared).toBeNull();
+    expect(constant.disattenuatedCorrelation).toBeNull();
+    const single = automatedScoreAgreement(subjectsOf([1, 2], [1, 3], (subject) => ({ group: `g${subject}` })));
+    expect(single.groups[0]).toMatchObject({ subjects: 1, firstSd: null, correlation: null, exactAgreement: 1 });
+  });
+
+  it("rejects machine scores that are not categories without a scale, and other invalid input", () => {
+    expect(() => automatedScoreAgreement(subjectsOf([1.5, 2], [1, 2]))).toThrow(
+      "Subject 1 has the machine score 1.5, which is not a category, an integer from 0: pass the option scale",
+    );
+    expect(() => automatedScoreAgreement(subjectsOf([1], [1]))).toThrow("at least 2 scored subjects, found 1");
+    expect(() => automatedScoreAgreement(subjectsOf([1, 2], [1, 2.5]))).toThrow(
+      "Subject 2 needs a human score that is a category, an integer from 0, or null, found 2.5.",
+    );
+    expect(() => automatedScoreAgreement(JSON.parse('[{"machine":1,"human":1},{"machine":"2","human":1}]'))).toThrow(
+      'Subject 2 needs a machine score that is a finite number, found "2".',
+    );
+    expect(() => automatedScoreAgreement(JSON.parse('[{"machine":1,"human":1},{"machine":2}]'))).toThrow(
+      "Subject 2 needs a human score, found undefined.",
+    );
+    expect(() =>
+      automatedScoreAgreement(JSON.parse('[{"machine":1,"human":1},{"machine":2,"human":1,"group":3}]')),
+    ).toThrow("Subject 2 needs a group that is a string or null, found 3.");
+    expect(() => automatedScoreAgreement(JSON.parse('[{"machine":1,"human":1},null]'))).toThrow(
+      "Subject 2 must be a record { machine, human }, found null.",
+    );
+    expect(() => automatedScoreAgreement(JSON.parse("null"))).toThrow(
+      "The scores must be an array of { machine, human } records, found null.",
+    );
+    const two = subjectsOf([1, 2], [1, 2]);
+    expect(() => automatedScoreAgreement(two, { scale: { lowest: 3, highest: 2 } })).toThrow(
+      "The option scale needs integers from 0 with lowest below highest, found 3 and 2.",
+    );
+    expect(() => automatedScoreAgreement(two, JSON.parse('{"scale":{"lowest":1,"highest":5,"step":1}}'))).toThrow(
+      'The option scale may hold only lowest and highest, found "step".',
+    );
+    expect(() => automatedScoreAgreement(two, JSON.parse('{"round":true}'))).toThrow('There is no option "round"');
+    expect(() => automatedScoreAgreement(two, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+  });
+});
+
+describe("validateAutomatedScores", () => {
+  const ellipse = subjectsOf(ELLIPSE.machine, ELLIPSE.first, (subject) => ({ second: ELLIPSE.second[subject] }));
+  const agreement = automatedScoreAgreement(ellipse, { scale: { lowest: 1, highest: 5 } });
+
+  it("lists every default rule that ELLIPSE's length-based scores break, with its value and threshold", () => {
+    // QWK 0.20 and r 0.20 below 0.70, and a fall of 0.31 from two people's QWK of 0.51; the SMD, -0.03, is within 0.15.
+    const { accepted, failures } = validateAutomatedScores(agreement);
+    expect(accepted).toBe(false);
+    expect(failures.map(({ rule, threshold }) => [rule, threshold])).toEqual([
+      ["quadratic-kappa", 0.7],
+      ["correlation", 0.7],
+      ["quadratic-kappa-degradation", 0.1],
+    ]);
+    expectClose(failures[0]?.value ?? null, ELLIPSE.humanSystem.quadraticKappa, SCORING_TOLERANCE);
+    expectClose(failures[2]?.value ?? null, -ELLIPSE.degradation.quadraticKappa, SCORING_TOLERANCE);
+  });
+
+  it("accepts scores that meet every rule, and judges each rule at its threshold inclusively", () => {
+    const close = automatedScoreAgreement(
+      ellipse.map((subject) => ({ ...subject, machine: subject.human, group: "all" })),
+    );
+    expect(validateAutomatedScores(close)).toEqual({ accepted: true, failures: [] });
+    const value = defined(agreement.machineHuman.quadraticKappa);
+    expect(validateAutomatedScores(agreement, { thresholds: { quadraticKappa: value } }).failures[0]?.rule).toBe(
+      "correlation",
+    );
+  });
+
+  it("takes thresholds that differ from the defaults, turns a rule off with null and judges the SD ratio", () => {
+    const off = { quadraticKappa: null, correlation: null, quadraticKappaDegradation: null };
+    expect(validateAutomatedScores(agreement, { thresholds: off }).accepted).toBe(true);
+    const ratio = defined(agreement.machineHuman.secondSd) / defined(agreement.machineHuman.firstSd);
+    const narrow = validateAutomatedScores(agreement, { thresholds: { ...off, sdRatio: [ratio + 0.01, 2] } });
+    expect(narrow.failures).toEqual([{ rule: "sd-ratio", value: ratio, threshold: ratio + 0.01, group: null }]);
+    const high = validateAutomatedScores(agreement, { thresholds: { ...off, sdRatio: [0.5, ratio - 0.01] } });
+    expect(high.failures[0]?.threshold).toBe(ratio - 0.01);
+    const exact = validateAutomatedScores(agreement, { thresholds: { ...off, exactAgreementDegradation: 0.05125 } });
+    expect(exact.failures.map(({ rule }) => rule)).toEqual(["exact-agreement-degradation"]);
+    expect(ACCEPTANCE_THRESHOLDS).toEqual({
+      quadraticKappa: 0.7,
+      correlation: 0.7,
+      quadraticKappaDegradation: 0.1,
+      smd: 0.15,
+      groupSmd: 0.1,
+      sdRatio: null,
+      exactAgreementDegradation: null,
+    });
+  });
+
+  it("fails a rule whose statistic is undefined, as a fall without second scores, and names a subgroup that breaks one", () => {
+    const persuade = subjectsOf(PERSUADE.machine, PERSUADE.human, (subject) => ({ group: PERSUADE.groups[subject] }));
+    const result = automatedScoreAgreement(persuade, { scale: { lowest: 1, highest: 6 } });
+    const { failures } = validateAutomatedScores(result, { thresholds: { quadraticKappa: null, correlation: null } });
+    expect(failures[0]).toEqual({ rule: "quadratic-kappa-degradation", value: null, threshold: 0.1, group: null });
+    const broken = PERSUADE.byGroup.filter(({ smd }) => smd === null || Math.abs(smd) > 0.1).map(({ group }) => group);
+    expect(
+      failures
+        .filter(({ rule }) => rule === "group-smd")
+        .map(({ group }) => group)
+        .sort(),
+    ).toEqual(broken.sort());
+    expect(broken.length).toBeGreaterThan(0);
+  });
+
+  it("rejects thresholds and agreements that are not valid", () => {
+    expect(() => validateAutomatedScores(agreement, JSON.parse('{"thresholds":{"qwk":0.7}}'))).toThrow(
+      'The option thresholds may hold only quadraticKappa, correlation, quadraticKappaDegradation, smd, groupSmd, sdRatio and exactAgreementDegradation, found "qwk".',
+    );
+    expect(() => validateAutomatedScores(agreement, JSON.parse('{"thresholds":{"smd":"0.15"}}'))).toThrow(
+      'The threshold smd must be a finite number or null, found "0.15".',
+    );
+    expect(() => validateAutomatedScores(agreement, { thresholds: { sdRatio: [1.5, 0.5] } })).toThrow(
+      "The threshold sdRatio must be two positive numbers in order, or null, found an array.",
+    );
+    expect(() => validateAutomatedScores(JSON.parse('{"machineHuman":{}}'))).toThrow(
+      "The agreement must be one that automatedScoreAgreement returns",
+    );
+    expect(() => validateAutomatedScores(JSON.parse("null"))).toThrow(
+      "The agreement must be one that automatedScoreAgreement returns, found null.",
+    );
+    expect(() => validateAutomatedScores(agreement, JSON.parse('{"strict":true}'))).toThrow(
+      'There is no option "strict"',
+    );
+  });
+});
+
+describe("routingCurve", () => {
+  const ellipse = subjectsOf(ELLIPSE.machine, ELLIPSE.first, (subject) => ({
+    confidence: scoringReferences.routing.confidence[subject],
+  }));
+  const curve = routingCurve(ellipse, { scale: { lowest: 1, highest: 5 } });
+
+  it("matches base R's statistics of the subjects at or above each confidence on ELLIPSE", () => {
+    const expected = scoringReferences.routing.points;
+    expect(curve.map(({ minConfidence }) => minConfidence)).toEqual(expected.map(({ minConfidence }) => minConfidence));
+    curve.forEach((point, k) => {
+      const reference = defined(expected[k]);
+      expect(point.subjects).toBe(reference.subjects);
+      for (const name of [
+        "coverage",
+        "exactAgreement",
+        "adjacentAgreement",
+        "quadraticKappa",
+        "correlation",
+        "smd",
+        "rmse",
+      ] as const) {
+        expectClose(point[name], reference[name], SCORING_TOLERANCE, `${reference.minConfidence} ${name}`);
+      }
+    });
+  });
+
+  it("ends with every subject, whose statistics are those of automatedScoreAgreement", () => {
+    const last = defined(curve.at(-1));
+    const whole = automatedScoreAgreement(ellipse, { scale: { lowest: 1, highest: 5 } }).machineHuman;
+    expect(last.coverage).toBe(1);
+    for (const name of [
+      "exactAgreement",
+      "adjacentAgreement",
+      "quadraticKappa",
+      "correlation",
+      "smd",
+      "rmse",
+    ] as const) {
+      expectClose(last[name], whole[name], 1e-12, name);
     }
-    const correlation = defined(system.correlation) / Math.sqrt(defined(humans.correlation));
-    expectClose(correlation, disattenuated, SCORING_TOLERANCE, "disattenuated r");
+  });
+
+  it("rejects a subject without a confidence", () => {
+    expect(() =>
+      routingCurve(subjectsOf([1, 2], [1, 2], (subject) => ({ confidence: subject === 0 ? 0.5 : null }))),
+    ).toThrow("Subject 2 needs a confidence for the routing curve.");
+    expect(() => routingCurve(subjectsOf([1], [1], () => ({ confidence: Number.NaN })))).toThrow(
+      "Subject 1 needs a confidence that is a finite number or null, found NaN.",
+    );
+  });
+});
+
+describe("automatedScoreDrift", () => {
+  const { time, width, windows } = scoringReferences.drift;
+  const persuade = subjectsOf(PERSUADE.machine, PERSUADE.human, (subject) => ({ time: time[subject] }));
+
+  it("matches base R's statistics of each week of PERSUADE 2.0's essays", () => {
+    const result = automatedScoreDrift(persuade, { width, scale: { lowest: 1, highest: 6 } });
+    expect(result.map(({ start, end }) => [start, end])).toEqual(windows.map(({ start, end }) => [start, end]));
+    result.forEach(({ agreement }, k) => {
+      const reference = defined(windows[k]).agreement;
+      expect(agreement.subjects).toBe(reference.subjects);
+      for (const name of [
+        "exactAgreement",
+        "adjacentAgreement",
+        "kappa",
+        "quadraticKappa",
+        "correlation",
+        "smd",
+        "rmse",
+      ] as const) {
+        expectClose(agreement[name], reference[name], SCORING_TOLERANCE, `window ${k + 1} ${name}`);
+      }
+    });
+  });
+
+  it("starts the windows at the option start and leaves empty windows out", () => {
+    const scores = subjectsOf([1, 2, 2, 3], [1, 2, 3, 3], (subject) => ({ time: [10, 12, 35, 36][subject] }));
+    const result = automatedScoreDrift(scores, { width: 10, start: 5 });
+    expect(result.map(({ start, end, agreement }) => [start, end, agreement.subjects])).toEqual([
+      [5, 15, 2],
+      [35, 45, 2],
+    ]);
+    expect(() => automatedScoreDrift(scores, { width: 10, start: 11 })).toThrow(
+      "A subject's time, 10, is before the option start, 11.",
+    );
+    expect(() => automatedScoreDrift(subjectsOf([1, 2], [1, 2]), { width: 10 })).toThrow(
+      "Subject 1 needs a time for the windows of drift.",
+    );
+    expect(() => automatedScoreDrift(scores, { width: 0 })).toThrow(
+      "The option width must be a positive number, found 0.",
+    );
+    expect(() => automatedScoreDrift(scores, JSON.parse("{}"))).toThrow("The option width must be a positive number");
+  });
+});
+
+describe("scoreMapping and mappedScore", () => {
+  const { knots, at, mapped, linear } = scoringReferences.mapping;
+  const ellipse = subjectsOf(ELLIPSE.machine, ELLIPSE.first);
+
+  it("fits R's isoreg to ELLIPSE's unrounded machine scores, and maps between the knots as approx with rule 2", () => {
+    const mapping = scoreMapping(ellipse, { method: "isotonic" });
+    if (mapping.method !== "isotonic") throw new Error("The mapping is isotonic.");
+    expect(mapping.knots.map(({ machine }) => machine)).toEqual(knots.machine);
+    mapping.knots.forEach(({ human }, k) => {
+      expectClose(human, defined(knots.human[k]), 1e-12, `knot ${k + 1}`);
+    });
+    at.forEach((score, k) => {
+      expectClose(mappedScore(mapping, score), defined(mapped[k]), 1e-12, `at ${score}`);
+    });
+  });
+
+  it("fits the line that gives the machine scores the human scores' mean and SD", () => {
+    const mapping = scoreMapping(subjectsOf(linear.machine, linear.human));
+    expect(mapping).toMatchObject({ method: "linear" });
+    if (mapping.method !== "linear") throw new Error("The mapping is linear.");
+    expectClose(mapping.slope, linear.slope, 1e-12);
+    expectClose(mapping.intercept, linear.intercept, 1e-12);
+    expectClose(mappedScore(mapping, 2), linear.slope * 2 + linear.intercept, 1e-12);
+  });
+
+  it("pools the scores of one machine score, and pools neighbors while they fall, derived by hand", () => {
+    const scores = subjectsOf([1, 2, 2, 3, 3, 2.5], [1, 2, 3, 4, 3, 4]);
+    const mapping = scoreMapping(scores, { method: "isotonic" });
+    expect(mapping).toEqual({
+      method: "isotonic",
+      knots: [
+        { machine: 1, human: 1 },
+        { machine: 2, human: 2.5 },
+        { machine: 2.5, human: 11 / 3 },
+        { machine: 3, human: 11 / 3 },
+      ],
+    });
+    expect(mappedScore(mapping, 0)).toBe(1);
+    expect(mappedScore(mapping, 9)).toBe(11 / 3);
+    expectClose(mappedScore(mapping, 1.5), 1.75, 1e-15);
+  });
+
+  it("rejects a linear mapping of constant scores, and mappings that are not valid", () => {
+    expect(() => scoreMapping(subjectsOf([2, 2, 2], [1, 2, 3]))).toThrow(
+      "A linear mapping needs machine and human scores that vary.",
+    );
+    expect(() => scoreMapping(subjectsOf([1, 2], [1, 2]), JSON.parse('{"method":"spline"}'))).toThrow(
+      'The option method must be "linear" or "isotonic", found "spline".',
+    );
+    const knot = (machine: number, human: number) => ({ machine, human });
+    expect(() => mappedScore({ method: "isotonic", knots: [knot(1, 2), knot(1, 3)] }, 1)).toThrow(
+      "Knot 2 of the mapping must have finite scores, its machine score above the knot before",
+    );
+    expect(() => mappedScore({ method: "isotonic", knots: [knot(1, 2), knot(2, 1)] }, 1)).toThrow(
+      "Knot 2 of the mapping",
+    );
+    expect(() => mappedScore({ method: "isotonic", knots: [] }, 1)).toThrow(
+      "An isotonic mapping needs at least one knot.",
+    );
+    expect(() => mappedScore(JSON.parse('{"method":"spline"}'), 1)).toThrow(
+      'The mapping\'s method must be "linear" or "isotonic", found "spline".',
+    );
+    expect(() => mappedScore({ method: "linear", slope: 1, intercept: 0 }, Number.NaN)).toThrow(
+      "The machine score must be a finite number, found NaN.",
+    );
+    expect(() => mappedScore(JSON.parse("null"), 1)).toThrow(
+      "The mapping must be one that scoreMapping returns, found null.",
+    );
+  });
+});
+
+describe("replayShift", () => {
+  const { maxShiftSd, cases } = scoringReferences.replay;
+
+  for (const reference of cases) {
+    it(`matches base R on a planted shift of ${reference.shift} SD, which ${reference.passed ? "passes" : "fails"}`, () => {
+      const ratings = reference.locked.map((score, k) => [score, reference.replayed[k] ?? null]);
+      const result = replayShift(ratings, { maxShiftSd });
+      expectClose(result.meanShift, reference.meanShift, 1e-12, "mean shift");
+      expectClose(result.lockedSd, reference.lockedSd, 1e-12, "SD");
+      expectClose(result.standardizedShift, reference.standardizedShift, 1e-12, "standardized shift");
+      expectClose(result.standardError, reference.standardError, 1e-12, "standard error");
+      expectClose(result.correlation, reference.correlation, 1e-12, "correlation");
+      expect(result.passed).toBe(reference.passed);
+    });
+  }
+
+  it("gives a paired standard error and counts equal scores, derived by hand", () => {
+    // Locked 1, 2, 3 of SD 1 and replayed 2, 2, 4: shift 2/3; differences 1, 0, 1 of SD 1/√3, over √3.
+    const result = replayShift(
+      [
+        [1, 2],
+        [2, 2],
+        [3, 4],
+      ],
+      { maxShiftSd: 0.7 },
+    );
+    expectClose(result.standardizedShift, 2 / 3, 1e-15);
+    expectClose(result.standardError, 1 / 3, 1e-15);
+    expect(result.exactAgreement).toBeCloseTo(1 / 3, 15);
+    expect(result.passed).toBe(true);
+    expect(
+      replayShift(
+        [
+          [2, 2],
+          [2, 3],
+        ],
+        { maxShiftSd: 1 },
+      ),
+    ).toMatchObject({ standardizedShift: null, passed: false });
+  });
+
+  it("rejects a maxShiftSd that is not a non-negative number, and invalid ratings", () => {
+    expect(() =>
+      replayShift(
+        [
+          [1, 1],
+          [2, 2],
+        ],
+        { maxShiftSd: -0.1 },
+      ),
+    ).toThrow("The option maxShiftSd must be a non-negative number, found -0.1.");
+    expect(() =>
+      replayShift(
+        [
+          [1, 1],
+          [2, 2],
+        ],
+        JSON.parse("{}"),
+      ),
+    ).toThrow("The option maxShiftSd must be a non-negative number");
+    expect(() => replayShift([[1, 1]], { maxShiftSd: 0.05 })).toThrow("The replay shift needs at least 2 subjects");
+    expect(() => replayShift(JSON.parse("null"), { maxShiftSd: 0.05 })).toThrow(
+      "The replay shift needs an array of ratings",
+    );
   });
 });
 
@@ -1556,6 +2025,80 @@ describe("properties", () => {
         const reversed = { first: population.second, second: population.first };
         expectClose(standardizedMeanDifference(swapped, { population: reversed }), -value, 1e-12);
       }),
+    );
+  });
+
+  it("the evaluation of automated scores does not depend on the order of subjects, and its shares lie from 0 to 1", () => {
+    fc.assert(
+      fc.property(ratings(3), (rows) => {
+        const scores = rows.map(([machine = 0, human = 0, second = 0], k) => ({
+          machine,
+          human,
+          second,
+          group: `g${k % 3}`,
+        }));
+        const forward = automatedScoreAgreement(scores);
+        const backward = automatedScoreAgreement([...scores].reverse());
+        for (const name of ["exactAgreement", "quadraticKappa", "correlation", "smd", "rmse"] as const) {
+          expectClose(backward.machineHuman[name], forward.machineHuman[name], 1e-12, name);
+        }
+        expect(forward.machineHuman.exactAgreement).toBeLessThanOrEqual(forward.machineHuman.adjacentAgreement);
+        expect(forward.machineHuman.adjacentAgreement).toBeLessThanOrEqual(1);
+        expect(forward.machineHuman.quadraticKappa ?? 0).toBeLessThanOrEqual(1 + 1e-12);
+      }),
+    );
+  });
+
+  it("each routing point's QWK is Cohen's with quadratic weights on its subjects, and coverage grows to 1", () => {
+    fc.assert(
+      fc.property(
+        ratings(2),
+        fc.array(fc.integer({ min: 0, max: 5 }), { minLength: 20, maxLength: 20 }),
+        (rows, levels) => {
+          const scores = rows.map(([machine = 0, human = 0], k) => ({ machine, human, confidence: levels[k] ?? 0 }));
+          const curve = routingCurve(scores);
+          expect(curve.at(-1)?.coverage).toBe(1);
+          curve.forEach((point, k) => {
+            expect(point.coverage).toBeGreaterThan(k === 0 ? 0 : (curve[k - 1]?.coverage ?? 0));
+            const covered = scores.filter(({ confidence }) => confidence >= point.minConfidence);
+            let kappa: number | null = null;
+            try {
+              kappa = cohenKappa(
+                covered.map(({ machine, human }) => [machine, human]),
+                { weights: "quadratic" },
+              );
+            } catch (error) {
+              if (!(error instanceof DataError)) throw error;
+            }
+            expectClose(point.quadraticKappa, kappa, 1e-12, `${point.minConfidence}`);
+          });
+        },
+      ),
+    );
+  });
+
+  it("an isotonic mapping does not fall, and keeps the mean of the human scores", () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({ machine: fc.integer({ min: 0, max: 8 }), human: fc.double({ min: -5, max: 5, noNaN: true }) }),
+          {
+            minLength: 2,
+            maxLength: 30,
+          },
+        ),
+        (scores) => {
+          const mapping = scoreMapping(scores, { method: "isotonic" });
+          const mappedMean =
+            scores.reduce((sum, { machine }) => sum + mappedScore(mapping, machine), 0) / scores.length;
+          const humanMean = scores.reduce((sum, { human }) => sum + human, 0) / scores.length;
+          expectClose(mappedMean, humanMean, 1e-9);
+          if (mapping.method !== "isotonic") throw new Error("The mapping is isotonic.");
+          mapping.knots.forEach((knot, k) => {
+            expect(knot.human).toBeGreaterThanOrEqual(mapping.knots[k - 1]?.human ?? Number.NEGATIVE_INFINITY);
+          });
+        },
+      ),
     );
   });
 

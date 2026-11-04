@@ -3,12 +3,14 @@
 `@measurekit/psychometrics/rater` measures how far raters agree: exact and adjacent agreement, Cohen's kappa for two
 raters, unweighted, linear or quadratic weighted, Fleiss' kappa for two or more, and intraclass correlations of
 scores; how far two raters order the subjects alike, by the correlation of their ratings; and how far one rater is more
-lenient than another, by the standardized mean difference, of a whole sample or of a subgroup. With them it evaluates
-automated scores against human ones, as RSMTool does ([recipe](#recipe-evaluating-automated-scores)). It also estimates what
+lenient than another, by the standardized mean difference, of a whole sample or of a subgroup. It evaluates automated
+scores against human ones, as RSMTool does, judges them against thresholds of acceptance, and watches them by window,
+by confidence and by replay ([evaluating automated scores](#evaluating-automated-scores)). It also estimates what
 raters do to scores: the many-facet Rasch model puts persons, items and raters on one scale, so that a rater's severity
 is a number of logits and a person's score can be adjusted for the raters who gave it, and a bias analysis finds the
 raters who are harsher or milder than usual on one item. The agreement statistics are validated against irr, psych,
-effsize and RSMTool, the model against base R and TAM ([validation](validation.md)).
+effsize and RSMTool, the routing curve, the mappings and the replay against base R, the model against base R and TAM
+([validation](validation.md)).
 
 ## Ratings
 
@@ -214,97 +216,194 @@ Where effsize treats the two sets of ratings as independent samples, so does thi
 function, though the same subjects were rated; it does not use the standard deviation of the differences, as a paired
 effect size would.
 
-## Recipe: evaluating automated scores
+## Evaluating automated scores
 
-A scoring engine's scores are evaluated against human scores on the same responses before it scores operationally:
-agreement, association and the difference of means, overall and by subgroup, and against the agreement of two humans,
-as Williamson, Xi and Breyer (2012) set out and RSMTool, ETS's evaluation tool, computes. Each is a function above.
+A scoring engine's scores are evaluated against human scores on the same responses before it scores alone: agreement,
+association and the difference of means, overall and by subgroup, and against the agreement of two people, as
+Williamson, Xi and Breyer (2012) set out and RSMTool, ETS's evaluation tool, computes. Once it scores, its agreement is
+watched by window of time, the responses it is least sure of go to people, and responses scored again show whether the
+engine changed.
 
 ```mermaid
 flowchart LR
-  P["Machine scores"] --> R["Rounded and trimmed to the scale"]
-  R --> M["Against human scores: agreement, kappa, QWK, r, SMD, RMSE, SD ratio"]
-  R --> G["By subgroup: SMD on the population's SDs"]
-  H["A second human score"] --> HH["Human-human: the same statistics"]
-  M --> D["Degradation: machine-human less human-human; disattenuated r"]
-  HH --> D
+  S["AutomatedScore: machine, human,<br/>second, group, confidence, time"] --> A["automatedScoreAgreement:<br/>machine-human, human-human,<br/>degradation, subgroups"]
+  A --> V["validateAutomatedScores:<br/>accepted, failures"]
+  S --> D["automatedScoreDrift:<br/>agreement by window"]
+  S --> R["routingCurve:<br/>coverage and agreement by confidence"]
+  S --> M["scoreMapping, mappedScore:<br/>to the human scale"]
+  L["Locked and replayed scores"] --> P["replayShift:<br/>the shift and whether it passes"]
 ```
 
-| Statistic                       | measurekit, rows `[machine, human]`                        | RSMTool                                                          |
-| ------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| Exact and adjacent agreement    | `exactAgreement`, `adjacentAgreement`                      | `agreement(tolerance = 0, 1)`, in percent                        |
-| Kappa, quadratic weighted kappa | `cohenKappa`, `cohenKappa({ weights: "quadratic" })`       | `kappa`, `quadratic_weighted_kappa`                              |
-| Correlation                     | `ratingCorrelation`                                        | `pearsonr`                                                       |
-| SMD, whole sample               | `standardizedMeanDifference`                               | `standardized_mean_difference(method = "pooled")`                |
-| SMD of a subgroup               | `standardizedMeanDifference` with `population`             | `method = "williamson"`                                          |
-| RMSE, R², SD ratio              | One line each                                              | `RMSE`, `R2`, `sys_sd` and `h_sd`                                |
-| Degradation, disattenuated r    | Differences of the statistics; r over √r of the two humans | The analyzer's degradation; `compute_disattenuated_correlations` |
+| Function                                      | Returns                                                                                                        |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `automatedScoreAgreement(scores, options)`    | `machineHuman`, `humanHuman`, `degradation`, `disattenuatedCorrelation` and `groups`                           |
+| `validateAutomatedScores(agreement, options)` | `{ accepted, failures }`: each rule of acceptance broken, with its value and threshold                         |
+| `automatedScoreDrift(scores, options)`        | The machine-human agreement of each window of time with a subject                                              |
+| `routingCurve(scores, options)`               | For each confidence, the share of subjects at or above it and their agreement                                  |
+| `scoreMapping(scores, options)`               | A line or an isotonic function from machine to human scores; `mappedScore(mapping, score)` applies it          |
+| `replayShift(ratings, options)`               | The shift of replayed scores from locked ones in SDs, its standard error and whether it is within `maxShiftSd` |
+
+Each subject is an `AutomatedScore`: `machine`, the engine's score, any finite number; `human`, a person's score, a
+category, an integer from 0; and where it has them, `second`, a second person's score, `group`, the writer's subgroup,
+`confidence`, the engine's confidence, any finite number where higher is surer, and `time`, any finite number such as
+epoch milliseconds. Fields of other names are ignored, so a host passes its own records.
+
+### Agreement
+
+`automatedScoreAgreement` gives each statistic as a `ScoreAgreement` of a first scoring against a second: the machine's
+against the human's in `machineHuman`, the second person's against the first's in `humanHuman`.
+
+| Field                                            | Value                                                                   | RSMTool                            |
+| ------------------------------------------------ | ----------------------------------------------------------------------- | ---------------------------------- |
+| `exactAgreement`, `adjacentAgreement`            | The share of subjects with equal scores, and with scores within 1       | `exact_agr`, `adj_agr`, in percent |
+| `kappa`, `quadraticKappa`                        | Cohen's kappa, unweighted and with quadratic weights (QWK)              | `kappa`, `wtkappa`                 |
+| `correlation`                                    | Pearson's r                                                             | `corr`                             |
+| `smd`                                            | The first mean less the second over √((s₁² + s₂²) / 2)                  | `SMD` with `smd_method = "pooled"` |
+| `rmse`, `rSquared`                               | √(mean (first - second)²); 1 - Σ (second - first)² / Σ (second - mean)² | `RMSE`, `R2`                       |
+| `firstMean`, `firstSd`, `secondMean`, `secondSd` | Means, and SDs on n - 1                                                 | `sys_sd`, `h_sd`                   |
+
+The machine-human statistics use every subject, and the human-human ones the subjects with a `second` score, as RSMTool
+does by default. `degradation` is the machine-human value less the human-human one of the correlation, both kappas and
+both agreements, negative where the machine agrees less than a second person; `disattenuatedCorrelation` is
+r_mh / √r_hh. Each of `groups` is the machine-human agreement within a subgroup, in order of the group's first subject,
+its SMD over the population's SDs, those of the machine and human scores of every subject: Williamson et al.'s subgroup
+SMD and RSMTool's `"williamson"`, so that the subgroups share one scale and a group whose scores vary less does not look
+more different. Subjects without a group are in no subgroup.
+
+| Option  | Default                       | Meaning                                                                                                |
+| ------- | ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `scale` | none: machine scores as given | `{ lowest, highest }`: machine scores are trimmed to it and rounded, a half up, before every statistic |
+
+Kappa needs categories: machine scores are rounded to the scale first, as RSMTool's trimmed and rounded scores; without
+`scale` they must already be integers from 0. A statistic the scores leave undefined, such as kappa when every score is
+one category or a correlation of constant scores, is `null`.
 
 ```ts
-import {
-  adjacentAgreement,
-  cohenKappa,
-  exactAgreement,
-  ratingCorrelation,
-  standardizedMeanDifference,
-} from "@measurekit/psychometrics/rater";
+import { automatedScoreAgreement, validateAutomatedScores } from "@measurekit/psychometrics/rater";
 
-// Ten essays on a scale of 1 to 6: a human's scores, a second human's, an engine's unrounded scores and the writers' groups.
+// Ten essays on a scale of 1 to 6: an engine's unrounded scores, a person's, a second person's and the writers' groups,
+// with the engine's confidence and the day it scored each.
+const machine = [3.4, 3.6, 2.6, 4.4, 3.3, 4.6, 1.8, 3.7, 5.3, 4.2];
 const human = [3, 4, 2, 5, 3, 4, 1, 3, 6, 4];
 const second = [3, 4, 3, 5, 2, 4, 2, 3, 5, 4];
-const predicted = [3.4, 3.6, 2.6, 4.4, 3.3, 4.6, 1.8, 3.7, 5.3, 4.2];
-const groups = ["a", "a", "a", "a", "a", "b", "b", "b", "b", "b"];
+const confidence = [0.9, 0.6, 0.8, 0.7, 0.95, 0.5, 0.85, 0.4, 0.75, 0.9];
+const day = 86_400_000;
+const scores = machine.map((score, i) => ({
+  machine: score,
+  human: human[i] ?? 0,
+  second: second[i] ?? null,
+  group: i < 5 ? "a" : "b",
+  confidence: confidence[i] ?? null,
+  time: Date.UTC(2026, 9, 5) + i * 2 * day,
+}));
+const scale = { lowest: 1, highest: 6 };
 
-const machine = predicted.map((score) => Math.min(6, Math.max(1, Math.round(score))));
-const against = (scores: readonly number[]) => scores.map((score, i) => [score, human[i] ?? null]);
-const evaluate = (rows: (number | null)[][]) => ({
-  exact: exactAgreement(rows),
-  adjacent: adjacentAgreement(rows),
-  kappa: cohenKappa(rows),
-  quadraticKappa: cohenKappa(rows, { weights: "quadratic" }),
-  correlation: ratingCorrelation(rows),
-  smd: standardizedMeanDifference(rows),
-});
-const system = evaluate(against(machine)); // exact 0.4, adjacent 1, kappa 0.21, QWK 0.78, r 0.86, SMD 0.16
-const humans = evaluate(against(second)); // exact 0.6, adjacent 1, kappa 0.49, QWK 0.86, r 0.90, SMD 0
-system.quadraticKappa - humans.quadraticKappa; // -0.084: the degradation of QWK
-(system.correlation ?? 0) / Math.sqrt(humans.correlation ?? 0); // 0.91: the disattenuated r
-
-const sd = (scores: readonly number[]) => {
-  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  return Math.sqrt(scores.reduce((sum, score) => sum + (score - mean) ** 2, 0) / (scores.length - 1));
-};
-const population = { first: sd(machine), second: sd(human) };
-for (const group of ["a", "b"]) {
-  standardizedMeanDifference(
-    against(machine).filter((_, i) => groups[i] === group),
-    { population },
-  ); // 0 for a, 0.33 for b, where b's own SDs would give 0.26
-}
+const agreement = automatedScoreAgreement(scores, { scale });
+agreement.machineHuman; // exact 0.4, adjacent 1, kappa 0.21, QWK 0.78, r 0.86, SMD 0.16
+agreement.humanHuman; // exact 0.6, adjacent 1, kappa 0.49, QWK 0.86, r 0.90, SMD 0
+agreement.degradation?.quadraticKappa; // -0.084
+agreement.disattenuatedCorrelation; // 0.91
+agreement.groups.map(({ group, smd }) => [group, smd]); // [["a", 0], ["b", 0.33]], where b's own SDs give 0.26
 ```
 
-Machine scores are rounded before kappa, as a category is an integer. The thresholds below are the programs' policies,
-which a host applies to these values:
+### Acceptance
 
-| Statistic                                       | Threshold                       | Source                                                                           |
-| ----------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------- |
-| Quadratic weighted kappa, machine-human         | At least 0.70                   | Williamson, Xi and Breyer (2012), in ACT's technical brief R2100 (2021), Table 2 |
-| Its degradation from human-human                | At most 0.10                    | The same                                                                         |
-| SMD, machine-human                              | From -0.15 to 0.15              | The same                                                                         |
-| SD ratio, human over machine                    | From 2/3 to 1.50                | Wang and von Davier (2014), in ACT's Table 2                                     |
-| Exact agreement, human-human less machine-human | At most 5.125 percentage points | McGraw-Hill Education CTB (2014) and Pearson and ETS (2014), in ACT's Table 2    |
-| Pearson's r, machine-human                      | At least 0.70                   | Williamson et al. (2012), in ETS's RM-23-01 (2023), p. 7                         |
+`validateAutomatedScores(agreement, options)` judges an agreement against thresholds and returns `{ accepted, failures }`:
+each rule broken as `{ rule, value, threshold, group }`, in the order below. A rule's statistic that the data leave
+undefined, as a degradation without second scores, breaks it with `value` `null`; turn such a rule off with `null`.
 
-On PERSUADE 2.0's essays on one prompt and ELLIPSE's double-scored essays, with machine scores from essay length,
-every statistic of the recipe equals RSMTool 12.0.0's within 1.3e-13 ([validation](validation.md)).
+| Rule (`thresholds`)                                           | Passes when                                               | Default | Source                                                                                 |
+| ------------------------------------------------------------- | --------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `"quadratic-kappa"` (`quadraticKappa`)                        | Machine-human QWK at least the threshold                  | 0.70    | Williamson, Xi and Breyer (2012), in ACT's technical brief R2100 (2021), Table 2       |
+| `"correlation"` (`correlation`)                               | Machine-human r at least the threshold                    | 0.70    | Williamson et al. (2012), in ETS's RM-23-01 (2023), p. 7                               |
+| `"quadratic-kappa-degradation"` (`quadraticKappaDegradation`) | Human-human QWK less machine-human at most it             | 0.10    | Williamson et al. (2012), in ACT's Table 2                                             |
+| `"smd"` (`smd`)                                               | \|SMD\| at most the threshold                             | 0.15    | Williamson et al. (2012), in ACT's Table 2                                             |
+| `"group-smd"` (`groupSmd`)                                    | Each subgroup's \|SMD\| at most the threshold             | 0.10    | Williamson et al. (2012)                                                               |
+| `"sd-ratio"` (`sdRatio`)                                      | Human SD over machine SD within `[lowest, highest]`       | off     | Wang and von Davier (2014), from 2/3 to 1.5, in ACT's Table 2                          |
+| `"exact-agreement-degradation"` (`exactAgreementDegradation`) | Human-human exact agreement less machine-human at most it | off     | McGraw-Hill Education CTB (2014) and Pearson and ETS (2014), 0.05125, in ACT's Table 2 |
 
-| Topic                      | This recipe                                        | RSMTool                                                               |
+`ACCEPTANCE_THRESHOLDS` holds the defaults; `thresholds` replaces some of them. The thresholds are a program's policy:
+the defaults are Williamson et al.'s, which ETS applies, and the two that are off are other programs'.
+
+```ts continues
+validateAutomatedScores(agreement);
+// { accepted: false, failures: [{ rule: "smd", value: 0.16, ... }, { rule: "group-smd", value: 0.33, group: "b", ... }] }
+validateAutomatedScores(agreement, { thresholds: { smd: 0.2, groupSmd: null } }).accepted; // true
+```
+
+### Drift, routing and mapping
+
+`automatedScoreDrift(scores, { width, start, scale })` puts each subject in the window of `width` that holds its `time`,
+from `start`, by default the earliest time, and gives each window with a subject its machine-human `ScoreAgreement`.
+Compare the windows with the acceptance, or judge each with `validateAutomatedScores`; a window of few subjects gives
+wide statistics, so choose a width that holds as many subjects as the acceptance did.
+
+`routingCurve(scores, { scale })` gives a point for each distinct `confidence`, from the highest: the subjects at or
+above it, whose machine scores would stand alone while the others go to a person, their share `coverage`, and their
+exact and adjacent agreement, QWK, correlation, SMD and RMSE. It is the curve of coverage against agreement of selective
+prediction (El-Yaniv and Wiener, 2010), from which a host picks the least confidence that keeps the agreement it needs.
+Pick it on other data than those that judge it: the best point of one sample agrees less on the next.
+
+`scoreMapping(scores, { method })` fits a map from machine scores, unrounded, to the human scale:
+
+| `method`             | Map                                                                                                                                                                                          | Reference              |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `"linear"` (default) | slope × machine + intercept, with the human scores' mean and SD: RSMTool's scaled scores                                                                                                     | Base R `mean` and `sd` |
+| `"isotonic"`         | The non-decreasing function nearest the human scores in least squares, by pooling adjacent violators; a knot per distinct machine score, the mean of its human scores where several share it | R's `isoreg`           |
+
+`mappedScore(mapping, score)` applies a map: the line, or the knots joined by straight lines and flat beyond the ends,
+as R's `approx` with `rule = 2`. Round the result to the scale, as `automatedScoreAgreement`'s `scale` does.
+
+```ts continues
+import { automatedScoreDrift, mappedScore, routingCurve, scoreMapping } from "@measurekit/psychometrics/rater";
+
+automatedScoreDrift(scores, { width: 7 * day, scale }).map(({ agreement }) => agreement.quadraticKappa);
+// [0.67, 0.81, 0.63]: weeks of 4, 3 and 3 essays
+routingCurve(scores, { scale }).map(({ minConfidence, coverage }) => [minConfidence, coverage]);
+// [[0.95, 0.1], [0.9, 0.3], [0.85, 0.4], ...]: the QWK of the 30% at or above 0.9 is 1
+const linear = scoreMapping(scores);
+mappedScore(linear, 3.5); // 3.23
+mappedScore(scoreMapping(scores, { method: "isotonic" }), 3.5); // 3.25, between the knots of 3.4 and 3.6
+```
+
+### Replay
+
+Responses whose scores are locked, the engine's at its acceptance or people's, are scored again after a change of model,
+prompt or pipeline, or on a schedule. `replayShift(ratings, { maxShiftSd })` takes rows `[locked, replayed]` and returns
+the mean shift, `meanShift`, the SD of the locked scores, `lockedSd`, the shift in those SDs, `standardizedShift`, its
+standard error, that of a paired mean, the exact agreement and the correlation of the two, and `passed`, whether the
+absolute standardized shift is at most `maxShiftSd`. The standard error is √(2 (1 - r) / n) for n responses whose two
+scores have the same SD and correlate at r: 0.035 for 200 responses at r = 0.88. People's scores of new responses cannot
+tell a changed engine from changed responses; the replay holds the responses still.
+
+| Option       | Default  | Meaning                                                                                                         |
+| ------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `maxShiftSd` | required | The largest absolute shift, in SDs of the locked scores, that passes: a program's policy, as no source sets one |
+
+```ts continues
+import { replayShift } from "@measurekit/psychometrics/rater";
+
+const locked = [2, 3, 3, 4, 1, 2, 4, 3];
+const replayed = [2, 3, 4, 4, 1, 3, 4, 3];
+replayShift(
+  locked.map((score, i) => [score, replayed[i] ?? null]),
+  { maxShiftSd: 0.05 },
+); // standardizedShift 0.24, standardError 0.16, passed false
+```
+
+### Differences from RSMTool
+
+On PERSUADE 2.0's essays on one prompt and ELLIPSE's double-scored essays, with machine scores from essay length, every
+statistic of `automatedScoreAgreement` equals RSMTool 12.0.0's within 1.3e-13 ([validation](validation.md)).
+
+| Topic                      | measurekit                                         | RSMTool                                                               |
 | -------------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
 | Agreement                  | A proportion                                       | A percentage                                                          |
 | The SMD of a whole sample  | Pooled over the two raters, Williamson et al.'s    | `"unpooled"`, the human SD alone, by default in the analyzer          |
 | The SMD of a subgroup      | On the population's pooled SD, Williamson et al.'s | The difference of standardized means (DSM) by default in the analyzer |
-| The degradation of the SMD | Both SMDs pooled                                   | The machine-human SMD unpooled, the human-human SMD pooled            |
+| The degradation of the SMD | Not given                                          | The machine-human SMD unpooled less the human-human SMD pooled        |
 | Kappa of unrounded scores  | Round first: a category is an integer              | `quadratic_weighted_kappa` takes continuous scores                    |
+| Thresholds                 | Judged by `validateAutomatedScores`                | Not judged: the report shows the values                               |
 
 ## Many-facet Rasch model
 
@@ -531,7 +630,8 @@ no cell.
 
 - **Joint maximum likelihood (FACETS).** Outside the sources: its measures are biased for short tests, and marginal
   maximum likelihood is consistent. Measures differ from FACETS' by its bias.
-- **Rater drift over time.** No reference: it needs its own terms in the model, and no package that runs it was found.
+- **Rater drift as a term of the many-facet model.** No reference: it needs its own terms in the model, and no package
+  that runs it was found; `automatedScoreDrift` gives the agreement by window.
 - **The hierarchical rater model.** No reference: it needs its own terms in the model, and no package that runs it was
   found.
 - **A person facet other than one.** No reference: the persons are the only random facet.
@@ -539,6 +639,7 @@ no cell.
   it, and ETS's RM-23-01 (2023) was still exploring thresholds for its operational use; RSMTool has it.
 - **Quadratic weighted kappa of continuous scores (Haberman, 2019).** Outside the sources: no program report found uses
   it; programs round machine scores, and on integers `cohenKappa` with quadratic weights is the same statistic.
+- **The degradation of the SMD.** Outside the sources: RSMTool's mixes an unpooled and a pooled SMD.
 - **The difference of standardized means by subgroup (DSM).** Outside the sources: RSMTool's option; Williamson et al.'s
   subgroup SMD is `standardizedMeanDifference` with `population`.
 - **The SMD on the human SD alone, or on the population's human SD.** Outside the sources: RSMTool's `"unpooled"` and
@@ -547,9 +648,10 @@ no cell.
   program report found uses them.
 - **Building, explaining and cross-validating a scoring model.** No fit: machine learning, another domain; RSMTool, SHAP
   and SKLL do it.
-- **Acceptance thresholds.** No fit: a host's policy; the recipe tables them with their sources.
 - **Confusion matrices, score distributions and descriptive statistics.** No fit: counts and general statistics.
-- **Scaling of machine scores to the human scores.** No fit: the scorer's transformation, one line.
+- **A least-squares line from machine to human scores.** Outside the sources: it shrinks the scores toward their mean,
+  which the SD ratio flags; RSMTool scales to the human mean and SD, as `scoreMapping`'s `"linear"` does.
+- **A confidence of the scorer.** No fit: the scorer's own, which `routingCurve` takes.
 - **Evaluation reports, as RSMTool's HTML, `rsmcompare` and `rsmsummarize`.** No fit: input and output.
 - **Spearman's rank correlation.** Outside the sources: it ranks the ratings first, which makes it a different statistic
   from the correlation of the ratings.
@@ -577,6 +679,8 @@ no cell.
 - Cohen, J. (1968). Weighted kappa. Psychological Bulletin, 70, 213-220.
 - Eckes, T. (2023). Introduction to many-facet Rasch measurement: Analyzing and evaluating rater-mediated assessments
   (3rd ed.). Peter Lang.
+- El-Yaniv, R., & Wiener, Y. (2010). On the foundations of noise-free selective classification. Journal of Machine
+  Learning Research, 11, 1605-1641.
 - Fleiss, J. L. (1971). Measuring nominal scale agreement among many raters. Psychological Bulletin, 76, 378-382.
 - Linacre, J. M. (1989). Many-facet Rasch measurement. MESA Press.
 - Linacre, J. M. (2002). What do infit and outfit, mean-square and standardized mean? Rasch Measurement Transactions,

@@ -3,7 +3,7 @@ rater-automated-scoring.json, which validation/psychometrics/automated-scoring.p
 
     validation/psychometrics/.venv-scoring/bin/python -I validation/benchmarks/automated-scoring.py
 
-Each task starts from the unrounded machine scores and rounds and trims them, as the recipe of rater.md does. On ELLIPSE,
+Each task starts from the unrounded machine scores and rounds and trims them, as automatedScoreAgreement's scale does. On ELLIPSE,
 the analyzer's compute_degradation_and_disattenuated_correlations gives the human-system and human-human metrics, the
 degradation and the disattenuated correlation; on PERSUADE 2.0, metrics_helper gives the metrics of all essays and of
 each group, with the SMD on the population's SDs. The results go to validation/benchmarks/results/python-scoring.json,

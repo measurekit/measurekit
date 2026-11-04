@@ -1,13 +1,33 @@
 /**
  * Rater agreement and rater effects: exact and adjacent agreement, Cohen's kappa, unweighted and weighted, Fleiss'
  * kappa, intraclass correlations, the correlation and the standardized mean difference between raters, of a whole
- * sample or of a subgroup on the population's standard deviations; the many-facet Rasch model, with the severity of
- * raters and the difficulty of items, fair scores, element fit and the bias of each rater and item pair.
+ * sample or of a subgroup on the population's standard deviations; the evaluation of automated scores against human
+ * scores, with acceptance by thresholds, subgroups, windows of drift, the routing curve by confidence, the mapping to
+ * the human scale and the shift of a replay; the many-facet Rasch model, with the severity of raters and the difficulty
+ * of items, fair scores, element fit and the bias of each rater and item pair.
  *
  * @module @measurekit/psychometrics/rater
  */
 export type { KappaWeights } from "@measurekit/core";
+export {
+  ACCEPTANCE_THRESHOLDS,
+  type AcceptanceFailure,
+  type AcceptanceRule,
+  type AcceptanceThresholds,
+  type AutomatedScoreValidation,
+  type ValidateAutomatedScoresOptions,
+  validateAutomatedScores,
+} from "./acceptance.js";
 export { type AdjacentAgreementOptions, adjacentAgreement, exactAgreement } from "./agreement.js";
+export {
+  type AgreementDegradation,
+  type AutomatedScoreAgreement,
+  type AutomatedScoreAgreementOptions,
+  automatedScoreAgreement,
+  type GroupAgreement,
+} from "./automated-agreement.js";
+export type { AutomatedScore, ScoreAgreement, ScoreRange } from "./automated-scores.js";
+export { type AutomatedScoreDriftOptions, automatedScoreDrift, type DriftWindow } from "./drift.js";
 export { type ExpectedRatingOptions, expectedRating } from "./expected-rating.js";
 export type { FacetElement, FacetSummary, HomogeneityTest } from "./facet-summary.js";
 export { type IntraclassCorrelation, intraclassCorrelation } from "./intraclass-correlation.js";
@@ -27,3 +47,15 @@ export {
   standardizedMeanDifference,
 } from "./mean-difference.js";
 export { ratingCorrelation } from "./rating-correlation.js";
+export { type ReplayShift, type ReplayShiftOptions, replayShift } from "./replay-shift.js";
+export { type RoutingCurveOptions, type RoutingPoint, routingCurve } from "./routing-curve.js";
+export {
+  type IsotonicScoreMapping,
+  type LinearScoreMapping,
+  mappedScore,
+  type ScoreKnot,
+  type ScoreMapping,
+  type ScoreMappingMethod,
+  type ScoreMappingOptions,
+  scoreMapping,
+} from "./score-mapping.js";
