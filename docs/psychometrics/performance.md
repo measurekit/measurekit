@@ -25,13 +25,13 @@ measured and how to refresh this page are in [validation](../../validation/READM
 ### Where measurekit is slower
 
 ```mermaid
-%%{init: {"xyChart": {"height": 218, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 286, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Tasks that take more than 1.5 times as long as the reference"
-  x-axis ["fit.rootMeanSquareDeviation", "cdm.attributeProfiles"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 6
-  bar [5.5, 2.7]
-  line [1, 1]
+  x-axis ["dimensionality.smoothCorrelations1000", "fit.rootMeanSquareDeviation", "dimensionality.smoothCorrelations200", "cdm.attributeProfiles"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 11
+  bar [11, 5.5, 4.6, 2.7]
+  line [1, 1, 1, 1]
 ```
 
 A bar above the line takes longer than the reference, and md stands for multidimensional.
@@ -69,13 +69,23 @@ xychart-beta horizontal
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 660, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 456, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "data, dif, dimensionality"
-  x-axis ["scoreResponses", "irtLikelihoodRatio", "rajuArea", "sibtest", "mantelHaenszel", "logisticRegression", "lordChiSquare", "lordChiSquarePurified", "ordinalLogistic", "maximumLikelihoodFactors", "omegaHierarchical", "polychoricCorrelations", "parallelAnalysis", "exploratoryFactorAnalysis", "minimumAveragePartial"]
+  title "data, dif"
+  x-axis ["scoreResponses", "irtLikelihoodRatio", "rajuArea", "sibtest", "mantelHaenszel", "logisticRegression", "lordChiSquare", "lordChiSquarePurified", "ordinalLogistic"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.91, 0.24, 0.67, 0.15, 0.06, 0.53, 0.73, 0.72, 0.38, 0.26, 0.48, 0.0064, 0.0032, 0.33, 0.1]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.91, 0.24, 0.67, 0.15, 0.06, 0.53, 0.73, 0.72, 0.38]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 524, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "dimensionality"
+  x-axis ["maximumLikelihoodFactors", "omegaHierarchical", "smoothCorrelations25", "smoothCorrelations50", "smoothCorrelations100", "smoothCorrelations200", "smoothCorrelations1000", "polychoricCorrelations", "parallelAnalysis", "exploratoryFactorAnalysis", "minimumAveragePartial"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 11
+  bar [0.3, 0.65, 0.086, 0.26, 1.5, 4.6, 11, 0.0062, 0.0056, 0.37, 0.11]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
@@ -89,53 +99,53 @@ xychart-beta horizontal
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 660, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "fit, generalizability"
-  x-axis ["andersenTest", "martinLofTest", "raschWaldTest", "itemFit", "personFit", "summedScoreFit", "yenQ3", "correctedPersonFit", "kernelItemCurves", "limitedInformationFit", "rootMeanSquareDeviation", "localDependenceChiSquare", "generalizabilityStudy", "generalizabilityStudyUnbalanced"]
+  x-axis ["andersenTest", "martinLofTest", "raschWaldTest", "itemFit", "personFit", "summedScoreFit", "yenQ3", "yenQ3CriticalValue", "correctedPersonFit", "kernelItemCurves", "limitedInformationFit", "rootMeanSquareDeviation", "localDependenceChiSquare", "generalizabilityStudy", "generalizabilityStudyUnbalanced"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 6
-  bar [0.068, 0.1, 0.042, 0.079, 0.23, 0.13, 0.044, 0.55, 0.084, 0.16, 5.5, 0.033, 0.0026, 0.021]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.068, 0.1, 0.042, 0.079, 0.23, 0.13, 0.044, 0.53, 0.55, 0.084, 0.16, 5.5, 0.033, 0.0026, 0.021]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 796, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 830, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "irt"
-  x-axis ["conditionalRasch", "conditionalPartialCredit", "conditionalRatingScale", "calibrateUnfolding", "calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "testInformation", "calibrate2plLatentRegression"]
+  x-axis ["conditionalRasch", "conditionalPartialCredit", "conditionalRatingScale", "calibrateUnfolding", "calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "summedScoreTableTestlets", "testInformation", "calibrate2plLatentRegression"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.042, 0.014, 0.071, 0.007, 0.74, 0.51, 0.5, 0.28, 0.012, 0.26, 0.19, 0.0031, 0.62, 0.064, 0.11, 0.015, 0.33, 0.41, 0.21]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-```
-
-```mermaid
-%%{init: {"xyChart": {"height": 762, "xAxis": {"labelFontSize": 11}}}}%%
-xychart-beta horizontal
-  title "mokken, rater"
-  x-axis ["personScalability", "guttmanErrors", "conditionalAssociation", "twoWayImputation", "scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering", "automatedScoring", "automatedScoringGroups", "cohenKappa", "fleissKappa", "exactAgreement", "adjacentAgreement", "meanDifference", "intraclassCorrelation", "manyFacetRasch", "manyFacetRaschInteractions"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.031, 0.00054, 0.01, 0.14, 0.011, 0.03, 0.17, 0.19, 0.028, 0.033, 0.3, 0.0081, 0.061, 0.064, 1.3, 0.0029, 1.2, 0.64]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.042, 0.014, 0.071, 0.007, 0.74, 0.51, 0.5, 0.28, 0.012, 0.26, 0.19, 0.0031, 0.62, 0.064, 0.11, 0.015, 0.33, 0.31, 0.41, 0.21]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
 %%{init: {"xyChart": {"height": 422, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "responseTime, scaling, sim, similarity"
-  x-axis ["calibrateResponseTimes", "drawJointThetas", "simulateResponses", "selectPairs", "omegaIndex", "generalizedBinomialTest", "m4Index", "kIndex"]
+  title "mokken"
+  x-axis ["personScalability", "guttmanErrors", "conditionalAssociation", "twoWayImputation", "scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.038, 0.97, 0.37, 0.11, 0.0013, 0.0021, 0.0003, 0.000026]
+  bar [0.031, 0.00054, 0.01, 0.14, 0.011, 0.03, 0.17, 0.19]
   line [1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 184, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "standardSetting"
-  x-axis ["livingstonLewis"]
+  title "rater, responseTime, scaling, sim"
+  x-axis ["automatedScoring", "automatedScoringGroups", "scoreMappingIsotonic", "cohenKappa", "fleissKappa", "exactAgreement", "adjacentAgreement", "meanDifference", "intraclassCorrelation", "manyFacetRasch", "manyFacetRaschInteractions", "calibrateResponseTimes", "drawJointThetas", "simulateResponses"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.81]
-  line [1]
+  bar [0.028, 0.033, 0.98, 0.3, 0.0081, 0.061, 0.064, 1.3, 0.0029, 1.2, 0.64, 0.038, 0.97, 0.37]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+```
+
+```mermaid
+%%{init: {"xyChart": {"height": 354, "xAxis": {"labelFontSize": 11}}}}%%
+xychart-beta horizontal
+  title "similarity, standardSetting"
+  x-axis ["selectPairs", "omegaIndex", "generalizedBinomialTest", "m4Index", "kIndex", "livingstonLewis"]
+  y-axis "Time of measurekit over the time of the reference" 0 --> 2
+  bar [0.11, 0.0013, 0.0021, 0.0003, 0.000026, 0.81]
+  line [1, 1, 1, 1, 1, 1]
 ```
 
 <!-- /charts -->
@@ -197,12 +207,17 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Lord's chi-square of every item, with both groups calibrated by the 2PL                                          | 2,000 persons in two groups, 30 items                                                                        |             676 | difR 6.1.0 `difLord`                                                                                      |            922 |     0.73× |
 | Lord's chi-square of every item, purified until two rounds flag the same items                                   | 2,000 persons in two groups, 30 items                                                                        |             676 | difR 6.1.0 `difLord, purify = TRUE`                                                                       |            938 |     0.72× |
 | Ordinal logistic regression of every item                                                                        | 1,000 persons in two groups, 10 items of 4 categories                                                        |            33.2 | rms 8.2.0 `lrm, three models for an item`                                                                 |           87.0 |     0.38× |
-| Five factors by maximum likelihood with oblimin rotation, and their fit                                          | 2,800 persons, 25 items of 6 categories                                                                      |            17.5 | psych 2.6.9 `fa(nfactors = 5, fm = "ml", rotate = "oblimin")`                                             |           67.0 |     0.26× |
-| Omega hierarchical and total from five group factors by minimum residuals                                        | 2,800 persons, 25 items of 6 categories                                                                      |            16.3 | psych 2.6.9 `omega(nfactors = 5, fm = "minres")`                                                          |           34.0 |     0.48× |
-| Polychoric correlations of every pair of items                                                                   | 2,800 persons, 25 items of 6 categories                                                                      |            9.53 | psych 2.6.9 `polychoric`                                                                                  |          1,490 |   0.0064× |
-| Parallel analysis of components and factors from polychoric correlations, 20 data sets                           | 2,800 persons, 25 items of 6 categories                                                                      |             100 | psych 2.6.9 `fa.parallel(cor = "poly")`                                                                   |         31,037 |   0.0032× |
-| Five factors by minimum residuals with oblimin rotation, from Pearson correlations                               | 2,800 persons, 25 items of 6 categories                                                                      |            10.6 | psych 2.6.9 `fa(nfactors = 5, fm = "minres", rotate = "oblimin")`                                         |           32.0 |     0.33× |
-| Velicer's minimum average partial test of 8 components, from Pearson correlations                                | 2,800 persons, 25 items of 6 categories                                                                      |            8.97 | psych 2.6.9 `VSS(n = 8)`                                                                                  |           90.0 |      0.1× |
+| Five factors by maximum likelihood with oblimin rotation, and their fit                                          | 2,800 persons, 25 items of 6 categories                                                                      |            20.1 | psych 2.6.9 `fa(nfactors = 5, fm = "ml", rotate = "oblimin")`                                             |           67.0 |      0.3× |
+| Omega hierarchical and total from five group factors by minimum residuals                                        | 2,800 persons, 25 items of 6 categories                                                                      |            21.2 | psych 2.6.9 `omega(nfactors = 5, fm = "minres")`                                                          |           32.5 |     0.65× |
+| Smoothing of a positive definite correlation matrix: its eigendecomposition                                      | 25 items                                                                                                     |           0.044 | psych 2.6.9 `cor.smooth`                                                                                  |          0.512 |    0.086× |
+| Smoothing of a positive definite correlation matrix: its eigendecomposition                                      | 50 items                                                                                                     |           0.263 | psych 2.6.9 `cor.smooth`                                                                                  |           1.00 |     0.26× |
+| Smoothing of a positive definite correlation matrix: its eigendecomposition                                      | 100 items                                                                                                    |            3.03 | psych 2.6.9 `cor.smooth`                                                                                  |           2.02 |      1.5× |
+| **Smoothing of a positive definite correlation matrix: its eigendecomposition**                                  | 200 items                                                                                                    |            27.3 | psych 2.6.9 `cor.smooth`                                                                                  |           5.91 |  **4.6×** |
+| **Smoothing of a positive definite correlation matrix: its eigendecomposition**                                  | 1,000 items                                                                                                  |           3,052 | psych 2.6.9 `cor.smooth`                                                                                  |            280 |   **11×** |
+| Polychoric correlations of every pair of items                                                                   | 2,800 persons, 25 items of 6 categories                                                                      |            18.3 | psych 2.6.9 `polychoric`                                                                                  |          2,935 |   0.0062× |
+| Parallel analysis of components and factors from polychoric correlations, 20 data sets                           | 2,800 persons, 25 items of 6 categories                                                                      |             320 | psych 2.6.9 `fa.parallel(cor = "poly")`                                                                   |         57,514 |   0.0056× |
+| Five factors by minimum residuals with oblimin rotation, from Pearson correlations                               | 2,800 persons, 25 items of 6 categories                                                                      |            19.1 | psych 2.6.9 `fa(nfactors = 5, fm = "minres", rotate = "oblimin")`                                         |           51.0 |     0.37× |
+| Velicer's minimum average partial test of 8 components, from Pearson correlations                                | 2,800 persons, 25 items of 6 categories                                                                      |            17.4 | psych 2.6.9 `VSS(n = 8)`                                                                                  |            164 |     0.11× |
 | Kernel equating with its standard errors, from log-linear fits of degree 3                                       | 41 scores, two forms                                                                                         |            1.59 | kequate 1.6.4 `kequate("EG")`                                                                             |            162 |   0.0098× |
 | The link of a chain of three forms by Haebara's method, with its covariance                                      | 3 forms of 20 items                                                                                          |            3.43 | equateIRT 2.5.2 `alldirec, chainec`                                                                       |           15.3 |     0.22× |
 | The standard errors of true-score equating through a mean-mean link                                              | 2 forms of 20 items                                                                                          |            6.23 | equateIRT 2.5.2 `score(se = TRUE)`                                                                        |           12.0 |     0.52× |
@@ -227,6 +242,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Infit, outfit and the standardized log-likelihood of the persons                                                 | 2,000 persons, 40 items                                                                                      |            4.05 | mirt 1.48 `personfit`                                                                                     |           17.3 |     0.23× |
 | The summed-score statistic S-X2 of the items                                                                     | 2,000 persons, 40 items                                                                                      |            5.06 | mirt 1.48 `itemfit(fit_stats = "S_X2")`                                                                   |           38.0 |     0.13× |
 | Yen's Q3 of every pair of items                                                                                  | 2,000 persons, 40 items                                                                                      |            5.28 | mirt 1.48 `residuals(type = "Q3")`                                                                        |            121 |    0.044× |
+| The critical value of Q3 by a parametric bootstrap of 10 replications                                            | 2,000 persons, 40 items                                                                                      |           2,934 | mirt 1.48 `mirt, fscores and residuals(type = "Q3") in each replication`                                  |          5,527 |     0.53× |
 | Snijders' lz* of the persons at their posterior modes                                                            | 2,000 persons, 40 items                                                                                      |            2.77 | PerFit 1.4.7 `lzstar(Ability.PModel = "BM")`                                                              |           5.00 |     0.55× |
 | Kernel-smoothed curves of the categories of the items at 51 points                                               | 2,000 persons, 40 items                                                                                      |            17.3 | KernSmoothIRT 6.6 `ksIRT(format = 2)`                                                                     |            206 |    0.084× |
 | M2* with its RMSEA, SRMSR, TLI and CFI                                                                           | 2,000 persons, 40 items                                                                                      |            68.3 | mirt 1.48 `M2`                                                                                            |            435 |     0.16× |
@@ -252,6 +268,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | Ability by weighted likelihood                                                                                   | 2,000 persons, the 40 items of the calibration                                                               |             123 | mirt 1.48 `fscores(method = "WLE")`                                                                       |          8,172 |    0.015× |
 | Joint maximum likelihood calibration of the Rasch model                                                          | 2,000 persons, 40 items                                                                                      |            8.98 | TAM 4.3.25 `tam.jml`                                                                                      |           27.0 |     0.33× |
 | The posterior mean of the ability given each summed score                                                        | 40 items                                                                                                     |           0.178 | none                                                                                                      |                |           |
+| The posterior mean of the ability given each summed score, with testlets                                         | 40 items in 8 testlets of 5                                                                                  |            9.81 | mirt 1.48 `fscores(method = "EAPsum_2.0")`                                                                |           32.0 |     0.31× |
 | Information of a test at 121 values of theta                                                                     | 40 items                                                                                                     |           0.597 | mirt 1.48 `testinfo`                                                                                      |           1.44 |     0.41× |
 | Calibration of the two-parameter model with a latent regression by EM                                            | 2,000 persons, 40 dichotomous items                                                                          |             121 | mirt 1.48 `mirt(itemtype = "2PL", covdata, formula = ~ x)`                                                |            583 |     0.21× |
 | The normed Guttman errors, U3 and Ht of every person                                                             | 2,000 persons, 40 dichotomous items                                                                          |            2.69 | PerFit 1.4.7 `Gnormed, U3, Ht`                                                                            |           87.0 |    0.031× |
@@ -308,7 +325,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 - Simulation of adaptive tests that select testlets as units, by their mean information: catR has no testlets, so no reference does this task.
 - Assembly of parallel forms with enemies, by weighted deviations in rotation: highs finds the forms whose largest gap from the target is smallest (minimax), to its limit of 10 seconds..
 - The fit statistics of each item of a G-DINA calibration: itemfit's expected values come from a simulation of persons, and measurekit's are exact sums over the profiles.
-- Posterior profiles of the persons of a calibration: personparm multiplies the log posterior that the fit stored by the profiles, which is work of the fit; measurekit's calibration holds no posterior, so it computes each person's from the responses, and returns the posterior, the probability of each attribute and the MAP and EAP profiles. The same computation in R, with matrix products, takes 0.69 ms.
+- Posterior profiles of the persons of a calibration: personparm multiplies the log posterior that the fit stored by the profiles, which is work of the fit; measurekit's calibration holds no posterior, so it computes each person's from the responses, and returns the posterior, the probability of each attribute and the MAP and EAP profiles. The same computation in R, with matrix products, takes NA ms.
 - Wald tests of the DINA, DINO, A-CDM, LLM and R-RUM against the G-DINA, for each item with two or more attributes: modelcomp computes the covariance of the success probabilities of the fit again for each item; measurekit's comes with its calibration, which cdm.calibrateGdinaStandardErrors times.
 - Raju's signed and unsigned areas of every item, with both groups calibrated by the 2PL: difRaju calibrates by ltm's marginal maximum likelihood, and measurekit by EM.
 - Five factors by maximum likelihood with oblimin rotation, and their fit: fa also computes factor scores' statistics and other fit indices, which measurekit leaves out.
@@ -317,7 +334,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 - Velicer's minimum average partial test of 8 components, from Pearson correlations: VSS also fits 8 factor solutions with their very simple structure and fit statistics, which this task leaves out.
 - The link of a chain of three forms by Haebara's method, with its covariance: alldirec links each pair of forms both ways, twice the links of the chain, as chainec takes no other list; equateIRT differentiates the links analytically, and measurekit, for items of any model, by central differences of one Newton step from each link's minimum.
 - Kernel-smoothed curves of the categories of the items at 51 points: ksIRT also computes the expected scores, the correlation of each item with the total and the maximum likelihood theta of each person on the curves.
-- The RMSD and mean deviation of the items, at 61 nodes: IRT.RMSD reads the expected counts that the calibration stored, which is work of the calibration; measurekit takes items, so it computes each person's posterior from the responses. The same computation in R, with matrix products, takes 3.1 ms: OpenBLAS's kernels multiply the matrices of persons by items and items by nodes with vector instructions and fused multiply-add, and measurekit adds an item's log-probabilities to each person's posterior one by one.
+- The RMSD and mean deviation of the items, at 61 nodes: IRT.RMSD reads the expected counts that the calibration stored, which is work of the calibration; measurekit takes items, so it computes each person's posterior from the responses. The same computation in R, with matrix products, takes NA ms.
 - The Rasch model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
 - The partial credit model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
 - The rating scale model by conditional maximum likelihood: eRm maximizes with nlm, which stops on its own criteria, and measurekit by Newton's method to a change of 1e-6.
