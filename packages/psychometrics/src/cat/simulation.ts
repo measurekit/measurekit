@@ -1,4 +1,5 @@
-import { checkRandom, DataError, describe, isRecord, type Random } from "@measurekit/core";
+import { checkOptions, checkRandom, DataError, describe, isRecord, type Random } from "@measurekit/core";
+import { checkFunction } from "../checks.js";
 import { indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
 import { checkThetas, simulateResponse } from "../sim/internal.js";
 import type { AdaptiveTest, AdaptiveTestState } from "./adaptive-test.js";
@@ -44,36 +45,52 @@ export interface TestSimulation<TState extends TestState> {
   readonly exposureRates: readonly ExposureRate[];
 }
 
+/** Options of the simulations of adaptive tests, diagnostic and multidimensional ones included. */
+export interface AdaptiveSimulationOptions {
+  /**
+   * Returns the generator of the test's random choices, such as the first item, ties and exposure control, at one step
+   * of one person: step 0 starts the test and step n answers its nth item, and the persons are numbered from 0 in the
+   * order given. A host that seeds each call of `start` and `answer` from a person's session passes its generators, so
+   * that the simulation gives the items the host would; the responses still come from `random`.
+   *
+   * @defaultValue the `random` of the responses, which makes the choices between its draws
+   */
+  readonly testRandom?: (person: number, step: number) => Random;
+}
+
 /**
  * Simulates an adaptive test for persons with known thetas: each response is drawn from the item's category
- * probabilities at the person's theta. The same `random` draws the responses and makes the test's random choices, so
- * a seeded generator reproduces the simulation.
+ * probabilities at the person's theta. The same `random` draws the responses and makes the test's random choices, or the
+ * option `testRandom` makes those choices, so seeded generators reproduce the simulation.
  *
  * @param test - The test to run.
  * @param thetas - The abilities of the persons.
- * @param random - The generator of the responses, the first item and ties.
+ * @param random - The generator of the responses and, without `testRandom`, of the first item and ties.
+ * @param options - The generator of the test's choices at each step of each person.
  * @returns The simulated tests of the persons, the bias and root mean square error of the estimates, the mean length
  *   and the exposure rate of each item.
- * @throws `DataError` when `test` is not an adaptive test or `random` not a random number generator, without thetas or
- * when a theta is not finite.
+ * @throws `DataError` when `test` is not an adaptive test, `random` or a generator of `testRandom` not a random number
+ * generator, without thetas or when a theta is not finite.
  */
 export function simulateAdaptiveTest(
   test: AdaptiveTest,
   thetas: readonly number[],
   random: Random,
+  options: AdaptiveSimulationOptions = {},
 ): TestSimulation<AdaptiveTestState> {
   checkTest(test, "pool", "The test must be an adaptive test from createAdaptiveTest");
   checkRandom(random);
+  const randomOf = stepRandoms(options, random);
   const { pool } = test;
   const indices = indexItems(pool);
   const probabilities = new Float64Array(largestCategoryCount(pool));
   checkThetas(thetas);
-  const persons = thetas.map((theta) => ({
+  const persons = thetas.map((theta, person) => ({
     theta,
     state: administer(
       test,
       (id) => simulateResponse(itemById(pool, indices, id), theta, random, probabilities),
-      random,
+      randomOf(person),
     ),
   }));
   return summarize(persons, pool);
@@ -155,20 +172,42 @@ function summarize<TState extends TestState>(
 }
 
 /**
+ * Returns, for each person, the generator of each step of their test: those of the option `testRandom`, checked as
+ * they come, or `random` at every step.
+ *
+ * @throws `DataError` when the options are not an object or `testRandom` is not a function.
+ */
+export function stepRandoms(
+  options: AdaptiveSimulationOptions,
+  random: Random,
+): (person: number) => (step: number) => Random {
+  checkOptions(options);
+  const { testRandom } = options;
+  if (testRandom === undefined) return () => () => random;
+  checkFunction(testRandom, "The option testRandom must be a function of a person and a step");
+  return (person) => (step) => {
+    const found = testRandom(person, step);
+    checkRandom(found);
+    return found;
+  };
+}
+
+/**
  * Administers a test to one person and returns the state at its end.
  *
  * @param respond - Returns the person's response to the item with an id.
+ * @param randomAt - Returns the generator of a step: 0 to start, n to answer the nth item.
  */
-export function administer<TState extends { readonly next: string | null }>(
+export function administer<TState extends { readonly items: readonly string[]; readonly next: string | null }>(
   test: {
     start(random: Random): TState;
     answer(state: TState, response: number, random: Random): TState;
   },
   respond: (id: string) => number,
-  random: Random,
+  randomAt: (step: number) => Random,
 ): TState {
-  let state = test.start(random);
-  while (state.next !== null) state = test.answer(state, respond(state.next), random);
+  let state = test.start(randomAt(0));
+  while (state.next !== null) state = test.answer(state, respond(state.next), randomAt(state.items.length + 1));
   return state;
 }
 

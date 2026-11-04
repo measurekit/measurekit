@@ -3607,6 +3607,49 @@ describe("simulation", () => {
     );
   });
 
+  it("gives the items that a host seeding each step gets, where the test draws its choices", () => {
+    // A host seeds the start of a person's test and each answer from the session, as a CAT service behind a port does.
+    const stepSeed = (person: number, step: number): number => 1000 * (person + 1) + step;
+    const pool = POOL_CONTENT.map((item, i) => ({ ...item, exposure: i % 3 === 0 ? 0.5 : 1 }));
+    const test = createAdaptiveTest({
+      pool,
+      selection: randomesque(maximumInformation, 3),
+      stopping: testLength(8),
+      contentTargets: catContent.targets,
+    });
+    const replay = (state: AdaptiveTestState, person: number): AdaptiveTestState => {
+      let replayed = test.start(createRandom(stepSeed(person, 0)));
+      for (const response of state.responses) {
+        replayed = test.answer(replayed, response, createRandom(stepSeed(person, replayed.items.length + 1)));
+      }
+      return replayed;
+    };
+    const persons = thetas.slice(0, 40);
+    const testRandom = (person: number, step: number): Random => createRandom(stepSeed(person, step));
+    const seeded = simulateAdaptiveTest(test, persons, createRandom(11), { testRandom });
+    seeded.persons.forEach(({ state }, person) => {
+      expect(replay(state, person)).toEqual(state);
+    });
+    // With one generator for the responses and the choices, the host's items differ.
+    const shared = simulateAdaptiveTest(test, persons, createRandom(11));
+    expect(shared.persons.some(({ state }, person) => replay(state, person).items.join() !== state.items.join())).toBe(
+      true,
+    );
+  });
+
+  it("rejects options that are not an object and a testRandom that gives no generator", () => {
+    const test = createAdaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping: testLength(1) });
+    expect(() => simulateAdaptiveTest(test, [0], createRandom(1), JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => simulateAdaptiveTest(test, [0], createRandom(1), { testRandom: JSON.parse("1") })).toThrow(
+      "The option testRandom must be a function of a person and a step, found 1.",
+    );
+    expect(() => simulateAdaptiveTest(test, [0], createRandom(1), { testRandom: () => JSON.parse("{}") })).toThrow(
+      "A random number generator must be one from createRandom, found an object.",
+    );
+  });
+
   it("rejects missing and non-finite thetas", () => {
     const test = createAdaptiveTest({ pool: POOL_3PL, stopping: testLength(2) });
     expect(() => simulateAdaptiveTest(test, [], createRandom(1))).toThrow("A simulation needs at least one theta.");
@@ -4697,6 +4740,26 @@ describe("simulateDiagnosticTest", () => {
     });
   });
 
+  it("gives the items that a host seeding each step gets, with testRandom", () => {
+    // Exposure control draws whether each item that half the pool may be withheld from is administered.
+    const test = createDiagnosticAdaptiveTest({
+      pool: SingleAttributePool.map((item, i) => ({ ...item, exposure: i % 2 === 0 ? 0.5 : 1 })),
+      attributes: ["a", "b", "c"],
+      stopping: testLength(5),
+    });
+    const seedOf = (person: number, step: number): number => 100 * (person + 1) + step;
+    const { persons } = simulateDiagnosticTest(test, Profiles, createRandom(3), {
+      testRandom: (person, step) => createRandom(seedOf(person, step)),
+    });
+    persons.forEach(({ state }, person) => {
+      let replayed = test.start(createRandom(seedOf(person, 0)));
+      for (const response of state.responses) {
+        replayed = test.answer(replayed, response, createRandom(seedOf(person, replayed.items.length + 1)));
+      }
+      expect(replayed).toEqual(state);
+    });
+  });
+
   it("reports the exposure rate of every item and the mean length", () => {
     const test = createDiagnosticAdaptiveTest({
       pool: SingleAttributePool,
@@ -5383,6 +5446,32 @@ describe("simulateMultidimensionalAdaptiveTest", () => {
     );
     expect(result.meanLength).toBeLessThan(25);
     expect(result.meanLength).toBeGreaterThan(0);
+  });
+
+  it("gives the items that a host seeding each step gets, with testRandom", () => {
+    const randomOrder: ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate> = {
+      scores({ eligible, random }, out) {
+        eligible.forEach((flag, i) => {
+          if (flag === 1) out[i] = random.uniform();
+        });
+      },
+    };
+    const test = createMultidimensionalAdaptiveTest({
+      pool: largePool(),
+      stopping: testLength(6),
+      selection: randomOrder,
+    });
+    const seedOf = (person: number, step: number): number => 100 * (person + 1) + step;
+    const { persons } = simulateMultidimensionalAdaptiveTest(test, randomThetas(10, 5), createRandom(3), {
+      testRandom: (person, step) => createRandom(seedOf(person, step)),
+    });
+    persons.forEach(({ state }, person) => {
+      let replayed = test.start(createRandom(seedOf(person, 0)));
+      for (const response of state.responses) {
+        replayed = test.answer(replayed, response, createRandom(seedOf(person, replayed.items.length + 1)));
+      }
+      expect(replayed).toEqual(state);
+    });
   });
 
   it("draws each person's responses from the true thetas and reproduces from its seed", () => {

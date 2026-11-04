@@ -104,6 +104,7 @@ export {
   type SelectionContext,
 } from "./selection.js";
 export {
+  type AdaptiveSimulationOptions,
   type ExposureRate,
   type SimulatedPerson,
   simulateAdaptiveTest,

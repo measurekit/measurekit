@@ -1,7 +1,15 @@
 import { checkArray, checkRandom, type Random } from "@measurekit/core";
 import { simulateCdmResponses } from "../sim/internal.js";
 import type { DiagnosticAdaptiveTest, DiagnosticAdaptiveTestState } from "./diagnostic-test.js";
-import { administer, checkTest, type ExposureRate, responseLookup, summarizeAdministrations } from "./simulation.js";
+import {
+  type AdaptiveSimulationOptions,
+  administer,
+  checkTest,
+  type ExposureRate,
+  responseLookup,
+  stepRandoms,
+  summarizeAdministrations,
+} from "./simulation.js";
 
 /** One simulated person of a diagnostic test: the true profile and the final state of the test. */
 export interface SimulatedDiagnosticPerson {
@@ -28,31 +36,34 @@ export interface DiagnosticTestSimulation {
 /**
  * Simulates a diagnostic adaptive test for persons with known profiles: each person's response to an item is correct
  * with the success probability of the item's latent group that the profile falls in, as {@link simulateCdmResponses}
- * draws it. The same `random` draws the responses, then makes the test's random choices, so a seeded generator
- * reproduces the simulation.
+ * draws it. The same `random` draws the responses, then makes the test's random choices unless the option `testRandom`
+ * makes them, so seeded generators reproduce the simulation.
  *
  * @param test - The test to run.
  * @param profiles - The profile of each person, one 0 or 1 for each attribute.
- * @param random - The generator of the responses, the first item and ties.
+ * @param random - The generator of the responses and, without `testRandom`, of the first item and ties.
+ * @param options - The generator of the test's choices at each step of each person.
  * @returns The simulated tests of the persons, the accuracy of the classification of the profiles and of each
  *   attribute, the mean length and the exposure rate of each item.
- * @throws `DataError` when `test` is not a diagnostic adaptive test, `random` is not a random number generator, there
- * are no profiles or a profile is not a 0 or 1 for each attribute.
+ * @throws `DataError` when `test` is not a diagnostic adaptive test, `random` or a generator of `testRandom` is not a
+ * random number generator, there are no profiles or a profile is not a 0 or 1 for each attribute.
  */
 export function simulateDiagnosticTest(
   test: DiagnosticAdaptiveTest,
   profiles: readonly (readonly number[])[],
   random: Random,
+  options: AdaptiveSimulationOptions = {},
 ): DiagnosticTestSimulation {
   checkTest(test, "pool", "The test must be a diagnostic adaptive test from createDiagnosticAdaptiveTest");
   checkArray(test.attributes, "The test must be a diagnostic adaptive test from createDiagnosticAdaptiveTest");
   checkRandom(random);
+  const randomOf = stepRandoms(options, random);
   const { pool, attributes } = test;
   const matrix = simulateCdmResponses({ attributes, items: pool }, profiles, random);
   const response = responseLookup(matrix.responses, matrix.itemIds);
   const persons = profiles.map((profile, person) => ({
     profile,
-    state: administer(test, (id) => response(person, id), random),
+    state: administer(test, (id) => response(person, id), randomOf(person)),
   }));
   const share = (agrees: (person: SimulatedDiagnosticPerson) => boolean): number =>
     persons.filter(agrees).length / persons.length;

@@ -130,6 +130,10 @@ testlets taken whole, items in several content areas and a most of `overlap` ite
 
 The options that restrict the items of an adaptive test, `contentTargets`, `enemies` and `withinTestlet`, are one type, `TestControlOptions`, which the options of the adaptive, diagnostic and multidimensional tests extend. Every function documents each parameter and its result.
 
+`simulateAdaptiveTest`, `simulateDiagnosticTest` and `simulateMultidimensionalAdaptiveTest` take `testRandom`, the
+generator of the test's random choices at each step of each person, so that a simulation gives the items of a host that
+seeds each call of `start` and `answer`; without it, the generator of the responses makes them.
+
 `generalizedGradedUnfolding` is the generalized graded unfolding model for agree-disagree items, whose persons agree most
 near an item's location. `calibrateUnfolding` calibrates it as the GGUM package does: from Roberts and Laughlin's starts,
 through the graded unfolding model and the model with a = 1, to every parameter, leaving out the persons who disagree

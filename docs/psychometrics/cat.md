@@ -831,10 +831,11 @@ fixed-precision test of at most 20 items. A custom rule implements `StoppingRule
 
 ### Simulation of diagnostic tests
 
-`simulateDiagnosticTest(test, profiles, random)` administers the test to one person per true profile. Each person's
-response to every pool item is drawn first, correct with the success probability of the latent group the profile falls
-in, as [`simulateCdmResponses`](sim.md#responses) draws them; the same `random` then makes the test's random choices, so
-a seed reproduces the result.
+`simulateDiagnosticTest(test, profiles, random, options)` administers the test to one person per true profile. Each
+person's response to every pool item is drawn first, correct with the success probability of the latent group the
+profile falls in, as [`simulateCdmResponses`](sim.md#responses) draws them; the same `random` then makes the test's
+random choices, so a seed reproduces the result. The option `testRandom` makes them instead, as for
+[`simulateAdaptiveTest`](#simulation).
 
 | Result              | Meaning                                                                         |
 | ------------------- | ------------------------------------------------------------------------------- |
@@ -976,10 +977,11 @@ tests only.
 
 ### Simulation of multidimensional tests
 
-`simulateMultidimensionalAdaptiveTest(test, thetas, random)` administers the test to one person per vector of true
-thetas, as many thetas as the items have dimensions. Each person's response to every pool item is drawn first from the
-item's category probabilities at the person's thetas, as [`simulateMultidimensionalResponses`](sim.md#responses) draws
-them; the same `random` then makes the test's random choices, so a seed reproduces the result.
+`simulateMultidimensionalAdaptiveTest(test, thetas, random, options)` administers the test to one person per vector of
+true thetas, as many thetas as the items have dimensions. Each person's response to every pool item is drawn first from
+the item's category probabilities at the person's thetas, as [`simulateMultidimensionalResponses`](sim.md#responses)
+draws them; the same `random` then makes the test's random choices, so a seed reproduces the result. The option
+`testRandom` makes them instead, as for [`simulateAdaptiveTest`](#simulation).
 
 | Result                | Meaning                                                                         |
 | --------------------- | ------------------------------------------------------------------------------- |
@@ -1120,9 +1122,9 @@ modules carry are ignored, and the stages and items are checked as `createMultis
 ## Simulation
 
 [`simulateDiagnosticTest`](#simulation-of-diagnostic-tests) simulates diagnostic tests. `simulateAdaptiveTest(test,
-thetas, random)` and `simulateMultistageTest(test, thetas, random)` administer a test to one person per true theta,
-drawing each response from the item's category probabilities, as [`simulateResponses`](sim.md#responses) does. The same
-`random` draws the responses and the test's random choices, so a seed reproduces the result.
+thetas, random, options)` and `simulateMultistageTest(test, thetas, random)` administer a test to one person per true
+theta, drawing each response from the item's category probabilities, as [`simulateResponses`](sim.md#responses) does.
+The same `random` draws the responses and the test's random choices, so a seed reproduces the result.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -1153,6 +1155,42 @@ result.rootMeanSquareError; // also bias, meanLength, exposureRates and persons
 | `rootMeanSquareError` | √(mean of the squared differences)                                                       |
 | `meanLength`          | Mean number of items administered                                                        |
 | `exposureRates`       | `{ id, rate }` for every item of the pool or panel: the share of persons administered it |
+
+| Option       | Meaning                                                                                                                                                                  | Default                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| `testRandom` | `(person, step) => Random`: the generator of the test's random choices at a step of a person, step 0 starting the test and step n answering its nth item, persons from 0 | the `random` of the responses |
+
+A host that seeds each call of `start` and `answer` from a person's session, as a CAT service behind a port does, passes
+its generators as `testRandom`: the simulation then gives the items that the host gives for the same responses. With one
+generator for both, the items differ as soon as the test draws a choice: the first item, `randomesque`, exposure control
+or a tie of content areas. `simulateDiagnosticTest` and `simulateMultidimensionalAdaptiveTest` take the same option.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  createAdaptiveTest,
+  maximumInformation,
+  randomesque,
+  simulateAdaptiveTest,
+  testLength,
+} from "@measurekit/psychometrics/cat";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems } from "@measurekit/psychometrics/sim";
+
+const pool = simulateItems(twoParameterLogistic, 50, createRandom(7)).map((item, i) => ({ ...item, id: `q${i + 1}` }));
+// Each item is drawn from the three most informative.
+const test = createAdaptiveTest({ pool, selection: randomesque(maximumInformation, 3), stopping: testLength(10) });
+// The host's generator of a step of a person's session.
+const stepRandom = (person: number, step: number) => createRandom(1000 * (person + 1) + step);
+const [simulated] = simulateAdaptiveTest(test, [0.5], createRandom(8), { testRandom: stepRandom }).persons;
+
+// The host, given the same responses, administers the same items.
+let state = test.start(stepRandom(0, 0));
+for (const response of simulated?.state.responses ?? []) {
+  state = test.answer(state, response, stepRandom(0, state.items.length + 1));
+}
+state.items.join() === simulated?.state.items.join(); // true
+```
 
 ## Form assembly
 

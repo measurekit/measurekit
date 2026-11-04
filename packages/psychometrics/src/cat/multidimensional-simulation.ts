@@ -1,7 +1,15 @@
 import { checkRandom, mean, type Random } from "@measurekit/core";
 import { simulateMultidimensionalResponses } from "../sim/internal.js";
 import type { MultidimensionalAdaptiveTest, MultidimensionalAdaptiveTestState } from "./multidimensional-test.js";
-import { administer, checkTest, type ExposureRate, responseLookup, summarizeAdministrations } from "./simulation.js";
+import {
+  type AdaptiveSimulationOptions,
+  administer,
+  checkTest,
+  type ExposureRate,
+  responseLookup,
+  stepRandoms,
+  summarizeAdministrations,
+} from "./simulation.js";
 
 /** One simulated person of a multidimensional test: the true thetas and the final state of the test. */
 export interface SimulatedMultidimensionalPerson {
@@ -28,23 +36,28 @@ export interface MultidimensionalTestSimulation {
 /**
  * Simulates a multidimensional adaptive test for persons with known thetas: each person's response to every pool item is
  * drawn from the item's category probabilities at the person's thetas, as {@link simulateMultidimensionalResponses}
- * draws them. The same `random` then makes the test's random choices, so a seeded generator reproduces the simulation.
+ * draws them. The same `random` then makes the test's random choices unless the option `testRandom` makes them, so
+ * seeded generators reproduce the simulation.
  *
  * @param test - The test to run.
  * @param thetas - The thetas of each person, one for each dimension.
- * @param random - The generator of the responses, the first item and ties.
+ * @param random - The generator of the responses and, without `testRandom`, of the first item and ties.
+ * @param options - The generator of the test's choices at each step of each person.
  * @returns The simulated tests of the persons, the bias and root mean square error of the estimates, the mean length
  *   and the exposure rate of each item.
- * @throws `DataError` when `test` is not a multidimensional adaptive test, `random` is not a random number generator,
- * there are no persons, or a person's thetas are not as many finite numbers as the items have dimensions.
+ * @throws `DataError` when `test` is not a multidimensional adaptive test, `random` or a generator of `testRandom` is not
+ * a random number generator, there are no persons, or a person's thetas are not as many finite numbers as the items
+ * have dimensions.
  */
 export function simulateMultidimensionalAdaptiveTest(
   test: MultidimensionalAdaptiveTest,
   thetas: readonly (readonly number[])[],
   random: Random,
+  options: AdaptiveSimulationOptions = {},
 ): MultidimensionalTestSimulation {
   checkTest(test, "pool", "The test must be a multidimensional adaptive test from createMultidimensionalAdaptiveTest");
   checkRandom(random);
+  const randomOf = stepRandoms(options, random);
   const { pool } = test;
   const matrix = simulateMultidimensionalResponses(pool, thetas, random);
   const response = responseLookup(
@@ -53,7 +66,7 @@ export function simulateMultidimensionalAdaptiveTest(
   );
   const persons = thetas.map((theta, person) => ({
     theta,
-    state: administer(test, (id) => response(person, id), random),
+    state: administer(test, (id) => response(person, id), randomOf(person)),
   }));
   const dimensions = thetas[0]?.length ?? 0;
   const errors = (d: number): number[] =>
