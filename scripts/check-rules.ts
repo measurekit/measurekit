@@ -975,14 +975,26 @@ export const RULES: readonly Rule[] = [
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */
 const SKIPPED = new Set(["node_modules", ".git", "dist", "coverage", "api"]);
-/** The longest a test of a copy may take, in milliseconds. */
+/** The longest a test of a copy may take, in milliseconds: a removed bound can make a test wait for ever. */
 const TEST_TIMEOUT_MS = 120_000;
-/** The longest a run of a copy may take, in milliseconds: a rule that bounds work leaves a run that does not end. */
-const RUN_TIMEOUT_MS = 150_000;
+/**
+ * The longest a run of a copy may take in all, in milliseconds, before it is stopped. It is well above the time of a test,
+ * because a test that is busy in synchronous work reports that it ran out of time only when the work ends: the slowest
+ * bound that a removed rule leaves to a test to find takes 200 s, and a run stopped before that says nothing of the rule.
+ */
+const RUN_TIMEOUT_MS = 300_000;
+/**
+ * The most that a run may print, in bytes. Node.js stops a run at 1 MiB of output by default and cuts the summary off, and a
+ * copy without a rule can fail every test of a file with a long message each.
+ */
+const REPORT_MAX_BYTES = 64 * 1024 * 1024;
 
-/** What checking one rule found. */
+/**
+ * What checking one rule found: the rule is guarded, it is not, or a run took longer than its limit and nothing is known.
+ * A run that is only slow, on a host with other work to do, says nothing about the rule.
+ */
 export interface Verdict {
-  readonly guarded: boolean;
+  readonly outcome: "guarded" | "unguarded" | "timed-out";
   /** A sentence that says what happened and, when the rule is not guarded, what to do. */
   readonly message: string;
 }
@@ -1000,11 +1012,33 @@ export function removeRule(source: string, rule: Rule): string {
   return source.replace(rule.find, () => rule.replace);
 }
 
-/** Returns the number of failed tests in the report of a Vitest run, or `undefined` when the run did not run tests. */
+/**
+ * Returns the number of tests of a Vitest run that failed, or `undefined` when the run did not run tests.
+ *
+ * @remarks
+ * A test that did not finish counts as failed, and so does an error of the run. A removed rule can make the worker crash, and
+ * the summary then says "29 passed (80)" without a word about the 51 tests that never ran.
+ */
 export function failedTests(report: string): number | undefined {
   const summary = /^\s*Tests\s+(.*)$/m.exec(report)?.[1];
   if (summary === undefined || !/\d+ (?:failed|passed)/.test(summary)) return undefined;
-  return Number(/(\d+) failed/.exec(summary)?.[1] ?? 0);
+  const count = (state: string): number => Number(new RegExp(`(\\d+) ${state}`).exec(summary)?.[1] ?? 0);
+  const total = Number(/\((\d+)\)\s*$/.exec(summary)?.[1] ?? 0);
+  const finished = count("failed") + count("passed") + count("skipped") + count("todo");
+  const errors = Number(/^\s*Errors\s+(\d+)/m.exec(report)?.[1] ?? 0);
+  return count("failed") + Math.max(0, total - finished) + errors;
+}
+
+/**
+ * Returns how many of the failed tests of a report of a Vitest run ran out of time. A failed test has one block, which starts
+ * with `FAIL`, and the message may be printed again outside it (the reporter of GitHub Actions annotates it), so the blocks
+ * are counted and not the messages.
+ */
+export function timedOutTests(report: string): number {
+  return report
+    .split(/^ FAIL /m)
+    .slice(1)
+    .filter((block) => /(?:Test|Hook) timed out in \d+ms/.test(block)).length;
 }
 
 /** The folders directly below a folder of the repository, if it exists. */
@@ -1025,8 +1059,19 @@ function copyRepository(root: string, scratch: string): void {
   }
 }
 
-/** Runs the tests of a rule in a copy and returns what they reported; a run that does not end counts as a failure. */
-function runTests(root: string, scratch: string, rule: Rule): { failed: number | undefined; report: string } {
+/** What a run of the tests of a rule reported. */
+interface TestRun {
+  /** The number of failed tests, or `undefined` when no tests ran. */
+  readonly failed: number | undefined;
+  readonly report: string;
+  /** Whether the run was stopped at its limit, with tests that had not finished. */
+  readonly stopped: boolean;
+  /** Whether every failed test ran out of time. */
+  readonly onlyTimeouts: boolean;
+}
+
+/** Runs the tests of a rule in a copy with Vitest and returns what they reported. */
+function runTests(root: string, scratch: string, rule: Rule, limit: number): TestRun {
   const vitest = join(root, "node_modules/vitest/vitest.mjs");
   // Threads, so that a run that is stopped leaves no worker behind.
   const options = ["--pool=threads", "--maxWorkers=2", `--testTimeout=${TEST_TIMEOUT_MS}`, "-t", rule.titles];
@@ -1036,46 +1081,71 @@ function runTests(root: string, scratch: string, rule: Rule): { failed: number |
     // biome-ignore lint/style/useNamingConvention: these are the names of the variables.
     env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
     killSignal: "SIGKILL",
-    timeout: RUN_TIMEOUT_MS,
+    timeout: limit,
+    maxBuffer: REPORT_MAX_BYTES,
   });
   const report = `${run.stdout}${run.stderr}`;
-  return { failed: run.error === undefined ? failedTests(report) : 1, report };
+  const failed = failedTests(report);
+  return {
+    failed,
+    report,
+    stopped: run.error !== undefined && "code" in run.error && run.error.code === "ETIMEDOUT",
+    onlyTimeouts: failed !== undefined && failed > 0 && timedOutTests(report) >= failed,
+  };
+}
+
+/** Says that a run took longer than its limit and that this is not a verdict on the rule. */
+function timedOut(test: string, where: string, run: TestRun, limit: number): Verdict {
+  const slow = timedOutTests(run.report);
+  const what = run.stopped
+    ? `was stopped after ${limit / 1000} s`
+    : `has ${slow} ${slow === 1 ? "test" : "tests"} that ran out of time`;
+  return {
+    outcome: "timed-out",
+    message: `${test} ${what} ${where}, so nothing is known of the rule; run it again on a host with less work.`,
+  };
 }
 
 /**
- * Checks that the tests of a rule pass on the code, and fail on a copy of the code without the rule.
+ * Checks that the tests of a rule pass on the code, and fail on a copy of the code without the rule. A run that takes longer
+ * than its limit on the unchanged code, or is stopped on the copy, is a timeout and not a verdict: the host may be busy.
  *
  * @param root - The repository.
  * @param rule - The rule.
+ * @param runLimit - The longest a run of the tests may take in all, in milliseconds.
  */
-export function checkRule(root: string, rule: Rule): Verdict {
+export function checkRule(root: string, rule: Rule, runLimit: number = RUN_TIMEOUT_MS): Verdict {
   const scratch = mkdtempSync(join(tmpdir(), "measurekit-rule-"));
   try {
     copyRepository(root, scratch);
-    const baseline = runTests(root, scratch, rule);
+    const baseline = runTests(root, scratch, rule, runLimit);
+    if (baseline.stopped || baseline.onlyTimeouts) {
+      return timedOut(rule.test, "on the unchanged code", baseline, runLimit);
+    }
     if (baseline.failed !== 0) {
       return {
-        guarded: false,
+        outcome: "unguarded",
         message: `${rule.test} does not pass on the unchanged code; fix it first.\n${baseline.report}`,
       };
     }
     const path = join(scratch, rule.file);
     writeFileSync(path, removeRule(readFileSync(path, "utf8"), rule));
-    const mutated = runTests(root, scratch, rule);
+    const mutated = runTests(root, scratch, rule, runLimit);
+    if (mutated.stopped) return timedOut(rule.test, "on the copy without the rule", mutated, runLimit);
     if (mutated.failed === undefined) {
       return {
-        guarded: false,
+        outcome: "unguarded",
         message: `${rule.test} did not run on the copy without the rule; the replacement may be invalid code.\n${mutated.report}`,
       };
     }
     if (mutated.failed === 0) {
       return {
-        guarded: false,
+        outcome: "unguarded",
         message: `${rule.test} passes without the rule: add a test that fails when "${rule.rule}" is broken.`,
       };
     }
     return {
-      guarded: true,
+      outcome: "guarded",
       message: `${mutated.failed} ${mutated.failed === 1 ? "test fails" : "tests fail"} without the rule.`,
     };
   } finally {
@@ -1083,20 +1153,26 @@ export function checkRule(root: string, rule: Rule): Verdict {
   }
 }
 
-/** Checks every rule, or the rules of the given files, and returns the exit code. */
+/** The labels of the outcomes in the report, of one width. */
+const LABELS = { guarded: "guarded   ", unguarded: "UNGUARDED ", "timed-out": "TIMED OUT " } as const;
+
+/** Checks every rule, or the rules of the given files, and returns the exit code: 1 when a rule is not guarded, 2 when none is not but a run timed out. */
 function main(paths: readonly string[]): number {
   const root = resolve(dirname(import.meta.dirname));
   const rules = RULES.filter(({ file }) => paths.length === 0 || paths.some((path) => file.startsWith(path)));
-  let unguarded = 0;
+  const counts = { guarded: 0, unguarded: 0, "timed-out": 0 };
   for (const rule of rules) {
-    const { guarded, message } = checkRule(root, rule);
-    if (!guarded) unguarded += 1;
-    console.log(`${guarded ? "guarded  " : "UNGUARDED"} ${rule.rule} ${message}`);
+    const { outcome, message } = checkRule(root, rule);
+    counts[outcome] += 1;
+    console.log(`${LABELS[outcome]}${rule.rule} ${message}`);
   }
   console.log(
-    unguarded === 0 ? `Every one of ${rules.length} rules is guarded.` : `${unguarded} rules are not guarded.`,
+    counts.guarded === rules.length
+      ? `Every one of ${rules.length} rules is guarded.`
+      : `${counts.guarded} of ${rules.length} rules are guarded, ${counts.unguarded} are not, and ${counts["timed-out"]} could not be judged because a run timed out.`,
   );
-  return unguarded === 0 ? 0 : 1;
+  if (counts.unguarded > 0) return 1;
+  return counts["timed-out"] > 0 ? 2 : 0;
 }
 
 if (import.meta.main) process.exitCode = main(process.argv.slice(2));

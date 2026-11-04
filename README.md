@@ -49,21 +49,22 @@ Node.js 22.18+ and pnpm 12 are required.
 
 ```bash
 pnpm install
-pnpm lint             # Biome and cspell
-pnpm check:standards  # the rules of the standards that a script can check
-pnpm typecheck        # every package and its examples
-pnpm test             # Vitest, a project per package, the scripts and the examples; runs offline
-pnpm test:coverage    # the coverage floors of the packages
-pnpm bench            # the benchmarks of every package, against their budgets
-pnpm knip             # unused files, exports and dependencies
-pnpm build            # the built packages
-pnpm check:packages   # publint and Are the Types Wrong on the packed packages
-pnpm check:release    # every package of a changeset is published, and a first release is 1.0.0
-pnpm check:tarballs   # packs the packages, installs them and imports every subpath
-pnpm check:rules      # the rules on untrusted input: each one's test fails without it
-pnpm check:licenses   # the licenses of the production dependencies
-pnpm check:audit      # known vulnerabilities of the dependencies
-pnpm docs:api         # builds, then TypeDoc into docs/api; fails on undocumented exports
+pnpm lint               # Biome and cspell
+pnpm check:standards    # the rules of the standards that a script can check
+pnpm check:duplication  # repeated code of the sources, against the repeats that AGENTS.md lists
+pnpm typecheck          # every package and its examples
+pnpm test               # Vitest, a project per package, the scripts and the examples; runs offline
+pnpm test:coverage      # the coverage floors of the packages
+pnpm bench              # the benchmarks of every package, against their budgets
+pnpm knip               # unused files, exports and dependencies
+pnpm build              # the built packages
+pnpm check:packages     # publint and Are the Types Wrong on the packed packages
+pnpm check:release      # every package of a changeset is published, and a first release is 1.0.0
+pnpm check:tarballs     # packs the packages, installs them and imports every subpath
+pnpm check:rules        # the rules on untrusted input: each one's test fails without it; a run that takes too long exits 2
+pnpm check:licenses     # the licenses of the production dependencies
+pnpm check:audit        # known vulnerabilities of the dependencies
+pnpm docs:api           # builds, then TypeDoc into docs/api; fails on undocumented exports
 ```
 
 [AGENTS.md](AGENTS.md) states the conventions, [CONTRIBUTING.md](CONTRIBUTING.md) the process and

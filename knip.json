@@ -3,6 +3,9 @@
   "workspaces": {
     "examples": {
       "entry": ["**/*.ts"]
+    },
+    ".": {
+      "ignoreDependencies": ["jscpd"]
     }
   }
 }
