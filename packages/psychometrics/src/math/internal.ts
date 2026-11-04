@@ -1,6 +1,5 @@
 // Helpers that the modules and tests of this package share. They are not exported from the package.
 
-export { bivariateNormalCdf, bivariateNormalDensity, bivariateNormalLogDensitySlope } from "./bivariate-normal.js";
 export { symmetricEigen } from "./eigen.js";
 export { numericalHessian } from "./hessian.js";
 export {
@@ -45,10 +44,8 @@ export {
 export { noncentralChiSquareCdf } from "./noncentral-chi-square.js";
 export { type HessianFunction, type NewtonOptions, newton } from "./optimize.js";
 export { orthonormalBasis } from "./orthonormal-basis.js";
-export { pearsonMatrix } from "./pearson.js";
 export { poissonFit } from "./poisson-fit.js";
-export { pseudoInverse } from "./pseudo-inverse.js";
-export { adaptiveIntegral, gaussHermite, type Quadrature, rectangular } from "./quadrature.js";
+export { gaussHermite, type Quadrature, rectangular } from "./quadrature.js";
 export { findIncreasingRoot, findRoot } from "./root.js";
 export { type RotationMethod, type RotationOptions, resolveRotation, rotateLoadingMatrix } from "./rotation.js";
 export {

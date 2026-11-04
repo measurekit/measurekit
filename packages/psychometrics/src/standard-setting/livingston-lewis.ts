@@ -9,7 +9,8 @@ import {
   logGamma,
 } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
-import { adaptiveIntegral, roundHalfToEven } from "../math/internal.js";
+import { roundHalfToEven } from "../math/internal.js";
+import { adaptiveIntegral } from "./adaptive-integral.js";
 import { checkCuts } from "./classification.js";
 
 /** Options of {@link livingstonLewisClassification}. */

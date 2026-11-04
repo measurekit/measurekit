@@ -7,8 +7,8 @@ import {
   DataError,
   type FieldNames,
 } from "@measurekit/core";
-import { pseudoInverse } from "../math/internal.js";
 import { type CdmCalibration, type CdmModel, checkSuccessProbabilities } from "./calibration.js";
+import { pseudoInverse } from "./pseudo-inverse.js";
 import { profilesOf } from "./q-matrix.js";
 
 /** A model that an item can be reduced to: every model but the G-DINA. */

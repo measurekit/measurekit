@@ -11,10 +11,11 @@ import {
   shuffle,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { pearsonMatrix, sampleQuantile } from "../math/internal.js";
+import { sampleQuantile } from "../math/internal.js";
 import { codeItems } from "./coded-items.js";
 import { correlationEigenvalues } from "./eigenvalues.js";
 import { checkedMatrix, checkItems, correlateItems, ITEM_CORRELATIONS } from "./item-correlations.js";
+import { pearsonMatrix } from "./pearson.js";
 import { DEFAULT_CORRECTION, type PolychoricOptions } from "./polychoric.js";
 
 /** Options of {@link parallelAnalysis}. */

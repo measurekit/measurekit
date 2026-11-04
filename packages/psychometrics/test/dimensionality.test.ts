@@ -1,6 +1,7 @@
 import { normalCdf, shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { bivariateNormalCdf, bivariateNormalDensity } from "../src/dimensionality/bivariate-normal.js";
 import {
   averagePartials,
   correlationEigenvalues,
@@ -31,13 +32,7 @@ import {
   smoothCorrelations,
   twoParameterLogistic,
 } from "../src/index.js";
-import {
-  bivariateNormalCdf,
-  bivariateNormalDensity,
-  minres,
-  minresLoadings,
-  symmetricEigen,
-} from "../src/math/internal.js";
+import { minres, minresLoadings, symmetricEigen } from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type DimensionalityFactorsFixture, readFixture } from "./fixtures.js";
 

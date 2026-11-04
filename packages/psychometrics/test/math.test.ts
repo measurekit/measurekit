@@ -11,7 +11,6 @@ import {
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
-  adaptiveIntegral,
   findIncreasingRoot,
   findRoot,
   gaussHermite,
@@ -25,7 +24,6 @@ import {
   newton,
   noncentralChiSquareCdf,
   numericalHessian,
-  pseudoInverse,
   rectangular,
   resolveRotation,
   rotateLoadingMatrix,
@@ -520,77 +518,6 @@ describe("invertPositiveDefinite", () => {
   });
 });
 
-describe("pseudoInverse", () => {
-  it("is the inverse of a positive definite matrix, derived by hand for a 2 by 2 matrix", () => {
-    // [[2, 1], [1, 2]]⁻¹ = [[2, -1], [-1, 2]] / 3
-    const inverse = pseudoInverse(Float64Array.from([2, 1, 1, 2]), 2);
-    [2 / 3, -1 / 3, -1 / 3, 2 / 3].forEach((value, i) => {
-      expectClose(defined(inverse[i]), value, 1e-14, `entry ${i}`);
-    });
-  });
-
-  it("gives the Moore-Penrose inverse of a matrix of deficient rank", () => {
-    // The projection onto (1, 1) / √2 scaled by 4 has the eigenvalues 4 and 0: its pseudo-inverse is a quarter of it.
-    const inverse = pseudoInverse(Float64Array.from([2, 2, 2, 2]), 2);
-    [0.125, 0.125, 0.125, 0.125].forEach((value, i) => {
-      expectClose(defined(inverse[i]), value, 1e-14, `entry ${i}`);
-    });
-    expect(Array.from(pseudoInverse(new Float64Array(4), 2))).toEqual([0, 0, 0, 0]);
-  });
-
-  it("drops the eigenvalues below the square root of the machine epsilon times the largest, and keeps those above", () => {
-    const dropped = pseudoInverse(Float64Array.from([1, 0, 0, 1e-9]), 2);
-    expect(Array.from(dropped)).toEqual([1, 0, 0, 0]);
-    const kept = pseudoInverse(Float64Array.from([1, 0, 0, 1e-6]), 2);
-    expectClose(defined(kept[3]), 1e6, 1e-3, "kept");
-  });
-
-  it("treats an eigenvalue whose reciprocal overflows as 0", () => {
-    expect(Array.from(pseudoInverse(Float64Array.from([5e-324]), 1))).toEqual([0]);
-  });
-
-  it("satisfies the four Moore-Penrose conditions for any semidefinite matrix", () => {
-    fc.assert(
-      fc.property(
-        fc.integer({ min: 1, max: 5 }),
-        fc.integer({ min: 1, max: 5 }),
-        fc.array(
-          fc.double({ min: -2, max: 2, noNaN: true }).map((x) => (Math.abs(x) < 0.1 ? 0 : x)),
-          { minLength: 25, maxLength: 25 },
-        ),
-        (size, rank, entries) => {
-          // B' B for a rank by size matrix B is semidefinite of rank at most `rank`.
-          const factor = entries.slice(0, rank * size);
-          const a = new Float64Array(size * size);
-          for (let i = 0; i < size; i++) {
-            for (let j = 0; j < size; j++) {
-              for (let k = 0; k < rank; k++) {
-                a[i * size + j] = (a[i * size + j] ?? 0) + (factor[k * size + i] ?? 0) * (factor[k * size + j] ?? 0);
-              }
-            }
-          }
-          const g = pseudoInverse(a, size);
-          const product = (x: Float64Array, y: Float64Array): Float64Array => {
-            const out = new Float64Array(size * size);
-            multiply(x, y, size, size, size, out);
-            return out;
-          };
-          // Rounding is relative to the largest entry that a condition involves, which a nearly singular matrix's inverse enlarges.
-          const close = (x: Float64Array, y: Float64Array): void => {
-            const scale = Math.max(1, ...x.map(Math.abs), ...y.map(Math.abs));
-            for (let i = 0; i < x.length; i++)
-              expect(Math.abs(defined(x[i]) - defined(y[i]))).toBeLessThan(1e-6 * scale);
-          };
-          close(product(product(a, g), a), a);
-          close(product(product(g, a), g), g);
-          close(product(a, g), transpose(product(a, g), size, size));
-          close(product(g, a), transpose(product(g, a), size, size));
-        },
-      ),
-    );
-  });
-});
-
 describe("matrix helpers", () => {
   const a = Float64Array.of(1, 2, 3, 4, 5, 6);
   const b = Float64Array.of(7, 8, 9, 10, 11, 12);
@@ -767,40 +694,6 @@ describe("rectangular", () => {
       1e-15,
     );
     expectClose(defined(weights[31]) / defined(weights[30]), normalDensity(0.2) / normalDensity(0), 1e-15);
-  });
-});
-
-describe("adaptiveIntegral", () => {
-  it("integrates a polynomial to rounding, its error taken as the difference from the 10-point Gauss rule", () => {
-    const polynomial = (x: number): number => 32 * x ** 31 + 3 * x * x - 1;
-    expectClose(adaptiveIntegral(polynomial, 0, 1, 1e-12), 1, 1e-14);
-  });
-
-  it("halves the intervals of a sharp peak and of a function with a kink until the relative tolerance holds", () => {
-    const peak = (x: number): number => Math.exp(-((x - 0.3) ** 2) / (2 * 1e-4));
-    expectClose(adaptiveIntegral(peak, 0, 1, 1e-12), Math.sqrt(2 * Math.PI) * 1e-2, 1e-14);
-    expectClose(
-      adaptiveIntegral((x) => Math.abs(x - 1 / 3), 0, 1, 1e-12),
-      1 / 18 + 2 / 9,
-      1e-12,
-    );
-  });
-
-  it("stops at once for an integrand of 0, and on an interval of no width", () => {
-    let calls = 0;
-    expect(
-      adaptiveIntegral(
-        () => {
-          calls++;
-          return 0;
-        },
-        -1,
-        1,
-        1e-12,
-      ),
-    ).toBe(0);
-    expect(calls).toBe(21);
-    expect(adaptiveIntegral(() => 1, 2, 2, 1e-12)).toBe(0);
   });
 });
 

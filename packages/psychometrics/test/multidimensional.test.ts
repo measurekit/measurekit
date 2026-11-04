@@ -1,6 +1,7 @@
 import { cholesky, logistic, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { pearsonMatrix } from "../src/dimensionality/pearson.js";
 import {
   betaPrior,
   buildResponseMatrix,
@@ -51,7 +52,6 @@ import {
   weightedLikelihoodEstimate,
 } from "../src/index.js";
 import { compressResponses } from "../src/irt/internal.js";
-import { pearsonMatrix } from "../src/math/internal.js";
 import {
   createChain,
   createCorrelations,

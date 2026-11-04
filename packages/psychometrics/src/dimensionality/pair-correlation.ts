@@ -1,5 +1,5 @@
 import { normalCdf } from "@measurekit/core";
-import { bivariateNormalCdf, bivariateNormalDensity, bivariateNormalLogDensitySlope } from "../math/internal.js";
+import { bivariateNormalCdf, bivariateNormalDensity, bivariateNormalLogDensitySlope } from "./bivariate-normal.js";
 
 /**
  * The correlations searched are within this of ±1, where the distribution is almost a line and the cells of a table

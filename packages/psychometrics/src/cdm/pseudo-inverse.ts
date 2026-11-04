@@ -1,6 +1,5 @@
 import { invertPositiveDefinite } from "@measurekit/core";
-import { symmetricEigen } from "./eigen.js";
-import { trace } from "./matrix.js";
+import { symmetricEigen, trace } from "../math/internal.js";
 
 /** The relative size below which an eigenvalue counts as 0: the square root of the machine epsilon, as R's `MASS::ginv`. */
 const RANK_TOLERANCE = Math.sqrt(Number.EPSILON);

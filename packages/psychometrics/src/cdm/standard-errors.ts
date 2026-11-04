@@ -1,6 +1,7 @@
 import { DataError } from "@measurekit/core";
-import { addOuterProduct, mirror, pseudoInverse } from "../math/internal.js";
+import { addOuterProduct, mirror } from "../math/internal.js";
 import { type CdmState, type DichotomousRows, forEachPosterior } from "./expectation.js";
+import { pseudoInverse } from "./pseudo-inverse.js";
 import type { CdmDesign } from "./q-matrix.js";
 
 /**

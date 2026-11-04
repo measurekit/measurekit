@@ -25,6 +25,7 @@ import {
   type TestItem,
   threeParameterLogistic,
 } from "../src/index.js";
+import { adaptiveIntegral } from "../src/standard-setting/adaptive-integral.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureParameters, item2pl, MODELS } from "./fixture-items.js";
 import { readFixture } from "./fixtures.js";
@@ -1187,5 +1188,39 @@ describe("properties", () => {
       }),
       { numRuns: 60 },
     );
+  });
+});
+
+describe("adaptiveIntegral", () => {
+  it("integrates a polynomial to rounding, its error taken as the difference from the 10-point Gauss rule", () => {
+    const polynomial = (x: number): number => 32 * x ** 31 + 3 * x * x - 1;
+    expectClose(adaptiveIntegral(polynomial, 0, 1, 1e-12), 1, 1e-14);
+  });
+
+  it("halves the intervals of a sharp peak and of a function with a kink until the relative tolerance holds", () => {
+    const peak = (x: number): number => Math.exp(-((x - 0.3) ** 2) / (2 * 1e-4));
+    expectClose(adaptiveIntegral(peak, 0, 1, 1e-12), Math.sqrt(2 * Math.PI) * 1e-2, 1e-14);
+    expectClose(
+      adaptiveIntegral((x) => Math.abs(x - 1 / 3), 0, 1, 1e-12),
+      1 / 18 + 2 / 9,
+      1e-12,
+    );
+  });
+
+  it("stops at once for an integrand of 0, and on an interval of no width", () => {
+    let calls = 0;
+    expect(
+      adaptiveIntegral(
+        () => {
+          calls++;
+          return 0;
+        },
+        -1,
+        1,
+        1e-12,
+      ),
+    ).toBe(0);
+    expect(calls).toBe(21);
+    expect(adaptiveIntegral(() => 1, 2, 2, 1e-12)).toBe(0);
   });
 });
