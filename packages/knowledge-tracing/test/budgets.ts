@@ -20,6 +20,7 @@ const BUDGETS = {
   "logistic.fitManyItems": 5_000,
   "logistic.searchRates": 3_000, // laptop
   "irt.replay": 6_000,
+  "irt.nominal": 9_000, // laptop
   "irt.drift": 4_000,
   "kst.blim": 400,
   "kst.mdml": 700,

@@ -8,16 +8,18 @@ import {
   logistic,
   logisticProbabilities,
   logLogistic,
+  type NominalParameters,
+  nominalProbabilities,
   partialCreditProbabilities,
   type ThresholdItem,
 } from "@measurekit/core";
 
 /**
  * An item's parameters in the IRT form of mirt and `@measurekit/psychometrics`, D = 1. A dichotomous item has
- * P(correct) = c + (d - c) logistic(a (θ - b)): the 1PL to 4PL. A polytomous item has categories 0 to K - 1 and K - 1
- * thresholds.
+ * P(correct) = c + (d - c) logistic(a (θ - b)): the 1PL to 4PL. A polytomous item has categories 0 to K - 1: K - 1
+ * thresholds, or a slope and an intercept per category.
  */
-export type IrtItem = DichotomousItem | GradedItem | PartialCreditItem;
+export type IrtItem = DichotomousItem | GradedItem | PartialCreditItem | NominalItem;
 
 /** A dichotomous item: the 1PL to 4PL. */
 export interface DichotomousItem {
@@ -54,9 +56,20 @@ export interface PartialCreditItem extends ThresholdItem {
   readonly model: "gpcm";
 }
 
+/**
+ * A nominal response item (Bock): P(k) ∝ exp(a_k θ + c_k), a slope and an intercept for each category, as
+ * `nominalResponse` of `@measurekit/psychometrics` calibrates them and mirt's `nominal` item type gives them with
+ * `IRTpars = TRUE`.
+ */
+export interface NominalItem extends NominalParameters {
+  /** The model: `"nominal"`. */
+  readonly model: "nominal";
+}
+
 /** Returns the number of categories of an item: 2 for a dichotomous one. */
 export function categoryCount(item: IrtItem): number {
-  return "model" in item ? item.b.length + 1 : 2;
+  if (!("model" in item)) return 2;
+  return item.model === "nominal" ? item.a.length : item.b.length + 1;
 }
 
 /**
@@ -65,7 +78,7 @@ export function categoryCount(item: IrtItem): number {
 export function categoryTerms(item: IrtItem, k: number, theta: number, out: Float64Array): void {
   if (!("model" in item)) dichotomousTerms(item, k, theta, out);
   else if (item.model === "graded") gradedTerms(item, k, theta, out);
-  else partialCreditTerms(item, k, theta, out);
+  else divideByTotalTerms(item, k, theta, out);
 }
 
 /**
@@ -78,22 +91,33 @@ export function expectedOutcome(item: IrtItem, theta: number, terms: Float64Arra
     logisticProbabilities(a * (theta - b), c, d, terms);
     return terms[1] ?? 0;
   }
-  const count = item.b.length + 1;
+  const count = categoryCount(item);
   const probabilities = scratchOf(count);
   if (item.model === "graded") gradedProbabilities(item.a, item.b, theta, probabilities);
-  else partialCreditProbabilities(item.a, 0, item.b, theta, probabilities);
+  else if (item.model === "gpcm") partialCreditProbabilities(item.a, 0, item.b, theta, probabilities);
+  else nominalProbabilities(item.a, item.c, theta, probabilities);
   let sum = 0;
   for (let k = 1; k < count; k++) sum += k * (probabilities[k] ?? 0);
   return sum / (count - 1);
 }
 
-/** The logits or probabilities of one polytomous item at a time: the calls are synchronous, so one array serves them. */
+/**
+ * The logits, then the probabilities, of one polytomous item at a time, and the slopes of the logits beside them: the
+ * calls are synchronous, so one pair of arrays serves them.
+ */
 let scratch = new Float64Array(0);
+let slopeScratch = new Float64Array(0);
 
 /** Returns the scratch space for `count` values, grown when it is too small. */
 function scratchOf(count: number): Float64Array {
   if (scratch.length < count) scratch = new Float64Array(count);
   return scratch;
+}
+
+/** Returns the scratch space of the slopes for `count` values, grown when it is too small. */
+function slopeScratchOf(count: number): Float64Array {
+  if (slopeScratch.length < count) slopeScratch = new Float64Array(count);
+  return slopeScratch;
 }
 
 /**
@@ -142,51 +166,99 @@ function gradedTerms(item: GradedItem, k: number, theta: number, out: Float64Arr
   out[2] = -item.a * item.a * (su * tu + sl * tl);
 }
 
-function partialCreditTerms(item: PartialCreditItem, k: number, theta: number, out: Float64Array): void {
-  // ln P(k) = z_k - ln Σ exp(z_j), z_j = Σ_{i ≤ j} a (θ - b_i); its derivatives are a (k - E[j]) and -a² Var(j).
-  const count = item.b.length + 1;
+/**
+ * The divide-by-total models, the generalized partial credit and the nominal response model, give category k the
+ * probability exp(z_k) / Σ_j exp(z_j), with logits z_j linear in θ of slopes s_j. ln P(k) = z_k - ln Σ exp(z_j), and
+ * its derivatives are s_k - E[s] and -Var(s) under the probabilities. The variance is taken about the mean, in a second
+ * pass, so that it stays at least 0 where the probabilities gather in one category.
+ */
+function divideByTotalTerms(item: PartialCreditItem | NominalItem, k: number, theta: number, out: Float64Array): void {
+  const count = categoryCount(item);
   const z = scratchOf(count);
-  z[0] = 0;
-  for (let j = 1; j < count; j++) z[j] = (z[j - 1] ?? 0) + item.a * (theta - (item.b[j - 1] ?? 0));
-  let top = 0;
-  for (let j = 1; j < count; j++) top = Math.max(top, z[j] ?? 0);
+  const slopes = slopeScratchOf(count);
+  writeLogits(item, theta, z, slopes);
+  let top = Number.NEGATIVE_INFINITY;
+  for (let j = 0; j < count; j++) top = Math.max(top, z[j] ?? 0);
+  const logit = z[k] ?? 0;
+  // The logits give way to their weights exp(z_j - top), which the second pass reads.
   let total = 0;
   let mean = 0;
-  let squares = 0;
   for (let j = 0; j < count; j++) {
     const weight = Math.exp((z[j] ?? 0) - top);
+    z[j] = weight;
     total += weight;
-    mean += j * weight;
-    squares += j * j * weight;
+    mean += weight * (slopes[j] ?? 0);
   }
   mean /= total;
-  out[0] = (z[k] ?? 0) - top - Math.log(total);
-  out[1] = item.a * (k - mean);
-  out[2] = -item.a * item.a * (squares / total - mean * mean);
+  let variance = 0;
+  for (let j = 0; j < count; j++) variance += (z[j] ?? 0) * ((slopes[j] ?? 0) - mean) ** 2;
+  out[0] = logit - top - Math.log(total);
+  out[1] = (slopes[k] ?? 0) - mean;
+  out[2] = -variance / total;
+}
+
+/**
+ * Writes the logits z_j of a divide-by-total item at θ and their slopes s_j = dz_j/dθ: Σ_{i ≤ j} a (θ - b_i) and j a
+ * for the GPCM, a_j θ + c_j and a_j for the NRM.
+ */
+function writeLogits(
+  item: PartialCreditItem | NominalItem,
+  theta: number,
+  z: Float64Array,
+  slopes: Float64Array,
+): void {
+  if (item.model === "nominal") {
+    for (let j = 0; j < item.a.length; j++) {
+      z[j] = (item.a[j] ?? 0) * theta + (item.c[j] ?? 0);
+      slopes[j] = item.a[j] ?? 0;
+    }
+    return;
+  }
+  z[0] = 0;
+  slopes[0] = 0;
+  for (let j = 1; j <= item.b.length; j++) {
+    z[j] = (z[j - 1] ?? 0) + item.a * (theta - (item.b[j - 1] ?? 0));
+    slopes[j] = j * item.a;
+  }
 }
 
 /** Checks an item's parameters, throwing a `DataError` that names the item. */
 export function checkItem(item: IrtItem, id: string): void {
   const label = `Item "${id}"`;
   checkRecord(item, `${label} must be an object`);
-  if (!Number.isFinite(item.a)) throw new DataError(`${label} needs a, a finite number, found ${describe(item.a)}.`);
-  if ("model" in item) checkPolytomous(item, label);
-  else checkDichotomous(item, label);
+  if (!("model" in item)) checkDichotomous(item, label);
+  else if (item.model === "nominal") checkNominal(item, label);
+  else checkPolytomous(item, label);
 }
 
-function checkDichotomous({ b, c = 0, d = 1 }: DichotomousItem, label: string): void {
+function checkDichotomous({ a, b, c = 0, d = 1 }: DichotomousItem, label: string): void {
+  if (!Number.isFinite(a)) throw new DataError(`${label} needs a, a finite number, found ${describe(a)}.`);
   if (!Number.isFinite(b)) throw new DataError(`${label} needs b, a finite number, found ${describe(b)}.`);
   if (!hasValidAsymptotes(c, d)) {
     throw new DataError(`${label} needs 0 ≤ c < d ≤ 1, found c = ${describe(c)} and d = ${describe(d)}.`);
   }
 }
 
+function checkNominal({ a, c }: NominalItem, label: string): void {
+  const finite = (values: unknown): values is readonly number[] =>
+    Array.isArray(values) && values.every(Number.isFinite);
+  if (!(finite(a) && finite(c) && a.length >= 2 && a.length === c.length)) {
+    const shown = (values: unknown): string => (Array.isArray(values) ? `[${values.join(", ")}]` : describe(values));
+    throw new DataError(
+      `${label} is nominal, so needs a and c, arrays of finite numbers, a slope and an intercept for each of at least two categories, found a = ${shown(a)} and c = ${shown(c)}.`,
+    );
+  }
+}
+
 function checkPolytomous(item: GradedItem | PartialCreditItem, label: string): void {
   const { model } = item as { readonly model: unknown };
   if (model !== "graded" && model !== "gpcm") {
-    throw new DataError(`${label} has the model ${describe(model)}; polytomous items are "graded" or "gpcm".`);
+    throw new DataError(
+      `${label} has the model ${describe(model)}; polytomous items are "graded", "gpcm" or "nominal".`,
+    );
   }
   const { a, b } = item;
+  if (!Number.isFinite(a)) throw new DataError(`${label} needs a, a finite number, found ${describe(a)}.`);
   if (!(Array.isArray(b) && b.length > 0 && b.every(Number.isFinite))) {
     throw new DataError(`${label} needs b, a non-empty array of finite thresholds, found ${describe(b)}.`);
   }

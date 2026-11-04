@@ -1,19 +1,14 @@
-import { DataError, isRecord, mean, softmax, stridedSoftmax } from "@measurekit/core";
+import {
+  DataError,
+  isRecord,
+  mean,
+  type NominalParameters,
+  nominalProbabilities,
+  stridedSoftmax,
+} from "@measurekit/core";
 import { divideByTotalThetaDerivatives } from "./divide-by-total.js";
 import type { IrtModel } from "./model.js";
 import { allFinite, formatList } from "./thresholds.js";
-
-/**
- * Parameters of a nominal response item: a slope and an intercept per category, in mirt's IRT parameterization. Adding
- * a constant to every slope or every intercept leaves the probabilities unchanged; calibration reports both summing
- * to 0, as mirt does.
- */
-export interface NominalParameters {
-  /** The slope of each category: mirt's a1 to aK. */
-  readonly a: readonly number[];
-  /** The intercept of each category: mirt's c1 to cK. */
-  readonly c: readonly number[];
-}
 
 /**
  * The nominal response model (NRM, Bock): P(k) ∝ exp(a_k θ + c_k) for unordered categories. This is mirt's `nominal`
@@ -53,16 +48,10 @@ export const nominalResponse: IrtModel<NominalParameters> = {
     const size = vector.length / 2;
     return { a: completed(vector.subarray(0, size)), c: completed(vector.subarray(size)) };
   },
-  probabilities({ a, c }, theta, out) {
-    for (let k = 0; k < a.length; k++) out[k] = (a[k] ?? 0) * theta + (c[k] ?? 0);
-    softmax(out, a.length);
-  },
+  probabilities: ({ a, c }, theta, out) => nominalProbabilities(a, c, theta, out),
   thetaDerivatives({ a, c }, theta, first, second) {
-    for (let k = 0; k < a.length; k++) {
-      first[k] = (a[k] ?? 0) * theta + (c[k] ?? 0);
-      second[k] = a[k] ?? 0;
-    }
-    softmax(first, a.length);
+    nominalProbabilities(a, c, theta, first);
+    for (let k = 0; k < a.length; k++) second[k] = a[k] ?? 0;
     divideByTotalThetaDerivatives(first, second, a.length);
   },
   parameterDerivatives({ a, c }, theta, out) {

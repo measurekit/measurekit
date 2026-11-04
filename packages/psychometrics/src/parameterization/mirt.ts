@@ -1,4 +1,12 @@
-import { checkRecord, DataError, describe, type LogisticItem, mean, type ThresholdItem } from "@measurekit/core";
+import {
+  checkRecord,
+  DataError,
+  describe,
+  type LogisticItem,
+  mean,
+  type NominalParameters,
+  type ThresholdItem,
+} from "@measurekit/core";
 import {
   centered,
   checkItem,
@@ -8,7 +16,6 @@ import {
   gradedResponse,
   type IrtItem,
   type IrtModel,
-  type NominalParameters,
   nominalResponse,
   oneParameterLogistic,
   partialCredit,

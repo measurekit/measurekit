@@ -227,6 +227,13 @@ posterior within 1.3e-15. Its MAP stops at its optimizer's tolerance, 2e-6 from 
 3.7e-5 from the exact curvature, so the exact mode is the reference. mirt's default grid differs slightly from 61
 points over ±6, by up to 2.5e-8 in EAP; the script sets it.
 
+`irt.R nominal` does the same for a test with nominal response items, mirt's `nominal` item type: 10 learners
+answering 8 items, 4 of them nominal, with 3 to 5 categories, centered as mirt reports them, with a category whose slope
+lies between others', and in the slope-intercept form `a_1 = c_1 = 0`; and a 2PL, a 3PL, a graded and a GPCM item,
+`set.seed(20261104)`. mirt's EAP equals the written-out posterior within 1.3e-15 and its standard error within 6.7e-16;
+its MAP is 1.8e-6 from the exact mode. The tests hold the same tolerances as for the other items: 1e-10 for EAP, its
+standard error, the predictions and the log-likelihood, 1e-5 for MAP and 1e-4 for its standard error.
+
 ### Drift
 
 `validation/knowledge-tracing/irt.R drift` runs learners through the chain of `drift` in base R, at 0.02 a week on a

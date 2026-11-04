@@ -924,6 +924,22 @@ export const RULES: readonly Rule[] = [
     titles: "logistic fits replayed",
   },
   {
+    rule: "A nominal item has as many intercepts as slopes, so that a category without an intercept is never read as 0.",
+    file: "packages/knowledge-tracing/src/irt/items.ts",
+    find: "a.length >= 2 && a.length === c.length",
+    replace: "a.length >= 2",
+    test: "packages/knowledge-tracing/test/irt.test.ts",
+    titles: "rejects invalid items",
+  },
+  {
+    rule: "A nominal item has at least two categories, as one category makes every outcome certain.",
+    file: "packages/knowledge-tracing/src/irt/items.ts",
+    find: "a.length >= 2 && a.length === c.length",
+    replace: "a.length === c.length",
+    test: "packages/knowledge-tracing/test/irt.test.ts",
+    titles: "rejects invalid items",
+  },
+  {
     rule: "A state serves the learner it belongs to.",
     file: "packages/knowledge-tracing/src/data/learner.ts",
     find: "if (attempt.learner !== learner) {",

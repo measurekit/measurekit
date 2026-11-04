@@ -68,7 +68,7 @@ export {
 } from "./logistic.js";
 export { type Maximization, maximization, unboundedCoordinates, unboundedScales } from "./m-step.js";
 export type { IrtItem, IrtModel, ModelParameter, TestItem } from "./model.js";
-export { centered, type NominalParameters, nominalResponse } from "./nominal.js";
+export { centered, nominalResponse } from "./nominal.js";
 export {
   checkCovariance,
   differenceStep,

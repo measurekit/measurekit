@@ -6,7 +6,7 @@
  * @module @measurekit/psychometrics/irt
  */
 
-export type { LogisticItem, ThetaDistribution, ThresholdItem } from "@measurekit/core";
+export type { LogisticItem, NominalParameters, ThetaDistribution, ThresholdItem } from "@measurekit/core";
 export {
   type AbilityEstimate,
   type AbilityEstimator,
@@ -53,7 +53,7 @@ export {
   twoParameterLogistic,
 } from "./logistic.js";
 export type { IrtItem, IrtModel, ModelParameter, TestItem } from "./model.js";
-export { type NominalParameters, nominalResponse } from "./nominal.js";
+export { nominalResponse } from "./nominal.js";
 export type { ParameterCovariance } from "./parameter-covariance.js";
 export { generalizedPartialCredit, partialCredit } from "./partial-credit.js";
 export { betaPrior, logNormalPrior, normalPrior, type ParameterPrior } from "./prior.js";

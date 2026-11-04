@@ -7,6 +7,7 @@ import {
   describe,
   type FieldNames,
   type LogisticItem,
+  type NominalParameters,
   type Random,
   type ThresholdItem,
 } from "@measurekit/core";
@@ -19,7 +20,6 @@ import {
   gradedResponse,
   type IrtItem,
   type IrtModel,
-  type NominalParameters,
   nominalResponse,
   oneParameterLogistic,
   partialCredit,

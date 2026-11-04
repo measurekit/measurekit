@@ -7,6 +7,7 @@ import {
   logistic,
   logisticPair,
   logisticProbabilities,
+  nominalProbabilities,
   partialCreditProbabilities,
   softmax,
   stridedSoftmax,
@@ -145,6 +146,55 @@ describe("partialCreditProbabilities", () => {
     const probabilities = partialCreditOf(5, 0, [-100, -100], 100);
     expect(probabilities.every(Number.isFinite)).toBe(true);
     expect(probabilities[2]).toBeCloseTo(1, 15);
+  });
+});
+
+describe("nominalProbabilities", () => {
+  /** Returns the probabilities of a nominal item. */
+  function nominalOf(a: readonly number[], c: readonly number[], theta: number): number[] {
+    const out = new Float64Array(a.length);
+    nominalProbabilities(a, c, theta, out);
+    return Array.from(out);
+  }
+
+  it("is the logistic of (a_1 - a_0) θ + c_1 - c_0 with two categories", () => {
+    expect(nominalOf([-0.3, 0.9], [0.2, -0.4], 0.7)[1]).toBeCloseTo(logistic(1.2 * 0.7 - 0.6), 15);
+  });
+
+  it("is the partial credit item whose slopes are k a and intercepts -a times the sums of the thresholds", () => {
+    const written = partialCreditOf(1.3, 0, [-0.5, 0.2, 1.1], 0.4);
+    nominalOf([0, 1.3, 2.6, 3.9], [0, 0.65, 0.39, -1.04], 0.4).forEach((probability, k) => {
+      expect(probability).toBeCloseTo(defined(written[k]), 14);
+    });
+  });
+
+  it("is unchanged by a constant added to every slope or every intercept, and sums to 1", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: 2, maxLength: 6 }),
+        fc.double({ min: -5, max: 5, noNaN: true }),
+        fc.double({ min: -6, max: 6, noNaN: true }),
+        (a, shift, theta) => {
+          const c = a.map((slope, k) => slope * k - 1);
+          const probabilities = nominalOf(a, c, theta);
+          const moved = nominalOf(
+            a.map((slope) => slope + shift),
+            c.map((intercept) => intercept - shift),
+            theta,
+          );
+          moved.forEach((probability, k) => {
+            expect(Math.abs(probability - defined(probabilities[k]))).toBeLessThan(1e-12);
+          });
+          expect(Math.abs(sum(probabilities) - 1)).toBeLessThan(ROUNDING);
+        },
+      ),
+    );
+  });
+
+  it("does not overflow at large logits", () => {
+    const probabilities = nominalOf([-50, 0, 50], [0, 0, 0], 20);
+    expect(probabilities.every(Number.isFinite)).toBe(true);
+    expect(probabilities[2]).toBe(1);
   });
 });
 

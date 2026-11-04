@@ -176,8 +176,8 @@ validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/data-
 ```
 
 The R scripts need R with the packages pROC, irr, lme4, LiblineaR, LKT, mirt, kst, pks, DAKS, sets and jsonlite; `common.R`
-holds their shared helpers. `irt.R` takes about two minutes, most of them on the grid of 1,921 points; `irt.R abilities`
-or `irt.R drift` runs one part. `bkt.py` needs the Python environment below, and takes under a minute.
+holds their shared helpers. `irt.R` takes about two minutes, most of them on the grid of 1,921 points; `irt.R abilities`,
+`irt.R nominal` or `irt.R drift` runs one part. `bkt.py` needs the Python environment below, and takes under a minute.
 
 ### Python
 

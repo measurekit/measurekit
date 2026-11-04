@@ -30,6 +30,18 @@ export interface ThresholdItem {
 }
 
 /**
+ * The parameters of a nominal response item in mirt's IRT parameterization, D = 1: a slope and an intercept per
+ * category, with P(k) ∝ exp(a_k θ + c_k) for unordered categories (Bock). Adding a constant to every slope or every
+ * intercept leaves the probabilities unchanged; calibration reports both summing to 0, as mirt does.
+ */
+export interface NominalParameters {
+  /** The slope of each category: mirt's a1 to aK. */
+  readonly a: readonly number[];
+  /** The intercept of each category: mirt's c1 to cK. */
+  readonly c: readonly number[];
+}
+
+/**
  * Writes the probabilities of the two categories of a logistic item at the logit `z`: `out[0]` is P(0) and `out[1]` is
  * P(1) = c + (d - c) logistic(z).
  *
@@ -102,6 +114,25 @@ export function partialCreditProbabilities(
     out[k] = z;
   }
   softmax(out, steps.length + 1);
+}
+
+/**
+ * Writes the probabilities of the K = `a.length` categories of a nominal response item at `theta`:
+ * P(k) = exp(a_k θ + c_k) / Σ_j exp(a_j θ + c_j).
+ *
+ * @param a - The slope of each category.
+ * @param c - The intercept of each category, as many as the slopes.
+ * @param theta - The ability.
+ * @param out - Receives the probability of each category, from index 0.
+ */
+export function nominalProbabilities(
+  a: ArrayLike<number>,
+  c: ArrayLike<number>,
+  theta: number,
+  out: Float64Array,
+): void {
+  for (let k = 0; k < a.length; k++) out[k] = (a[k] ?? 0) * theta + (c[k] ?? 0);
+  softmax(out, a.length);
 }
 
 /**

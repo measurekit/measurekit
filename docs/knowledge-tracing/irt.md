@@ -37,16 +37,37 @@ weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0
 
 Item parameters use the IRT parameterization with D = 1, as `@measurekit/psychometrics` and mirt with `IRTpars = TRUE`:
 
-| Item                                | Parameters                                 | Probability                                                     |
-| ----------------------------------- | ------------------------------------------ | --------------------------------------------------------------- |
-| Dichotomous, 1PL to 4PL             | `{ a, b, c, d }`; `c` default `0`, `d` `1` | P(correct) = c + (d - c) logistic(a (θ - b))                    |
-| Graded response (Samejima)          | `{ model: "graded", a, b: [b_1, ...] }`    | P(category ≥ k) = logistic(a (θ - b_k)), b increasing for a > 0 |
-| Generalized partial credit (Muraki) | `{ model: "gpcm", a, b: [b_1, ...] }`      | P(category k) ∝ exp(Σ over j ≤ k of a (θ - b_j))                |
+| Item                                | Parameters                                           | Probability                                                     |
+| ----------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------- |
+| Dichotomous, 1PL to 4PL             | `{ a, b, c, d }`; `c` default `0`, `d` `1`           | P(correct) = c + (d - c) logistic(a (θ - b))                    |
+| Graded response (Samejima)          | `{ model: "graded", a, b: [b_1, ...] }`              | P(category ≥ k) = logistic(a (θ - b_k)), b increasing for a > 0 |
+| Generalized partial credit (Muraki) | `{ model: "gpcm", a, b: [b_1, ...] }`                | P(category k) ∝ exp(Σ over j ≤ k of a (θ - b_j))                |
+| Nominal response (Bock)             | `{ model: "nominal", a: [a_0, ...], c: [c_0, ...] }` | P(category k) ∝ exp(a_k θ + c_k)                                |
 
-An item `{ model, parameters }` of `@measurekit/psychometrics` gives its `parameters`, with `model: "graded"`
-or `"gpcm"` added for the polytomous models. An item with K categories takes the outcomes k / (K - 1), as a rubric
-score from 0 to K - 1 divided by K - 1; a dichotomous item takes 0 and 1. A prediction is the expected outcome on
-that scale: P(correct) for a dichotomous item.
+An item `{ model, parameters }` of `@measurekit/psychometrics` gives its `parameters`, with `model: "graded"`,
+`"gpcm"` or `"nominal"` added for the polytomous models: `gradedResponse`, `generalizedPartialCredit` and
+`nominalResponse`. An item with K categories takes the outcomes k / (K - 1), as a rubric score from 0 to K - 1
+divided by K - 1; a dichotomous item takes 0 and 1. A prediction is the expected outcome on that scale: P(correct) for
+a dichotomous item.
+
+A nominal item has a slope and an intercept for each category, as many of each as it has categories, in mirt's IRT
+form; adding a constant to every slope or every intercept changes nothing. Its categories need no order: the outcome of
+the category with the largest slope raises the estimate of θ, that of the smallest lowers it, and one between them, such
+as a distractor that weak and strong learners both avoid, may move it either way. Its prediction is the expected
+category over K - 1, mirt's `expected.item` over K - 1, which reads the categories as scores in their order:
+
+```ts
+import { irt } from "@measurekit/knowledge-tracing/irt";
+
+// A multiple-choice item calibrated by nominalResponse: option 3 is the key, option 1 the strongest distractor.
+const model = irt({
+  parameters: { items: { mc: { model: "nominal", a: [-1.2, -0.4, 0.3, 1.3], c: [-0.5, 0.4, 0.6, -0.5] } } },
+});
+const attempt = { learner: "ana", item: "mc", skills: [], time: 1 };
+const start = model.initialState("ana");
+model.ability(model.update(start, { ...attempt, outcome: 1 })); // => { theta: 0.876, standardError: 0.831 }, the key
+model.ability(model.update(start, { ...attempt, outcome: 1 / 3 })); // => { theta: -0.283, standardError: 0.828 }, option 1
+```
 
 The posterior of θ starts from the prior, the population's distribution in the calibration, and each outcome multiplies
 it by the outcome's probability. Without `drift`, θ is constant: the posterior narrows with every outcome and does not
@@ -201,13 +222,13 @@ item parameters were estimated elsewhere.
 
 Invalid input throws `DataError` naming the value found.
 
-| Error                                                                                                                                                                 | What to do                                                                |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| An item without parameters, or with invalid ones: `a` or `b` not finite, not 0 ≤ c < d ≤ 1, graded thresholds out of order, a model other than `"graded"` or `"gpcm"` | Give the items' parameters as the calibration wrote them, in the IRT form |
-| An outcome that is not one of the item's categories, k / (K - 1)                                                                                                      | Divide a rubric score from 0 to K - 1 by K - 1                            |
-| A prior whose grid has no distinct, finite points: an sd too small, or a mean too large                                                                               | Give the prior of the calibration's population                            |
-| `drift` without `points`                                                                                                                                              | Give `points`: 241, or the number of points of the stored states          |
-| A malformed state, or a state written with drift read by a model without it, or the reverse                                                                           | Read a state with a model of the same `points` and `drift` that wrote it  |
+| Error                                                                                                                                                                                                                                                                       | What to do                                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| An item without parameters, or with invalid ones: `a` or `b` not finite, not 0 ≤ c < d ≤ 1, graded thresholds out of order, a nominal item without a finite slope and intercept for each of at least two categories, a model other than `"graded"`, `"gpcm"` or `"nominal"` | Give the items' parameters as the calibration wrote them, in the IRT form |
+| An outcome that is not one of the item's categories, k / (K - 1)                                                                                                                                                                                                            | Divide a rubric score from 0 to K - 1 by K - 1                            |
+| A prior whose grid has no distinct, finite points: an sd too small, or a mean too large                                                                                                                                                                                     | Give the prior of the calibration's population                            |
+| `drift` without `points`                                                                                                                                                                                                                                                    | Give `points`: 241, or the number of points of the stored states          |
+| A malformed state, or a state written with drift read by a model without it, or the reverse                                                                                                                                                                                 | Read a state with a model of the same `points` and `drift` that wrote it  |
 
 ## Not included
 
@@ -228,6 +249,8 @@ The reference is mirt 1.48's `fscores`, with the items' parameters fixed ([valid
 
 ## References
 
+- Bock, R. D. (1972). Estimating item parameters and latent ability when responses are scored in two or more nominal
+  categories. Psychometrika, 37(1), 29-51.
 - Bock, R. D., & Mislevy, R. J. (1982). Adaptive EAP estimation of ability in a microcomputer environment. Applied
   Psychological Measurement, 6(4), 431-444.
 - Chalmers, R. P. (2012). mirt: A multidimensional item response theory package for the R environment. Journal of

@@ -1,4 +1,9 @@
-import { gradedProbabilities, logisticProbabilities, partialCreditProbabilities } from "@measurekit/core";
+import {
+  gradedProbabilities,
+  logisticProbabilities,
+  nominalProbabilities,
+  partialCreditProbabilities,
+} from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -11,10 +16,12 @@ import {
   type EventLog,
   type IrtDrift,
   type IrtItem,
+  type IrtModel,
   type IrtParameters,
   type IrtPrior,
   type IrtState,
   irt,
+  type NominalItem,
   splitByLearner,
   type ThetaDistribution,
 } from "../src/index.js";
@@ -54,6 +61,17 @@ interface IrtAbilitiesFixture {
   mirt: { eap: number[]; eapStandardError: number[]; map: number[]; mapStandardError: number[] };
 }
 const reference = readFixture<IrtAbilitiesFixture>("irt-abilities.json");
+
+/** An ability trace of R: before each event the prediction and its log-probability, after it EAP and MAP. */
+type AbilityTrace = IrtAbilitiesFixture["standard"]["trace"];
+
+interface IrtNominalFixture {
+  items: Record<string, IrtItem>;
+  events: { learner: string; item: string; skills: never[]; time: number; outcome: number }[];
+  standard: { prior: { mean: number; sd: number }; points: number; trace: AbilityTrace };
+  mirt: { eap: number[]; eapStandardError: number[]; map: number[]; mapStandardError: number[] };
+}
+const nominal = readFixture<IrtNominalFixture>("irt-nominal.json");
 
 interface IrtDriftFixture {
   drift: { variance: number; per: number };
@@ -102,50 +120,67 @@ function momentsOf({ nodes, weights }: ThetaDistribution): [number, number] {
 const items = reference.items as Record<string, IrtItem>;
 const log = buildEventLog(reference.events);
 
+/**
+ * Expects a model of the items to follow R's written-out posterior event by event: the predictions, EAP and the
+ * posterior's moments, MAP and its standard error after each learner's last event, and the log-likelihood of a fit.
+ */
+function expectTrace(
+  parameters: IrtParameters,
+  events: EventLog,
+  { prior, points, trace }: { prior: IrtPrior; points: number; trace: AbilityTrace },
+): void {
+  const spacing = (12 * prior.sd) / (points - 1) / 0.2;
+  const model = irt({ parameters, prior, points });
+  const fit = model.fit(events);
+  const eap: number[] = [];
+  const moments: number[] = [];
+  const map: number[] = [];
+  const states = new Map<string, IrtState>();
+  for (const event of events) {
+    const state = model.update(states.get(event.learner) ?? model.initialState(event.learner), event);
+    states.set(event.learner, state);
+    eap.push(model.ability(state).theta, model.ability(state).standardError);
+    moments.push(...momentsOf(model.posterior(state)));
+    map.push(model.ability(state, { estimator: "map" }).theta);
+  }
+  expectAllClose(allPredicted(fit.predictions), trace.prediction, GRID_TOLERANCE, "prediction");
+  expectAllClose(
+    eap,
+    trace.eap.flatMap((theta, i) => [theta, trace.eapStandardError[i] ?? 0]),
+    GRID_TOLERANCE,
+    "EAP",
+  );
+  expectAllClose(moments, eap, GRID_TOLERANCE, "posterior mean and standard deviation");
+  expectAllClose(map, trace.map, MODE_TOLERANCE * spacing ** 5, "MAP");
+  const errors = [...states.values()].map((state) => model.ability(state, { estimator: "map" }).standardError);
+  const lastOfEach = [...states.keys()].map((learner) => events.findLastIndex((event) => event.learner === learner));
+  expectAllClose(
+    errors,
+    lastOfEach.map((i) => trace.mapStandardError[i] ?? 0),
+    MODE_ERROR_TOLERANCE * spacing ** 4,
+    "MAP standard error",
+  );
+  expect(Math.abs(fit.logLikelihood - trace.logProbability.reduce((sum, value) => sum + value, 0))).toBeLessThan(
+    GRID_TOLERANCE,
+  );
+  expect(fit.states).toEqual(Object.fromEntries(states));
+}
+
 describe("IRT ability estimates against R", () => {
   for (const name of ["standard", "shifted"] as const) {
-    const { prior, points, trace } = reference[name];
     it(`follows the written-out posterior event by event, with the ${name} prior`, () => {
-      const spacing = (12 * prior.sd) / (points - 1) / 0.2;
-      const model = irt({ parameters: { items }, prior: prior as IrtPrior, points });
-      const fit = model.fit(log);
-      const eap: number[] = [];
-      const moments: number[] = [];
-      const map: number[] = [];
-      const states = new Map<string, IrtState>();
-      for (const event of log) {
-        const state = model.update(states.get(event.learner) ?? model.initialState(event.learner), event);
-        states.set(event.learner, state);
-        eap.push(model.ability(state).theta, model.ability(state).standardError);
-        moments.push(...momentsOf(model.posterior(state)));
-        map.push(model.ability(state, { estimator: "map" }).theta);
-      }
-      expectAllClose(allPredicted(fit.predictions), trace.prediction, GRID_TOLERANCE, "prediction");
-      expectAllClose(
-        eap,
-        trace.eap.flatMap((theta, i) => [theta, trace.eapStandardError[i] ?? 0]),
-        GRID_TOLERANCE,
-        "EAP",
-      );
-      expectAllClose(moments, eap, GRID_TOLERANCE, "posterior mean and standard deviation");
-      expectAllClose(map, trace.map, MODE_TOLERANCE * spacing ** 5, "MAP");
-      const errors = [...states.values()].map((state) => model.ability(state, { estimator: "map" }).standardError);
-      const lastOfEach = [...states.keys()].map((learner) => log.findLastIndex((event) => event.learner === learner));
-      expectAllClose(
-        errors,
-        lastOfEach.map((i) => trace.mapStandardError[i] ?? 0),
-        MODE_ERROR_TOLERANCE * spacing ** 4,
-        "MAP standard error",
-      );
-      expect(Math.abs(fit.logLikelihood - trace.logProbability.reduce((sum, value) => sum + value, 0))).toBeLessThan(
-        GRID_TOLERANCE,
-      );
-      expect(fit.states).toEqual(Object.fromEntries(states));
+      expectTrace({ items }, log, reference[name]);
     });
   }
 
   it("matches mirt's fscores for EAP, as the written-out posterior does", () => {
     expectAllClose(reference.mirt.eap, reference.standard.trace.eap, GRID_TOLERANCE, "mirt EAP");
+  });
+
+  it("follows the written-out posterior with nominal response items, whose EAP matches mirt's", () => {
+    expectTrace({ items: nominal.items }, buildEventLog(nominal.events), nominal.standard);
+    expectAllClose(nominal.mirt.eap, nominal.standard.trace.eap, GRID_TOLERANCE, "mirt EAP");
+    expectAllClose(nominal.mirt.eapStandardError, nominal.standard.trace.eapStandardError, GRID_TOLERANCE, "mirt SD");
   });
 });
 
@@ -167,10 +202,7 @@ describe("IRT model", () => {
     d: fc.double({ min: 0.8, max: 1, noNaN: true }),
   });
   const answers = fc.array(fc.tuple(fc.constantFrom(...Object.keys(items)), fc.nat()), { maxLength: 20 });
-  const lastCategory = (id: string): number => {
-    const item = items[id];
-    return item !== undefined && "model" in item ? item.b.length : 1;
-  };
+  const lastCategory = (id: string): number => categoryCount(defined(items[id])) - 1;
   const eventsOf = (pairs: readonly (readonly [string, number])[]): Event[] =>
     pairs.map(([item, k], time) => {
       const last = lastCategory(item);
@@ -311,6 +343,99 @@ describe("IRT model", () => {
   });
 });
 
+describe("IRT with nominal items", () => {
+  /** A nominal item of 2 to 5 categories, its slopes and intercepts from -3 to 3. */
+  const nominalItem: fc.Arbitrary<NominalItem> = fc.integer({ min: 2, max: 5 }).chain((count) => {
+    const values = fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: count, maxLength: count });
+    return fc.record({ model: fc.constant("nominal" as const), a: values, c: values });
+  });
+  const answers = fc.array(fc.tuple(fc.constantFrom(...Object.keys(items)), fc.nat()), { maxLength: 12 });
+  /** Returns the state of a learner after an answer to each item of `pairs`, in a category taken modulo its count. */
+  const stateAfter = (model: IrtModel, pairs: readonly (readonly [string, number])[]): IrtState => {
+    let state = model.initialState("ana");
+    pairs.forEach(([item, k], time) => {
+      const last = categoryCount(defined(items[item])) - 1;
+      state = model.update(state, { learner: "ana", item, skills: [], time, outcome: (k % (last + 1)) / last });
+    });
+    return state;
+  };
+  const answer = (outcome: number): Event => ({ learner: "ana", item: "x", skills: [], time: 100, outcome });
+
+  it("raises the estimate after the category of the largest slope and lowers it after that of the smallest", () => {
+    // P(k) of the largest slope rises with θ, as its log-slope a_k - E[a] is never below 0, and that of the smallest
+    // falls: the posterior moves with it. A category between them has a P(k) that rises and then falls.
+    fc.assert(
+      fc.property(nominalItem, answers, (drawn, pairs) => {
+        // Slopes a tenth apart at least, so that the direction is not lost to rounding.
+        const item = { ...drawn, a: drawn.a.map((slope) => Math.round(10 * slope) / 10) };
+        fc.pre(new Set(item.a).size === item.a.length);
+        const tested = irt({ parameters: { items: { ...items, x: item } } });
+        const state = stateAfter(tested, pairs);
+        const before = tested.ability(state).theta;
+        const last = item.a.length - 1;
+        const highest = item.a.indexOf(Math.max(...item.a));
+        const lowest = item.a.indexOf(Math.min(...item.a));
+        expect(tested.ability(tested.update(state, answer(highest / last))).theta).toBeGreaterThan(before);
+        expect(tested.ability(tested.update(state, answer(lowest / last))).theta).toBeLessThan(before);
+      }),
+    );
+  });
+
+  it("is unchanged by a constant added to every slope or to every intercept", () => {
+    fc.assert(
+      fc.property(nominalItem, fc.double({ min: -2, max: 2, noNaN: true }), fc.nat(), (item, shift, k) => {
+        const moved: NominalItem = {
+          ...item,
+          a: item.a.map((slope) => slope + shift),
+          c: item.c.map((c) => c - shift),
+        };
+        const [one, other] = [item, moved].map((x) => irt({ parameters: { items: { x } } }));
+        const outcome = (k % item.a.length) / (item.a.length - 1);
+        const [first, second] = [one, other].map((model) =>
+          defined(model).update(defined(model).initialState("ana"), answer(outcome)),
+        );
+        expectAllClose(defined(second).logDensity, defined(first).logDensity, 1e-12, "log-density");
+        expectAllClose(defined(second).slope ?? [], defined(first).slope ?? [], 1e-12, "slope");
+        expectAllClose(defined(second).curvature ?? [], defined(first).curvature ?? [], 1e-12, "curvature");
+        expectClose(
+          defined(other).predict(defined(second), answer(0)),
+          defined(one).predict(defined(first), answer(0)),
+          1e-12,
+        );
+      }),
+    );
+  });
+
+  it("gives the states of the 2PL item that a nominal item of two categories is, and of a GPCM item with slopes k a", () => {
+    const run = (x: IrtItem, outcomes: readonly number[]): IrtState => {
+      const model = irt({ parameters: { items: { x } } });
+      return outcomes.reduce(
+        (state, outcome, time) => model.update(state, { ...answer(outcome), time }),
+        model.initialState("ana"),
+      );
+    };
+    const expectSameStates = (found: IrtState, expected: IrtState, label: string): void => {
+      expectAllClose(found.logDensity, expected.logDensity, 1e-12, `${label} log-density`);
+      expectAllClose(found.slope ?? [], expected.slope ?? [], 1e-12, `${label} slope`);
+      expectAllClose(found.curvature ?? [], expected.curvature ?? [], 1e-11, `${label} curvature`);
+    };
+    // P(1) = exp(a θ + c) / (1 + exp(a θ + c)) is the 2PL with b = -c / a.
+    const binary = [1, 0, 1, 1, 0];
+    expectSameStates(
+      run({ model: "nominal", a: [0, 1.4], c: [0, -0.7] }, binary),
+      run({ a: 1.4, b: 0.5 }, binary),
+      "two categories",
+    );
+    // The GPCM's logits are Σ_{j ≤ k} a (θ - b_j) = k a θ - a Σ_{j ≤ k} b_j.
+    const partial = [2 / 3, 0, 1, 1 / 3, 1, 2 / 3];
+    expectSameStates(
+      run({ model: "nominal", a: [0, 1.1, 2.2, 3.3], c: [0, 0.77, 0.33, -0.99] }, partial),
+      run({ model: "gpcm", a: 1.1, b: [-0.7, 0.4, 1.2] }, partial),
+      "slopes k a",
+    );
+  });
+});
+
 describe("IRT edge cases", () => {
   const model = irt({ parameters: { items } });
   const event: Event = { learner: "ana", item: "i1", skills: [], time: 1, outcome: 1 };
@@ -325,8 +450,16 @@ describe("IRT edge cases", () => {
       'Item "x" is graded, so needs thresholds b strictly increasing when a > 0 and decreasing when a < 0, found a = 1, b = 1, 0.',
     );
     expect(() => build({ model: "graded", a: -1, b: [1, 0] })()).not.toThrow();
-    expect(build({ model: "nominal", a: 1, b: [0] })).toThrow('polytomous items are "graded" or "gpcm"');
+    expect(build({ model: "ordinal", a: 1, b: [0] })).toThrow('polytomous items are "graded", "gpcm" or "nominal"');
     expect(build({ model: "gpcm", a: 1, b: [] })).toThrow("non-empty array of finite thresholds");
+    expect(build({ model: "gpcm", a: "1", b: [0] })).toThrow('Item "x" needs a, a finite number, found "1".');
+    expect(build({ model: "nominal", a: [0, 1], c: [0] })).toThrow(
+      'Item "x" is nominal, so needs a and c, arrays of finite numbers, a slope and an intercept for each of at least two categories, found a = [0, 1] and c = [0].',
+    );
+    expect(build({ model: "nominal", a: [1], c: [0] })).toThrow("for each of at least two categories");
+    expect(build({ model: "nominal", a: [0, Number.NaN], c: [0, 0] })).toThrow("found a = [0, NaN]");
+    expect(build(JSON.parse('{"model":"nominal","a":[0,1],"c":"0,0"}'))).toThrow('and c = "0,0".');
+    expect(build({ model: "nominal", a: 1, b: [0] })).toThrow("found a = 1 and c = undefined.");
     expect(() => irt({ parameters: { items }, prior: { mean: 0, sd: 0 } })).toThrow(
       "The sd of the prior must be a positive number, found 0.",
     );
@@ -361,13 +494,19 @@ describe("IRT edge cases", () => {
     fc.assert(
       fc.property(extreme, fc.array(fc.constantFrom(0, 1), { minLength: 1, maxLength: 30 }), (item, outcomes) => {
         const tested = irt({
-          parameters: { items: { x: item, g: { model: "graded", a: item.a, b: [item.b, item.b + 1] } } },
+          parameters: {
+            items: {
+              x: item,
+              g: { model: "graded", a: item.a, b: [item.b, item.b + 1] },
+              n: { model: "nominal", a: [-item.a, 0, item.a], c: [item.b, 0, -item.b] },
+            },
+          },
         });
         let state = tested.initialState("ana");
         outcomes.forEach((outcome, time) => {
           state = tested.update(JSON.parse(JSON.stringify(state)), {
             ...event,
-            item: time % 2 ? "g" : "x",
+            item: ["x", "g", "n"][time % 3] ?? "x",
             time,
             outcome,
           });
@@ -797,7 +936,8 @@ describe("IRT items against the probabilities of core", () => {
     const out = new Float64Array(categoryCount(item));
     if (!("model" in item)) logisticProbabilities(item.a * (theta - item.b), item.c ?? 0, item.d ?? 1, out);
     else if (item.model === "graded") gradedProbabilities(item.a, item.b, theta, out);
-    else partialCreditProbabilities(item.a, 0, item.b, theta, out);
+    else if (item.model === "gpcm") partialCreditProbabilities(item.a, 0, item.b, theta, out);
+    else nominalProbabilities(item.a, item.c, theta, out);
     return out;
   }
 
@@ -822,11 +962,30 @@ describe("IRT items against the probabilities of core", () => {
   const partialCredit: fc.Arbitrary<IrtItem> = fc
     .tuple(slopes, fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: 1, maxLength: 4 }))
     .map(([a, b]) => ({ model: "gpcm", a, b }));
+  const nominal: fc.Arbitrary<IrtItem> = fc.integer({ min: 2, max: 5 }).chain((count) => {
+    const values = fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: count, maxLength: count });
+    return fc.record({ model: fc.constant("nominal" as const), a: values, c: values });
+  });
+  const anyItem = fc.oneof(dichotomous, graded, partialCredit, nominal);
   const theta = fc.double({ min: -6, max: 6, noNaN: true });
+
+  it("the probabilities of an item's categories sum to 1", () => {
+    fc.assert(
+      fc.property(anyItem, theta, (item, point) => {
+        const terms = new Float64Array(3);
+        let total = 0;
+        for (let k = 0; k < categoryCount(item); k++) {
+          categoryTerms(item, k, point, terms);
+          total += Math.exp(terms[0] ?? 0);
+        }
+        expect(Math.abs(total - 1)).toBeLessThan(CORE_TOLERANCE);
+      }),
+    );
+  });
 
   it("the log-probability of each category is the logarithm of its probability", () => {
     fc.assert(
-      fc.property(fc.oneof(dichotomous, graded, partialCredit), theta, (item, point) => {
+      fc.property(anyItem, theta, (item, point) => {
         const probabilities = probabilitiesOf(item, point);
         const terms = new Float64Array(3);
         for (let k = 0; k < probabilities.length; k++) {
@@ -840,7 +999,7 @@ describe("IRT items against the probabilities of core", () => {
   it("the slope of the log-probability is the slope of the probability over the probability", () => {
     const step = DIFFERENCE_STEP;
     fc.assert(
-      fc.property(fc.oneof(dichotomous, graded, partialCredit), theta, (item, point) => {
+      fc.property(anyItem, theta, (item, point) => {
         const [two, one, back, backTwo] = [2 * step, step, -step, -2 * step].map((shift) =>
           probabilitiesOf(item, point + shift),
         );
@@ -858,7 +1017,7 @@ describe("IRT items against the probabilities of core", () => {
 
   it("the expected outcome is the expected category over K - 1 of the probabilities", () => {
     fc.assert(
-      fc.property(fc.oneof(dichotomous, graded, partialCredit), theta, (item, point) => {
+      fc.property(anyItem, theta, (item, point) => {
         const probabilities = probabilitiesOf(item, point);
         let expected = 0;
         probabilities.forEach((probability, k) => {

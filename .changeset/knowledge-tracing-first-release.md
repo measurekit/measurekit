@@ -19,7 +19,8 @@ Online IRT follows a learner who changes with `drift: { variance, per }`: θ is 
 across each gap by the grid's chain, computed by uniformization with a lower bound for the points that underflow.
 `predict` answers at the attempt's time, `ability` and `posterior` at any time with `at`, and the fit's log-likelihood
 is the forward likelihood, by which a host chooses the variance. `points` is required with `drift`, and a model with
-drift reads the states of a model without it.
+drift reads the states of a model without it. Online IRT takes nominal response items, `{ model: "nominal", a, c }`, as
+`nominalResponse` of `@measurekit/psychometrics` calibrates them.
 
 BKT holds rates at given values with `fixed`, keeps the rates it estimates within `bounds`, and takes the learn and forget
 rates by the pair of the resource before an attempt and its own with `pairLearning`, as pyBKT's `fixed` and `multipair`.
