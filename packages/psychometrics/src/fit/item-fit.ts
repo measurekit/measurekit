@@ -25,7 +25,11 @@ export interface ItemFit extends MeanSquareFit {
  * @throws `DataError` when the matrix, the items or the thetas are invalid, or a response is not a category of its
  * item.
  */
-export function itemFit(matrix: ResponseMatrix, items: readonly IrtItem[], thetas: readonly number[]): ItemFit[] {
+export function itemFit(
+  matrix: ResponseMatrix,
+  items: readonly IrtItem[],
+  thetas: readonly number[],
+): readonly ItemFit[] {
   checkItems(matrix, items);
   checkPersonThetas(matrix, thetas);
   const sums = new Float64Array(items.length * SUM_COUNT);

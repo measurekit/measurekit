@@ -305,7 +305,11 @@ function expectTable(
 const HALVES: IrtItem[] = [0, 1].map(() => ({ model: oneParameterLogistic, parameters: { a: 1, b: 0, c: 0, d: 1 } }));
 
 /** A seeded 2PL simulation: items with slopes from 0.5 to 2 and difficulties from -2 to 2, thetas N(0, 1). */
-function simulated(seed: number, persons: number, itemCount: number): { matrix: ResponseMatrix; items: IrtItem[] } {
+function simulated(
+  seed: number,
+  persons: number,
+  itemCount: number,
+): { matrix: ResponseMatrix; items: readonly IrtItem[] } {
   const random = createRandom(seed);
   const items = simulateItems(twoParameterLogistic, itemCount, random, {
     distributions: { a: uniformDistribution(0.5, 2), b: uniformDistribution(-2, 2) },

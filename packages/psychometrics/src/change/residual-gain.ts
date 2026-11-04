@@ -20,7 +20,7 @@ import { checkPairedScores } from "./paired-scores.js";
  * pre scores are all equal.
  * @see {@link https://doi.org/10.1037/h0029382 | Cronbach and Furby (1970)}
  */
-export function residualGain(pre: readonly number[], post: readonly number[]): number[] {
+export function residualGain(pre: readonly number[], post: readonly number[]): readonly number[] {
   checkPairedScores(pre, post, 2);
   // Equal scores are tested as equal: their mean need not be one of them, as that of three 0.1s is not, and the sum of
   // squares about it is then a rounding error that would give the regression a slope.

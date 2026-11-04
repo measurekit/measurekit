@@ -69,7 +69,7 @@ interface CurveRows {
  * @see {@link https://doi.org/10.1007/BF02294494 | Ramsay (1991)}
  * @see {@link https://doi.org/10.18637/jss.v058.i06 | Mazza, Punzo and McGuire (2014)}
  */
-export function kernelItemCurves(matrix: ResponseMatrix, options: KernelCurveOptions = {}): KernelItemCurve[] {
+export function kernelItemCurves(matrix: ResponseMatrix, options: KernelCurveOptions = {}): readonly KernelItemCurve[] {
   checkOptions(options);
   const { points = DEFAULT_POINTS, bandwidth } = options;
   checkIntegerFrom(points, "The option points", 2);

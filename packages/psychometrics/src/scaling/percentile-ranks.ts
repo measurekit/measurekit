@@ -26,7 +26,7 @@ import { checkArray, checkFinite, DataError, describe } from "@measurekit/core";
  * finite numbers.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
  */
-export function percentileRanks(sample: readonly number[], scores: readonly number[]): number[] {
+export function percentileRanks(sample: readonly number[], scores: readonly number[]): readonly number[] {
   checkArray(sample, "The norm sample must be an array of scores");
   checkArray(scores, "The scores must be an array of numbers");
   if (sample.length === 0) throw new DataError("The norm sample needs at least one score.");

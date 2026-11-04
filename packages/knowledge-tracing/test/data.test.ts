@@ -488,7 +488,7 @@ describe("splits", () => {
   it("never trains on events later than those it tests", () => {
     fc.assert(
       fc.property(arbitraryLog, fc.integer({ min: 1, max: 3 }), (arbitrary, count) => {
-        let folds: Fold[];
+        let folds: readonly Fold[];
         try {
           folds = splitByTime(arbitrary, count);
         } catch (error) {

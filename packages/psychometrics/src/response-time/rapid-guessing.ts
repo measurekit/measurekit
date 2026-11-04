@@ -47,7 +47,7 @@ export interface ResponseTimeEffort {
 export function normativeThresholds(
   data: ResponseMatrix | ResponseRecords,
   options: NormativeThresholdOptions = {},
-): Record<string, number> {
+): Readonly<Record<string, number>> {
   checkOptions(options);
   const { percentage = DEFAULT_PERCENTAGE, cap = DEFAULT_CAP } = options;
   checkPositive(percentage, "The option percentage");
@@ -83,7 +83,7 @@ export function normativeThresholds(
 export function responseTimeEffort(
   data: ResponseMatrix | ResponseRecords,
   thresholds: Readonly<Record<string, number>>,
-): ResponseTimeEffort[] {
+): readonly ResponseTimeEffort[] {
   const timed = timedResponses(data, "Response time effort");
   const limits = thresholdsOf(timed.itemIds, thresholds);
   return timed.personIds.map((id, person) => {
@@ -116,7 +116,7 @@ export function effortModeratedEstimates(
   items: readonly TestItem[],
   thresholds: Readonly<Record<string, number>>,
   options: AbilityEstimatesOptions = {},
-): PersonEstimate[] {
+): readonly PersonEstimate[] {
   checkOptions(options);
   const timed = timedResponses(data, "Effort-moderated scoring");
   const limits = thresholdsOf(timed.itemIds, thresholds);

@@ -23,7 +23,7 @@ export interface ThetaSimulationOptions {
  * @throws `DataError` when `count` is not a positive integer, `random` not a random number generator, the options not an
  * object or `distribution` not a function, or a draw is not finite.
  */
-export function simulateThetas(count: number, random: Random, options: ThetaSimulationOptions = {}): number[] {
+export function simulateThetas(count: number, random: Random, options: ThetaSimulationOptions = {}): readonly number[] {
   checkPositiveInteger(count, "The number of thetas");
   checkRandom(random);
   checkOptions(options);

@@ -36,7 +36,7 @@ export function manyFacetEstimates(
   scores: readonly FacetedScore[],
   model: ManyFacetRasch,
   options: ManyFacetEstimatesOptions = {},
-): PersonEstimate[] {
+): readonly PersonEstimate[] {
   checkManyFacetRasch(model);
   checkOptions(options);
   const {

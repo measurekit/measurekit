@@ -92,7 +92,7 @@ function copyOf(values: Float64Array): number[] {
  * @throws `DataError` when the matrix is invalid, its items are not the calibration's in its order, or a response is
  * neither 0 nor 1.
  */
-export function attributeProfiles(matrix: ResponseMatrix, calibration: CdmCalibration): AttributeProfile[] {
+export function attributeProfiles(matrix: ResponseMatrix, calibration: CdmCalibration): readonly AttributeProfile[] {
   const { data, design, state } = calibratedModel(matrix, calibration);
   const table = tableOf(design.profiles);
   const persons = new Array<AttributeProfile>(matrix.personIds.length);

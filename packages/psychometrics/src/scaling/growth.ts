@@ -48,7 +48,7 @@ export interface ScaleGrowth {
  * `group` label, a finite `mean` and a positive `sd`, or two groups have the same label.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1986.tb00252.x | Yen (1986)}
  */
-export function scaleGrowth(groups: readonly GroupScale[]): ScaleGrowth[] {
+export function scaleGrowth(groups: readonly GroupScale[]): readonly ScaleGrowth[] {
   checkArray(groups, "The groups must be an array");
   if (groups.length < 2) {
     throw new DataError(`Growth needs at least two groups on the shared scale, found ${groups.length}.`);

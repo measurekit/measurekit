@@ -48,7 +48,7 @@ export function nonparametricClassification(
   matrix: ResponseMatrix,
   qMatrix: QMatrix,
   options: NonparametricOptions = {},
-): NonparametricClassification[] {
+): readonly NonparametricClassification[] {
   checkOptions(options);
   const { rule = "conjunctive" } = options;
   checkChoice(rule, "The option rule", RULES);

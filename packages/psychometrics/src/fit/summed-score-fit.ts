@@ -72,7 +72,7 @@ export function summedScoreFit(
   matrix: ResponseMatrix,
   items: readonly IrtItem[],
   options: SummedScoreFitOptions = {},
-): SummedScoreFit[] {
+): readonly SummedScoreFit[] {
   checkOptions(options);
   const { fixed = [], fixedParameters = {} } = options;
   checkItems(matrix, items);

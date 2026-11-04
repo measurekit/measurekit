@@ -35,7 +35,7 @@ export interface SummedScoreEstimate {
 export function summedScoreTable(
   items: readonly IrtItem[],
   options: ThetaIntegrationOptions = {},
-): SummedScoreEstimate[] {
+): readonly SummedScoreEstimate[] {
   checkItemList(items, "A summed-score table");
   checkOptions(options);
   const { mean, sd } = checkThetaPrior(options.prior);

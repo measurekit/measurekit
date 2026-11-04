@@ -54,7 +54,7 @@ export interface SubscoreValue {
 export function subscoreValue(
   matrix: ResponseMatrix,
   sections: Readonly<Record<string, readonly string[]>>,
-): SubscoreValue[] {
+): readonly SubscoreValue[] {
   const { cases, names, indices } = sectionCases(matrix, sections, "Subscore value");
   const totalVariance = variance(cases.totals);
   if (totalVariance === 0) throw new DataError("Subscore value needs total scores with variance.");

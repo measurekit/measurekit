@@ -44,7 +44,7 @@ export interface ItemStatistics {
  * @returns The statistics of every item, in item order.
  * @throws `DataError` when the matrix is malformed or `groupFraction` is out of range.
  */
-export function itemStatistics(matrix: ResponseMatrix, options: GroupOptions = {}): ItemStatistics[] {
+export function itemStatistics(matrix: ResponseMatrix, options: GroupOptions = {}): readonly ItemStatistics[] {
   checkResponseMatrix(matrix);
   checkOptions(options);
   const cases = completeCases(matrix);

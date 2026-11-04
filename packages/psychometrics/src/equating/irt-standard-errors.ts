@@ -72,7 +72,7 @@ export function irtEquatingStandardErrors(
   to: readonly TestItem[],
   covariance: ParameterCovariance,
   options: IrtEquatingErrorOptions = {},
-): number[] {
+): readonly number[] {
   checkOptions(options);
   const { method = "true-score" } = options;
   checkChoice(method, "The option method", METHODS);
@@ -102,7 +102,7 @@ function equator(
   from: readonly IrtItem[],
   to: readonly IrtItem[],
   setup: ObservedScoreSetup | null,
-): { readonly scores: number; equate(moved: readonly (readonly IrtItem[])[]): number[] } {
+): { readonly scores: number; equate(moved: readonly (readonly IrtItem[])[]): readonly number[] } {
   if (setup === null) {
     const trueScores = trueScoreThetas(from, to);
     return {

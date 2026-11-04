@@ -66,6 +66,9 @@ the masks of a KST model at most 2^28, each refused with `DataError` past its li
 likely state in `mostLikelyStates`, and their posteriors in `states` only with `posteriors: true`, as they take learners
 × states × 8 bytes; `ModelFit.states` is optional for that, and every other model gives it.
 
+Every array that a function returns, such as the folds of `splitByTime` and the evaluations of `compareModels`, is
+`readonly`, as those inside its results are: a caller who sorts one in place copies it first.
+
 `buildEventLog` builds a log from events, `selectFirstAttempts` keeps each learner's first attempts, `alignPredictions`
 pairs the predictions with the outcomes of a log, `calibrationCurve` tabulates calibration in bins and `fitPowerLaw`
 fits the power law of practice.

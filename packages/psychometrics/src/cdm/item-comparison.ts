@@ -77,7 +77,7 @@ interface ComparableItem {
 export function compareItemModels(
   calibration: CdmCalibration,
   options: ItemComparisonOptions = {},
-): ItemModelComparison[] {
+): readonly ItemModelComparison[] {
   checkOptions(options);
   const { models = REDUCED_MODELS } = options;
   checkModels(models);

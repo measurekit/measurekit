@@ -62,7 +62,7 @@ export function validateQMatrix(
   matrix: ResponseMatrix,
   calibration: CdmCalibration,
   options: QMatrixValidationOptions = {},
-): QVectorSuggestion[] {
+): readonly QVectorSuggestion[] {
   checkOptions(options);
   const { eps = DEFAULT_EPS } = options;
   checkUnitInterval(eps, "The option eps");

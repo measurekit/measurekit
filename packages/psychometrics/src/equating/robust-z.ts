@@ -40,7 +40,7 @@ const IQR_TO_SD = 0.74;
  * differences is 0, as with one common item.
  * @see {@link https://pareonline.net/getvn.asp?v=15&n=2 | Huynh and Meyer (2010)}
  */
-export function robustZ(from: readonly IrtItem[], to: readonly IrtItem[]): AnchorDrift[] {
+export function robustZ(from: readonly IrtItem[], to: readonly IrtItem[]): readonly AnchorDrift[] {
   checkCommonItems(from, to);
   const locations = (items: readonly IrtItem[], scale: string): number[] =>
     items.map((item, j) => mean(itemMoments(item, `Common item ${j + 1} on the ${scale} scale`).locations));

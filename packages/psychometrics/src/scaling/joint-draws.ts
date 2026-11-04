@@ -216,7 +216,7 @@ export function drawJointThetas(
   correlation: readonly (readonly number[])[],
   draws: number,
   random: Random,
-): number[][] {
+): readonly (readonly number[])[] {
   checkArray(posteriors, "The posteriors must be an array of distributions");
   if (posteriors.length === 0) throw new DataError("Drawing jointly needs at least one posterior, found none.");
   const margins = posteriors.map((posterior, k) => marginOf(posterior, `posterior ${k + 1}`));

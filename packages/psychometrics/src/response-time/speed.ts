@@ -56,7 +56,7 @@ export function speedEstimates(
   data: ResponseMatrix | ResponseRecords,
   items: readonly TimeItem[],
   options: SpeedOptions = {},
-): SpeedEstimate[] {
+): readonly SpeedEstimate[] {
   const timed = timedResponses(data, "Speed estimation");
   const { means, variances, answered } = speedPosteriors(timed, items, options);
   return timed.personIds.map((id, person) =>
@@ -87,7 +87,7 @@ export function responseTimeFit(
   data: ResponseMatrix | ResponseRecords,
   items: readonly TimeItem[],
   options: SpeedOptions = {},
-): PersonTimeFit[] {
+): readonly PersonTimeFit[] {
   const timed = timedResponses(data, "Response time fit");
   return estimatesOf(timed, items, options);
 }

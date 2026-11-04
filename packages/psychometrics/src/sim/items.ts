@@ -118,7 +118,7 @@ export function simulateItems<TParameters>(
   count: number,
   random: Random,
   options: ItemSimulationOptions = {},
-): IrtItem<TParameters>[] {
+): readonly IrtItem<TParameters>[] {
   checkModel(model, "The model must be one of the built-in models, such as twoParameterLogistic");
   const draws = DRAWS.get(model);
   if (draws === undefined) {

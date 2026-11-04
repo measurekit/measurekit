@@ -25,7 +25,7 @@ export function compareModels(
   models: Readonly<Record<string, LearnerModel>>,
   folds: readonly Fold[],
   options: CrossValidateOptions = {},
-): ModelEvaluation[] {
+): readonly ModelEvaluation[] {
   const entries = isRecord(models) ? Object.entries(models) : [];
   if (entries.length === 0) {
     throw new DataError("A comparison needs at least one model, as an object of models by name.");

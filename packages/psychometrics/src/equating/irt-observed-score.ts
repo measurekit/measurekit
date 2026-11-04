@@ -73,7 +73,7 @@ export function irtObservedScoreEquating(
   from: readonly IrtItem[],
   to: readonly IrtItem[],
   options: IrtObservedScoreOptions = {},
-): number[] {
+): readonly number[] {
   checkItemList(from, "The from form");
   checkItemList(to, "The to form");
   return observedScoreEquivalents(from, to, observedScoreSetup(options));
@@ -103,7 +103,7 @@ export function observedScoreEquivalents(
   from: readonly IrtItem[],
   to: readonly IrtItem[],
   { from: fromPopulation, to: toPopulation, weight }: ObservedScoreSetup,
-): number[] {
+): readonly number[] {
   const synthetic = (items: readonly IrtItem[]): number[] => {
     const first = scoreDistribution(items, fromPopulation);
     const second = scoreDistribution(items, toPopulation);

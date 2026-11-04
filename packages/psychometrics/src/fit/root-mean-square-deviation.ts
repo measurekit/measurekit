@@ -50,7 +50,7 @@ export function rootMeanSquareDeviation(
   matrix: ResponseMatrix,
   items: readonly IrtItem[],
   options: ResidualFitOptions = {},
-): ItemDeviation[] {
+): readonly ItemDeviation[] {
   checkItems(matrix, items);
   const { nodes, weights } = residualPopulation(options);
   const tables = items.map((item): ItemTable => {

@@ -105,7 +105,7 @@ export function conversionTable(
   items: readonly IrtItem[],
   scale: ScoreScale,
   options: ConversionTableOptions = {},
-): ConversionRow[] {
+): readonly ConversionRow[] {
   checkItemList(items, "A conversion table");
   const checked = checkScale(scale);
   checkOptions(options);

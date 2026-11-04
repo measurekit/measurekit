@@ -1417,7 +1417,12 @@ describe("drawJointThetas", () => {
       expect(drawJointThetas(posteriors, correlation, 100, createRandom(22))).not.toEqual(first);
       expect(posteriors).toEqual(frozenCopy);
       expect(correlation).toEqual(equicorrelation(2, 0.4));
-      for (const draw of first) draw.fill(0);
+      // The type forbids writing to a result; the test checks that no draw is an array of the inputs.
+      for (const draw of first)
+        Object.assign(
+          draw,
+          Array.from(draw, () => 0),
+        );
       expect(posteriors).toEqual(frozenCopy);
     });
 

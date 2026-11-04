@@ -81,7 +81,7 @@ export function correctedPersonFit(
   items: readonly IrtItem[],
   thetas: readonly number[],
   options: CorrectedPersonFitOptions = {},
-): CorrectedPersonFit[] {
+): readonly CorrectedPersonFit[] {
   checkItems(matrix, items);
   checkPersonThetas(matrix, thetas);
   checkOptions(options);

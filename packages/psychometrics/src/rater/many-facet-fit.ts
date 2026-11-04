@@ -34,7 +34,7 @@ export function manyFacetFit(
   scores: readonly FacetedScore[],
   model: ManyFacetRasch,
   persons: readonly PersonEstimate[],
-): FacetFit[] {
+): readonly FacetFit[] {
   checkManyFacetRasch(model);
   checkFacetedScores(scores, [model.person, ...model.facets.map(({ facet }) => facet)]);
   const thetas = personThetas(persons);

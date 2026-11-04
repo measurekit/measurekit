@@ -38,7 +38,7 @@ export function multidimensionalDiscrimination(item: MultidimensionalItem): numb
  * its slopes are all 0, so that it has no direction.
  * @see {@link https://doi.org/10.1007/978-0-387-89976-3 | Reckase (2009)}
  */
-export function multidimensionalDifficulty(item: MultidimensionalItem): number[] {
+export function multidimensionalDifficulty(item: MultidimensionalItem): readonly number[] {
   const discrimination = multidimensionalDiscrimination(item);
   if (discrimination === 0) {
     throw new DataError("An item whose slopes are all 0 has no direction, and so no multidimensional difficulty.");

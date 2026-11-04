@@ -1248,7 +1248,7 @@ describe("bootstrapEquating", () => {
       from: bootstrap.randomGroups.from,
       to: bootstrap.randomGroups.to,
     };
-    const equate = (s: typeof sample): number[] => linearEquating(s.from, s.to);
+    const equate = (s: typeof sample): readonly number[] => linearEquating(s.from, s.to);
     const first = bootstrapEquating(sample, equate, createRandom(1), { replications: 50 });
     expect(bootstrapEquating(sample, equate, createRandom(1), { replications: 50 })).toEqual(first);
     expect(bootstrapEquating(sample, equate, createRandom(2), { replications: 50 })).not.toEqual(first);
@@ -1265,7 +1265,7 @@ describe("bootstrapEquating", () => {
       from: sample.from.map((n) => 4 * n),
       to: sample.to.map((n) => 4 * n),
     };
-    const equate = (s: typeof sample): number[] => linearEquating(s.from, s.to);
+    const equate = (s: typeof sample): readonly number[] => linearEquating(s.from, s.to);
     const small = bootstrapEquating(sample, equate, createRandom(SEED), { replications: 1000 });
     const large = bootstrapEquating(larger, equate, createRandom(SEED), { replications: 1000 });
     const rms = (errors: readonly number[]): number =>
@@ -1315,7 +1315,7 @@ describe("bootstrapEquating", () => {
 
   it("rejects invalid arguments", () => {
     const sample = { design: "random-groups" as const, from: [1, 2, 3], to: [3, 2, 1] };
-    const equate = (s: typeof sample): number[] => linearEquating(s.from, s.to);
+    const equate = (s: typeof sample): readonly number[] => linearEquating(s.from, s.to);
     const random = createRandom(SEED);
     expect(() => bootstrapEquating(sample, equate, random, { replications: 1 })).toThrow(
       "The option replications must be an integer from 2, found 1.",
@@ -1689,7 +1689,7 @@ describe("irtObservedScoreEquating", () => {
 
   it("ignores the population of the other group when the weight is 1 or 0", () => {
     const { from, to, populations } = forms;
-    const equated = (weight: number, other: ThetaDistribution): number[] =>
+    const equated = (weight: number, other: ThetaDistribution): readonly number[] =>
       irtObservedScoreEquating(from, to, {
         populations: weight === 1 ? { from: populations.from, to: other } : { from: other, to: populations.to },
         weight,
@@ -1871,7 +1871,7 @@ describe("irtEquatingStandardErrors", () => {
     const covariance: ParameterCovariance = { parameters: [{ item: "C1", name: "a" }], matrix: [[variance]] };
     const slope = (item: TestItem, shift: number): TestItem =>
       item.id === "C1" ? withEntry(item, 0, a + shift) : item;
-    const equated = (shift: number): number[] =>
+    const equated = (shift: number): readonly number[] =>
       trueScoreEquating(
         from.map((item) => slope(item, shift)),
         to.map((item) => slope(item, shift)),
@@ -1896,7 +1896,7 @@ describe("irtEquatingStandardErrors", () => {
       parameters,
       matrix: parameters.map(() => parameters.map(() => variance)),
     };
-    const equated = (shift: number): number[] => {
+    const equated = (shift: number): readonly number[] => {
       const moved = items.map((item) => withEntry(item, 0, a + shift));
       return trueScoreEquating(moved.slice(0, 6), moved.slice(3));
     };
@@ -1914,7 +1914,7 @@ describe("irtEquatingStandardErrors", () => {
     const items = simulateItems(twoParameterLogistic, 16, random).map((item, j) => ({ ...item, id: `item${j + 1}` }));
     const from = items.slice(0, 10);
     const to = items.slice(6);
-    const errorsFor = (persons: number): number[] => {
+    const errorsFor = (persons: number): readonly number[] => {
       const thetas = simulateThetas(persons, random);
       const { covariance } = calibrateWithCovariance(simulateResponses(items, thetas, random), {
         model: twoParameterLogistic,

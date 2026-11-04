@@ -21,7 +21,10 @@ import { cumulativeSums, equipercentileEquating, scoreAtPercentileRank } from ".
  * @throws `DataError` when a distribution is invalid or the two have different numbers of anchor scores.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
  */
-export function chainedEquipercentileEquating(from: BivariateDistribution, to: BivariateDistribution): number[] {
+export function chainedEquipercentileEquating(
+  from: BivariateDistribution,
+  to: BivariateDistribution,
+): readonly number[] {
   const [source, target] = neatTables(from, to);
   const sourceMargins = margins(source);
   const targetMargins = margins(target);
@@ -64,7 +67,7 @@ export function frequencyEstimationEquating(
   from: BivariateDistribution,
   to: BivariateDistribution,
   options: SyntheticOptions = {},
-): number[] {
+): readonly number[] {
   const { source, target, weight } = syntheticGroups(from, to, options);
   const sourceAnchor = margins(source).columns;
   const targetAnchor = margins(target).columns;

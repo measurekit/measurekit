@@ -36,7 +36,7 @@ export function abilityEstimates(
   data: ResponseMatrix | ResponseRecords,
   items: readonly TestItem[],
   options: AbilityEstimatesOptions = {},
-): PersonEstimate[] {
+): readonly PersonEstimate[] {
   checkOptions(options);
   const { estimator = posteriorMeanEstimate } = options;
   checkFunction(estimator, "The estimator must be a function of items and responses, such as posteriorMeanEstimate");

@@ -46,7 +46,7 @@ const DEFAULT_RESPONSE_PROBABILITY = 0.67;
  * is not between 0 and 1, or a logistic item's probability never equals it: c ≥ RP or d ≤ RP.
  * @see {@link https://doi.org/10.4324/9781410600264 | Mitzel, Lewis, Patz and Green (2001)}
  */
-export function orderedItemBooklet(items: readonly TestItem[], options: BookmarkOptions = {}): BookletPage[] {
+export function orderedItemBooklet(items: readonly TestItem[], options: BookmarkOptions = {}): readonly BookletPage[] {
   checkOptions(options);
   const { responseProbability = DEFAULT_RESPONSE_PROBABILITY } = options;
   if (!(typeof responseProbability === "number" && responseProbability > 0 && responseProbability < 1)) {

@@ -52,7 +52,7 @@ export function localDependenceChiSquare(
   matrix: ResponseMatrix,
   items: readonly IrtItem[],
   options: ResidualFitOptions = {},
-): LocalDependencePair[] {
+): readonly LocalDependencePair[] {
   checkItems(matrix, items);
   checkMatrixItems(items.length, "Local dependence");
   const { nodes, weights } = residualPopulation(options);
@@ -192,7 +192,7 @@ export function yenQ3(
   matrix: ResponseMatrix,
   items: readonly IrtItem[],
   thetas: readonly number[],
-): (number | null)[][] {
+): readonly (readonly (number | null)[])[] {
   checkItems(matrix, items);
   checkMatrixItems(items.length, "Yen's Q3");
   checkPersonThetas(matrix, thetas);

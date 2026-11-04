@@ -34,7 +34,7 @@ const ALL = 0.999999999999;
  * @see {@link https://doi.org/10.18637/jss.v048.i05 | van der Ark (2012)}
  * @see {@link https://doi.org/10.4135/9781412984676 | Sijtsma and Molenaar (2002)}
  */
-export function monotonicity(matrix: ResponseMatrix, options: MonotonicityOptions = {}): ItemCheck[] {
+export function monotonicity(matrix: ResponseMatrix, options: MonotonicityOptions = {}): readonly ItemCheck[] {
   const checked = checkMonotonicityOptions(options);
   const data = mokkenData(matrix, "The monotonicity check");
   const minimumViolation = checked.minimumViolation ?? DEFAULT_MINIMUM_VIOLATION;

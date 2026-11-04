@@ -55,7 +55,7 @@ export function tuckerEquating(
   from: BivariateDistribution,
   to: BivariateDistribution,
   options: SyntheticOptions = {},
-): number[] {
+): readonly number[] {
   const { source, target, weight } = syntheticGroups(from, to, options);
   const sourceMoments = groupMoments(source, "from");
   const targetMoments = groupMoments(target, "to");
@@ -92,7 +92,7 @@ export function levineEquating(
   from: BivariateDistribution,
   to: BivariateDistribution,
   options: LevineOptions = {},
-): number[] {
+): readonly number[] {
   const { source, target, weight } = syntheticGroups(from, to, options);
   const { trueScore = false, anchor = "internal" } = options;
   checkBoolean(trueScore, "The option trueScore");
@@ -123,7 +123,7 @@ export function levineEquating(
  * fewer than two persons or total or anchor scores without variance.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
  */
-export function chainedLinearEquating(from: BivariateDistribution, to: BivariateDistribution): number[] {
+export function chainedLinearEquating(from: BivariateDistribution, to: BivariateDistribution): readonly number[] {
   const [source, target] = neatTables(from, to);
   const sourceMoments = groupMoments(source, "from");
   const targetMoments = groupMoments(target, "to");

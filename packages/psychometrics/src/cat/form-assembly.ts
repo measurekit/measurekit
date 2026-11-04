@@ -165,7 +165,7 @@ interface Assembly {
  * or more distinct pool items, or `random` is not a random number generator.
  * @see {@link https://doi.org/10.1177/014662169301700205 | Swanson and Stocking (1993)}
  */
-export function assembleForms(options: FormAssemblyOptions): AssembledForm[] {
+export function assembleForms(options: FormAssemblyOptions): readonly AssembledForm[] {
   checkOptions(options);
   const { pool, length, content = [], target = [], enemies = [], forms = 1, overlap = 0, random } = options;
   const indices = indexItems(pool);

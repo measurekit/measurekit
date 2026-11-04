@@ -33,7 +33,11 @@ export interface PersonFit extends MeanSquareFit {
  * @throws `DataError` when the matrix, the items or the thetas are invalid, or a response is not a category of its
  * item.
  */
-export function personFit(matrix: ResponseMatrix, items: readonly IrtItem[], thetas: readonly number[]): PersonFit[] {
+export function personFit(
+  matrix: ResponseMatrix,
+  items: readonly IrtItem[],
+  thetas: readonly number[],
+): readonly PersonFit[] {
   checkItems(matrix, items);
   checkPersonThetas(matrix, thetas);
   const sums = new Float64Array(SUM_COUNT);

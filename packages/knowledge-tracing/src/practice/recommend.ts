@@ -45,7 +45,7 @@ export function recommend<TState>(
   state: TState,
   candidates: readonly Attempt[],
   options: RecommendOptions = {},
-): Recommendation[] {
+): readonly Recommendation[] {
   checkModel(model, "A recommendation needs a learner model, such as bkt()");
   checkOptions(options);
   const { band = DEFAULT_BAND } = options;

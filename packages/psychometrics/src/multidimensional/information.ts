@@ -15,7 +15,7 @@ import type { MultidimensionalItem } from "./model.js";
 export function multidimensionalInformation(
   items: readonly MultidimensionalItem[],
   theta: readonly number[],
-): number[][] {
+): readonly (readonly number[])[] {
   const dimensions = checkMultidimensionalItems(items, "Information");
   checkDimensions(dimensions, "Information");
   checkArray(theta, "Theta must be an array");

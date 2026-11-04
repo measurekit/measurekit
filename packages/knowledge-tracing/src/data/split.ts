@@ -22,7 +22,7 @@ export interface Fold {
  * @throws `DataError` when the log is malformed, `folds` is not an integer of at least 2, or there are fewer learners
  * than folds.
  */
-export function splitByLearner(log: EventLog, folds: number, random: Random): Fold[] {
+export function splitByLearner(log: EventLog, folds: number, random: Random): readonly Fold[] {
   return splitByKey(log, folds, random, "learner", (event) => event.learner);
 }
 
@@ -41,7 +41,7 @@ export function splitByLearner(log: EventLog, folds: number, random: Random): Fo
  * @throws `DataError` when the log is malformed, `folds` is not an integer of at least 2, or there are fewer items with
  * an outcome than folds.
  */
-export function splitByItem(log: EventLog, folds: number, random: Random): Fold[] {
+export function splitByItem(log: EventLog, folds: number, random: Random): readonly Fold[] {
   return splitByKey(log, folds, random, "item", (event) => event.item, isObserved);
 }
 
@@ -57,7 +57,7 @@ export function splitByItem(log: EventLog, folds: number, random: Random): Fold[
  * @throws `DataError` when the log is malformed, `folds` is not a positive integer, or the times of the events with an
  * outcome do not divide into `folds + 1` non-empty blocks.
  */
-export function splitByTime(log: EventLog, folds: number): Fold[] {
+export function splitByTime(log: EventLog, folds: number): readonly Fold[] {
   checkLog(log);
   checkFolds(folds, 1);
   const blocks = folds + 1;

@@ -14,7 +14,7 @@ import { checkArray, DataError, describe } from "@measurekit/core";
  * @throws `DataError` when a distribution is invalid or has fewer than two persons, or the `from` scores have no
  * variance.
  */
-export function linearEquating(from: readonly number[], to: readonly number[]): number[] {
+export function linearEquating(from: readonly number[], to: readonly number[]): readonly number[] {
   const source = moments(from, "from");
   const target = moments(to, "to");
   if (!(source.variance > 0)) throw new DataError("Linear equating needs `from` scores with variance.");
@@ -39,7 +39,7 @@ export function linearEquating(from: readonly number[], to: readonly number[]): 
  * @throws `DataError` when a distribution is invalid.
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
  */
-export function equipercentileEquating(from: readonly number[], to: readonly number[]): number[] {
+export function equipercentileEquating(from: readonly number[], to: readonly number[]): readonly number[] {
   const sourceTotal = checkDistribution(from, "from");
   const targetTotal = checkDistribution(to, "to");
   const cumulative = cumulativeSums(to);

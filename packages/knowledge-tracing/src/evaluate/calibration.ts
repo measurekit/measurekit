@@ -42,7 +42,7 @@ export function calibrationCurve(
   predictions: readonly number[],
   outcomes: readonly number[],
   options: CalibrationOptions = {},
-): CalibrationBin[] {
+): readonly CalibrationBin[] {
   checkOptions(options);
   const { binCount = DEFAULT_BIN_COUNT } = options;
   checkPredictions(predictions, outcomes);

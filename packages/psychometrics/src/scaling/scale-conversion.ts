@@ -34,7 +34,7 @@ export function scaleConversion(
   equivalents: readonly number[],
   conversion: readonly number[],
   options: ScoreRounding = {},
-): number[] {
+): readonly number[] {
   checkArray(equivalents, "The equivalents must be an array of total scores");
   checkArray(conversion, "The conversion must be an array of scale scores");
   checkOptions(options);

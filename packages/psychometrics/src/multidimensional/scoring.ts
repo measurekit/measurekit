@@ -383,7 +383,7 @@ export function multidimensionalEstimates(
   data: ResponseMatrix | ResponseRecords,
   items: readonly MultidimensionalTestItem[],
   options: MultidimensionalEstimatesOptions = {},
-): MultidimensionalPersonEstimate[] {
+): readonly MultidimensionalPersonEstimate[] {
   checkOptions(options);
   const { estimator = multidimensionalPosteriorModeEstimate } = options;
   checkFunction(

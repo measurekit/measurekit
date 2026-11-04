@@ -50,7 +50,7 @@ const EMPTY_CELL = 0.5;
  * @throws `DataError` as {@link cdmModelFit} does.
  * @see {@link https://doi.org/10.1111/j.1745-3984.2012.00185.x | Chen, de la Torre and Zhang (2013)}
  */
-export function cdmItemFit(matrix: ResponseMatrix, calibration: CdmCalibration): CdmItemFit[] {
+export function cdmItemFit(matrix: ResponseMatrix, calibration: CdmCalibration): readonly CdmItemFit[] {
   const { design, state, models, sample } = checkedModel(matrix, calibration);
   const itemCount = models.length;
   const persons = sample.persons;

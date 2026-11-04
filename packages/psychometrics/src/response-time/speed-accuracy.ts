@@ -254,7 +254,7 @@ export function calibrateSpeedAccuracy<TParameters>(
 export function speedAccuracyEstimates<TParameters>(
   data: ResponseMatrix | ResponseRecords,
   calibration: SpeedAccuracyCalibration<TParameters>,
-): SpeedAccuracyEstimate[] {
+): readonly SpeedAccuracyEstimate[] {
   const timed = timedResponses(data, "Speed-accuracy estimation");
   checkCalibration(calibration);
   const indices = indexItems(calibration.items);

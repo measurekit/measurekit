@@ -194,6 +194,9 @@ items.
 estimator as the option `estimator`, `simulateThetas` its distribution as `distribution`, `maximumDeterminant` its prior
 as `prior`, `classifyDifficulty` and `classifyDiscrimination` their thresholds as `thresholds`,
 `standardErrorOfMeasurement` its reliability as `reliability`, and `expectedRating` its elements as `levels`.
+Every array and record that a function returns is `readonly`, as those inside its results are: a caller who sorts one in
+place copies it first.
+
 `buildResponseMatrix`, `buildResponseMatrixFromColumns` and `buildResponseRecords` build the data of a test, and
 `createAdaptiveTest`, `createDiagnosticAdaptiveTest`, `createMultidimensionalAdaptiveTest` and `createMultistageTest`
 create its adaptive tests. `readMirtIrt`, `readMirtSlopeIntercept` and `readMirtMultidimensional` read the coefficients

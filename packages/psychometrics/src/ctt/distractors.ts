@@ -40,7 +40,7 @@ export interface OptionAnalysis {
  * @returns The statistics of every option of every item.
  * @throws `DataError` when the choices, key, labels or ids are invalid, or `groupFraction` is out of range.
  */
-export function distractorAnalysis(scored: ScoredResponses, options: GroupOptions = {}): OptionAnalysis[] {
+export function distractorAnalysis(scored: ScoredResponses, options: GroupOptions = {}): readonly OptionAnalysis[] {
   // Scored responses built by hand or loaded from JSON may be another value or lack a field.
   checkRecord(scored, "Scored responses must be an object from scoreResponses");
   checkOptions(options);

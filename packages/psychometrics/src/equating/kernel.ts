@@ -256,7 +256,7 @@ export function kernelEquating(data: KernelData, options: KernelEquatingOptions 
  * @returns The standard error of e₁(x) - e₂(x) at each score of the form to equate.
  * @throws `DataError` when either is not a kernel equating, or their error vectors differ in number or length.
  */
-export function kernelEquatingDifference(first: KernelEquating, second: KernelEquating): number[] {
+export function kernelEquatingDifference(first: KernelEquating, second: KernelEquating): readonly number[] {
   checkRecord(first, "The first kernel equating must be an object { errorVectors, ... }");
   checkRecord(second, "The second kernel equating must be an object { errorVectors, ... }");
   checkArray(first.errorVectors, "The error vectors of the first kernel equating must be an array");

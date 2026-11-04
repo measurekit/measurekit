@@ -22,7 +22,7 @@ import { scoreLimits } from "./models.js";
  * @see {@link https://doi.org/10.4324/9780203056615 | Lord (1980)}
  * @see {@link https://doi.org/10.1007/978-1-4939-0317-7 | Kolen and Brennan (2014)}
  */
-export function trueScoreEquating(from: readonly IrtItem[], to: readonly IrtItem[]): number[] {
+export function trueScoreEquating(from: readonly IrtItem[], to: readonly IrtItem[]): readonly number[] {
   return trueScoreThetas(from, to).equated;
 }
 

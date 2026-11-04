@@ -240,6 +240,9 @@ Knowledge tracing: the model families never import each other, nor does anything
 - Psychometrics checks items with `checkItem` or `checkItemList` and a model with `checkModel`, all of `irt/items.ts`.
   Knowledge tracing checks a learner model with `checkModel` of `model.ts`, attempts with `checkAttempts`, and a
   model's predictions with `checkUnitInterval`.
+- A public function returns plain data: every array and record in a result is `readonly`, at the top level as inside
+  objects, so that a caller who sorts in place copies first. `pnpm check:standards` fails on a return type that a caller
+  could write to.
 - Options are destructured with their defaults, `const { tolerance = DEFAULT_TOLERANCE } = options`, so that a value set
   to `null` is rejected, never taken as absent.
 - Missing responses are `null`, and each function documents which persons a statistic uses. A statistic undefined for

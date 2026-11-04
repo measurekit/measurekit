@@ -53,7 +53,7 @@ interface ItemOrder {
  * @see {@link https://doi.org/10.1177/0022002182013003001 | van der Flier (1982)}
  * @see {@link https://doi.org/10.1207/S15324818AME1604_2 | Karabatsos (2003)}
  */
-export function personScalability(matrix: ResponseMatrix): PersonScalability[] {
+export function personScalability(matrix: ResponseMatrix): readonly PersonScalability[] {
   checkResponseMatrix(matrix);
   checkDichotomous(matrix, "Person scalability");
   const order = itemOrder(matrix);

@@ -80,7 +80,7 @@ export function bootstrapEquating<TSample extends EquatingSample>(
   equate: (sample: TSample) => readonly number[],
   random: Random,
   options: BootstrapOptions = {},
-): number[] {
+): readonly number[] {
   checkRecord(sample, "The sample must be an object with a design");
   checkChoice(sample.design, "The design of the sample", DESIGNS);
   checkFunction(equate, "The equate argument must be a function of a sample");

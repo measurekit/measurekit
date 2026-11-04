@@ -52,7 +52,7 @@ export function linkedEquatingErrors(
   from: CalibratedForm,
   to: CalibratedForm,
   options: LinkedEquatingOptions = {},
-): number[] {
+): readonly number[] {
   const link = linker(options);
   const { method = "true-score" } = options;
   checkChoice(method, "The option method", METHODS);
@@ -82,7 +82,7 @@ export function linkedEquatingErrors(
 /** The number of equated scores, and the equating of the forms with a parameter moved by a small step. */
 interface Equator {
   readonly scores: number;
-  equate(moved: readonly (readonly IrtItem[])[]): number[];
+  equate(moved: readonly (readonly IrtItem[])[]): readonly number[];
 }
 
 /**
@@ -105,7 +105,11 @@ function equator(
       equate: ([from = [], to = []]) => trueScores.nearby(linked(from, nearbyLink(base, from, to, common)), to),
     };
   }
-  const observed = (transformation: ScaleTransformation, from: readonly IrtItem[], to: readonly IrtItem[]): number[] =>
+  const observed = (
+    transformation: ScaleTransformation,
+    from: readonly IrtItem[],
+    to: readonly IrtItem[],
+  ): readonly number[] =>
     observedScoreEquivalents(linked(from, transformation), to, {
       ...setup,
       from: movedPopulation(setup.from, transformation.slope, transformation.intercept),
