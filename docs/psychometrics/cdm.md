@@ -6,6 +6,29 @@ mastery probabilities and profiles, classification accuracy and consistency, Wal
 item, Q-matrix validation, model and item fit, the identifiability of the DINA, and a nonparametric classification for
 small samples. Each is validated against GDINA, CDM or NPCD ([validation](validation.md)).
 
+## Quick start
+
+Calibrate the DINA model of two attributes on six persons, and classify them:
+
+```ts
+import { attributeProfiles, calibrateCdm, cdmClassificationAccuracy } from "@measurekit/psychometrics/cdm";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+
+const matrix = buildResponseMatrix([
+  [1, 1, 0, 1],
+  [0, 0, 1, 0],
+  [1, 0, 0, 1],
+  [1, 1, 1, 1],
+  [0, 1, 0, 0],
+  [0, 0, 0, 0],
+]);
+const qMatrix = { item1: ["a"], item2: ["a", "b"], item3: ["b"], item4: ["a"] };
+const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
+attributeProfiles(matrix, calibration)[0]; // => { id: "person1", mastery: [1.00, 0.50], map: [1, 0], eap: [1, 0] }
+attributeProfiles(matrix, calibration, { posterior: true })[0]?.posterior; // => [0.00, 0.50, 0.00, 0.50]
+cdmClassificationAccuracy(matrix, calibration); // => { accuracy: 0.83, consistency: 0.79, ... }
+```
+
 ## Q-matrix
 
 A `QMatrix` lists the attributes each item measures, by item id. It is the `QMatrix` of
@@ -164,25 +187,6 @@ true profile, with `profileAccuracy` τ_c, and `attributeAccuracy` τ_k; `consis
 the chance that two measurements agree, and `attributeConsistency` γ_k. They use the persons with a response.
 `attributeProfiles` returns the 2^K posterior probabilities of each person, 260 KB a person at 15 attributes, only with
 `posterior: true`; `cdmClassificationAccuracy` sums each person's posterior as it forms it and holds none of them.
-
-```ts
-import { attributeProfiles, calibrateCdm, cdmClassificationAccuracy } from "@measurekit/psychometrics/cdm";
-import { buildResponseMatrix } from "@measurekit/psychometrics/data";
-
-const matrix = buildResponseMatrix([
-  [1, 1, 0, 1],
-  [0, 0, 1, 0],
-  [1, 0, 0, 1],
-  [1, 1, 1, 1],
-  [0, 1, 0, 0],
-  [0, 0, 0, 0],
-]);
-const qMatrix = { item1: ["a"], item2: ["a", "b"], item3: ["b"], item4: ["a"] };
-const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
-attributeProfiles(matrix, calibration)[0]; // => { id: "person1", mastery: [1.00, 0.50], map: [1, 0], eap: [1, 0] }
-attributeProfiles(matrix, calibration, { posterior: true })[0]?.posterior; // => [0.00, 0.50, 0.00, 0.50]
-cdmClassificationAccuracy(matrix, calibration); // => { accuracy: 0.83, consistency: 0.79, ... }
-```
 
 ## Q-matrix validation
 
@@ -364,6 +368,52 @@ responses up to errors and gives no probabilities.
 model's attributes and items, such as a calibration's, for one person per profile. It takes success probabilities, so
 the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀ + Σ δ_k α_k) for each of its latent groups.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                                                                             | What to do                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| An item of the matrix without a row in the Q-matrix, an empty row, an attribute that is not a non-empty string or is listed twice | Give every item at least one distinct attribute, by item id                      |
+| More than 15 attributes, more latent groups over all items than the limit, or more cells of items by profiles                     | Split the attributes into tests of their own, or give each item fewer attributes |
+| A matrix without a response                                                                                                       | Give the responses of at least one person                                        |
+| A calibration from elsewhere whose attributes, profiles or success probabilities do not match its items                           | Pass the calibration that `calibrateCdm` returned, as stored                     |
+| A matrix other than the calibration's items, in their order                                                                       | Classify the persons on the items of the calibration                             |
+| Standard errors `"incomplete"` of items that are not G-DINA, or above the limit of success probabilities                          | Calibrate G-DINA for every item, or take another kind of standard errors         |
+| A Wald test or a model comparison of items without the covariance of their success probabilities                                  | Calibrate with the option `standardErrors: "incomplete"`                         |
+| A model fit of more items than its limit, or with fewer than two persons who answered every item                                  | Test the fit of a part of the items, of the persons with complete responses      |
+
+## Not included
+
+| Not included                                                         | Why                                                                                                                                                            |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The likelihood ratio test of `modelcomp`                             | Outside the sources: the Wald test is the step for choosing a model per item, and it is built; the likelihood ratio refits each item under each model.         |
+| The Lagrange multiplier test of `modelcomp`                          | Outside the sources: the Wald test is the step for choosing a model per item, and it is built; the Lagrange multiplier test refits each item under each model. |
+| The item-wise and complete information matrices of `SE.type` 1 and 3 | Outside the sources: options of GDINA, beside the standard errors that are built.                                                                              |
+| Monotonicity constraints                                             | Outside the sources: an option of GDINA (`mono.constraint`), off by default.                                                                                   |
+| Sequential CDMs                                                      | Outside the sources: an option of GDINA (`sequential`), off by default.                                                                                        |
+| Hierarchical attribute structures                                    | Outside the sources: an option of GDINA (`att.str`), off by default.                                                                                           |
+| The R-RUM's original parameters                                      | No fit: the parameters `π*` and `r*` follow from `coefficients`, as above.                                                                                     |
+| Higher-order attribute models                                        | Outside the sources: a variant, as GDINA's `att.dist` shows; the saturated distribution of the profiles is its default.                                        |
+| Polytomous attributes                                                | Outside the sources: a variant of the models for attributes mastered or not.                                                                                   |
+| Identifiability of general CDMs (Xu, 2017)                           | No reference: chapter 16 treats it, and no package checks the conditions; `qMatrixIdentifiability` covers the DINA and DINO.                                   |
+| S-X² and RMSEA of CDM items                                          | Outside the sources: functions of CDM, beside Chen, de la Torre and Zhang's statistics.                                                                        |
+| MADcor and the other residual summaries of CDM                       | No fit: one line over the residual correlations of `cdmItemFit`'s pairs.                                                                                       |
+| DIF in cognitive diagnosis models                                    | Outside the sources: chapter 18 is off the list, and `GDINA::dif` flags 15.5% of clean items at 0.05 on 20 seeded sets.                                        |
+| Q validation by MesaR, EPSA, MLR-B and stepwise Wald                 | Outside the sources: options of `Qval`, beside PVAF; `"MLR-B"` stops with an error in GDINA 2.13.2.                                                            |
+| Bootstrap standard errors                                            | No fit: a loop over `calibrateCdm`.                                                                                                                            |
+| The monotonicity check and `autoGDINA`                               | No fit: a pipeline of what is built.                                                                                                                           |
+| Jackknife and delta utilities                                        | No fit: general statistics.                                                                                                                                    |
+| Multiple-choice and multiple-strategy models                         | Outside the sources: variants of the G-DINA.                                                                                                                   |
+| The general diagnostic model                                         | Outside the sources: a variant with polytomous skills.                                                                                                         |
+| Structured and regularized latent classes                            | Outside the sources: research models.                                                                                                                          |
+| Iterative latent-class analysis                                      | Outside the sources: a research model.                                                                                                                         |
+| Joint maximum likelihood and deterministic classification            | Outside the sources: `nonparametricClassification` serves small samples.                                                                                       |
+| The generalized distance method                                      | Outside the sources: `nonparametricClassification` serves small samples.                                                                                       |
+| Person fit of diagnosis                                              | Outside the sources: not in the chapters on the list.                                                                                                          |
+| KL-based indices and entropy of a test                               | Outside the sources: `cat` has the selection rules.                                                                                                            |
+| Neural, ranking and fuzzy diagnosis                                  | No fit: a tensor runtime.                                                                                                                                      |
+
 ## Differences from the references
 
 | Reference | Difference                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -376,44 +426,6 @@ the probabilities of an additive item follow from its coefficients: g⁻¹(δ₀
 | GDINA     | Where Δ's rank is below its columns, `modelfit` takes nrow - ncol columns of `qr.Q`'s complement, which depend on the order of Δ's columns: on `sim10GDINA` its G-DINA M2 is 6.87 on 10 df, and 5.43 with the columns reversed. `cdmModelFit` uses the whole complement: 7.68 on 11 df. For the A-CDM, GDINA gives 36.36 on 20 df, 35.56 reversed; `cdmModelFit` 51.59 on 24 df. Where Δ has full rank the two agree. |
 | GDINA     | `itemfit` simulates the expected values from `N.resampling` persons; `cdmItemFit` sums over the profiles, as CDM's `modelfit.cor.din`, which it equals within 1e-5 on the DINA from its own calibration. GDINA's z differ from the exact ones by up to 0.09 at 1e6 persons.                                                                                                                                           |
 | GDINA     | Model and item fit use the persons who answered every item; GDINA's use each pair's persons. A constant item's correlations are left out of the other items' largest z; GDINA gives every item `NA` then.                                                                                                                                                                                                             |
-
-## Not included
-
-- **The likelihood ratio test of `modelcomp`.** Outside the sources: the Wald test is the step for choosing a model per
-  item, and it is built; the likelihood ratio refits each item under each model.
-- **The Lagrange multiplier test of `modelcomp`.** Outside the sources: the Wald test is the step for choosing a model
-  per item, and it is built; the Lagrange multiplier test refits each item under each model.
-- **The item-wise and complete information matrices of `SE.type` 1 and 3.** Outside the sources: options of GDINA,
-  beside the standard errors that are built.
-- **Monotonicity constraints.** Outside the sources: an option of GDINA (`mono.constraint`), off by default.
-- **Sequential CDMs.** Outside the sources: an option of GDINA (`sequential`), off by default.
-- **Hierarchical attribute structures.** Outside the sources: an option of GDINA (`att.str`), off by default.
-- **The R-RUM's original parameters.** No fit: the parameters `π*` and `r*` follow from `coefficients`, as above.
-- **Higher-order attribute models.** Outside the sources: a variant, as GDINA's `att.dist` shows; the saturated
-  distribution of the profiles is its default.
-- **Polytomous attributes.** Outside the sources: a variant of the models for attributes mastered or not.
-- **Identifiability of general CDMs (Xu, 2017).** No reference: chapter 16 treats it, and no package checks the
-  conditions; `qMatrixIdentifiability` covers the DINA and DINO.
-- **S-X² and RMSEA of CDM items.** Outside the sources: functions of CDM, beside Chen, de la Torre and Zhang's statistics.
-- **MADcor and the other residual summaries of CDM.** No fit: one line over the residual correlations of `cdmItemFit`'s
-  pairs.
-- **DIF in cognitive diagnosis models.** Outside the sources: chapter 18 is off the list, and `GDINA::dif` flags 15.5%
-  of clean items at 0.05 on 20 seeded sets.
-- **Q validation by MesaR, EPSA, MLR-B and stepwise Wald.** Outside the sources: options of `Qval`, beside PVAF;
-  `"MLR-B"` stops with an error in GDINA 2.13.2.
-- **Bootstrap standard errors.** No fit: a loop over `calibrateCdm`.
-- **The monotonicity check and `autoGDINA`.** No fit: a pipeline of what is built.
-- **Jackknife and delta utilities.** No fit: general statistics.
-- **Multiple-choice and multiple-strategy models.** Outside the sources: variants of the G-DINA.
-- **The general diagnostic model.** Outside the sources: a variant with polytomous skills.
-- **Structured and regularized latent classes.** Outside the sources: research models.
-- **Iterative latent-class analysis.** Outside the sources: a research model.
-- **Joint maximum likelihood and deterministic classification.** Outside the sources: `nonparametricClassification`
-  serves small samples.
-- **The generalized distance method.** Outside the sources: `nonparametricClassification` serves small samples.
-- **Person fit of diagnosis.** Outside the sources: not in the chapters on the list.
-- **KL-based indices and entropy of a test.** Outside the sources: `cat` has the selection rules.
-- **Neural, ranking and fuzzy diagnosis.** No fit: a tensor runtime.
 
 ## References
 

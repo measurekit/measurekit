@@ -14,6 +14,31 @@ flowchart LR
   S -.-> A
 ```
 
+## Quick start
+
+Replay a log of two learners and two items, with abilities in each skill, and read the ratings, the states and the predictions:
+
+```ts
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
+import { elo } from "@measurekit/knowledge-tracing/elo";
+
+const log = buildEventLog(
+  [
+    { learner: "ana", item: "q1", time: 1, outcome: 1 },
+    { learner: "budi", item: "q2", time: 2, outcome: 0 },
+    { learner: "ana", item: "q2", time: 3, outcome: 0.5 },
+    { learner: "budi", item: "q1", time: 4, outcome: 1 },
+  ],
+  { qMatrix: { q1: ["fractions"], q2: ["fractions", "decimals"] } },
+);
+const fit = elo({ skills: true }).fit(log);
+fit.model.parameters.items; // => { q1: { difficulty: -1.09, count: 2 }, q2: { difficulty: 0.56, count: 2 } }
+fit.states.ana;
+// => { learner: "ana", ability: 0.44, count: 2,
+//      skills: { fractions: { ability: 0.44, count: 2 }, decimals: { ability: -0.06, count: 1 } } }
+fit.predictions; // => [0.5, 0.5, 0.56, 0.38]: each event's prediction before its outcome, as online use would have made it
+```
+
 ## The models
 
 A learner has an ability θ and an item a difficulty d, both 0 at first, and
@@ -50,28 +75,7 @@ The defaults of U are those Pelánek (2016) recommends as a starting point. To t
 ## Batch: replaying a log
 
 `fit(log)` replays a log in time order from the model's item ratings, every learner from 0, updating the learner and
-the item after each event as online use would.
-
-```ts
-import { buildEventLog } from "@measurekit/knowledge-tracing/data";
-import { elo } from "@measurekit/knowledge-tracing/elo";
-
-const log = buildEventLog(
-  [
-    { learner: "ana", item: "q1", time: 1, outcome: 1 },
-    { learner: "budi", item: "q2", time: 2, outcome: 0 },
-    { learner: "ana", item: "q2", time: 3, outcome: 0.5 },
-    { learner: "budi", item: "q1", time: 4, outcome: 1 },
-  ],
-  { qMatrix: { q1: ["fractions"], q2: ["fractions", "decimals"] } },
-);
-const fit = elo({ skills: true }).fit(log);
-fit.model.parameters.items; // => { q1: { difficulty: -1.09, count: 2 }, q2: { difficulty: 0.56, count: 2 } }
-fit.states.ana;
-// => { learner: "ana", ability: 0.44, count: 2,
-//      skills: { fractions: { ability: 0.44, count: 2 }, decimals: { ability: -0.06, count: 1 } } }
-fit.predictions; // => [0.5, 0.5, 0.56, 0.38]: each event's prediction before its outcome, as online use would have made it
-```
+the item after each event as online use would, as in the [quick start](#quick-start).
 
 The fit's `logLikelihood` sums the log-likelihoods of these predictions; `aic` and `bic` are `null`, as Elo estimates
 no fixed number of parameters; `converged` is `true` and `iterations` 1, a single pass.
@@ -88,7 +92,7 @@ events from a log changes no state, rating or prediction. A host skips the write
 An app keeps each learner's state and each item's rating as a row, and an answer needs only the two rows it touches:
 
 ```ts continues
-// The rows as stored, here from the fit above.
+// The rows as stored, here from the fit of the quick start.
 const rows = JSON.parse(JSON.stringify({ q1: fit.model.parameters.items.q1, ana: fit.states.ana }));
 const model = elo({ skills: true, parameters: { items: { q1: rows.q1 } } });
 const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 5 };
@@ -125,12 +129,29 @@ a malformed state, naming the field. Item ratings `{ difficulty, count }` are pl
 Elo defines no mastery, so the model has no `mastery` member. `predict` gives the probability of answering a given
 item, which practice decisions can use directly.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                                               | What to do                                                              |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| An uncertainty function with a ≤ 0 or b < 0, or `skillWeight` not above 0 or without `skills: true` | Give a above 0, b from 0, and `skillWeight` with `skills: true`         |
+| An item rating or an ability that is not finite, or a count that is not an integer from 0           | Pass the ratings and states as the model wrote them                     |
+| A malformed state, or the state of another learner than the attempt's                               | Pass the learner's own state, as `initialState` or `update` returned it |
+| A malformed event or log                                                                            | Build the log with [`buildEventLog`](data.md#logs)                      |
+| A log without an event with an outcome, for `fit`                                                   | Fit a log with outcomes                                                 |
+
 ## Not included
 
-- **Glicko.** Outside the sources: Pelánek (2016) names it and sets it aside, as its Bayesian derivation is hard to
-  modify for a new situation, such as the shifted logistic of multiple-choice answers; Elo with an uncertainty function is
-  built.
-- **Urnings.** Outside the sources: it postdates Pelánek (2016), and no package has it.
+| Not included | Why                                                                                                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Glicko       | Outside the sources: Pelánek (2016) names it and sets it aside, as its Bayesian derivation is hard to modify for a new situation, such as the shifted logistic of multiple-choice answers; Elo with an uncertainty function is built. |
+| Urnings      | Outside the sources: it postdates Pelánek (2016), and no package has it.                                                                                                                                                              |
+
+## Differences from the references
+
+None: no package of record has Elo for education, so the equations of Pelánek (2016) are written out in R and replayed
+event by event, which `elo` matches ([validation](validation.md)).
 
 ## References
 

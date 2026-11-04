@@ -10,23 +10,9 @@ all purify their matching criterion or their link on request. The dichotomous st
 polytomous ones against base R, rms, MASS and lordif, SIBTEST against mirt and difR, the likelihood-ratio tests against
 mirt, the differential functioning against DFIT, and the sparse-data rule against base R ([validation](validation.md)).
 
-## Groups
+## Quick start
 
-Every function takes a [response matrix](data.md) and one `DifGroup` per person: `"reference"` or `"focal"`, the group
-whose items are studied. Both groups need persons.
-
-| Function                                                | Items                              | Matching                                                        | Persons used                                                            |
-| ------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `mantelHaenszel(matrix, groups, options)`               | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
-| `logisticRegressionDif(matrix, groups, options)`        | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
-| `lordChiSquare(matrix, groups, options)`                | 2PL, 3PL or 4PL                    | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
-| `mantelTest(matrix, groups, options)`                   | Any                                | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
-| `ordinalLogisticRegressionDif(matrix, groups, options)` | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
-| `logisticDiscriminantDif(matrix, groups, options)`      | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
-| `sibtest(matrix, groups, options)`                      | Any, or bundles                    | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
-| `rajuAreaDif(matrix, groups, options)`                  | 2PL; 3PL, 4PL with held asymptotes | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
-| `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model                          | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
-| `differentialFunctioning(reference, focal, options)`    | Any model                          | Theta of the focal group's population                           | None: it takes items                                                    |
+Simulate 500 persons per group on 10 items, one harder for the focal group, and test them by three methods:
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -52,6 +38,24 @@ logisticRegressionDif(matrix, groups, { purify: true }).purification;
 // => { anchors: ["item1", "item2", "item5", "item6", "item7", "item8", "item9", "item10"], iterations: 1, converged: true }
 lordChiSquare(matrix, groups, { model: twoParameterLogistic }).items[2]; // => { id: "item3", chiSquare: 19.3, ... }
 ```
+
+## Groups
+
+Every function takes a [response matrix](data.md) and one `DifGroup` per person: `"reference"` or `"focal"`, the group
+whose items are studied. Both groups need persons.
+
+| Function                                                | Items                              | Matching                                                        | Persons used                                                            |
+| ------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `mantelHaenszel(matrix, groups, options)`               | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
+| `logisticRegressionDif(matrix, groups, options)`        | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
+| `lordChiSquare(matrix, groups, options)`                | 2PL, 3PL or 4PL                    | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
+| `mantelTest(matrix, groups, options)`                   | Any                                | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
+| `ordinalLogisticRegressionDif(matrix, groups, options)` | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
+| `logisticDiscriminantDif(matrix, groups, options)`      | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
+| `sibtest(matrix, groups, options)`                      | Any, or bundles                    | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
+| `rajuAreaDif(matrix, groups, options)`                  | 2PL; 3PL, 4PL with held asymptotes | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
+| `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model                          | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
+| `differentialFunctioning(reference, focal, options)`    | Any model                          | Theta of the focal group's population                           | None: it takes items                                                    |
 
 ## Matching score
 
@@ -602,50 +606,6 @@ differentialFunctioning(freeOf("reference").filter(inPassage), freeOf("focal").f
 Raju et al. flag an item whose NCDIF is above 0.006 for a dichotomous item, a cutoff the caller applies; their item
 parameter replication for the cutoffs is not included.
 
-## Not included
-
-- **The exact Mantel-Haenszel test.** Outside the sources: an option of `difR::difMH`, off by default.
-- **Wald tests.** Outside the sources: an option of difR (`criterion = "Wald"` of `difLogistic`), whose default, the
-  likelihood ratio, is built.
-- **Matching on a score other than the total for the Mantel-Haenszel and logistic regression statistics.** Outside the
-  sources: an option of difR, off by default.
-- **Lord's test for polytomous items.** Outside the sources: the likelihood ratio, the cited practice for polytomous items
-  (Kim and Cohen, 1998), is built.
-- **The iterated theta of lordif with group-specific item parameters.** Outside the sources: one pass of lordif is the
-  composition above, and ordinal logistic regression is the practice.
-- **lordif's `minCell` collapsing of sparse categories.** Outside the sources: ordinal logistic regression and the
-  Mantel test are the practice.
-- **The Mantel test matched on theta.** Outside the sources: it needs a discretization, and the Mantel test matched on
-  the total score is the practice.
-- **Multiple focal groups.** Outside the sources: the sources were not confirmed to treat it, and [a
-  recipe](#recipe-several-focal-groups) runs `mantelHaenszel` for each focal group.
-- **The Breslow-Day test.** Outside the sources: Penfield and Camilli cite neither Breslow and Day (1980) nor Penfield
-  (2003), and `logisticRegressionDif`'s `nonuniform` tests crossing DIF.
-- **Crossing SIBTEST.** Outside the sources: Li and Stout (1996) is not cited, and `logisticRegressionDif`'s `nonuniform`
-  tests crossing DIF.
-- **The multi-group SIBTEST of mirt.** Outside the sources: Chalmers and Zheng (2023) is not cited, and [a
-  recipe](#recipe-several-focal-groups) compares each focal group with the reference group.
-- **The focal group's weights of SIBTEST.** Outside the sources: an option of mirt (`pk_focal`), off by default.
-- **The reference and total weights of standardization.** Outside the sources: options of difR; focal weights, Dorans and
-  Kulick's, are `mantelTest`'s [standardized mean difference](#recipe-standardization).
-- **Standardized alpha.** No fit: one line from STD P-DIF and the focal group's proportion correct.
-- **Bayesian and hierarchical DIF.** Outside the sources: the listed chapter presents them as recent innovations, and
-  hierarchical models are lme4's.
-- **Quade-type association indices.** Outside the sources: not cited by the listed chapter, and the Mantel test is the
-  practice.
-- **Transformed item difficulties.** Outside the sources: not cited, and it matches no ability.
-- **Wald tests with a full covariance of groups.** Outside the sources: `lordChiSquare` is the Wald test of the sources.
-- **DRF, DTF, `RMSD_DIF` and the empirical effect sizes of mirt.** Outside the sources: beside DFIT, which is built.
-- **Item parameter replication for DFIT's cutoffs.** No fit: a loop over draws from a covariance; the guide gives the
-  usual 0.006.
-- **DIF between calibrations (`dif.test`).** Outside the sources: `lordChiSquare` is the same test.
-- **Lasso DIF.** Outside the sources: a research method of difR.
-- **Item-level heterogeneous mixed-model DIF.** Outside the sources: a research method of difR.
-- **DIF of continuous item scores.** No fit: a response is an integer category.
-- **Flagging by chi-square, slope or R² cutoffs.** No fit: the numbers are in the result, and a cutoff is the caller's.
-- **Monte Carlo and permutation cutoffs.** No fit: a loop over the simulation functions.
-- **Generation of DIF.** No fit: `simulateResponses` with changed items, as the examples above show.
-
 ## Recipe: several focal groups
 
 The functions compare one focal group with the reference group. For several focal groups, such as the languages of a
@@ -849,7 +809,41 @@ Invalid input throws `DataError` naming the value found.
 | `fixedParameters` holds a or b in Lord's chi-square or Raju's area                                         | Hold the asymptotes alone, as the link moves a and b                                                 |
 | Differential functioning with lists of other items or order, or a population whose weights do not sum to 1 | Give the same items in the same order in both lists, and a distribution of theta                     |
 
-## Differences from difR
+## Not included
+
+| Not included                                                                                        | Why                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The exact Mantel-Haenszel test                                                                      | Outside the sources: an option of `difR::difMH`, off by default.                                                                                                  |
+| Wald tests                                                                                          | Outside the sources: an option of difR (`criterion = "Wald"` of `difLogistic`), whose default, the likelihood ratio, is built.                                    |
+| Matching on a score other than the total for the Mantel-Haenszel and logistic regression statistics | Outside the sources: an option of difR, off by default.                                                                                                           |
+| Lord's test for polytomous items                                                                    | Outside the sources: the likelihood ratio, the cited practice for polytomous items (Kim and Cohen, 1998), is built.                                               |
+| The iterated theta of lordif with group-specific item parameters                                    | Outside the sources: one pass of lordif is the composition above, and ordinal logistic regression is the practice.                                                |
+| lordif's `minCell` collapsing of sparse categories                                                  | Outside the sources: ordinal logistic regression and the Mantel test are the practice.                                                                            |
+| The Mantel test matched on theta                                                                    | Outside the sources: it needs a discretization, and the Mantel test matched on the total score is the practice.                                                   |
+| Multiple focal groups                                                                               | Outside the sources: the sources were not confirmed to treat it, and [a recipe](#recipe-several-focal-groups) runs `mantelHaenszel` for each focal group.         |
+| The Breslow-Day test                                                                                | Outside the sources: Penfield and Camilli cite neither Breslow and Day (1980) nor Penfield (2003), and `logisticRegressionDif`'s `nonuniform` tests crossing DIF. |
+| Crossing SIBTEST                                                                                    | Outside the sources: Li and Stout (1996) is not cited, and `logisticRegressionDif`'s `nonuniform` tests crossing DIF.                                             |
+| The multi-group SIBTEST of mirt                                                                     | Outside the sources: Chalmers and Zheng (2023) is not cited, and [a recipe](#recipe-several-focal-groups) compares each focal group with the reference group.     |
+| The focal group's weights of SIBTEST                                                                | Outside the sources: an option of mirt (`pk_focal`), off by default.                                                                                              |
+| The reference and total weights of standardization                                                  | Outside the sources: options of difR; focal weights, Dorans and Kulick's, are `mantelTest`'s [standardized mean difference](#recipe-standardization).             |
+| Standardized alpha                                                                                  | No fit: one line from STD P-DIF and the focal group's proportion correct.                                                                                         |
+| Bayesian and hierarchical DIF                                                                       | Outside the sources: the listed chapter presents them as recent innovations, and hierarchical models are lme4's.                                                  |
+| Quade-type association indices                                                                      | Outside the sources: not cited by the listed chapter, and the Mantel test is the practice.                                                                        |
+| Transformed item difficulties                                                                       | Outside the sources: not cited, and it matches no ability.                                                                                                        |
+| Wald tests with a full covariance of groups                                                         | Outside the sources: `lordChiSquare` is the Wald test of the sources.                                                                                             |
+| DRF, DTF, `RMSD_DIF` and the empirical effect sizes of mirt                                         | Outside the sources: beside DFIT, which is built.                                                                                                                 |
+| Item parameter replication for DFIT's cutoffs                                                       | No fit: a loop over draws from a covariance; the guide gives the usual 0.006.                                                                                     |
+| DIF between calibrations (`dif.test`)                                                               | Outside the sources: `lordChiSquare` is the same test.                                                                                                            |
+| Lasso DIF                                                                                           | Outside the sources: a research method of difR.                                                                                                                   |
+| Item-level heterogeneous mixed-model DIF                                                            | Outside the sources: a research method of difR.                                                                                                                   |
+| DIF of continuous item scores                                                                       | No fit: a response is an integer category.                                                                                                                        |
+| Flagging by chi-square, slope or R² cutoffs                                                         | No fit: the numbers are in the result, and a cutoff is the caller's.                                                                                              |
+| Monte Carlo and permutation cutoffs                                                                 | No fit: a loop over the simulation functions.                                                                                                                     |
+| Generation of DIF                                                                                   | No fit: `simulateResponses` with changed items, as the examples above show.                                                                                       |
+
+## Differences from the references
+
+### difR
 
 | Topic                      | This package                                                                                                                   | difR                                                                                                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -864,7 +858,7 @@ Invalid input throws `DataError` naming the value found.
 | Raju's p-value             | Two-sided, 2 (1 - Φ(\|z\|))                                                                                                    | 2 (1 - Φ(z)), above 1 for a negative z; its flags and adjusted p-values use \|z\|                                                                          |
 | Missing responses          | The scaled matching score of each item's persons                                                                               | Sums the responses given; `difMH` counts a missing response to the studied item as both correct and incorrect                                              |
 
-## Differences from mirt
+### mirt
 
 | Topic                | This package                                                | mirt                                                                                                    |
 | -------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -876,7 +870,7 @@ Invalid input throws `DataError` naming the value found.
 | Likelihood-ratio DIF | Every parameter of the item is freed; `purify` as difR's    | `which.par` chooses the parameters; `scheme = "drop_sequential"` purifies by dropping anchors in rounds |
 | Likelihood-ratio DIF | One calibration per test, from the starting values          | `DIF` refits from the constrained model's estimates; both reach the same maximum within 3e-7 in χ²      |
 
-## Differences from DFIT
+### DFIT
 
 | Topic      | This package                                | DFIT                                                                                   |
 | ---------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -884,7 +878,7 @@ Invalid input throws `DataError` naming the value found.
 | Models     | Any model, by its expected score            | The 1PL to the 4PL, the graded and the partial credit models, by name                  |
 | Cutoffs    | None: the numbers are in the result         | `Ipr` and `CutoffIpr` draw item parameters from their covariance for cutoffs           |
 
-## Differences from lordif
+### lordif
 
 | Topic             | This package                                                     | lordif                                                                                          |
 | ----------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |

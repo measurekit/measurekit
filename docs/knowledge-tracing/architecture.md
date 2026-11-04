@@ -239,18 +239,15 @@ Evaluation, practice and simulation check that a model passed in is an object wi
 
 ## Not included
 
-- **DKT.** No fit: a recurrent network needs a tensor runtime, against the one-dependency rule, and its state is a
-  hidden vector, not a mastery for each skill. `pyKT` is the reference, and it belongs in a package of its own.
-  [`LearnerModel`](#the-learner-model-interface) lets one be evaluated here.
-- **DKVMN.** No fit: as DKT, it needs a tensor runtime and its state is a hidden memory, not a mastery for each skill;
-  `pyKT` is the reference.
-- **SAKT.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill;
-  `pyKT` is the reference.
-- **AKT.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill;
-  `pyKT` is the reference.
-- **DKT+.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.
-- **GKT.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.
-- **LPKT.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.
-- **LBKT.** No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.
-- **KPT.** No fit: a tensor runtime, and features computed from text.
-- **EKPT.** No fit: a tensor runtime, and features computed from text.
+| Not included | Why                                                                                                                                                                                                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DKT          | No fit: a recurrent network needs a tensor runtime, against the one-dependency rule, and its state is a hidden vector, not a mastery for each skill. `pyKT` is the reference, and it belongs in a package of its own. [`LearnerModel`](#the-learner-model-interface) lets one be evaluated here. |
+| DKVMN        | No fit: as DKT, it needs a tensor runtime and its state is a hidden memory, not a mastery for each skill; `pyKT` is the reference.                                                                                                                                                               |
+| SAKT         | No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill; `pyKT` is the reference.                                                                                                                                                               |
+| AKT          | No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill; `pyKT` is the reference.                                                                                                                                                               |
+| DKT+         | No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.                                                                                                                                                                                        |
+| GKT          | No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.                                                                                                                                                                                        |
+| LPKT         | No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.                                                                                                                                                                                        |
+| LBKT         | No fit: as DKT, it needs a tensor runtime and its state is a hidden vector, not a mastery for each skill.                                                                                                                                                                                        |
+| KPT          | No fit: a tensor runtime, and features computed from text.                                                                                                                                                                                                                                       |
+| EKPT         | No fit: a tensor runtime, and features computed from text.                                                                                                                                                                                                                                       |

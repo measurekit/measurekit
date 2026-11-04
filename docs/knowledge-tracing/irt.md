@@ -6,6 +6,33 @@ predicts the next outcome from it. With `drift`, θ moves between events, so tha
 changes. Estimates are validated against mirt's `fscores`, a posterior written out in R, and for drift the chain
 computed in logs on the same grid and on a much finer one ([validation](validation.md#item-response-theory)).
 
+## Quick start
+
+Update a learner's posterior of θ with two outcomes, one of a 2PL item and one of a partial credit item, and read the ability, a prediction and the posterior:
+
+```ts
+import { irt } from "@measurekit/knowledge-tracing/irt";
+
+const model = irt({
+  parameters: {
+    items: {
+      q1: { a: 1.2, b: -0.5 },
+      q2: { a: 1.5, b: 0.4, c: 0.2 },
+      essay: { model: "gpcm", a: 0.9, b: [-1, 0, 1.2] },
+    },
+  },
+});
+const attempt = { learner: "ana", item: "q1", skills: [], time: 1 };
+let ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
+ana = model.update(ana, { ...attempt, item: "essay", time: 2, outcome: 2 / 3 }); // category 2 of 0 to 3
+model.ability(ana); // => { theta: 0.508, standardError: 0.748 }, EAP
+model.ability(ana, { estimator: "map" }); // => { theta: 0.471, standardError: 0.731 }, the posterior mode
+model.predict(ana, { ...attempt, item: "q2", time: 3 }); // => 0.625
+const { nodes, weights } = model.posterior(ana);
+nodes.length; // => 61, from -6 to 6
+weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // => 0.706, P(θ > 0)
+```
+
 ## The model
 
 Item parameters use the IRT parameterization with D = 1, as `@measurekit/psychometrics` and mirt with `IRTpars = TRUE`:
@@ -55,28 +82,7 @@ advances the state to its time, which changes no posterior at a later time, as g
 
 ## Online
 
-```ts
-import { irt } from "@measurekit/knowledge-tracing/irt";
-
-const model = irt({
-  parameters: {
-    items: {
-      q1: { a: 1.2, b: -0.5 },
-      q2: { a: 1.5, b: 0.4, c: 0.2 },
-      essay: { model: "gpcm", a: 0.9, b: [-1, 0, 1.2] },
-    },
-  },
-});
-const attempt = { learner: "ana", item: "q1", skills: [], time: 1 };
-let ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
-ana = model.update(ana, { ...attempt, item: "essay", time: 2, outcome: 2 / 3 }); // category 2 of 0 to 3
-model.ability(ana); // => { theta: 0.508, standardError: 0.748 }, EAP
-model.ability(ana, { estimator: "map" }); // => { theta: 0.471, standardError: 0.731 }, the posterior mode
-model.predict(ana, { ...attempt, item: "q2", time: 3 }); // => 0.625
-const { nodes, weights } = model.posterior(ana);
-nodes.length; // => 61, from -6 to 6
-weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // => 0.706, P(θ > 0)
-```
+The [quick start](#quick-start) updates a learner with two outcomes.
 
 `ability(state, { estimator })` returns:
 
@@ -191,12 +197,34 @@ the marginal log-likelihood of the outcomes on the grid, the learners' θ integr
 forward likelihood, each outcome predicted from the posterior advanced to its time; `aic` and `bic` are `null`, as the
 item parameters were estimated elsewhere.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                                                                                                                 | What to do                                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| An item without parameters, or with invalid ones: `a` or `b` not finite, not 0 ≤ c < d ≤ 1, graded thresholds out of order, a model other than `"graded"` or `"gpcm"` | Give the items' parameters as the calibration wrote them, in the IRT form |
+| An outcome that is not one of the item's categories, k / (K - 1)                                                                                                      | Divide a rubric score from 0 to K - 1 by K - 1                            |
+| A prior whose grid has no distinct, finite points: an sd too small, or a mean too large                                                                               | Give the prior of the calibration's population                            |
+| `drift` without `points`                                                                                                                                              | Give `points`: 241, or the number of points of the stored states          |
+| A malformed state, or a state written with drift read by a model without it, or the reverse                                                                           | Read a state with a model of the same `points` and `drift` that wrote it  |
+
 ## Not included
 
-- **Multidimensional online IRT.** No fit: on the one-dimensional slice of the product grid, against 1,921 points and
-  the worst of 8 learners, 31 nodes err by 0.026 at 100 items and 0.104 at 300, 15 nodes by 0.282, 9 by 0.612 and 7 by
-  0.805, while the posterior SD is 0.10 to 0.18. A batch test sees one test, but an online state accumulates without
-  limit. Use one model for each section.
+| Not included                | Why                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multidimensional online IRT | No fit: on the one-dimensional slice of the product grid, against 1,921 points and the worst of 8 learners, 31 nodes err by 0.026 at 100 items and 0.104 at 300, 15 nodes by 0.282, 9 by 0.612 and 7 by 0.805, while the posterior SD is 0.10 to 0.18. A batch test sees one test, but an online state accumulates without limit. Use one model for each section. |
+
+## Differences from the references
+
+The reference is mirt 1.48's `fscores`, with the items' parameters fixed ([validation](validation.md#item-response-theory)).
+
+| Topic   | This package                                                                                                                                                                       | mirt                                                                                                          |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Updates | One outcome at a time, as an app receives them; the posterior equals that of the whole pattern                                                                                     | A whole pattern of responses                                                                                  |
+| MAP     | The highest grid point, then the quintic that matches the log-posterior and its first two derivatives at the two nearest points: within 1e-5 of the exact mode at the default grid | An optimizer, stopped 2e-6 from the exact mode                                                                |
+| Grid    | 61 points from 6 prior standard deviations below the mean to 6 above                                                                                                               | `quadpts` points of its own spacing, which differ from those by up to 2.5e-8 in EAP; the validation sets them |
+| Drift   | θ a random walk between events                                                                                                                                                     | None                                                                                                          |
 
 ## References
 

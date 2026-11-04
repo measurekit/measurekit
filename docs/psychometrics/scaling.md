@@ -7,11 +7,9 @@ scores of equated scores, percentile ranks and norms with their standard errors 
 posterior of theta, and joint draws of theta from separate posteriors. Every function is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
 has [its own guide](vertical-scaling.md).
 
-## Scales
+## Quick start
 
-A scale reports slope θ + intercept, rounded to the nearest multiple of `step`, halves up, and bounded to `lowest` and
-`highest`. `scaleScore(theta, scale)` applies it. A multiple of a decimal step such as 0.1 is the double nearest the
-decimal, 52.3 rather than 523 · 0.1 = 52.300000000000004.
+Report two thetas on a scale of 200 to 800 in steps of 10:
 
 ```ts
 import { scaleScore } from "@measurekit/psychometrics/scaling";
@@ -20,6 +18,12 @@ const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 
 scaleScore(0.234, scale); // => 520
 scaleScore(-4.2, scale); // => 200
 ```
+
+## Scales
+
+A scale reports slope θ + intercept, rounded to the nearest multiple of `step`, halves up, and bounded to `lowest` and
+`highest`. `scaleScore(theta, scale)` applies it. A multiple of a decimal step such as 0.1 is the double nearest the
+decimal, 52.3 rather than 523 · 0.1 = 52.300000000000004.
 
 | Option      | Default     | Valid range              | Meaning                                           |
 | ----------- | ----------- | ------------------------ | ------------------------------------------------- |
@@ -526,21 +530,6 @@ a regression. With no difference between the sets, B is 0 and the degrees of fre
 replicate weights of a survey design enter the variance of each set, which the caller computes ([not
 included](#not-included)).
 
-## Not included
-
-- **Smoothed or continuous norming.** Outside the sources: a clinical practice with competing models (`cNORM`); it needs
-  a norming model, not a rank.
-- **The standard errors of a stratified or clustered design.** No fit: the design's strata and clusters, which the
-  survey package's `svydesign` describes, set them; the weights alone give those of independent draws.
-- **Growth during practice.** No fit: learning models live in `@measurekit/knowledge-tracing`.
-- **Model-based percentiles Φ((θ - μ) / σ).** No fit: one line with a `GroupDistribution`'s `mean` and `sd`.
-- **Scale anchoring.** No reference: descriptive work on a calibrated bank with no statistic of its own.
-- **Item mapping.** No reference: descriptive work on a calibrated bank with no statistic of its own.
-- **A copula other than the Gaussian.** Outside the sources: the correlation bounds of comonotonicity and independence
-  hold for any copula, but the Gaussian one is the usual choice for separate posteriors and needs one matrix.
-- **Rubin's combining rules.** No fit: a few lines over the plausible values, [a recipe](#recipe-rubins-rules).
-- **Replicate weights.** No fit: a loop over `calibrate` that the program's design sets.
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
@@ -562,6 +551,20 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `predictThetaScore`                                        | A scale without finite `lowest` and `highest` and a `step` above 0, or of more than 10,000 reportable scores                             | Bound the scale and use a step that reports at most 10,000 scores                |
 | `drawJointThetas`                                          | No posteriors, nodes that do not ascend, or a correlation that is not a symmetric matrix of one row per posterior with 1 on the diagonal | Give the correlation of the normal scores, one row per posterior                 |
 | `drawJointThetas`                                          | A correlation with an eigenvalue below -1e-10                                                                                            | Pass it through `smoothCorrelations` of the dimensionality module                |
+
+## Not included
+
+| Not included                                            | Why                                                                                                                                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Smoothed or continuous norming                          | Outside the sources: a clinical practice with competing models (`cNORM`); it needs a norming model, not a rank.                                                                            |
+| The standard errors of a stratified or clustered design | No fit: the design's strata and clusters, which the survey package's `svydesign` describes, set them; the weights alone give those of independent draws.                                   |
+| Growth during practice                                  | No fit: learning models live in `@measurekit/knowledge-tracing`.                                                                                                                           |
+| Model-based percentiles Φ((θ - μ) / σ)                  | No fit: one line with a `GroupDistribution`'s `mean` and `sd`.                                                                                                                             |
+| Scale anchoring                                         | No reference: descriptive work on a calibrated bank with no statistic of its own.                                                                                                          |
+| Item mapping                                            | No reference: descriptive work on a calibrated bank with no statistic of its own.                                                                                                          |
+| A copula other than the Gaussian                        | Outside the sources: the correlation bounds of comonotonicity and independence hold for any copula, but the Gaussian one is the usual choice for separate posteriors and needs one matrix. |
+| Rubin's combining rules                                 | No fit: a few lines over the plausible values, [a recipe](#recipe-rubins-rules).                                                                                                           |
+| Replicate weights                                       | No fit: a loop over `calibrate` that the program's design sets.                                                                                                                            |
 
 ## Differences from the references
 

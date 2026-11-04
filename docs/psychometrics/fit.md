@@ -22,34 +22,9 @@ flowchart LR
   M --> K["kernelItemCurves: each category's curve, without a model"]
 ```
 
-## Inputs
+## Quick start
 
-Every function takes a [response matrix](data.md) and its items, one per column, of any model, such as a
-calibration's `items`. The residual statistics also take one theta per person, finite, from any estimator; the
-references use maximum likelihood estimates for Rasch items (eRm) and EAP estimates otherwise (mirt).
-`rootMeanSquareDeviation` and `localDependenceChiSquare` integrate over a population of theta, the option
-`population`, N(0, 1) on 61 rectangular points from -6 to 6 by default: give a calibration's group at its nodes when it
-is not standard normal. `limitedInformationFit` takes the calibration itself, whose group it integrates over. The Rasch tests take the matrix
-alone, as they estimate the items themselves, and so do the kernel curves, which assume no model.
-
-| Function                                        | Result per                    | Persons used                                                |
-| ----------------------------------------------- | ----------------------------- | ----------------------------------------------------------- |
-| `itemFit(matrix, items, thetas)`                | item: `ItemFit`               | Persons without an extreme score; missing responses skipped |
-| `personFit(matrix, items, thetas)`              | person: `PersonFit`           | Each person's answered items                                |
-| `correctedPersonFit(matrix, items, thetas, …)`  | person: `CorrectedPersonFit`  | Each person's answered items; none of an extreme score      |
-| `summedScoreFit(matrix, items, …)`              | item: `SummedScoreFit`        | Persons who answered every item                             |
-| `yenQ3(matrix, items, thetas)`                  | pair of items: a matrix entry | For each pair, the persons who answered both                |
-| `yenQ3CriticalValue(matrix, items, random, …)`  | test: `Q3CriticalValue`       | As `yenQ3`; each replication misses the same responses      |
-| `rootMeanSquareDeviation(matrix, items, …)`     | item: `ItemDeviation`         | Persons with a response                                     |
-| `localDependenceChiSquare(matrix, items, …)`    | pair: `LocalDependencePair`   | For each pair, the persons who answered both                |
-| `limitedInformationFit(matrix, calibration, …)` | test: `LimitedInformationFit` | Persons who answered every item                             |
-| `andersenTest(matrix, options)`                 | test: `AndersenTest`          | Those of conditional maximum likelihood                     |
-| `raschWaldTest(matrix, options)`                | item: `RaschWaldItem`         | Those of conditional maximum likelihood                     |
-| `martinLofTest(matrix, options)`                | test: `RaschTest`             | Persons who answered every item                             |
-| `kernelItemCurves(matrix, options)`             | item: `KernelItemCurve`       | Persons with a response; for an item, those who answered it |
-
-An extreme score has every answered response in its item's lowest category, or every one in its highest; its maximum
-likelihood theta is infinite. A statistic undefined for the data is `null`.
+Test the fit of Rasch and 2PL items, and of the persons, on eight persons:
 
 ```ts
 import { buildResponseMatrix } from "@measurekit/psychometrics/data";
@@ -88,6 +63,35 @@ summedScoreFit(matrix, items);
 personFit(matrix, items, thetas); // => [{ id: "person1", ..., standardizedLogLikelihood: 0.78 }, ...]
 yenQ3(matrix, items, thetas); // => [[1, 0.03, 0.32, 0.03], [0.03, 1, -0.45, -0.17], ...]: 4 × 4, symmetric
 ```
+
+## Inputs
+
+Every function takes a [response matrix](data.md) and its items, one per column, of any model, such as a
+calibration's `items`. The residual statistics also take one theta per person, finite, from any estimator; the
+references use maximum likelihood estimates for Rasch items (eRm) and EAP estimates otherwise (mirt).
+`rootMeanSquareDeviation` and `localDependenceChiSquare` integrate over a population of theta, the option
+`population`, N(0, 1) on 61 rectangular points from -6 to 6 by default: give a calibration's group at its nodes when it
+is not standard normal. `limitedInformationFit` takes the calibration itself, whose group it integrates over. The Rasch tests take the matrix
+alone, as they estimate the items themselves, and so do the kernel curves, which assume no model.
+
+| Function                                        | Result per                    | Persons used                                                |
+| ----------------------------------------------- | ----------------------------- | ----------------------------------------------------------- |
+| `itemFit(matrix, items, thetas)`                | item: `ItemFit`               | Persons without an extreme score; missing responses skipped |
+| `personFit(matrix, items, thetas)`              | person: `PersonFit`           | Each person's answered items                                |
+| `correctedPersonFit(matrix, items, thetas, …)`  | person: `CorrectedPersonFit`  | Each person's answered items; none of an extreme score      |
+| `summedScoreFit(matrix, items, …)`              | item: `SummedScoreFit`        | Persons who answered every item                             |
+| `yenQ3(matrix, items, thetas)`                  | pair of items: a matrix entry | For each pair, the persons who answered both                |
+| `yenQ3CriticalValue(matrix, items, random, …)`  | test: `Q3CriticalValue`       | As `yenQ3`; each replication misses the same responses      |
+| `rootMeanSquareDeviation(matrix, items, …)`     | item: `ItemDeviation`         | Persons with a response                                     |
+| `localDependenceChiSquare(matrix, items, …)`    | pair: `LocalDependencePair`   | For each pair, the persons who answered both                |
+| `limitedInformationFit(matrix, calibration, …)` | test: `LimitedInformationFit` | Persons who answered every item                             |
+| `andersenTest(matrix, options)`                 | test: `AndersenTest`          | Those of conditional maximum likelihood                     |
+| `raschWaldTest(matrix, options)`                | item: `RaschWaldItem`         | Those of conditional maximum likelihood                     |
+| `martinLofTest(matrix, options)`                | test: `RaschTest`             | Persons who answered every item                             |
+| `kernelItemCurves(matrix, options)`             | item: `KernelItemCurve`       | Persons with a response; for an item, those who answered it |
+
+An extreme score has every answered response in its item's lowest category, or every one in its highest; its maximum
+likelihood theta is infinite. A statistic undefined for the data is `null`.
 
 ## Infit and outfit
 
@@ -603,6 +607,34 @@ Invalid input throws `DataError` naming the value found.
 | Kernel curves of fewer than two persons with a response   | Give the responses of two persons or more                                               |
 | lz* of an item of more than two categories                | lz* is for dichotomous items; `personFit`'s lz takes any model                          |
 
+## Not included
+
+| Not included                                                                         | Why                                                                                                               |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Nonparametric Rasch tests, RaschSampler                                              | No fit: a Monte Carlo sampler of matrices.                                                                        |
+| Stepwise item elimination                                                            | No fit: a loop over `andersenTest` or `raschWaldTest`.                                                            |
+| Bootstrap goodness of fit of the Rasch model                                         | No fit: a loop over `calibrate`.                                                                                  |
+| eRm's `gofIRT`                                                                       | Outside the sources: an option of eRm.                                                                            |
+| The G² form of local dependence                                                      | Outside the sources: an option of mirt; `localDependenceChiSquare` is Chen and Thissen's X² form.                 |
+| Bias-corrected RMSD, MAD and the RMSD chi-square                                     | Outside the sources: options of CDM's `IRT.RMSD`.                                                                 |
+| MADaQ3 and TAM's absolute chi-square                                                 | Outside the sources: options of TAM; `yenQ3` and SRMSR cover them.                                                |
+| M2 for several groups                                                                | Outside the sources: an option of mirt; `limitedInformationFit` takes one population.                             |
+| M2 with covariates, testlets or an empirical histogram                               | Outside the sources: options of mirt; the normal population is the practice.                                      |
+| Fit on two- and three-way margins                                                    | Outside the sources: `limitedInformationFit` is the practice.                                                     |
+| Person-fit cutoffs by simulation                                                     | No fit: a loop over `simulateResponses` and `correctedPersonFit`.                                                 |
+| The Q3 bootstrap of a calibration with groups, a latent regression or person weights | Outside the sources: Christensen, Makransky and Horton bootstrap a calibration of one standard normal population. |
+| Quadratic and uniform kernels                                                        | Outside the sources: options of KernSmoothIRT, whose default is the Gaussian.                                     |
+| A bandwidth by cross-validation                                                      | Outside the sources: an option of KernSmoothIRT, whose default is Silverman's rule.                               |
+| Kernel curves by group, for DIF                                                      | Outside the sources: an option of KernSmoothIRT; the methods of [dif](dif.md) are the practice.                   |
+| X2 and G2 on groups of estimated theta                                               | No reference: mirt's flag 79% of the items of a true model at 0.05 on 30 seeded sets, where S-X² flags 6.2%.      |
+| PV-Q1 and its star form                                                              | Outside the sources: options of mirt from 2017; PV-Q1 flagged 0% at 0.05 on the same sets.                        |
+| X2 star and its degrees of freedom                                                   | Outside the sources: options of mirt, beside S-X².                                                                |
+| Yen's Q1 with Monte Carlo p-values                                                   | Outside the sources: S-X² replaced it.                                                                            |
+| Wald tests of constraints                                                            | No fit: the library has no constraint language.                                                                   |
+| Lagrange tests                                                                       | No fit: the library has no constraint language.                                                                   |
+| The second-order convergence test                                                    | No fit: a check of an optimizer, not of a model.                                                                  |
+| Bayesian model fit                                                                   | No fit: posterior predictive checks need the draws of a sampler: general Bayesian computation.                    |
+
 ## Differences from the references
 
 | Topic                                                  | This package                                                                                     | Reference                                                                                                                                                                                                                                          |
@@ -619,7 +651,7 @@ Invalid input throws `DataError` naming the value found.
 | M2* of the independence model                          | N Σ r², on J (J - 1) / 2 df: the statistic on the whole complement of Δ, on polytomous items too | mirt's Δ has rank J below its columns, and `qr.Q` takes an arbitrary part of the complement: 238.6, and 257.6 with the items reversed                                                                                                              |
 | A Δ whose rank is below its columns                    | The whole complement of its span, with the moments less its rank as df                           | mirt and GDINA take nrow - ncol columns of `qr.Q`'s complement, which depend on the order of Δ's columns                                                                                                                                           |
 | Missing responses in M2                                | The persons who answered every item                                                              | mirt: each moment from the persons who answered its items                                                                                                                                                                                          |
-| Rasch tests with missing responses of polytomous items | Each conditional likelihood is maximized                                                         | eRm's `PCM` does not maximize it (see [irt](irt.md#differences-from-erm)), so neither does `LRtest`: 60.46 on the fixtures' small sparse test, whose statistic is 11.65 by base R                                                                  |
+| Rasch tests with missing responses of polytomous items | Each conditional likelihood is maximized                                                         | eRm's `PCM` does not maximize it (see [irt](irt.md#erm)), so neither does `LRtest`: 60.46 on the fixtures' small sparse test, whose statistic is 11.65 by base R                                                                                   |
 | Items left out of a Rasch test                         | Counted again after each item left out, over the persons each conditional likelihood uses        | eRm checks each group once over all its persons, so an item that another's exclusion leaves constant stays, and its parameter in that group diverges                                                                                               |
 | The Wald test of a polytomous item                     | The item's location, the mean of its thresholds                                                  | eRm's `Waldtest` compares each item-category parameter, normalized to sum to 0 for the PCM; for the rating scale model the location equals eRm's first one                                                                                         |
 | The Martin-Löf test of the rating scale model          | Its degrees of freedom count the steps of each set                                               | eRm's `MLoef` counts those of the partial credit model: 80 on the fixtures' rating scale test, against 82                                                                                                                                          |
@@ -634,36 +666,3 @@ Invalid input throws `DataError` naming the value found.
 | A missing response in kernel curves                    | The person leaves the item's averages                                                            | `ksIRT` makes it an option of its own, of score 0, whose curve the others share the node with                                                                                                                                                      |
 | A bandwidth that underflows every weight               | The weights relative to the nearest person's                                                     | `ksIRT` gives the curve 0 at that node                                                                                                                                                                                                             |
 | A bandwidth given as a number                          | `bandwidth`                                                                                      | `ksIRT` 6.6 refuses one: its `match.arg` takes `"Silverman"` or `"CV"` alone                                                                                                                                                                       |
-
-## Not included
-
-- **Nonparametric Rasch tests, RaschSampler.** No fit: a Monte Carlo sampler of matrices.
-- **Stepwise item elimination.** No fit: a loop over `andersenTest` or `raschWaldTest`.
-- **Bootstrap goodness of fit of the Rasch model.** No fit: a loop over `calibrate`.
-- **eRm's `gofIRT`.** Outside the sources: an option of eRm.
-- **The G² form of local dependence.** Outside the sources: an option of mirt; `localDependenceChiSquare` is Chen and
-  Thissen's X² form.
-- **Bias-corrected RMSD, MAD and the RMSD chi-square.** Outside the sources: options of CDM's `IRT.RMSD`.
-- **MADaQ3 and TAM's absolute chi-square.** Outside the sources: options of TAM; `yenQ3` and SRMSR cover them.
-- **M2 for several groups.** Outside the sources: an option of mirt; `limitedInformationFit` takes one population.
-- **M2 with covariates, testlets or an empirical histogram.** Outside the sources: options of mirt; the normal population
-  is the practice.
-- **Fit on two- and three-way margins.** Outside the sources: `limitedInformationFit` is the practice.
-- **Person-fit cutoffs by simulation.** No fit: a loop over `simulateResponses` and `correctedPersonFit`.
-- **The Q3 bootstrap of a calibration with groups, a latent regression or person weights.** Outside the sources:
-  Christensen, Makransky and Horton bootstrap a calibration of one standard normal population.
-- **Quadratic and uniform kernels.** Outside the sources: options of KernSmoothIRT, whose default is the Gaussian.
-- **A bandwidth by cross-validation.** Outside the sources: an option of KernSmoothIRT, whose default is Silverman's
-  rule.
-- **Kernel curves by group, for DIF.** Outside the sources: an option of KernSmoothIRT; the methods of [dif](dif.md)
-  are the practice.
-- **X2 and G2 on groups of estimated theta.** No reference: mirt's flag 79% of the items of a true model at 0.05 on 30
-  seeded sets, where S-X² flags 6.2%.
-- **PV-Q1 and its star form.** Outside the sources: options of mirt from 2017; PV-Q1 flagged 0% at 0.05 on the same
-  sets.
-- **X2 star and its degrees of freedom.** Outside the sources: options of mirt, beside S-X².
-- **Yen's Q1 with Monte Carlo p-values.** Outside the sources: S-X² replaced it.
-- **Wald tests of constraints.** No fit: the library has no constraint language.
-- **Lagrange tests.** No fit: the library has no constraint language.
-- **The second-order convergence test.** No fit: a check of an optimizer, not of a model.
-- **Bayesian model fit.** No fit: posterior predictive checks need the draws of a sampler: general Bayesian computation.

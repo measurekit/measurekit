@@ -6,9 +6,9 @@ import {
   checkErrorNames,
   checkFamilies,
   checkFileNames,
+  checkGuideSections,
   checkHistory,
   checkModuleExamples,
-  checkModuleGuides,
   checkNotIncluded,
   checkReadonlyResults,
   checkSectionSigns,
@@ -299,103 +299,108 @@ describe("module examples", () => {
   });
 });
 
-describe("not included", () => {
-  const bullet = "- **Kernel equating.** Outside the sources: Kolen and Brennan give it no chapter.\n";
+describe("guide sections", () => {
+  const complete = [
+    "# Guide",
+    "## Quick start",
+    "## Errors",
+    "## Not included",
+    "",
+    "| Not included    | Why                                                     |",
+    "| --------------- | ------------------------------------------------------- |",
+    "| Kernel equating | Outside the sources: Kolen and Brennan give it no chapter. |",
+    "",
+    "## Differences from the references",
+  ].join("\n");
 
-  it("accepts a bullet of a method, a reason of the three and why, wrapped or not, at any heading level", () => {
+  it("accepts the guide of a module that has every section, and the pages that are not guides of a module", () => {
     const files = repository({
-      "docs/a/one.md": `# One\n\n## Not included\n\n${bullet}- **Deep learning.** No fit: it needs a tensor\n  runtime.\n- **Spline.** No\n  reference: nothing runs it.\n\n## Next\n`,
-      "docs/a/two.md": `# Two\n\n### Not included\n\n${bullet}`,
-    });
-    expect(checkNotIncluded(files)).toStrictEqual([]);
-  });
-
-  it("reports a bullet without a method in bold, with another reason, without why, and prose or a table", () => {
-    const files = repository({
-      "docs/a/one.md": [
-        "## Not included",
-        "",
-        "- Kernel equating.",
-        "- **Kernel equating.** Little use: it is rare.",
-        "- **Kernel equating** No fit: no period.",
-        "- **Kernel equating.** No fit:",
-        "Some prose.",
-        "| Method | Reason |",
-        bullet.trim(),
-      ].join("\n"),
-    });
-    expect(checkNotIncluded(files).map(({ line }) => line)).toStrictEqual([3, 4, 5, 6, 7, 8]);
-  });
-
-  it("reads only the Not included sections of the guides", () => {
-    const files = repository({
-      "docs/a/one.md": "## Differences\n\n- Anything goes here.\n",
-      "README.md": "## Not included\n\n- Anything.\n",
-    });
-    expect(checkNotIncluded(files)).toStrictEqual([]);
-  });
-});
-
-describe("module guides", () => {
-  const source = {
-    "packages/a/src/index.ts": 'export * from "./one/index.js";\n',
-    "packages/a/src/one/index.ts": "export const one = 1;\n",
-    "packages/a/src/two/index.ts": "export const two = 2;\n",
-    "packages/a/src/math/internal.ts": "export const three = 3;\n",
-  };
-  const section = "## Not included\n\n- **Kernel equating.** No fit: it is rare.\n";
-
-  it("reports the guide of a module without a Not included section, with the guide and the module in the message", () => {
-    const files = repository({
-      ...source,
-      "docs/a/one.md": `# One\n\n${DIAGRAM}`,
-      "docs/a/two.md": `# Two\n\n${section}`,
-    });
-    expect(checkModuleGuides(files)).toStrictEqual([
-      {
-        file: "docs/a/one.md",
-        line: 0,
-        rule: "module-guide",
-        message:
-          'The guide of the one module has no "## Not included" section; list each method the module leaves out, with its reason.',
-      },
-    ]);
-  });
-
-  it("accepts the section at the end of a guide, whatever the sections around it", () => {
-    const files = repository({
-      ...source,
-      "docs/a/one.md": `# One\n\n## Options\n\n${section}\n## References\n`,
-      "docs/a/two.md": `# Two\n\n## Options\n\n${section.trimEnd()}`,
-    });
-    expect(checkModuleGuides(files)).toStrictEqual([]);
-  });
-
-  it("does not take a heading of another level, a fenced heading or a similar title for the section", () => {
-    const files = repository({
-      ...source,
-      "docs/a/one.md": "# One\n\n### Not included\n\n- **A.** No fit: b.\n",
-      "docs/a/two.md": "# Two\n\n```md\n## Not included\n```\n\n## Not included here\n",
-    });
-    expect(checkModuleGuides(files).map(({ file }) => file)).toStrictEqual(["docs/a/one.md", "docs/a/two.md"]);
-  });
-
-  it("asks nothing of the other documents of a package, nor of a guide of another package", () => {
-    const files = repository({
-      ...source,
+      "docs/a/one.md": complete,
       "docs/a/architecture.md": "# Architecture\n",
+      "docs/a/performance.md": "# Performance\n",
+      "docs/a/storage.md": "# Storage\n",
       "docs/a/validation.md": "# Validation\n",
-      "docs/a/math.md": "# Math\n",
-      "docs/b/one.md": "# One\n",
       "docs/a/one/extra.md": "# Extra\n",
       "README.md": "# A\n",
     });
-    expect(checkModuleGuides(files)).toStrictEqual([]);
+    expect(checkGuideSections(files)).toStrictEqual([]);
+  });
+
+  it("names each section that the guide of a module lacks, and ignores a heading inside a fence or of another level", () => {
+    const files = repository({
+      "docs/a/one.md": ["# One", "## Quick start", "```md", "## Errors", "```", "### Not included"].join("\n"),
+    });
+    expect(checkGuideSections(files)).toStrictEqual(
+      ["Errors", "Not included", "Differences from the references"].map((title) => ({
+        file: "docs/a/one.md",
+        line: 0,
+        rule: "guide-sections",
+        message: `Every guide of a module has a "## ${title}" section; add it, with "None" and the reason where there is nothing to say.`,
+      })),
+    );
   });
 
   it("is one of the checks of the repository", () => {
-    const files = repository({ ...source, "docs/a/one.md": `# One\n\n${DIAGRAM}` });
-    expect(checkStandards(files).filter(({ rule }) => rule === "module-guide")).toHaveLength(1);
+    const files = repository({ "docs/a/one.md": `# One\n\n${DIAGRAM}` });
+    expect(checkStandards(files).filter(({ rule }) => rule === "guide-sections")).toHaveLength(4);
+  });
+});
+
+describe("not included", () => {
+  const table = (...rows: string[]): string =>
+    ["# One", "", "## Not included", "", "| Not included | Why |", "| --- | --- |", ...rows, ""].join("\n");
+
+  it("accepts a table of a method and a reason of the three with why on each row, before the next section", () => {
+    const files = repository({
+      "docs/a/one.md": `${table(
+        "| Kernel equating | Outside the sources: Kolen and Brennan give it no chapter. |",
+        "| Deep learning   | No fit: it needs a tensor runtime.                           |",
+        "| A \\| B spline  | No reference: nothing runs it.                               |",
+      )}\n## References\n\n- Anything.\n`,
+    });
+    expect(checkNotIncluded(files)).toStrictEqual([]);
+  });
+
+  it("reports a row without a method, with another reason, without why, of more cells, and prose in the table", () => {
+    const files = repository({
+      "docs/a/one.md": table(
+        "|  | No fit: no method. |",
+        "| Kernel equating | Little use: it is rare. |",
+        "| Kernel equating | No fit: |",
+        "| Kernel equating | No fit: it is rare. | More |",
+        "Some prose.",
+      ),
+    });
+    expect(checkNotIncluded(files).map(({ line, rule }) => [line, rule])).toStrictEqual([
+      [7, "not-included"],
+      [8, "not-included"],
+      [9, "not-included"],
+      [10, "not-included"],
+      [11, "not-included"],
+    ]);
+  });
+
+  it("reports bullets or another header in place of the table, and a header without its delimiter row", () => {
+    const files = repository({
+      "docs/a/one.md": "## Not included\n\n- **Kernel equating.** No fit: it is rare.\n",
+      "docs/a/two.md": "## Not included\n\n| What | Reason |\n| --- | --- |\n",
+      "docs/a/three.md": "## Not included\n\n| Not included | Why |\n| Kernel equating | No fit: it is rare. |\n",
+      "docs/a/four.md": "## Not included\n",
+    });
+    expect(checkNotIncluded(files).map(({ file, line }) => [file, line])).toStrictEqual([
+      ["docs/a/one.md", 3],
+      ["docs/a/two.md", 3],
+      ["docs/a/three.md", 4],
+      ["docs/a/four.md", 1],
+    ]);
+  });
+
+  it("reads only the Not included sections of the pages of docs", () => {
+    const files = repository({
+      "docs/a/one.md": "## Differences from the references\n\n- Anything goes here.\n",
+      "README.md": "## Not included\n\n- Anything.\n",
+    });
+    expect(checkNotIncluded(files)).toStrictEqual([]);
   });
 });
 

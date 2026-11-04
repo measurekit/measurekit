@@ -12,11 +12,9 @@ raters who are harsher or milder than usual on one item. The agreement statistic
 effsize and RSMTool, the routing curve, the mappings and the replay against base R, the model against base R and TAM
 ([validation](validation.md)).
 
-## Ratings
+## Quick start
 
-Every function takes ratings by subject: one row per rated subject, such as an essay, with one rating per rater,
-`null` when a rater did not rate the subject. Agreement and kappa take categories, integers from 0, as item responses; the
-correlation, the standardized mean difference and the intraclass correlations take any finite numbers. Each statistic uses the subjects every rater rated.
+Score the agreement of three raters on four essays:
 
 ```ts
 import { cohenKappa, fleissKappa, intraclassCorrelation } from "@measurekit/psychometrics/rater";
@@ -35,6 +33,12 @@ cohenKappa(
 fleissKappa(ratings); // => 0.40, over essays 1 to 3
 intraclassCorrelation(ratings); // => { oneWay: 0.88, agreement: 0.89, consistency: 0.91, oneWayAverage: 0.96, ... }
 ```
+
+## Ratings
+
+Every function takes ratings by subject: one row per rated subject, such as an essay, with one rating per rater,
+`null` when a rater did not rate the subject. Agreement and kappa take categories, integers from 0, as item responses; the
+correlation, the standardized mean difference and the intraclass correlations take any finite numbers. Each statistic uses the subjects every rater rated.
 
 ## Kappa
 
@@ -393,20 +397,6 @@ replayShift(
 ); // => { standardizedShift: 0.24, standardError: 0.16, passed: false, ... }
 ```
 
-### Differences from RSMTool
-
-On PERSUADE 2.0's essays on one prompt and ELLIPSE's double-scored essays, with machine scores from essay length, every
-statistic of `automatedScoreAgreement` equals RSMTool 12.0.0's within 1.3e-13 ([validation](validation.md)).
-
-| Topic                      | measurekit                                         | RSMTool                                                               |
-| -------------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
-| Agreement                  | A proportion                                       | A percentage                                                          |
-| The SMD of a whole sample  | Pooled over the two raters, Williamson et al.'s    | `"unpooled"`, the human SD alone, by default in the analyzer          |
-| The SMD of a subgroup      | On the population's pooled SD, Williamson et al.'s | The difference of standardized means (DSM) by default in the analyzer |
-| The degradation of the SMD | Not given                                          | The machine-human SMD unpooled less the human-human SMD pooled        |
-| Kappa of unrounded scores  | Round first: a category is an integer              | `quadratic_weighted_kappa` takes continuous scores                    |
-| Thresholds                 | Judged by `validateAutomatedScores`                | Not judged: the report shows the values                               |
-
 ## Many-facet Rasch model
 
 `manyFacetRasch(scores, options)` estimates the many-facet Rasch model (Linacre, 1989) by marginal maximum likelihood.
@@ -609,7 +599,77 @@ The biases enter `manyFacetEstimates` and `manyFacetFit`, which score each ratin
 enter `expectedRating` or the fair averages of a facet, which are at a facet's mean: a facet that is not in `levels` has
 no cell.
 
-### Differences from FACETS
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                                                                                 | What to do                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| A subject without one rating per rater, or a rating that is not a category or a finite number, or `null`                              | Give each subject a row of the raters' ratings, `null` where a rater did not rate |
+| An evaluation of automated scores without a machine and a human score per subject, or with fewer subjects than its minimum            | Give each subject `{ machine, human }`, and enough subjects                       |
+| A machine score that is not a category for the agreement statistics                                                                   | Pass the option `scale`, which rounds and trims the machine scores                |
+| A mapping of machine scores to human ones whose scores do not vary, or knots out of order                                             | Fit the mapping on scores that vary                                               |
+| Faceted scores of the many-facet Rasch model without a person facet, an element of a facet, or a score from 0 to its highest category | Give each score its person and the element of every facet                         |
+| A category that no score of a facet's element uses, below one that is used                                                            | Merge the empty category with a neighbor                                          |
+| An interaction whose cells the elements fix, so that every bias would be 0                                                            | Score elements together with at least two elements of the other facet             |
+
+## Not included
+
+| Not included                                                           | Why                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Joint maximum likelihood (FACETS)                                      | Outside the sources: its measures are biased for short tests, and marginal maximum likelihood is consistent. Measures differ from FACETS' by its bias.                          |
+| Rater drift as a term of the many-facet model                          | No reference: it needs its own terms in the model, and no package that runs it was found; `automatedScoreDrift` gives the agreement by window.                                  |
+| The hierarchical rater model                                           | No reference: it needs its own terms in the model, and no package that runs it was found.                                                                                       |
+| A person facet other than one                                          | No reference: the persons are the only random facet.                                                                                                                            |
+| PRMSE of automated scores on true scores (Loukina et al., 2020)        | Outside the sources: no program report found uses it, and ETS's RM-23-01 (2023) was still exploring thresholds for its operational use; RSMTool has it.                         |
+| Quadratic weighted kappa of continuous scores (Haberman, 2019)         | Outside the sources: no program report found uses it; programs round machine scores, and on integers `cohenKappa` with quadratic weights is the same statistic.                 |
+| The degradation of the SMD                                             | Outside the sources: RSMTool's mixes an unpooled and a pooled SMD.                                                                                                              |
+| The difference of standardized means by subgroup (DSM)                 | Outside the sources: RSMTool's option; Williamson et al.'s subgroup SMD is `standardizedMeanDifference` with `population`.                                                      |
+| The SMD on the human SD alone, or on the population's human SD         | Outside the sources: RSMTool's `"unpooled"` and `"johnson"`; Williamson et al. pool the two SDs.                                                                                |
+| Fairness models OSA, OSD and CSD (Loukina, Madnani and Zechner, 2019)  | Outside the sources: a research proposal; no program report found uses them.                                                                                                    |
+| Building, explaining and cross-validating a scoring model              | No fit: machine learning, another domain; RSMTool, SHAP and SKLL do it.                                                                                                         |
+| Confusion matrices, score distributions and descriptive statistics     | No fit: counts and general statistics.                                                                                                                                          |
+| A least-squares line from machine to human scores                      | Outside the sources: it shrinks the scores toward their mean, which the SD ratio flags; RSMTool scales to the human mean and SD, as `scoreMapping`'s `"linear"` does.           |
+| A confidence of the scorer                                             | No fit: the scorer's own, which `routingCurve` takes.                                                                                                                           |
+| Evaluation reports, as RSMTool's HTML, `rsmcompare` and `rsmsummarize` | No fit: input and output.                                                                                                                                                       |
+| Spearman's rank correlation                                            | Outside the sources: it ranks the ratings first, which makes it a different statistic from the correlation of the ratings.                                                      |
+| The correlations among more than two raters                            | No fit: pairs of raters give them.                                                                                                                                              |
+| The small-sample correction of Hedges' g                               | Outside the sources: an option of effsize's `cohen.d`.                                                                                                                          |
+| Confidence intervals of the standardized mean difference               | Outside the sources: effsize reports them.                                                                                                                                      |
+| The standardized mean differences among more than two raters           | No fit: pairs of raters give them.                                                                                                                                              |
+| Light's kappa                                                          | Outside the sources: a function of irr, beside `cohenKappa` and `fleissKappa`.                                                                                                  |
+| Kendall's W                                                            | Outside the sources: a function of irr.                                                                                                                                         |
+| Finn's coefficient                                                     | Outside the sources: a function of irr.                                                                                                                                         |
+| Robinson's A                                                           | Outside the sources: a function of irr.                                                                                                                                         |
+| Iota                                                                   | Outside the sources: a function of irr.                                                                                                                                         |
+| Maxwell's RE                                                           | Outside the sources: a function of irr.                                                                                                                                         |
+| The Bhapkar test                                                       | Outside the sources: a function of irr.                                                                                                                                         |
+| The Stuart-Maxwell test                                                | Outside the sources: a function of irr.                                                                                                                                         |
+| Sample size for kappa                                                  | Outside the sources: a planning tool of irr.                                                                                                                                    |
+| The latent class model for two raters                                  | Outside the sources: a function of sirt.                                                                                                                                        |
+| Krippendorff's alpha                                                   | Outside the sources: the method of Hayes and Krippendorff (2007), which no testing program's technical report found uses; programs report agreement and kappa, which are built. |
+
+## Differences from the references
+
+The agreement statistics match irr, psych and base R within the tolerances of
+[validation](validation.md); the evaluation of automated scores and the many-facet Rasch model differ from their
+references as follows.
+
+### RSMTool
+
+On PERSUADE 2.0's essays on one prompt and ELLIPSE's double-scored essays, with machine scores from essay length, every
+statistic of `automatedScoreAgreement` equals RSMTool 12.0.0's within 1.3e-13 ([validation](validation.md)).
+
+| Topic                      | measurekit                                         | RSMTool                                                               |
+| -------------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
+| Agreement                  | A proportion                                       | A percentage                                                          |
+| The SMD of a whole sample  | Pooled over the two raters, Williamson et al.'s    | `"unpooled"`, the human SD alone, by default in the analyzer          |
+| The SMD of a subgroup      | On the population's pooled SD, Williamson et al.'s | The difference of standardized means (DSM) by default in the analyzer |
+| The degradation of the SMD | Not given                                          | The machine-human SMD unpooled less the human-human SMD pooled        |
+| Kappa of unrounded scores  | Round first: a category is an integer              | `quadratic_weighted_kappa` takes continuous scores                    |
+| Thresholds                 | Judged by `validateAutomatedScores`                | Not judged: the report shows the values                               |
+
+### FACETS
 
 | Topic          | This package                                                         | FACETS                                                                  |
 | -------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -618,7 +678,7 @@ no cell.
 | Separation     | The variance of the measures divided by the number of elements       | Reports it for the population (N) and for the sample (N - 1)            |
 | Bias analysis  | The biases enter the likelihood with the measures                    | A second step with the other measures fixed: the biases differ          |
 
-### Differences from TAM
+### TAM
 
 | Topic                 | This package                                                                                         | TAM's `tam.mml.mfr`                                                                     |
 | --------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -627,52 +687,6 @@ no cell.
 | Constraints           | Each facet and each set of thresholds sums to 0                                                      | The same, with `constraint = "items"`                                                   |
 | Thresholds by a facet | Any facet                                                                                            | `rater:step` fails with more than three raters in TAM 4.3-25                            |
 | Interaction           | `interactions`: biases within 4e-4 of TAM's on the fixture; standard errors from the Hessian         | `item:rater`: standard errors of its own parameters, 0.6 to 2.4 times the Hessian's     |
-
-## Not included
-
-- **Joint maximum likelihood (FACETS).** Outside the sources: its measures are biased for short tests, and marginal
-  maximum likelihood is consistent. Measures differ from FACETS' by its bias.
-- **Rater drift as a term of the many-facet model.** No reference: it needs its own terms in the model, and no package
-  that runs it was found; `automatedScoreDrift` gives the agreement by window.
-- **The hierarchical rater model.** No reference: it needs its own terms in the model, and no package that runs it was
-  found.
-- **A person facet other than one.** No reference: the persons are the only random facet.
-- **PRMSE of automated scores on true scores (Loukina et al., 2020).** Outside the sources: no program report found uses
-  it, and ETS's RM-23-01 (2023) was still exploring thresholds for its operational use; RSMTool has it.
-- **Quadratic weighted kappa of continuous scores (Haberman, 2019).** Outside the sources: no program report found uses
-  it; programs round machine scores, and on integers `cohenKappa` with quadratic weights is the same statistic.
-- **The degradation of the SMD.** Outside the sources: RSMTool's mixes an unpooled and a pooled SMD.
-- **The difference of standardized means by subgroup (DSM).** Outside the sources: RSMTool's option; Williamson et al.'s
-  subgroup SMD is `standardizedMeanDifference` with `population`.
-- **The SMD on the human SD alone, or on the population's human SD.** Outside the sources: RSMTool's `"unpooled"` and
-  `"johnson"`; Williamson et al. pool the two SDs.
-- **Fairness models OSA, OSD and CSD (Loukina, Madnani and Zechner, 2019).** Outside the sources: a research proposal; no
-  program report found uses them.
-- **Building, explaining and cross-validating a scoring model.** No fit: machine learning, another domain; RSMTool, SHAP
-  and SKLL do it.
-- **Confusion matrices, score distributions and descriptive statistics.** No fit: counts and general statistics.
-- **A least-squares line from machine to human scores.** Outside the sources: it shrinks the scores toward their mean,
-  which the SD ratio flags; RSMTool scales to the human mean and SD, as `scoreMapping`'s `"linear"` does.
-- **A confidence of the scorer.** No fit: the scorer's own, which `routingCurve` takes.
-- **Evaluation reports, as RSMTool's HTML, `rsmcompare` and `rsmsummarize`.** No fit: input and output.
-- **Spearman's rank correlation.** Outside the sources: it ranks the ratings first, which makes it a different statistic
-  from the correlation of the ratings.
-- **The correlations among more than two raters.** No fit: pairs of raters give them.
-- **The small-sample correction of Hedges' g.** Outside the sources: an option of effsize's `cohen.d`.
-- **Confidence intervals of the standardized mean difference.** Outside the sources: effsize reports them.
-- **The standardized mean differences among more than two raters.** No fit: pairs of raters give them.
-- **Light's kappa.** Outside the sources: a function of irr, beside `cohenKappa` and `fleissKappa`.
-- **Kendall's W.** Outside the sources: a function of irr.
-- **Finn's coefficient.** Outside the sources: a function of irr.
-- **Robinson's A.** Outside the sources: a function of irr.
-- **Iota.** Outside the sources: a function of irr.
-- **Maxwell's RE.** Outside the sources: a function of irr.
-- **The Bhapkar test.** Outside the sources: a function of irr.
-- **The Stuart-Maxwell test.** Outside the sources: a function of irr.
-- **Sample size for kappa.** Outside the sources: a planning tool of irr.
-- **The latent class model for two raters.** Outside the sources: a function of sirt.
-- **Krippendorff's alpha.** Outside the sources: the method of Hayes and Krippendorff (2007), which no testing program's
-  technical report found uses; programs report agreement and kappa, which are built.
 
 ## References
 

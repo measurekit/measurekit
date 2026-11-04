@@ -22,11 +22,9 @@ flowchart LR
 | `reliableChange(pre, post, test, options)`        | Did one person change more than error explains, from test scores? | Two scores, the test's sd and reliability   |
 | `reliableChangeFromTheta(before, after, options)` | The same, from ability estimates                                  | Two estimates with their standard errors    |
 
-## Gains
+## Quick start
 
-Each function takes the scores of the same persons, in the same order, as two arrays of finite numbers, and needs at
-least one person (`residualGain` two). A gain of a person who did not take both tests has no place in the arrays: leave
-the person out of both.
+Compute the gains of five persons between two tests of 50 points:
 
 ```ts
 import { normalizedGain, residualGain, simpleGain } from "@measurekit/psychometrics/change";
@@ -39,6 +37,12 @@ residualGain(pre, post); // => [-0.097, -6.329, 4.726, -2.451, 4.151]
 normalizedGain(pre, post, { maximum: 50 });
 // => { group: 0.205, persons: [0.158, -0.033, 0.474, null, 0.36] }
 ```
+
+## Gains
+
+Each function takes the scores of the same persons, in the same order, as two arrays of finite numbers, and needs at
+least one person (`residualGain` two). A gain of a person who did not take both tests has no place in the arrays: leave
+the person out of both.
 
 | Gain       | Definition                                                                      | Reads as                                                           |
 | ---------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -134,15 +138,15 @@ Invalid input throws `DataError` with the value found.
 | A `level` of 0 or 1, or outside                                       | Use a level between 0 and 1, such as 0.9 or 0.95                                     |
 | A standard error that is 0 or not finite in `reliableChangeFromTheta` | Estimate the person again with items that carry information                          |
 
+## Not included
+
+| Not included                             | Why                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The cutoffs of clinical significance     | Outside the sources: the module takes from Jacobson and Truax (1991) the reliable change index and from Cronbach and Furby (1970) the measurement of change. |
+| Other forms of the reliable change index | Outside the sources: the module follows the index of Jacobson and Truax (1991).                                                                              |
+
 ## Differences from the references
 
 | Reference                                                 | Difference                                                                                                                                                                                               |
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | clinicalsignificance `cs_distribution(rci_method = "JT")` | It takes the standard deviation from the data and a reliability from 0 to 1; this library takes both as input and refuses a reliability of 1. `better_is = "higher"` gives this library's classification |
-
-## Not included
-
-- **The cutoffs of clinical significance.** Outside the sources: the module takes from Jacobson and Truax (1991) the
-  reliable change index and from Cronbach and Furby (1970) the measurement of change.
-- **Other forms of the reliable change index.** Outside the sources: the module follows the index of Jacobson and Truax
-  (1991).

@@ -19,12 +19,9 @@ flowchart LR
   B["Bootstrap and delta-method standard errors"] --> R
 ```
 
-## Linking
+## Quick start
 
-Each calibration fixes theta ~ N(0, 1) in its own group, so the same item gets different parameters from groups of
-different ability. A linear transformation θ_to = A θ_from + B, a `ScaleTransformation` `{ slope, intercept }`, maps
-one scale to the other. The linking functions estimate it from common items: `from[j]` and `to[j]` are the same item
-calibrated on the two scales, with the same model and number of categories.
+Link two forms through their common items, move form X to form Y's scale, and equate their true scores:
 
 ```ts
 import { haebaraLinking, transformItem, transformTheta, trueScoreEquating } from "@measurekit/psychometrics/equating";
@@ -42,6 +39,13 @@ const formXOnY = formX.map((x) => transformItem(x, transformation));
 transformTheta(0.5, transformation); // => 0.78, a theta of form X's calibration on form Y's scale
 trueScoreEquating(formXOnY, formY); // => [0.00, 1.17, 2.16, 3.00]: the form Y true score of each form X score, 0 to 3
 ```
+
+## Linking
+
+Each calibration fixes theta ~ N(0, 1) in its own group, so the same item gets different parameters from groups of
+different ability. A linear transformation θ_to = A θ_from + B, a `ScaleTransformation` `{ slope, intercept }`, maps
+one scale to the other. The linking functions estimate it from common items: `from[j]` and `to[j]` are the same item
+calibrated on the two scales, with the same model and number of categories.
 
 | Function                                 | A and B                                                                                                        |
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -615,32 +619,6 @@ linkedEquatingErrors(formY, formX);
 // => [0, 0.139, 0.192, 0.181, 0.126, 0.087, 0.091, 0.108, 0.112, 0.086, 0]: the error of each form Y score's equivalent
 ```
 
-## Not included
-
-- **Braun-Holland linear equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the
-  linear, equipercentile and frequency estimation families that are built.
-- **Circle-arc equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the families
-  that are built.
-- **Nominal weights equating.** Outside the sources: Kolen and Brennan give it no chapter, and the practice is the
-  families that are built.
-- **Cubic-spline postsmoothing.** No reference: no R package for it was found, and the C code of Equating Recipes was
-  not run.
-- **Analytic standard errors of observed-score equating.** No reference: `equate` has only the bootstrap, and
-  `bootstrapEquating` is built; kernel equating has its own.
-- **Local equating.** Outside the sources: chapter 6 of González and Wiberg presents a research method; the list's
-  coverage does not name it.
-- **The methods of "Recent Developments in Equating".** Outside the sources: research methods.
-- **Kernel IRT observed-score equating.** Outside the sources: a variant of `irtObservedScoreEquating`.
-- **Kernel equating with covariates, kequate's NEC design.** Outside the sources: a research extension;
-  post-stratification on an anchor is the practice, and is built.
-- **Logistic and uniform kernels.** Outside the sources: options of kequate; the Gaussian kernel is the practice.
-- **Freeman-Tukey residuals of a presmoothing.** No fit: one line over the fitted counts.
-- **Composite linking.** Outside the sources: an option of equate.
-- **Bisector linking.** Outside the sources: an option of equateIRT.
-- **Linking several forms at once, Haberman's linking, robust linking.** Outside the sources: `linkCovariance` over a
-  chain and concurrent `groups` are the practice.
-- **Identity and chain-consistency tests.** Outside the sources: functions of equateIRT; `robustZ` screens the items.
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
@@ -669,6 +647,26 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `irtEquatingStandardErrors`, `linkCovariance`, `linkedEquatingErrors`                                                       | A covariance that is not a square matrix of finite numbers, a parameter on a bound of its range such as c = 0, or a negative variance                                                      | Pass the covariance of `calibrateWithCovariance`, without fixed bounds                   |
 | `linkCovariance`, `linkedEquatingErrors`                                                                                    | Fewer than two forms, forms that share no item by id, or no covariance with a parameter of a common item                                                                                   | Give forms that share common items, with their covariances                               |
 | `linkCovariance`, `linkedEquatingErrors`                                                                                    | A characteristic curve criterion with no strict minimum at the link                                                                                                                        | Use common items whose curves rise with theta, or a moment method                        |
+
+## Not included
+
+| Not included                                                      | Why                                                                                                                                                         |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Braun-Holland linear equating                                     | Outside the sources: Kolen and Brennan give it no chapter, and the practice is the linear, equipercentile and frequency estimation families that are built. |
+| Circle-arc equating                                               | Outside the sources: Kolen and Brennan give it no chapter, and the practice is the families that are built.                                                 |
+| Nominal weights equating                                          | Outside the sources: Kolen and Brennan give it no chapter, and the practice is the families that are built.                                                 |
+| Cubic-spline postsmoothing                                        | No reference: no R package for it was found, and the C code of Equating Recipes was not run.                                                                |
+| Analytic standard errors of observed-score equating               | No reference: `equate` has only the bootstrap, and `bootstrapEquating` is built; kernel equating has its own.                                               |
+| Local equating                                                    | Outside the sources: chapter 6 of González and Wiberg presents a research method; the list's coverage does not name it.                                     |
+| The methods of "Recent Developments in Equating"                  | Outside the sources: research methods.                                                                                                                      |
+| Kernel IRT observed-score equating                                | Outside the sources: a variant of `irtObservedScoreEquating`.                                                                                               |
+| Kernel equating with covariates, kequate's NEC design             | Outside the sources: a research extension; post-stratification on an anchor is the practice, and is built.                                                  |
+| Logistic and uniform kernels                                      | Outside the sources: options of kequate; the Gaussian kernel is the practice.                                                                               |
+| Freeman-Tukey residuals of a presmoothing                         | No fit: one line over the fitted counts.                                                                                                                    |
+| Composite linking                                                 | Outside the sources: an option of equate.                                                                                                                   |
+| Bisector linking                                                  | Outside the sources: an option of equateIRT.                                                                                                                |
+| Linking several forms at once, Haberman's linking, robust linking | Outside the sources: `linkCovariance` over a chain and concurrent `groups` are the practice.                                                                |
+| Identity and chain-consistency tests                              | Outside the sources: functions of equateIRT; `robustZ` screens the items.                                                                                   |
 
 ## Differences from the references
 

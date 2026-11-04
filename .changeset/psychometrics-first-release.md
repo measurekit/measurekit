@@ -148,8 +148,8 @@ near an item's location. `calibrateUnfolding` calibrates it as the GGUM package 
 through the graded unfolding model and the model with a = 1, to every parameter, leaving out the persons who disagree
 with every item and reporting how many it kept.
 
-The guide of each module lists under Not included the methods it leaves out, one bullet each with its reason, and
-`check:standards` fails a module guide without the section. The guides show as recipes what a few lines over the functions
+The guide of each module opens with a quick start and ends with its errors, the methods it leaves out, one row each with
+its reason, and its differences from the references; `check:standards` fails a module guide without these sections. The guides show as recipes what a few lines over the functions
 compute, each with a test against its reference: plausible values and Rubin's rules, responses missing not at random,
 restricted exposure, the nested-model chi-square, bootstrap standard errors and the intervals of alpha and omega.
 

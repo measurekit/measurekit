@@ -30,7 +30,7 @@ flowchart TD
 | Move items and thetas   | `transformItem`, `transformTheta`                                              | equating                              |
 | Report growth           | `scaleGrowth(groups)`                                                          | scaling                               |
 
-## A worked sample
+## Quick start
 
 Three grades take forms of 20 items from a pool of 48. Each form shares 6 items with the form of the grade below. The
 persons of grade 3 have theta ~ N(0, 1), those of grade 4 N(0.8, 1.2²) and those of grade 5 N(1.3, 1.1²), 1,000 persons
@@ -214,14 +214,15 @@ Invalid input throws `DataError` with the value found.
 
 ## Not included
 
-- **Growth curves.** No fit: general statistics applied to scores.
-- **Mixed models.** No fit: general statistics applied to scores; `lme4` fits them.
-- **Student growth percentiles.** No fit: quantile regression and accountability policy are a wider domain than scaling;
-  `SGP` exists on CRAN.
-- **Value-added models.** No fit: accountability policy is a wider domain than scaling.
-- **Hieronymus scaling.** No reference: Kolen and Brennan's chapter 9 treats it, and no package on CRAN does.
-- **Thurstone scaling.** No reference: Kolen and Brennan's chapter 9 treats it, and no package on CRAN does.
-- **Grade equivalents.** No reference: Kolen and Brennan's chapter 9 treats them, and no package on CRAN does.
+| Not included               | Why                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Growth curves              | No fit: general statistics applied to scores.                                                                |
+| Mixed models               | No fit: general statistics applied to scores; `lme4` fits them.                                              |
+| Student growth percentiles | No fit: quantile regression and accountability policy are a wider domain than scaling; `SGP` exists on CRAN. |
+| Value-added models         | No fit: accountability policy is a wider domain than scaling.                                                |
+| Hieronymus scaling         | No reference: Kolen and Brennan's chapter 9 treats it, and no package on CRAN does.                          |
+| Thurstone scaling          | No reference: Kolen and Brennan's chapter 9 treats it, and no package on CRAN does.                          |
+| Grade equivalents          | No reference: Kolen and Brennan's chapter 9 treats them, and no package on CRAN does.                        |
 
 ## Differences from the references
 

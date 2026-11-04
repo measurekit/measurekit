@@ -52,7 +52,7 @@ flowchart LR
 | A state or parameters altered in a database or browser storage | The learner models check the states and parameters they are given and throw `DataError`, so stored data can be passed in directly. A learner can still edit a state kept in browser storage to a valid one: keep states on a server where estimates matter |
 | A long log                                                     | A log is checked and replayed in time proportional to its events, and cross-validation fits the model once per fold                                                                                                                                        |
 | Inductive item tree analysis of many items                     | Its time grows faster than its limits bound: 1,000 learners take 10 ms at 12 items and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). Run it in a worker with a deadline   |
-| A knowledge structure of many states                           | A structure built from prerequisites or clauses stops at `maxStates`, and the masks of a model at 2^28 cells ([kst](docs/knowledge-tracing/kst.md#limits-and-errors))                                                                                      |
+| A knowledge structure of many states                           | A structure built from prerequisites or clauses stops at `maxStates`, and the masks of a model at 2^28 cells ([kst](docs/knowledge-tracing/kst.md#limits))                                                                                                 |
 
 ## Core
 
@@ -101,11 +101,11 @@ What would grow faster than the input has a limit, and passing it throws `DataEr
 | Products of conditional maximum likelihood's functions with two items left out, in a Newton step   | 2^29: a step of 0.6 to 8.5 s               | [irt](docs/psychometrics/irt.md#conditional-maximum-likelihood)                                               |
 | Estimated parameters of standard errors, of IRT of one or more dimensions                          | 2,000: about 210 MB                        | [irt](docs/psychometrics/irt.md#standard-errors)                                                              |
 | Coefficients of a logistic fit without a ridge, or random θ                                        | 5,000: a dense matrix of 200 MB            | [logistic](docs/knowledge-tracing/logistic.md)                                                                |
-| States of a structure built from prerequisites or clauses                                          | `maxStates`, 10,000                        | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-| Learning paths; cells of the Jacobian of identifiability                                           | `maxPaths`, 10,000; 1e7                    | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-| Items of IITA, the difference test and the validity of a structure; elements of a surmise relation | 1,000: tables of a cell for each pair      | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-| Cells of IITA's candidates: a prerequisite each, and 8 for each item                               | 24 million: about 260 MB                   | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-| Cells of a KST model's masks: a byte for each state and set of skills                              | 2^28: 256 MB                               | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
+| States of a structure built from prerequisites or clauses                                          | `maxStates`, 10,000                        | [kst](docs/knowledge-tracing/kst.md#limits)                                                                   |
+| Learning paths; cells of the Jacobian of identifiability                                           | `maxPaths`, 10,000; 1e7                    | [kst](docs/knowledge-tracing/kst.md#limits)                                                                   |
+| Items of IITA, the difference test and the validity of a structure; elements of a surmise relation | 1,000: tables of a cell for each pair      | [kst](docs/knowledge-tracing/kst.md#limits)                                                                   |
+| Cells of IITA's candidates: a prerequisite each, and 8 for each item                               | 24 million: about 260 MB                   | [kst](docs/knowledge-tracing/kst.md#limits)                                                                   |
+| Cells of a KST model's masks: a byte for each state and set of skills                              | 2^28: 256 MB                               | [kst](docs/knowledge-tracing/kst.md#limits)                                                                   |
 
 ## Runtime dependencies
 

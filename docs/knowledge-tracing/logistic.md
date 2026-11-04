@@ -19,6 +19,26 @@ flowchart LR
   G --> P
 ```
 
+## Quick start
+
+Predict a learner's next attempt at a skill from the features of their history, at given parameters:
+
+```ts
+import { logistic } from "@measurekit/knowledge-tracing/logistic";
+
+const model = logistic({
+  features: ["opportunities", { recency: 0.5 }],
+  proficiency: "fixed",
+  parameters: {
+    skills: { fractions: { intercept: -0.4, coefficients: { opportunities: 0.15, "recency(0.5)": 0.8 } } },
+    learners: { ana: 0.6, budi: -0.2 },
+  },
+});
+const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 100 };
+const ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
+model.predict(ana, { ...attempt, item: "q2", time: 104 }); // => 0.68: θ 0.6, -0.4 + 0.15 × 1 + 0.8 × 4^-0.5
+```
+
 ## The models
 
 logit P(correct) = θ + β_item + Σ over the attempt's skills k of (β_k + Σ_f w_kf x_kf) + Σ_g w_g x_g + Σ_c w_c z_c,
@@ -247,21 +267,7 @@ return at once, since Δt⁻ᵉ grows without bound as Δt falls.
 
 ## Online
 
-```ts
-import { logistic } from "@measurekit/knowledge-tracing/logistic";
-
-const model = logistic({
-  features: ["opportunities", { recency: 0.5 }],
-  proficiency: "fixed",
-  parameters: {
-    skills: { fractions: { intercept: -0.4, coefficients: { opportunities: 0.15, "recency(0.5)": 0.8 } } },
-    learners: { ana: 0.6, budi: -0.2 },
-  },
-});
-const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 100 };
-const ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
-model.predict(ana, { ...attempt, item: "q2", time: 104 }); // => 0.68: θ 0.6, -0.4 + 0.15 × 1 + 0.8 × 4^-0.5
-```
+The [quick start](#quick-start) is online use, at given parameters.
 
 The state holds each skill's history: `successes`, `failures`, `last`, the time of the last attempt, and `decayed`, the
 decayed successes and failures of each decay the features use, and the fields that the model's other features read
@@ -271,35 +277,6 @@ and that it has what the model's features need. An attempt or event earlier than
 skills throws `DataError`, as the time since it would be negative. Coefficients are keyed by the feature's label: its
 name, with its parameter in parentheses. A skill without coefficients throws `DataError`. Every event needs at least one
 skill; outcomes from 0 to 1 count as partial credit.
-
-## Differences from the references
-
-| Quantity             | Reference                              | Here                                                                                                                     |
-| -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Ridge fits           | LiblineaR stops at a relative gradient | Newton-CG stops at a gradient of `tolerance` in every component, 1e-8 by default, so the minimum is reached more exactly |
-| Singular information | `glm` gives `NA` to an aliased column  | `standardErrors` is `null`, as one number for a coefficient would not tell which is aliased                              |
-| Fixed proficiency    | `glm` drops an aliased column          | θ has a mean of 0 in each set, and the errors are those of the centered estimates, as sum contrasts give                 |
-| Estimated rates      | LKT's `seedpars` fits with a penalty   | `searchRates` maximizes the log-likelihood, so its rates differ from LKT's in the second decimal                         |
-
-## Not included
-
-- **Random slopes per learner.** No fit: `lme4` fits them, and a solver for random slopes would change the numerics that
-  every logistic model shares. iAFM users stay in R.
-- **`base4` of LKT.** Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing
-  effect.
-- **`base5suc` of LKT.** Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing
-  effect.
-- **`base5fail` of LKT.** Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing
-  effect.
-- **The `diff` features of LKT (`diffrelcor1` to `diffall2`).** No fit: they read other learners, so a state is not a
-  function of a learner's own events.
-- **`errordec` of LKT.** No fit: it reads an earlier model, so a state is not a function of a learner's own events.
-- **`logitdecevol` of LKT.** No fit: it reads an earlier model, or a parameter free for each item, so a state is not a
-  function of a learner's own events.
-- **`baseratepropdec` of LKT.** No fit: it reads an earlier model, or a parameter free for each item, so a state is not
-  a function of a learner's own events.
-- **`recencytest` of LKT.** No reference: it reads `previousstudy`, whose line is commented out in LKT 1.7.0.
-- **`recencystudy` of LKT.** No reference: it reads `previousstudy`, whose line is commented out in LKT 1.7.0.
 
 ## Errors
 
@@ -314,6 +291,30 @@ skill; outcomes from 0 to 1 count as partial credit.
 | An attempt is earlier than the learner's last attempt at a skill, item or any item that a term reads    | Give the attempts in time order                                                                |
 | A feature's value is not finite, such as `recency` with a large exponent at a short time apart          | Lower the exponent or decay, or give times in larger units                                     |
 | `searchRates` gets bounds of the wrong length, a start outside them, or a `build` that returns no model | Pass one start, lower and upper bound for each rate `build` takes                              |
+
+## Not included
+
+| Not included                                             | Why                                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Random slopes per learner                                | No fit: `lme4` fits them, and a solver for random slopes would change the numerics that every logistic model shares. iAFM users stay in R. |
+| `base4` of LKT                                           | Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing effect.                                     |
+| `base5suc` of LKT                                        | Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing effect.                                     |
+| `base5fail` of LKT                                       | Outside the sources: its scaling is set by hand, such as `par4 * 10`; `ppe` covers the spacing effect.                                     |
+| The `diff` features of LKT (`diffrelcor1` to `diffall2`) | No fit: they read other learners, so a state is not a function of a learner's own events.                                                  |
+| `errordec` of LKT                                        | No fit: it reads an earlier model, so a state is not a function of a learner's own events.                                                 |
+| `logitdecevol` of LKT                                    | No fit: it reads an earlier model, or a parameter free for each item, so a state is not a function of a learner's own events.              |
+| `baseratepropdec` of LKT                                 | No fit: it reads an earlier model, or a parameter free for each item, so a state is not a function of a learner's own events.              |
+| `recencytest` of LKT                                     | No reference: it reads `previousstudy`, whose line is commented out in LKT 1.7.0.                                                          |
+| `recencystudy` of LKT                                    | No reference: it reads `previousstudy`, whose line is commented out in LKT 1.7.0.                                                          |
+
+## Differences from the references
+
+| Quantity             | Reference                              | Here                                                                                                                     |
+| -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Ridge fits           | LiblineaR stops at a relative gradient | Newton-CG stops at a gradient of `tolerance` in every component, 1e-8 by default, so the minimum is reached more exactly |
+| Singular information | `glm` gives `NA` to an aliased column  | `standardErrors` is `null`, as one number for a coefficient would not tell which is aliased                              |
+| Fixed proficiency    | `glm` drops an aliased column          | θ has a mean of 0 in each set, and the errors are those of the centered estimates, as sum contrasts give                 |
+| Estimated rates      | LKT's `seedpars` fits with a penalty   | `searchRates` maximizes the log-likelihood, so its rates differ from LKT's in the second decimal                         |
 
 ## References
 

@@ -20,6 +20,10 @@ An attempt with `observe: false` (default `true`), such as a lesson, draws nothi
 the model is updated with it, so a lesson can teach the simulated learner. Attempts may carry a `resource` for the
 learn and forget rates of a lesson.
 
+## Quick start
+
+Simulate 500 learners at given BKT rates, and fit the rates back:
+
 ```ts
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
 import { createRandom } from "@measurekit/knowledge-tracing";
@@ -38,6 +42,8 @@ const { log } = simulate(bkt({ parameters: { skills: truth } }), attempts, creat
 bkt().fit(log).model.parameters.skills.fractions;
 // => { prior: 0.253, learn: 0.146, forget: 0, guess: 0.203, slip: 0.094 }
 ```
+
+## Learners and models
 
 For BKT, logistic models, IRT and KST, the prediction is the probability of a correct answer given the learner's
 earlier outcomes, so `simulate` draws from the model itself, the latent knowledge along with the outcomes. A known
@@ -69,4 +75,11 @@ Invalid input throws `DataError` naming the value found.
 
 ## Not included
 
-- **Simulated rows of DataShop or ASSISTments.** No fit: a map of column names.
+| Not included                              | Why                            |
+| ----------------------------------------- | ------------------------------ |
+| Simulated rows of DataShop or ASSISTments | No fit: a map of column names. |
+
+## Differences from the references
+
+None: the draws come from the model itself, and no reference shares the generator of `createRandom`, so seeded studies of
+what each family recovers are the references ([validation](validation.md#simulation-recovery)).

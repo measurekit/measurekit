@@ -14,6 +14,36 @@ flowchart LR
   T --> N["normativeThresholds"] --> F["responseTimeEffort, effortModeratedEstimates"]
 ```
 
+## Quick start
+
+Simulate the times of 300 persons on three items, calibrate the lognormal model, and estimate each person's speed:
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { calibrateResponseTimes, responseTimeFit, speedEstimates } from "@measurekit/psychometrics/response-time";
+import { normalDistribution, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 300 persons answer 3 items; ln T = β - τ + ε / α with β = 4, 3.5 and 3, α = 2 and speeds τ ~ N(0, 0.3²).
+const random = createRandom(2026);
+const intensities = [4, 3.5, 3];
+const speeds = simulateThetas(300, random, { distribution: normalDistribution(0, 0.3) });
+const times = speeds.map((speed) => intensities.map((intensity) => Math.exp(intensity - speed + random.normal() / 2)));
+const data = buildResponseMatrix(
+  times.map((row) => row.map(() => 1)),
+  { times },
+);
+
+const calibration = calibrateResponseTimes(data);
+calibration.items.map(({ intensity, discrimination }) => [intensity, discrimination]);
+// => [[3.943, 2.241], [3.455, 2.004], [3.018, 1.913]]: the intensities and the discriminations
+calibration.speedSd; // => 0.32
+const options = { sd: calibration.speedSd };
+speedEstimates(data, calibration.items, options)[0]; // => { id: "person1", speed: -0.09, standardError: 0.21 }
+responseTimeFit(data, calibration.items, options)[0];
+// => { id: "person1", residuals: [0.48, -0.01, -0.12], statistic: 0.24, ... }
+```
+
 ## Times
 
 Times are in seconds, positive, aligned with the responses: `times` of a [response matrix](data.md), by person, then
@@ -67,32 +97,6 @@ at least two times that differ: with equal times its variance would be 0 and the
 
 The intensities' standard errors are the square roots of the diagonal of (Σ_j X_jᵀ V_j⁻¹ X_j)⁻¹, as lme's `vcov`. Each
 item needs two times or more; responses without times are skipped.
-
-```ts
-import { createRandom } from "@measurekit/psychometrics";
-import { buildResponseMatrix } from "@measurekit/psychometrics/data";
-import { calibrateResponseTimes, responseTimeFit, speedEstimates } from "@measurekit/psychometrics/response-time";
-import { normalDistribution, simulateThetas } from "@measurekit/psychometrics/sim";
-
-// 300 persons answer 3 items; ln T = β - τ + ε / α with β = 4, 3.5 and 3, α = 2 and speeds τ ~ N(0, 0.3²).
-const random = createRandom(2026);
-const intensities = [4, 3.5, 3];
-const speeds = simulateThetas(300, random, { distribution: normalDistribution(0, 0.3) });
-const times = speeds.map((speed) => intensities.map((intensity) => Math.exp(intensity - speed + random.normal() / 2)));
-const data = buildResponseMatrix(
-  times.map((row) => row.map(() => 1)),
-  { times },
-);
-
-const calibration = calibrateResponseTimes(data);
-calibration.items.map(({ intensity, discrimination }) => [intensity, discrimination]);
-// => [[3.943, 2.241], [3.455, 2.004], [3.018, 1.913]]: the intensities and the discriminations
-calibration.speedSd; // => 0.32
-const options = { sd: calibration.speedSd };
-speedEstimates(data, calibration.items, options)[0]; // => { id: "person1", speed: -0.09, standardError: 0.21 }
-responseTimeFit(data, calibration.items, options)[0];
-// => { id: "person1", residuals: [0.48, -0.01, -0.12], statistic: 0.24, ... }
-```
 
 ## Speed
 
@@ -273,20 +277,18 @@ Invalid input throws `DataError` naming the value found.
 
 ## Not included
 
-- **The item population level of the hierarchical model.** Outside the sources: it is a multivariate normal distribution
-  of the item parameters, which only Bayesian estimation (`LNIRT`) uses.
-- **Response times as collateral information in adaptive tests.** No reference: no package that uses them was found, and
-  `AbilityEstimator` sees no times.
-- **Speed that changes within a test.** No reference: no package that fits it was found.
-- **Mixture models of the joint distribution of times and responses.** No reference: no package that fits them was
-  found.
-- **Rapid-guessing models of the joint distribution of times and responses.** No reference: no package that fits them
-  was found.
-- **Poisson and gamma models of reading speed.** Outside the sources: one chapter; the lognormal model is the practice.
-- **Diffusion-based models.** Outside the sources: one chapter, a cognitive model of each response.
-- **Reaction-time and span task summaries.** No fit: scoring of a behavioral task, not a model of response times.
+| Not included                                                           | Why                                                                                                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| The item population level of the hierarchical model                    | Outside the sources: it is a multivariate normal distribution of the item parameters, which only Bayesian estimation (`LNIRT`) uses. |
+| Response times as collateral information in adaptive tests             | No reference: no package that uses them was found, and `AbilityEstimator` sees no times.                                             |
+| Speed that changes within a test                                       | No reference: no package that fits it was found.                                                                                     |
+| Mixture models of the joint distribution of times and responses        | No reference: no package that fits them was found.                                                                                   |
+| Rapid-guessing models of the joint distribution of times and responses | No reference: no package that fits them was found.                                                                                   |
+| Poisson and gamma models of reading speed                              | Outside the sources: one chapter; the lognormal model is the practice.                                                               |
+| Diffusion-based models                                                 | Outside the sources: one chapter, a cognitive model of each response.                                                                |
+| Reaction-time and span task summaries                                  | No fit: scoring of a behavioral task, not a model of response times.                                                                 |
 
-## Differences from LNIRT
+## Differences from the references
 
 | Topic             | This package                                                               | LNIRT                                                                                                                                                                          |
 | ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

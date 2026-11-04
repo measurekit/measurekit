@@ -285,6 +285,13 @@ Invalid input throws `DataError` with the value found.
 | A pair compares more than 1,000 items in `generalizedBinomialTest` or `m4Index` | Compare the items of one form                                                   |
 | The K index's counts above 2²⁴ cells                                            | Merge rare categories, or analyze fewer items                                   |
 
+## Not included
+
+| Not included                                       | Why                                                                                                                                                                                                                                             |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The older indices g2, ESA and Bm                   | Outside the sources: Wollack (1997), as Sotaridona (2003) reports, found the Type I errors of g2 grossly inflated and ESA and Bm less powerful than g2; CopyDetect keeps the indices that the simulation studies of its sources show effective. |
+| Estimating the items and thetas inside the indices | No fit: `calibrate` and `abilityEstimates` give them for any model, as the module's composition, where CopyDetect fits its models again on every call.                                                                                          |
+
 ## Differences from the references
 
 | Reference                    | Difference                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -296,14 +303,6 @@ Invalid input throws `DataError` with the value found.
 | CopyDetect 1.4               | Its S2 takes a guessing probability of 0.2 for scores and 1 over the number of options for choices; this library takes `guessing`, 0.2 by default                                                                                                                                                                                                                                                         |
 | Sotaridona and Meijer (2003) | S2 rounds the weighted count to the nearest integer; CopyDetect, and this library, round it up, and add the rounded-up mean weight of a group to its mean identical incorrect responses                                                                                                                                                                                                                   |
 | CopyDetect 1.3               | Its `centers` forms every ordered pair of a center, of any size; `selectPairs` forms each pair once, over several contexts, with `maxGroup` and `maxPairs`                                                                                                                                                                                                                                                |
-
-## Not included
-
-- **The older indices g2, ESA and Bm.** Outside the sources: Wollack (1997), as Sotaridona (2003) reports, found the
-  Type I errors of g2 grossly inflated and ESA and Bm less powerful than g2; CopyDetect keeps the indices that the
-  simulation studies of its sources show effective.
-- **Estimating the items and thetas inside the indices.** No fit: `calibrate` and `abilityEstimates` give them for any
-  model, as the module's composition, where CopyDetect fits its models again on every call.
 
 ## References
 

@@ -11,6 +11,19 @@ flowchart LR
   N -->|"readMirtMultidimensional"| M
 ```
 
+## Quick start
+
+Write a 3PL item in mirt's slope-intercept form, and read it back:
+
+```ts
+import { threeParameterLogistic } from "@measurekit/psychometrics/irt";
+import { readMirtSlopeIntercept, writeMirtSlopeIntercept } from "@measurekit/psychometrics/parameterization";
+
+const item = { model: threeParameterLogistic, parameters: { a: 1.2, b: -0.5, c: 0.2, d: 1 } };
+const coefficients = writeMirtSlopeIntercept(item); // => { a1: 1.2, d: 0.6, g: 0.2, u: 1 }, d = -a b
+readMirtSlopeIntercept(coefficients, threeParameterLogistic).parameters; // => { a: 1.2, b: -0.5, c: 0.2, d: 1 }
+```
+
 ## mirt
 
 mirt reports an item's coefficients in two forms, both with D = 1: the IRT form, `coef(model, IRTpars = TRUE)`, and
@@ -92,6 +105,25 @@ const items = [
 items[1]; // => { parameters: { a: 0.86, b: [-3.27, -2.89, 1.54] }, ... }
 ```
 
+## Errors
+
+A conversion from mirt throws `DataError` naming the value found.
+
+| Error                                                                             | What to do                                                                            |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| A name of the form missing or not finite, or a name the form does not use         | Give the item's row of `coef(model, simplify = TRUE)$items` with its own columns only |
+| A slope a1 = 0 to the IRT form, which divides by it                               | Read the item in the slope-intercept form                                             |
+| A partial credit item whose scores ak are not 0, 1, ..., or d0 not 0              | Give the coefficients of a `gpcm` item as mirt writes them                            |
+| A nominal item whose first and last slopes are equal, to the slope-intercept form | Read and write it in the IRT form                                                     |
+| An item of a model that is not built in, or of the GGUM                           | Convert only the built-in models other than the GGUM                                  |
+
 ## Not included
 
-- **Conversions beyond mirt's forms.** No fit: the parameterization of one more program is a line.
+| Not included                    | Why                                                         |
+| ------------------------------- | ----------------------------------------------------------- |
+| Conversions beyond mirt's forms | No fit: the parameterization of one more program is a line. |
+
+## Differences from the references
+
+None: the conversions are mirt's definitions of its two forms, checked against the coefficients of 25 items and 21
+multidimensional items set in mirt ([validation](validation.md#datasets)).

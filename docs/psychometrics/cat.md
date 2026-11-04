@@ -9,6 +9,30 @@ step; content bounds against a replay in base R and mirtCAT's shadow test; diagn
 against a replay in base R and against mirtCAT; testlets against a replay in base R and mirtCAT's ordered groups;
 routing cuts against root finders in base R ([validation](validation.md)).
 
+## Quick start
+
+Run an adaptive test from a pool of 50 2PL items for a person of theta 1, until the standard error falls below 0.4 or 20 items are given:
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { anyOf, createAdaptiveTest, standardErrorThreshold, testLength } from "@measurekit/psychometrics/cat";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems } from "@measurekit/psychometrics/sim";
+
+const random = createRandom(7);
+const pool = simulateItems(twoParameterLogistic, 50, random).map((item, j) => ({ id: `q${j + 1}`, ...item }));
+const test = createAdaptiveTest({ pool, stopping: anyOf(standardErrorThreshold(0.4), testLength(20)) });
+
+// The person answers each item with its 2PL probability at theta 1.
+let state = test.start(random);
+while (state.next !== null) {
+  const { a, b } = pool.find(({ id }) => id === state.next)?.parameters ?? { a: 1, b: 0 };
+  state = test.answer(state, random.uniform() < 1 / (1 + Math.exp(-a * (1 - b))) ? 1 : 0, random);
+}
+state.items.length; // => 19
+state.estimate; // => { theta: 0.85, standardError: 0.40 }
+```
+
 ## Adaptive tests
 
 `createAdaptiveTest(options)` returns a test with two functions, `start` and `answer`. Each returns a new state and
@@ -1290,65 +1314,69 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | The bounds are not met                                                                   | The counts and the information are returned, to check |
 | A testlet with two items that are enemies                                                | No form takes it                                      |
 
+## Implementation
+
+- Selection rules write scores into a `Float64Array` with one entry per pool item; the built-ins loop over the pool
+  through the model's methods, without allocating per item.
+- Estimates come from the [IRT estimators](irt.md#ability-estimation), so CAT and MST support every model, a custom
+  `IrtModel` included.
+- Testlets are a wrapper around the selection rule, which scores testlets as units for any rule, and the engine reads
+  the testlet in progress from the last administered item, so a stored state holds nothing more than without testlets.
+
+## Errors
+
+Invalid input throws `DataError` naming the value found; a rule's own errors are in its section.
+
+| Error                                                                                                                                      | What to do                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| A pool item without a string id, ids that repeat, or an item invalid for its model                                                         | Give each item a unique id and the parameters of its model, as a calibration's `items` have them                   |
+| A stopping, selection or estimator rule that is not one of the module's or a function of its interface                                     | Pass the rules that the module makes, or functions of their interfaces                                             |
+| A state that does not match the test: arrays missing, an item twice, enemies administered together, a response count other than the items' | Pass the state that `start` or `answer` returned, as stored                                                        |
+| A selection rule that needs a `b` or items of two categories, at an item of another model                                                  | Use a rule for any model ([item selection](#item-selection))                                                       |
+| Content bounds that the pool cannot meet, or items of a testlet in two content areas with content targets                                  | Give each area enough items ([content bounds](#content-bounds)), and each testlet one area                         |
+| A diagnostic test's prior with a profile twice or entries other than 0 and 1; a multidimensional estimator without a prior                 | Give the prior of the calibration ([diagnostic](#prior), [multidimensional](#estimates-of-multidimensional-tests)) |
+| A panel whose first stage has more than one module, whose modules have no items or ids that repeat, or whose cuts do not ascend            | Build the panel as [multistage tests](#multistage-tests) and its [routing cuts](#routing-cuts) say                 |
+| An assembly of more counts than its limit, or an invalid constraint                                                                        | Assemble fewer forms at a time ([form assembly](#form-assembly))                                                   |
+
 ## Not included
 
-- **Diagnostic tests of polytomous items or attributes.** No reference: `cdcatR::cdcat` takes a GDINA fit, and none was
-  found for polytomous items or attributes.
-- **Tests that mix IRT and diagnostic items.** No reference: no package that mixes the two was found.
-- **Exposure calibration for diagnostic tests.** Outside the sources: progressive restriction, as `cdcatR` does it, is a
-  research topic. `calibrateExposure` takes IRT tests only; set `exposure` on the items.
-- **The dual rule on the two largest posteriors.** Outside the sources: GDI and PWKL are the practice, and both are
-  built.
-- **The Jensen-Shannon divergence rule.** Outside the sources: GDI and PWKL are the practice, and it ranks items as
-  `shannonEntropy` does.
-- **The nonparametric selection rules NPS and GNPS.** Outside the sources: GDI and PWKL are the practice, and both are
-  built.
-- **A-optimal multidimensional selection.** Outside the sources: the D-rule is the practice, and is built; polytomous
-  items are supported through any model of the pool.
-- **E-optimal multidimensional selection.** Outside the sources: the D-rule is the practice, and is built.
-- **KL-optimal multidimensional selection.** Outside the sources: van der Linden and Glas give it a chapter as a variant
-  of the D-rule, which is the practice and is built.
-- **Exposure calibration for multidimensional tests.** No reference: no package that calibrates it was found.
-  `calibrateExposure` takes IRT tests only; set `exposure` by hand.
-- **Testlets from which only some items are administered, such as a passage with more questions than a test takes.** No
-  reference: no package that administers part of a testlet was found.
-- **Testlets whose items are in several target areas under content balancing.** No reference: no package that balances
-  content over testlets was found, so a rule for items in several areas has nothing to match.
-- **A testlet-level exposure parameter.** No reference: the `exposure` of the first item to be administered acts for its
-  testlet.
-- **Shadow tests.** No fit: a test that solves an integer program at each step to meet its bounds exactly, as mirtCAT's
-  `constr_fun` does, needs a solver, and measurekit has no dependency. The bounds of `contentBounds` hold by a filter,
-  with a greedy cover for items in several areas; a shadow test fits `ItemSelectionRule` as a rule, so a later start
-  changes no type.
-- **Content bounds across the stages of a multistage panel.** No fit: a module is assembled by [form
-  assembly](#form-assembly), which holds bounds per module.
-- **Exact assembly.** No fit: a solver proves a blueprint infeasible and finds a smaller gap from the target, by integer
-  programming with the minimax model; measurekit has no solver dependency, and a later one fits an option with no type
-  changed.
-- **Items every form must hold, such as the anchors of a NEAT design.** No fit: a host assembles the rest around them,
-  lowering the bounds and the targets by the anchors' values.
-- **Routing cuts by other rules than equal information and shares of a population.** Outside the sources: optimizing the
-  accuracy of classification is a variant of the two rules that are built.
-- **Stopping on the change of theta.** No fit: one line of a `StoppingRule`, the
-  [recipe](#recipe-stopping-on-the-change-of-theta).
-- **Cuts that differ with the route that led to a module.** Outside the sources: the cuts of a stage are the same for
-  every route, except through the items on the scale `"number-correct"`.
-- **b-blocking.** Outside the sources: a variant of `aStratified`.
-- **b-stratified and maximum-information stratified selection.** Outside the sources: variants of `aStratified`.
-- **5-4-3-2-1 selection.** Outside the sources: `randomesque` covers the control.
-- **Interval-information selection.** Outside the sources: a variant of Fisher information, in catsim.
-- **Cluster selection.** Outside the sources: an option of catsim.
-- **The precision form of progressive and proportional weights.** Outside the sources: an option of catR; `length` is
-  the form built.
-- **Fixed and random initial thetas.** No fit: the estimator's prior sets them.
-- **The discrimination index of items of more than two categories.** No reference: catR's `GDI` and `GDIP` take items of
-  two categories only.
-- **Restricted exposure control.** No fit: a live count across persons is the host's: it sets an over-exposed item's
-  `exposure` to 0 between tests, [a recipe](#recipe-restricted-exposure).
-- **Several tests sharing a corpus.** No fit: a host loop over `createAdaptiveTest`.
-- **Seeding of unscored items.** No fit: the host mixes them in; `fixed` in `calibrate` takes them on.
+| Not included                                                                                                  | Why                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Diagnostic tests of polytomous items or attributes                                                            | No reference: `cdcatR::cdcat` takes a GDINA fit, and none was found for polytomous items or attributes.                                                                                                                                                                                                                                                      |
+| Tests that mix IRT and diagnostic items                                                                       | No reference: no package that mixes the two was found.                                                                                                                                                                                                                                                                                                       |
+| Exposure calibration for diagnostic tests                                                                     | Outside the sources: progressive restriction, as `cdcatR` does it, is a research topic. `calibrateExposure` takes IRT tests only; set `exposure` on the items.                                                                                                                                                                                               |
+| The dual rule on the two largest posteriors                                                                   | Outside the sources: GDI and PWKL are the practice, and both are built.                                                                                                                                                                                                                                                                                      |
+| The Jensen-Shannon divergence rule                                                                            | Outside the sources: GDI and PWKL are the practice, and it ranks items as `shannonEntropy` does.                                                                                                                                                                                                                                                             |
+| The nonparametric selection rules NPS and GNPS                                                                | Outside the sources: GDI and PWKL are the practice, and both are built.                                                                                                                                                                                                                                                                                      |
+| A-optimal multidimensional selection                                                                          | Outside the sources: the D-rule is the practice, and is built; polytomous items are supported through any model of the pool.                                                                                                                                                                                                                                 |
+| E-optimal multidimensional selection                                                                          | Outside the sources: the D-rule is the practice, and is built.                                                                                                                                                                                                                                                                                               |
+| KL-optimal multidimensional selection                                                                         | Outside the sources: van der Linden and Glas give it a chapter as a variant of the D-rule, which is the practice and is built.                                                                                                                                                                                                                               |
+| Exposure calibration for multidimensional tests                                                               | No reference: no package that calibrates it was found. `calibrateExposure` takes IRT tests only; set `exposure` by hand.                                                                                                                                                                                                                                     |
+| Testlets from which only some items are administered, such as a passage with more questions than a test takes | No reference: no package that administers part of a testlet was found.                                                                                                                                                                                                                                                                                       |
+| Testlets whose items are in several target areas under content balancing                                      | No reference: no package that balances content over testlets was found, so a rule for items in several areas has nothing to match.                                                                                                                                                                                                                           |
+| A testlet-level exposure parameter                                                                            | No reference: the `exposure` of the first item to be administered acts for its testlet.                                                                                                                                                                                                                                                                      |
+| Shadow tests                                                                                                  | No fit: a test that solves an integer program at each step to meet its bounds exactly, as mirtCAT's `constr_fun` does, needs a solver, and measurekit has no dependency. The bounds of `contentBounds` hold by a filter, with a greedy cover for items in several areas; a shadow test fits `ItemSelectionRule` as a rule, so a later start changes no type. |
+| Content bounds across the stages of a multistage panel                                                        | No fit: a module is assembled by [form assembly](#form-assembly), which holds bounds per module.                                                                                                                                                                                                                                                             |
+| Exact assembly                                                                                                | No fit: a solver proves a blueprint infeasible and finds a smaller gap from the target, by integer programming with the minimax model; measurekit has no solver dependency, and a later one fits an option with no type changed.                                                                                                                             |
+| Items every form must hold, such as the anchors of a NEAT design                                              | No fit: a host assembles the rest around them, lowering the bounds and the targets by the anchors' values.                                                                                                                                                                                                                                                   |
+| Routing cuts by other rules than equal information and shares of a population                                 | Outside the sources: optimizing the accuracy of classification is a variant of the two rules that are built.                                                                                                                                                                                                                                                 |
+| Stopping on the change of theta                                                                               | No fit: one line of a `StoppingRule`, the [recipe](#recipe-stopping-on-the-change-of-theta).                                                                                                                                                                                                                                                                 |
+| Cuts that differ with the route that led to a module                                                          | Outside the sources: the cuts of a stage are the same for every route, except through the items on the scale `"number-correct"`.                                                                                                                                                                                                                             |
+| b-blocking                                                                                                    | Outside the sources: a variant of `aStratified`.                                                                                                                                                                                                                                                                                                             |
+| b-stratified and maximum-information stratified selection                                                     | Outside the sources: variants of `aStratified`.                                                                                                                                                                                                                                                                                                              |
+| 5-4-3-2-1 selection                                                                                           | Outside the sources: `randomesque` covers the control.                                                                                                                                                                                                                                                                                                       |
+| Interval-information selection                                                                                | Outside the sources: a variant of Fisher information, in catsim.                                                                                                                                                                                                                                                                                             |
+| Cluster selection                                                                                             | Outside the sources: an option of catsim.                                                                                                                                                                                                                                                                                                                    |
+| The precision form of progressive and proportional weights                                                    | Outside the sources: an option of catR; `length` is the form built.                                                                                                                                                                                                                                                                                          |
+| Fixed and random initial thetas                                                                               | No fit: the estimator's prior sets them.                                                                                                                                                                                                                                                                                                                     |
+| The discrimination index of items of more than two categories                                                 | No reference: catR's `GDI` and `GDIP` take items of two categories only.                                                                                                                                                                                                                                                                                     |
+| Restricted exposure control                                                                                   | No fit: a live count across persons is the host's: it sets an over-exposed item's `exposure` to 0 between tests, [a recipe](#recipe-restricted-exposure).                                                                                                                                                                                                    |
+| Several tests sharing a corpus                                                                                | No fit: a host loop over `createAdaptiveTest`.                                                                                                                                                                                                                                                                                                               |
+| Seeding of unscored items                                                                                     | No fit: the host mixes them in; `fixed` in `calibrate` takes them on.                                                                                                                                                                                                                                                                                        |
 
-## Differences from catR
+## Differences from the references
+
+### catR
 
 | Topic             | This package                                                               | catR                                                                     |
 | ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -1370,7 +1398,7 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | Testlets          | [Selected as a unit](#testlets), administered together                     | None                                                                     |
 | Classification    | `classificationThreshold` stops when every cut is decided                  | `stop` with several `classification` rules stops when any one is         |
 
-## Differences from cdcatR
+### cdcatR
 
 | Topic            | This package                                                | cdcatR                                                                                |
 | ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -1384,7 +1412,7 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | Estimates        | `ProfileEstimate`: posterior, mastery, MAP and EAP profiles | ML, MAP and EAP profiles by item in `est.cat`                                         |
 | Parallel runs    | One test at a time; a seed reproduces a simulation          | Persons in parallel on sockets, `seed + i` per person                                 |
 
-## Differences from mirtCAT
+### mirtCAT
 
 | Topic                   | This package                                                             | mirtCAT                                                                                                         |
 | ----------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
@@ -1400,12 +1428,3 @@ forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // 
 | Test length             | A test ends after a testlet that began; any stopping rule                | `min_SEM` ends after the group; `max_items` inside a group stops with an error                                  |
 | SPRT                    | `sequentialProbabilityRatio` decides each of several cuts                | One cut alone: with several, its `\|\|` compares a vector, which R 4.3 and later refuse                         |
 | Interval classification | A cut the interval touches is decided, as catR                           | `classify` needs \|θ̂ - cut\| / SE strictly beyond the quantile                                                  |
-
-## Implementation
-
-- Selection rules write scores into a `Float64Array` with one entry per pool item; the built-ins loop over the pool
-  through the model's methods, without allocating per item.
-- Estimates come from the [IRT estimators](irt.md#ability-estimation), so CAT and MST support every model, a custom
-  `IrtModel` included.
-- Testlets are a wrapper around the selection rule, which scores testlets as units for any rule, and the engine reads
-  the testlet in progress from the last administered item, so a stored state holds nothing more than without testlets.

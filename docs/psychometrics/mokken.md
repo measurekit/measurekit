@@ -43,6 +43,32 @@ persons, 14 s for 1,000 items of 8 persons: on matrices from users, run them in 
 | `invariantItemOrdering(matrix, options)`    | Violations of the order of items, by item, the items removed, and H^T |
 | `molenaarSijtsmaReliability(matrix)`        | The reliability of the total score, MS                                |
 
+## Quick start
+
+Compute the scalability of four items from the responses of ten persons:
+
+```ts
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { scalability } from "@measurekit/psychometrics/mokken";
+
+const matrix = buildResponseMatrix([
+  [0, 0, 0, 0],
+  [1, 0, 0, 0],
+  [1, 1, 0, 0],
+  [1, 1, 1, 0],
+  [1, 1, 1, 1],
+  [1, 0, 1, 0],
+  [1, 1, 0, 1],
+  [0, 1, 0, 0],
+  [1, 1, 1, 0],
+  [1, 0, 0, 0],
+]);
+const { scale, items } = scalability(matrix);
+scale.coefficient; // => 0.50, H: a strong scale from 0.5
+scale.standardError; // => 0.24
+items.map(({ id, coefficient }) => [id, coefficient]); // => [["item1", 0.58], ["item2", 0.44], ["item3", 0.44], ["item4", 0.58]]
+```
+
 ## Missing responses
 
 Every other function of the module uses the persons who answered every item. `twoWayImputation(matrix, random,
@@ -451,41 +477,6 @@ the correlation of two parallel forms, and alpha 0.733 ([validation](validation.
 | Fewer than two items or complete cases | Throws, as every function of the module     |
 | An item without variance               | Its steps drop out; the other items give MS |
 
-## Not included
-
-- **The genetic algorithm of the automated item selection.** Outside the sources: an option of `mokken::aisp`
-  (`search`), off by default.
-- **The extended search of the automated item selection.** Outside the sources: an option of `mokken::aisp`, off by
-  default.
-- **The Wald-based test of the item selection (`type.z`).** Outside the sources: an option of `mokken::aisp`, off by
-  default.
-- **The range-preserving test of the item selection (`type.z`).** Outside the sources: an option of `mokken::aisp`, off
-  by default.
-- **The test of H_i against the lower bound (`test.Hi`).** Outside the sources: an option of `mokken::aisp`, off by
-  default.
-- **The coefficient λ₂ of `check.reliability`.** Outside the sources: Sijtsma and van der Ark (2017) name the
-  Molenaar-Sijtsma coefficient as a step, and it is built.
-- **The coefficient LCRC of `check.reliability`.** Outside the sources: Sijtsma and van der Ark (2017) name the
-  Molenaar-Sijtsma coefficient as a step, and it is built; LCRC needs a latent class model.
-- **`check.pmatrix`.** Outside the sources: `monotonicity` covers the checks of the curves.
-- **`check.restscore`.** Outside the sources: `monotonicity` covers the checks of the curves.
-- **Invariant item ordering by item steps (`IT`).** Outside the sources: the method of manifest invariant item ordering
-  (MIIO) is the practice, and is built.
-- **Invariant item ordering by the scale-level conditional proportions (`MSCPM`).** Outside the sources: the method of
-  manifest invariant item ordering (MIIO) is the practice, and is built.
-- **Clustered items with a fixed item order.** Outside the sources: the method of manifest invariant item ordering
-  (MIIO) is the practice, and is built.
-- **`check.bounds`.** Outside the sources: not a step of the tutorial of Sijtsma and van der Ark (2017).
-- **The adjusted boxplot of G+.** Outside the sources: Tukey's fence is the tutorial's rule, which mentions the adjusted
-  boxplot for skewed counts.
-- **The O+ outlier score.** Outside the sources: the tutorial uses G+.
-- **Polytomous U3 and normed G.** Outside the sources: variants of the dichotomous indices that `personScalability`
-  builds.
-- **ZU3, the standardized U3.** Outside the sources: a variant of the U3 that `personScalability` builds.
-- **The caution index C, the modified caution index, NCI, A, D and E.** Outside the sources: beside G, U3 and Ht, which are the practice.
-- **Two-level scalability for clustered persons, such as raters.** Outside the sources: a multilevel option of mokken
-  (`MLcoefH`).
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found.
@@ -501,6 +492,30 @@ Invalid input throws `DataError` naming the value found.
 | `minimumSize` is above the persons who answered every item                                      | Lower `minimumSize`                                                                                      |
 | The total scores have no variance, for the reliability                                          | The coefficient is undefined for persons who all score alike                                             |
 | A response other than 0 and 1, for the person fit indices                                       | Dichotomize the items, or use `guttmanErrors`, whose G+ takes polytomous items                           |
+
+## Not included
+
+| Not included                                                                 | Why                                                                                                                                                    |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The genetic algorithm of the automated item selection                        | Outside the sources: an option of `mokken::aisp` (`search`), off by default.                                                                           |
+| The extended search of the automated item selection                          | Outside the sources: an option of `mokken::aisp`, off by default.                                                                                      |
+| The Wald-based test of the item selection (`type.z`)                         | Outside the sources: an option of `mokken::aisp`, off by default.                                                                                      |
+| The range-preserving test of the item selection (`type.z`)                   | Outside the sources: an option of `mokken::aisp`, off by default.                                                                                      |
+| The test of H_i against the lower bound (`test.Hi`)                          | Outside the sources: an option of `mokken::aisp`, off by default.                                                                                      |
+| The coefficient λ₂ of `check.reliability`                                    | Outside the sources: Sijtsma and van der Ark (2017) name the Molenaar-Sijtsma coefficient as a step, and it is built.                                  |
+| The coefficient LCRC of `check.reliability`                                  | Outside the sources: Sijtsma and van der Ark (2017) name the Molenaar-Sijtsma coefficient as a step, and it is built; LCRC needs a latent class model. |
+| `check.pmatrix`                                                              | Outside the sources: `monotonicity` covers the checks of the curves.                                                                                   |
+| `check.restscore`                                                            | Outside the sources: `monotonicity` covers the checks of the curves.                                                                                   |
+| Invariant item ordering by item steps (`IT`)                                 | Outside the sources: the method of manifest invariant item ordering (MIIO) is the practice, and is built.                                              |
+| Invariant item ordering by the scale-level conditional proportions (`MSCPM`) | Outside the sources: the method of manifest invariant item ordering (MIIO) is the practice, and is built.                                              |
+| Clustered items with a fixed item order                                      | Outside the sources: the method of manifest invariant item ordering (MIIO) is the practice, and is built.                                              |
+| `check.bounds`                                                               | Outside the sources: not a step of the tutorial of Sijtsma and van der Ark (2017).                                                                     |
+| The adjusted boxplot of G+                                                   | Outside the sources: Tukey's fence is the tutorial's rule, which mentions the adjusted boxplot for skewed counts.                                      |
+| The O+ outlier score                                                         | Outside the sources: the tutorial uses G+.                                                                                                             |
+| Polytomous U3 and normed G                                                   | Outside the sources: variants of the dichotomous indices that `personScalability` builds.                                                              |
+| ZU3, the standardized U3                                                     | Outside the sources: a variant of the U3 that `personScalability` builds.                                                                              |
+| The caution index C, the modified caution index, NCI, A, D and E             | Outside the sources: beside G, U3 and Ht, which are the practice.                                                                                      |
+| Two-level scalability for clustered persons, such as raters                  | Outside the sources: a multilevel option of mokken (`MLcoefH`).                                                                                        |
 
 ## Differences from the references
 

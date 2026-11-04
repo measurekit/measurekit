@@ -29,11 +29,9 @@ flowchart LR
 
 Cut scores on the total score scale are not rounded: a person meets the standard with a total score at or above it.
 
-## Modified Angoff
+## Quick start
 
-Each panelist rates each item with the expected score of a borderline person, the person just at the standard: for a
-dichotomous item, the probability of a correct response (Angoff, 1971). `angoffCutScore(ratings)` takes the ratings
-by panelist, then item.
+Set a cut score from the Angoff ratings of three panelists on three items:
 
 ```ts
 import { angoffCutScore } from "@measurekit/psychometrics/standard-setting";
@@ -44,6 +42,12 @@ angoffCutScore([
   [0.5, 0.7, 2.1],
 ]); // => { cutScore: 3.4, panelistCutScores: [3.4, 3.5, 3.3], sd: 0.1, standardError: 0.058 }
 ```
+
+## Modified Angoff
+
+Each panelist rates each item with the expected score of a borderline person, the person just at the standard: for a
+dichotomous item, the probability of a correct response (Angoff, 1971). `angoffCutScore(ratings)` takes the ratings
+by panelist, then item.
 
 | Field               | Meaning                                                                |
 | ------------------- | ---------------------------------------------------------------------- |
@@ -405,30 +409,6 @@ const ratings = cells.flatMap(({ items, proportion }) => new Array<number>(items
 angoffCutScore([ratings]).cutScore; // => 14.35
 ```
 
-## Not included
-
-- **Nedelsky.** No fit: `angoffCutScore` of the reciprocals of the options left, a recipe.
-- **Ebel.** No fit: a sum of items times proportions over the cells, a recipe.
-- **A standard error of the borderline group's cut over stations.** Outside the sources: the stations' groups hold
-  different persons, and no source gives the error of their sum; a bootstrap over the persons gives one.
-- **A standard error of the borderline group's median.** Outside the sources: no source gives one; a bootstrap over the
-  group gives one.
-- **The bootstrap standard errors of borderline regression (Homer et al., 2016).** No fit: a resampling of the persons
-  that calls `borderlineRegressionCutScores`, which also counts the variation of the ratings.
-- **The objective borderline method (Shulruf et al., 2013).** Outside the sources: a recent variant whose assumption,
-  that higher grades always bring higher marks, Homer, Pell and Fuller (2017) question.
-- **Direct consensus.** No fit: `angoffCutScore` takes the sums of clusters.
-- **Item-descriptor matching.** No fit: a panel procedure with no statistic beyond the Bookmark's.
-- **The analytic judgment and other holistic methods.** Outside the sources: variants of Body of Work.
-- **Vertically moderated standards.** No fit: a policy across grades, not a statistic.
-- **Standards for alternate assessments.** No fit: a policy, not a statistic.
-- **Lee's IRT classification indices.** Outside the sources: no technical report found uses them; programs use
-  Livingston-Lewis and Rudner's, both built. cacIRT and irtQ have them.
-- **The compound multinomial method (Lee, Brennan and Wan, 2009).** Outside the sources: a research extension of
-  Livingston-Lewis for mixed formats.
-- **Nonparametric classification (Lathrop and Cheng).** Outside the sources: a research method beside Rudner's and
-  Livingston-Lewis.
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
@@ -456,7 +436,26 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `livingstonLewisClassification`          | An effective test length that rounds to below 1 or above 10,000 trials                                             | Check the reliability: a value near 1 or far too low for the scores' variance gives such a length |
 | `livingstonLewisClassification`          | No permissible beta for the true scores                                                                            | Check the reliability against the scores' variance; use Rudner's indices on theta instead         |
 
-## Differences from betafunctions
+## Not included
+
+| Not included                                                                | Why                                                                                                                                                   |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nedelsky                                                                    | No fit: `angoffCutScore` of the reciprocals of the options left, a recipe.                                                                            |
+| Ebel                                                                        | No fit: a sum of items times proportions over the cells, a recipe.                                                                                    |
+| A standard error of the borderline group's cut over stations                | Outside the sources: the stations' groups hold different persons, and no source gives the error of their sum; a bootstrap over the persons gives one. |
+| A standard error of the borderline group's median                           | Outside the sources: no source gives one; a bootstrap over the group gives one.                                                                       |
+| The bootstrap standard errors of borderline regression (Homer et al., 2016) | No fit: a resampling of the persons that calls `borderlineRegressionCutScores`, which also counts the variation of the ratings.                       |
+| The objective borderline method (Shulruf et al., 2013)                      | Outside the sources: a recent variant whose assumption, that higher grades always bring higher marks, Homer, Pell and Fuller (2017) question.         |
+| Direct consensus                                                            | No fit: `angoffCutScore` takes the sums of clusters.                                                                                                  |
+| Item-descriptor matching                                                    | No fit: a panel procedure with no statistic beyond the Bookmark's.                                                                                    |
+| The analytic judgment and other holistic methods                            | Outside the sources: variants of Body of Work.                                                                                                        |
+| Vertically moderated standards                                              | No fit: a policy across grades, not a statistic.                                                                                                      |
+| Standards for alternate assessments                                         | No fit: a policy, not a statistic.                                                                                                                    |
+| Lee's IRT classification indices                                            | Outside the sources: no technical report found uses them; programs use Livingston-Lewis and Rudner's, both built. cacIRT and irtQ have them.          |
+| The compound multinomial method (Lee, Brennan and Wan, 2009)                | Outside the sources: a research extension of Livingston-Lewis for mixed formats.                                                                      |
+| Nonparametric classification (Lathrop and Cheng)                            | Outside the sources: a research method beside Rudner's and Livingston-Lewis.                                                                          |
+
+## Differences from the references
 
 | Topic               | This package                                                                                    | betafunctions                                                                         |
 | ------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |

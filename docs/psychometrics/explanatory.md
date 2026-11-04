@@ -29,12 +29,9 @@ own for every person and item. The LLTM is validated against a base R maximum wi
 regression against base R and metafor, the change against glm and base R with eRm as a cross-check
 ([validation](validation.md)).
 
-## The linear logistic test model
+## Quick start
 
-The LLTM (Fischer, 1973) makes the difficulty of each item the sum of the effects of its features: the probability of a
-correct response is logistic(θ - b_i), b_i = x_iᵀη, with θ ~ N(0, σ²). `lltm(data, features, options)` estimates η and σ
-by the Bock-Aitkin EM algorithm on the engine of the [many-facet Rasch model](rater.md), and tests the model against
-the Rasch model that gives every item a difficulty of its own.
+Fit the linear logistic test model to six items whose difficulty grows with the steps they take:
 
 ```ts
 import { createRandom, lltm, simulateResponses, simulateThetas, twoParameterLogistic } from "@measurekit/psychometrics";
@@ -61,6 +58,13 @@ model.sd; // => 0.98
 model.comparison; // => { raschLogLikelihood: -1831.8, chiSquare: 2.43, degreesOfFreedom: 4, significance: 0.66 }
 model.items[0]?.parameters; // => { a: 1, b: -1.06, c: 0, d: 1 }
 ```
+
+## The linear logistic test model
+
+The LLTM (Fischer, 1973) makes the difficulty of each item the sum of the effects of its features: the probability of a
+correct response is logistic(θ - b_i), b_i = x_iᵀη, with θ ~ N(0, σ²). `lltm(data, features, options)` estimates η and σ
+by the Bock-Aitkin EM algorithm on the engine of the [many-facet Rasch model](rater.md), and tests the model against
+the Rasch model that gives every item a difficulty of its own.
 
 `data` is a [response matrix or response records](data.md) of dichotomous responses; `features` are the
 [features by item id](#features) of every item in it.
@@ -462,18 +466,15 @@ and for these cases:
 
 ## Not included
 
-- **Polytomous linear change.** No reference: Fischer and Ponocny (1995) treat it, and eRm, the only package, warns that
-  it equates the two lowest categories.
-- **Item features computed from text.** No fit: finding the features is the caller's job, and has no statistic.
-- **The one-stage random-item model estimated from the responses.** Outside the sources: a research model; the two-stage
-  regression of ln a gives the slopes' prior.
-- **The 2PL model whose slopes are constrained by features.** Outside the sources: a research model; the two-stage
-  regression of ln a gives the slopes' prior.
-- **Standard errors adjusted for few items (Knapp and Hartung).** Outside the sources: an adjustment of meta-analysis
-  (`metafor`).
-- **The regression of several parameters at once.** Outside the sources: a technique of meta-analysis (`metafor`).
-- **The LLTM and its polytomous forms by conditional maximum likelihood.** Outside the sources: the same models by
-  marginal maximum likelihood are built, and `eRm::LPCM` failed to recover truth.
+| Not included                                                        | Why                                                                                                                            |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Polytomous linear change                                            | No reference: Fischer and Ponocny (1995) treat it, and eRm, the only package, warns that it equates the two lowest categories. |
+| Item features computed from text                                    | No fit: finding the features is the caller's job, and has no statistic.                                                        |
+| The one-stage random-item model estimated from the responses        | Outside the sources: a research model; the two-stage regression of ln a gives the slopes' prior.                               |
+| The 2PL model whose slopes are constrained by features              | Outside the sources: a research model; the two-stage regression of ln a gives the slopes' prior.                               |
+| Standard errors adjusted for few items (Knapp and Hartung)          | Outside the sources: an adjustment of meta-analysis (`metafor`).                                                               |
+| The regression of several parameters at once                        | Outside the sources: a technique of meta-analysis (`metafor`).                                                                 |
+| The LLTM and its polytomous forms by conditional maximum likelihood | Outside the sources: the same models by marginal maximum likelihood are built, and `eRm::LPCM` failed to recover truth.        |
 
 ## Differences from the references
 

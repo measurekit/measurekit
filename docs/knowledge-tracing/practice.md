@@ -3,10 +3,9 @@
 `@measurekit/knowledge-tracing/practice` chooses what a learner practices next and decides when a skill is mastered.
 It works with any model through the `LearnerModel` interface, including models written outside the package.
 
-## Next item
+## Quick start
 
-`recommend(model, state, candidates, { band })` predicts each candidate attempt and ranks them: those predicted inside
-the band first, nearest its middle first, then the others, nearest the band first. Ties keep the candidates' order.
+Rank three items for a learner by the predicted success, aiming at the default band:
 
 ```ts
 import { elo } from "@measurekit/knowledge-tracing/elo";
@@ -27,6 +26,11 @@ recommend(model, ana, candidates);
 // => [{ attempt: { item: "q2", ... }, prediction: 0.750 }, { attempt: { item: "q1", ... }, prediction: 0.924 },
 //     { attempt: { item: "q3", ... }, prediction: 0.426 }]
 ```
+
+## Next item
+
+`recommend(model, state, candidates, { band })` predicts each candidate attempt and ranks them: those predicted inside
+the band first, nearest its middle first, then the others, nearest the band first. Ties keep the candidates' order.
 
 | Option | Default        | Meaning                                  |
 | ------ | -------------- | ---------------------------------------- |
@@ -193,11 +197,15 @@ Invalid input throws `DataError` naming the value found.
 
 ## Not included
 
-- **Bandit and reinforcement-learning sequencing.** No fit: reward design and policy evaluation are a wider domain than
-  tracing.
-- **Spaced repetition.** No fit: a domain with its own library,
-  [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs); [the section above](#spaced-repetition) shows how to use
-  it beside mastery.
+| Not included                                 | Why                                                                                                                                                                              |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bandit and reinforcement-learning sequencing | No fit: reward design and policy evaluation are a wider domain than tracing.                                                                                                     |
+| Spaced repetition                            | No fit: a domain with its own library, [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs); [the section above](#spaced-repetition) shows how to use it beside mastery. |
+
+## Differences from the references
+
+None: no package has mastery criteria over a log, so base R replays each criterion, and the tables match it exactly
+([validation](validation.md#mastery-criteria)).
 
 ## References
 

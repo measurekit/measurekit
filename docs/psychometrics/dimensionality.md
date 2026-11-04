@@ -19,23 +19,9 @@ flowchart LR
   L --> SL["schmidLeiman, omegaHierarchical: a general factor"]
 ```
 
-## Correlations
+## Quick start
 
-`polychoricCorrelations(matrix, options)` takes a [response matrix](data.md): responses are integers from 0, `null` when
-missing, with any number of categories per item. Pearson correlations of scores treat the categories as equally spaced
-numbers; a polychoric correlation instead takes each item to be a normal variable cut at thresholds into its categories,
-and estimates the correlation of those variables.
-
-| Option       | Default | Meaning                                                                                                         |
-| ------------ | ------- | --------------------------------------------------------------------------------------------------------------- |
-| `correction` | `0.5`   | A number of 0 or more added to each empty cell of a table of two items with two categories each; 0 adds nothing |
-
-The result holds the `itemIds`, the `correlations` and each item's `thresholds`.
-
-| Field          | Meaning                                                                                                      |
-| -------------- | ------------------------------------------------------------------------------------------------------------ |
-| `correlations` | A symmetric matrix by item, 1 on the diagonal; `null` where undefined, below                                 |
-| `thresholds`   | Φ⁻¹ of each item's cumulative proportions over its observed categories but the last: one fewer than they are |
+Simulate 800 persons on two independent traits, and read their polychoric correlations:
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -58,6 +44,24 @@ correlations[0]?.[1]; // => 0.557: items 1 and 2 share a trait
 correlations[0]?.[6]; // => -0.031: items 1 and 7 do not
 thresholds[0]; // => [-0.006]: one for a dichotomous item
 ```
+
+## Correlations
+
+`polychoricCorrelations(matrix, options)` takes a [response matrix](data.md): responses are integers from 0, `null` when
+missing, with any number of categories per item. Pearson correlations of scores treat the categories as equally spaced
+numbers; a polychoric correlation instead takes each item to be a normal variable cut at thresholds into its categories,
+and estimates the correlation of those variables.
+
+| Option       | Default | Meaning                                                                                                         |
+| ------------ | ------- | --------------------------------------------------------------------------------------------------------------- |
+| `correction` | `0.5`   | A number of 0 or more added to each empty cell of a table of two items with two categories each; 0 adds nothing |
+
+The result holds the `itemIds`, the `correlations` and each item's `thresholds`.
+
+| Field          | Meaning                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `correlations` | A symmetric matrix by item, 1 on the diagonal; `null` where undefined, below                                 |
+| `thresholds`   | Φ⁻¹ of each item's cumulative proportions over its observed categories but the last: one fewer than they are |
 
 Each item's thresholds come from all the persons who answered it. For each pair of items, the correlation ρ maximizes
 the log-likelihood Σ n_kl ln π_kl(ρ) of the table of the persons who answered both, where π_kl is the probability of
@@ -355,43 +359,6 @@ correlations of `SAT12`, 32 items, have a least eigenvalue of -0.09. `explorator
 `minimumAveragePartial` smooth and report it in `smoothed`; `parallelAnalysis` does not, so that its eigenvalues can be
 negative.
 
-## Not included
-
-- **Rotations other than varimax and oblimin, such as promax.** Outside the sources: Fabrigar et al. (1999) prefer no
-  oblique rotation, as their results are alike; oblimin, `psych::fa`'s default, and varimax are built.
-- **The asymptotic omega hierarchical, ECV and the omegas of the group factors.** No fit: each is one line over the
-  Schmid-Leiman loadings, as psych's `omega` reports them.
-- **WLS and WLSMV extraction.** Outside the sources: options of psych and lavaan.
-- **Standard errors of loadings.** Outside the sources: a bootstrap over the persons gives them.
-- **Factor scores.** Outside the sources: not confirmed in them; `multidimensionalEstimates` scores persons on the
-  full-information route.
-- **The Kaiser-Meyer-Olkin measure.** Outside the sources: not confirmed in them; parallel analysis, MAP and the fit
-  decide the number of factors.
-- **Bartlett's test of sphericity.** Outside the sources: not confirmed in them; it rejects at any useful sample size.
-- **Very simple structure.** Outside the sources: a function of psych, beside MAP.
-- **Principal components analysis.** No fit: general statistics; `parallelAnalysis` reports the eigenvalues, and
-  Fabrigar et al. (1999) set it apart from factor analysis.
-- **ICLUST and Bass-Ackward factoring.** Outside the sources: functions of psych.
-- **Nonparametric conditional covariances.** Outside the sources: a function of sirt.
-- **Statistical implicative analysis.** Outside the sources: a function of sirt.
-- **Confirmatory factor analysis of ordinal items.** No fit: structural equation modeling, another domain's tool,
-  lavaan.
-- **Modification indices and score tests.** No fit: structural equation modeling, lavaan.
-- **Multi-group confirmatory factor analysis and measurement invariance.** No fit: structural equation modeling,
-  lavaan; `dif` tests items.
-- **Structural paths, mediation and full-information maximum likelihood.** No fit: structural equation modeling,
-  lavaan.
-- **Invariance alignment.** No fit: structural equation modeling, sirt and Mplus.
-- **Local structural equation models.** No fit: structural equation modeling, sirt.
-- **DETECT.** Outside the sources: a method for clusters of items, beside the parallel analysis, MAP and factor analysis
-  that are built.
-- **DIMTEST.** No reference: no package that runs it was found.
-- **Polyserial correlations of scores with categories.** Outside the sources: not confirmed in them; `itemRest` serves
-  polytomous item analysis.
-- **Standard errors of the correlations.** Outside the sources: a bootstrap over the persons gives them.
-- **Weights of persons.** Outside the sources: the functions take responses.
-- **A correlation matrix as input.** Outside the sources: the functions take responses.
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
@@ -408,7 +375,36 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `minimumAveragePartial`                                                                       | `maxFactors` above the items less 1, or components that leave an item no variance                                                      | Test fewer components; an item uncorrelated with every other ends the test                       |
 | `smoothCorrelations`                                                                          | A matrix that is not a `Float64Array` of `size` squared finite numbers, symmetric with 1 on the diagonal, or a `tolerance` not above 0 | Give the correlations by rows with their size                                                    |
 
-## Differences from psych
+## Not included
+
+| Not included                                                               | Why                                                                                                                                                        |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rotations other than varimax and oblimin, such as promax                   | Outside the sources: Fabrigar et al. (1999) prefer no oblique rotation, as their results are alike; oblimin, `psych::fa`'s default, and varimax are built. |
+| The asymptotic omega hierarchical, ECV and the omegas of the group factors | No fit: each is one line over the Schmid-Leiman loadings, as psych's `omega` reports them.                                                                 |
+| WLS and WLSMV extraction                                                   | Outside the sources: options of psych and lavaan.                                                                                                          |
+| Standard errors of loadings                                                | Outside the sources: a bootstrap over the persons gives them.                                                                                              |
+| Factor scores                                                              | Outside the sources: not confirmed in them; `multidimensionalEstimates` scores persons on the full-information route.                                      |
+| The Kaiser-Meyer-Olkin measure                                             | Outside the sources: not confirmed in them; parallel analysis, MAP and the fit decide the number of factors.                                               |
+| Bartlett's test of sphericity                                              | Outside the sources: not confirmed in them; it rejects at any useful sample size.                                                                          |
+| Very simple structure                                                      | Outside the sources: a function of psych, beside MAP.                                                                                                      |
+| Principal components analysis                                              | No fit: general statistics; `parallelAnalysis` reports the eigenvalues, and Fabrigar et al. (1999) set it apart from factor analysis.                      |
+| ICLUST and Bass-Ackward factoring                                          | Outside the sources: functions of psych.                                                                                                                   |
+| Nonparametric conditional covariances                                      | Outside the sources: a function of sirt.                                                                                                                   |
+| Statistical implicative analysis                                           | Outside the sources: a function of sirt.                                                                                                                   |
+| Confirmatory factor analysis of ordinal items                              | No fit: structural equation modeling, another domain's tool, lavaan.                                                                                       |
+| Modification indices and score tests                                       | No fit: structural equation modeling, lavaan.                                                                                                              |
+| Multi-group confirmatory factor analysis and measurement invariance        | No fit: structural equation modeling, lavaan; `dif` tests items.                                                                                           |
+| Structural paths, mediation and full-information maximum likelihood        | No fit: structural equation modeling, lavaan.                                                                                                              |
+| Invariance alignment                                                       | No fit: structural equation modeling, sirt and Mplus.                                                                                                      |
+| Local structural equation models                                           | No fit: structural equation modeling, sirt.                                                                                                                |
+| DETECT                                                                     | Outside the sources: a method for clusters of items, beside the parallel analysis, MAP and factor analysis that are built.                                 |
+| DIMTEST                                                                    | No reference: no package that runs it was found.                                                                                                           |
+| Polyserial correlations of scores with categories                          | Outside the sources: not confirmed in them; `itemRest` serves polytomous item analysis.                                                                    |
+| Standard errors of the correlations                                        | Outside the sources: a bootstrap over the persons gives them.                                                                                              |
+| Weights of persons                                                         | Outside the sources: the functions take responses.                                                                                                         |
+| A correlation matrix as input                                              | Outside the sources: the functions take responses.                                                                                                         |
+
+## Differences from the references
 
 | Topic                                   | This package                                                                      | psych                                                                                                                    |
 | --------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |

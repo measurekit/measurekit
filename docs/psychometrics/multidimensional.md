@@ -10,6 +10,10 @@ number of dimensions; and computes information matrices. Every estimate is valid
 R ([validation](validation.md)). The dimensions have mean 0 and variance 1, in the first group of a calibration of
 several groups.
 
+## Quick start
+
+Calibrate a confirmatory 2PL of two correlated dimensions, and estimate a person's thetas:
+
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
 import {
@@ -739,31 +743,42 @@ multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // =>
 | Check      | A correlation near 0 means the omissions say little about the ability, and the items differ little from those of a calibration that skips them |
 | Limits     | The model is the one of Holman and Glas: omissions depend on the ability only through the correlation of the two dimensions                    |
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                                                                                     | What to do                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Neither `dimensions` nor `loadings`, or both                                                                                              | Give `dimensions` for an exploratory model, or `loadings` for a confirmatory one |
+| Loadings, primary or specific dimensions, or priors for an id that is not an item, or a dimension named twice for an item                 | Name the dimensions of the items of the matrix, each once                        |
+| An item with invalid parameters: slopes or intercepts not finite, graded intercepts that do not decrease, or c and d out of 0 ≤ c < d ≤ 1 | Give the parameters in mirt's slope-intercept form                               |
+| More than three dimensions with EM, an exploratory model with too few items, or a grid of more nodes than its limit                       | Use `method: "mhrm"`, fewer `points`, or more items                              |
+| A bifactor model of more than one primary dimension, or a two-tier model of more than two                                                 | Use `calibrateMultidimensional` with `loadings`                                  |
+| Groups or occasions that share no item, or fixed items that leave a dimension without a scale                                             | Give them common items, or fix items with slopes on every dimension              |
+| A longitudinal calibration of more than three occasions                                                                                   | Calibrate two or three occasions at a time                                       |
+| A prior whose covariance is not symmetric positive definite, or scoring without items or a prior                                          | Give the prior of the calibration's correlations                                 |
+| A rotation of fewer than two dimensions, or of loadings that are not an exploratory calibration's                                         | Rotate the items of an exploratory calibration                                   |
+
 ## Not included
 
-- **Noncompensatory models.** Outside the sources: a variant of the compensatory models; the graded model covers ordered
-  items.
-- **Multidimensional GPCM.** Outside the sources: a variant of the graded model, which covers ordered items.
-- **Multidimensional nominal models.** Outside the sources: a variant of the graded model, which covers ordered items.
-- **Multidimensional linking of separate calibrations.** Outside the sources: concurrent calibration of groups is the
-  practice here, though Reckase gives linking a chapter; the groups are calibrated together, on one scale.
-- **QMC-EM.** Outside the sources: an option of mirt (`method = "QMCEM"`), and MH-RM serves high dimensions.
-- **Standard errors of the means and covariances of the groups.** Outside the sources: the items' standard errors
-  account for them.
-- **Items whose parameters differ between groups.** Outside the sources: the groups share one set of item parameters.
-- **More than three occasions.** No fit: the grid has a dimension for each, and the grids that a product can afford are
-  too coarse for the correlations that longitudinal data have; on them mirt itself returns wrong moments that report
-  `converged` ([why](#longitudinal-calibration)).
-- **Structured means and covariances of the occasions, such as a growth curve or an autoregressive covariance.** No fit:
-  every mean, standard deviation and correlation of the later occasions is free, and a structure on them is a model of
-  growth fitted to the estimated moments.
-- **Multidimensional person fit.** Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.
-- **Multidimensional DIF.** Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.
-- **Normal-ogive multidimensional models.** Outside the sources: the logistic form is the practice, and is built.
-- **Multicomponent models.** Outside the sources: a variant of the noncompensatory models.
-- **NOHARM.** Outside the sources: `calibrateMultidimensional` is full information.
+| Not included                                                                                              | Why                                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Noncompensatory models                                                                                    | Outside the sources: a variant of the compensatory models; the graded model covers ordered items.                                                                                                                                                         |
+| Multidimensional GPCM                                                                                     | Outside the sources: a variant of the graded model, which covers ordered items.                                                                                                                                                                           |
+| Multidimensional nominal models                                                                           | Outside the sources: a variant of the graded model, which covers ordered items.                                                                                                                                                                           |
+| Multidimensional linking of separate calibrations                                                         | Outside the sources: concurrent calibration of groups is the practice here, though Reckase gives linking a chapter; the groups are calibrated together, on one scale.                                                                                     |
+| QMC-EM                                                                                                    | Outside the sources: an option of mirt (`method = "QMCEM"`), and MH-RM serves high dimensions.                                                                                                                                                            |
+| Standard errors of the means and covariances of the groups                                                | Outside the sources: the items' standard errors account for them.                                                                                                                                                                                         |
+| Items whose parameters differ between groups                                                              | Outside the sources: the groups share one set of item parameters.                                                                                                                                                                                         |
+| More than three occasions                                                                                 | No fit: the grid has a dimension for each, and the grids that a product can afford are too coarse for the correlations that longitudinal data have; on them mirt itself returns wrong moments that report `converged` ([why](#longitudinal-calibration)). |
+| Structured means and covariances of the occasions, such as a growth curve or an autoregressive covariance | No fit: every mean, standard deviation and correlation of the later occasions is free, and a structure on them is a model of growth fitted to the estimated moments.                                                                                      |
+| Multidimensional person fit                                                                               | Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.                                                                                                                                                                      |
+| Multidimensional DIF                                                                                      | Outside the sources: rare; the groups allow a likelihood-ratio comparison of models.                                                                                                                                                                      |
+| Normal-ogive multidimensional models                                                                      | Outside the sources: the logistic form is the practice, and is built.                                                                                                                                                                                     |
+| Multicomponent models                                                                                     | Outside the sources: a variant of the noncompensatory models.                                                                                                                                                                                             |
+| NOHARM                                                                                                    | Outside the sources: `calibrateMultidimensional` is full information.                                                                                                                                                                                     |
 
-## Differences from mirt
+## Differences from the references
 
 - **Exploratory models.** mirt leaves all slopes of an exploratory model free, so that the likelihood is flat along the
   rotations and its EM runs long: SAT12 scored with 31 points did not converge in 5,000 iterations at `TOL = 1e-10`. Here the first

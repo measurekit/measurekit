@@ -279,9 +279,9 @@ Where the code departs from `STANDARDS.md`, with the reason: none.
   spread into an array literal. `pnpm lint` fails on it in `packages/*/src` (`biome/no-spread-arguments.grit`).
 - A number with a meaning is a named constant with its source, such as the reference's name for it.
 - A capability is built when the sources of `docs/<package>/architecture.md` treat it as standard practice, a usable
-  reference exists and it fits a library. The guide lists the rest under "Not included", one bullet for each method,
-  `- **Method.** Reason: why`, with Reason one of No fit, No reference or Outside the sources. No speculative options,
-  abstractions or modules.
+  reference exists and it fits a library. The guide lists the rest under "Not included", a table that opens with
+  `| Not included | Why |`, one row for each method, `| Method | Reason: why |`, with Reason one of No fit, No reference
+  or Outside the sources. No speculative options, abstractions or modules.
 
 ## Repeats left on purpose
 
@@ -329,6 +329,11 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
     complete, with its imports, runs alone and shows at least one result, as the samples of the guides do.
   - No other tags and no boilerplate.
 - `//` comments only explain why something non-obvious is done, or cite a source. No commented-out code.
+- The guide of a module, every page of `docs/<package>/` but `architecture`, `performance`, `storage` and `validation`,
+  has `## Quick start` first, a minimal sample of the main call, and ends with `## Errors`, `## Not included` and
+  `## Differences from the references`, in that order, before `## References`; a section with nothing to say says "None"
+  and why. `pnpm check:standards` fails on a guide without the four sections (`guide-sections`) and on a Not included
+  section that is not the table above (`not-included`).
 - Docs lead with a picture, then tables, then prose. Diagrams are Mermaid in Markdown: GitHub renders them, and
   `typedoc-plugin-mermaid`, pinned in `typedoc.json` with the Mermaid version it loads, renders them on the docs site.
 - US English; short sentences, a table or list rather than prose; complete samples with their imports; a source's section

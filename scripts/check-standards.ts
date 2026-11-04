@@ -309,68 +309,106 @@ export function checkConsole(files: Files): Violation[] {
   );
 }
 
-/** A bullet of a "Not included" section: the method in bold with a final period, a reason of the three, a colon and why. */
-const NOT_INCLUDED_BULLET = new RegExp(`^- \\*\\*[^*]+\\.\\*\\* (?:${REASONS.join("|")}): \\S`);
+/** The pages of `docs/<package>/` that are not the guide of a module. */
+const OTHER_PAGES = new Set(["architecture", "performance", "storage", "validation"]);
+/** The sections that the guide of every module has, by the text of their `##` heading. */
+const GUIDE_SECTIONS = ["Quick start", "Errors", "Not included", "Differences from the references"];
+/** The first row of the table of what a page leaves out, as every page writes it. */
+const NOT_INCLUDED_HEADER = "| Not included | Why |";
 
-/** The entries of the "Not included" sections of a guide, each with the line it starts at and its lines joined. */
-function notIncludedEntries(text: string): { line: number; text: string }[] {
-  const entries: { line: number; text: string }[] = [];
-  let level = 0;
-  let current: { line: number; text: string } | undefined;
+/** The `##` headings of a Markdown file outside fenced code, with the 1-based line of each. */
+function sectionsOf(text: string): { readonly title: string; readonly line: number }[] {
+  const found: { title: string; line: number }[] = [];
+  let fenced = false;
   linesOf(text).forEach((line, index) => {
-    const heading = /^(#{1,6}) (.*)$/.exec(line);
-    if (heading !== null) level = heading[2]?.trim() === "Not included" ? (heading[1]?.length ?? 0) : 0;
-    if (level === 0 || heading !== null || line.trim() === "") {
-      current = undefined;
-    } else if (line.startsWith("  ") && current !== undefined) {
-      current.text += ` ${line.trim()}`;
-    } else {
-      current = { line: index + 1, text: line };
-      entries.push(current);
-    }
+    if (/^\s*```/.test(line)) fenced = !fenced;
+    const title = fenced ? undefined : /^## (.+?)\s*$/.exec(line)?.[1];
+    if (title !== undefined) found.push({ title, line: index + 1 });
   });
-  return entries;
+  return found;
+}
+
+/** The sections of the guide of a module that its page lacks. */
+function missingGuideSections(file: string, sections: readonly { readonly title: string }[]): Violation[] {
+  return GUIDE_SECTIONS.filter((title) => !sections.some((section) => section.title === title)).map((title) => ({
+    file,
+    line: 0,
+    rule: "guide-sections",
+    message: `Every guide of a module has a "## ${title}" section; add it, with "None" and the reason where there is nothing to say.`,
+  }));
+}
+
+/** The cells of a row of a Markdown table, split at the pipes that are not escaped. */
+function cellsOf(row: string): string[] {
+  return row
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split(/(?<!\\)\|/)
+    .map((cell) => cell.trim());
+}
+
+/** The lines of a section that are not blank, as `[1-based line, text]`, from its heading to the next heading of its level. */
+function sectionBody(text: string, heading: number): [number, string][] {
+  const body: [number, string][] = [];
+  for (const [index, line] of linesOf(text).slice(heading).entries()) {
+    if (/^#{1,2} /.test(line)) break;
+    if (line.trim() !== "") body.push([heading + index + 1, line]);
+  }
+  return body;
+}
+
+/** A row of the table of what a page leaves out whose Why does not open with a reason of the three and a colon. */
+const WITHOUT_REASON = new RegExp(`^(?!(?:${REASONS.join("|")}): \\S)`);
+
+/** The breaches of one `## Not included` section: a first row other than the header, a line out of the table, a Why without its reason. */
+function oddNotIncluded(file: string, text: string, heading: number): Violation[] {
+  const violation = (line: number, message: string): Violation => ({ file, line, rule: "not-included", message });
+  const [header, delimiter, ...rows] = sectionBody(text, heading);
+  if (header === undefined || header[1].replace(/\s+/g, " ").trim() !== NOT_INCLUDED_HEADER)
+    return [
+      violation(
+        header?.[0] ?? heading,
+        `Write what the page leaves out as a table whose first row reads ${NOT_INCLUDED_HEADER}.`,
+      ),
+    ];
+  if (delimiter === undefined || !/^\|(\s*:?-+:?\s*\|){2}$/.test(delimiter[1].trim()))
+    return [violation(delimiter?.[0] ?? header[0], "Follow the first row of the table with its delimiter row.")];
+  return rows.flatMap(([line, row]) => {
+    const cells = row.startsWith("|") ? cellsOf(row) : [];
+    return cells.length === 2 && cells[0] !== "" && !WITHOUT_REASON.test(cells[1] ?? "")
+      ? []
+      : [
+          violation(
+            line,
+            `A row names one method and why: | Method | Reason: why |, with Reason one of ${REASONS.join(", ")}.`,
+          ),
+        ];
+  });
 }
 
 /**
- * Every bullet under a "Not included" heading of a guide names one method and one reason of the three: `- **Method.**
- * Reason: why`. A bullet may continue on lines that start with two spaces; nothing else but blank lines may follow.
+ * The guide of every module has a quick start, the errors, what is not included and the differences from the references, so
+ * that the guides read alike.
+ */
+export function checkGuideSections(files: Files): Violation[] {
+  return [...files].flatMap(([file, text]) => {
+    const page = /^docs\/[^/]+\/([^/]+)\.md$/.exec(file)?.[1];
+    return page === undefined || OTHER_PAGES.has(page) ? [] : missingGuideSections(file, sectionsOf(text));
+  });
+}
+
+/**
+ * What a page of `docs/<package>/` leaves out is one table that opens with `| Not included | Why |`, a row for each method,
+ * whose Why opens with one of the three reasons that a method stays out of a module: `| Method | Reason: why |`.
  */
 export function checkNotIncluded(files: Files): Violation[] {
   return [...files].flatMap(([file, text]) =>
     /^docs\/[^/]+\/[^/]+\.md$/.test(file)
-      ? notIncludedEntries(text)
-          .filter((entry) => !NOT_INCLUDED_BULLET.test(entry.text))
-          .map((entry) => ({
-            file,
-            line: entry.line,
-            rule: "not-included",
-            message: `A Not included entry reads "- **Method.** Reason: why", with Reason one of ${REASONS.join(", ")}.`,
-          }))
+      ? sectionsOf(text)
+          .filter(({ title }) => title === "Not included")
+          .flatMap(({ line }) => oddNotIncluded(file, text, line))
       : [],
   );
-}
-
-/**
- * Every guide of a module, `docs/<package>/<module>.md` for a folder `packages/<package>/src/<module>/` with an
- * `index.ts`, has a `## Not included` section: what a module leaves out is part of what it is complete for.
- */
-export function checkModuleGuides(files: Files): Violation[] {
-  return [...files].flatMap(([file, text]) => {
-    const [, library, module] = /^docs\/([^/]+)\/([^/]+)\.md$/.exec(file) ?? [];
-    const isModuleGuide = library !== undefined && files.has(`packages/${library}/src/${module}/index.ts`);
-    const hasSection = proseLines(text).some(([, line]) => line.trimEnd() === "## Not included");
-    return isModuleGuide && !hasSection
-      ? [
-          {
-            file,
-            line: 0,
-            rule: "module-guide",
-            message: `The guide of the ${module} module has no "## Not included" section; list each method the module leaves out, with its reason.`,
-          },
-        ]
-      : [];
-  });
 }
 
 /** The types of the standard library that are mutable lists or records, and so are not a result. */
@@ -528,8 +566,8 @@ export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkFamilies,
   checkEntries,
   checkConsole,
+  checkGuideSections,
   checkNotIncluded,
-  checkModuleGuides,
   checkReadonlyResults,
   checkModuleExamples,
 ];

@@ -14,6 +14,24 @@ flowchart LR
   U --> N[prediction null, no likelihood term, no opportunity]
 ```
 
+## Quick start
+
+Build a log from events in any order, with the skills of their items from a Q-matrix:
+
+```ts
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
+
+const log = buildEventLog(
+  [
+    { learner: "budi", item: "q2", time: 1730190000000, outcome: 0 },
+    { learner: "ana", item: "q1", time: 1730180000000, outcome: 1 },
+    { learner: "ana", item: "q3", skills: ["decimals"], time: 1730200000000, outcome: 0.5 },
+  ],
+  { qMatrix: { q1: ["fractions"], q2: ["fractions", "decimals"] } },
+);
+log.map((event) => event.skills); // => [["fractions"], ["fractions", "decimals"], ["decimals"]]
+```
+
 ## Events
 
 An event is one attempt of a learner at an item, with its outcome, or with `outcome: null` when the attempt is a learning
@@ -44,20 +62,7 @@ with equal times. The result is an `EventLog`: events in time order, for each le
 which models that also update items, such as Elo, need. Every event counts as an attempt, so remove the repeated rows
 some exports hold, as ASSISTments 2009 does: there, one row per skill of an event and copies of rows. Events with equal
 times keep the order given, which another tool may not: order them by a unique time, such as a row number, to compare.
-
-```ts
-import { buildEventLog } from "@measurekit/knowledge-tracing/data";
-
-const log = buildEventLog(
-  [
-    { learner: "budi", item: "q2", time: 1730190000000, outcome: 0 },
-    { learner: "ana", item: "q1", time: 1730180000000, outcome: 1 },
-    { learner: "ana", item: "q3", skills: ["decimals"], time: 1730200000000, outcome: 0.5 },
-  ],
-  { qMatrix: { q1: ["fractions"], q2: ["fractions", "decimals"] } },
-);
-log.map((event) => event.skills); // => [["fractions"], ["fractions", "decimals"], ["decimals"]]
-```
+The [quick start](#quick-start) builds one.
 
 | Rule   | Detail                                                                                                                                       |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -204,9 +209,26 @@ A step with no skill is an attempt at none, which no skill's model counts. The t
 on seeded rows of each export and compares the outcomes of each learner at each skill, in order, with the data that
 pyBKT's `convert_data` makes of the same rows ([validation](validation.md)).
 
+## Errors
+
+Invalid input throws `DataError` naming the first problem and the event's position in the input.
+
+| Error                                                                                     | What to do                                                                                             |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| An event without a learner, an item, a finite time or an outcome from 0 to 1 or `null`    | Give every field of the [events](#events) table; a missing outcome is `null` when nothing was observed |
+| A skill listed twice, an empty id, or hints, a duration or an attempt number out of range | Give distinct non-empty ids, and the metadata in the ranges of the table                               |
+| A Q-matrix that is not lists of skill ids by item id                                      | Give `{ [item]: string[] }`                                                                            |
+| An empty log, or a log out of time order                                                  | Build the log with `buildEventLog`, which orders the events                                            |
+| Fewer learners or items than folds, or times that do not divide into the folds            | Use fewer folds, or more distinct times with an outcome                                                |
+
 ## Not included
 
-- **Reading files.** No fit: the package does no I/O, so a caller reads the file and maps its rows, as the recipe above
-  shows.
-- **Reading the rows of DataShop and ASSISTments.** No fit: a map of column names is not a method; the [recipe
-  above](#recipe-the-rows-of-an-export) is the map.
+| Not included                                 | Why                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Reading files                                | No fit: the package does no I/O, so a caller reads the file and maps its rows, as the recipe above shows.    |
+| Reading the rows of DataShop and ASSISTments | No fit: a map of column names is not a method; the [recipe above](#recipe-the-rows-of-an-export) is the map. |
+
+## Differences from the references
+
+None: the functions build and split logs, and pyBKT's `convert_data` gives the same sequences of outcomes from the rows of
+an export ([recipe](#recipe-the-rows-of-an-export)).

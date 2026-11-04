@@ -14,6 +14,20 @@ flowchart LR
   M --> A["calibrate, DIF, equating and every other analysis"]
 ```
 
+| Function                                                            | Result                                                                                         |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `simulateThetas(count, random, options)`                            | `count` thetas from the option `distribution`, by default N(0, 1)                              |
+| `simulateItems(model, count, random, options)`                      | `count` items `{ model, parameters }` of a built-in model                                      |
+| `simulateResponses(items, thetas, random, options)`                 | A response matrix: a row per theta, a column per item, the default ids                         |
+| `simulateMultidimensionalResponses(items, thetas, random, options)` | The same for [multidimensional](multidimensional.md) items, with an array of thetas per person |
+
+Thetas need not come from `simulateThetas`: any finite values work, such as a grid or the estimates of a real
+sample. A seed gives the same simulation for the same calls in the same order.
+
+## Quick start
+
+Simulate 2,000 persons on 20 2PL items, and calibrate the items back:
+
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
 import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
@@ -25,16 +39,6 @@ const thetas = simulateThetas(2000, random);
 const matrix = simulateResponses(items, thetas, random, { missingProbability: 0.05 });
 calibrate(matrix, { model: twoParameterLogistic }).items; // estimates near items[j].parameters
 ```
-
-| Function                                                            | Result                                                                                         |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `simulateThetas(count, random, options)`                            | `count` thetas from the option `distribution`, by default N(0, 1)                              |
-| `simulateItems(model, count, random, options)`                      | `count` items `{ model, parameters }` of a built-in model                                      |
-| `simulateResponses(items, thetas, random, options)`                 | A response matrix: a row per theta, a column per item, the default ids                         |
-| `simulateMultidimensionalResponses(items, thetas, random, options)` | The same for [multidimensional](multidimensional.md) items, with an array of thetas per person |
-
-Thetas need not come from `simulateThetas`: any finite values work, such as a grid or the estimates of a real
-sample. A seed gives the same simulation for the same calls in the same order.
 
 ## Distributions
 
@@ -145,7 +149,26 @@ R's generator differs from `createRandom`, so no R reference reproduces a simula
 the distributions instead ([validation](validation.md#simulation)): moments, category frequencies, the share of
 missing responses, exact reproduction, and the recovery of simulated 2PL items by calibration.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                                                           | What to do                                                                |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| No theta, or a theta that is not finite, or a person without one theta per dimension                            | Give at least one finite theta per person, one per dimension of the items |
+| An item of a model that is not built in, or of the GGUM                                                         | Simulate the built-in models other than the GGUM                          |
+| A distribution for a parameter the model does not draw, or a uniform distribution whose bounds are not in order | Give distributions only for the model's parameters, lower bound first     |
+| `categoryCount` below 2, or other than 2 for the 1PL to 4PL                                                     | Give an integer from 2, and 2 for dichotomous models                      |
+| An item without a string id where other items have one                                                          | Give every item an id, or none                                            |
+| A profile without a 0 or 1 for each attribute, or an item's attribute not among them                            | Give each person a profile over the attributes of the Q-matrix            |
+
 ## Not included
 
-- **Simulated DIF, misfit and aberrant responses.** No fit: `simulateResponses` with changed items or thetas composes
-  them.
+| Not included                                 | Why                                                                     |
+| -------------------------------------------- | ----------------------------------------------------------------------- |
+| Simulated DIF, misfit and aberrant responses | No fit: `simulateResponses` with changed items or thetas composes them. |
+
+## Differences from the references
+
+None: R's generator differs from `createRandom`, so no reference reproduces a draw; seeded tests check the distributions,
+and a calibration recovers the items it simulates ([validation](#validation)).

@@ -9,6 +9,37 @@ others. Components are validated against base R's `aov`, the expected mean squar
 lme4's REML estimates, unbalanced designs against Method 1 written out in base R and against GeneralizIT, and decision
 studies against the textbook formulas of each design ([validation](validation.md)).
 
+## Quick start
+
+Estimate the variance components of six persons by four items, p × i:
+
+```ts
+import { generalizabilityStudy } from "@measurekit/psychometrics/generalizability";
+
+const persons = ["p1", "p2", "p3", "p4", "p5", "p6"];
+const items = ["i1", "i2", "i3", "i4"];
+const ratings = [
+  [4, 5, 3, 4],
+  [2, 3, 2, 2],
+  [5, 5, 4, 5],
+  [3, 4, 3, 2],
+  [1, 2, 1, 2],
+  [4, 4, 5, 4],
+];
+const scores = ratings.flatMap((row, p) =>
+  row.map((score, i) => ({ levels: { person: persons[p] ?? "", item: items[i] ?? "" }, score })),
+);
+const study = generalizabilityStudy(scores, { facets: ["item"] });
+study.sampleSizes; // => { person: 6, item: 4 }
+study.components.map(({ facets, degreesOfFreedom, meanSquare, variance }) => [
+  facets.join(" x "),
+  degreesOfFreedom,
+  Math.round(meanSquare * 1000) / 1000,
+  Math.round(variance * 1000) / 1000,
+]);
+// => [["person", 5, 6.342, 1.506], ["item", 3, 0.819, 0.083], ["person x item", 15, 0.319, 0.319]], after rounding
+```
+
 ## Designs
 
 Scores are in long format: a `FacetedScore` has the element of each facet in `levels` and a `score`. The design names
@@ -44,33 +75,6 @@ to be balanced is still found.
 `generalizabilityStudy(scores, design)` returns one `VarianceComponent` for each effect of the design, ordered by the
 number of facets in the effect and then by the order of the facets: for p × i, the person, the item and the person by item
 effect.
-
-```ts
-import { generalizabilityStudy } from "@measurekit/psychometrics/generalizability";
-
-const persons = ["p1", "p2", "p3", "p4", "p5", "p6"];
-const items = ["i1", "i2", "i3", "i4"];
-const ratings = [
-  [4, 5, 3, 4],
-  [2, 3, 2, 2],
-  [5, 5, 4, 5],
-  [3, 4, 3, 2],
-  [1, 2, 1, 2],
-  [4, 4, 5, 4],
-];
-const scores = ratings.flatMap((row, p) =>
-  row.map((score, i) => ({ levels: { person: persons[p] ?? "", item: items[i] ?? "" }, score })),
-);
-const study = generalizabilityStudy(scores, { facets: ["item"] });
-study.sampleSizes; // => { person: 6, item: 4 }
-study.components.map(({ facets, degreesOfFreedom, meanSquare, variance }) => [
-  facets.join(" x "),
-  degreesOfFreedom,
-  Math.round(meanSquare * 1000) / 1000,
-  Math.round(variance * 1000) / 1000,
-]);
-// => [["person", 5, 6.342, 1.506], ["item", 3, 0.819, 0.083], ["person x item", 15, 0.319, 0.319]], after rounding
-```
 
 | Field of a component | Meaning                                                                                            |
 | -------------------- | -------------------------------------------------------------------------------------------------- |
@@ -408,25 +412,6 @@ The covariance components equal those from the mean products of the two scores, 
 within rounding. The universe scores correlate 0.567 here, against 0.6 in the data. The test of this recipe runs the
 code on the seeded scores and compares it with the mean products to 1e-9.
 
-## Not included
-
-- **Henderson's Method 2.** Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and
-  GeneralizIT compute and which is built.
-- **Henderson's Method 3.** Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and
-  GeneralizIT compute and which is built.
-- **REML estimates of the components of an unbalanced design.** Outside the sources: the estimator for unbalanced
-  designs is Method 1, which urGENOVA and GeneralizIT compute and which is built; lme4 fits REML.
-- **MIVQUE estimates of the components of an unbalanced design.** Outside the sources: the estimator for unbalanced
-  designs is Method 1, which urGENOVA and GeneralizIT compute and which is built.
-- **Multivariate generalizability theory.** No reference: Brennan's chapters 9 to 12 treat it, but no package runs it,
-  as mGENOVA is a Windows program. [A recipe](#recipe-a-multivariate-g-study) gets the covariance components from three
-  univariate studies.
-- **Standard errors and confidence intervals of the components.** No reference: Brennan's chapter 6 treats them, but no
-  package runs them.
-- **Mixed-model G studies.** No fit: fixed facets are handled in the D study, from the random-effects components.
-- **Facets in the object of measurement.** No reference: no package that fits an object nested in another facet, such as
-  persons within schools, was found.
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
@@ -443,6 +428,19 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `decisionStudy`         | A size that is not a positive integer, or a facet of `sampleSizes`, `fixed` or `nested` that is not one of the study's but the object | Name the study's facets, with whole numbers of elements                                                 |
 | `decisionStudy`         | A study that is not balanced and `sampleSizes` without a facet                                                                        | Give the number of elements of every facet but the object                                               |
 | `decisionStudy`         | A universe score and relative error variance both 0                                                                                   | The coefficients are undefined: check the components and the fixed facets                               |
+
+## Not included
+
+| Not included                                               | Why                                                                                                                                                                                                                  |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Henderson's Method 2                                       | Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and GeneralizIT compute and which is built.                                                                                    |
+| Henderson's Method 3                                       | Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and GeneralizIT compute and which is built.                                                                                    |
+| REML estimates of the components of an unbalanced design   | Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and GeneralizIT compute and which is built; lme4 fits REML.                                                                    |
+| MIVQUE estimates of the components of an unbalanced design | Outside the sources: the estimator for unbalanced designs is Method 1, which urGENOVA and GeneralizIT compute and which is built.                                                                                    |
+| Multivariate generalizability theory                       | No reference: Brennan's chapters 9 to 12 treat it, but no package runs it, as mGENOVA is a Windows program. [A recipe](#recipe-a-multivariate-g-study) gets the covariance components from three univariate studies. |
+| Standard errors and confidence intervals of the components | No reference: Brennan's chapter 6 treats them, but no package runs them.                                                                                                                                             |
+| Mixed-model G studies                                      | No fit: fixed facets are handled in the D study, from the random-effects components.                                                                                                                                 |
+| Facets in the object of measurement                        | No reference: no package that fits an object nested in another facet, such as persons within schools, was found.                                                                                                     |
 
 ## Differences from the references
 

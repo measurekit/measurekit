@@ -7,6 +7,25 @@ abilities, converts summed scores to theta, and computes information and reliabi
 against mirt, ltm, TAM, the GGUM package and base R ([validation](validation.md)). Theta is
 on the N(0, 1) scale unless a calibration estimates its distribution.
 
+## Quick start
+
+Simulate 1,000 persons on ten 2PL items, calibrate the items back, and estimate the first person's theta:
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrate, posteriorMeanEstimate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+const random = createRandom(7);
+const truth = simulateItems(twoParameterLogistic, 10, random);
+const matrix = simulateResponses(truth, simulateThetas(1000, random), random);
+const { items, converged } = calibrate(matrix, { model: twoParameterLogistic });
+converged; // => true
+truth[0]?.parameters; // => { a: 0.85, b: -0.13, c: 0, d: 1 }
+items[0]?.parameters; // => { a: 0.83, b: -0.18, c: 0, d: 1 }: the estimates of the first item
+posteriorMeanEstimate(items, matrix.responses[0] ?? []); // => { theta: 0.32, standardError: 0.59 }
+```
+
 ## Models
 
 An item with K categories is scored 0 to K - 1. Parameters follow mirt's `coef(model, IRTpars = TRUE)` with D = 1
@@ -878,14 +897,6 @@ take theta on the Rasch scale, and `itemFit` reads them. On 40 seeded sets of 2,
 the difficulties have an RMSE of 0.052 and their 95% intervals cover them in 96.3% of cases. The Andersen, Martin-Löf and
 Wald tests of [fit](fit.md#rasch-tests) compare CML fits in parts of the matrix.
 
-### Differences from eRm
-
-| Topic                                 | This package                                                      | eRm                                                                                                                                                |
-| ------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Normalization                         | The thresholds sum to 0                                           | `sum0 = TRUE`: the easiness parameters, -(b1 + ... + bk) for category k, sum to 0, which shifts every threshold of a polytomous test by a constant |
-| Optimizer                             | Newton's method on the exact gradient and Hessian, to `tolerance` | `nlm` with numerical derivatives, which stops up to 1e-4 short in the thresholds                                                                   |
-| Missing responses of polytomous items | The conditional likelihood of each person's answered items        | `PCM` maximizes another function: on a seeded test that likelihood is -780.5 at its estimates, 3.4 below its maximum, and eRm reports -812.1       |
-
 ## Ability estimation
 
 Each estimator takes items with known parameters, of any models, such as a calibration's `items`, and one response per
@@ -1299,6 +1310,65 @@ calibrate(
 
 Validate a new model against an R reference before relying on it, as [validation](validation.md) describes.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found; the sections name the errors of their options.
+
+| Error                                                                                                       | What to do                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| An estimated item with no response in a category below its highest, or with responses in one category alone | Merge the empty category with a neighbor ([recipe](#recipe-an-item-with-an-empty-category)), or leave the item out                |
+| A model that is not an IRT model, or another number of models than the items                                | Give one model, or one for each item                                                                                              |
+| Standard errors of more than 2,000 estimated parameters                                                     | Leave `standardErrors` at `"none"`, or calibrate the items in sets that share fixed anchors ([standard errors](#standard-errors)) |
+| Fixed, held or prior parameters that their model lacks, that items share, or that leave the item invalid    | Name the parameters of each item's model, and keep one free ([priors](#priors), [held parameters](#held-parameters))              |
+| A covariance of fixed items whose labels or values do not fit them                                          | Label the parameters of `fixed` items as `calibrateWithCovariance` does ([error of fixed items](#error-of-fixed-items))           |
+| An item answered all right or all wrong, in joint or conditional maximum likelihood                         | Leave the item out: its estimate would be infinite                                                                                |
+| Maximum likelihood or WLE of a person without responses                                                     | Use EAP or MAP, which return the prior                                                                                            |
+| An unfolding calibration of more than 500 items, or of categories without responses                         | As its [table](#unfolding-calibration) says                                                                                       |
+
+## Not included
+
+| Not included                                                                                        | Why                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Marginal reliability under the testlet model                                                        | No reference: mirt's `marginal_rxx` takes one dimension, and the information of a testlet sums over its response patterns, whose number grows exponentially with its items; the reliability of a summed-score table's rows and `empiricalReliability` cover it. |
+| Pairwise, PML, PROX and eigenvector Rasch estimators                                                | Outside the sources: CML, MML and JML are the practice, and are built.                                                                                                                                                                                          |
+| Hyperbolic cosine model                                                                             | No reference: no package fits it; the GGUM, the chapter's other unfolding model, is built.                                                                                                                                                                      |
+| Ideal-point, ALM, SSLM and parallelogram items                                                      | Outside the sources: unfolding forms of mirt; the GGUM is the Handbook's model, and is built.                                                                                                                                                                   |
+| Linking and equating of unfolding items                                                             | No reference: equateIRT links the dominance models only, and a GGUM item's expected score falls on both sides of its location, where true-score equating needs it to increase.                                                                                  |
+| Design-based standard errors with survey weights                                                    | No fit: strata and clusters are survey design, the `survey` package's; `personWeights` are rescaled frequencies, and a replicate-weight variance is a loop over `calibrate`.                                                                                    |
+| Sequential models                                                                                   | Outside the sources: a variant for ordered categories; the graded and partial credit models are the practice, and recoded steps fit as 2PL items.                                                                                                               |
+| Models for continuous responses                                                                     | No fit: a response is an integer category throughout the library.                                                                                                                                                                                               |
+| Multiple-choice and nested logit models                                                             | Outside the sources: variants of `nominalResponse`, which fits distractors.                                                                                                                                                                                     |
+| Graded rating scale and scoring matrices                                                            | Outside the sources: options of mirt, beside `ratingScale` and `generalizedPartialCredit`.                                                                                                                                                                      |
+| Spline and monotone polynomial items                                                                | Outside the sources: research models; `kernelItemCurves` shows the shape of a curve.                                                                                                                                                                            |
+| Generalized logistic and Ramsay quotient models                                                     | Outside the sources: options of sirt.                                                                                                                                                                                                                           |
+| 5PL, complementary log-log and unipolar links                                                       | Outside the sources: options of mirt.                                                                                                                                                                                                                           |
+| Davidian and mixture latent densities                                                               | Outside the sources: `"empirical-histogram"` covers a distribution that is not normal.                                                                                                                                                                          |
+| Mixture models and discrete latent classes                                                          | Outside the sources: one chapter presents them as a variant; `@measurekit/psychometrics/cdm` holds latent classes.                                                                                                                                              |
+| Multilevel response models                                                                          | Outside the sources: `groups` and `covariates` cover the practice; lme4 and Mplus fit the rest.                                                                                                                                                                 |
+| Item-family models                                                                                  | Outside the sources: a research model of cloned items.                                                                                                                                                                                                          |
+| Randomized response models                                                                          | Outside the sources: a design of data collection for sensitive questions.                                                                                                                                                                                       |
+| Mixed-coefficients multinomial logit, generalized linear latent and mixed models                    | No fit: a model language; `IrtModel` and the options cover their named cases.                                                                                                                                                                                   |
+| Bayesian nonparametric models                                                                       | No fit: general Bayesian computation, another domain's tool: Stan and JAGS fit them.                                                                                                                                                                            |
+| Bayesian estimation by MCMC                                                                         | No fit: general Bayesian computation, another domain's tool: Stan, JAGS and NIMBLE fit any model here; `priors` give posterior modes, and MH-RM serves high dimensions.                                                                                         |
+| Variational estimation                                                                              | Outside the sources: chapter 14 of Statistical Tools presents an approximation for the models that EM and MH-RM fit, as QMC-EM is one for mirt.                                                                                                                 |
+| Amortized estimation                                                                                | No fit: a neural network, so a tensor runtime: `py-irt` fits one.                                                                                                                                                                                               |
+| Joint maximum likelihood of the 2PL and graded models                                               | Outside the sources: inconsistent without a Rasch form; marginal maximum likelihood is the practice.                                                                                                                                                            |
+| Optimal design of a calibration                                                                     | Outside the sources: chapter 16 of Statistical Tools presents design theory; optimal calibration designs (`optical` on CRAN) are a research method, and online calibration with `fixed` is the practice.                                                        |
+| General equality constraints                                                                        | Outside the sources: shared parameters and `fixed` are the practice.                                                                                                                                                                                            |
+| Oakes and sandwich standard errors                                                                  | Outside the sources: options of mirt, beside `"hessian"` and `"cross-product"`.                                                                                                                                                                                 |
+| Bootstrap standard errors and the bootstrap likelihood ratio                                        | No fit: a loop over `calibrate`, [a recipe](#recipe-bootstrap-standard-errors).                                                                                                                                                                                 |
+| Profile-likelihood intervals                                                                        | Outside the sources: an option of mirt.                                                                                                                                                                                                                         |
+| Nested-model tests                                                                                  | No fit: one line from `logLikelihood`, [a recipe](#recipe-nested-model-chi-square).                                                                                                                                                                             |
+| Cross-validation of a fit                                                                           | No fit: a loop over `calibrate`.                                                                                                                                                                                                                                |
+| Thurstonian thresholds                                                                              | No fit: a root of the model's `probabilities`, one line.                                                                                                                                                                                                        |
+| Observed information of an item                                                                     | Outside the sources: expected information is the practice of `itemInformation` and `testInformation`.                                                                                                                                                           |
+| The distribution of an ability estimator                                                            | Outside the sources: an option of catR.                                                                                                                                                                                                                         |
+| Draws of item parameters from their covariance                                                      | No fit: one line with a Cholesky factor.                                                                                                                                                                                                                        |
+| IRT parameters from factor loadings                                                                 | No fit: one formula; `calibrate` takes the responses.                                                                                                                                                                                                           |
+| Projective IRT                                                                                      | Outside the sources: an option of mirt.                                                                                                                                                                                                                         |
+| Rasch copula, beta IRT, grade of membership, ISOP, probabilistic Guttman and least squares distance | Outside the sources: models of sirt with no source here.                                                                                                                                                                                                        |
+| Bradley-Terry models                                                                                | Outside the sources: paired comparisons, not responses to items.                                                                                                                                                                                                |
+
 ## Differences from the references
 
 | Topic                                                        | This package                                                           | Reference                                                                                                                                                                                                                                                              |
@@ -1313,69 +1383,10 @@ Validate a new model against an R reference before relying on it, as [validation
 | Standard errors with fixed items                             | With `fixedCovariance`, they carry the fixed items' error              | mirt, with `est = FALSE` on the fixed items, takes them as known, as this package without the option                                                                                                                                                                   |
 | Person weights in a latent regression                        | Covariate patterns count their persons' weights, as TAM's `pweights`   | mirt's `survey.weights` leave the regression out: on the fixture's 600 persons of weights 1 to 4, its coefficient is 0.754 against 0.712 for the persons repeated, its items differ by up to 0.19, and base R's weighted log-likelihood is 1.65 lower at its estimates |
 
-## Not included
+### eRm
 
-- **Marginal reliability under the testlet model.** No reference: mirt's `marginal_rxx` takes one dimension, and the
-  information of a testlet sums over its response patterns, whose number grows exponentially with its items; the
-  reliability of a summed-score table's rows and `empiricalReliability` cover it.
-- **Pairwise, PML, PROX and eigenvector Rasch estimators.** Outside the sources: CML, MML and JML are the practice, and
-  are built.
-- **Hyperbolic cosine model.** No reference: no package fits it; the GGUM, the chapter's other unfolding model, is
-  built.
-- **Ideal-point, ALM, SSLM and parallelogram items.** Outside the sources: unfolding forms of mirt; the GGUM is the
-  Handbook's model, and is built.
-- **Linking and equating of unfolding items.** No reference: equateIRT links the dominance models only, and a GGUM
-  item's expected score falls on both sides of its location, where true-score equating needs it to increase.
-- **Design-based standard errors with survey weights.** No fit: strata and clusters are survey design, the `survey`
-  package's; `personWeights` are rescaled frequencies, and a replicate-weight variance is a loop over `calibrate`.
-- **Sequential models.** Outside the sources: a variant for ordered categories; the graded and partial credit models are
-  the practice, and recoded steps fit as 2PL items.
-- **Models for continuous responses.** No fit: a response is an integer category throughout the library.
-- **Multiple-choice and nested logit models.** Outside the sources: variants of `nominalResponse`, which fits
-  distractors.
-- **Graded rating scale and scoring matrices.** Outside the sources: options of mirt, beside `ratingScale` and
-  `generalizedPartialCredit`.
-- **Spline and monotone polynomial items.** Outside the sources: research models; `kernelItemCurves` shows the shape of
-  a curve.
-- **Generalized logistic and Ramsay quotient models.** Outside the sources: options of sirt.
-- **5PL, complementary log-log and unipolar links.** Outside the sources: options of mirt.
-- **Davidian and mixture latent densities.** Outside the sources: `"empirical-histogram"` covers a distribution that is
-  not normal.
-- **Mixture models and discrete latent classes.** Outside the sources: one chapter presents them as a variant;
-  `@measurekit/psychometrics/cdm` holds latent classes.
-- **Multilevel response models.** Outside the sources: `groups` and `covariates` cover the practice; lme4 and Mplus fit
-  the rest.
-- **Item-family models.** Outside the sources: a research model of cloned items.
-- **Randomized response models.** Outside the sources: a design of data collection for sensitive questions.
-- **Mixed-coefficients multinomial logit, generalized linear latent and mixed models.** No fit: a model language;
-  `IrtModel` and the options cover their named cases.
-- **Bayesian nonparametric models.** No fit: general Bayesian computation, another domain's tool: Stan and JAGS fit
-  them.
-- **Bayesian estimation by MCMC.** No fit: general Bayesian computation, another domain's tool: Stan, JAGS and NIMBLE
-  fit any model here; `priors` give posterior modes, and MH-RM serves high dimensions.
-- **Variational estimation.** Outside the sources: chapter 14 of Statistical Tools presents an approximation for the
-  models that EM and MH-RM fit, as QMC-EM is one for mirt.
-- **Amortized estimation.** No fit: a neural network, so a tensor runtime: `py-irt` fits one.
-- **Joint maximum likelihood of the 2PL and graded models.** Outside the sources: inconsistent without a Rasch form;
-  marginal maximum likelihood is the practice.
-- **Optimal design of a calibration.** Outside the sources: chapter 16 of Statistical Tools presents design theory;
-  optimal calibration designs (`optical` on CRAN) are a research method, and online calibration with `fixed` is the
-  practice.
-- **General equality constraints.** Outside the sources: shared parameters and `fixed` are the practice.
-- **Oakes and sandwich standard errors.** Outside the sources: options of mirt, beside `"hessian"` and
-  `"cross-product"`.
-- **Bootstrap standard errors and the bootstrap likelihood ratio.** No fit: a loop over `calibrate`, [a
-  recipe](#recipe-bootstrap-standard-errors).
-- **Profile-likelihood intervals.** Outside the sources: an option of mirt.
-- **Nested-model tests.** No fit: one line from `logLikelihood`, [a recipe](#recipe-nested-model-chi-square).
-- **Cross-validation of a fit.** No fit: a loop over `calibrate`.
-- **Thurstonian thresholds.** No fit: a root of the model's `probabilities`, one line.
-- **Observed information of an item.** Outside the sources: expected information is the practice of `itemInformation`
-  and `testInformation`.
-- **The distribution of an ability estimator.** Outside the sources: an option of catR.
-- **Draws of item parameters from their covariance.** No fit: one line with a Cholesky factor.
-- **IRT parameters from factor loadings.** No fit: one formula; `calibrate` takes the responses.
-- **Projective IRT.** Outside the sources: an option of mirt.
-- **Rasch copula, beta IRT, grade of membership, ISOP, probabilistic Guttman and least squares distance.** Outside the
-  sources: models of sirt with no source here.
-- **Bradley-Terry models.** Outside the sources: paired comparisons, not responses to items.
+| Topic                                 | This package                                                      | eRm                                                                                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Normalization                         | The thresholds sum to 0                                           | `sum0 = TRUE`: the easiness parameters, -(b1 + ... + bk) for category k, sum to 0, which shifts every threshold of a polytomous test by a constant |
+| Optimizer                             | Newton's method on the exact gradient and Hessian, to `tolerance` | `nlm` with numerical derivatives, which stops up to 1e-4 short in the thresholds                                                                   |
+| Missing responses of polytomous items | The conditional likelihood of each person's answered items        | `PCM` maximizes another function: on a seeded test that likelihood is -780.5 at its estimates, 3.4 below its maximum, and eRm reports -812.1       |

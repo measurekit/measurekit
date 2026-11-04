@@ -14,9 +14,9 @@ flowchart LR
   R --> Y["Calibration and ability estimation"]
 ```
 
-## Response matrices
+## Quick start
 
-A `ResponseMatrix` holds `personIds`, `itemIds` and `responses`: one row per person, one column per item.
+Build the same matrix of two persons and three items from its rows and from its columns:
 
 ```ts
 import { buildResponseMatrix, buildResponseMatrixFromColumns } from "@measurekit/psychometrics/data";
@@ -37,7 +37,13 @@ const byColumns = buildResponseMatrixFromColumns(
   ],
   { itemIds: ["q1", "q2", "q3"] },
 );
+byColumns.responses; // => [[1, 0, 2], [0, null, 1]]: the same rows as byRows
 ```
+
+## Response matrices
+
+A `ResponseMatrix` holds `personIds`, `itemIds` and `responses`: one row per person, one column per item, as the
+[quick start](#quick-start) builds it.
 
 | Rule      | Detail                                                                                                                  |
 | --------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -149,7 +155,28 @@ Empty strings are rejected; convert blank cells to `null`. To score an omitted r
 replace its `null` with a label of its own, such as `"omit"`, and add that label to `optionLabels` if you pass them;
 distractor analysis then reports it as an option.
 
+## Errors
+
+Invalid input throws `DataError` naming the first problem.
+
+| Error                                                                                                    | What to do                                                                  |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A response that is not an integer from 0 to 2³¹ - 1 or `null`, such as an empty string or `NaN`          | Convert blank cells to `null`, and scores to integers from 0                |
+| Rows or columns of different lengths, or ids of another count than the rows or columns                   | Give one response per item in every row, and one id per person and per item |
+| An id that is not a string, or that appears twice                                                        | Give unique string ids                                                      |
+| A record of a person or an item not among the ids, or a second record of a person at an item             | Give each record a person and an item of the ids, once                      |
+| A time that is not positive, or a time without a response                                                | Give times above 0 where there is a response, `null` elsewhere              |
+| A choice that is not an option label, a row of another length than the key, or option labels that repeat | Give the option each person chose, and unique labels                        |
+| A faceted score without a finite score or a string element for every facet                               | Give each score its levels and a finite score                               |
+
 ## Not included
 
-- **Reading files.** No fit: the package does no I/O; the caller parses a file into rows.
-- **The formats of flexMIRT, IRTPRO and BILOG.** No fit: a map of columns, and the package does no I/O.
+| Not included                              | Why                                                                  |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| Reading files                             | No fit: the package does no I/O; the caller parses a file into rows. |
+| The formats of flexMIRT, IRTPRO and BILOG | No fit: a map of columns, and the package does no I/O.               |
+
+## Differences from the references
+
+None: the functions check and build the data that the analyses take, which no reference does in their form; the
+analyses' references read the same data ([validation](validation.md)).

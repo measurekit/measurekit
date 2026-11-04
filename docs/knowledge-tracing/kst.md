@@ -21,6 +21,21 @@ flowchart LR
   R --> T
 ```
 
+## Quick start
+
+Build the structure of four skills from their prerequisites, and read its states and the fringes of a state:
+
+```ts
+import { fringes, isLearningSpace, surmiseStructure } from "@measurekit/knowledge-tracing/kst";
+
+const structure = surmiseStructure({ add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] });
+structure.states;
+// => [[], ["add"], ["add", "subtract"], ["add", "multiply"], ["add", "subtract", "multiply"],
+//  ["add", "subtract", "multiply", "divide"]]
+isLearningSpace(structure); // => true
+fringes(structure, ["add", "subtract"]); // => { inner: ["subtract"], outer: ["multiply"] }
+```
+
 ## Knowledge structures
 
 A structure is plain data: `{ domain, states }`, the elements, skills or items, and each state's elements. It contains
@@ -56,17 +71,6 @@ flowchart LR
 | `structureTrace(structure, elements)`      | The structure that its states leave on some elements                                                              |
 | `notions(structure)`                       | The classes of elements that are in the same states                                                               |
 | `delineate(structure, qMatrix)`            | The item structure of a skill structure: an item is in a state when all its skills are                            |
-
-```ts
-import { fringes, isLearningSpace, surmiseStructure } from "@measurekit/knowledge-tracing/kst";
-
-const structure = surmiseStructure({ add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] });
-structure.states;
-// => [[], ["add"], ["add", "subtract"], ["add", "multiply"], ["add", "subtract", "multiply"],
-//  ["add", "subtract", "multiply", "divide"]]
-isLearningSpace(structure); // => true
-fringes(structure, ["add", "subtract"]); // => { inner: ["subtract"], outer: ["multiply"] }
-```
 
 `prerequisites` has every element as a key, with its prerequisites; theirs are implied. Elements that require each
 other are learned together, so their space is not a learning space. States are ordered by size, then by the domain's
@@ -332,7 +336,7 @@ The result has `prerequisites`, `diff`, the mean squared difference of observed 
 resolves conflicting pairs in the order of the items. Pass `prerequisites` to `surmiseStructure` for the knowledge
 space.
 
-IITA's time grows faster than the items and the learners that its [limits](#limits-and-errors) bound: each count of
+IITA's time grows faster than the items and the learners that its [limits](#limits) bound: each count of
 counterexamples checks the pairs it adds against every item, pass after pass, until none breaks transitivity. DAKS's
 `iita` finds the same quasi-orders and takes longer, on the answers of 1,000 learners to a chain of items, each run in
 turn on one machine:
@@ -440,7 +444,7 @@ linear in them, misses their square. Over 300 bootstrap samples of the fixtures,
 orders was 0.92 to 1.24 times its standard error, and that of one order up to 2 times, with the bootstrap mean up to 3.4
 standard errors above the estimate.
 
-## Limits and errors
+## Limits
 
 | Limit                                                                                                        | Value                    | At the limit                                                                                                   |
 | ------------------------------------------------------------------------------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------- |
@@ -451,6 +455,10 @@ standard errors above the estimate.
 | Items of `iita`, `diffTest` and `structureValidity`; elements of `surmiseStructure`                          | `1000`                   | `DataError` that suggests units: their tables grow with the square of the elements                             |
 | Cells of the candidates of `iita`: a prerequisite each, and 8 for each item                                  | 24 million, about 260 MB | `DataError`: analyze fewer items                                                                               |
 | Cells of the masks of a model: a byte for each state and each set of skills, or item, that its attempts name | 2^28, 256 MB             | `DataError` that suggests a model for each unit                                                                |
+
+## Errors
+
+Invalid input throws `DataError` naming the value found; the limits above say what each limit throws.
 
 | Error                                                                                                   | What to do                                                                                    |
 | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -463,20 +471,15 @@ standard errors above the estimate.
 
 ## Not included
 
-- **Stochastic learning paths.** No reference: Falmagne and Doignon's chapter 12 treats them, but nothing runs the
-  dynamic model.
-- **The simple learning model.** No reference: `pks::slm` is cross-sectional, so it does not move a learner's state.
-- **QUERY.** No reference: Falmagne and Doignon's chapters 15 and 16 treat it, and no package has it: not `kst`, `pks`,
-  `DAKS`, `kstMatrix` or `CbKST`.
-- **Domains of ALEKS size.** No reference: no package handles them; `kst` and `pks` enumerate states, as here.
-  `maxStates` and units cover the large domains.
-- **`populationIita`.** Outside the sources: DAKS's `pop_iita` takes given rates and no data, a tool for studying IITA
-  itself.
-- **IITA on incomplete patterns.** No reference: MCAR-IITA (Steiner et al., 2026) is a conference paper whose code is
-  not a released package; `diffTest` tests a quasi order on them.
-- **A test of a quasi order when missing answers depend on the answers, as an adaptive test's.** No reference: it needs
-  a model of every item together, such as the basic local independence model of [the model](#the-model) fitted to the
-  incomplete log, and no package tests a quasi order that way.
+| Not included                                                                              | Why                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stochastic learning paths                                                                 | No reference: Falmagne and Doignon's chapter 12 treats them, but nothing runs the dynamic model.                                                                                                        |
+| The simple learning model                                                                 | No reference: `pks::slm` is cross-sectional, so it does not move a learner's state.                                                                                                                     |
+| QUERY                                                                                     | No reference: Falmagne and Doignon's chapters 15 and 16 treat it, and no package has it: not `kst`, `pks`, `DAKS`, `kstMatrix` or `CbKST`.                                                              |
+| Domains of ALEKS size                                                                     | No reference: no package handles them; `kst` and `pks` enumerate states, as here. `maxStates` and units cover the large domains.                                                                        |
+| `populationIita`                                                                          | Outside the sources: DAKS's `pop_iita` takes given rates and no data, a tool for studying IITA itself.                                                                                                  |
+| IITA on incomplete patterns                                                               | No reference: MCAR-IITA (Steiner et al., 2026) is a conference paper whose code is not a released package; `diffTest` tests a quasi order on them.                                                      |
+| A test of a quasi order when missing answers depend on the answers, as an adaptive test's | No reference: it needs a model of every item together, such as the basic local independence model of [the model](#the-model) fitted to the incomplete log, and no package tests a quasi order that way. |
 
 ## Differences from the references
 

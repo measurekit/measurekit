@@ -16,6 +16,24 @@ flowchart LR
   M --> N["P(L) at the next attempt"]
 ```
 
+## Quick start
+
+Trace a skill at given rates: predict an attempt, update the learner's state with its outcome, and read P(L):
+
+```ts
+import { bkt } from "@measurekit/knowledge-tracing/bkt";
+
+const model = bkt({
+  parameters: { skills: { fractions: { prior: 0.3, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } },
+});
+const ana = model.initialState("ana"); // => { learner: "ana", skills: {} }
+const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 1 };
+model.predict(ana, attempt); // => 0.41
+const next = model.update(ana, { ...attempt, outcome: 1 }); // => { learner: "ana", skills: { fractions: 0.73 } }
+model.mastery(next, "fractions"); // => 0.73, P(L)
+model.opportunitiesToMastery(next, "fractions"); // => 8
+```
+
 ## The model
 
 For each skill, a learner either knows it or not:
@@ -98,9 +116,6 @@ flowchart LR
 - **Bounds.** Each rate's expected log-likelihood is a Bernoulli term, concave in the rate, so clamping the ratio of
   expected counts to the bounds is the exact constrained maximum of each M-step. Random starts are clamped to the
   bounds, and given parameters outside them are rejected.
-- **Errors.** `DataError` for a fixed rate outside its bounds or not a probability, a lower bound above its upper,
-  `forget` fixed or bounded without `forgetting`, `resources` without `resourceLearning`, `pairLearning` with
-  `resourceLearning` (pyBKT allows one resource handling), and `parameters` outside the bounds.
 
 ## Pairs
 
@@ -175,26 +190,12 @@ fitted skill by skill and the results merged ([storage](storage.md#fitting-bkt-s
 
 ## Online
 
-```ts
-import { bkt } from "@measurekit/knowledge-tracing/bkt";
-
-const model = bkt({
-  parameters: { skills: { fractions: { prior: 0.3, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } },
-});
-const ana = model.initialState("ana"); // => { learner: "ana", skills: {} }
-const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 1 };
-model.predict(ana, attempt); // => 0.41
-const next = model.update(ana, { ...attempt, outcome: 1 }); // => { learner: "ana", skills: { fractions: 0.73 } }
-model.mastery(next, "fractions"); // => 0.73, P(L)
-model.opportunitiesToMastery(next, "fractions"); // => 8
-```
+The [quick start](#quick-start) is online use, at given rates.
 
 - `update(state, event)` returns a new state; `predict` and `mastery` read it. A skill the learner has not practiced
   has their prior. The model has no parameters for a skill it was not fitted to, and throws `DataError` for it.
 - The state, `{ learner, skills: { [skill]: P(L) } }`, is plain data: store it as JSON and pass it back. Model methods
   check it.
-- An outcome that has probability 0 under given parameters, as a correct answer with P(L) = 0 and P(G) = 0, throws
-  `DataError`; fitted parameters give every outcome a positive probability.
 
 ## Mastery
 
@@ -205,16 +206,43 @@ limit + (P(L) - limit) (1 - P(T) - P(F))ⁿ with limit = P(T) / (P(T) + P(F)). T
 threshold, and `Infinity` when the limit is at or below it or the number exceeds the largest double, as for a P(T) near
 the smallest double. It uses the skill's P(T) and P(F), as the items to come are not known.
 
+## Errors
+
+Invalid input throws `DataError` naming the value found.
+
+| Error                                                                                                                                         | What to do                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| An outcome other than 0, 1 or `null`, or an event with an outcome and no skill                                                                | Score each attempt 0 or 1, and give its skills or a Q-matrix to `buildEventLog`; trace partial credit with [Elo](elo.md) |
+| A skill the model has no parameters for, in `predict`, `update` or `mastery`                                                                  | Fit the model on a log with the skill, or give its rates in `parameters`                                                 |
+| A rate that is not a probability, in `parameters` or `fixed`                                                                                  | Give each rate from 0 to 1                                                                                               |
+| A bound that is not `[lower, upper]` of probabilities, or with the lower above the upper                                                      | Give each bound as two probabilities in order                                                                            |
+| `parameters` or a fixed rate outside the bounds                                                                                               | Widen the bounds, or start from rates within them                                                                        |
+| `forget` fixed or bounded without `forgetting: true`, `resources` without `resourceLearning: true`, or `pairLearning` with `resourceLearning` | Turn on the option that the rate needs, and choose one of the two resource options                                       |
+| A prior group that is not a non-empty string                                                                                                  | Give each learner of `priorGroups` a group id                                                                            |
+| An outcome of probability 0 under given parameters, as a correct answer with P(L) = 0 and P(G) = 0                                            | Give guess and slip rates above 0 and below 1, or fit them: fitted rates give every outcome a positive probability       |
+| A log without an event with an outcome, for `fit`                                                                                             | Fit a log with outcomes                                                                                                  |
+| A malformed state                                                                                                                             | Pass a state that `initialState` or `update` of the model returned, as stored                                            |
+
 ## Not included
 
-- **Contextual BKT.** No reference: no package has it, not pyBKT, nor its R port `BKT`.
-- **Partial-credit BKT.** No reference: no package has it, not pyBKT, nor its R port `BKT`.
-- **Conjunctive BKT.** No reference: no package has it, and the multi-skill form of `hmm-scalable` is compensatory.
-- **Individualized BKT.** No reference: Yudelson et al. (2013) describe it, but no tool reaches the joint fit:
-  `hmm-scalable` does not finish, and two `optim` starts end 62 nats apart. As written the model is not identified,
-  since a constant moved between every offset and a skill's logit leaves the likelihood unchanged. On 200 seeded
-  learners it does not beat standard BKT on held-out events. It can return with an L2 penalty, offsets of mean 0, and a
-  joint reference that converges.
+| Not included       | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contextual BKT     | No reference: no package has it, not pyBKT, nor its R port `BKT`.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Partial-credit BKT | No reference: no package has it, not pyBKT, nor its R port `BKT`.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Conjunctive BKT    | No reference: no package has it, and the multi-skill form of `hmm-scalable` is compensatory.                                                                                                                                                                                                                                                                                                                                                                                |
+| Individualized BKT | No reference: Yudelson et al. (2013) describe it, but no tool reaches the joint fit: `hmm-scalable` does not finish, and two `optim` starts end 62 nats apart. As written the model is not identified, since a constant moved between every offset and a skill's logit leaves the likelihood unchanged. On 200 seeded learners it does not beat standard BKT on held-out events. It can return with an L2 penalty, offsets of mean 0, and a joint reference that converges. |
+
+## Differences from the references
+
+The reference is pyBKT 1.4.3 ([validation](validation.md#bayesian-knowledge-tracing)).
+
+| Topic                         | This package                                                                       | pyBKT                                                                                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Prior groups                  | A group has its own P(L0) of each skill, and combines with item and resource rates | A group's prior is the learn rate of a phantom step before each learner's first attempt; `multiprior` combines with neither `multigs` nor `multilearn` |
+| Resource rates and pairs      | `resourceLearning` and `pairLearning` refuse each other, as a rate has one key     | One resource handling at a time                                                                                                                        |
+| Bounds                        | `bounds` clamps each rate that EM estimates, the exact maximum of each M-step      | None                                                                                                                                                   |
+| Random starts with forgetting | P(F) from U(0, 0.2)                                                                | P(F) starts at 0, where EM keeps it                                                                                                                    |
+| Guess and slip                | Kept 2⁻⁵² from 0 and 1, so that every outcome has a positive probability           | The ratio of the expected counts, which reaches 0 or 1                                                                                                 |
 
 ## References
 

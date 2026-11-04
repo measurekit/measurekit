@@ -4,6 +4,26 @@
 standard error of measurement, the value of subscores and augmented subscores from a [response matrix](data.md). Every statistic is validated against R
 ([validation](validation.md)).
 
+## Quick start
+
+Compute alpha and the statistics of each item for six persons on five items:
+
+```ts
+import { cronbachAlpha, itemStatistics } from "@measurekit/psychometrics/ctt";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+
+const matrix = buildResponseMatrix([
+  [1, 1, 0, 1, 1],
+  [0, 1, 0, 0, 1],
+  [1, 1, 1, 1, 1],
+  [0, 0, 0, 1, 0],
+  [1, 0, 1, 1, 1],
+  [0, 1, 0, 0, 0],
+]);
+cronbachAlpha(matrix); // => 0.674
+itemStatistics(matrix).map(({ itemRest }) => itemRest); // => [0.90, -0.15, 0.56, 0.35, 0.68]: item2 works against the rest
+```
+
 ## Missing responses
 
 | Statistics                                                                                                        | Persons used                                     |
@@ -192,15 +212,6 @@ A section needs at least two items for alpha, and there must be at least two sec
 subscore. A section whose subscore has no variance or whose alpha is not above 0 has no true-score variance to predict:
 both PRMSEs are `null` and `addedValue` is `false`.
 
-### Differences from the subscore package
-
-| Topic             | This package                                        | CTTsub                                                                          |
-| ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Sections          | Item ids by name; items in no section are left out  | The sections' item columns side by side, and the total test as a last matrix    |
-| Missing responses | Persons who answered every item of the sections     | `rowSums` of the answered items, `na.rm = TRUE`: a missing response counts as 0 |
-| Total test        | The sum of the items of the sections                | Any matrix; the formulas assume it is the sum of the sections                   |
-| Reliability       | Alpha of the section's items, from sample variances | The same (`CTT::itemAnalysis`)                                                  |
-
 ## Augmented subscores
 
 A section of few items gives an unreliable subscore, and the other sections carry information about it when abilities
@@ -276,15 +287,6 @@ The statistics use the persons who answered every item of the sections, as `subs
 three abilities that correlate at 0.8, with six items in each section and known true subscores, the observed subscores
 correlate 0.744 with the true ones and the augmented 0.824 ([validation](validation.md)).
 
-### Differences from subscore.Wainer
-
-| Topic             | This package                                       | `subscore.Wainer`                                               |
-| ----------------- | -------------------------------------------------- | --------------------------------------------------------------- |
-| Sections          | Item ids by name; items in no section are left out | The sections' item columns, and the total test as a last matrix |
-| Missing responses | Persons who answered every item of the sections    | `rowSums` of the answered items and pairwise covariances        |
-| Reliability       | Alpha of the section's items; it must be above 0   | `CTT::itemAnalysis`, whatever its sign                          |
-| Weights           | Returned as `weights`                              | Not returned                                                    |
-
 ## Classification
 
 `classifyDifficulty(p)` and `classifyDiscrimination(value)` label items. Both take the option `thresholds`; the
@@ -331,28 +333,6 @@ data to `null`. A function that returns one statistic throws `DataError` with th
 | A section with a constant or negative-alpha subscore | `subscoreValue` gives `null` PRMSEs and `addedValue` `false`                                                    |
 | Fewer than two sections or a section of one item     | `subscoreValue` throws                                                                                          |
 
-## Not included
-
-- **The significance of differences between PRMSEs (Olkin, Williams).** Outside the sources: `subscore` has no such
-  test, and `addedValue` is the plain comparison, as CTTsub's `added.value.s`.
-- **Guttman's λ1, λ2, λ4, λ5 and λ6, and Revelle's β.** Outside the sources: not confirmed in McDonald (1999) or
-  Thissen and Wainer (2001), and no testing program's technical report was found to use them. Omega total and omega
-  hierarchical, which reviews favor (Revelle and Zinbarg, 2009; McNeish, 2018), are built from McDonald (1999).
-- **The greatest lower bound.** Outside the sources: as above; the sample bound overestimates reliability, the more so
-  in small samples (Ten Berge and Sočan, 2004).
-- **Ten Berge and Zegers' μ bounds.** Outside the sources: as above.
-- **Stratified alpha.** Outside the sources: not confirmed in them; `cronbachAlpha` per section composes it.
-- **Green-Yang and nonlinear SEM reliability.** Outside the sources: functions of sirt.
-- **Multilevel reliability.** No fit: `generalizabilityStudy` covers it.
-- **Test-retest reliability.** No fit: a correlation of two totals.
-- **Intervals of alpha and omega.** No fit: a bootstrap over the persons gives them, [a recipe](#recipe-intervals-of-alpha-and-omega).
-- **The correction for attenuation.** No fit: one line.
-- **The correction for range restriction.** No fit: one line.
-- **Omega from given loadings.** No fit: one line of `mcdonaldOmega`'s formula.
-- **Reverse scoring, prorating and composites.** No fit: scoring rules of a questionnaire, which the caller holds.
-- **psych's `reliability()` table.** No fit: a table of coefficients that are built.
-- **The AUC and d prime of an item.** No fit: general statistics.
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
@@ -376,6 +356,49 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `augmentedSubscores`                                                       | A section whose alpha is not above 0, or subscores that are linearly dependent                                                  | Augment sections with true-score variance, and more persons than sections                      |
 | `classifyDifficulty`                                                       | A p-value outside [0, 1], or thresholds not ordered within it                                                                   | Give a mean score of a dichotomous item, and difficult ≤ easy                                  |
 | `classifyDiscrimination`                                                   | A value that is not finite, or thresholds not in order                                                                          | Give marginal ≤ good ≤ very good                                                               |
+
+## Not included
+
+| Not included                                                     | Why                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The significance of differences between PRMSEs (Olkin, Williams) | Outside the sources: `subscore` has no such test, and `addedValue` is the plain comparison, as CTTsub's `added.value.s`.                                                                                                                                                                 |
+| Guttman's λ1, λ2, λ4, λ5 and λ6, and Revelle's β                 | Outside the sources: not confirmed in McDonald (1999) or Thissen and Wainer (2001), and no testing program's technical report was found to use them. Omega total and omega hierarchical, which reviews favor (Revelle and Zinbarg, 2009; McNeish, 2018), are built from McDonald (1999). |
+| The greatest lower bound                                         | Outside the sources: as above; the sample bound overestimates reliability, the more so in small samples (Ten Berge and Sočan, 2004).                                                                                                                                                     |
+| Ten Berge and Zegers' μ bounds                                   | Outside the sources: as above.                                                                                                                                                                                                                                                           |
+| Stratified alpha                                                 | Outside the sources: not confirmed in them; `cronbachAlpha` per section composes it.                                                                                                                                                                                                     |
+| Green-Yang and nonlinear SEM reliability                         | Outside the sources: functions of sirt.                                                                                                                                                                                                                                                  |
+| Multilevel reliability                                           | No fit: `generalizabilityStudy` covers it.                                                                                                                                                                                                                                               |
+| Test-retest reliability                                          | No fit: a correlation of two totals.                                                                                                                                                                                                                                                     |
+| Intervals of alpha and omega                                     | No fit: a bootstrap over the persons gives them, [a recipe](#recipe-intervals-of-alpha-and-omega).                                                                                                                                                                                       |
+| The correction for attenuation                                   | No fit: one line.                                                                                                                                                                                                                                                                        |
+| The correction for range restriction                             | No fit: one line.                                                                                                                                                                                                                                                                        |
+| Omega from given loadings                                        | No fit: one line of `mcdonaldOmega`'s formula.                                                                                                                                                                                                                                           |
+| Reverse scoring, prorating and composites                        | No fit: scoring rules of a questionnaire, which the caller holds.                                                                                                                                                                                                                        |
+| psych's `reliability()` table                                    | No fit: a table of coefficients that are built.                                                                                                                                                                                                                                          |
+| The AUC and d prime of an item                                   | No fit: general statistics.                                                                                                                                                                                                                                                              |
+
+## Differences from the references
+
+The statistics match their R references within the tolerances of
+[validation](validation.md); the subscores differ from their references as follows.
+
+### The subscore package
+
+| Topic             | This package                                        | CTTsub                                                                          |
+| ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Sections          | Item ids by name; items in no section are left out  | The sections' item columns side by side, and the total test as a last matrix    |
+| Missing responses | Persons who answered every item of the sections     | `rowSums` of the answered items, `na.rm = TRUE`: a missing response counts as 0 |
+| Total test        | The sum of the items of the sections                | Any matrix; the formulas assume it is the sum of the sections                   |
+| Reliability       | Alpha of the section's items, from sample variances | The same (`CTT::itemAnalysis`)                                                  |
+
+### subscore.Wainer
+
+| Topic             | This package                                       | `subscore.Wainer`                                               |
+| ----------------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| Sections          | Item ids by name; items in no section are left out | The sections' item columns, and the total test as a last matrix |
+| Missing responses | Persons who answered every item of the sections    | `rowSums` of the answered items and pairwise covariances        |
+| Reliability       | Alpha of the section's items; it must be above 0   | `CTT::itemAnalysis`, whatever its sign                          |
+| Weights           | Returned as `weights`                              | Not returned                                                    |
 
 ## References
 

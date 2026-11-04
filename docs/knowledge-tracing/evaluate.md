@@ -15,6 +15,18 @@ flowchart LR
   C["crossValidate, compareModels"] --> T["compareByLearner: paired test of two models"]
 ```
 
+## Quick start
+
+Score four predictions against their outcomes:
+
+```ts
+import { auc, metrics } from "@measurekit/knowledge-tracing/evaluate";
+
+auc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]); // => 0.75
+metrics([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]);
+// => { count: 4, auc: 0.75, rmse: 0.4, logLoss: 0.47, accuracy: 0.75, rSquared: 0.37, kappa: 0.5 }
+```
+
 ## Metrics
 
 Each function takes predictions, probabilities of a correct outcome, and the outcomes, from 0 to 1, as two arrays of
@@ -29,14 +41,6 @@ equal length with at least one entry.
 | `rSquared(predictions, outcomes)` | 1 - Σ(y - p)² / Σ(y - ȳ)²: the share of the variance of the outcomes that the predictions explain                 | Outcomes not all equal     |
 | `kappa(predictions, outcomes)`    | Cohen's kappa of the predictions above 0.5 and the outcomes: agreement beyond chance, (p_o - p_e) / (1 - p_e)     | 0/1 outcomes, p_e below 1  |
 | `metrics(predictions, outcomes)`  | `{ count, auc, rmse, logLoss, accuracy, rSquared, kappa }`, with the undefined ones `null`                        | Any outcomes               |
-
-```ts
-import { auc, metrics } from "@measurekit/knowledge-tracing/evaluate";
-
-auc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]); // => 0.75
-metrics([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]);
-// => { count: 4, auc: 0.75, rmse: 0.4, logLoss: 0.47, accuracy: 0.75, rSquared: 0.37, kappa: 0.5 }
-```
 
 - **AUC** depends only on the order of the predictions, so it is unchanged by any increasing transformation of them.
   It measures how well predictions rank outcomes, not whether their values are right; RMSE, log-loss and calibration
@@ -352,11 +356,10 @@ categorizeCurve(fractions, { minLearners: 3, minPoints: 3, slope: 0.2, minSlope:
 
 ## Not included
 
-- **DeLong's test of two AUCs.** No fit: it assumes independent events, which a log breaks. Use `compareByLearner`;
-  `pROC` has DeLong's.
-- **Knowledge component search.** No reference: no package implements Learning Factors Analysis, as one search and a
-  CRAN listing found. LKT's `autoKC` clusters items, which is another method. The evaluation tools compare candidate
-  Q-matrices.
+| Not included               | Why                                                                                                                                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DeLong's test of two AUCs  | No fit: it assumes independent events, which a log breaks. Use `compareByLearner`; `pROC` has DeLong's.                                                                                                           |
+| Knowledge component search | No reference: no package implements Learning Factors Analysis, as one search and a CRAN listing found. LKT's `autoKC` clusters items, which is another method. The evaluation tools compare candidate Q-matrices. |
 
 ## Differences from the references
 
