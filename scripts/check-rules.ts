@@ -884,6 +884,14 @@ export const RULES: readonly Rule[] = [
     titles: "however far apart",
   },
   {
+    rule: "A line search asks a function given apart for its gradient at the length it accepts alone, as a gradient by finite differences costs a fit for each of its points.",
+    file: "packages/core/src/descent.ts",
+    find: "whole ? f(trial.x, trial.gradient) : f.value(trial.x);",
+    replace: "whole ? f(trial.x, trial.gradient) : f.value(trial.x); if (!whole) f.gradient(trial.x, trial.gradient);",
+    test: "packages/core/test/numerics.test.ts",
+    titles: "for its gradient at the accepted one alone",
+  },
+  {
     rule: "A minimization never reports convergence at a point that is not finite.",
     file: "packages/core/src/bfgs.ts",
     find: "converged: isFinitePoint(point)",

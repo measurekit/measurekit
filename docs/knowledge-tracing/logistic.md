@@ -210,7 +210,10 @@ exposure features and the DAS3H windows are not LKT's. LKT's components map to t
 ## Estimating the rates of the features
 
 The decays and exponents of the features are given, or estimated by `searchRates` as LKT's `seedpars` does: the rates
-that maximize the log-likelihood of the log, found by BFGS over the rates mapped to the whole line.
+that maximize the log-likelihood of the log, found by BFGS over the rates mapped to the whole line. Each trial fits the
+model to the log: the line search fits it at each length it tries, and the gradient, by central differences, fits it
+twice for each rate at the length the line search accepts, as `optim` calls `gr`. A fit that does not converge, at a
+length or in the gradient there, is a failed trial that the line search steps back from.
 
 ```ts
 import type { EventLog } from "@measurekit/knowledge-tracing/data";

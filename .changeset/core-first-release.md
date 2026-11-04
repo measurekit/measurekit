@@ -18,6 +18,11 @@ item.
 
 `createRandom` has an example, which a test runs against the values its comments state.
 
+`bfgs` and `stepAlong` take a function as its value and, apart, its gradient (`ValueAndGradient`), as R's `optim` takes
+`fn` and `gr`: the line search evaluates the value alone at each length it tries and the gradient at the length it
+accepts, so that a gradient by finite differences is computed once a step. A length where that gradient is not finite
+is refused and the step halved again, as `backtrack` refuses a length its new option `accept` refuses.
+
 `checkOptions` takes the names of a function's options, a `FieldNames` constant that the type checker holds complete,
 and refuses an option the function does not take, naming it; `checkFields` does the same for a record of settings inside
 the options. `bfgs`, `backtrack` and `kappaOfPairs` refuse an option they do not take.

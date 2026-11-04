@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bfgs, type GradientFunction } from "../src/index.js";
+import { bfgs, type GradientFunction, type ValueAndGradient } from "../src/index.js";
 
 /** The Rosenbrock function, minimal at (1, 1). */
 const rosenbrock: GradientFunction = (x, gradient) => {
@@ -53,6 +53,38 @@ describe("bfgs", () => {
       return 0;
     };
     expect(bfgs(infiniteSlope, [1]).converged).toBe(false);
+  });
+
+  it("reaches the same point from a function given with its gradient apart, asking the gradient once a step", () => {
+    let values = 0;
+    let gradients = 0;
+    const scratch = new Float64Array(2);
+    const apart: ValueAndGradient = {
+      value: (x) => {
+        values++;
+        return rosenbrock(x, scratch);
+      },
+      gradient: (x, gradient) => {
+        gradients++;
+        rosenbrock(x, gradient);
+      },
+    };
+    const together = bfgs(rosenbrock, [-1.2, 1]);
+    const result = bfgs(apart, [-1.2, 1]);
+    expect(result).toEqual(together);
+    // The start and each accepted step: the restarts of the approximation accept no step.
+    expect(gradients).toBeLessThanOrEqual(result.iterations + 1);
+    expect(values).toBeGreaterThan(gradients);
+  });
+
+  it("does not report convergence where the gradient given apart is not finite", () => {
+    const undefinedSlope: ValueAndGradient = {
+      value: () => 0,
+      gradient: (_, gradient) => {
+        gradient[0] = Number.NaN;
+      },
+    };
+    expect(bfgs(undefinedSlope, [1])).toMatchObject({ iterations: 0, converged: false });
   });
 
   it("does not change its start", () => {

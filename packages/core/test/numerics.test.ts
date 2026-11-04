@@ -16,6 +16,7 @@ import {
   normalizeLogs,
   normalQuantile,
   stepAlong,
+  type ValueAndGradient,
 } from "../src/index.js";
 
 /** Relative tolerance of the sums that the normalization of logs rounds. */
@@ -272,6 +273,20 @@ describe("backtrack", () => {
     expect(backtrack(() => Number.NaN, 4, -1, { maxHalvings: 2 })).toBeNull();
   });
 
+  it("asks the further test only of lengths that decrease the objective enough, and halves on past one it refuses", () => {
+    const asked: number[] = [];
+    // (10 t - 2)² is 64 at t = 1, 9 at 1/2, 0.25 at 1/4 and 0.25 at 1/8: the first two do not decrease enough.
+    const length = backtrack(objective(10), 4, -40, {
+      accept: (t) => {
+        asked.push(t);
+        return t < 0.25;
+      },
+    });
+    expect(asked).toEqual([0.25, 0.125]);
+    expect(length).toBe(0.125);
+    expect(backtrack(objective(10), 4, -40, { accept: () => false, maxHalvings: 5 })).toBeNull();
+  });
+
   it("takes the Armijo constant 1e-4 by default", () => {
     expect(ARMIJO).toBe(1e-4);
     // At slope -1 and length 1 the accepted bound is the value less 1e-4.
@@ -321,5 +336,36 @@ describe("stepAlong", () => {
     const point = pointAt(0);
     const trial = { x: new Float64Array(1), gradient: new Float64Array(1), value: 0 };
     expect(stepAlong(square, point, Float64Array.of(-1), trial)).toBe(false);
+  });
+
+  /** The same function with its value and gradient apart, recording the points at which each is asked. */
+  const apart = (asked: { values: number[]; gradients: number[] }, undefinedAt?: number): ValueAndGradient => ({
+    value: (x) => {
+      asked.values.push(x[0] ?? 0);
+      return ((x[0] ?? 0) - 2) ** 2;
+    },
+    gradient: (x, gradient) => {
+      asked.gradients.push(x[0] ?? 0);
+      gradient[0] = x[0] === undefinedAt ? Number.NaN : 2 * ((x[0] ?? 0) - 2);
+    },
+  });
+
+  it("asks a function given apart for its value at each length tried, and for its gradient at the accepted one alone", () => {
+    const asked = { values: [] as number[], gradients: [] as number[] };
+    const trial = { x: new Float64Array(1), gradient: new Float64Array(1), value: 0 };
+    expect(stepAlong(apart(asked), pointAt(0), Float64Array.of(10), trial)).toBe(true);
+    expect(asked).toEqual({ values: [10, 5, 2.5], gradients: [2.5] });
+    const together = { x: new Float64Array(1), gradient: new Float64Array(1), value: 0 };
+    stepAlong(square, pointAt(0), Float64Array.of(10), together);
+    expect(trial).toEqual(together);
+  });
+
+  it("halves on past a length where the gradient is not finite", () => {
+    const asked = { values: [] as number[], gradients: [] as number[] };
+    const trial = { x: new Float64Array(1), gradient: new Float64Array(1), value: 0 };
+    expect(stepAlong(apart(asked, 2.5), pointAt(0), Float64Array.of(10), trial)).toBe(true);
+    expect(asked).toEqual({ values: [10, 5, 2.5, 1.25], gradients: [2.5, 1.25] });
+    expect(Array.from(trial.x)).toEqual([1.25]);
+    expect(Array.from(trial.gradient)).toEqual([-1.5]);
   });
 });

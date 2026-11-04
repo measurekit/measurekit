@@ -1,5 +1,5 @@
 import { checkOptions, type FieldNames } from "./checks.js";
-import { type DescentPoint, type GradientFunction, stepAlong } from "./descent.js";
+import { type DescentPoint, type GradientFunction, stepAlong, type ValueAndGradient } from "./descent.js";
 import { dot, maxAbs, multiplyVector } from "./vectors.js";
 
 /** Stopping rules of a minimization. */
@@ -46,9 +46,12 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * The inverse Hessian approximation starts as the identity, is scaled before its first update, and restarts from the
  * identity when it stops giving a descent direction or a step that makes progress. When steepest descent makes no
  * progress either, the point is a minimum to the precision of the function and the minimization has converged, as in
- * R's `optim`, unless the value or the gradient there is not finite.
+ * R's `optim`, unless the value or the gradient there is not finite. A function given as a {@link ValueAndGradient}
+ * has its value alone evaluated at the lengths the line search tries, and its gradient at the start and at each length
+ * the search accepts: a gradient by finite differences, which costs several values, is then computed once a step, as
+ * `optim` calls `gr`.
  *
- * @param f - The function to minimize.
+ * @param f - The function to minimize, with its gradient together or apart.
  * @param start - The point to start from.
  * @param options - The stopping rules.
  * @returns The point reached, the function value there, the iterations run and whether the minimization converged.
@@ -56,7 +59,7 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * @see {@link https://doi.org/10.1007/978-0-387-40065-5 | Nocedal and Wright (2006), eq. 6.20}
  */
 export function bfgs(
-  f: GradientFunction,
+  f: GradientFunction | ValueAndGradient,
   start: ArrayLike<number>,
   options: OptimizerOptions = {},
 ): OptimizationResult {
@@ -66,7 +69,12 @@ export function bfgs(
   const approximation = inverseHessianOf(size);
   const direction = new Float64Array(size);
   let point: DescentPoint = { x: Float64Array.from(start), gradient: new Float64Array(size), value: 0 };
-  point.value = f(point.x, point.gradient);
+  if (typeof f === "function") {
+    point.value = f(point.x, point.gradient);
+  } else {
+    point.value = f.value(point.x);
+    f.gradient(point.x, point.gradient);
+  }
   let trial: DescentPoint = { x: new Float64Array(size), gradient: new Float64Array(size), value: 0 };
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     if (maxAbs(point.gradient) <= tolerance) {

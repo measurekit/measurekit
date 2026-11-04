@@ -8,6 +8,7 @@ import {
   describe,
   type FieldNames,
   logistic as sigmoid,
+  type ValueAndGradient,
 } from "@measurekit/core";
 import type { EventLog } from "../data/internal.js";
 import { checkModel } from "../model.js";
@@ -29,7 +30,8 @@ export interface RateSearchOptions {
    */
   readonly tolerance?: number;
   /**
-   * The most iterations of the search; each costs the fits of a gradient and of the line search.
+   * The most iterations of the search; each costs a fit for each length its line search tries, and the two fits for each
+   * rate of the gradient at the length it accepts.
    *
    * @defaultValue `100`
    */
@@ -70,13 +72,15 @@ const DIFFERENCE_STEP = 1e-4;
  *
  * @remarks
  * `build` makes the model from the rates, such as the decays and exponents of its features, and each trial fits it to
- * the log, so the cost is the cost of a fit times the trials: a gradient takes two fits for each rate. A rate between
+ * the log, so the cost is the cost of a fit times the trials. The line search fits the model at each length it tries,
+ * and the gradient, by central differences, takes two fits for each rate at the length it accepts alone. A rate between
  * its bounds is mapped to the line by the logit of its place between them, so the search never leaves the bounds. The
  * result may be a local optimum: the log-likelihood in the rates need not have one maximum, so a search from other starts
  * can end elsewhere.
  *
- * A fit that does not converge counts as a failed trial, the search steps back from it, and a search that ends on
- * failed trials has not converged. An error that `build` or the fit throws ends the search with it.
+ * A fit that does not converge counts as a failed trial, the search steps back from it, as from a length where a fit of
+ * the gradient fails, and a search that ends on failed trials has not converged. An error that `build` or the fit throws
+ * ends the search with it.
  *
  * @param build - Builds the model for a list of rates, in the order of `start`.
  * @param log - The log to fit each model to.
@@ -112,25 +116,30 @@ export function searchRates(
     };
   };
   let lastFailed = false;
-  const negativeLogLikelihood = (x: Float64Array, gradient: Float64Array): number => {
-    const here = trial(x);
-    lastFailed = !Number.isFinite(here.value);
-    if (lastFailed) return here.value;
-    const moved = Float64Array.from(x);
-    for (let i = 0; i < x.length; i++) {
-      const centre = x[i] ?? 0;
-      moved[i] = centre + DIFFERENCE_STEP;
-      const up = trial(moved).value;
-      moved[i] = centre - DIFFERENCE_STEP;
-      const down = trial(moved).value;
-      moved[i] = centre;
-      if (!(Number.isFinite(up) && Number.isFinite(down))) {
-        lastFailed = true;
-        return Number.POSITIVE_INFINITY;
+  const negativeLogLikelihood: ValueAndGradient = {
+    value: (x) => {
+      const { value } = trial(x);
+      lastFailed = !Number.isFinite(value);
+      return value;
+    },
+    gradient: (x, gradient) => {
+      const moved = Float64Array.from(x);
+      for (let i = 0; i < x.length; i++) {
+        const centre = x[i] ?? 0;
+        moved[i] = centre + DIFFERENCE_STEP;
+        const up = trial(moved).value;
+        moved[i] = centre - DIFFERENCE_STEP;
+        const down = trial(moved).value;
+        moved[i] = centre;
+        // A failed fit leaves the gradient undefined, which rejects the length the line search tried.
+        if (!(Number.isFinite(up) && Number.isFinite(down))) {
+          lastFailed = true;
+          gradient.fill(Number.NaN);
+          return;
+        }
+        gradient[i] = (up - down) / (2 * DIFFERENCE_STEP);
       }
-      gradient[i] = (up - down) / (2 * DIFFERENCE_STEP);
-    }
-    return here.value;
+    },
   };
   const origin = Float64Array.from(start, (rate, i) => {
     const place = (rate - (lower[i] ?? 0)) / ((upper[i] ?? 0) - (lower[i] ?? 0));

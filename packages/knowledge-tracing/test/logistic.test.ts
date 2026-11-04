@@ -1698,6 +1698,34 @@ describe("rate search", () => {
     expect(found.iterations).toBeGreaterThan(0);
   });
 
+  it("fits the gradient at the start and at the lengths its line search accepts, not at those it rejects", () => {
+    const fitted: (readonly number[])[] = [];
+    const recorded = (values: readonly number[]) => {
+      fitted.push(values);
+      return build(values);
+    };
+    const found = searchRates(recorded, log, bounds);
+    const { lower, upper } = bounds;
+    const logits = fitted.map((values) =>
+      values.map((value, i) => {
+        const place = (value - defined(lower[i])) / (defined(upper[i]) - defined(lower[i]));
+        return Math.log(place / (1 - place));
+      }),
+    );
+    // A fit of the gradient moves one rate of the point the line search tried by 1e-4 on the logit scale.
+    let tried = defined(logits[0]);
+    let gradientFits = 0;
+    for (const point of logits.slice(1)) {
+      const moved = point.map((value, i) => Math.abs(value - defined(tried[i])));
+      const steps = moved.filter((distance) => distance > 1e-9);
+      if (steps.length === 1 && Math.abs(defined(steps[0]) - 1e-4) < 1e-7) gradientFits++;
+      else tried = point;
+    }
+    expect(gradientFits % 4).toBe(0);
+    expect(gradientFits / 4).toBeLessThanOrEqual(found.iterations + 1);
+    expect(fitted.length - gradientFits).toBeGreaterThan(found.iterations + 1);
+  });
+
   it("recovers the decay of simulated logs, and keeps the weakly identified exponent within its bounds", () => {
     // On 20 logs of this design in base R, optim over glm spreads the decay with an SD of 0.13 and the exponent with one
     // of 0.90 (the fixture's recovery), so 2,000 events identify the decay only: every search converges, and the mean of
