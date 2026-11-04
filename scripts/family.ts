@@ -22,6 +22,15 @@ export const FAMILY = {
   author: "Fariz Wakan (https://github.com/luthfanwakan)",
 } as const;
 
+/** Facts of use that hold for every package, as `llms.txt` and `context7.json` state them to an assistant. */
+export const FACTS: readonly string[] = [
+  "Import each module from its subpath, such as `@measurekit/psychometrics/irt`, or every module from the package's name; every package is ESM with TypeScript types.",
+  "Inputs and results are plain JSON data: a response is an integer from 0, or `null` when missing, and invalid input throws `DataError`.",
+  "Every function is synchronous and reads no clock, network or environment; random draws come from a `seed` option or a `Random` of `createRandom(seed)` that the caller passes.",
+  "No result holds `NaN`: a statistic undefined for the data is `null`, and an iterative method reports `converged` and `iterations`.",
+  "A knowledge tracing model is immutable: `update` returns a new state, and states and parameters are plain JSON to store and resume.",
+];
+
 /** The identity of one package: what npm, the README, the docs site and `llms.txt` say of it. */
 export interface PackageIdentity {
   /** The name on npm, which is also the folder below `packages/` and `docs/` after the scope. */

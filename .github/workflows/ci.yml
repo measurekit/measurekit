@@ -102,10 +102,11 @@ jobs:
           // site with the plugin and the files at the top of docs/.
           const NOT_CHECKED =
             /^(\.changeset\/|\.github\/(?!workflows\/ci\.yml$)|[^/]+\.md$|LICENSE$|biome\.json$|biome\/|cspell\.json$|knip\.json$|typedoc\.json$|lefthook\.yml$|\.editorconfig$|docs\/([^/]+|[^/]+\/performance\.md)$|validation\/(?!benchmarks\/))/;
-          // The scripts that only check, or are checked by the tests of scripts, with the identity of the family, which check reads.
-          // Every other script, bench-harness.ts, serves the tests and the benchmarks of the packages.
+          // The scripts that only check, or are checked by the tests of scripts, with the identity of the family and the generator of
+          // the docs site, which check builds. Every other script, bench-harness.ts, serves the tests and the benchmarks of the
+          // packages.
           const OWN_SCRIPTS =
-            /^scripts\/(test\/|check-standards\.ts$|check-identity\.ts$|family\.ts$|identity\.ts$|check-duplication\.ts$|check-licenses\.ts$|check-rules\.ts$|check-release\.ts$|check-tarballs\.ts$|entry-sizes\.ts$|size-budgets\.ts$|peak-memory\.ts$|prepare\.ts$)/;
+            /^scripts\/(test\/|check-standards\.ts$|check-identity\.ts$|check-site\.ts$|family\.ts$|identity\.ts$|llms\.ts$|check-duplication\.ts$|check-licenses\.ts$|check-rules\.ts$|check-release\.ts$|check-tarballs\.ts$|entry-sizes\.ts$|size-budgets\.ts$|peak-memory\.ts$|prepare\.ts$)/;
 
           // The runner of the samples and the comparison of their results, which the examples run and the tests of scripts check.
           const SAMPLE_SCRIPTS = /^scripts\/(guide-samples|stated-values)\.ts$/;
@@ -188,6 +189,8 @@ jobs:
       - run: pnpm check:licenses
       - run: pnpm check:audit
       - run: pnpm docs:api
+      # The built site: titles, descriptions, canonical URLs and the sitemap, the Markdown copies, llms.txt and the links to it.
+      - run: pnpm check:site
       # Version and Dependabot pull requests change package files without a changeset of their own.
       - if: >-
           github.event_name == 'pull_request' &&

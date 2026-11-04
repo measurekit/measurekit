@@ -1,4 +1,4 @@
-# Validation
+# Validation of psychometrics
 
 Every statistic of `@measurekit/psychometrics` is compared with an R reference; [simulation](#simulation) is checked
 by its properties instead. R scripts in [`validation/`](../../validation/README.md) load public datasets or

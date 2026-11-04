@@ -1,4 +1,4 @@
-# Elo
+# Elo ratings of learners and items
 
 `@measurekit/knowledge-tracing/elo` estimates learners' abilities and items' difficulties with the Elo rating system
 as adapted to education (Pelánek, 2016): each answer is a match between a learner and an item. It needs no

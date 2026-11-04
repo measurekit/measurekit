@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>measurekit</title>
+  <rect width="32" height="32" rx="6" fill="#1f3a5f"/>
+  <path d="M5 26h22" stroke="#9cc3e6" stroke-width="2" stroke-linecap="round"/>
+  <path d="M6 22.5C13 22.5 15 7.5 26 7.5" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+</svg>

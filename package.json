@@ -18,6 +18,7 @@
     "format": "biome check --write .",
     "knip": "knip",
     "docs:api": "pnpm build && typedoc",
+    "check:site": "node scripts/check-site.ts",
     "check:packages": "pnpm -r check:packages",
     "check:rules": "node scripts/check-rules.ts",
     "check:licenses": "node scripts/check-licenses.ts",

@@ -1,4 +1,4 @@
-# Evaluation
+# Evaluation of learner models
 
 `@measurekit/knowledge-tracing/evaluate` measures how well learner models predict outcomes: metrics and calibration of
 predictions, cross-validation and comparison of any [`LearnerModel`](architecture.md#the-learner-model-interface), a

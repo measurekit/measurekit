@@ -1,4 +1,4 @@
-# Simulation
+# Simulation of persons, items and responses
 
 `@measurekit/psychometrics/sim` simulates thetas, item parameters of every built-in [IRT model](irt.md) and
 response matrices, also of [multidimensional models](multidimensional.md), for test design and research: recovery studies, the design of forms and pools, and data for any

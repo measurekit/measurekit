@@ -1,4 +1,4 @@
-# Data
+# Events and logs
 
 Functions in `@measurekit/knowledge-tracing/data` build the logs that every model and evaluation takes, keep the first
 attempts of a log, and split it into folds. Logs are plain arrays of plain objects, so they can be built by hand or

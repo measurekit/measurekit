@@ -1,4 +1,4 @@
-# Storage
+# Storing learner states
 
 How an app backed by a database uses `@measurekit/knowledge-tracing`: what it stores, what an answer reads and
 writes, how it refits models, and how much memory a fit takes.

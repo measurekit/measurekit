@@ -1,4 +1,4 @@
-# Change
+# Change between two occasions
 
 `@measurekit/psychometrics/change` measures how much persons changed between two occasions, how well a difference of
 two scores measures anything, and whether one person's change is more than the error of measurement explains. Every

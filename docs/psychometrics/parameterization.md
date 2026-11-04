@@ -1,4 +1,4 @@
-# Parameterization
+# Parameterization in mirt's coefficients
 
 `@measurekit/psychometrics/parameterization` converts item parameters ([IRT](irt.md) and
 [multidimensional IRT](multidimensional.md)) to and from mirt's coefficients.

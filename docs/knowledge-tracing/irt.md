@@ -1,4 +1,4 @@
-# Item response theory
+# Online item response theory
 
 `@measurekit/knowledge-tracing/irt` estimates learners' ability online from item parameters calibrated beforehand, as
 by `@measurekit/psychometrics` or mirt: each outcome updates the posterior of the learner's θ, and the model

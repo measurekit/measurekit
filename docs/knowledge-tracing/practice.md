@@ -1,4 +1,4 @@
-# Practice
+# Practice recommendations and mastery criteria
 
 `@measurekit/knowledge-tracing/practice` chooses what a learner practices next and decides when a skill is mastered.
 It works with any model through the `LearnerModel` interface, including models written outside the package.

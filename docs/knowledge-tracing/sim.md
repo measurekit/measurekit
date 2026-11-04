@@ -1,4 +1,4 @@
-# Simulation
+# Simulation of learners
 
 `@measurekit/knowledge-tracing/sim` draws outcomes from a learner model, seeded, to check what a fit recovers
 before collecting data, to plan how many learners a fit needs, or to test an app with realistic logs.

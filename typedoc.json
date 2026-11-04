@@ -5,6 +5,8 @@
   "entryPoints": ["packages/core", "packages/psychometrics", "packages/knowledge-tracing"],
   "readme": "README.md",
   "out": "docs/api",
+  "router": "structure-dir",
+  "favicon": "docs/favicon.svg",
   "treatWarningsAsErrors": true,
   "plugin": ["typedoc-plugin-mermaid", "./docs/typedoc-seo.ts"],
   "mermaidVersion": "11.17.2",

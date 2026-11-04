@@ -1,4 +1,4 @@
-# Architecture
+# Architecture of knowledge-tracing
 
 ## Principles
 

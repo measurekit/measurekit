@@ -1,4 +1,4 @@
-# Validation
+# Validation of knowledge-tracing
 
 Every statistic of `@measurekit/knowledge-tracing` is compared with a reference: a function of an R or Python
 package, or a computation written out in the scripts. Bayesian knowledge tracing is compared with pyBKT; logistic
