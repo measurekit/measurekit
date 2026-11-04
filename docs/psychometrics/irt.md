@@ -687,7 +687,8 @@ A held lower asymptote is the practice where the number of options sets the gues
 enough to hold it gives nearly the same estimates, a little off the value. The items must be estimated, not in
 `fixed`; each must keep one parameter free, have the parameters named, and not share them among items, as RSM items
 share a and the steps; and the item with its held values must be valid for its model, so a held c needs c < d. Each of
-these cases throws `DataError`. Held parameters do not fix the scale: an estimated distribution of theta still needs
+these cases throws `DataError`. A held threshold of a graded item moves the starting values of the others to fit it, so
+that only thresholds out of order among themselves are refused. Held parameters do not fix the scale: an estimated distribution of theta still needs
 items in `fixed` or a standard normal group.
 
 ### Quadrature
@@ -1239,22 +1240,23 @@ outside the package works there as a built-in one does. Functions that rely on t
 models take those only, the GGUM excepted: moment linking, `transformItem`, true-score equating, Lord's chi-square,
 `simulateItems`, the Bookmark method and the conversions of `@measurekit/psychometrics/parameterization`.
 
-| Member                                               | Purpose                                                                                                         |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `name`                                               | A short name for messages.                                                                                      |
-| `maxCategories`                                      | The most response categories an item can have: 2 for a dichotomous model, `Infinity` without a limit.           |
-| `categoryCount(parameters)`                          | The number of categories of an item.                                                                            |
-| `parameters(categoryCount)`                          | The estimated parameters as `ModelParameter`s, in vector order: `name`, `lower` and `upper` bounds, `shared`.   |
-| `startingValues(proportions)`                        | Parameters to start calibration from, given the share of persons in each category.                              |
-| `toVector(parameters)`, `fromVector(vector)`         | Conversion to and from the vector the optimizer works on. `toVector` throws `DataError` for invalid parameters. |
-| `probabilities(parameters, theta, out)`              | Writes P(k \| θ) for each category k.                                                                           |
-| `thetaDerivatives(parameters, theta, first, second)` | Writes dP/dθ and d²P/dθ² for each category.                                                                     |
-| `parameterDerivatives(parameters, theta, out)`       | Writes dP(k)/dξⱼ for each category k and vector entry j at `out[k * size + j]`.                                 |
-| `information(parameters, theta)`                     | Fisher information at theta.                                                                                    |
+| Member                                               | Purpose                                                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `name`                                               | A short name for messages.                                                                                               |
+| `maxCategories`                                      | The most response categories an item can have: 2 for a dichotomous model, `Infinity` without a limit.                    |
+| `categoryCount(parameters)`                          | The number of categories of an item.                                                                                     |
+| `parameters(categoryCount)`                          | The estimated parameters as `ModelParameter`s, in vector order: `name`, `lower` and `upper` bounds, `shared`, `ordered`. |
+| `startingValues(proportions)`                        | Parameters to start calibration from, given the share of persons in each category.                                       |
+| `toVector(parameters)`, `fromVector(vector)`         | Conversion to and from the vector the optimizer works on. `toVector` throws `DataError` for invalid parameters.          |
+| `probabilities(parameters, theta, out)`              | Writes P(k \| θ) for each category k.                                                                                    |
+| `thetaDerivatives(parameters, theta, first, second)` | Writes dP/dθ and d²P/dθ² for each category.                                                                              |
+| `parameterDerivatives(parameters, theta, out)`       | Writes dP(k)/dξⱼ for each category k and vector entry j at `out[k * size + j]`.                                          |
+| `information(parameters, theta)`                     | Fisher information at theta.                                                                                             |
 
 A parameter with finite bounds is estimated on the logit scale between them (exponential with one bound); a
 `shared` parameter has one value for all estimated items of the model, which therefore need the same shared
-parameters. Methods that write into `out` must not allocate: they run in the inner loops. This Rasch model fixes a = 1:
+parameters; `ordered` parameters must keep their order, so a held one moves the starting values of the others to fit it.
+Methods that write into `out` must not allocate: they run in the inner loops. This Rasch model fixes a = 1:
 
 ```ts
 import { DataError } from "@measurekit/psychometrics";

@@ -63,6 +63,13 @@ export interface ModelParameter {
    */
   readonly upper?: number;
   /**
+   * Whether the model needs this parameter and the others so marked in their order, as a graded item's thresholds. A
+   * value `fixedParameters` holds then moves the starting values of the others, so that they stay in order around it.
+   *
+   * @defaultValue `false`
+   */
+  readonly ordered?: boolean;
+  /**
    * Whether one value is estimated for all calibrated items of the model, as the 1PL's `a`.
    *
    * @defaultValue `false`

@@ -2,7 +2,7 @@ import { checkRecord, DataError } from "@measurekit/core";
 import type { Quadrature } from "../math/internal.js";
 import type { CalibrationOptions } from "./calibration-options.js";
 import type { ExpectationItem } from "./expectation.js";
-import { checkHeldParameters, readFixedParameters } from "./fixed-parameters.js";
+import { checkHeldParameters, readFixedParameters, startAtHeldParameters } from "./fixed-parameters.js";
 import { checkFixedCategories, checkFixedIds, checkItem, checkModel, modelsOf } from "./items.js";
 import { type Population, population } from "./latent.js";
 import type { IrtModel, ModelParameter } from "./model.js";
@@ -111,6 +111,7 @@ export function setUp<TParameters>(
     const own = priorsOfItem.get(id);
     const held = heldOfItem.get(id);
     checkHeldItem(id, model.name, specifications, held, own);
+    if (held !== undefined) startAtHeldParameters(specifications, held, start);
     const freeSlot = (
       { name, lower = Number.NEGATIVE_INFINITY, upper = Number.POSITIVE_INFINITY, shared: common }: ModelParameter,
       p: number,

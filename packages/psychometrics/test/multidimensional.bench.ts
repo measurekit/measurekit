@@ -8,6 +8,7 @@ import {
   multidimensionalGradedResponse,
   multidimensionalMaximumLikelihoodEstimate,
   multidimensionalPosteriorMeanEstimate,
+  multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
   multidimensionalWeightedLikelihoodEstimate,
   rotateLoadings,
@@ -30,6 +31,15 @@ interface BenchMultidimensionalLongitudinalFixture {
 }
 const longitudinal = readFixture<BenchMultidimensionalLongitudinalFixture>("bench-multidimensional-longitudinal.json");
 
+interface HeldFixture {
+  models: string[];
+  itemIds: string[];
+  responses: number[][];
+  loadings: Record<string, string[]>;
+  fixedParameters: Record<string, Record<string, number>>;
+}
+const held = readFixture<HeldFixture>("multidimensional-fixed-parameters.json");
+
 const { points } = fixture;
 const confirmatory = buildResponseMatrix(fixture.confirmatory.responses, { itemIds: fixture.confirmatory.itemIds });
 const graded = buildResponseMatrix(fixture.graded.responses, { itemIds: fixture.graded.itemIds });
@@ -49,6 +59,25 @@ test("calibrates a confirmatory two-dimensional 2PL of 1,000 persons and 24 item
     context,
     "multidimensional.calibrateConfirmatory",
     () => calibrateMultidimensional(confirmatory, confirmatoryOptions),
+    SLOW_OPTIONS,
+  );
+});
+
+test("calibrates a confirmatory two-dimensional 2PL and 3PL of 2,000 persons and 12 items with parameters held", async (context) => {
+  const options = {
+    model: held.models.map((name) =>
+      name === "m3pl" ? multidimensionalThreeParameterLogistic : multidimensionalTwoParameterLogistic,
+    ),
+    loadings: held.loadings,
+    fixedParameters: held.fixedParameters,
+    points,
+  };
+  const data = buildResponseMatrix(held.responses, { itemIds: held.itemIds });
+  expect(calibrateMultidimensional(data, options).converged).toBe(true);
+  await benchmark(
+    context,
+    "multidimensional.calibrateHeld",
+    () => calibrateMultidimensional(data, options),
     SLOW_OPTIONS,
   );
 });

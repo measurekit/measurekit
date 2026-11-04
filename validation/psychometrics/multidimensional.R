@@ -251,6 +251,69 @@ if (selected("m3pl")) {
   ))
 }
 
+# --- Confirmatory 2D M2PL and M3PL with single parameters held: mirt's est = FALSE ------------------------------------
+
+# Items 1 to 6 load on F1 and 6 to 12 on F2, and item 12 on both as well: item 6, which both dimensions share, is a
+# 3PL item whose lower asymptote is held at 1/4, as are those of items 1 and 7, and item 2's at 1/5; item 5 is a 2PL item
+# whose slope a1 is held at 1, its true value. The others are 2PL items, every parameter estimated.
+set.seed(20261104)
+held_slopes <- simulate_slopes(6, 2)
+held_slopes[6, 2] <- 0.9
+held_slopes[12, 1] <- 0.7
+held_slopes[5, 1] <- 1
+held_guessing <- c(0.25, 0.2, 0, 0, 0, 0.25, 0.25, 0, 0, 0, 0, 0)
+held_types <- ifelse(held_guessing > 0, "3PL", "2PL")
+held_data <- simdata(held_slopes, rnorm(12), 2000, itemtype = "dich", guess = held_guessing,
+                     sigma = matrix(c(1, 0.4, 0.4, 1), 2))
+colnames(held_data) <- sprintf("q%02d", 1:12)
+
+if (selected("fixed-parameters")) {
+  held_model <- mirt.model("F1 = 1-6, 12\nF2 = 6-12\nCOV = F1*F2")
+  held_values <- mirt(held_data, held_model, itemtype = held_types, pars = "values")
+  hold <- function(item, name, value) {
+    rows <- held_values$item == item & held_values$name == name
+    held_values$value[rows] <<- value
+    held_values$est[rows] <<- FALSE
+  }
+  for (j in which(held_guessing > 0)) hold(colnames(held_data)[j], "g", held_guessing[j])
+  hold("q05", "a1", 1)
+  held_fit <- function(se_type) {
+    fit <- mirt(held_data, held_model, itemtype = held_types, pars = held_values, quadpts = 31, TOL = TOL, SE = TRUE,
+                SE.type = se_type, verbose = FALSE, technical = list(NCYCLES = 20000))
+    stopifnot_converged(fit)
+    fit
+  }
+  # mirt gives a held parameter's standard error as NA; measurekit lists none.
+  listed <- function(errors) lapply(errors, function(item) Filter(function(value) !is.na(value), item))
+  held <- held_fit("Oakes")
+  held_cross <- held_fit("crossprod")
+  held_items <- lapply(mirt_items(held, 2, graded = FALSE, guessing = TRUE), function(item) {
+    item$standardErrors <- listed(list(item$standardErrors))[[1]]
+    item
+  })
+
+  write_fixture("multidimensional-fixed-parameters", c(
+    list(
+      source = paste("simdata (set.seed(20261104)): 2000 persons, 12 dichotomous items on 2 dimensions correlated 0.4,",
+                     "items 6 and 12 on both; mirt 1.48 with est = FALSE on g of the 3PL items 1, 2, 6 and 7 and on a1",
+                     "of item 5, quadpts = 31, TOL = 1e-10, SE.type Oakes and crossprod."),
+      models = I(tolower(sub("PL", "pl", paste0("m", held_types)))), points = 31, itemIds = colnames(held_data),
+      responses = unname(held_data),
+      loadings = confirmatory_pattern(colnames(held_data), c(rep(list("F1"), 5), list(c("F1", "F2")),
+                                                             rep(list("F2"), 5), list(c("F1", "F2")))),
+      dimensionNames = c("F1", "F2"),
+      fixedParameters = list(q01 = list(c = 0.25), q02 = list(c = 0.2), q05 = list(a1 = 1), q06 = list(c = 0.25),
+                             q07 = list(c = 0.25)),
+      items = held_items, estimated = sum(mod2values(held)$est)
+    ),
+    mirt_correlations(held, 2), mirt_statistics(held),
+    list(crossProduct = c(
+      list(standardErrors = listed(mirt_standard_errors(held_cross, 2, graded = FALSE, guessing = TRUE))),
+      mirt_correlations(held_cross, 2)["correlationStandardErrors"]
+    ))
+  ))
+}
+
 # --- Confirmatory graded models: psych::bfi ----------------------------------------------------------------------------
 
 bfi_items <- function(scales) {

@@ -93,29 +93,30 @@ intervals of the cross-product errors cover the true a of 141 and the true b of 
 cover the true b of 125. Every location is within 0.75 of the truth after the reflection, and their RMSE at most 0.2 in
 each case (0.441 and 0.135 at worst).
 
-| Multidimensional quantity                                          | Reference                                                                                                                                             |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2PL: estimates, SEs, correlations, log-likelihood, AIC, BIC        | `mirt(model = "F1 = 1-6 / F2 = 7-12 / COV = F1*F2", SE.type = "Oakes")`, `TOL = 1e-10`, 31 points; also with 8% of the responses missing              |
-| Responses missing not at random: items, correlation, fit           | The same mirt model of the responses and their indicators, 31 points, `TOL = 1e-10` (below)                                                           |
-| 3PL with normal priors on logit c                                  | The same, 21 points, `PRIOR = (1-12, g, norm, ...)`                                                                                                   |
-| Graded: `bfi` A and C on two dimensions, A, C and E on three       | `mirt(itemtype = "graded")` with `COV`; 31 points and 15 points                                                                                       |
-| Cross-product standard errors                                      | `mirt(SE.type = "crossprod")`                                                                                                                         |
-| Several groups: estimates, SEs, moments, log-likelihood            | `multipleGroup(invariance = c("slopes", "intercepts", "free_means", "free_var"))`, `TOL = 1e-10`, 31 and 15 points                                    |
-| Fixed items that set the scale                                     | `multipleGroup` with `pars` and `est = FALSE` for the fixed items, and the other items named in `invariance`                                          |
-| Longitudinal: items, moments, changes, log-likelihood              | `mirt`: a dimension per occasion, items tied by `constrain`, `MEAN` and `COV` for later occasions, `TOL = 1e-9`; changes in base R                    |
-| Longitudinal: Rasch model                                          | `tam.mml` with `Q` and `A`, on the scale of the first occasion; `mirt` with equal slopes                                                              |
-| Longitudinal: standard errors                                      | `mirt`'s `SE.type = "Oakes"` and `"crossprod"`, with the delta method for difficulty, correlation, SD                                                 |
-| MH-RM: estimates, correlations, standard errors                    | The EM references above for two and three dimensions; `mirt(method = "MHRM", SE = TRUE)` with `technical = list(set.seed = 1 to 4)` for five          |
-| MH-RM complete-data score and information of an item               | `mirt:::Deriv` at given thetas                                                                                                                        |
-| Exploratory 2D 2PL: estimates, log-likelihood                      | Base R: BFGS then Newton steps on the exact gradient of the marginal likelihood from mirt's estimates, the first item's second slope fixed at 0       |
-| Rotation: varimax, oblimin, Kaiser normalization, gamma            | `GPArotation::Varimax`, `GPArotation::oblimin` to a gradient of 1e-10, mirt's sign convention; checked against mirt's `Rotate`                        |
-| Rotated slopes and scores in the rotated dimensions                | mirt's `rotateLambdas`; `fscores(rotate = "oblimin", method = "EAP")`                                                                                 |
-| EAP theta and standard error                                       | `fscores(method = "EAP", QMC = FALSE)`, rectangular nodes from -6 to 6 on the prior                                                                   |
-| MAP theta; standard error                                          | `fscores(method = "MAP")`; the standard error from base R: the inverse of the information matrices plus the precision of the prior                    |
-| ML and WLE theta; standard errors                                  | Base R: roots of the score and Warm's weighted score in [-6, 6] by Newton, SEs from I⁻¹; `fscores(method = "ML", "WLE")`                              |
-| Information matrices                                               | Base R: the sum over categories of the outer products of the derivatives of the probabilities written out, checked against `probtrace` and `iteminfo` |
-| MDISC and MDIFF                                                    | mirt's `MDISC` and `MDIFF` of the items set in mirt                                                                                                   |
-| mirt's slope-intercept coefficients of items on 2 and 3 dimensions | `coef(simplify = TRUE)` and `probtrace` of the same items                                                                                             |
+| Multidimensional quantity                                              | Reference                                                                                                                                             |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2PL: estimates, SEs, correlations, log-likelihood, AIC, BIC            | `mirt(model = "F1 = 1-6 / F2 = 7-12 / COV = F1*F2", SE.type = "Oakes")`, `TOL = 1e-10`, 31 points; also with 8% of the responses missing              |
+| Responses missing not at random: items, correlation, fit               | The same mirt model of the responses and their indicators, 31 points, `TOL = 1e-10` (below)                                                           |
+| 3PL with normal priors on logit c                                      | The same, 21 points, `PRIOR = (1-12, g, norm, ...)`                                                                                                   |
+| Parameters held: estimates, SEs, correlation, log-likelihood, AIC, BIC | The same with `pars` and `est = FALSE` on `g` of 3PL items, 1 of them on both dimensions, and on `a1` of a 2PL item; 31 points, Oakes and `crossprod` |
+| Graded: `bfi` A and C on two dimensions, A, C and E on three           | `mirt(itemtype = "graded")` with `COV`; 31 points and 15 points                                                                                       |
+| Cross-product standard errors                                          | `mirt(SE.type = "crossprod")`                                                                                                                         |
+| Several groups: estimates, SEs, moments, log-likelihood                | `multipleGroup(invariance = c("slopes", "intercepts", "free_means", "free_var"))`, `TOL = 1e-10`, 31 and 15 points                                    |
+| Fixed items that set the scale                                         | `multipleGroup` with `pars` and `est = FALSE` for the fixed items, and the other items named in `invariance`                                          |
+| Longitudinal: items, moments, changes, log-likelihood                  | `mirt`: a dimension per occasion, items tied by `constrain`, `MEAN` and `COV` for later occasions, `TOL = 1e-9`; changes in base R                    |
+| Longitudinal: Rasch model                                              | `tam.mml` with `Q` and `A`, on the scale of the first occasion; `mirt` with equal slopes                                                              |
+| Longitudinal: standard errors                                          | `mirt`'s `SE.type = "Oakes"` and `"crossprod"`, with the delta method for difficulty, correlation, SD                                                 |
+| MH-RM: estimates, correlations, standard errors                        | The EM references above for two and three dimensions; `mirt(method = "MHRM", SE = TRUE)` with `technical = list(set.seed = 1 to 4)` for five          |
+| MH-RM complete-data score and information of an item                   | `mirt:::Deriv` at given thetas                                                                                                                        |
+| Exploratory 2D 2PL: estimates, log-likelihood                          | Base R: BFGS then Newton steps on the exact gradient of the marginal likelihood from mirt's estimates, the first item's second slope fixed at 0       |
+| Rotation: varimax, oblimin, Kaiser normalization, gamma                | `GPArotation::Varimax`, `GPArotation::oblimin` to a gradient of 1e-10, mirt's sign convention; checked against mirt's `Rotate`                        |
+| Rotated slopes and scores in the rotated dimensions                    | mirt's `rotateLambdas`; `fscores(rotate = "oblimin", method = "EAP")`                                                                                 |
+| EAP theta and standard error                                           | `fscores(method = "EAP", QMC = FALSE)`, rectangular nodes from -6 to 6 on the prior                                                                   |
+| MAP theta; standard error                                              | `fscores(method = "MAP")`; the standard error from base R: the inverse of the information matrices plus the precision of the prior                    |
+| ML and WLE theta; standard errors                                      | Base R: roots of the score and Warm's weighted score in [-6, 6] by Newton, SEs from I⁻¹; `fscores(method = "ML", "WLE")`                              |
+| Information matrices                                                   | Base R: the sum over categories of the outer products of the derivatives of the probabilities written out, checked against `probtrace` and `iteminfo` |
+| MDISC and MDIFF                                                        | mirt's `MDISC` and `MDIFF` of the items set in mirt                                                                                                   |
+| mirt's slope-intercept coefficients of items on 2 and 3 dimensions     | `coef(simplify = TRUE)` and `probtrace` of the same items                                                                                             |
 
 | Dimensionality quantity                                                                                   | Reference                                                                                                                                                                                                                                |
 | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1497,6 +1498,9 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Multidimensional 2PL parameters, correlations, loadings, communalities                             | 1e-5 absolute                                                   | 1.3e-6                   |
 | Multidimensional 2PL standard errors                                                               | 1e-4 relative                                                   | 1.5e-6                   |
 | Multidimensional 2PL log-likelihood, AIC, BIC                                                      | 1e-6 absolute                                                   | 4.4e-11                  |
+| Multidimensional parameters held by `fixedParameters`: parameters, correlation                     | 1e-5 absolute                                                   | 4.1e-6                   |
+| Multidimensional parameters held: Oakes' and cross-product standard errors, their correlation's    | 1e-5 relative                                                   | 4.0e-6                   |
+| Multidimensional parameters held: log-likelihood, AIC, BIC                                         | 1e-8 absolute                                                   | 6.1e-10                  |
 | Multidimensional 3PL and graded parameters, correlations, loadings                                 | 2e-4 absolute                                                   | 9.7e-5                   |
 | Multidimensional 3PL and graded standard errors                                                    | 1e-3 relative                                                   | 9.2e-5                   |
 | Multidimensional 3PL and graded log-likelihood, AIC, BIC                                           | 1e-4 absolute                                                   | 2.5e-5                   |
@@ -1561,7 +1565,7 @@ on both sides. mirt's ML and MAP use `nlm` with numerical derivatives, good to a
 computes 1 - P by subtraction, so information is compared in absolute terms: in the tails mirt keeps few significant
 digits. JML runs with `tolerance: 1e-12` against a base R solution iterated to 1e-12.
 
-The multidimensional calibrations run with `tolerance: 1e-9` for the 2PL, 1e-7 for the 3PL and the graded model on two
+The multidimensional calibrations run with `tolerance: 1e-9` for the 2PL and with parameters held, 1e-7 for the 3PL and the graded model on two
 dimensions, and 1e-8 on three, and the exploratory ones with 1e-8: the likelihoods of the other models are flatter, and
 mirt's EM stops within the tolerances above. The `bfi` fixtures take a few seconds each, and the exploratory cases, whose
 EM needs hundreds to thousands of iterations on 600 persons, tens of seconds.

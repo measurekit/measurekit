@@ -30,6 +30,7 @@ const BUDGETS = {
   "irt.conditionalRatingScale": 40,
   "irt.calibrateUnfolding": 3_000,
   "multidimensional.calibrateConfirmatory": 4_000,
+  "multidimensional.calibrateHeld": 4_000, // laptop
   "multidimensional.calibrateGraded": 5_000,
   "multidimensional.calibrateExploratory": 30_000,
   "multidimensional.calibrateGroups": 6_000,

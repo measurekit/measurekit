@@ -68,3 +68,38 @@ export function checkHeldParameters(
     );
   }
 }
+
+/**
+ * Writes the held values into an item's starting vector, and moves the starting values of its other ordered parameters
+ * to fit them, so that a valid held value is not refused for the starts around it: an entry between two held ones goes
+ * evenly between them, and one beyond them keeps its distance from the nearest. Other starts stay as they are.
+ *
+ * @param specifications - The estimated parameters of the item's model, in vector order.
+ * @param held - The values `fixedParameters` holds, each of a parameter in `specifications`.
+ * @param start - The item's starting vector, which receives the values.
+ */
+export function startAtHeldParameters(
+  specifications: readonly ModelParameter[],
+  held: ReadonlyMap<string, number>,
+  start: Float64Array,
+): void {
+  const series = Array.from(specifications.keys()).filter((p) => specifications[p]?.ordered === true);
+  const heldAt = (p: number): number | undefined => held.get(specifications[p]?.name ?? "");
+  const pinned = series.filter((p) => heldAt(p) !== undefined);
+  const before = start.slice();
+  for (const p of series) {
+    const lower = pinned.findLast((q) => q <= p);
+    const upper = pinned.find((q) => q >= p);
+    if (lower !== undefined && upper !== undefined && lower < upper) {
+      const share = (series.indexOf(p) - series.indexOf(lower)) / (series.indexOf(upper) - series.indexOf(lower));
+      start[p] = (heldAt(lower) ?? 0) + share * ((heldAt(upper) ?? 0) - (heldAt(lower) ?? 0));
+    } else if (lower !== undefined || upper !== undefined) {
+      const nearest = lower ?? upper ?? p;
+      start[p] = (heldAt(nearest) ?? 0) + (before[p] ?? 0) - (before[nearest] ?? 0);
+    }
+  }
+  specifications.forEach(({ name }, p) => {
+    const value = held.get(name);
+    if (value !== undefined) start[p] = value;
+  });
+}

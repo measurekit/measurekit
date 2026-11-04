@@ -205,9 +205,12 @@ function itemUnit<TParameters>(
   axis: Float64Array,
   scaled: boolean,
 ): ScoreUnit {
-  const { dimensions, free } = item;
+  const { dimensions, free, vector } = item;
   let set: DimensionSet = 0;
   for (const j of free) if (j < dimensions) set |= 1 << j;
+  // A slope held at a value other than 0 moves the probabilities as an estimated one does, so the scores of the item's
+  // other entries depend on its dimension. An anchor has no scores, and needs no dimension.
+  if (free.length > 0) for (let d = 0; d < dimensions; d++) if ((vector[d] ?? 0) !== 0) set |= 1 << d;
   const nodes = subgridCount(set, axis.length);
   const coordinates = new Float64Array(nodes * dimensions);
   subgridNodes(set, axis, dimensions, coordinates);

@@ -78,6 +78,7 @@ import {
   rescaledWeights,
   STANDARD_RULES,
   squarem,
+  startAtHeldParameters,
   unfoldingStarts,
 } from "../src/irt/internal.js";
 import { rectangular } from "../src/math/internal.js";
@@ -2188,6 +2189,62 @@ describe("fixed parameters", () => {
     expectClose(held.aic, free.aic - 2, 1e-7, "AIC");
   });
 
+  it("move the starts of the other ordered parameters to fit the held ones, and no others", () => {
+    const start = Float64Array.of(1, -2, -1, 0, 1);
+    const specifications = [
+      { name: "a" },
+      { name: "b1", ordered: true },
+      { name: "b2", ordered: true },
+      { name: "b3", ordered: true },
+      { name: "b4", ordered: true },
+    ];
+    startAtHeldParameters(specifications, new Map([["b2", 4]]), start);
+    expect(Array.from(start)).toEqual([1, 3, 4, 5, 6]);
+    startAtHeldParameters(
+      specifications,
+      new Map([
+        ["b1", 0],
+        ["b4", 9],
+      ]),
+      start,
+    );
+    expect(Array.from(start)).toEqual([1, 0, 3, 6, 9]);
+    const unordered = Float64Array.of(1, -2, -1);
+    startAtHeldParameters(
+      [{ name: "a" }, { name: "b1" }, { name: "b2" }],
+      new Map([
+        ["a", 2],
+        ["b2", 5],
+      ]),
+      unordered,
+    );
+    expect(Array.from(unordered)).toEqual([2, -2, 5]);
+  });
+
+  it("give the free calibration when a threshold of a graded item is held at its estimate, whatever the starts", () => {
+    const grades = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
+    const free = calibrate(grades, { model: gradedResponse, tolerance: EM_TOLERANCE, maxIterations: 10_000 });
+    const second = defined(free.items[1]);
+    const b = second.parameters.b;
+    for (const fixedParameters of [
+      { [second.id]: { b1: defined(b[0]) } },
+      { [second.id]: { b1: defined(b[0]), b3: defined(b[2]) } },
+      { [second.id]: { b3: defined(b[2]) } },
+    ]) {
+      const held = calibrate(grades, {
+        model: gradedResponse,
+        fixedParameters,
+        tolerance: EM_TOLERANCE,
+        maxIterations: 10_000,
+      });
+      expect(held.converged).toBe(true);
+      free.items.forEach((item, i) => {
+        expectParameters(defined(held.items[i]).parameters, item.parameters, 1e-5, item.id);
+      });
+      expectClose(held.logLikelihood, free.logLikelihood, 1e-7, "log-likelihood");
+    }
+  });
+
   it("agree with the near-degenerate beta prior that held the guessing parameter", () => {
     // A beta prior of mode c and SD about 0.004 for each held c: the estimates move by little more than that.
     const itemPriors = Object.fromEntries(
@@ -2248,6 +2305,13 @@ describe("fixed parameters", () => {
     expect(rejected({ item2: { a: 1 } }, { model: oneParameterLogistic })).toBe(
       'The option fixedParameters holds "a" of item "item2", whose 1PL model shares it among items.',
     );
+    const thresholds = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
+    expect(() =>
+      calibrate(thresholds, {
+        model: gradedResponse,
+        fixedParameters: { [defined(science.itemIds[0])]: { b1: 1, b2: 0 } },
+      }),
+    ).toThrow(/with its held parameters: A GRM item .* thresholds b strictly increasing/);
     expect(rejected({ item2: { c: 1 } }, { model: threeParameterLogistic })).toMatch(
       /^Item "item2" with its held parameters: Logistic item parameters need finite a and b and 0 ≤ c < d ≤ 1, found .* c = 1, d = 1\.$/,
     );
@@ -2579,7 +2643,12 @@ describe("expectationStep", () => {
 
 describe("gradedResponse", () => {
   it("names the slope a and one threshold b for each boundary between categories", () => {
-    expect(gradedResponse.parameters(4)).toEqual([{ name: "a" }, { name: "b1" }, { name: "b2" }, { name: "b3" }]);
+    expect(gradedResponse.parameters(4)).toEqual([
+      { name: "a" },
+      { name: "b1", ordered: true },
+      { name: "b2", ordered: true },
+      { name: "b3", ordered: true },
+    ]);
     expect(gradedResponse.categoryCount({ a: 1, b: [0, 1] })).toBe(3);
   });
 

@@ -2,6 +2,7 @@ import { cholesky, logistic, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  betaPrior,
   buildResponseMatrix,
   buildResponseRecords,
   calibrate,
@@ -438,6 +439,30 @@ interface MultidimensionalM3plFixture {
 }
 const m3pl = readFixture<MultidimensionalM3plFixture>("multidimensional-m3pl.json");
 
+interface MultidimensionalHeldFixture {
+  source: string;
+  models: ("m2pl" | "m3pl")[];
+  points: number;
+  itemIds: string[];
+  responses: number[][];
+  loadings: Record<string, string[]>;
+  fixedParameters: Record<string, Record<string, number>>;
+  items: {
+    id: string;
+    parameters: { a: number[]; intercept: number; c: number; d: number };
+    standardErrors: Record<string, number>;
+  }[];
+  estimated: number;
+  correlations: number[][];
+  correlationStandardErrors: number[][];
+  logLikelihood: number;
+  aic: number;
+  bic: number;
+  iterations: number;
+  crossProduct: { standardErrors: Record<string, number>[]; correlationStandardErrors: number[][] };
+}
+const held = readFixture<MultidimensionalHeldFixture>("multidimensional-fixed-parameters.json");
+
 interface MultidimensionalMhrmFixture {
   source: string;
   model: string;
@@ -631,7 +656,7 @@ function logitNormalPrior(mean: number, sd: number): ParameterPrior {
 /** Compares a calibration with mirt's: the parameters, correlations and fit statistics, and the standard errors. */
 function expectCalibration(
   fit: MultidimensionalCalibration<Parameters>,
-  fixture: Fixture,
+  fixture: Omit<Fixture, "model" | "points" | "itemIds" | "responses" | "loadings">,
   tolerances: { parameters: number; errors: number; likelihood: number },
   label: string,
 ): void {
@@ -1370,6 +1395,209 @@ describe("calibration", () => {
     );
     expect(short.converged).toBe(false);
     expect(short.iterations).toBe(3);
+  });
+});
+
+describe("fixed parameters", () => {
+  const matrix = buildResponseMatrix(held.responses, { itemIds: held.itemIds });
+  const options = {
+    model: held.models.map(modelOf),
+    loadings: held.loadings,
+    fixedParameters: held.fixedParameters,
+    points: held.points,
+    tolerance: 1e-9,
+    maxIterations: 5000,
+  };
+  const hessian = calibrateMultidimensional(matrix, { ...options, standardErrors: "hessian" });
+
+  it("match mirt with est = FALSE on a shared 3PL item's asymptote and a 2PL item's slope", () => {
+    expectCalibration(hessian, held, { parameters: 1e-5, errors: 1e-5, likelihood: 1e-8 }, "held");
+    expect(hessian.converged).toBe(true);
+    expect(hessian.dimensions).toEqual(["F1", "F2"]);
+  });
+
+  it("match mirt's cross-product standard errors", () => {
+    const fit = calibrateMultidimensional(matrix, { ...options, standardErrors: "cross-product" });
+    held.crossProduct.standardErrors.forEach((errors, i) => {
+      const found = defined(fit.items[i]?.standardErrors);
+      expect(Object.keys(found)).toEqual(Object.keys(errors));
+      for (const [name, value] of Object.entries(errors)) {
+        expectClose(defined(found[name]) / value, 1, 1e-5, `${held.itemIds[i]} ${name}`);
+      }
+    });
+    expectClose(
+      defined(fit.correlationStandardErrors?.[0]?.[1]) / defined(held.crossProduct.correlationStandardErrors[0]?.[1]),
+      1,
+      1e-5,
+      "correlation",
+    );
+  });
+
+  it("keep each held value exactly, list it in no standard errors, and count it in no criterion", () => {
+    const parameters = (id: string): MultidimensionalLogisticParameters =>
+      defined(hessian.items.find((item) => item.id === id)).parameters as MultidimensionalLogisticParameters;
+    expect(parameters("q01").c).toBe(0.25);
+    expect(parameters("q02").c).toBe(0.2);
+    expect(parameters("q06").c).toBe(0.25);
+    expect(parameters("q07").c).toBe(0.25);
+    expect(parameters("q05").a[0]).toBe(1);
+    expect(parameters("q06").a.every((slope) => slope > 0.3)).toBe(true);
+    held.items.forEach(({ standardErrors }, i) => {
+      expect(Object.keys(defined(hessian.items[i]?.standardErrors))).toEqual(Object.keys(standardErrors));
+    });
+    expect(hessian.aic).toBeCloseTo(-2 * hessian.logLikelihood + 2 * held.estimated, 9);
+    expect(hessian.bic).toBeCloseTo(-2 * hessian.logLikelihood + held.estimated * Math.log(held.responses.length), 9);
+  });
+
+  it("give the free calibration when a graded item's intercept is held at its estimate", () => {
+    const data = buildResponseMatrix(graded.responses.slice(0, 300), { itemIds: [...graded.itemIds] });
+    const base = {
+      model: multidimensionalGradedResponse,
+      loadings: graded.loadings,
+      points: 11,
+      tolerance: 1e-7,
+      maxIterations: 2000,
+    };
+    const free = calibrateMultidimensional(data, base);
+    const [first, second] = free.items;
+    const intercept = (defined(second).parameters as MultidimensionalGradedParameters).intercepts[1];
+    const fit = calibrateMultidimensional(data, {
+      ...base,
+      fixedParameters: { [defined(second).id]: { intercept2: defined(intercept) } },
+    });
+    expect((defined(fit.items[1]).parameters as MultidimensionalGradedParameters).intercepts[1]).toBe(intercept);
+    free.items.forEach(({ id, parameters }, i) => {
+      defined(fit.items[i]).parameters.a.forEach((slope, d) => {
+        expectClose(slope, defined(parameters.a[d]), 1e-4, `${id} a${d + 1}`);
+      });
+    });
+    expect(first?.id).toBe(graded.itemIds[0]);
+    expectClose(fit.logLikelihood, free.logLikelihood, 1e-6, "log-likelihood");
+    expectClose(fit.aic, free.aic - 2, 1e-5, "AIC");
+    expect(() =>
+      calibrateMultidimensional(data, {
+        ...base,
+        fixedParameters: { [defined(second).id]: { intercept1: 0, intercept2: 1 } },
+      }),
+    ).toThrow(/with its held parameters: An MGRM item needs strictly decreasing intercepts/);
+  });
+
+  it("hold with anchors and groups too, which set the scale as they do without them", () => {
+    const id = defined(hessian.items[0]).id;
+    const anchors = Object.fromEntries(
+      [hessian.items[2], hessian.items[8]].map((item) => [defined(item).id, defined(item).parameters]),
+    );
+    const groups = held.responses.map((_, p) => (p % 2 === 0 ? "reference" : "focal"));
+    const fit = calibrateMultidimensional(matrix, {
+      ...options,
+      tolerance: 1e-5,
+      fixed: anchors,
+      groups,
+    });
+    expect((defined(fit.items[0]).parameters as MultidimensionalLogisticParameters).c).toBe(0.25);
+    expect(fit.items[0]?.id).toBe(id);
+    expect(fit.groups?.map(({ group }) => group)).toEqual(["reference", "focal"]);
+    fit.groups?.forEach(({ means }) => {
+      for (const value of means) expect(Math.abs(value)).toBeLessThan(0.3);
+    });
+  });
+
+  it("hold with MH-RM, near the solution of EM within its Monte Carlo error", () => {
+    const fit = calibrateMultidimensional(matrix, {
+      model: options.model,
+      loadings: options.loadings,
+      fixedParameters: options.fixedParameters,
+      method: "mhrm",
+      seed: 1,
+      standardErrors: "hessian",
+    });
+    expect(fit.converged).toBe(true);
+    held.items.forEach(({ id, parameters, standardErrors }, i) => {
+      const found = defined(fit.items[i]);
+      const logistic = found.parameters as MultidimensionalLogisticParameters;
+      expect(logistic.c).toBe(held.fixedParameters[id]?.c ?? 0);
+      parameters.a.forEach((slope, d) => {
+        expect(Math.abs(defined(logistic.a[d]) - slope), `${id} a${d + 1}`).toBeLessThan(0.15);
+      });
+      expect(Math.abs(logistic.intercept - parameters.intercept), `${id} intercept`).toBeLessThan(0.15);
+      expect(Object.keys(defined(found.standardErrors))).toEqual(Object.keys(standardErrors));
+    });
+    expect(fit.aic).toBeCloseTo(-2 * fit.logLikelihood + 2 * held.estimated, 9);
+  }, 120_000);
+
+  it("change nothing when empty", () => {
+    const small = buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] });
+    const plain = {
+      model: multidimensionalTwoParameterLogistic,
+      loadings: m2pl.loadings,
+      points: 11,
+    };
+    const fit = calibrateMultidimensional(small, plain);
+    expect(calibrateMultidimensional(small, { ...plain, fixedParameters: {} })).toEqual(fit);
+    expect(calibrateMultidimensional(small, { ...plain, fixedParameters: { q01: {} } })).toEqual(fit);
+  });
+
+  it("reject unknown and fixed items, parameters the item lacks, every parameter, and invalid values", () => {
+    const small = buildResponseMatrix(held.responses.slice(0, 40), { itemIds: held.itemIds });
+    const base = { model: options.model, loadings: held.loadings, points: 5, maxIterations: 1 };
+    const rejected = (value: object | string, extra: object = {}): string | undefined => {
+      try {
+        const fixedParameters = typeof value === "string" ? JSON.parse(value) : value;
+        calibrateMultidimensional(small, { ...base, ...extra, fixedParameters });
+      } catch (error) {
+        return error instanceof DataError ? error.message : undefined;
+      }
+      return undefined;
+    };
+    expect(rejected({ zz: { c: 0.25 } })).toBe(
+      'The option fixedParameters holds parameters of "zz", which is not an item id.',
+    );
+    const anchor = { q03: defined(held.items[2]).parameters };
+    expect(rejected({ q03: { a1: 1 } }, { fixed: anchor })).toBe(
+      'The option fixedParameters holds parameters of item "q03", which the option fixed holds whole.',
+    );
+    expect(rejected({ q03: { c: 0.25 } })).toBe(
+      'The option fixedParameters holds "c" of item "q03", whose M2PL model has a1, intercept.',
+    );
+    expect(rejected({ q01: { g: 0.25 } })).toBe(
+      'The option fixedParameters holds "g" of item "q01", whose M3PL model has a1, intercept, c.',
+    );
+    expect(rejected({ q01: { a2: 1 } })).toBe(
+      'The option fixedParameters holds "a2" of item "q01", a slope that the pattern of loadings fixes at 0.',
+    );
+    expect(rejected({ q01: { a2: 0 } })).toBe(
+      'The option fixedParameters holds "a2" of item "q01", a slope that the pattern of loadings fixes at 0.',
+    );
+    expect(
+      rejected(
+        { q01: { a2: 1 } },
+        { loadings: undefined, dimensions: 2, model: multidimensionalThreeParameterLogistic },
+      ),
+    ).toBe('The option fixedParameters holds "a2" of item "q01", a slope that the pattern of loadings fixes at 0.');
+    expect(rejected({ q03: { a1: 1, intercept: 0 } })).toBe(
+      'The option fixedParameters holds every parameter of item "q03"; give its parameters in the option fixed.',
+    );
+    expect(rejected({ q01: { c: 1 } })).toMatch(
+      /^Item "q01" with its held parameters: An M3PL item needs finite slopes a, at least one, a finite intercept and 0 ≤ c < d ≤ 1, found .* c = 1, d = 1\.$/,
+    );
+    const everyAsymptote = Object.fromEntries(
+      held.models.flatMap((name, i) => (name === "m3pl" ? [[held.itemIds[i], { c: 0.25 }]] : [])),
+    );
+    expect(rejected(everyAsymptote, { priors: { c: betaPrior(5, 17) } })).toBe(
+      'A prior is given for "c", which no estimated item has.',
+    );
+    expect(rejected("null")).toBe(
+      "The option fixedParameters must be an object of values by item id and parameter name, found null.",
+    );
+    expect(rejected('{ "q01": [] }')).toBe(
+      'The held parameters of item "q01" must be an object of values by parameter name, found an array.',
+    );
+    expect(rejected('{ "q01": { "c": "0.25" } }')).toBe(
+      'The held value of "c" of item "q01" must be a finite number, found "0.25".',
+    );
+    expect(rejected('{ "constructor": {} }')).toBe(
+      'The option fixedParameters holds parameters of "constructor", which is not an item id.',
+    );
   });
 });
 

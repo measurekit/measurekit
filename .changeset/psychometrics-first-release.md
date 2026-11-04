@@ -71,7 +71,9 @@ them, and 0 gives independent draws. It forecasts a composite of several scores,
 
 `calibrate` holds single parameters of estimated items at given values with `fixedParameters`, such as the lower
 asymptote of a 3PL item at 1/4 while its slope and difficulty are estimated, as mirt's `est = FALSE`: a held parameter
-has no standard error, prior or place in the covariance, and the AIC and BIC do not count it. `limitedInformationFit`
+has no standard error, prior or place in the covariance, and the AIC and BIC do not count it. `calibrateMultidimensional`
+holds them the same way, by EM and MH-RM, so an M3PL item that two dimensions share keeps its lower asymptote at 1/4. A
+held threshold of a graded item moves the starting values of the others to fit it (`ordered` of `ModelParameter`). `limitedInformationFit`
 and `summedScoreFit` take the same object, and `summedScoreFit` the anchors' ids, so that Δ and the degrees of freedom
 count only the estimated parameters, as mirt's.
 

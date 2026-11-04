@@ -25,7 +25,8 @@ import type { Settings, Solution } from "./solution.js";
 export interface CalibratedMultidimensionalItem<TParameters> extends MultidimensionalTestItem<TParameters> {
   /**
    * Standard errors of the estimated parameters by name: `a1` to `aD`, `intercept` or `intercept1` upward, and `c`.
-   * Slopes fixed at 0 by the pattern of loadings are not listed. `null` without standard errors: with the option
+   * Slopes fixed at 0 by the pattern of loadings and parameters that `fixedParameters` holds are not listed. `null`
+   * without standard errors: with the option
    * `standardErrors` `"none"`, and when the information matrix cannot be inverted or gives a variance that is not
    * positive.
    */
@@ -73,8 +74,8 @@ export interface MultidimensionalCalibration<TParameters> {
   /** The marginal log-likelihood at the estimates, without the priors. */
   readonly logLikelihood: number;
   /**
-   * Akaike's information criterion: -2 logLikelihood + 2p, with p the number of estimated item parameters,
-   * correlations and, with several groups or fixed items, means and variances.
+   * Akaike's information criterion: -2 logLikelihood + 2p, with p the number of estimated item parameters, which
+   * leaves out those `fixedParameters` holds, correlations and, with several groups or fixed items, means and variances.
    */
   readonly aic: number;
   /** The Bayesian information criterion: -2 logLikelihood + p ln n, with n the number of persons with at least one response. */
@@ -126,11 +127,15 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * the grid, a mean outside it or a standard deviation below the spacing of its nodes or above its range, leaves
  * `converged` `false`.
  *
+ * Held parameters: `fixedParameters` keeps single parameters of an estimated item at given values, as mirt's `est =
+ * FALSE`, by either method, so an M3PL item that two dimensions share keeps its lower asymptote at 1/4. The estimated
+ * parameters alone enter the standard errors, the covariance behind them and the number of parameters of the AIC and BIC.
+ *
  * An exploratory solution is determined up to the signs of its dimensions; {@link rotateLoadings} rotates it.
  *
  * @param data - The responses of the persons, as a matrix or as records.
- * @param options - The model, the method, the dimensions or loadings, the groups and fixed items, the priors, the
- *   quadrature, the standard errors and the stopping rules; each option has its default.
+ * @param options - The model, the method, the dimensions or loadings, the groups, fixed items and held parameters, the
+ *   priors, the quadrature, the standard errors and the stopping rules; each option has its default.
  * @returns The items with their parameters, the correlations of the dimensions, the groups, the standardized loadings
  *   and communalities, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations run.
  * @throws `DataError` when the data or an option is invalid, there are no responses, neither or both of `dimensions`
@@ -138,7 +143,9 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * category up to its highest or has more categories than its model allows; with EM, when there are more than 3
  * dimensions, the grid has more than 10⁶ nodes or the items' categories at its nodes more than 2 ** 24, a group has no
  * person with a response, the groups share no item or a fixed item is invalid, or the fixed items leave a dimension
- * without a scale; with MH-RM, when `points`, `groups`, `fixed` or the standard errors `"cross-product"` are given.
+ * without a scale; with MH-RM, when `points`, `groups`, `fixed` or the standard errors `"cross-product"` are given; and
+ * when `fixedParameters` holds a parameter of an item that is not estimated, a parameter its model lacks, a slope the
+ * pattern of loadings fixes at 0, or every parameter an item estimates, or leaves an item's parameters invalid.
  *
  * @example
  * ```ts

@@ -94,6 +94,26 @@ bench_fixture("psychometrics", "multidimensional", list(
 bench_task("multidimensional.calibrateConfirmatory", "Calibration of a confirmatory two-dimensional 2PL by EM",
            sprintf("%s persons, 24 items, 2 correlated dimensions", count(persons)),
            reference("mirt", "mirt(model, quadpts = 31)"), calibrate_confirmatory)
+# The items of multidimensional-fixed-parameters.json, whose 3PL items hold g and whose fifth holds a1, item 6 and item 12
+# on both dimensions.
+held <- fromJSON("packages/psychometrics/test/fixtures/multidimensional-fixed-parameters.json")
+held_data <- held$responses
+colnames(held_data) <- held$itemIds
+held_types <- ifelse(held$models == "m3pl", "3PL", "2PL")
+held_model <- mirt.model("F1 = 1-6, 12\nF2 = 6-12\nCOV = F1*F2")
+held_values <- mirt(held_data, held_model, itemtype = held_types, pars = "values")
+for (id in names(held$fixedParameters)) {
+  entry <- held$fixedParameters[[id]]
+  rows <- held_values$item == id & held_values$name == (if (is.null(entry$c)) "a1" else "g")
+  held_values$value[rows] <- if (is.null(entry$c)) entry$a1 else entry$c
+  held_values$est[rows] <- FALSE
+}
+bench_task("multidimensional.calibrateHeld",
+           "Calibration of a confirmatory two-dimensional 2PL and 3PL with its asymptotes and a slope held, by EM",
+           sprintf("%s persons, 12 items, 2 correlated dimensions", count(nrow(held_data))),
+           reference("mirt", "mirt(pars = values, quadpts = 31)"),
+           function() mirt(held_data, held_model, itemtype = held_types, pars = held_values, quadpts = POINTS, TOL = TOL,
+                           verbose = FALSE))
 bench_task("multidimensional.calibrateGraded", "Calibration of a confirmatory two-dimensional graded model by EM",
            sprintf("%s persons, 20 items of 4 categories, 2 correlated dimensions", count(persons)),
            reference("mirt", "mirt(itemtype = \"graded\", quadpts = 31)"), calibrate_graded)

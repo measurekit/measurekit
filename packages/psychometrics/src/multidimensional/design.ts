@@ -6,7 +6,7 @@ import type { LoadingPattern } from "./model.js";
 export interface Design {
   /** The names of the dimensions. */
   readonly dimensionNames: readonly string[];
-  /** For each item, in item order, whether it loads on each dimension: a slope that is not estimated is 0. */
+  /** For each item, in item order, whether it loads on each dimension: a slope on any other is 0. */
   readonly loads: readonly (readonly boolean[])[];
   /** Whether the dimensions are found by the calibration, without a pattern of loadings. */
   readonly exploratory: boolean;

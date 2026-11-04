@@ -26,7 +26,7 @@ export const multidimensionalGradedResponse: MultidimensionalModel<Multidimensio
   dimensionCount: ({ a }) => a.length,
   parameters: (categoryCount, dimensions) => [
     ...Array.from({ length: dimensions }, (_, d) => ({ name: `a${d + 1}` })),
-    ...Array.from({ length: categoryCount - 1 }, (_, k) => ({ name: `intercept${k + 1}` })),
+    ...Array.from({ length: categoryCount - 1 }, (_, k) => ({ name: `intercept${k + 1}`, ordered: true })),
   ],
   startingValues(proportions, slopes) {
     // At theta 0, P(X ≥ k) is the share of persons in categories k and above.

@@ -102,21 +102,22 @@ flowchart TD
 or one per item. Missing responses are skipped, which suits responses missing at random, and persons without responses change
 nothing. [A recipe](#recipe-responses-missing-not-at-random) models omissions that depend on the ability.
 
-| Option           | Default                                   | Meaning                                                                                                              |
-| ---------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `model`          | required                                  | One model, or one per item in item order                                                                             |
-| `method`         | `"em"` up to 3 dimensions, `"mhrm"` above | `"em"` or `"mhrm"`                                                                                                   |
-| `dimensions`     | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, 3 at most for EM, 100 for MH-RM; every item loads on each |
-| `loadings`       | none; one of `dimensions` and `loadings`  | Confirmatory: the names of the dimensions of each item, by item id, of every item                                    |
-| `correlated`     | `true`                                    | Confirmatory: estimate the correlations, in every group. Ignored when exploratory                                    |
-| `groups`         | one group                                 | EM only: each person's group label, aligned with the persons; [several groups on one scale](#groups-and-fixed-items) |
-| `fixed`          | none                                      | EM only: parameters of anchor items by item id, which are not estimated and set the scale                            |
-| `priors`         | none                                      | Priors by parameter name: `"a"` for every slope, `"intercept"` and `"c"`; estimates are posterior modes              |
-| `points`         | `61`, `31`, `15` for 1, 2, 3 dimensions   | EM only: nodes per dimension of the grid, at least 2, from -6 to 6 standard deviations: mirt's `quadpts`             |
-| `standardErrors` | `"none"`                                  | `"hessian"`, or `"cross-product"` for EM only                                                                        |
-| `seed`           | `0`                                       | MH-RM only: a safe integer; the same seed gives the same calibration                                                 |
-| `tolerance`      | `1e-4` for EM, `1e-3` for MH-RM           | Converged when no parameter changes by more than this: in an EM iteration, or in 3 successive MH-RM cycles           |
-| `maxIterations`  | `500` for EM, `2000` for MH-RM            | The most EM iterations, or the most cycles of MH-RM's last stage, after the 250 of its first two stages              |
+| Option            | Default                                   | Meaning                                                                                                                                           |
+| ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`           | required                                  | One model, or one per item in item order                                                                                                          |
+| `method`          | `"em"` up to 3 dimensions, `"mhrm"` above | `"em"` or `"mhrm"`                                                                                                                                |
+| `dimensions`      | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, 3 at most for EM, 100 for MH-RM; every item loads on each                              |
+| `loadings`        | none; one of `dimensions` and `loadings`  | Confirmatory: the names of the dimensions of each item, by item id, of every item                                                                 |
+| `correlated`      | `true`                                    | Confirmatory: estimate the correlations, in every group. Ignored when exploratory                                                                 |
+| `groups`          | one group                                 | EM only: each person's group label, aligned with the persons; [several groups on one scale](#groups-and-fixed-items)                              |
+| `fixed`           | none                                      | EM only: parameters of anchor items by item id, which are not estimated and set the scale                                                         |
+| `fixedParameters` | none                                      | Values of single parameters of estimated items by item id, then entry name, held while the rest is estimated: [held parameters](#held-parameters) |
+| `priors`          | none                                      | Priors by parameter name: `"a"` for every slope, `"intercept"` and `"c"`; estimates are posterior modes                                           |
+| `points`          | `61`, `31`, `15` for 1, 2, 3 dimensions   | EM only: nodes per dimension of the grid, at least 2, from -6 to 6 standard deviations: mirt's `quadpts`                                          |
+| `standardErrors`  | `"none"`                                  | `"hessian"`, or `"cross-product"` for EM only                                                                                                     |
+| `seed`            | `0`                                       | MH-RM only: a safe integer; the same seed gives the same calibration                                                                              |
+| `tolerance`       | `1e-4` for EM, `1e-3` for MH-RM           | Converged when no parameter changes by more than this: in an EM iteration, or in 3 successive MH-RM cycles                                        |
+| `maxIterations`   | `500` for EM, `2000` for MH-RM            | The most EM iterations, or the most cycles of MH-RM's last stage, after the 250 of its first two stages                                           |
 
 - **Confirmatory.** Each item loads on the dimensions named for it; the dimensions are named in order of first
   appearance among the items, in item order, and their slopes on the other dimensions are fixed at 0. With
@@ -183,6 +184,54 @@ several groups or fixed items, the means and variances; n is the number of perso
 The standardized loadings follow mirt's `summary`: λ = (a / 1.702) / √(1 + (a / 1.702)ᵀ Φ (a / 1.702)), where Φ is the
 correlation matrix, and the communality is λᵀ Φ λ. With several groups, Φ is the correlation matrix of the first group
 and the slopes are scaled by its standard deviations.
+
+### Held parameters
+
+`fixedParameters` holds single parameters of estimated items at given values while their other parameters are
+estimated, as mirt's `est = FALSE` on one parameter, by EM and by MH-RM: an M3PL item that two dimensions share keeps
+its lower asymptote at 1/4 of its four options, with no prior on any item's `c`. The names are those of the standard
+errors: `a1` to `aD`, `intercept` or `intercept1` upward, and `c`.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import {
+  calibrateMultidimensional,
+  multidimensionalThreeParameterLogistic,
+  multidimensionalTwoParameterLogistic,
+} from "@measurekit/psychometrics/multidimensional";
+import { simulateMultidimensionalResponses } from "@measurekit/psychometrics/sim";
+
+// Seven items, three on each of two dimensions, and "item4", of four options, on both.
+const random = createRandom(2026);
+const shared = 3;
+const items = Array.from({ length: 7 }, (_, i) => ({
+  model: i === shared ? multidimensionalThreeParameterLogistic : multidimensionalTwoParameterLogistic,
+  parameters: {
+    a: [i <= shared ? 1.3 : 0, i >= shared ? 1.1 : 0],
+    intercept: (i % 3) - 1,
+    c: i === shared ? 0.25 : 0,
+    d: 1,
+  },
+}));
+const thetas = Array.from({ length: 1000 }, () => [random.normal(), random.normal()]);
+const responses = simulateMultidimensionalResponses(items, thetas, random);
+const dimensionsOf = (i: number) =>
+  i === shared ? ["verbal", "quantitative"] : [i < shared ? "verbal" : "quantitative"];
+const fit = calibrateMultidimensional(responses, {
+  model: items.map(({ model }) => model),
+  loadings: Object.fromEntries(responses.itemIds.map((id, i) => [id, dimensionsOf(i)])),
+  fixedParameters: { item4: { c: 0.25 } },
+  standardErrors: "hessian",
+});
+fit.items[shared]?.parameters; // => { a: [1.16, 1.21], intercept: -1.02, c: 0.25, d: 1 }
+fit.items[shared]?.standardErrors; // => { a1: 0.28, a2: 0.32, intercept: 0.20 }, none for c
+```
+
+A held parameter is kept exactly, has no standard error, prior or place in the covariance, and the AIC and BIC do not
+count it, as in [`calibrate`](irt.md#held-parameters). The items must be estimated, not in `fixed`, and keep at least
+one parameter free; a slope the pattern of loadings fixes at 0 cannot be held, and every value must leave a valid item.
+A held slope is on the scale of the dimensions, which stay N(0, 1) without `fixed`: it does not set the scale. A held
+intercept of a graded item moves the starting values of the others to fit it.
 
 ### Groups and fixed items
 
@@ -408,7 +457,7 @@ Standard errors take at most 2,000 estimated parameters, by EM, MH-RM, bifactor 
 [irt](irt.md#standard-errors) explains: beyond it calibration throws `DataError` before it estimates anything.
 
 A standard error is listed by the name of the parameter: `a1` to `aD` for the slopes the item loads on, `intercept` or
-`intercept1`, `intercept2`, ..., and `c`. Slopes fixed at 0 have none. All standard errors of a calibration are `null`
+`intercept1`, `intercept2`, ..., and `c`. Slopes fixed at 0 and held parameters have none. All standard errors of a calibration are `null`
 if the information matrix cannot be inverted or gives a variance that is not positive.
 
 ### Time
@@ -747,17 +796,18 @@ multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // =>
 
 Invalid input throws `DataError` naming the value found.
 
-| Error                                                                                                                                     | What to do                                                                       |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Neither `dimensions` nor `loadings`, or both                                                                                              | Give `dimensions` for an exploratory model, or `loadings` for a confirmatory one |
-| Loadings, primary or specific dimensions, or priors for an id that is not an item, or a dimension named twice for an item                 | Name the dimensions of the items of the matrix, each once                        |
-| An item with invalid parameters: slopes or intercepts not finite, graded intercepts that do not decrease, or c and d out of 0 ≤ c < d ≤ 1 | Give the parameters in mirt's slope-intercept form                               |
-| More than three dimensions with EM, an exploratory model with too few items, or a grid of more nodes than its limit                       | Use `method: "mhrm"`, fewer `points`, or more items                              |
-| A bifactor model of more than one primary dimension, or a two-tier model of more than two                                                 | Use `calibrateMultidimensional` with `loadings`                                  |
-| Groups or occasions that share no item, or fixed items that leave a dimension without a scale                                             | Give them common items, or fix items with slopes on every dimension              |
-| A longitudinal calibration of more than three occasions                                                                                   | Calibrate two or three occasions at a time                                       |
-| A prior whose covariance is not symmetric positive definite, or scoring without items or a prior                                          | Give the prior of the calibration's correlations                                 |
-| A rotation of fewer than two dimensions, or of loadings that are not an exploratory calibration's                                         | Rotate the items of an exploratory calibration                                   |
+| Error                                                                                                                                                                          | What to do                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Neither `dimensions` nor `loadings`, or both                                                                                                                                   | Give `dimensions` for an exploratory model, or `loadings` for a confirmatory one |
+| Loadings, primary or specific dimensions, or priors for an id that is not an item, or a dimension named twice for an item                                                      | Name the dimensions of the items of the matrix, each once                        |
+| An item with invalid parameters: slopes or intercepts not finite, graded intercepts that do not decrease, or c and d out of 0 ≤ c < d ≤ 1                                      | Give the parameters in mirt's slope-intercept form                               |
+| More than three dimensions with EM, an exploratory model with too few items, or a grid of more nodes than its limit                                                            | Use `method: "mhrm"`, fewer `points`, or more items                              |
+| A bifactor model of more than one primary dimension, or a two-tier model of more than two                                                                                      | Use `calibrateMultidimensional` with `loadings`                                  |
+| Groups or occasions that share no item, or fixed items that leave a dimension without a scale                                                                                  | Give them common items, or fix items with slopes on every dimension              |
+| A longitudinal calibration of more than three occasions                                                                                                                        | Calibrate two or three occasions at a time                                       |
+| A held parameter of an item that is not estimated, one its model lacks, a slope the loadings fix at 0, every parameter an item estimates, or values that leave an invalid item | Hold what the item estimates at valid values; put a whole item in `fixed`        |
+| A prior whose covariance is not symmetric positive definite, or scoring without items or a prior                                                                               | Give the prior of the calibration's correlations                                 |
+| A rotation of fewer than two dimensions, or of loadings that are not an exploratory calibration's                                                                              | Rotate the items of an exploratory calibration                                   |
 
 ## Not included
 
@@ -766,6 +816,7 @@ Invalid input throws `DataError` naming the value found.
 | Noncompensatory models                                                                                    | Outside the sources: a variant of the compensatory models; the graded model covers ordered items.                                                                                                                                                         |
 | Multidimensional GPCM                                                                                     | Outside the sources: a variant of the graded model, which covers ordered items.                                                                                                                                                                           |
 | Multidimensional nominal models                                                                           | Outside the sources: a variant of the graded model, which covers ordered items.                                                                                                                                                                           |
+| Held parameters in bifactor and longitudinal calibration                                                  | Outside the sources: a prior serves the asymptotes there, and `calibrateMultidimensional` holds parameters of the same bifactor pattern given as `loadings`.                                                                                              |
 | Multidimensional linking of separate calibrations                                                         | Outside the sources: concurrent calibration of groups is the practice here, though Reckase gives linking a chapter; the groups are calibrated together, on one scale.                                                                                     |
 | QMC-EM                                                                                                    | Outside the sources: an option of mirt (`method = "QMCEM"`), and MH-RM serves high dimensions.                                                                                                                                                            |
 | Standard errors of the means and covariances of the groups                                                | Outside the sources: the items' standard errors account for them.                                                                                                                                                                                         |
@@ -812,6 +863,9 @@ Invalid input throws `DataError` naming the value found.
   constrain parameters that it does not estimate, so for fixed items it needs the other items named in `invariance`;
   here `fixed` frees the means and covariance of the first group as well. mirt's covariance of a group is free in
   every entry its model frees; here an uncorrelated model has a diagonal covariance in every group, as mirt's.
+- **Held parameters.** `fixedParameters` stands for mirt's `pars` with `est = FALSE` on a parameter. mirt keeps a held `g` on
+  its logit, 0.2499999999999999 for 1/4; here the value given is kept exactly. mirt refuses a held intercept of a graded
+  item that its starting values leave out of order, until the others are set in `pars`; here their starts move to fit it.
 - **Groups of few persons.** mirt's `multipleGroup` estimates the correlation of a group of one or two persons on two
   dimensions as 1 and reports convergence, and stops with a singular covariance at five; here a group of no more persons
   than its correlated dimensions is refused.

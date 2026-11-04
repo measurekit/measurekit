@@ -1,12 +1,6 @@
 import { DataError, gradedProbabilities, hasOrderedThresholds, logistic, type ThresholdItem } from "@measurekit/core";
 import type { IrtModel } from "./model.js";
-import {
-  formatList,
-  sharesAbove,
-  thresholdParameterList,
-  thresholdsFromVector,
-  thresholdVector,
-} from "./thresholds.js";
+import { formatList, sharesAbove, thresholdsFromVector, thresholdVector } from "./thresholds.js";
 
 /**
  * The graded response model (GRM, Samejima): an item with K ordered categories has a slope `a` and thresholds
@@ -17,7 +11,10 @@ export const gradedResponse: IrtModel<ThresholdItem> = {
   name: "GRM",
   maxCategories: Number.POSITIVE_INFINITY,
   categoryCount: ({ b }) => b.length + 1,
-  parameters: (categoryCount) => thresholdParameterList({ name: "a" }, categoryCount),
+  parameters: (categoryCount) => [
+    { name: "a" },
+    ...Array.from({ length: categoryCount - 1 }, (_, k) => ({ name: `b${k + 1}`, ordered: true })),
+  ],
   startingValues(proportions) {
     // With a = 1, P(X ≥ k) at θ = 0 is the share of persons in categories k and above.
     return { a: 1, b: sharesAbove(proportions).map((above) => Math.log((1 - above) / above)) };

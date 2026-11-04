@@ -1,5 +1,5 @@
 import type { FieldNames } from "@measurekit/core";
-import type { ParameterPrior, StandardErrorMethod } from "../irt/internal.js";
+import type { FixedParameters, ParameterPrior, StandardErrorMethod } from "../irt/internal.js";
 import type { LoadingPattern, MultidimensionalModel } from "./model.js";
 
 /** How a calibration estimates: `"em"`, by quadrature over a grid, or `"mhrm"`, by Metropolis-Hastings Robbins-Monro. */
@@ -63,6 +63,17 @@ export interface MultidimensionalCalibrationOptions<TParameters> {
    */
   readonly fixed?: Readonly<Record<string, TParameters>>;
   /**
+   * Values of single parameters of estimated items, by item id, then the name of the entry in the item's parameter
+   * vector, such as `{ q7: { c: 0.25 } }` for an M3PL item whose lower asymptote is held at 1/4 while its slopes and
+   * intercept are estimated, as mirt's `est = FALSE` on one parameter. The names are those of the standard errors: `a1`
+   * to `aD`, `intercept` or `intercept1` upward, and `c`. A held parameter has no standard error, no prior and no
+   * place in the covariance, and the AIC and BIC do not count it. The items must be estimated and keep at least one
+   * parameter free, and a held slope must be one the item loads on.
+   *
+   * @defaultValue none: every parameter of an estimated item is estimated
+   */
+  readonly fixedParameters?: FixedParameters;
+  /**
    * Priors by parameter name: `"a"` for every slope, `"intercept"` for every intercept, and `"c"`, applied to that
    * parameter of every item whose model estimates it. Estimates with priors are posterior modes.
    *
@@ -115,6 +126,7 @@ export const MULTIDIMENSIONAL_CALIBRATION_OPTIONS: FieldNames<MultidimensionalCa
   correlated: true,
   groups: true,
   fixed: true,
+  fixedParameters: true,
   priors: true,
   points: true,
   standardErrors: true,
