@@ -1,5 +1,5 @@
 # Helpers of the benchmark scripts: the fixtures with the inputs of the tasks, the timing of the references, and the
-# record of each task that docs/performance.md is made from. Run the scripts from the repository root, with
+# record of each task that docs/<package>/performance.md is made from. Run the scripts from the repository root, with
 # `Rscript validation/benchmarks.R`.
 
 suppressPackageStartupMessages(library(jsonlite))
@@ -34,7 +34,7 @@ time_calls <- function(fn) {
   list(median = median(samples), min = min(samples), samples = runs)
 }
 
-# The name, version and function of a reference, as the table of docs/performance.md shows it.
+# The name, version and function of a reference, as the tables of docs/<package>/performance.md show it.
 reference <- function(package, call) {
   sprintf("%s %s `%s`", package, as.character(packageVersion(package)), call)
 }

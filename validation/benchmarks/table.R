@@ -1,6 +1,7 @@
-# The charts and tables of docs/performance.md: for each task, the median of measurekit from the JSON reports of Vitest, the
-# median of its reference from r.json and python.json, and their ratio. The charts and the tables replace what lies between
-# their markers in the document. The rows where measurekit is more than 1.5 times slower are in bold.
+# The charts and tables of the performance page of each package, docs/<package>/performance.md: for each task, the median
+# of measurekit from the JSON reports of Vitest, the median of its reference from r.json and python.json, and their ratio.
+# The charts and the tables replace what lies between their markers in the page. The rows where measurekit is more than
+# 1.5 times slower are in bold.
 #
 #   pnpm --filter @measurekit/core bench --reporter json --outputFile validation/benchmarks/results/measurekit-core-1.json
 #   pnpm --filter @measurekit/psychometrics bench --reporter json --outputFile validation/benchmarks/results/measurekit-psychometrics-1.json
@@ -9,8 +10,7 @@
 # Run each three times, with -1, -2 and -3 in the name of the file: the median of the runs is the time of measurekit.
 
 SLOW <- 1.5
-DOCUMENT <- "docs/performance.md"
-PACKAGES <- c(core = "Core", psychometrics = "Psychometrics", `knowledge-tracing` = "Knowledge tracing")
+PACKAGES <- c("core", "psychometrics", "knowledge-tracing")
 # The most tasks that a chart shows, so that the names of the tasks stay readable.
 CHART_TASKS <- 18
 # The most characters of the modules in the title of a chart, so that the title is not clipped.
@@ -68,7 +68,7 @@ tasks <- function(package) {
                                                            ratio = if (is.null(theirs)) NA else own / theirs))
   })
 }
-results <- lapply(setNames(names(PACKAGES), names(PACKAGES)), function(package) {
+results <- lapply(setNames(PACKAGES, PACKAGES), function(package) {
   if (is.null(references[[package]])) list() else tasks(package)
 })
 
@@ -112,26 +112,28 @@ chart_groups <- function(entries) {
   c(groups, if (length(current) > 0) list(current))
 }
 
-all_entries <- unlist(results, recursive = FALSE)
-slow_entries <- Filter(function(entry) !is.na(entry$ratio) && entry$ratio > SLOW, unname(all_entries))
-slow_entries <- slow_entries[order(-vapply(slow_entries, function(entry) entry$ratio, 0))]
-
 command <- function(...) tryCatch(trimws(system2(..., stdout = TRUE, stderr = FALSE)[1]), error = function(e) "unknown")
 environment <- sprintf("Measured on %s with %s cores, %s GB of memory, Node.js %s and %s.",
                        command("sysctl", c("-n", "machdep.cpu.brand_string")), command("sysctl", c("-n", "hw.ncpu")),
                        round(as.numeric(command("sysctl", c("-n", "hw.memsize"))) / 2^30),
                        sub("^v", "", command("node", "--version")), R.version.string)
 
-charts <- c("### Where measurekit is slower", "",
-            chart(sprintf("Tasks that take more than %s times as long as the reference", SLOW), slow_entries, by_module = FALSE),
-            "A bar above the line takes longer than the reference, and md stands for multidimensional.", "",
-            "### Every task", "",
-            unlist(lapply(names(PACKAGES), function(package) {
-              unlist(lapply(chart_groups(results[[package]]), function(group) {
-                modules <- unique(vapply(group, function(entry) sub("\\..*$", "", entry$key), ""))
-                chart(sprintf("%s: %s", PACKAGES[[package]], paste(modules, collapse = ", ")), group)
-              }))
-            })))
+# The charts of a package: those of its tasks that take more than SLOW times as long as their reference, if any, and every
+# task of the package, in groups of modules.
+charts <- function(package) {
+  slow <- Filter(function(entry) !is.na(entry$ratio) && entry$ratio > SLOW, results[[package]])
+  slow <- slow[order(-vapply(slow, function(entry) entry$ratio, 0))]
+  note <- paste0("A bar above the line takes longer than the reference",
+                 if (package == "psychometrics") ", and md stands for multidimensional." else ".")
+  c(if (length(slow) > 0) c("### Where measurekit is slower", "",
+                            chart(sprintf("Tasks that take more than %s times as long as the reference", SLOW), slow,
+                                  by_module = FALSE),
+                            note, ""),
+    "### Every task", "",
+    unlist(lapply(chart_groups(results[[package]]), function(group) {
+      chart(paste(unique(vapply(group, function(entry) sub("\\..*$", "", entry$key), "")), collapse = ", "), group)
+    })))
+}
 
 # --- Tables ---------------------------------------------------------------------------------------------------------------
 
@@ -147,17 +149,15 @@ section <- function(package) {
                             if (is.na(entry$ratio)) "" else cell(sprintf("%s×", format(signif(entry$ratio, 2), scientific = FALSE, trim = TRUE)))))
     if (!is.null(entry$note)) notes <- c(notes, sprintf("- %s: %s.", entry$task, entry$note))
   }
-  c(sprintf("### %s", PACKAGES[[package]]), "",
+  c(environment, "",
     "| Task | Size | measurekit (ms) | Reference | Reference (ms) | Ratio |",
     "| ---- | ---- | --------------: | --------- | -------------: | ----: |", rows, "",
     if (length(notes) > 0) c(notes, ""))
 }
 
-tables <- c(environment, "", unlist(lapply(names(PACKAGES), function(package) if (length(results[[package]]) == 0) NULL else section(package))))
+# --- The pages ------------------------------------------------------------------------------------------------------------
 
-# --- The document ---------------------------------------------------------------------------------------------------------
-
-# Replaces what lies between the markers of a document with `text`.
+# Replaces what lies between the markers of a page with `text`.
 replace_between <- function(lines, name, text) {
   first <- which(lines == sprintf("<!-- %s -->", name))
   last <- which(lines == sprintf("<!-- /%s -->", name))
@@ -165,8 +165,12 @@ replace_between <- function(lines, name, text) {
   c(lines[seq_len(first)], "", text, lines[last:length(lines)])
 }
 
-lines <- readLines(DOCUMENT)
-lines <- replace_between(lines, "charts", charts)
-lines <- replace_between(lines, "tables", tables)
-writeLines(lines, DOCUMENT)
-message("Wrote the charts and tables of ", DOCUMENT)
+for (package in PACKAGES) {
+  if (length(results[[package]]) == 0) next
+  document <- sprintf("docs/%s/performance.md", package)
+  lines <- readLines(document)
+  lines <- replace_between(lines, "charts", charts(package))
+  lines <- replace_between(lines, "tables", section(package))
+  writeLines(lines, document)
+  message("Wrote the charts and tables of ", document)
+}

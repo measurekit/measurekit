@@ -25,7 +25,7 @@ flowchart LR
 - **Resource use.** Time and memory grow with the size of the input; what would grow faster than it has a limit in
   [Default limits](#default-limits). Limit the size of data accepted from untrusted sources before analyzing it on a server:
   a response matrix or a log takes at most about 50 times the bytes of its JSON, a Q-matrix or a diagnostic pool of a few
-  hundred bytes up to 300 MB within the limits ([peak memory](docs/performance.md#peak-memory)). The computations that the
+  hundred bytes up to 300 MB within the limits ([peak memory](docs/psychometrics/performance.md#memory) of psychometrics and [of knowledge tracing](docs/knowledge-tracing/performance.md#memory)). The computations that the
   sections below name take time that grows faster than their limits bound: run them on data from users in a worker with a
   deadline, and end the worker when it passes.
 - **Randomness.** `createRandom` is a seeded generator for reproducible simulation and splits. It is not cryptographically

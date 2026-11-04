@@ -1,7 +1,7 @@
 // The size of every entry point of the packages bundled alone, as a host's bundler makes it, with code splitting on, and
 // the modules it holds.
 // `test/entry-sizes.test.ts` checks them against `size-budgets.ts`; `node scripts/entry-sizes.ts` prints them as the table
-// of docs/performance.md.
+// of docs/<package>/performance.md.
 
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";

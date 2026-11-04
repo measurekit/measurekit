@@ -99,7 +99,7 @@ jobs:
 
           // A change to these reaches no job but check (and a test of scripts, for what SCRIPT_TESTED names).
           const NOT_CHECKED =
-            /^(\.changeset\/|\.github\/(?!workflows\/ci\.yml$)|[^/]+\.md$|LICENSE$|biome\.json$|biome\/|cspell\.json$|knip\.json$|typedoc\.json$|lefthook\.yml$|\.editorconfig$|docs\/(diagrams\.css|performance\.md)$|validation\/(?!benchmarks\/))/;
+            /^(\.changeset\/|\.github\/(?!workflows\/ci\.yml$)|[^/]+\.md$|LICENSE$|biome\.json$|biome\/|cspell\.json$|knip\.json$|typedoc\.json$|lefthook\.yml$|\.editorconfig$|docs\/(diagrams\.css|[^/]+\/performance\.md)$|validation\/(?!benchmarks\/))/;
           // The scripts that only check, or are checked by the tests of scripts. Every other script, bench-harness.ts, serves the
           // tests and the benchmarks of the packages.
           const OWN_SCRIPTS =
@@ -123,7 +123,8 @@ jobs:
             if (SCRIPT_TESTED.test(file)) scriptTests = true;
             if (top === "packages" && members.has(`packages/${name}`)) touched.add(`packages/${name}`);
             else if ((top === "examples" || top === "compat") && members.has(top)) touched.add(top);
-            else if (top === "docs" && third !== undefined && members.has(`packages/${name}`)) guides = true;
+            else if (top === "docs" && third !== undefined && third !== "performance.md" && members.has(`packages/${name}`))
+              guides = true;
             else if (file === "README.md") guides = true;
             else if (top === "validation" && name === "benchmarks") benchmarks = true;
             else if (SAMPLE_SCRIPTS.test(file)) guides = scriptTests = true;
@@ -220,7 +221,7 @@ jobs:
         run: pnpm test --project ${{ matrix.project }} --coverage --coverage.include='packages/${{ matrix.project }}/src/**'
 
   # The benchmarks of the packages, on seeded data. The job fails when the fastest sample of a benchmark is above its budget
-  # (docs/performance.md). Its last green run took 13 minutes, within a third of its limit.
+  # (docs/<package>/performance.md). Its last green run took 13 minutes, within a third of its limit.
   bench:
     needs: changes
     if: needs.changes.outputs.bench == 'true'

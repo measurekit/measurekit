@@ -268,7 +268,7 @@ pair; // => { compared: 8, identicalCorrect: 3, identicalIncorrect: 3, significa
 | Counts of the K index: groups × categories of all items | 2²⁴                   | Counts, and a weight per group and item: up to 165 MB for 2,895 items                |
 
 Time grows with the pairs. On 40 items of 5 options a pair takes about 1.5 µs for ω, 2 µs for the generalized binomial
-test, 15 µs for M4 and 3 µs for the K index ([performance](../performance.md)); M4 grows with the cube of the compared
+test, 15 µs for M4 and 3 µs for the K index ([performance](performance.md)); M4 grows with the cube of the compared
 items, the test with their square, and the others linearly. The K index also counts every response once.
 
 ## Errors

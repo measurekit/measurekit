@@ -13,7 +13,7 @@ export interface EntryBudget {
  * The budget of every entry point of the packages, bundled alone as a host's bundler makes it: minified, with
  * `export *` of the entry. The size is 1.25 times the size measured after gzip, rounded up to the next 500 bytes; the
  * modules are those it holds, which the import rules of AGENTS.md allow, so that an import that pulls another module
- * into an entry point fails until the list says so. docs/performance.md lists them. A budget changes only with the
+ * into an entry point fails until the list says so. docs/<package>/performance.md lists them. A budget changes only with the
  * reason in the commit that changes it.
  */
 export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {

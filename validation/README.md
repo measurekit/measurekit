@@ -192,18 +192,89 @@ uv pip install --python validation/knowledge-tracing/.venv -r validation/knowled
 
 ## Benchmarks
 
-`benchmarks.R` and `benchmarks.py` time the references on the tasks of the benchmarks of measurekit
-([performance](../docs/performance.md)). Each script of `validation/benchmarks/<package>/` simulates the inputs, writes
-them to `packages/<package>/test/fixtures/bench-<module>.json` and times the reference on them with one thread:
-
-```bash
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R               # every module
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R irt mokken    # the modules named
-validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py                  # pyBKT
-Rscript validation/benchmarks.R table                                                   # the charts and tables of docs/performance.md
-```
+`benchmarks.R` and `benchmarks.py` time the references on the tasks of the benchmarks of measurekit, whose times, ratios
+and budgets are on the performance page of each package: [core](../docs/core/performance.md),
+[psychometrics](../docs/psychometrics/performance.md) and [knowledge tracing](../docs/knowledge-tracing/performance.md).
+Each script of `validation/benchmarks/<package>/` simulates the inputs, writes them to
+`packages/<package>/test/fixtures/bench-<module>.json` and times the reference on them with one thread.
 
 They need the packages of the scripts above, and for the tasks of
 `validation/benchmarks/` psych, TAM, nlme, metafor, pROC, irr, equate, equateIRT, difR, rms, GDINA, NPCD, catR, cdcatR,
 mirtCAT, pks, DAKS, kst, sets, eRm and CopyDetect, installed as above, in its library on `R_LIBS`, as for
 `similarity.R`; similarity's references take about 10 minutes. The results go to `validation/benchmarks/results/`, which git ignores.
+
+### Method
+
+```mermaid
+flowchart LR
+  S["validation/benchmarks.R: simulate the inputs"] --> F[("bench-module.json fixtures")]
+  F --> M["measurekit: test/module.bench.ts, Vitest"]
+  F --> R["References: R packages, one thread"]
+  F --> P["pyBKT: validation/benchmarks.py"]
+  F --> Q["RSMTool: validation/benchmarks/automated-scoring.py"]
+  M --> T["Tables and charts of docs/<package>/performance.md"]
+  R --> T
+  P --> T
+  Q --> T
+  M --> B["Budgets: the fastest sample, in CI"]
+```
+
+Each benchmark times the hot path of a module, and the same task on the same data in the reference implementation that the
+validation of each package uses: an R package, base R where no package does the task, or pyBKT. The ratio is
+the time of measurekit over the time of the reference, so a ratio above 1 means that measurekit is slower. A ratio above
+1.5 is in bold in the tables.
+
+| Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Data       | `validation/benchmarks.R` simulates the inputs with a fixed seed, or takes a public dataset, and writes them to `packages/<package>/test/fixtures/bench-<module>.json`. measurekit and its reference read the same data.                                                                                                                                                                                                                                                                                       |
+| measurekit | `packages/<package>/test/<module>.bench.ts`, run by Vitest on Node.js with one thread, against the build of the package, which `pnpm bench` makes first: Vitest's module runner turns each import of a source file into a getter that the compiler cannot inline, so that it times a call of a small function several times as slow as it is for a user. A benchmark takes at least 10 samples, or 5 when it takes a second or more, after a warm-up. The tables give the median of the medians of three runs. |
+| References | `validation/benchmarks/<package>/<module>.R`, run with one thread: `OPENBLAS_NUM_THREADS=1` and `OMP_NUM_THREADS=1` set R's BLAS. A task takes 15 samples under a second, 7 under 15 seconds, 3 under a minute and 2 above, after one call to warm up.                                                                                                                                                                                                                                                         |
+| pyBKT      | `validation/benchmarks.py`, on the log of `bench-bkt.json`, with its processes off. It times what R does not.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| RSMTool    | `validation/benchmarks/automated-scoring.py`, in the environment of `validation/psychometrics/automated-scoring.py`, on the scores of `rater-automated-scoring.json`. It writes `python-scoring.json`, which `table` reads with `python.json`.                                                                                                                                                                                                                                                                 |
+| Settings   | A reference runs with the settings that make its work that of measurekit: the same quadrature, convergence tolerance and starts. The notes under a table name where they differ.                                                                                                                                                                                                                                                                                                                               |
+| Order      | On a machine shared with other work, the runs of measurekit and of its reference alternate, three of each, so that the load falls on both; the times are the medians of the three.                                                                                                                                                                                                                                                                                                                             |
+| Ratio      | The median of measurekit over the median of the reference.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+An EM calibration stops when its estimates stop changing, so two programs that agree on the criterion can need different
+numbers of iterations: the ratio is that of the time to the same answer, not of one iteration. The ability estimators and the
+replays compare the work for each person, and the notes say where the reference does less.
+
+### Running
+
+```bash
+pnpm install
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R               # the inputs and the references
+validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py                  # pyBKT
+validation/psychometrics/.venv-scoring/bin/python -I validation/benchmarks/automated-scoring.py  # RSMTool
+pnpm bench                                                                              # measurekit, against the budgets
+```
+
+`Rscript validation/benchmarks.R irt mokken` runs the modules named, and `knowledge-tracing/irt` one module of a package.
+To refresh the charts and tables, run each package with the JSON reporter three times, with the run number in the name of the
+file, after a run of the references each time, whose `results/r.json` is copied to `results/r-1.json` and so on, then
+`Rscript validation/benchmarks.R table`, which takes the median of the runs of each side:
+
+```bash
+pnpm --filter @measurekit/core bench --reporter json --outputFile validation/benchmarks/results/measurekit-core-1.json
+pnpm --filter @measurekit/psychometrics bench --reporter json --outputFile validation/benchmarks/results/measurekit-psychometrics-1.json
+pnpm --filter @measurekit/knowledge-tracing bench --reporter json --outputFile validation/benchmarks/results/measurekit-knowledge-tracing-1.json
+Rscript validation/benchmarks.R table   # the charts and tables of docs/<package>/performance.md
+```
+
+### Budgets
+
+A benchmark fails when its fastest sample is above its budget, which is in `packages/<package>/test/budgets.ts`. The fastest
+sample is the least affected by the other work of a shared machine. The budget of a time is five times the fastest sample that
+the CI runner took, rounded up to one significant digit, the one rule of STANDARDS.md section 11: the median, over the green
+runs of the `bench` job of 2026-11-03 and 2026-11-04 (three to eight for each benchmark), of the fastest sample of each run.
+The sample is the runner's, because the gate runs there, and the budget is absolute, so it holds for the runner's class of
+machine: the runner took a median of 2.4 times as long as a laptop with an Apple M5, from 0.35 times (`ctt.mcdonaldOmega`)
+to 5.9 times as long (`numerics.logistic`), so a budget holds on a machine up to about five times slower than the runner,
+and on a slower one only the ratios to the references apply, which are documented and not gated, as R does not run on the
+runner. The factor allows for the noise of a shared runner, whose fastest samples of one benchmark differed by a median of
+1.8 times and by up to 8.6 times (`bkt.fitPairs`) between those runs; every budget stands at least 2.3 times above the
+slowest of those samples. It is far below the cost of the changes that the budgets exist to catch. A benchmark that the
+runner has not taken, or took only before its code changed, has five times its fastest sample on the laptop, times the
+median ratio of the runner's fastest samples to the laptop's for the other benchmarks of its module, rounded up to one
+significant digit, until the runner's samples replace it; `budgets.ts` marks it. A budget changes only with the reason in
+the commit that changes it.

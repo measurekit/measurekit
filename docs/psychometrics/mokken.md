@@ -27,7 +27,7 @@ from 1 to 5 work as scores from 0 to 4. Scores may span at most 10 categories, a
 `ResponseMatrix`. Every function but `twoWayImputation` and `personScalability` compares every pair of items, so it takes
 at most 1,000 items, the limit of the analyses of pairs of items in [dimensionality](dimensionality.md#correlations):
 at that limit the coefficients of `scalability` and the indices of `conditionalAssociation` hold a million entries, up
-to about 150 MB ([peak memory](../performance.md#peak-memory)). Their time grows with the pairs times the persons, and
+to about 150 MB ([peak memory](performance.md#memory)). Their time grows with the pairs times the persons, and
 that of `conditionalAssociation`, whose W1 conditions every pair on a third item, with the cube of the items times the
 persons, 14 s for 1,000 items of 8 persons: on matrices from users, run them in a worker with a deadline.
 

@@ -260,7 +260,7 @@ the model expects, as items that share a stimulus, has a large chi-square and a 
 
 Both statistics give every pair of items, so each takes at most 1,000 items, the limit of the analyses of pairs of items
 in [dimensionality](dimensionality.md#correlations): at that limit `localDependenceChiSquare` returns 499,500 pairs, about
-200 MB, and `yenQ3` a matrix of a million entries ([peak memory](../performance.md#peak-memory)). Their time grows with
+200 MB, and `yenQ3` a matrix of a million entries ([peak memory](performance.md#memory)). Their time grows with
 the pairs times the persons. The tables of `localDependenceChiSquare` hold a cell for each pair of categories of each
 pair of items, at most 2^24 cells in all: two items of 4,096 categories, or 579 items of 10, which take about a second
 and, for the two items, 260 MB.

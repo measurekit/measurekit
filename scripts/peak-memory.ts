@@ -3,7 +3,7 @@
 // same process that parses it and does not. Each process has a heap bounded to the case's `heap`, so that a reading that
 // keeps more alive at once fails, whenever the collector runs and however busy the machine is; the budget of the rise bounds
 // what the heap does not hold, the buffers of typed arrays. `test/peak-memory.test.ts` checks each case; `node
-// scripts/peak-memory.ts` prints the rises, the median of three pairs, as the table of docs/performance.md, and `node
+// scripts/peak-memory.ts` prints the rises, the median of three pairs, as the tables of docs/<package>/performance.md, and `node
 // scripts/peak-memory.ts --heap` the least heap in which each reading ends, from which `heap` is chosen.
 
 import { spawnSync } from "node:child_process";
@@ -17,7 +17,7 @@ const PACKAGES = resolve(import.meta.dirname, "../packages");
 const LIBRARIES = ["psychometrics", "knowledge-tracing"] as const;
 const MEGABYTE = 2 ** 20;
 /**
- * The heap of the processes whose rise the table of docs/performance.md gives, in MiB: above V8's default, as the rise that a
+ * The heap of the processes whose rise the tables of docs/<package>/performance.md give, in MiB: above V8's default, as the rise that a
  * host sees depends on when the collector runs, which a bounded heap brings forward.
  */
 const TABLE_HEAP = 8192;
@@ -39,7 +39,7 @@ type Libraries = Readonly<Record<(typeof LIBRARIES)[number], any>>;
  * before the reading, such as a response matrix, and the reading.
  */
 interface ReaderCase {
-  /** The reader and its input, as the table of docs/performance.md names them. */
+  /** The reader and its input, as the tables of docs/<package>/performance.md name them. */
   readonly name: string;
   /**
    * The most that the reading may add to the peak, in megabytes: twice the largest rise measured on Node.js 22 and 24, on

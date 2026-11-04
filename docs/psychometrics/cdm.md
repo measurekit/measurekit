@@ -132,7 +132,7 @@ the machine epsilon. Responses are 0 or 1; missing ones are skipped.
 | Success probabilities with `standardErrors` | 3,162 over all items      | An item of k attributes has 2^k, and their information matrix has p² cells: 80 MB at the limit                                                                    |
 
 The memory is the rise of the peak of a process over two iterations of EM on two persons, measured as
-[performance](../performance.md#peak-memory) says; persons add no more, as the posteriors are summed person by person. A
+[performance](performance.md#memory) says; persons add no more, as the posteriors are summed person by person. A
 Q-matrix of a few hundred bytes reaches these limits. Applications fall well within them: TIMSS 2007's 25 items of 15
 attributes (Lee, Park and Taylan, 2011), as CDM ships them, hold 819,200 cells and 262 latent groups.
 

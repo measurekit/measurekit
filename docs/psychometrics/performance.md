@@ -1,19 +1,37 @@
-# Performance
+# Performance of psychometrics
 
-## Ratios
+What the hot paths of `@measurekit/psychometrics` cost against their references, how much each entry point adds to a
+bundle, and the memory that each reader of untrusted input needs on its worst input. A budget holds each number and
+fails a gate of CI: `pnpm bench` for the time, `pnpm test` for the size and the memory.
+
+```mermaid
+flowchart LR
+  speed["Each hot path against its reference<br/>pnpm bench"] --> time["Budget of the fastest sample<br/>packages/psychometrics/test/budgets.ts"]
+  size["Each entry point bundled alone<br/>pnpm test"] --> gzip["Gzip budget and the modules it may hold<br/>scripts/size-budgets.ts"]
+  memory["Peak memory of each reader<br/>of untrusted input, pnpm test"] --> heap["Heap and rise of each case<br/>scripts/peak-memory.ts"]
+```
+
+## Speed
+
+Each benchmark times the hot path of each module against its reference in R, or RSMTool for the evaluation of automated
+scores, on the same data, with one thread. The ratio is the time of measurekit over the time of the reference: above 1,
+measurekit is slower, and above 1.5 the row is in bold. A benchmark fails `pnpm bench` when its fastest sample is above
+its budget in `packages/psychometrics/test/budgets.ts`: five times the fastest sample of the CI runner, rounded up to
+one significant digit, as STANDARDS.md section 11 sets every budget. How each side is timed, how the budgets were
+measured and how to refresh this page are in [validation](../../validation/README.md#benchmarks).
 
 <!-- charts -->
 
 ### Where measurekit is slower
 
 ```mermaid
-%%{init: {"xyChart": {"height": 286, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 218, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
   title "Tasks that take more than 1.5 times as long as the reference"
-  x-axis ["fit.rootMeanSquareDeviation", "cdm.attributeProfiles", "numerics.cholesky", "logistic.fitItems"]
+  x-axis ["fit.rootMeanSquareDeviation", "cdm.attributeProfiles"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 6
-  bar [5.5, 2.7, 2.3, 1.6]
-  line [1, 1, 1, 1]
+  bar [5.5, 2.7]
+  line [1, 1]
 ```
 
 A bar above the line takes longer than the reference, and md stands for multidimensional.
@@ -21,19 +39,9 @@ A bar above the line takes longer than the reference, and md stands for multidim
 ### Every task
 
 ```mermaid
-%%{init: {"xyChart": {"height": 320, "xAxis": {"labelFontSize": 11}}}}%%
-xychart-beta horizontal
-  title "Core: numerics, random"
-  x-axis ["normalQuantile", "logistic", "cholesky", "uniform", "normal"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 3
-  bar [0.76, 0.45, 2.3, 1, 0.76]
-  line [1, 1, 1, 1, 1]
-```
-
-```mermaid
 %%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: multidimensional"
+  title "multidimensional"
   x-axis ["calibrateBifactor12", "calibrateBifactor40", "calibrateLongitudinal", "calibrateConfirmatory", "calibrateGraded", "calibrateExploratory", "calibrateGroups", "calibrateMhrm", "estimateMode", "estimateMean", "estimateLikelihood", "estimateWeighted", "rotateOblimin", "rotateVarimax"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.052, 0.088, 0.043, 0.3, 0.16, 0.55, 0.16, 0.7, 0.045, 0.65, 0.05, 0.017, 0.13, 0.28]
@@ -43,7 +51,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 796, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: cat"
+  title "cat"
   x-axis ["likelihoodWeightedInformation", "posteriorWeightedInformation", "expectedInformation", "expectedPosteriorVariance", "kullbackLeibler", "posteriorKullbackLeibler", "discriminationIndex", "posteriorDiscriminationIndex", "closestDifficulty", "progressive", "proportional", "simulateClassification", "simulateSprt", "simulateAdaptive", "simulateDiagnostic", "simulateMultidimensional", "multistageCuts", "contentBoundsStep", "assembleForms"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.00017, 0.00017, 0.13, 0.00016, 0.008, 0.008, 0.036, 0.033, 0.029, 0.1, 0.27, 0.02, 0.034, 0.017, 0.031, 0.012, 0.45, 0.024, 0.001]
@@ -53,7 +61,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 762, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: cdm, ctt"
+  title "cdm, ctt"
   x-axis ["modelFit", "itemFit", "calibrateGdina", "calibrateDina", "calibrateDino", "calibrateAcdm", "calibrateLlm", "calibrateRrum", "attributeProfiles", "accuracy", "validateQMatrix", "nonparametric", "compareItemModels", "calibrateGdinaStandardErrors", "itemStatistics", "cronbachAlpha", "mcdonaldOmega", "subscoreValue"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 3
   bar [0.58, 0.027, 0.8, 0.48, 0.6, 0.2, 0.17, 0.31, 2.7, 0.45, 1, 0.062, 0.0065, 0.83, 0.2, 0.037, 0.62, 0.018]
@@ -63,7 +71,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 660, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: data, dif, dimensionality"
+  title "data, dif, dimensionality"
   x-axis ["scoreResponses", "irtLikelihoodRatio", "rajuArea", "sibtest", "mantelHaenszel", "logisticRegression", "lordChiSquare", "lordChiSquarePurified", "ordinalLogistic", "maximumLikelihoodFactors", "omegaHierarchical", "polychoricCorrelations", "parallelAnalysis", "exploratoryFactorAnalysis", "minimumAveragePartial"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.91, 0.24, 0.67, 0.15, 0.06, 0.53, 0.73, 0.72, 0.38, 0.26, 0.48, 0.0064, 0.0032, 0.33, 0.1]
@@ -73,7 +81,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 728, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: equating, explanatory"
+  title "equating, explanatory"
   x-axis ["kernel", "linkCovariance", "linkedErrors", "linear", "equipercentile", "presmoothing", "bootstrapLinear", "tucker", "frequencyEstimation", "chainedEquipercentile", "stockingLordLinking", "haebaraLinking", "trueScore", "irtObservedScore", "linearChange", "itemFeatureRegression", "lltm"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.0098, 0.22, 0.52, 0.00083, 0.008, 0.031, 0.097, 0.0044, 0.0039, 0.015, 0.04, 0.032, 0.018, 0.13, 0.0031, 0.017, 0.24]
@@ -83,7 +91,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: fit, generalizability"
+  title "fit, generalizability"
   x-axis ["andersenTest", "martinLofTest", "raschWaldTest", "itemFit", "personFit", "summedScoreFit", "yenQ3", "correctedPersonFit", "kernelItemCurves", "limitedInformationFit", "rootMeanSquareDeviation", "localDependenceChiSquare", "generalizabilityStudy", "generalizabilityStudyUnbalanced"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 6
   bar [0.068, 0.1, 0.042, 0.079, 0.23, 0.13, 0.044, 0.55, 0.084, 0.16, 5.5, 0.033, 0.0026, 0.021]
@@ -93,7 +101,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 796, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: irt"
+  title "irt"
   x-axis ["conditionalRasch", "conditionalPartialCredit", "conditionalRatingScale", "calibrateUnfolding", "calibrate1pl", "calibrate2pl", "calibrate3pl", "calibrate2plCrossProduct", "calibrate2plHessian", "calibrateGraded", "calibrateGpcm", "calibrateTestlets", "abilityPosteriorMean", "abilityPosteriorMode", "abilityMaximumLikelihood", "abilityWeightedLikelihood", "jointMaximumLikelihood", "testInformation", "calibrate2plLatentRegression"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.042, 0.014, 0.071, 0.007, 0.74, 0.51, 0.5, 0.28, 0.012, 0.26, 0.19, 0.0031, 0.62, 0.064, 0.11, 0.015, 0.33, 0.41, 0.21]
@@ -103,7 +111,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 762, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: mokken, rater"
+  title "mokken, rater"
   x-axis ["personScalability", "guttmanErrors", "conditionalAssociation", "twoWayImputation", "scalability", "automatedItemSelection", "monotonicity", "invariantItemOrdering", "automatedScoring", "automatedScoringGroups", "cohenKappa", "fleissKappa", "exactAgreement", "adjacentAgreement", "meanDifference", "intraclassCorrelation", "manyFacetRasch", "manyFacetRaschInteractions"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.031, 0.00054, 0.01, 0.14, 0.011, 0.03, 0.17, 0.19, 0.028, 0.033, 0.3, 0.0081, 0.061, 0.064, 1.3, 0.0029, 1.2, 0.64]
@@ -113,7 +121,7 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 422, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: responseTime, scaling, sim, similarity"
+  title "responseTime, scaling, sim, similarity"
   x-axis ["calibrateResponseTimes", "drawJointThetas", "simulateResponses", "selectPairs", "omegaIndex", "generalizedBinomialTest", "m4Index", "kIndex"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.038, 0.97, 0.37, 0.11, 0.0013, 0.0021, 0.0003, 0.000026]
@@ -123,54 +131,20 @@ xychart-beta horizontal
 ```mermaid
 %%{init: {"xyChart": {"height": 184, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Psychometrics: standardSetting"
+  title "standardSetting"
   x-axis ["livingstonLewis"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
   bar [0.81]
   line [1]
 ```
 
-```mermaid
-%%{init: {"xyChart": {"height": 490, "xAxis": {"labelFontSize": 11}}}}%%
-xychart-beta horizontal
-  title "Knowledge tracing: bkt, elo, evaluate, irt"
-  x-axis ["fit", "fitSkills", "fitLessons", "fitPairs", "replay", "replay", "auc", "metricsByOpportunity", "replay", "drift"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.0042, 0.019, 0.0057, 0.0056, 0.024, 0.59, 0.28, 0.27, 0.15, 0.035]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-```
-
-```mermaid
-%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
-xychart-beta horizontal
-  title "Knowledge tracing: kst, logistic"
-  x-axis ["unionClosure", "structureBase", "clauseStructure", "blim", "iita", "mdml", "identifiability", "validity", "diffTest", "features", "fitItems", "fitManyItems", "searchRates", "afm"]
-  y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.0078, 0.000037, 0.0011, 0.81, 0.000015, 0.51, 1.2, 0.008, 0.00026, 0.67, 1.6, 0.75, 0.23, 0.025]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-```
-
 <!-- /charts -->
 
-## Results
+### Results
 
 <!-- tables -->
 
 Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R version 4.6.1 (2026-06-24).
-
-### Core
-
-| Task                       | Size                              | measurekit (ms) | Reference            | Reference (ms) |    Ratio |
-| -------------------------- | --------------------------------- | --------------: | -------------------- | -------------: | -------: |
-| Normal quantile function   | 1,000,000 probabilities           |            4.16 | stats 4.6.1 `qnorm`  |           5.44 |    0.76× |
-| Logistic function          | 1,000,000 points                  |            2.37 | stats 4.6.1 `plogis` |           5.22 |    0.45× |
-| **Cholesky factorization** | A correlation matrix of order 200 |           0.267 | base 4.6.1 `chol`    |          0.118 | **2.3×** |
-| Uniform draws              | 1,000,000 draws                   |            3.09 | stats 4.6.1 `runif`  |           3.00 |       1× |
-| Normal draws               | 1,000,000 draws                   |            8.84 | stats 4.6.1 `rnorm`  |           11.6 |    0.76× |
-
-- Cholesky factorization: R's LAPACK calls OpenBLAS, whose kernels add and multiply two doubles per instruction and fuse each pair; JavaScript has neither. measurekit's loops share their reads across a block of 4 rows and 3 columns, and the same loops in C compiled without vector instructions or fused multiply-add take 0.77 times as long as measurekit's and, compiled with both, 0.48 times as long.
-
-### Psychometrics
 
 | Task                                                                                                             | Size                                                                                                         | measurekit (ms) | Reference                                                                                                 | Reference (ms) |     Ratio |
 | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------: | --------------------------------------------------------------------------------------------------------- | -------------: | --------: |
@@ -361,62 +335,18 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 - The pairs of the persons who share a room: base R forms each pair both ways, and measurekit once.
 - Livingston and Lewis's accuracy and consistency by one cut: LL.CA integrates by integrate's default relative tolerance, about 1.2e-4, and measurekit to 1e-12; at LL.CA's tolerance measurekit takes about a quarter of LL.CA's time.
 
-### Knowledge tracing
-
-| Task                                                                                                                                  | Size                                             | measurekit (ms) | Reference                                 | Reference (ms) |     Ratio |
-| ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------: | ----------------------------------------- | -------------: | --------: |
-| Fit of the skills of a log by EM from five starts                                                                                     | 20,000 attempts of 200 learners at 5 skills      |            64.0 | pyBKT 1.4.3 `Model.fit`                   |         15,248 |   0.0042× |
-| Fit of the skills of a log by EM from five starts, each learner at 20 of many skills                                                  | 20,000 attempts of 500 learners at 400 skills    |             433 | pyBKT 1.4.3 `Model.fit`                   |         22,659 |    0.019× |
-| Fit of the skills of a log by EM from five starts, a fifth of its attempts without an outcome                                         | 20,000 attempts of 200 learners at 5 skills      |             104 | pyBKT 1.4.3 `Model.fit`, correct = -1     |         18,297 |   0.0057× |
-| Fit of the skills of a log by EM from five starts, learn and forget rates by pair of items                                            | 20,000 attempts of 200 learners at 5 skills      |             147 | pyBKT 1.4.3 `Model.fit(multipair = True)` |         26,031 |   0.0056× |
-| Replay of the log through the fitted model, a prediction and an update for each attempt                                               | 20,000 attempts of 200 learners at 5 skills      |            11.7 | pyBKT 1.4.3 `Model.predict`               |            491 |    0.024× |
-| Replay of a log through the learner-item Elo model                                                                                    | 100,000 attempts of 2,000 learners at 400 items  |            17.9 | base R, a loop over the attempts          |           30.5 |     0.59× |
-| The area under the ROC curve                                                                                                          | 100,000 predictions                              |            9.09 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           32.0 |     0.28× |
-| The AUC, RMSE, log-loss and accuracy of the predictions                                                                               | 100,000 predictions                              |            13.9 | none                                      |                |           |
-| The metrics of predictions by opportunity, over all skills and for each skill                                                         | 50,000 events of 2,000 learners at 5 skills      |            17.9 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           66.0 |     0.27× |
-| Replay of the responses of learners, the grid posterior of the ability updated after each                                             | 2,000 learners, 40 responses each                |             272 | mirt 1.48 `fscores(method = "EAP")`       |          1,777 |     0.15× |
-| Replay of the responses of learners, the posterior advanced by drift and updated after each                                           | 200 learners, 40 responses each, 241 points      |             199 | base R, the forward pass in logs          |          5,642 |    0.035× |
-| Closure under union of the 12 atoms of a space                                                                                        | 12 elements, 125 states                          |           0.090 | kst 0.5.6 `kspace`                        |           11.6 |   0.0078× |
-| Base of a space                                                                                                                       | 12 elements, 125 states                          |           0.059 | kst 0.5.6 `kbase`                         |          1,614 | 0.000037× |
-| Space of clauses, by enumeration of the subsets in base R                                                                             | 12 elements, 4096 subsets                        |           0.369 | base R `expand.grid` and `apply`          |            338 |   0.0011× |
-| Quasi-ordinal space of a cycle of prerequisites, each element requiring the next                                                      | 1,000 elements                                   |            10.4 | none                                      |                |           |
-| Fit of the basic local independence model of a chain of 12 items by EM                                                                | 1,000 persons, 12 items, 13 states               |            20.6 | pks 0.8.0 `blim`                          |           25.5 |     0.81× |
-| Inductive item tree analysis of the responses                                                                                         | 1,000 persons, 12 items                          |            1.13 | DAKS 2.1.3 `iita(v = 1)`                  |         73,057 | 0.000015× |
-| Fit of the basic local independence model of a chain of 12 items by minimum discrepancy maximum likelihood                            | 1,000 persons, 12 items, 13 states               |            58.4 | pks 0.8.0 `blim(method = "MDML")`         |            115 |     0.51× |
-| Rank of the Jacobian of the pattern probabilities of the model of a chain of 12 items                                                 | 12 items, 13 states, 36 parameters               |            12.7 | pks 0.8.0 `jacobian` and `qr`             |           10.8 |      1.2× |
-| Validity of the chain against the responses: gamma, violational coefficient, solution rates, discrepancy index and distance agreement | 1,000 persons, 12 items, 13 states               |            1.09 | kst 0.5.6 `kvalidate`                     |            136 |    0.008× |
-| Test of the fit of the chain of 6 items to the responses                                                                              | 1,000 persons, 6 items                           |           0.481 | DAKS 2.1.3 `z_test(v = 1)`                |          1,850 |  0.00026× |
-| Test of one edge of the chain of 12 items, on responses with 3 in 10 missing                                                          | 1,000 persons, 12 items                          |            1.55 | none                                      |                |           |
-| The 16 features of LKT's other names, before each event                                                                               | 1,941 events of 17 learners, 16 features         |            38.5 | LKT 1.7.0 `computefeatures`               |           57.0 |     0.67× |
-| **Fit with an intercept for each skill and item, a proficiency for each learner and a ridge of 1**                                    | 20,000 events of 200 learners at 1,000 items     |            38.9 | LiblineaR 2.10.26 `LiblineaR(type = 0)`   |           24.5 |  **1.6×** |
-| Fit with an intercept for each skill and item, a proficiency for each learner and a ridge of 1                                        | 150,000 events of 3,000 learners at 49,546 items |             286 | LiblineaR 2.10.26 `LiblineaR(type = 0)`   |            381 |     0.75× |
-| Search for the decay of a proportion of successes and the exponent of a recency                                                       | 3,600 events of 60 learners at 4 skills, 2 rates |             149 | LKT 1.7.0 `LKT(seedpars = c(0.5, 0.5))`   |            643 |     0.23× |
-| Fit of the additive factors model by maximum likelihood                                                                               | 20,000 attempts of 200 learners at 5 skills      |            10.7 | base R `glm`, binomial family             |            426 |    0.025× |
-| The candidates ranked by their distance to the band of success of a learner                                                           | 500 candidate items, an Elo model                |           0.044 | none                                      |                |           |
-| A log built from and checked for events                                                                                               | 100,000 events                                   |            14.3 | none                                      |                |           |
-
-- Fit of the skills of a log by EM from five starts, each learner at 20 of many skills: pyBKT stops a start when the log-likelihood changes by at most 0.005, or after 100 iterations, and measurekit at 1e-6 or 500, so measurekit runs more iterations: a median of 38 for a skill's best start, and 4 of the 400 skills reach 500.
-- Replay of the responses of learners, the grid posterior of the ability updated after each: mirt scores each of the 40 prefixes of the responses from the first; measurekit updates the posterior by the one response and predicts it. A scoring of the final patterns alone takes a fortieth of the time.
-- Space of clauses, by enumeration of the subsets in base R: no package takes clauses.
-- Fit of the basic local independence model of a chain of 12 items by minimum discrepancy maximum likelihood: pks and measurekit both stop within 1e-9 of the maximum: pks when no parameter changes by more than 1e-8, after 330 iterations, and measurekit when the log-likelihood changes by at most 1e-8, after 331. At pks's tolerance of 1e-4 it stops after 41 iterations, 2.5e-3 from the maximum.
-- Rank of the Jacobian of the pattern probabilities of the model of a chain of 12 items: pks's `jacobian` takes 10 ms and `qr` 1 ms, measurekit's Jacobian 5 ms and its rank 10 ms: the rank orthogonalizes each column twice by Gram-Schmidt in JavaScript, where `qr` runs Householder reflections in compiled Fortran.
-- The 16 features of LKT's other names, before each event: measurekit replays the log once with every feature in one model.
-- Fit with an intercept for each skill and item, a proficiency for each learner and a ridge of 1: the time of the reference includes the features and the design from the events, as measurekit's does; both stop at the gradient that LiblineaR reaches at epsilon 0.0001 (0.0074 at 1,000 items, 0.22 at 50,000), where measurekit takes 1.6 and 0.75 times as long: its solver is JavaScript, each Hessian-vector product taking 3.5 times as long as the same loop in C, and its features and design take 0.7 and 0.4 times as long as the reference's; at its default gradient of 1e-8 it takes 1.7 times as long as at these.
-- Search for the decay of a proportion of successes and the exponent of a recency: each fit of the search is one of LiblineaR in LKT and one of Newton's method in measurekit.
-- Fit of the additive factors model by maximum likelihood: the proficiency of a learner is a fixed effect, as measurekit's default is none.
-
 <!-- /tables -->
 
-## Iterations
+### Iterations
 
-The iterations that each EM calibration of the tables needed to reach its tolerance, on the data of the benchmark. A ratio
-of times is the product of a ratio of iterations and a ratio of the time of one. The one-parameter to the generalized partial
-credit calibrations, the multidimensional ones, the many-facet Rasch model and the linear logistic test model of
-measurekit extrapolate EM with SQUAREM, as mirt does with Ramsay's method; the others run plain EM. Every EM iteration
-counts, those that follow an extrapolation included. EM stops when an iteration changes no parameter by more than the
-tolerance, which leaves the estimates some distance from the maximum, more where EM contracts slowly. Extrapolated, they
-stop closer to it than plain EM does, by up to about 1e-3 at the default tolerance (the confirmatory 2PL is 1.3e-4 from
-the maximum, was 4.8e-4); at a tolerance of 1e-8 both are at it.
+The iterations that each EM calibration of the tables needed to reach its tolerance, on the data of the benchmark. A
+ratio of times is the product of a ratio of iterations and a ratio of the time of one. The one-parameter to the
+generalized partial credit calibrations, the multidimensional ones, the many-facet Rasch model and the linear logistic
+test model of measurekit extrapolate EM with SQUAREM, as mirt does with Ramsay's method; the others run plain EM. Every
+EM iteration counts, those that follow an extrapolation included. EM stops when an iteration changes no parameter by
+more than the tolerance, which leaves the estimates some distance from the maximum, more where EM contracts slowly.
+Extrapolated, they stop closer to it than plain EM does, by up to about 1e-3 at the default tolerance (the confirmatory
+2PL is 1.3e-4 from the maximum, was 4.8e-4); at a tolerance of 1e-8 both are at it.
 
 | Calibration                         | measurekit | Reference |
 | ----------------------------------- | ---------: | --------: |
@@ -435,199 +365,100 @@ the maximum, was 4.8e-4); at a tolerance of 1e-8 both are at it.
 | LLM                                 |         52 |        61 |
 | R-RUM                               |         53 |        27 |
 
-## Method
-
-```mermaid
-flowchart LR
-  S["validation/benchmarks.R: simulate the inputs"] --> F[("bench-module.json fixtures")]
-  F --> M["measurekit: test/module.bench.ts, Vitest"]
-  F --> R["References: R packages, one thread"]
-  F --> P["pyBKT: validation/benchmarks.py"]
-  F --> Q["RSMTool: validation/benchmarks/automated-scoring.py"]
-  M --> T["Tables and charts of this page"]
-  R --> T
-  P --> T
-  Q --> T
-  M --> B["Budgets: the fastest sample, in CI"]
-```
-
-Each benchmark times the hot path of a module, and the same task on the same data in the reference implementation that the
-[validation](psychometrics/validation.md) uses: an R package, base R where no package does the task, or pyBKT. The ratio is
-the time of measurekit over the time of the reference, so a ratio above 1 means that measurekit is slower. A ratio above
-1.5 is in bold in the tables.
-
-| Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Data       | `validation/benchmarks.R` simulates the inputs with a fixed seed, or takes a public dataset, and writes them to `packages/<package>/test/fixtures/bench-<module>.json`. measurekit and its reference read the same data.                                                                                                                                                                                                                                                                                       |
-| measurekit | `packages/<package>/test/<module>.bench.ts`, run by Vitest on Node.js with one thread, against the build of the package, which `pnpm bench` makes first: Vitest's module runner turns each import of a source file into a getter that the compiler cannot inline, so that it times a call of a small function several times as slow as it is for a user. A benchmark takes at least 10 samples, or 5 when it takes a second or more, after a warm-up. The tables give the median of the medians of three runs. |
-| References | `validation/benchmarks/<package>/<module>.R`, run with one thread: `OPENBLAS_NUM_THREADS=1` and `OMP_NUM_THREADS=1` set R's BLAS. A task takes 15 samples under a second, 7 under 15 seconds, 3 under a minute and 2 above, after one call to warm up.                                                                                                                                                                                                                                                         |
-| pyBKT      | `validation/benchmarks.py`, on the log of `bench-bkt.json`, with its processes off. It times what R does not.                                                                                                                                                                                                                                                                                                                                                                                                  |
-| RSMTool    | `validation/benchmarks/automated-scoring.py`, in the environment of `validation/psychometrics/automated-scoring.py`, on the scores of `rater-automated-scoring.json`. It writes `python-scoring.json`, which `table` reads with `python.json`.                                                                                                                                                                                                                                                                 |
-| Settings   | A reference runs with the settings that make its work that of measurekit: the same quadrature, convergence tolerance and starts. The notes under a table name where they differ.                                                                                                                                                                                                                                                                                                                               |
-| Order      | On a machine shared with other work, the runs of measurekit and of its reference alternate, three of each, so that the load falls on both; the times are the medians of the three.                                                                                                                                                                                                                                                                                                                             |
-| Ratio      | The median of measurekit over the median of the reference.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-
-An EM calibration stops when its estimates stop changing, so two programs that agree on the criterion can need different
-numbers of iterations: the ratio is that of the time to the same answer, not of one iteration. The ability estimators and the
-replays compare the work for each person, and the notes say where the reference does less.
-
-## Running
-
-```bash
-pnpm install
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R               # the inputs and the references
-validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py                  # pyBKT
-validation/psychometrics/.venv-scoring/bin/python -I validation/benchmarks/automated-scoring.py  # RSMTool
-pnpm bench                                                                              # measurekit, against the budgets
-```
-
-`Rscript validation/benchmarks.R irt mokken` runs the modules named, and `knowledge-tracing/irt` one module of a package.
-To refresh the charts and tables, run each package with the JSON reporter three times, with the run number in the name of the
-file, after a run of the references each time, whose `results/r.json` is copied to `results/r-1.json` and so on, then
-`Rscript validation/benchmarks.R table`, which takes the median of the runs of each side:
-
-```bash
-pnpm --filter @measurekit/core bench --reporter json --outputFile validation/benchmarks/results/measurekit-core-1.json
-pnpm --filter @measurekit/psychometrics bench --reporter json --outputFile validation/benchmarks/results/measurekit-psychometrics-1.json
-pnpm --filter @measurekit/knowledge-tracing bench --reporter json --outputFile validation/benchmarks/results/measurekit-knowledge-tracing-1.json
-Rscript validation/benchmarks.R table
-```
-
-## Budgets
-
-A benchmark fails when its fastest sample is above its budget, which is in `packages/<package>/test/budgets.ts`. The fastest
-sample is the least affected by the other work of a shared machine. The budget of a time is five times the fastest sample that
-the CI runner took, rounded up to one significant digit, the one rule of STANDARDS.md section 11: the median, over the green
-runs of the `bench` job of 2026-11-03 and 2026-11-04 (three to eight for each benchmark), of the fastest sample of each run.
-The sample is the runner's, because the gate runs there, and the budget is absolute, so it holds for the runner's class of
-machine: the runner took a median of 2.4 times as long as a laptop with an Apple M5, from 0.35 times (`ctt.mcdonaldOmega`)
-to 5.9 times as long (`numerics.logistic`), so a budget holds on a machine up to about five times slower than the runner,
-and on a slower one only the ratios to the references apply, which are documented and not gated, as R does not run on the
-runner. The factor allows for the noise of a shared runner, whose fastest samples of one benchmark differed by a median of
-1.8 times and by up to 8.6 times (`bkt.fitPairs`) between those runs; every budget stands at least 2.3 times above the
-slowest of those samples. It is far below the cost of the changes that the budgets exist to catch. A benchmark that the
-runner has not taken, or took only before its code changed, has five times its fastest sample on the laptop, times the
-median ratio of the runner's fastest samples to the laptop's for the other benchmarks of its module, rounded up to one
-significant digit, until the runner's samples replace it; `budgets.ts` marks it. A budget changes only with the reason in
-the commit that changes it.
-
-## Sizes
+## Size
 
 Each entry point bundled alone, as a host's bundler makes it: minified with esbuild and code splitting on, `export *` of
 the entry, core from its sources. The bytes and the modules are those of the entry chunk and the chunks it imports
-statically, which load with it; a module that a dynamic `import()` loads later is a chunk of its own and is not counted. The modules each holds are those the import rules of [AGENTS.md](../AGENTS.md#dependencies) allow it, so
-that importing one module never pulls in the others; a module of a library is a folder of its `src/`, or `checks` and
-`model` for the files of those names. Every package declares `sideEffects: false`, so a named import from the root of a
-library holds only what that name needs: `cronbachAlpha` from `@measurekit/psychometrics` bundles to 3.3 KB, with
-`ctt`, `data`, `math` and core.
+statically, which load with it; a module that a dynamic `import()` loads later is a chunk of its own and is not counted.
+The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it. Every package
+declares `sideEffects: false`, so a named import from the root of the library holds only what that name needs:
+`cronbachAlpha` from `@measurekit/psychometrics` bundles to 3.5 KB minified, 1.4 KB after gzip, with `ctt`, `data`,
+`math` and core.
 
 | Entry point                                  | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own                          |
 | -------------------------------------------- | ---------------: | -----------: | --------------------------------------------------------- |
-| `@measurekit/core`                           |           14,392 |        5,888 | nothing                                                   |
-| `@measurekit/psychometrics`                  |          534,735 |      178,334 | every module of the package, and core                     |
-| `@measurekit/psychometrics/cat`              |           72,752 |       24,236 | core, cdm, checks, data, irt, math, multidimensional, sim |
-| `@measurekit/psychometrics/cdm`              |           43,762 |       15,959 | core, checks, data, irt, math                             |
-| `@measurekit/psychometrics/change`           |            5,451 |        2,336 | core, checks                                              |
-| `@measurekit/psychometrics/ctt`              |           22,043 |        8,382 | core, data, math                                          |
-| `@measurekit/psychometrics/data`             |            6,694 |        2,354 | core                                                      |
-| `@measurekit/psychometrics/dif`              |           94,478 |       32,496 | core, data, equating, irt, math                           |
-| `@measurekit/psychometrics/dimensionality`   |           38,604 |       14,301 | core, data, math                                          |
-| `@measurekit/psychometrics/equating`         |           61,294 |       20,877 | core, checks, irt, math                                   |
-| `@measurekit/psychometrics/explanatory`      |           50,565 |       17,622 | core, data, irt, math                                     |
-| `@measurekit/psychometrics/fit`              |          117,868 |       40,060 | core, checks, data, irt, math, sim                        |
-| `@measurekit/psychometrics/generalizability` |           14,727 |        5,484 | core, data, math                                          |
-| `@measurekit/psychometrics/irt`              |           84,439 |       28,486 | core, checks, data, math                                  |
-| `@measurekit/psychometrics/mokken`           |           32,971 |       12,182 | core, data, math                                          |
-| `@measurekit/psychometrics/multidimensional` |          135,603 |       44,060 | core, checks, data, irt, math                             |
-| `@measurekit/psychometrics/parameterization` |           18,255 |        5,958 | core, irt, multidimensional                               |
-| `@measurekit/psychometrics/rater`            |           67,369 |       23,006 | core, checks, data, fit, irt, math                        |
-| `@measurekit/psychometrics/response-time`    |           57,760 |       19,438 | core, checks, data, irt, math                             |
-| `@measurekit/psychometrics/scaling`          |           31,492 |       11,659 | core, checks, equating, irt, math                         |
-| `@measurekit/psychometrics/sim`              |           20,767 |        6,982 | core, cdm, checks, data, irt, multidimensional            |
-| `@measurekit/psychometrics/similarity`       |           23,146 |        8,805 | core, checks, data, irt, math                             |
-| `@measurekit/psychometrics/standard-setting` |           33,321 |       12,350 | core, checks, equating, irt, math                         |
-| `@measurekit/knowledge-tracing`              |          139,280 |       47,118 | every module of the package, and core                     |
-| `@measurekit/knowledge-tracing/bkt`          |           23,282 |        8,302 | core, data, math                                          |
-| `@measurekit/knowledge-tracing/data`         |            5,818 |        2,297 | core, math                                                |
-| `@measurekit/knowledge-tracing/elo`          |            6,638 |        2,326 | core, data, math                                          |
-| `@measurekit/knowledge-tracing/evaluate`     |           17,192 |        6,294 | core, data, math, model                                   |
-| `@measurekit/knowledge-tracing/irt`          |           13,907 |        5,436 | core, data, math                                          |
-| `@measurekit/knowledge-tracing/kst`          |           44,310 |       15,692 | core, data, math                                          |
-| `@measurekit/knowledge-tracing/logistic`     |           48,974 |       16,162 | core, data, math, model                                   |
-| `@measurekit/knowledge-tracing/practice`     |            6,222 |        2,323 | core, data, model                                         |
-| `@measurekit/knowledge-tracing/sim`          |            4,510 |        1,683 | core, data, model                                         |
+| `@measurekit/psychometrics`                  |          576,059 |      192,731 | every module of the package, and core                     |
+| `@measurekit/psychometrics/cat`              |           75,174 |       25,109 | core, cdm, checks, data, irt, math, multidimensional, sim |
+| `@measurekit/psychometrics/cdm`              |           44,456 |       16,262 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/change`           |            5,790 |        2,518 | core, checks                                              |
+| `@measurekit/psychometrics/ctt`              |           22,896 |        8,748 | core, data, math                                          |
+| `@measurekit/psychometrics/data`             |            7,148 |        2,522 | core                                                      |
+| `@measurekit/psychometrics/dif`              |           94,478 |       32,480 | core, data, equating, irt, math                           |
+| `@measurekit/psychometrics/dimensionality`   |           39,464 |       14,720 | core, data, math                                          |
+| `@measurekit/psychometrics/equating`         |           64,412 |       22,006 | core, checks, irt, math                                   |
+| `@measurekit/psychometrics/explanatory`      |           51,512 |       17,997 | core, data, irt, math                                     |
+| `@measurekit/psychometrics/fit`              |          118,124 |       40,292 | core, checks, data, irt, math, sim                        |
+| `@measurekit/psychometrics/generalizability` |           15,272 |        5,656 | core, data, math                                          |
+| `@measurekit/psychometrics/irt`              |           90,656 |       30,543 | core, checks, data, math                                  |
+| `@measurekit/psychometrics/mokken`           |           33,502 |       12,463 | core, data, math                                          |
+| `@measurekit/psychometrics/multidimensional` |          136,972 |       44,536 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/parameterization` |           18,264 |        5,992 | core, irt, multidimensional                               |
+| `@measurekit/psychometrics/rater`            |           67,369 |       23,000 | core, checks, data, fit, irt, math                        |
+| `@measurekit/psychometrics/response-time`    |           58,806 |       19,809 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/scaling`          |           35,667 |       13,221 | core, checks, equating, irt, math                         |
+| `@measurekit/psychometrics/sim`              |           21,511 |        7,251 | core, cdm, checks, data, irt, multidimensional            |
+| `@measurekit/psychometrics/similarity`       |           23,305 |        8,945 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/standard-setting` |           34,317 |       12,776 | core, checks, equating, irt, math                         |
 
 `scripts/test/entry-sizes.test.ts`, which `pnpm test --project scripts` runs without a build, bundles each entry point
 and fails when it takes more than its budget after gzip, or holds a module that its budget in `scripts/size-budgets.ts`
-does not list, or when a named import from the root of a library holds more than the subpath of its module. A budget is
-1.25 times the size measured after gzip, rounded up to the next 500 bytes. `node scripts/entry-sizes.ts` prints this
-table.
+does not list. A budget is 1.25 times the size measured after gzip, rounded up to the next 500 bytes. `node
+scripts/entry-sizes.ts` prints the sizes; the table gives them on Node.js 22, the version of the runner, and the gzip of
+Node.js 26 is up to 1.2 percent less.
 
-## Peak memory
+## Memory
 
 What each reader of untrusted input adds to the peak resident memory of a Node.js process, on its worst inputs within
-the limits of [SECURITY.md](../SECURITY.md): the peak of a process that parses the input from JSON and reads it, less
+the limits of [SECURITY.md](../../SECURITY.md): the peak of a process that parses the input from JSON and reads it, less
 the peak of the same process that parses it and does not, the median of three pairs run one after the other. Each reader
 grows in proportion to its input, but for the designs of cognitive diagnosis, the analyses of the pairs of items that
-hold a matrix of them, and the analyses of the relations between the elements of a knowledge structure, whose limits
-bound them, the statistics of pairs of items of fit and of Mokken scales, which their limit of 1,000 items bounds, and
-the selection of pairs of persons, M4 and the K index of answer similarity, which their limits bound.
+hold a matrix of them, whose limits bound them, the statistics of pairs of items of fit and of Mokken scales, which
+their limit of 1,000 items bounds, and the selection of pairs of persons, M4 and the K index of answer similarity, which
+their limits bound.
 
-| Reader                             | Input                                                          | JSON (MB) | Peak added (MB)             |
-| ---------------------------------- | -------------------------------------------------------------- | --------- | --------------------------- |
-| `buildResponseMatrix`              | 1,000 persons, 1,000 items                                     | 1.9       | below the peak of the parse |
-| `buildResponseMatrix`              | 1 person, 1,000,000 items, with the ids it gives them          | 1.9       | 86                          |
-| `buildResponseMatrix`              | 1,000,000 persons, 1 item, with the ids it gives them          | 3.8       | 94                          |
-| `buildResponseMatrix` with `times` | 1,000 persons, 1,000 items                                     | 4.6       | 49                          |
-| `buildResponseMatrixFromColumns`   | 1,000 persons, 1,000 items                                     | 1.9       | 23                          |
-| `buildResponseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items             | 43        | 106                         |
-| `buildResponseRecords`             | 1,000,000 records, each of its own person and item             | 48        | 421                         |
-| `scoreResponses`                   | 1,000 persons, 1,000 items of 4 options                        | 3.8       | 8                           |
-| `calibrate` of records             | 200,000 records of 100,000 items, two persons each             | 9.9       | 440                         |
-| `qMatrixIdentifiability`           | A Q-matrix of 100,000 items of 20 attributes                   | 12        | 62                          |
-| `calibrateCdm`                     | 128 items of 11 of 15 attributes, the most cells and groups    | 0.010     | 160 to 230 by run           |
-| `calibrateMultidimensional`        | 8 dichotomous items, 2 persons, 10⁶ nodes                      | 0.0002    | 310                         |
-| `calibrateMultidimensional`        | The same, 3 dimensions, exploratory, standard errors           | 0.0002    | 650 to 750 by run           |
-| `calibrateBifactor`                | 1,000 persons, two-tier, 40 items, standard errors             | 0.09      | 620 to 670 by run           |
-| `generalizabilityStudy`            | 1,000,000 scores of 6 facets of 10 elements                    | 87        | 125                         |
-| `generalizabilityStudy`            | The same with one score missing, `unbalanced`                  | 87        | 301                         |
-| `exploratoryFactorAnalysis`        | 1,000 items of 40 persons, the most a matrix of items takes    | 0.08      | 152                         |
-| `omegaHierarchical`                | 1,000 items of 40 persons                                      | 0.08      | 148                         |
-| `mcdonaldOmega`                    | 1,000 items of 40 persons                                      | 0.08      | 118                         |
-| `buildEventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items             | 72        | 79                          |
-| `buildEventLog`                    | 1,000,000 events, each of its own learner, item and skill      | 82        | 171                         |
-| `bkt` with stored parameters       | 100,000 skills                                                 | 6.6       | 56                          |
-| `kst` with a structure             | 10,000 states of 64 items                                      | 1.9       | 1                           |
-| `iita`                             | 1,000,000 events, each of its own learner and item             | 77        | 270                         |
-| `iita`                             | 1,000 items, 276 learners: 24 candidates of 23.9 million cells | 19        | 259                         |
-| `diffTest`                         | 1,000 items, 200 learners                                      | 14        | 38                          |
-| `structureValidity`                | 1,000 items, 200 learners, a chain                             | 14        | 42                          |
-| `surmiseStructure`                 | 1,000 elements, 12 free and a class of 988: 8,192 states       | 0.02      | 138                         |
-| `kst`, its masks                   | 4,096 sets of 16 skills, 65,536 states                         | 0.33      | 173                         |
-| `manyFacetRasch`                   | 1,994 persons, 997 raters: 1,000 parameters, one EM iteration  | 0.26      | 66 to 77 by run             |
-| `personScalability`                | 2 persons, 1,000,000 items, from their response matrix         | 3.8       | 195                         |
-| `localDependenceChiSquare`         | 2 persons, 1,000 2PL items, the most: 499,500 pairs            | 0.028     | 102 to 228 by version, OS   |
-| `localDependenceChiSquare`         | 2 graded items of 4,096 categories, the most cells             | 0.1       | 132 to 262 by version, OS   |
-| `summedScoreFit`                   | 2 persons, 300 2PL items, the highest total score              | 0.008     | 5 to 9 by version, OS       |
-| `yenQ3`                            | 2 persons, 1,000 2PL items, the most                           | 0.028     | 14 to 22 by version, OS     |
-| `scalability`                      | 200 persons of distinct patterns, 1,000 items, the most        | 0.4       | 75 to 117 by version, OS    |
-| `conditionalAssociation`           | 8 persons, 1,000 items, the most                               | 0.015     | 141                         |
-| `assembleForms`                    | 8,191 forms of the one item of a pool, the most counts         | 0.0001    | 223 to 288 by version, OS   |
-| `createDiagnosticAdaptiveTest`     | 128 items of 11 of 15 attributes, the most cells and groups    | 1.0       | 55 to 90 by run             |
-| `selectPairs`                      | 10,000 persons in 50 groups of 200, the most: 995,000 pairs    | 0.2       | 136 to 157 by version, OS   |
-| `m4Index`                          | 2 persons, 1,000 2PL items, the most                           | 0.028     | 13 to 22 by version, OS     |
-| `kIndex`                           | 2,896 persons, 0 to 2,895 incorrect each, the most cells       | 16        | 95 to 165 by version, OS    |
+| Reader                             | Input                                                         | JSON (MB) | Peak added (MB)             |
+| ---------------------------------- | ------------------------------------------------------------- | --------- | --------------------------- |
+| `buildResponseMatrix`              | 1,000 persons, 1,000 items                                    | 1.9       | below the peak of the parse |
+| `buildResponseMatrix`              | 1 person, 1,000,000 items, with the ids it gives them         | 1.9       | 86                          |
+| `buildResponseMatrix`              | 1,000,000 persons, 1 item, with the ids it gives them         | 3.8       | 94                          |
+| `buildResponseMatrix` with `times` | 1,000 persons, 1,000 items                                    | 4.6       | 49                          |
+| `buildResponseMatrixFromColumns`   | 1,000 persons, 1,000 items                                    | 1.9       | 23                          |
+| `buildResponseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items            | 43        | 106                         |
+| `buildResponseRecords`             | 1,000,000 records, each of its own person and item            | 48        | 421                         |
+| `scoreResponses`                   | 1,000 persons, 1,000 items of 4 options                       | 3.8       | 8                           |
+| `calibrate` of records             | 200,000 records of 100,000 items, two persons each            | 9.9       | 440                         |
+| `qMatrixIdentifiability`           | A Q-matrix of 100,000 items of 20 attributes                  | 12        | 62                          |
+| `calibrateCdm`                     | 128 items of 11 of 15 attributes, the most cells and groups   | 0.010     | 160 to 230 by run           |
+| `calibrateMultidimensional`        | 8 dichotomous items, 2 persons, 10⁶ nodes                     | 0.0002    | 310                         |
+| `calibrateMultidimensional`        | The same, 3 dimensions, exploratory, standard errors          | 0.0002    | 650 to 750 by run           |
+| `calibrateBifactor`                | 1,000 persons, two-tier, 40 items, standard errors            | 0.09      | 620 to 670 by run           |
+| `generalizabilityStudy`            | 1,000,000 scores of 6 facets of 10 elements                   | 87        | 125                         |
+| `generalizabilityStudy`            | The same with one score missing, `unbalanced`                 | 87        | 301                         |
+| `exploratoryFactorAnalysis`        | 1,000 items of 40 persons, the most a matrix of items takes   | 0.08      | 152                         |
+| `omegaHierarchical`                | 1,000 items of 40 persons                                     | 0.08      | 148                         |
+| `mcdonaldOmega`                    | 1,000 items of 40 persons                                     | 0.08      | 118                         |
+| `manyFacetRasch`                   | 1,994 persons, 997 raters: 1,000 parameters, one EM iteration | 0.26      | 66 to 77 by run             |
+| `personScalability`                | 2 persons, 1,000,000 items, from their response matrix        | 3.8       | 195                         |
+| `localDependenceChiSquare`         | 2 persons, 1,000 2PL items, the most: 499,500 pairs           | 0.028     | 102 to 228 by version, OS   |
+| `localDependenceChiSquare`         | 2 graded items of 4,096 categories, the most cells            | 0.1       | 132 to 262 by version, OS   |
+| `summedScoreFit`                   | 2 persons, 300 2PL items, the highest total score             | 0.008     | 5 to 9 by version, OS       |
+| `yenQ3`                            | 2 persons, 1,000 2PL items, the most                          | 0.028     | 14 to 22 by version, OS     |
+| `scalability`                      | 200 persons of distinct patterns, 1,000 items, the most       | 0.4       | 75 to 117 by version, OS    |
+| `conditionalAssociation`           | 8 persons, 1,000 items, the most                              | 0.015     | 141                         |
+| `assembleForms`                    | 8,191 forms of the one item of a pool, the most counts        | 0.0001    | 223 to 288 by version, OS   |
+| `createDiagnosticAdaptiveTest`     | 128 items of 11 of 15 attributes, the most cells and groups   | 1.0       | 55 to 90 by run             |
+| `selectPairs`                      | 10,000 persons in 50 groups of 200, the most: 995,000 pairs   | 0.2       | 136 to 157 by version, OS   |
+| `m4Index`                          | 2 persons, 1,000 2PL items, the most                          | 0.028     | 13 to 22 by version, OS     |
+| `kIndex`                           | 2,896 persons, 0 to 2,895 incorrect each, the most cells      | 16        | 95 to 165 by version, OS    |
 
-A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or
+A reader of a matrix or of records takes at most about 50 times the bytes of its JSON, where it names a million items or
 persons itself, and 2 to 9 times where the input names them. A design of cognitive diagnosis, of a calibration or of an
 adaptive test's pool, takes up to about 300 MB from a few hundred bytes, which its limits stop there, by model and run:
-an additive model works on each latent group. The analyses of knowledge structures take up to
-about 260 MB within their limits: IITA's candidates from 19 MB of responses, and the masks of a model from a few hundred
-kilobytes of sets of skills. A statistic of every pair of items, local dependence, Yen's Q3 or a Mokken scale analysis,
-returns items² values, which their limit of 1,000 items stops at about 210 MB from 28 KB; the standard errors of
-Mokken's scalability add memory in proportion to the items times the persons' patterns. The many-facet Rasch model holds
-matrices of the square of its parameters, which its limit of 1,000 stops at 77 MB from 260 KB of scores; its time grows
-with their cube, 3.3 minutes to converge with standard errors there.
+an additive model works on each latent group. A statistic of every pair of items, local dependence, Yen's Q3 or a Mokken
+scale analysis, returns items² values, which their limit of 1,000 items stops at about 210 MB from 28 KB; the standard
+errors of Mokken's scalability add memory in proportion to the items times the persons' patterns. The many-facet Rasch
+model holds matrices of the square of its parameters, which its limit of 1,000 stops at 77 MB from 260 KB of scores; its
+time grows with their cube, 3.3 minutes to converge with standard errors there.
 
 A calibration of several dimensions holds tables over its grid, whose limit stops them at 310 MB, and at 700 MB with the
 standard errors of an exploratory model. The standard errors of a bifactor model keep, for each pattern of the responses
@@ -635,10 +466,11 @@ to a specific dimension's items, the mean scores of its items at each primary no
 on the grid of two primary dimensions take about 7 KB per response.
 
 `scripts/test/peak-memory.test.ts`, which `pnpm test --project scripts` runs without a build, measures the readers of
-`scripts/peak-memory.ts`, the worst rows of the table, from the sources, each in a pair of child processes whose heap is
-bounded, as STANDARDS.md section 7 asks: twice the least heap in which the reading ended on Node.js 22, 24 and 26, rounded up
-to 16 MiB, so that a reading that keeps more alive at once fails, whenever the collector runs and however busy the machine
-is. The test fails too when a reading adds more than its budget to the peak: twice the largest rise measured on Node.js 22 and
-24, on macOS and on Linux, rounded up to 10 MB, which bounds what the heap does not hold, the buffers of typed arrays. `node
-scripts/peak-memory.ts` prints the rises, the median of three pairs, with a heap of 8 GiB, as a host's process collects
-later than a bounded one, and `node scripts/peak-memory.ts --heap` the least heap of each reading.
+`scripts/peak-memory.ts`, the worst rows of the tables of each library, from the sources, each in a pair of child
+processes whose heap is bounded, as STANDARDS.md section 7 asks: twice the least heap in which the reading ended on
+Node.js 22, 24 and 26, rounded up to 16 MiB, so that a reading that keeps more alive at once fails, whenever the
+collector runs and however busy the machine is. The test fails too when a reading adds more than its budget to the peak:
+twice the largest rise measured on Node.js 22 and 24, on macOS and on Linux, rounded up to 10 MB, which bounds what the
+heap does not hold, the buffers of typed arrays. `node scripts/peak-memory.ts` prints the rises, the median of three
+pairs, with a heap of 8 GiB, as a host's process collects later than a bounded one, and `node scripts/peak-memory.ts
+--heap` the least heap of each reading.

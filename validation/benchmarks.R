@@ -2,11 +2,11 @@
 # validation/benchmarks/<package>/ writes the inputs of its tasks to packages/<package>/test/fixtures/bench-<module>.json,
 # which the benchmarks of measurekit read, and times the references on them. The results go to
 # validation/benchmarks/results/r.json, and `table` turns them, with the results of Vitest and of benchmarks.py, into
-# the table of docs/performance.md.
+# the charts and tables of docs/<package>/performance.md.
 #
 #   OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R            # every module
 #   OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript validation/benchmarks.R irt mokken # the modules named, or package/module
-#   Rscript validation/benchmarks.R table                                               # docs/performance.md
+#   Rscript validation/benchmarks.R table                                               # docs/<package>/performance.md
 #
 # The environment variables keep R's BLAS to one thread, which R cannot do once it has started.
 

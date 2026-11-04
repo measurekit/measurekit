@@ -9,6 +9,7 @@
     "notDocumented": true
   },
   "readme": "README.md",
+  "projectDocuments": ["../../docs/core/*.md"],
   "excludePrivate": true,
   "treatWarningsAsErrors": true
 }
