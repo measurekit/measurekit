@@ -1,4 +1,4 @@
-import { checkBoolean, checkOptions, chiSquareUpperTail, normalQuantile } from "@measurekit/core";
+import { checkBoolean, checkOptions, chiSquareUpperTail, type FieldNames, normalQuantile } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 
 import { type DifGroup, dichotomousData, type ItemCases, itemStatistics } from "./groups.js";
@@ -22,6 +22,8 @@ export interface MantelHaenszelOptions extends PurificationOptions {
    */
   readonly continuityCorrection?: boolean;
 }
+
+const MANTEL_HAENSZEL_OPTIONS: FieldNames<MantelHaenszelOptions> = { continuityCorrection: true, purify: true };
 
 /** Mantel-Haenszel DIF statistics of one item. */
 export interface MantelHaenszel {
@@ -105,7 +107,7 @@ export function mantelHaenszel(
   groups: readonly DifGroup[],
   options: MantelHaenszelOptions = {},
 ): DifAnalysis<MantelHaenszel> {
-  checkOptions(options);
+  checkOptions(options, MANTEL_HAENSZEL_OPTIONS);
   const { continuityCorrection = true, purify = false } = options;
   checkBoolean(continuityCorrection, "The option continuityCorrection");
   const data = dichotomousData(matrix, groups, "Mantel-Haenszel DIF");

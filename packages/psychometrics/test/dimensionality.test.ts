@@ -567,6 +567,7 @@ describe("polychoricCorrelations", () => {
     expect(() => polychoricCorrelations(matrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => polychoricCorrelations(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => polychoricCorrelations(matrix, { correction: JSON.parse('"0.5"') })).toThrow(
       'The option correction must be a non-negative number, found "0.5".',
     );
@@ -977,6 +978,7 @@ describe("parallelAnalysis", () => {
     expect(() => parallelAnalysis(matrix, random, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => parallelAnalysis(matrix, random, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => parallelAnalysis(matrix, random, options('{"correlation":"spearman"}'))).toThrow(
       'The option correlation must be "pearson" or "polychoric", found "spearman".',
     );

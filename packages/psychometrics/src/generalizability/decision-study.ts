@@ -7,6 +7,7 @@ import {
   checkRecord,
   DataError,
   describe,
+  type FieldNames,
   isNonEmptyString,
 } from "@measurekit/core";
 import { buildStructure, closeOver, type Effect, effectsOf, facetsOf, namesOf, type Structure } from "./structure.js";
@@ -37,6 +38,8 @@ export interface DecisionStudyOptions {
    */
   readonly nested?: Readonly<Record<string, readonly string[]>>;
 }
+
+const DECISION_STUDY_OPTIONS: FieldNames<DecisionStudyOptions> = { sampleSizes: true, fixed: true, nested: true };
 
 /** One effect of a decision study, with the share it contributes to the universe score and error variances. */
 export interface DecisionComponent {
@@ -101,7 +104,7 @@ export interface DecisionStudy {
  * @see {@link https://doi.org/10.1007/978-1-4757-3456-0 | Brennan (2001)}
  */
 export function decisionStudy(study: GeneralizabilityStudy, options: DecisionStudyOptions = {}): DecisionStudy {
-  checkOptions(options);
+  checkOptions(options, DECISION_STUDY_OPTIONS);
   const { sampleSizes = {}, fixed = [], nested = {} } = options;
   const { structure, variances } = checkStudy(study);
   const [object = "", ...facets] = structure.names;

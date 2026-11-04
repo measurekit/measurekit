@@ -1,4 +1,13 @@
-import { checkArray, checkFinite, checkRecord, DataError, describe, logGamma } from "@measurekit/core";
+import {
+  checkArray,
+  checkFinite,
+  checkOptions,
+  checkRecord,
+  DataError,
+  describe,
+  type FieldNames,
+  logGamma,
+} from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 import { adaptiveIntegral } from "../math/internal.js";
 import { checkCuts } from "./classification.js";
@@ -16,6 +25,12 @@ export interface LivingstonLewisOptions {
    */
   readonly minimum?: number;
 }
+
+const LIVINGSTON_LEWIS_OPTIONS: FieldNames<LivingstonLewisOptions> = {
+  reliability: true,
+  maximum: true,
+  minimum: true,
+};
 
 /** The accuracy and consistency of the classification into the scores below a cut and those at or above it. */
 export interface CutClassification {
@@ -103,6 +118,7 @@ export function livingstonLewisClassification(
   options: LivingstonLewisOptions,
 ): ScoreClassification {
   checkRecord(options, "Livingston and Lewis need options { reliability, maximum }");
+  checkOptions(options, LIVINGSTON_LEWIS_OPTIONS);
   const { reliability, maximum, minimum = 0 } = options;
   checkOpenUnitInterval(reliability, "The option reliability");
   checkFinite(maximum, "The option maximum");

@@ -214,3 +214,10 @@ numbers for each person; by default it returns their mastery, MAP and EAP profil
 
 The main function of every module has an example in its documentation, which a test runs against the values its
 comments state.
+
+Every function refuses an option it does not take, naming it, and so do the records of settings inside the options and in
+their place (priors, quadrature, thresholds, populations, bandwidths, content constraints, information targets, modules,
+designs, scales, Hofstee bounds and Beuk judgments): a misspelled name left its default in place unseen, as a
+calibration asked to hold `c` at 0.25 under a misspelled option estimated it at 0.68. `scaleConversion` takes the
+`lowest`, `highest` and `step` of a scale, not the scale, and a summed-score table and marginal reliability refuse
+`testlets`.

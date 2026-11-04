@@ -1,4 +1,4 @@
-import { checkArray, checkFinite, checkOptions, DataError, normalQuantile } from "@measurekit/core";
+import { checkArray, checkFinite, checkOptions, DataError, type FieldNames, normalQuantile } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 import { percentileRanks } from "./percentile-ranks.js";
 
@@ -46,6 +46,8 @@ export interface NormStatisticsOptions {
   readonly level?: number;
 }
 
+const NORM_STATISTICS_OPTIONS: FieldNames<NormStatisticsOptions> = { level: true };
+
 const DEFAULT_LEVEL = 0.95;
 /** The multiples of the SD that bound the stanines: half an SD wide, the fifth centered on the mean. */
 const STANINE_BOUNDARIES = [-1.75, -1.25, -0.75, -0.25, 0.25, 0.75, 1.25, 1.75];
@@ -69,7 +71,7 @@ const STANINE_BOUNDARIES = [-1.75, -1.25, -0.75, -0.25, 0.25, 0.75, 1.25, 1.75];
  */
 export function normStatistics(scores: readonly number[], options: NormStatisticsOptions = {}): NormStatistics {
   checkArray(scores, "The scores must be an array of numbers");
-  checkOptions(options);
+  checkOptions(options, NORM_STATISTICS_OPTIONS);
   const { level = DEFAULT_LEVEL } = options;
   checkOpenUnitInterval(level, "The option level");
   scores.forEach((score, index) => {

@@ -1086,6 +1086,9 @@ describe("ability estimation", () => {
     expect(() => abilityEstimates(buildResponseMatrix([[1]]), [], JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => abilityEstimates(buildResponseMatrix([[1]]), [], JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => abilityEstimates(buildResponseMatrix([[1]]), [], { estimator: JSON.parse("null") })).toThrow(
       "The estimator must be a function of items and responses, such as posteriorMeanEstimate, found null.",
     );
@@ -1110,12 +1113,21 @@ describe("ability estimation", () => {
     expect(() => posteriorMeanEstimate(ITEMS_2PL, responses, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => posteriorMeanEstimate(ITEMS_2PL, responses, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => posteriorMeanEstimate(ITEMS_2PL, responses, { prior: JSON.parse("null") })).toThrow(
       "The option prior must be an object { mean, sd }, found null.",
     );
     expect(() => posteriorMeanEstimate(ITEMS_2PL, responses, { quadrature: JSON.parse("null") })).toThrow(
       "The option quadrature must be an object { method, points }, found null.",
     );
+    expect(() => posteriorMeanEstimate(ITEMS_2PL, responses, { quadrature: JSON.parse('{"nodes":21}') })).toThrow(
+      'The option quadrature may hold only method and points, found "nodes".',
+    );
+    expect(() =>
+      posteriorMeanEstimate(ITEMS_2PL, responses, { prior: JSON.parse('{"mean":0,"sd":1,"df":3}') }),
+    ).toThrow('The option prior may hold only mean and sd, found "df".');
     expect(() => posteriorMeanEstimate(ITEMS_2PL, responses, { testlets: JSON.parse("{}") })).toThrow(
       "The option testlets must be an array of testlets, found an object.",
     );
@@ -1124,6 +1136,9 @@ describe("ability estimation", () => {
     );
     expect(() => weightedLikelihoodEstimate(ITEMS_2PL, responses, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => weightedLikelihoodEstimate(ITEMS_2PL, responses, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => posteriorModeEstimate(ITEMS_2PL, responses, { range: JSON.parse('[-6, "6"]') })).toThrow(
       'The upper bound of the range must be a finite number, found "6".',
@@ -1253,6 +1268,9 @@ describe("thetaPosterior", () => {
     expect(() => thetaPosterior(ITEMS_2PL, JSON.parse("null"))).toThrow("The responses must be an array, found null.");
     expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => thetaPosterior(ITEMS_2PL, [1, 0, 1, 0], { prior: JSON.parse('"normal"') })).toThrow(
       'The option prior must be an object { mean, sd }, found "normal".',
@@ -1548,6 +1566,7 @@ describe("calibrate", () => {
     const binary = buildResponseMatrix(rows);
     const options = { model: twoParameterLogistic };
     expect(() => calibrate(binary, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => calibrate(binary, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => calibrate(binary, { model: JSON.parse('{ "name": "2PL" }') })).toThrow(
       "The option model must be an IRT model such as twoParameterLogistic, found an object.",
     );
@@ -1719,6 +1738,7 @@ describe("calibrateWithCovariance", () => {
     expect(() => calibrateWithCovariance(matrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrateWithCovariance(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => calibrateWithCovariance(matrix, { ...options, standardErrors: JSON.parse('"full"') })).toThrow(
       'The option standardErrors must be "none", "hessian" or "cross-product", found "full".',
     );
@@ -2161,6 +2181,9 @@ describe("conditionalMaximumLikelihood", () => {
     expect(() => conditionalMaximumLikelihood(matrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => conditionalMaximumLikelihood(matrix, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => conditionalMaximumLikelihood(matrix, { model: JSON.parse('"RSM"') })).toThrow(DataError);
     expect(() => conditionalMaximumLikelihood(matrix, { tolerance: JSON.parse('"small"') })).toThrow(DataError);
     expect(() => conditionalMaximumLikelihood(JSON.parse("[]"))).toThrow(DataError);
@@ -2412,6 +2435,9 @@ describe("jointMaximumLikelihood", () => {
     );
     expect(() => jointMaximumLikelihood(buildResponseMatrix(rows), JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => jointMaximumLikelihood(buildResponseMatrix(rows), JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
   });
 });
@@ -3204,6 +3230,7 @@ describe("reliability", () => {
     expect(() => marginalReliability(ITEMS_2PL, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => marginalReliability(ITEMS_2PL, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => empiricalReliability(JSON.parse("null"))).toThrow(
       "Empirical reliability needs an array of estimates, found null.",
     );
@@ -3583,12 +3610,14 @@ describe("summedScoreTable", () => {
     }
   });
 
-  it("takes the prior and the quadrature but no testlets, which the table does not integrate out", () => {
+  it("takes the prior and the quadrature but refuses testlets, which the table does not integrate out", () => {
     const testlets = [{ items: ["item1", "item2"], sd: 1 }];
     // @ts-expect-error: a summed-score table assumes the items independent given theta.
-    summedScoreTable(ITEMS_2PL, { testlets });
+    expect(() => summedScoreTable(ITEMS_2PL, { testlets })).toThrow(
+      'There is no option "testlets": the options are prior and quadrature.',
+    );
     // @ts-expect-error: so does marginal reliability.
-    marginalReliability(ITEMS_2PL, { testlets });
+    expect(() => marginalReliability(ITEMS_2PL, { testlets })).toThrow('There is no option "testlets"');
   });
 
   it("rejects a form without items and invalid items", () => {
@@ -3600,6 +3629,7 @@ describe("summedScoreTable", () => {
       "A summed-score table needs an array of items, found an object.",
     );
     expect(() => summedScoreTable(ITEMS_2PL, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => summedScoreTable(ITEMS_2PL, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 });
 

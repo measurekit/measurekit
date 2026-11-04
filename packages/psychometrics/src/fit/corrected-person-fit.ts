@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { checkThetaPrior, type IrtItem, logProbability, type ThetaPrior } from "../irt/internal.js";
 import { checkItems, checkPersonThetas, isExtreme } from "./inputs.js";
@@ -24,6 +24,8 @@ export interface CorrectedPersonFitOptions {
    */
   readonly prior?: ThetaPrior;
 }
+
+const CORRECTED_PERSON_FIT_OPTIONS: FieldNames<CorrectedPersonFitOptions> = { estimator: true, prior: true };
 
 /** The corrected person fit of one person's responses. */
 export interface CorrectedPersonFit {
@@ -84,7 +86,7 @@ export function correctedPersonFit(
 ): readonly CorrectedPersonFit[] {
   checkItems(matrix, items);
   checkPersonThetas(matrix, thetas);
-  checkOptions(options);
+  checkOptions(options, CORRECTED_PERSON_FIT_OPTIONS);
   const { estimator = "maximum-likelihood", prior } = options;
   checkChoice(estimator, "The option estimator", ESTIMATORS);
   const { mean, sd } = checkThetaPrior(prior);

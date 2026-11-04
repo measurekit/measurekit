@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
+import { checkArray, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type DifData, type DifGroup, itemCasesOf, polytomousData } from "./groups.js";
 import { type DifAnalysis, type PurificationOptions, purified } from "./purification.js";
@@ -13,6 +13,8 @@ export interface MatchingOptions extends PurificationOptions {
    */
   readonly matching?: readonly (number | null)[];
 }
+
+const MATCHING_OPTIONS: FieldNames<MatchingOptions> = { matching: true, purify: true };
 
 /** The persons of an item's regressions, with their matching scores. */
 export interface MatchedCases {
@@ -42,7 +44,7 @@ export function matchedAnalysis<TItem>(
   statistics: (cases: MatchedCases, id: string) => TItem,
   flagged: (item: TItem) => boolean,
 ): DifAnalysis<{ readonly id: string } & TItem> {
-  checkOptions(options);
+  checkOptions(options, MATCHING_OPTIONS);
   const { purify = false, matching } = options;
   const data = polytomousData(matrix, groups, statistic);
   if (matching !== undefined) {

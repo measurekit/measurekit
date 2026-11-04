@@ -1,4 +1,4 @@
-import { checkFinite, checkOptions, DataError } from "@measurekit/core";
+import { checkFinite, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import { checkPairedScores } from "./paired-scores.js";
 
 /** Options of {@link normalizedGain}. */
@@ -6,6 +6,8 @@ export interface NormalizedGainOptions {
   /** The highest possible score of the test, which no score exceeds. */
   readonly maximum: number;
 }
+
+const NORMALIZED_GAIN_OPTIONS: FieldNames<NormalizedGainOptions> = { maximum: true };
 
 /** The normalized gain of a group and of each of its persons. */
 export interface NormalizedGain {
@@ -48,7 +50,7 @@ export function normalizedGain(
   options: NormalizedGainOptions,
 ): NormalizedGain {
   checkPairedScores(pre, post, 1);
-  checkOptions(options);
+  checkOptions(options, NORMALIZED_GAIN_OPTIONS);
   const { maximum } = options;
   checkFinite(maximum, "The option maximum");
   pre.forEach((score, person) => {

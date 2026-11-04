@@ -5,6 +5,7 @@ import {
   checkPositiveInteger,
   checkStopping,
   DataError,
+  type FieldNames,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
@@ -64,6 +65,16 @@ export interface ExploratoryFactorOptions extends PolychoricOptions {
    */
   readonly maxIterations?: number;
 }
+
+const EXPLORATORY_FACTOR_OPTIONS: FieldNames<ExploratoryFactorOptions> = {
+  factors: true,
+  correlation: true,
+  rotation: true,
+  extraction: true,
+  tolerance: true,
+  maxIterations: true,
+  correction: true,
+};
 
 /** The factors of a set of items. */
 export interface ExploratoryFactors {
@@ -145,7 +156,7 @@ export function exploratoryFactors(
   options: ExploratoryFactorOptions,
   analysis: string,
 ): FactorsOfData {
-  checkOptions(options);
+  checkOptions(options, EXPLORATORY_FACTOR_OPTIONS);
   const {
     factors,
     correlation = "pearson",

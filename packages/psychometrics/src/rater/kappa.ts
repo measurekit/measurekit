@@ -1,4 +1,11 @@
-import { checkChoice, checkOptions, DataError, type KappaWeights, kappaOfPairs } from "@measurekit/core";
+import {
+  checkChoice,
+  checkOptions,
+  DataError,
+  type FieldNames,
+  type KappaWeights,
+  kappaOfPairs,
+} from "@measurekit/core";
 import { completeRatings } from "./ratings.js";
 
 /** Options of {@link cohenKappa}. */
@@ -10,6 +17,8 @@ export interface CohenKappaOptions {
    */
   readonly weights?: KappaWeights;
 }
+
+const COHEN_KAPPA_OPTIONS: FieldNames<CohenKappaOptions> = { weights: true };
 
 const WEIGHTS: readonly KappaWeights[] = ["none", "linear", "quadratic"];
 
@@ -49,7 +58,7 @@ const WEIGHTS: readonly KappaWeights[] = ["none", "linear", "quadratic"];
  * ```
  */
 export function cohenKappa(ratings: readonly (readonly (number | null)[])[], options: CohenKappaOptions = {}): number {
-  checkOptions(options);
+  checkOptions(options, COHEN_KAPPA_OPTIONS);
   const { weights = "none" } = options;
   checkChoice(weights, "The option weights", WEIGHTS);
   const rows = completeRatings(ratings, "Cohen's kappa", {

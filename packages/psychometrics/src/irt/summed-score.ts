@@ -1,5 +1,5 @@
 import { checkOptions } from "@measurekit/core";
-import { checkThetaPrior, type ThetaIntegrationOptions } from "./ability.js";
+import { checkThetaPrior, THETA_INTEGRATION_OPTIONS, type ThetaIntegrationOptions } from "./ability.js";
 import { checkItemList } from "./items.js";
 import type { IrtItem } from "./model.js";
 import { quadratureRule } from "./quadrature.js";
@@ -37,7 +37,7 @@ export function summedScoreTable(
   options: ThetaIntegrationOptions = {},
 ): readonly SummedScoreEstimate[] {
   checkItemList(items, "A summed-score table");
-  checkOptions(options);
+  checkOptions(options, THETA_INTEGRATION_OPTIONS);
   const { mean, sd } = checkThetaPrior(options.prior);
   const { nodes, weights } = quadratureRule(options.quadrature, mean, sd);
   const likelihoods = scoreLikelihoods(items, nodes);

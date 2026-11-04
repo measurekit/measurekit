@@ -1,4 +1,4 @@
-import { checkOptions, checkPositiveInteger } from "@measurekit/core";
+import { checkOptions, checkPositiveInteger, type FieldNames } from "@measurekit/core";
 import { checkPredictions } from "./predictions.js";
 
 /** One bin of a calibration table: the predictions within its bounds and the outcomes of their events. */
@@ -27,6 +27,8 @@ export interface CalibrationOptions {
   readonly binCount?: number;
 }
 
+const CALIBRATION_OPTIONS: FieldNames<CalibrationOptions> = { binCount: true };
+
 /**
  * Returns a calibration table: predictions grouped into bins of equal width, with the mean prediction and the mean
  * outcome of each bin. A calibrated model's mean outcome is close to its mean prediction in every bin. Bin k of
@@ -43,7 +45,7 @@ export function calibrationCurve(
   outcomes: readonly number[],
   options: CalibrationOptions = {},
 ): readonly CalibrationBin[] {
-  checkOptions(options);
+  checkOptions(options, CALIBRATION_OPTIONS);
   const { binCount = DEFAULT_BIN_COUNT } = options;
   checkPredictions(predictions, outcomes);
   checkPositiveInteger(binCount, "The number of bins");

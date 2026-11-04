@@ -1,4 +1,13 @@
-import { checkArray, checkChoice, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
+import {
+  checkArray,
+  checkChoice,
+  checkFields,
+  checkOptions,
+  checkRecord,
+  DataError,
+  describe,
+  type FieldNames,
+} from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import {
   type AbilityEstimator,
@@ -30,6 +39,8 @@ export interface MultistageModule {
   readonly cuts?: readonly number[];
 }
 
+const MULTISTAGE_MODULE_FIELDS: FieldNames<MultistageModule> = { id: true, items: true, cuts: true };
+
 /** Options of {@link createMultistageTest}. */
 export interface MultistageTestOptions {
   /** The stages of the panel, in order, each a list of modules. The first stage has one module. */
@@ -43,6 +54,8 @@ export interface MultistageTestOptions {
    */
   readonly estimator?: AbilityEstimator;
 }
+
+const MULTISTAGE_TEST_OPTIONS: FieldNames<MultistageTestOptions> = { stages: true, routing: true, estimator: true };
 
 /** The state of a multistage test: plain data, which JSON serializes, so that a test can resume from a stored state. */
 export interface MultistageTestState extends TestState {
@@ -82,7 +95,7 @@ export const ROUTINGS: readonly MultistageRouting[] = ["number-correct", "theta"
  * stage, the routing is unknown, or the estimator is not a function.
  */
 export function createMultistageTest(options: MultistageTestOptions): MultistageTest {
-  checkOptions(options);
+  checkOptions(options, MULTISTAGE_TEST_OPTIONS);
   const { stages, routing, estimator = posteriorMeanEstimate } = options;
   checkChoice(routing, "The option routing", ROUTINGS);
   checkFunction(
@@ -176,6 +189,7 @@ export function locateStages(stages: readonly (readonly MultistageModule[])[]): 
   stages.forEach((modules, stage) => {
     for (const module of modules) {
       checkRecord(module, `The modules of stage ${stage + 1} must be objects { id, items, cuts }`);
+      checkFields(module, MULTISTAGE_MODULE_FIELDS, `A module of stage ${stage + 1}`);
       if (typeof module.id !== "string") {
         throw new DataError(`A module needs a string id, found ${describe(module.id)}.`);
       }

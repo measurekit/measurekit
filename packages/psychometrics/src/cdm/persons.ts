@@ -1,4 +1,4 @@
-import { checkBoolean, checkOptions } from "@measurekit/core";
+import { checkBoolean, checkOptions, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CdmCalibration, calibratedModel } from "./calibration.js";
 import { forEachPosterior } from "./expectation.js";
@@ -34,6 +34,8 @@ export interface AttributeProfilesOptions {
    */
   readonly posterior?: boolean;
 }
+
+const ATTRIBUTE_PROFILES_OPTIONS: FieldNames<AttributeProfilesOptions> = { posterior: true };
 
 /** Returns the attribute mastery, the MAP and EAP profiles of a posterior over `profiles`, in their order. */
 export function profileEstimate(
@@ -123,7 +125,7 @@ export function attributeProfiles(
   calibration: CdmCalibration,
   options: AttributeProfilesOptions = {},
 ): readonly AttributeProfile[] {
-  checkOptions(options);
+  checkOptions(options, ATTRIBUTE_PROFILES_OPTIONS);
   const { posterior: withPosterior = false } = options;
   checkBoolean(withPosterior, "The option posterior");
   const { data, design, state } = calibratedModel(matrix, calibration);

@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
+import { checkArray, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 import { newton } from "../math/internal.js";
 
@@ -11,6 +11,8 @@ export interface ContrastingGroupsOptions {
    */
   readonly probability?: number;
 }
+
+const CONTRASTING_GROUPS_OPTIONS: FieldNames<ContrastingGroupsOptions> = { probability: true };
 
 /** The cut scores between adjacent categories. */
 export interface ContrastingGroupsCutScores {
@@ -51,7 +53,7 @@ export function contrastingGroupsCutScores(
   categories: readonly number[],
   options: ContrastingGroupsOptions = {},
 ): ContrastingGroupsCutScores {
-  checkOptions(options);
+  checkOptions(options, CONTRASTING_GROUPS_OPTIONS);
   const { probability = DEFAULT_PROBABILITY } = options;
   checkOpenUnitInterval(probability, "The option probability");
   const highest = checkGroups(scores, categories);

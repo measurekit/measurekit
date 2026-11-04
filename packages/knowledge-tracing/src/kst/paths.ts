@@ -1,4 +1,4 @@
-import { checkIntegerFrom, checkOptions, DataError } from "@measurekit/core";
+import { checkIntegerFrom, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import { popcount } from "./build.js";
 import { stateIndex } from "./space.js";
 import {
@@ -25,6 +25,8 @@ export interface NeighbourhoodOptions {
   readonly distance?: number;
 }
 
+const NEIGHBOURHOOD_OPTIONS: FieldNames<NeighbourhoodOptions> = { distance: true };
+
 /** Options of {@link learningPaths}. */
 export interface LearningPathsOptions {
   /**
@@ -34,6 +36,8 @@ export interface LearningPathsOptions {
    */
   readonly maxPaths?: number;
 }
+
+const LEARNING_PATHS_OPTIONS: FieldNames<LearningPathsOptions> = { maxPaths: true };
 
 /**
  * Returns the states of the structure that differ from `state` by at least one and at most `distance` elements, in the
@@ -56,7 +60,7 @@ export function neighbourhood(
   state: readonly string[],
   options: NeighbourhoodOptions = {},
 ): readonly (readonly string[])[] {
-  checkOptions(options);
+  checkOptions(options, NEIGHBOURHOOD_OPTIONS);
   const { distance = 1 } = options;
   checkIntegerFrom(distance, "The option distance", 1);
   const compiled = compile(structure);
@@ -93,7 +97,7 @@ export function learningPaths(
   structure: KnowledgeStructure,
   options: LearningPathsOptions = {},
 ): readonly (readonly string[])[] {
-  checkOptions(options);
+  checkOptions(options, LEARNING_PATHS_OPTIONS);
   const { maxPaths = DEFAULT_MAX_PATHS } = options;
   checkIntegerFrom(maxPaths, "The option maxPaths", 1);
   const compiled = compile(structure);

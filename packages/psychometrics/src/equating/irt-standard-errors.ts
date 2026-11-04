@@ -1,4 +1,13 @@
-import { checkArray, checkChoice, checkFinite, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
+import {
+  checkArray,
+  checkChoice,
+  checkFinite,
+  checkOptions,
+  checkRecord,
+  DataError,
+  describe,
+  type FieldNames,
+} from "@measurekit/core";
 import { type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
 import {
   type IrtObservedScoreOptions,
@@ -18,6 +27,12 @@ export interface IrtEquatingErrorOptions extends IrtObservedScoreOptions {
    */
   readonly method?: "true-score" | "observed-score";
 }
+
+const IRT_EQUATING_ERROR_OPTIONS: FieldNames<IrtEquatingErrorOptions> = {
+  method: true,
+  populations: true,
+  weight: true,
+};
 
 /**
  * The step of the central differences, relative to a parameter of at least 1 in size: the cube root of the machine
@@ -73,7 +88,7 @@ export function irtEquatingStandardErrors(
   covariance: ParameterCovariance,
   options: IrtEquatingErrorOptions = {},
 ): readonly number[] {
-  checkOptions(options);
+  checkOptions(options, IRT_EQUATING_ERROR_OPTIONS);
   const { method = "true-score" } = options;
   checkChoice(method, "The option method", METHODS);
   const forms = [from, to] as const;

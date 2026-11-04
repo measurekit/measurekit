@@ -329,6 +329,9 @@ describe("scaleScore", () => {
     expect(() => scaleScore(0, JSON.parse("null"))).toThrow(
       "The score scale must be an object { slope, intercept }, found null.",
     );
+    expect(() => scaleScore(0, JSON.parse('{"slope":1,"intercept":0,"round":1}'))).toThrow(
+      'The score scale may hold only slope, intercept, lowest, highest and step, found "round".',
+    );
     expect(() => scaleScore(0, { slope: 0, intercept: 0 })).toThrow(
       "The slope of the score scale must be a positive number, found 0.",
     );
@@ -498,6 +501,7 @@ describe("conversionTable", () => {
     expect(() => conversionTable(FORM, SCALE, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => conversionTable(FORM, SCALE, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => conversionTable(FORM, SCALE, { method: JSON.parse('"ratio"') })).toThrow(
       'The option method must be "eap-sum" or "true-score", found "ratio".',
     );
@@ -588,7 +592,8 @@ describe("conditionalScaleError", () => {
 describe("scaleConversion", () => {
   for (const reference of conversions.scaleConversion) {
     it(`matches the base R interpolation in the table of ${reference.form}`, () => {
-      const actual = scaleConversion(reference.equivalents, reference.conversion, scaleOf(reference.scale));
+      const { slope: _slope, intercept: _intercept, ...rounding } = scaleOf(reference.scale);
+      const actual = scaleConversion(reference.equivalents, reference.conversion, rounding);
       expect(actual).toHaveLength(reference.scaleScores.length);
       reference.scaleScores.forEach((expected, i) => {
         expectClose(
@@ -640,6 +645,7 @@ describe("scaleConversion", () => {
     expect(() => scaleConversion([0], [1, 2], JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => scaleConversion([0], [1, 2], JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => scaleConversion([0], [1, 2], { step: -5 })).toThrow(DataError);
     expect(() => scaleConversion([0], [1, 2], { lowest: 9, highest: 3 })).toThrow(
       "The options needs a lowest score below the highest, found 9 and 3.",
@@ -822,6 +828,7 @@ describe("normStatistics", () => {
     expect(() => normStatistics(JSON.parse("null"))).toThrow("The scores must be an array of numbers, found null.");
     expect(() => normStatistics([1, 2], { level: 1 })).toThrow("The option level");
     expect(() => normStatistics([1, 2], JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => normStatistics([1, 2], JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 });
 
@@ -966,6 +973,9 @@ describe("predictFormScore", () => {
     );
     expect(() => predictFormScore(posterior, FORM, conversion, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => predictFormScore(posterior, FORM, conversion, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
   });
 });
@@ -1123,6 +1133,9 @@ describe("predictThetaScore", () => {
     expect(() => predictThetaScore(posterior, SCALE, { level: 1.5 })).toThrow(DataError);
     expect(() => predictThetaScore(posterior, SCALE, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => predictThetaScore(posterior, SCALE, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => predictThetaScore(posterior, JSON.parse("null"))).toThrow(
       "The score scale must be an object { slope, intercept }, found null.",

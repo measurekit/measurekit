@@ -1,4 +1,4 @@
-import { checkOptions, DataError } from "@measurekit/core";
+import { checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import { checkFacetedScores, type FacetedScore } from "../data/internal.js";
 import { type AbilityEstimator, type IrtItem, type PersonEstimate, posteriorMeanEstimate } from "../irt/internal.js";
@@ -14,6 +14,8 @@ export interface ManyFacetEstimatesOptions {
    */
   readonly estimator?: AbilityEstimator;
 }
+
+const MANY_FACET_ESTIMATES_OPTIONS: FieldNames<ManyFacetEstimatesOptions> = { estimator: true };
 
 /**
  * Returns the estimate of theta of every person in the scores, in order of first appearance, from the person's scores
@@ -38,7 +40,7 @@ export function manyFacetEstimates(
   options: ManyFacetEstimatesOptions = {},
 ): readonly PersonEstimate[] {
   checkManyFacetRasch(model);
-  checkOptions(options);
+  checkOptions(options, MANY_FACET_ESTIMATES_OPTIONS);
   const {
     estimator = (items: readonly IrtItem[], responses: readonly (number | null)[]) =>
       posteriorMeanEstimate(items, responses, { prior: model.population }),

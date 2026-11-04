@@ -1,10 +1,12 @@
 import {
   checkBoolean,
+  checkFields,
   checkNonNegative,
   checkOptions,
   checkPositive,
   checkRecord,
   DataError,
+  type FieldNames,
   logistic,
 } from "@measurekit/core";
 import {
@@ -34,6 +36,8 @@ export interface Uncertainty {
   /** How fast updates shrink with n; 0 gives a constant K = a. */
   readonly b: number;
 }
+
+const UNCERTAINTY_FIELDS: FieldNames<Uncertainty> = { a: true, b: true };
 
 /** Options of {@link elo}. */
 export interface EloOptions {
@@ -65,6 +69,8 @@ export interface EloOptions {
    */
   readonly parameters?: EloParameters;
 }
+
+const ELO_OPTIONS: FieldNames<EloOptions> = { uncertainty: true, skills: true, skillWeight: true, parameters: true };
 
 /** An Elo model: a learner model whose item ratings can also be updated online. */
 export interface EloModel extends LearnerModel<EloState, EloParameters> {
@@ -259,9 +265,10 @@ function checkStep(state: EloState, event: Event): void {
 }
 
 function settingsOf(options: EloOptions): Settings {
-  checkOptions(options);
+  checkOptions(options, ELO_OPTIONS);
   const { uncertainty = DEFAULT_UNCERTAINTY, skills = false, skillWeight } = options;
   checkRecord(uncertainty, "The uncertainty function must be an object { a, b }");
+  checkFields(uncertainty, UNCERTAINTY_FIELDS, "The uncertainty function");
   checkPositive(uncertainty.a, "The uncertainty function's a");
   checkNonNegative(uncertainty.b, "The uncertainty function's b");
   checkBoolean(skills, "The option skills");

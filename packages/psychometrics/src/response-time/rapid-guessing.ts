@@ -1,6 +1,12 @@
-import { checkOptions, checkPositive, checkRecord } from "@measurekit/core";
+import { checkOptions, checkPositive, checkRecord, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecord, ResponseRecords } from "../data/internal.js";
-import { type AbilityEstimatesOptions, abilityEstimates, type PersonEstimate, type TestItem } from "../irt/internal.js";
+import {
+  ABILITY_ESTIMATES_OPTIONS,
+  type AbilityEstimatesOptions,
+  abilityEstimates,
+  type PersonEstimate,
+  type TestItem,
+} from "../irt/internal.js";
 import { timedResponses } from "./timed-responses.js";
 
 const DEFAULT_PERCENTAGE = 10;
@@ -21,6 +27,8 @@ export interface NormativeThresholdOptions {
    */
   readonly cap?: number;
 }
+
+const NORMATIVE_THRESHOLD_OPTIONS: FieldNames<NormativeThresholdOptions> = { percentage: true, cap: true };
 
 /** A person's response time effort. */
 export interface ResponseTimeEffort {
@@ -48,7 +56,7 @@ export function normativeThresholds(
   data: ResponseMatrix | ResponseRecords,
   options: NormativeThresholdOptions = {},
 ): Readonly<Record<string, number>> {
-  checkOptions(options);
+  checkOptions(options, NORMATIVE_THRESHOLD_OPTIONS);
   const { percentage = DEFAULT_PERCENTAGE, cap = DEFAULT_CAP } = options;
   checkPositive(percentage, "The option percentage");
   checkPositive(cap, "The option cap");
@@ -140,7 +148,7 @@ export function effortModeratedEstimates(
   thresholds: Readonly<Record<string, number>>,
   options: AbilityEstimatesOptions = {},
 ): readonly PersonEstimate[] {
-  checkOptions(options);
+  checkOptions(options, ABILITY_ESTIMATES_OPTIONS);
   const timed = timedResponses(data, "Effort-moderated scoring");
   const limits = thresholdsOf(timed.itemIds, thresholds);
   const records: ResponseRecord[] = [];

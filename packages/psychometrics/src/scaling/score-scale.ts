@@ -1,4 +1,13 @@
-import { checkFinite, checkNonNegative, checkPositive, checkRecord, DataError, describe } from "@measurekit/core";
+import {
+  checkFields,
+  checkFinite,
+  checkNonNegative,
+  checkPositive,
+  checkRecord,
+  DataError,
+  describe,
+  type FieldNames,
+} from "@measurekit/core";
 import type { ScaleTransformation } from "../equating/internal.js";
 
 /** The rounding and the bounds of reported scores. */
@@ -25,8 +34,18 @@ export interface ScoreRounding {
   readonly step?: number;
 }
 
+export const SCORE_ROUNDING_FIELDS: FieldNames<ScoreRounding> = { lowest: true, highest: true, step: true };
+
 /** A linear scale of theta: `slope` θ + `intercept`, then rounded and bounded as `ScoreRounding` says. */
 export interface ScoreScale extends ScaleTransformation, ScoreRounding {}
+
+const SCORE_SCALE_FIELDS: FieldNames<ScoreScale> = {
+  slope: true,
+  intercept: true,
+  lowest: true,
+  highest: true,
+  step: true,
+};
 
 /** The rounding and bounds of a scale, with their defaults. */
 export interface CheckedRounding {
@@ -72,6 +91,7 @@ export function checkRounding(rounding: ScoreRounding, label: string): CheckedRo
  */
 export function checkScale(scale: ScoreScale): CheckedScale {
   checkRecord(scale, "The score scale must be an object { slope, intercept }");
+  checkFields(scale, SCORE_SCALE_FIELDS, "The score scale");
   checkPositive(scale.slope, "The slope of the score scale");
   checkFinite(scale.intercept, "The intercept of the score scale");
   return { slope: scale.slope, intercept: scale.intercept, ...checkRounding(scale, "The score scale") };

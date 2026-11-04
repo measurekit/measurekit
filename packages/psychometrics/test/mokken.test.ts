@@ -382,6 +382,9 @@ describe("twoWayImputation", () => {
     expect(() => twoWayImputation(matrix, createRandom(1), JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => twoWayImputation(matrix, createRandom(1), JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => twoWayImputation(matrix, JSON.parse("{}"))).toThrow("A random number generator must be one");
     expect(() => twoWayImputation(JSON.parse("null"), createRandom(1))).toThrow(DataError);
   });
@@ -809,6 +812,7 @@ describe("automatedItemSelection", () => {
     expect(() => automatedItemSelection(matrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => automatedItemSelection(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => automatedItemSelection(matrix, { lowerBound: JSON.parse('"0.3"') })).toThrow(
       'The option lowerBound must be a number from 0 to 1, found "0.3".',
     );
@@ -907,6 +911,7 @@ describe("conditionalAssociation", () => {
     expect(() => conditionalAssociation(matrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => conditionalAssociation(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => conditionalAssociation(matrix, { minimumSize: JSON.parse('"4"') })).toThrow(
       'The option minimumSize must be a positive integer, found "4".',
     );
@@ -1009,6 +1014,7 @@ describe("monotonicity", () => {
 
   it("rejects options of other types and too few persons", () => {
     expect(() => monotonicity(decreasing, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => monotonicity(decreasing, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => monotonicity(decreasing, { minimumViolation: -0.1 })).toThrow(
       "The option minimumViolation must be a non-negative number, found -0.1.",
     );
@@ -1101,6 +1107,9 @@ describe("invariantItemOrdering", () => {
   it("rejects options of other types, fewer than three items and too few persons", () => {
     expect(() => invariantItemOrdering(noisyMatrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => invariantItemOrdering(noisyMatrix, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => invariantItemOrdering(noisyMatrix, { selection: JSON.parse('"yes"') })).toThrow(
       "The option selection must be true or false, found yes.",

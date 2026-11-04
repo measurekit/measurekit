@@ -1,4 +1,4 @@
-import { checkChoice, checkIntegerFrom, checkOptions, checkStopping } from "@measurekit/core";
+import { checkChoice, checkIntegerFrom, checkOptions, checkStopping, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { compressResponses, type ParameterPrior, respondentsOf, type StandardErrorMethod } from "../irt/internal.js";
 import { bifactorFit, solveBifactor } from "./bifactor-fit.js";
@@ -69,6 +69,17 @@ export interface BifactorOptions<TParameters = MultidimensionalLogisticParameter
   readonly maxIterations?: number;
 }
 
+const BIFACTOR_OPTIONS: FieldNames<BifactorOptions<unknown>> = {
+  specific: true,
+  primary: true,
+  model: true,
+  priors: true,
+  points: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+};
+
 /** The defaults of EM, as `calibrateMultidimensional`'s. */
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
@@ -122,7 +133,7 @@ export function calibrateBifactor(
   data: ResponseMatrix | ResponseRecords,
   options: BifactorOptions<unknown>,
 ): MultidimensionalCalibration<unknown> {
-  checkOptions(options);
+  checkOptions(options, BIFACTOR_OPTIONS);
   const responses = compressResponses(data);
   const { standardErrors = "none", model = multidimensionalTwoParameterLogistic, priors } = options;
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);

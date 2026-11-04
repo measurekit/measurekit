@@ -1,6 +1,6 @@
 import { DataError } from "@measurekit/core";
 import { type BivariateDistribution, type BivariateTable, margins, neatTables } from "./bivariate.js";
-import { type SyntheticOptions, syntheticGroups } from "./neat.js";
+import { SYNTHETIC_OPTIONS, type SyntheticOptions, syntheticGroups } from "./neat.js";
 import { cumulativeSums, equipercentileEquating, scoreAtPercentileRank } from "./observed-score.js";
 
 /**
@@ -68,7 +68,7 @@ export function frequencyEstimationEquating(
   to: BivariateDistribution,
   options: SyntheticOptions = {},
 ): readonly number[] {
-  const { source, target, weight } = syntheticGroups(from, to, options);
+  const { source, target, weight } = syntheticGroups(from, to, options, SYNTHETIC_OPTIONS);
   const sourceAnchor = margins(source).columns;
   const targetAnchor = margins(target).columns;
   checkSharedAnchorScores(sourceAnchor, targetAnchor);

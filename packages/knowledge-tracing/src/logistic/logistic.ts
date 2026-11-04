@@ -5,6 +5,7 @@ import {
   checkOptions,
   checkStopping,
   DataError,
+  type FieldNames,
   mean,
   logistic as sigmoid,
 } from "@measurekit/core";
@@ -113,6 +114,18 @@ export interface LogisticOptions {
   readonly parameters?: LogisticParameters;
 }
 
+const LOGISTIC_OPTIONS: FieldNames<LogisticOptions> = {
+  features: true,
+  intercepts: true,
+  covariates: true,
+  proficiency: true,
+  ridge: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+  parameters: true,
+};
+
 /** Options of {@link afm}: those of {@link logistic} but the features, which AFM fixes. */
 export interface AfmOptions extends Omit<LogisticOptions, "features" | "proficiency"> {
   /**
@@ -122,6 +135,28 @@ export interface AfmOptions extends Omit<LogisticOptions, "features" | "proficie
    */
   readonly proficiency?: Proficiency;
 }
+
+const AFM_OPTIONS: FieldNames<AfmOptions> = {
+  proficiency: true,
+  covariates: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+  intercepts: true,
+  ridge: true,
+  parameters: true,
+};
+
+const PFA_OPTIONS: FieldNames<Omit<LogisticOptions, "features">> = {
+  intercepts: true,
+  covariates: true,
+  proficiency: true,
+  ridge: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+  parameters: true,
+};
 
 /** A logistic learner model: AFM, PFA or a model of LKT features. */
 export interface LogisticModel extends LearnerModel<LogisticState, LogisticParameters> {
@@ -216,7 +251,7 @@ const DEFAULT_MAX_ITERATIONS = 100;
 
 /** Builds a logistic model. */
 function create(options: LogisticOptions): LogisticModel {
-  checkOptions(options);
+  checkOptions(options, LOGISTIC_OPTIONS);
   const {
     features = [],
     intercepts = DEFAULT_INTERCEPTS,
@@ -363,7 +398,7 @@ function create(options: LogisticOptions): LogisticModel {
  * @see {@link https://doi.org/10.1007/11774303_17 | Cen, Koedinger and Junker (2006)}
  */
 export function afm(options: AfmOptions = {}): LogisticModel {
-  checkOptions(options);
+  checkOptions(options, AFM_OPTIONS);
   const { proficiency = AFM_PROFICIENCY } = options;
   return logistic({ ...options, proficiency, features: ["opportunities"] });
 }
@@ -379,6 +414,6 @@ export function afm(options: AfmOptions = {}): LogisticModel {
  * @see {@link https://doi.org/10.3233/978-1-60750-028-5-531 | Pavlik, Cen and Koedinger (2009)}
  */
 export function pfa(options: Omit<LogisticOptions, "features"> = {}): LogisticModel {
-  checkOptions(options);
+  checkOptions(options, PFA_OPTIONS);
   return logistic({ ...options, features: ["successes", "failures"] });
 }

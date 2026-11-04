@@ -1,4 +1,4 @@
-import { checkOptions, checkUnitInterval, DataError } from "@measurekit/core";
+import { checkOptions, checkUnitInterval, DataError, type FieldNames } from "@measurekit/core";
 import { type Attempt, checkAttempts } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
@@ -25,6 +25,8 @@ export interface RecommendOptions {
    */
   readonly band?: readonly [lower: number, upper: number];
 }
+
+const RECOMMEND_OPTIONS: FieldNames<RecommendOptions> = { band: true };
 
 /**
  * Ranks candidate attempts by the learner's predicted success: the attempts predicted inside the band first,
@@ -67,7 +69,7 @@ export function recommend<TState>(
   options: RecommendOptions = {},
 ): readonly Recommendation[] {
   checkModel(model, "A recommendation needs a learner model, such as bkt()");
-  checkOptions(options);
+  checkOptions(options, RECOMMEND_OPTIONS);
   const { band = DEFAULT_BAND } = options;
   const [lower, upper] = checkBand(band);
   checkAttempts(candidates, "Candidate");

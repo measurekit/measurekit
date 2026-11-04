@@ -1,4 +1,12 @@
-import { checkArray, checkFinite, checkRecord, DataError, isRecord } from "@measurekit/core";
+import {
+  checkArray,
+  checkFields,
+  checkFinite,
+  checkRecord,
+  DataError,
+  type FieldNames,
+  isRecord,
+} from "@measurekit/core";
 import { identity, invertPositiveDefinite } from "../math/internal.js";
 
 /** A multivariate normal prior distribution of theta. */
@@ -8,6 +16,8 @@ export interface MultivariateNormalPrior {
   /** The covariance matrix by rows: symmetric and positive definite. */
   readonly covariance: readonly (readonly number[])[];
 }
+
+const MULTIVARIATE_NORMAL_PRIOR_FIELDS: FieldNames<MultivariateNormalPrior> = { mean: true, covariance: true };
 
 /** The prior as the estimators use it. */
 export interface CheckedPrior {
@@ -39,6 +49,7 @@ export function checkedPrior(prior: MultivariateNormalPrior | undefined, dimensi
     return { mean: new Float64Array(dimensions), covariance, precision: covariance };
   }
   checkRecord(prior, "The option prior must be an object { mean, covariance }");
+  checkFields(prior, MULTIVARIATE_NORMAL_PRIOR_FIELDS, "The option prior");
   const { mean, covariance } = prior;
   checkArray(mean, "The mean of the prior must be an array");
   checkArray(covariance, "The covariance of the prior must be an array of rows");

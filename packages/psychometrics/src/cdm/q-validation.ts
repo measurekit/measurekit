@@ -1,4 +1,4 @@
-import { checkOptions, checkUnitInterval } from "@measurekit/core";
+import { checkOptions, checkUnitInterval, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CdmCalibration, calibratedModel } from "./calibration.js";
 import { forEachPosterior } from "./expectation.js";
@@ -20,6 +20,8 @@ export interface QMatrixValidationOptions {
    */
   readonly eps?: number;
 }
+
+const QMATRIX_VALIDATION_OPTIONS: FieldNames<QMatrixValidationOptions> = { eps: true };
 
 /** An item's q-vector and the one the data suggest. */
 // biome-ignore lint/style/useNamingConvention: Q-matrix and q-vector are the names of these in the field.
@@ -63,7 +65,7 @@ export function validateQMatrix(
   calibration: CdmCalibration,
   options: QMatrixValidationOptions = {},
 ): readonly QVectorSuggestion[] {
-  checkOptions(options);
+  checkOptions(options, QMATRIX_VALIDATION_OPTIONS);
   const { eps = DEFAULT_EPS } = options;
   checkUnitInterval(eps, "The option eps");
   const { data, design, state } = calibratedModel(matrix, calibration);

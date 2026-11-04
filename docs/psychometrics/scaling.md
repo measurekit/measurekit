@@ -101,7 +101,7 @@ O(items × scores) per theta, and a table does all its rows in one pass.
 Equating gives each score of form X an equivalent on form Y, usually not a whole number. `scaleConversion(equivalents,
 conversion, options)` reports it on Y's scale by linear interpolation between the neighboring scores of Y's table
 (Kolen and Brennan, 2014), holding the end values for equivalents below 0 and above Y's highest score, and then rounds
-and bounds as `options` say, which are those of [a scale](#scales).
+and bounds as `options` say: the `lowest`, `highest` and `step` of [a scale](#scales).
 
 ```ts continues
 import { linearEquating } from "@measurekit/psychometrics/equating";
@@ -111,7 +111,8 @@ import { conversionTable, scaleConversion } from "@measurekit/psychometrics/scal
 const equated = linearEquating([2, 8, 20, 10], [4, 11, 22, 8]); // [-0.295, 0.757, 1.808, 2.860]
 // Y's unrounded scale scores; `items` and `scale` are those of the first example, for form Y.
 const unrounded = conversionTable(items, { ...scale, step: 0 }).map((row) => row.scaleScore);
-scaleConversion(equated, unrounded, scale); // [400, 450, 520, 600]
+const { lowest, highest, step } = scale;
+scaleConversion(equated, unrounded, { lowest, highest, step }); // [400, 450, 520, 600]
 ```
 
 Interpolate unrounded scores: rounding Y's table first rounds twice. Any equating that returns equivalents on Y's raw

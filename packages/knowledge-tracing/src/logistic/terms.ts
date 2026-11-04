@@ -1,4 +1,13 @@
-import { checkArray, checkChoice, DataError, describe, isNonEmptyString, isRecord } from "@measurekit/core";
+import {
+  checkArray,
+  checkChoice,
+  checkFields,
+  DataError,
+  describe,
+  type FieldNames,
+  isNonEmptyString,
+  isRecord,
+} from "@measurekit/core";
 import { type Attempt, entry } from "../data/internal.js";
 import {
   checkFeature,
@@ -48,6 +57,8 @@ export interface LogisticTerm {
    */
   readonly coefficient?: TermCoefficient;
 }
+
+const LOGISTIC_TERM_FIELDS: FieldNames<LogisticTerm> = { feature: true, over: true, coefficient: true };
 
 /** A checked term. */
 export interface TermSpec {
@@ -140,11 +151,7 @@ function isTerm(entryOfFeatures: LogisticFeature | LogisticTerm): entryOfFeature
 
 /** Returns the fields of a term object, rejecting those it does not have. */
 function fieldsOf(term: LogisticTerm): TermFields {
-  for (const key of Object.keys(term)) {
-    if (!(key === "feature" || key === "over" || key === "coefficient")) {
-      throw new DataError(`A term has no field ${JSON.stringify(key)}; its fields are feature, over and coefficient.`);
-    }
-  }
+  checkFields(term, LOGISTIC_TERM_FIELDS, "A term");
   const { feature, over, coefficient } = term;
   if ("over" in term) checkChoice(over, "The field over of a term", SCOPES);
   if ("coefficient" in term) checkChoice(coefficient, "The field coefficient of a term", COEFFICIENTS);

@@ -6,6 +6,7 @@ import {
   checkStopping,
   checkUnitInterval,
   DataError,
+  type FieldNames,
   isRecord,
   isUnitInterval,
   iterateToConvergence,
@@ -58,6 +59,13 @@ export interface CdmCalibrationOptions {
    */
   readonly maxIterations?: number;
 }
+
+const CDM_CALIBRATION_OPTIONS: FieldNames<CdmCalibrationOptions> = {
+  model: true,
+  tolerance: true,
+  standardErrors: true,
+  maxIterations: true,
+};
 
 /** A calibrated item of a cognitive diagnosis model. */
 export interface CdmItem {
@@ -196,7 +204,7 @@ export function calibrateCdm(
   options: CdmCalibrationOptions = {},
 ): CdmCalibration {
   checkResponseMatrix(matrix);
-  checkOptions(options);
+  checkOptions(options, CDM_CALIBRATION_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, standardErrors = "none" } = options;
   checkStopping(tolerance, maxIterations);
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERRORS);

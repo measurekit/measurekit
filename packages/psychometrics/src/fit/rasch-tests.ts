@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, chiSquareUpperTail, DataError, describe } from "@measurekit/core";
+import { checkArray, checkOptions, chiSquareUpperTail, DataError, describe, type FieldNames } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { type ConditionalCalibrationOptions, type ConditionalFit, conditionalFit } from "../irt/internal.js";
 import { normalCdf } from "../math/internal.js";
@@ -20,6 +20,13 @@ export interface RaschTestOptions extends ConditionalCalibrationOptions {
    */
   readonly split?: RaschSplit;
 }
+
+const RASCH_TEST_OPTIONS: FieldNames<RaschTestOptions> = {
+  split: true,
+  model: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** A likelihood-ratio test of the Rasch model, a partial credit model or a rating scale model. */
 export interface RaschTest {
@@ -59,6 +66,13 @@ export interface MartinLofOptions extends ConditionalCalibrationOptions {
    */
   readonly split?: ItemSplit;
 }
+
+const MARTIN_LOF_OPTIONS: FieldNames<MartinLofOptions> = {
+  split: true,
+  model: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** The Wald test of one item. */
 export interface RaschWaldItem {
@@ -198,7 +212,7 @@ export function raschWaldTest(matrix: ResponseMatrix, options: RaschTestOptions 
  */
 export function martinLofTest(matrix: ResponseMatrix, options: MartinLofOptions = {}): RaschTest {
   checkResponseMatrix(matrix);
-  checkOptions(options);
+  checkOptions(options, MARTIN_LOF_OPTIONS);
   const { split = DEFAULT_SPLIT, ...fitOptions } = options;
   const rows = Int32Array.from(matrix.responses.keys()).filter((row) => !matrix.responses[row]?.includes(null));
   if (rows.length === 0) throw new DataError("The Martin-Löf test needs persons who answered every item, found none.");
@@ -259,7 +273,7 @@ function checkedSplit(
   options: RaschTestOptions,
 ): { readonly groups: PersonGroups; readonly fitOptions: ConditionalCalibrationOptions } {
   checkResponseMatrix(matrix);
-  checkOptions(options);
+  checkOptions(options, RASCH_TEST_OPTIONS);
   const { split = DEFAULT_SPLIT, ...fitOptions } = options;
   const labels = personLabels(matrix, split);
   const distinct = [...new Set(labels)].sort();

@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions } from "@measurekit/core";
+import { checkChoice, checkOptions, type FieldNames } from "@measurekit/core";
 import { scoreLimits } from "../equating/internal.js";
 import {
   checkItemList,
@@ -32,6 +32,13 @@ export interface ConversionTableOptions extends ThetaIntegrationOptions, RangeOp
    */
   readonly method?: ConversionMethod;
 }
+
+const CONVERSION_TABLE_OPTIONS: FieldNames<ConversionTableOptions> = {
+  method: true,
+  prior: true,
+  quadrature: true,
+  range: true,
+};
 
 /** One total score of a form with its theta and its scale score. */
 export interface ConversionRow {
@@ -108,11 +115,11 @@ export function conversionTable(
 ): readonly ConversionRow[] {
   checkItemList(items, "A conversion table");
   const checked = checkScale(scale);
-  checkOptions(options);
-  const { method = "eap-sum" } = options;
+  checkOptions(options, CONVERSION_TABLE_OPTIONS);
+  const { method = "eap-sum", range: givenRange, ...integration } = options;
   checkChoice(method, "The option method", METHODS);
-  const range = checkRange(options.range);
-  const thetas = method === "eap-sum" ? eapSumThetas(items, options, range) : trueScoreThetas(items, range);
+  const range = checkRange(givenRange);
+  const thetas = method === "eap-sum" ? eapSumThetas(items, integration, range) : trueScoreThetas(items, range);
   const scaleScores = thetas.map(({ theta }) => scoreOfTheta(theta, checked));
   const nodes = Float64Array.from(thetas, ({ theta }) => theta);
   const likelihoods = scoreLikelihoods(items, nodes);

@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
+import { checkArray, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
 import { type BivariateDistribution, bivariateTable } from "./bivariate.js";
 import { MAX_LOG_LINEAR_DEGREE, orthonormalPolynomials, poissonFit } from "./presmoothing.js";
 
@@ -17,6 +17,8 @@ export interface BivariatePresmoothingOptions {
    */
   readonly crossDegree?: number;
 }
+
+const BIVARIATE_PRESMOOTHING_OPTIONS: FieldNames<BivariatePresmoothingOptions> = { degrees: true, crossDegree: true };
 
 /** A bivariate distribution smoothed by a log-linear model. */
 export interface BivariateLogLinearPresmoothing {
@@ -50,7 +52,7 @@ export function bivariateLogLinearPresmoothing(
   distribution: BivariateDistribution,
   options: BivariatePresmoothingOptions,
 ): BivariateLogLinearPresmoothing {
-  checkOptions(options);
+  checkOptions(options, BIVARIATE_PRESMOOTHING_OPTIONS);
   const table = bivariateTable(distribution, "presmoothed");
   const { degrees, crossDegree = 1 } = options;
   checkArray(degrees, "The option degrees must be an array of the degrees of the total and the anchor scores");

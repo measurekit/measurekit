@@ -1,4 +1,4 @@
-import { checkOptions, type Random } from "@measurekit/core";
+import { checkOptions, type FieldNames, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import {
   checkDimensions,
@@ -36,6 +36,16 @@ export interface MultidimensionalAdaptiveTestOptions extends TestControlOptions 
    */
   readonly estimator?: MultidimensionalEstimator;
 }
+
+const MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS: FieldNames<MultidimensionalAdaptiveTestOptions> = {
+  pool: true,
+  stopping: true,
+  selection: true,
+  estimator: true,
+  contentTargets: true,
+  enemies: true,
+  withinTestlet: true,
+};
 
 /** The state of a multidimensional adaptive test: plain data, which JSON serializes, so that a test can resume from it. */
 export interface MultidimensionalAdaptiveTestState extends AdaptiveState<MultidimensionalEstimate> {}
@@ -105,7 +115,7 @@ export interface MultidimensionalAdaptiveTest {
 export function createMultidimensionalAdaptiveTest(
   options: MultidimensionalAdaptiveTestOptions,
 ): MultidimensionalAdaptiveTest {
-  checkOptions(options);
+  checkOptions(options, MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS);
   const {
     pool,
     stopping,

@@ -174,6 +174,9 @@ describe("calibrateResponseTimes", () => {
     expect(() => calibrateResponseTimes(buildResponseMatrix([[1, 0]]), JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrateResponseTimes(buildResponseMatrix([[1, 0]]), JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     const matrix = buildResponseMatrix(
       [
         [1, 0],
@@ -275,6 +278,7 @@ describe("rapid guessing", () => {
       "The thresholds must be an object of seconds by item id, found null.",
     );
     expect(() => normativeThresholds(data, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => normativeThresholds(data, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => effortModeratedEstimates(data, JSON.parse("null"), { item1: 2 })).toThrow(
       "The items must be an array, found null.",
     );
@@ -370,6 +374,7 @@ describe("speed and time fit", () => {
     expect(() => responseTimeFit(data, items, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => responseTimeFit(data, items, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 });
 
@@ -655,6 +660,7 @@ describe("calibrateSpeedAccuracy", () => {
     expect(() => calibrateSpeedAccuracy(matrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrateSpeedAccuracy(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => calibrateSpeedAccuracy(matrix, JSON.parse("{}"))).toThrow(
       "The option model must be an IRT model such as twoParameterLogistic, found undefined.",
     );

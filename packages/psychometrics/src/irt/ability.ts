@@ -1,11 +1,13 @@
 import {
   checkArray,
+  checkFields,
   checkFinite,
   checkOptions,
   checkPositive,
   checkRecord,
   DataError,
   describe,
+  type FieldNames,
   normalizeLogs,
   type ThetaDistribution,
 } from "@measurekit/core";
@@ -33,6 +35,8 @@ export interface RangeOptions {
   readonly range?: readonly [lower: number, upper: number];
 }
 
+export const RANGE_OPTIONS: FieldNames<RangeOptions> = { range: true };
+
 /** A normal prior distribution of theta. */
 export interface ThetaPrior {
   /** The mean. */
@@ -40,6 +44,8 @@ export interface ThetaPrior {
   /** The standard deviation. */
   readonly sd: number;
 }
+
+const THETA_PRIOR_FIELDS: FieldNames<ThetaPrior> = { mean: true, sd: true };
 
 /** Options of {@link posteriorModeEstimate}. */
 export interface PosteriorModeOptions extends RangeOptions {
@@ -50,6 +56,8 @@ export interface PosteriorModeOptions extends RangeOptions {
    */
   readonly prior?: ThetaPrior;
 }
+
+const POSTERIOR_MODE_OPTIONS: FieldNames<PosteriorModeOptions> = { prior: true, range: true };
 
 /**
  * A testlet in ability estimation: the ids of its items and the SD of its effect, as a calibration's `testlets` gives
@@ -81,6 +89,8 @@ export interface ThetaIntegrationOptions {
   readonly quadrature?: QuadratureOptions;
 }
 
+export const THETA_INTEGRATION_OPTIONS: FieldNames<ThetaIntegrationOptions> = { prior: true, quadrature: true };
+
 /** Options of {@link posteriorMeanEstimate}. */
 export interface PosteriorMeanOptions extends ThetaIntegrationOptions {
   /**
@@ -91,6 +101,8 @@ export interface PosteriorMeanOptions extends ThetaIntegrationOptions {
    */
   readonly testlets?: readonly TestletEffect[];
 }
+
+const POSTERIOR_MEAN_OPTIONS: FieldNames<PosteriorMeanOptions> = { testlets: true, prior: true, quadrature: true };
 
 /**
  * A function that estimates theta from items and one response per item, `null` when missing.
@@ -124,7 +136,7 @@ export function maximumLikelihoodEstimate(
   responses: readonly (number | null)[],
   options: RangeOptions = {},
 ): AbilityEstimate {
-  checkOptions(options);
+  checkOptions(options, RANGE_OPTIONS);
   const pattern = answered(items, responses, "Maximum likelihood");
   const theta = modalTheta((t) => pattern.slope(t), checkRange(options.range));
   return { theta, standardError: 1 / Math.sqrt(pattern.information(theta)) };
@@ -151,7 +163,7 @@ export function weightedLikelihoodEstimate(
   responses: readonly (number | null)[],
   options: RangeOptions = {},
 ): AbilityEstimate {
-  checkOptions(options);
+  checkOptions(options, RANGE_OPTIONS);
   const pattern = answered(items, responses, "Weighted likelihood");
   const theta = modalTheta((t) => pattern.slope(t) + pattern.warmCorrection(t), checkRange(options.range));
   return { theta, standardError: 1 / Math.sqrt(pattern.information(theta)) };
@@ -173,7 +185,7 @@ export function posteriorModeEstimate(
   responses: readonly (number | null)[],
   options: PosteriorModeOptions = {},
 ): AbilityEstimate {
-  checkOptions(options);
+  checkOptions(options, POSTERIOR_MODE_OPTIONS);
   const pattern = answered(items, responses);
   const { mean, sd } = checkThetaPrior(options.prior);
   const precision = 1 / (sd * sd);
@@ -203,7 +215,7 @@ export function posteriorMeanEstimate(
   responses: readonly (number | null)[],
   options: PosteriorMeanOptions = {},
 ): AbilityEstimate {
-  checkOptions(options);
+  checkOptions(options, POSTERIOR_MEAN_OPTIONS);
   const pattern = answered(items, responses);
   const { testlets = [] } = options;
   const testletOf = testletMembership(items, testlets);
@@ -244,7 +256,7 @@ export function thetaPosterior(
   responses: readonly (number | null)[],
   options: ThetaIntegrationOptions = {},
 ): ThetaDistribution {
-  checkOptions(options);
+  checkOptions(options, THETA_INTEGRATION_OPTIONS);
   const pattern = answered(items, responses);
   const { mean, sd } = checkThetaPrior(options.prior);
   const { nodes, weights } = quadratureRule(options.quadrature, mean, sd);
@@ -489,6 +501,7 @@ export function checkRange(range: readonly [number, number] = DEFAULT_THETA_RANG
  */
 export function checkThetaPrior(prior: ThetaPrior = STANDARD_PRIOR): ThetaPrior {
   checkRecord(prior, "The option prior must be an object { mean, sd }");
+  checkFields(prior, THETA_PRIOR_FIELDS, "The option prior");
   checkFinite(prior.mean, "The mean of the prior");
   checkPositive(prior.sd, "The sd of the prior");
   return prior;

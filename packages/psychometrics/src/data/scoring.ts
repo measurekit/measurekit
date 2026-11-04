@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
+import { checkArray, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
 import { buildResponseMatrixOfRows, type ResponseMatrix, type ResponseMatrixOptions } from "./response-matrix.js";
 
 /** Multiple-choice responses scored against a key, with the chosen options kept for distractor analysis. */
@@ -20,6 +20,8 @@ export interface ScoringOptions extends ResponseMatrixOptions {
    */
   readonly optionLabels?: readonly string[];
 }
+
+const SCORING_OPTIONS: FieldNames<ScoringOptions> = { optionLabels: true, personIds: true, itemIds: true, times: true };
 
 /**
  * Scores multiple-choice responses against a key: 1 for the keyed option, 0 for any other option, and `null` when no
@@ -54,7 +56,7 @@ export function scoreResponses(
 ): ScoredResponses {
   checkArray(choices, "The choices must be an array of rows of option labels");
   checkArray(key, "The key must be an array of option labels");
-  checkOptions(options);
+  checkOptions(options, SCORING_OPTIONS);
   choices.forEach((row, person) => {
     if (!Array.isArray(row)) throw new DataError(`Row ${person + 1} of the choices must be an array of option labels.`);
     if (row.length !== key.length) {

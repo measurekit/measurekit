@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions } from "@measurekit/core";
+import { checkChoice, checkOptions, type FieldNames } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import {
   type AbilityEstimator,
@@ -32,6 +32,8 @@ export interface ExpectedInformationOptions {
   readonly information?: ExpectedInformationKind;
 }
 
+const EXPECTED_INFORMATION_OPTIONS: FieldNames<ExpectedInformationOptions> = { estimator: true, information: true };
+
 /**
  * Returns maximum expected information (MEI), catR's `MEI`: each item scored by its information at the estimate after
  * its response, expected over its categories at the current estimate.
@@ -49,7 +51,7 @@ export interface ExpectedInformationOptions {
  * @see {@link https://doi.org/10.1007/978-0-387-85461-8_1 | van der Linden and Pashley (2010)}
  */
 export function expectedInformation(options: ExpectedInformationOptions = {}): ItemSelectionRule {
-  checkOptions(options);
+  checkOptions(options, EXPECTED_INFORMATION_OPTIONS);
   const { estimator = posteriorModeEstimate, information = "observed" } = options;
   checkFunction(
     estimator,

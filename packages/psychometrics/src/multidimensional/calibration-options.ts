@@ -1,3 +1,4 @@
+import type { FieldNames } from "@measurekit/core";
 import type { ParameterPrior, StandardErrorMethod } from "../irt/internal.js";
 import type { LoadingPattern, MultidimensionalModel } from "./model.js";
 
@@ -105,3 +106,19 @@ export interface MultidimensionalCalibrationOptions<TParameters> {
    */
   readonly maxIterations?: number;
 }
+
+export const MULTIDIMENSIONAL_CALIBRATION_OPTIONS: FieldNames<MultidimensionalCalibrationOptions<unknown>> = {
+  model: true,
+  method: true,
+  dimensions: true,
+  loadings: true,
+  correlated: true,
+  groups: true,
+  fixed: true,
+  priors: true,
+  points: true,
+  standardErrors: true,
+  seed: true,
+  tolerance: true,
+  maxIterations: true,
+};

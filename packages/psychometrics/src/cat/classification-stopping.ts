@@ -1,4 +1,13 @@
-import { checkArray, checkFinite, checkOptions, DataError, describe, isRecord, normalQuantile } from "@measurekit/core";
+import {
+  checkArray,
+  checkFinite,
+  checkOptions,
+  DataError,
+  describe,
+  type FieldNames,
+  isRecord,
+  normalQuantile,
+} from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 import { type AbilityEstimate, largestCategoryCount, logProbability } from "../irt/internal.js";
 import type { PoolControls, PoolItem } from "./items.js";
@@ -43,6 +52,8 @@ export interface ClassificationOptions {
   readonly level?: number;
 }
 
+const CLASSIFICATION_OPTIONS: FieldNames<ClassificationOptions> = { level: true };
+
 /**
  * Returns a rule that stops once the confidence interval of the estimate clears every cut, as catR's `classification`
  * rule does for one cut.
@@ -67,7 +78,7 @@ export function classificationThreshold<TItem extends PoolControls, TEstimate ex
     checkFinite(cut, `Cut ${i + 1}`);
     return [cut, cut];
   }).map(([cut]) => cut);
-  checkOptions(options);
+  checkOptions(options, CLASSIFICATION_OPTIONS);
   const { level = DEFAULT_LEVEL } = options;
   checkOpenUnitInterval(level, "The option level");
   // catR's z: the quantile of 1 - alpha / 2, alpha = 1 - level.
@@ -109,6 +120,8 @@ export interface SprtOptions {
   readonly beta?: number;
 }
 
+const SPRT_OPTIONS: FieldNames<SprtOptions> = { alpha: true, beta: true };
+
 /**
  * Returns a rule that stops once Wald's sequential probability ratio test has decided at every cut, as mirtCAT's SPRT
  * does for one cut.
@@ -141,7 +154,7 @@ export function sequentialProbabilityRatio(
     }
     return [cut.lower, cut.upper];
   });
-  checkOptions(options);
+  checkOptions(options, SPRT_OPTIONS);
   const { alpha = DEFAULT_ALPHA, beta = DEFAULT_BETA } = options;
   checkOpenUnitInterval(alpha, "The option alpha");
   checkOpenUnitInterval(beta, "The option beta");

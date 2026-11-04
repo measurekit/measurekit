@@ -1,4 +1,4 @@
-import { checkOptions } from "@measurekit/core";
+import { checkOptions, type FieldNames } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { type AbilityEstimator, posteriorMeanEstimate } from "./ability.js";
@@ -17,6 +17,8 @@ export interface AbilityEstimatesOptions {
    */
   readonly estimator?: AbilityEstimator;
 }
+
+export const ABILITY_ESTIMATES_OPTIONS: FieldNames<AbilityEstimatesOptions> = { estimator: true };
 
 /**
  * Returns the estimate of theta of every person, in the order of the data's person ids, from the person's answered
@@ -37,7 +39,7 @@ export function abilityEstimates(
   items: readonly TestItem[],
   options: AbilityEstimatesOptions = {},
 ): readonly PersonEstimate[] {
-  checkOptions(options);
+  checkOptions(options, ABILITY_ESTIMATES_OPTIONS);
   const { estimator = posteriorMeanEstimate } = options;
   checkFunction(estimator, "The estimator must be a function of items and responses, such as posteriorMeanEstimate");
   const estimate = estimator === posteriorMeanEstimate ? sharedPosteriorMeanEstimator() : estimator;

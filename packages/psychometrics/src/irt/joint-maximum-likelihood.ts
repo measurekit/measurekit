@@ -2,6 +2,7 @@ import {
   checkOptions,
   checkStopping,
   DataError,
+  type FieldNames,
   iterateToConvergence,
   type LogisticItem,
   largestChange,
@@ -31,6 +32,11 @@ export interface JointMaximumLikelihoodOptions {
    */
   readonly maxIterations?: number;
 }
+
+const JOINT_MAXIMUM_LIKELIHOOD_OPTIONS: FieldNames<JointMaximumLikelihoodOptions> = {
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** A person's theta from joint maximum likelihood, with its standard error. */
 export interface PersonEstimate {
@@ -94,7 +100,7 @@ export function jointMaximumLikelihood(
   options: JointMaximumLikelihoodOptions = {},
 ): JointCalibration {
   checkResponseMatrix(matrix);
-  checkOptions(options);
+  checkOptions(options, JOINT_MAXIMUM_LIKELIHOOD_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   checkStopping(tolerance, maxIterations);
   const { itemIds } = matrix;

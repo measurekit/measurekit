@@ -1,4 +1,4 @@
-import { checkOptions, checkPositive, checkPositiveInteger, DataError } from "@measurekit/core";
+import { checkOptions, checkPositive, checkPositiveInteger, DataError, type FieldNames } from "@measurekit/core";
 import { symmetricEigen } from "../math/internal.js";
 
 /** Options of {@link smoothCorrelations}. */
@@ -10,6 +10,8 @@ export interface SmoothingOptions {
    */
   readonly tolerance?: number;
 }
+
+const SMOOTHING_OPTIONS: FieldNames<SmoothingOptions> = { tolerance: true };
 
 /** psych's `eig.tol`: the eigenvalues of a smoothed matrix are at least 100 times it. */
 const DEFAULT_TOLERANCE = 1e-12;
@@ -41,7 +43,7 @@ export function smoothCorrelations(
   size: number,
   options: SmoothingOptions = {},
 ): Float64Array {
-  checkOptions(options);
+  checkOptions(options, SMOOTHING_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE } = options;
   checkPositive(tolerance, "The option tolerance");
   checkMatrix(correlations, size);

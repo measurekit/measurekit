@@ -5,6 +5,7 @@ import {
   chiSquareUpperTail,
   DataError,
   describe,
+  type FieldNames,
   isRecord,
   normalQuantile,
 } from "@measurekit/core";
@@ -54,6 +55,14 @@ export interface DiffTestOptions {
   readonly version?: Exclude<IitaVersion, "original">;
 }
 
+const DIFF_TEST_OPTIONS: FieldNames<DiffTestOptions> = {
+  alternative: true,
+  tail: true,
+  mean: true,
+  confidence: true,
+  version: true,
+};
+
 /** The result of {@link diffTest}. */
 export interface DiffTest {
   /** The fit measure `diff` over n², or the difference of the two, n the number of learners. */
@@ -92,7 +101,7 @@ export interface DiffTest {
  * @see {@link https://doi.org/10.18637/jss.v037.i02 | Ünlü and Sargin (2010)}
  */
 export function diffTest(log: EventLog, prerequisites: Prerequisites, options: DiffTestOptions = {}): DiffTest {
-  checkOptions(options);
+  checkOptions(options, DIFF_TEST_OPTIONS);
   const { alternative, tail = DEFAULT_TAIL, mean = DEFAULT_MEAN, confidence = DEFAULT_CONFIDENCE } = options;
   const { version = DEFAULT_VERSION } = options;
   checkChoice(tail, "The option tail", ["two-sided", "less", "greater"]);

@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
+import { checkFields, checkRecord, DataError, describe, type FieldNames, isUnitInterval } from "@measurekit/core";
 import { entry, mapRecord } from "../data/internal.js";
 import type { BktLearning, BktParameters, BktSkill } from "./parameters.js";
 
@@ -24,6 +24,15 @@ export interface BktFixedRates {
   readonly resources?: Readonly<Record<string, Partial<BktLearning>>>;
 }
 
+const BKT_FIXED_RATE_FIELDS: FieldNames<BktFixedRates> = {
+  prior: true,
+  learn: true,
+  forget: true,
+  guess: true,
+  slip: true,
+  resources: true,
+};
+
 /** The bounds of the rates that EM estimates: a lower and an upper bound, from 0 to 1, for each rate that has any. */
 export interface BktBounds {
   /** The bounds of P(L0), of the skill and of each group. */
@@ -37,6 +46,10 @@ export interface BktBounds {
   /** The bounds of P(S), of the skill and of each item. */
   readonly slip?: readonly [number, number];
 }
+
+const BKT_BOUND_FIELDS: FieldNames<BktBounds> = { prior: true, learn: true, forget: true, guess: true, slip: true };
+
+const LEARNING_FIELDS: FieldNames<Partial<BktLearning>> = { learn: true, forget: true };
 
 /** What a fit holds its estimates to: the fixed rates by skill and the bounds, which every skill has. */
 export interface Constraints {
@@ -125,11 +138,7 @@ interface Structure {
 export function checkConstraints({ fixed, bounds }: Constraints, structure: Structure): void {
   checkRecord(fixed, "The option fixed must be an object of fixed rates by skill id");
   checkRecord(bounds, "The option bounds must be an object of bounds by rate");
-  for (const rate of Object.keys(bounds)) {
-    if (!RATES.includes(rate as BktRate)) {
-      throw new DataError(`The option bounds has no rate "${rate}"; its rates are ${RATES.join(", ")}.`);
-    }
-  }
+  checkFields(bounds, BKT_BOUND_FIELDS, "The option bounds");
   for (const rate of RATES) {
     const pair = bounds[rate];
     if (pair === undefined) continue;
@@ -151,6 +160,7 @@ export function checkConstraints({ fixed, bounds }: Constraints, structure: Stru
 function checkFixedRates(skill: string, rates: BktFixedRates, bounds: BktBounds, structure: Structure): void {
   const label = `The fixed rates of skill "${skill}"`;
   checkRecord(rates, `${label} must be an object`);
+  checkFields(rates, BKT_FIXED_RATE_FIELDS, `The option fixed, for skill "${skill}",`);
   for (const rate of RATES) checkHeld(label, rate, rates[rate], bounds, structure.forgetting);
   if (rates.resources === undefined) return;
   if (!structure.resourceLearning) throw new DataError(`${label} have resources, which need resourceLearning: true.`);
@@ -158,6 +168,7 @@ function checkFixedRates(skill: string, rates: BktFixedRates, bounds: BktBounds,
   for (const [resource, held] of Object.entries(rates.resources)) {
     const where = `${label}, resource "${resource}",`;
     checkRecord(held, `${where} must be an object`);
+    checkFields(held, LEARNING_FIELDS, `The option fixed, for skill "${skill}" and resource "${resource}",`);
     for (const rate of ["learn", "forget"] as const) checkHeld(where, rate, held[rate], bounds, structure.forgetting);
   }
 }

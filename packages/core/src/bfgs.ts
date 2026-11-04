@@ -1,3 +1,4 @@
+import { checkOptions, type FieldNames } from "./checks.js";
 import { type DescentPoint, type GradientFunction, stepAlong } from "./descent.js";
 import { dot, maxAbs, multiplyVector } from "./vectors.js";
 
@@ -16,6 +17,8 @@ export interface OptimizerOptions {
    */
   readonly maxIterations?: number;
 }
+
+const OPTIMIZER_OPTIONS: FieldNames<OptimizerOptions> = { tolerance: true, maxIterations: true };
 
 /** The outcome of a minimization. */
 export interface OptimizationResult {
@@ -49,6 +52,7 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * @param start - The point to start from.
  * @param options - The stopping rules.
  * @returns The point reached, the function value there, the iterations run and whether the minimization converged.
+ * @throws `DataError` when the options are not an object or hold a name that is not an option.
  * @see {@link https://doi.org/10.1007/978-0-387-40065-5 | Nocedal and Wright (2006), eq. 6.20}
  */
 export function bfgs(
@@ -56,6 +60,7 @@ export function bfgs(
   start: ArrayLike<number>,
   options: OptimizerOptions = {},
 ): OptimizationResult {
+  checkOptions(options, OPTIMIZER_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   const size = start.length;
   const approximation = inverseHessianOf(size);

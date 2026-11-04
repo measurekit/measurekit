@@ -1,4 +1,11 @@
-import { checkOptions, checkRecord, checkUnitInterval, type ThetaDistribution } from "@measurekit/core";
+import {
+  checkFields,
+  checkOptions,
+  checkRecord,
+  checkUnitInterval,
+  type FieldNames,
+  type ThetaDistribution,
+} from "@measurekit/core";
 import {
   type CheckedThetaDistribution,
   checkItemList,
@@ -26,6 +33,8 @@ export interface EquatingPopulations {
   readonly to?: ThetaDistribution;
 }
 
+const EQUATING_POPULATION_FIELDS: FieldNames<EquatingPopulations> = { from: true, to: true };
+
 /** Options of {@link irtObservedScoreEquating}. */
 export interface IrtObservedScoreOptions {
   /** The populations of the two groups. */
@@ -38,6 +47,8 @@ export interface IrtObservedScoreOptions {
    */
   readonly weight?: number;
 }
+
+const IRT_OBSERVED_SCORE_OPTIONS: FieldNames<IrtObservedScoreOptions> = { populations: true, weight: true };
 
 /** The populations and weight of an equating, checked. */
 export interface ObservedScoreSetup {
@@ -76,18 +87,20 @@ export function irtObservedScoreEquating(
 ): readonly number[] {
   checkItemList(from, "The from form");
   checkItemList(to, "The to form");
+  checkOptions(options, IRT_OBSERVED_SCORE_OPTIONS);
   return observedScoreEquivalents(from, to, observedScoreSetup(options));
 }
 
 /**
- * Checks the options of an IRT observed-score equating and returns its populations and weight.
+ * Checks the populations and weight of an IRT observed-score equating, whose caller has checked its options, and returns
+ * them.
  *
- * @throws `DataError` as {@link irtObservedScoreEquating} does for the options.
+ * @throws `DataError` as {@link irtObservedScoreEquating} does for the populations and weight.
  */
 export function observedScoreSetup(options: IrtObservedScoreOptions): ObservedScoreSetup {
-  checkOptions(options);
   const { populations = {}, weight = 0.5 } = options;
   checkRecord(populations, "The option populations must be an object { from, to }");
+  checkFields(populations, EQUATING_POPULATION_FIELDS, "The option populations");
   checkUnitInterval(weight, "The option weight");
   const { from, to } = populations;
   const standard = quadratureRule();

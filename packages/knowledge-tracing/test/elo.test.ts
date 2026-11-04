@@ -302,6 +302,7 @@ describe("elo input checks", () => {
   it.each([
     ['{"uncertainty": {"a": 0, "b": 0.05}}', "The uncertainty function's a must be a positive number, found 0."],
     ['{"uncertainty": {"a": 1, "b": -1}}', "The uncertainty function's b must be a non-negative number, found -1."],
+    ['{"uncertainty": {"a": 1, "b": 0, "c": 1}}', 'The uncertainty function may hold only a and b, found "c".'],
     ['{"skillWeight": 0.5}', "The option skillWeight needs skills: true."],
     ['{"skills": true, "skillWeight": 0}', "The option skillWeight must be a positive number, found 0."],
     ['{"skills": "yes"}', 'The option skills must be a boolean, found "yes".'],
@@ -351,6 +352,7 @@ describe("elo input checks", () => {
 describe("elo options from JavaScript", () => {
   it("rejects options that are not an object", () => {
     expect(() => elo(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => elo(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 
   it("rejects parameters of null, which do not stand for the default", () => {

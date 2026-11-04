@@ -1,4 +1,12 @@
-import { checkOptions, checkRandom, checkStopping, DataError, describe, type Random } from "@measurekit/core";
+import {
+  checkOptions,
+  checkRandom,
+  checkStopping,
+  DataError,
+  describe,
+  type FieldNames,
+  type Random,
+} from "@measurekit/core";
 import { type AdaptiveTestOptions, createAdaptiveTest } from "./adaptive-test.js";
 import type { PoolItem } from "./items.js";
 import { type ExposureRate, simulateAdaptiveTest } from "./simulation.js";
@@ -22,6 +30,12 @@ export interface ExposureCalibrationOptions {
    */
   readonly maxIterations?: number;
 }
+
+const EXPOSURE_CALIBRATION_OPTIONS: FieldNames<ExposureCalibrationOptions> = {
+  maxRate: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** Sympson-Hetter exposure parameters calibrated by simulation. */
 export interface ExposureCalibration {
@@ -63,7 +77,7 @@ export function calibrateExposure(
   random: Random,
   options: ExposureCalibrationOptions,
 ): ExposureCalibration {
-  checkOptions(options);
+  checkOptions(options, EXPOSURE_CALIBRATION_OPTIONS);
   const { maxRate, tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   if (!(typeof maxRate === "number" && maxRate > 0 && maxRate <= 1)) {
     throw new DataError(`The option maxRate must be a number above 0 and at most 1, found ${describe(maxRate)}.`);

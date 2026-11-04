@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CdmCalibration, calibratedModel } from "./calibration.js";
 import { forEachPosterior } from "./expectation.js";
@@ -13,6 +13,8 @@ export interface CdmAccuracyOptions {
    */
   readonly classification?: "map" | "eap";
 }
+
+const CDM_ACCURACY_OPTIONS: FieldNames<CdmAccuracyOptions> = { classification: true };
 
 const CLASSIFICATIONS: readonly ("map" | "eap")[] = ["map", "eap"];
 
@@ -49,7 +51,7 @@ export function cdmClassificationAccuracy(
   calibration: CdmCalibration,
   options: CdmAccuracyOptions = {},
 ): CdmClassificationAccuracy {
-  checkOptions(options);
+  checkOptions(options, CDM_ACCURACY_OPTIONS);
   const { classification = "map" } = options;
   checkChoice(classification, "The option classification", CLASSIFICATIONS);
   const { data, design, state } = calibratedModel(matrix, calibration);

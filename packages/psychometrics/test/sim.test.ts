@@ -420,6 +420,9 @@ describe("simulateResponses", () => {
     expect(() => simulateResponses(Items, [0], random, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => simulateResponses(Items, [0], random, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
   });
 });
 
@@ -553,6 +556,9 @@ describe("simulateMultidimensionalResponses", () => {
     expect(() => simulateMultidimensionalResponses(Items, [[0, 0]], random, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => simulateMultidimensionalResponses(Items, [[0, 0]], random, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
   });
 });
 
@@ -574,6 +580,7 @@ describe("simulateThetas", () => {
       "Theta 1 must be a finite number, found Infinity.",
     );
     expect(() => simulateThetas(2, random, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => simulateThetas(2, random, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => simulateThetas(2, random, { distribution: JSON.parse("null") })).toThrow(
       "The distribution must be a function of a random number generator, found null.",
     );

@@ -5,6 +5,7 @@ import {
   checkStopping,
   chiSquareUpperTail,
   DataError,
+  type FieldNames,
   type LogisticItem,
   type ThresholdItem,
 } from "@measurekit/core";
@@ -77,6 +78,15 @@ export interface LltmOptions {
    */
   readonly maxIterations?: number;
 }
+
+const LLTM_OPTIONS: FieldNames<LltmOptions> = {
+  model: true,
+  intercept: true,
+  quadrature: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** The likelihood-ratio test of an LLTM against the Rasch model that gives every item a difficulty of its own. */
 export interface RaschComparison {
@@ -245,7 +255,7 @@ export function lltm(
   features: ItemFeatures,
   options: LltmOptions = {},
 ): Lltm<LogisticItem | ThresholdItem> {
-  checkOptions(options);
+  checkOptions(options, LLTM_OPTIONS);
   const {
     model = "dichotomous",
     intercept = true,

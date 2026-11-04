@@ -1,4 +1,4 @@
-import { checkOptions, type Random } from "@measurekit/core";
+import { checkOptions, type FieldNames, type Random } from "@measurekit/core";
 import { type ProfileEstimate, type ProfileProportion, profileEstimate } from "../cdm/internal.js";
 import { bindPool, checkPool, type DiagnosticPoolItem, type DiagnosticTestItem } from "./diagnostic-items.js";
 import { gdinaDiscriminationIndex } from "./diagnostic-selection.js";
@@ -33,6 +33,17 @@ export interface DiagnosticAdaptiveTestOptions extends TestControlOptions {
    */
   readonly selection?: ItemSelectionRule<DiagnosticTestItem, ProfileEstimate>;
 }
+
+const DIAGNOSTIC_ADAPTIVE_TEST_OPTIONS: FieldNames<DiagnosticAdaptiveTestOptions> = {
+  pool: true,
+  attributes: true,
+  prior: true,
+  stopping: true,
+  selection: true,
+  contentTargets: true,
+  enemies: true,
+  withinTestlet: true,
+};
 
 /** The state of a diagnostic adaptive test: plain data, which JSON serializes, so that a test can resume from it. */
 export interface DiagnosticAdaptiveTestState extends AdaptiveState<ProfileEstimate> {}
@@ -103,7 +114,7 @@ export interface DiagnosticAdaptiveTest {
  * ```
  */
 export function createDiagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): DiagnosticAdaptiveTest {
-  checkOptions(options);
+  checkOptions(options, DIAGNOSTIC_ADAPTIVE_TEST_OPTIONS);
   const {
     pool,
     attributes,

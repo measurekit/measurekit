@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, chiSquareUpperTail, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, chiSquareUpperTail, DataError, type FieldNames } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
@@ -29,6 +29,8 @@ export interface CdmModelFitOptions {
    */
   readonly level?: number;
 }
+
+const CDM_MODEL_FIT_OPTIONS: FieldNames<CdmModelFitOptions> = { level: true };
 
 /** The fit of a calibrated cognitive diagnosis model to the first- and second-order margins of its test. */
 export interface CdmModelFit {
@@ -79,7 +81,7 @@ export function cdmModelFit(
   calibration: CdmCalibration,
   options: CdmModelFitOptions = {},
 ): CdmModelFit {
-  checkOptions(options);
+  checkOptions(options, CDM_MODEL_FIT_OPTIONS);
   const { level = DEFAULT_LEVEL } = options;
   checkOpenUnitInterval(level, "The option level");
   const model = checkedModel(matrix, calibration);

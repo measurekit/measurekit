@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, type QMatrix } from "@measurekit/core";
+import { checkChoice, checkOptions, type FieldNames, type QMatrix } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { dichotomousRows } from "./calibration.js";
 import { cdmDesign } from "./q-matrix.js";
@@ -13,6 +13,8 @@ export interface NonparametricOptions {
    */
   readonly rule?: "conjunctive" | "disjunctive";
 }
+
+const NONPARAMETRIC_OPTIONS: FieldNames<NonparametricOptions> = { rule: true };
 
 const RULES: readonly ("conjunctive" | "disjunctive")[] = ["conjunctive", "disjunctive"];
 
@@ -49,7 +51,7 @@ export function nonparametricClassification(
   qMatrix: QMatrix,
   options: NonparametricOptions = {},
 ): readonly NonparametricClassification[] {
-  checkOptions(options);
+  checkOptions(options, NONPARAMETRIC_OPTIONS);
   const { rule = "conjunctive" } = options;
   checkChoice(rule, "The option rule", RULES);
   checkResponseMatrix(matrix);

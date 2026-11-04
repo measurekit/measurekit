@@ -1,4 +1,4 @@
-import { checkOptions, checkUnitInterval, normalQuantile } from "@measurekit/core";
+import { checkOptions, checkUnitInterval, type FieldNames, normalQuantile } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { checkLevel } from "./item-check.js";
 import { usableItems } from "./scalability.js";
@@ -19,6 +19,8 @@ export interface ItemSelectionOptions {
    */
   readonly alpha?: number;
 }
+
+const ITEM_SELECTION_OPTIONS: FieldNames<ItemSelectionOptions> = { lowerBound: true, alpha: true };
 
 /** The scales that automated item selection forms, and the items that belong to none. */
 export interface MokkenScales {
@@ -57,7 +59,7 @@ const ROW_EPSILON = 1e-10;
  * @see {@link https://doi.org/10.4135/9781412984676 | Sijtsma and Molenaar (2002)}
  */
 export function automatedItemSelection(matrix: ResponseMatrix, options: ItemSelectionOptions = {}): MokkenScales {
-  checkOptions(options);
+  checkOptions(options, ITEM_SELECTION_OPTIONS);
   const { lowerBound = DEFAULT_LOWER_BOUND, alpha = DEFAULT_ALPHA } = options;
   checkUnitInterval(lowerBound, "The option lowerBound");
   checkLevel(alpha, "The option alpha");

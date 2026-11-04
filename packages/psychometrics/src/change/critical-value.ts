@@ -1,4 +1,4 @@
-import { checkOptions, normalQuantile } from "@measurekit/core";
+import { checkOptions, type FieldNames, normalQuantile } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 
 /** Options of {@link reliableChange} and {@link reliableChangeFromTheta}. */
@@ -11,6 +11,8 @@ export interface ReliableChangeOptions {
   readonly level?: number;
 }
 
+const RELIABLE_CHANGE_OPTIONS: FieldNames<ReliableChangeOptions> = { level: true };
+
 const DEFAULT_LEVEL = 0.95;
 
 /**
@@ -20,7 +22,7 @@ const DEFAULT_LEVEL = 0.95;
  * @throws `DataError` when the options are not an object or the level is not a number between 0 and 1, exclusive.
  */
 export function criticalValue(options: ReliableChangeOptions): number {
-  checkOptions(options);
+  checkOptions(options, RELIABLE_CHANGE_OPTIONS);
   const { level = DEFAULT_LEVEL } = options;
   checkOpenUnitInterval(level, "The option level");
   return normalQuantile((1 + level) / 2);

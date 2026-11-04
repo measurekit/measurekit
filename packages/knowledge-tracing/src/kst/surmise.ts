@@ -1,10 +1,12 @@
-import { checkOptions, DataError, describe, isRecord } from "@measurekit/core";
+import { checkOptions, DataError, describe, type FieldNames, isRecord } from "@measurekit/core";
 import { checkMaxStates, type StateLimitOptions, tooManyStates } from "./build.js";
 import { checkElementCount } from "./element-limit.js";
 import { compareStates, type KnowledgeStructure, seal } from "./structure.js";
 
 /** Options of {@link surmiseStructure}. */
 export type SurmiseStructureOptions = StateLimitOptions;
+
+const SURMISE_STRUCTURE_OPTIONS: FieldNames<SurmiseStructureOptions> = { maxStates: true };
 
 /**
  * A quasi-order of elements as `iita` returns it: each element's prerequisites, the elements that every learner who
@@ -41,7 +43,7 @@ export function surmiseStructure(
   prerequisites: Prerequisites,
   options: SurmiseStructureOptions = {},
 ): KnowledgeStructure {
-  checkOptions(options);
+  checkOptions(options, SURMISE_STRUCTURE_OPTIONS);
   const maxStates = checkMaxStates(options.maxStates);
   if (!isRecord(prerequisites)) {
     throw new DataError(

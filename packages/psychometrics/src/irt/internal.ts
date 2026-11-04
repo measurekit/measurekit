@@ -9,11 +9,12 @@ export {
   modalTheta,
   posteriorMeanEstimate,
   posteriorModeEstimate,
+  RANGE_OPTIONS,
   type RangeOptions,
   type ThetaIntegrationOptions,
   type ThetaPrior,
 } from "./ability.js";
-export { type AbilityEstimatesOptions, abilityEstimates } from "./ability-estimates.js";
+export { ABILITY_ESTIMATES_OPTIONS, type AbilityEstimatesOptions, abilityEstimates } from "./ability-estimates.js";
 export { fromUnbounded, toUnbounded, unboundedDerivative } from "./bounds.js";
 export {
   type CalibratedItem,

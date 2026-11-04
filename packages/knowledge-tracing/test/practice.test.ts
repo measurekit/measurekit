@@ -160,13 +160,18 @@ describe("practice options from JavaScript", () => {
     const missing = JSON.parse("null");
     const model = bkt({ parameters: { skills: { s: { prior: 0.3, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } } });
     const log = buildEventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
-    for (const use of [
-      () => recommend(model, model.initialState("ana"), [], missing),
-      () => streakMastery(log, missing),
-      () => thresholdMastery(model, log, missing),
-      () => opportunitiesToStreak(0.5, missing),
+    for (const [options, message] of [
+      [missing, "The options must be an object, found null."],
+      [JSON.parse('{"verbose":1}'), 'There is no option "verbose"'],
     ]) {
-      expect(use).toThrow("The options must be an object, found null.");
+      for (const use of [
+        () => recommend(model, model.initialState("ana"), [], options),
+        () => streakMastery(log, options),
+        () => thresholdMastery(model, log, options),
+        () => opportunitiesToStreak(0.5, options),
+      ]) {
+        expect(use).toThrow(message);
+      }
     }
   });
 
@@ -406,8 +411,13 @@ describe("mastery criteria, errors", () => {
   it("rejects options of other types and values from JavaScript", () => {
     const missing = JSON.parse("null");
     expect(() => movingAverageMastery(log, missing)).toThrow("The options must be an object, found null.");
+    expect(() => movingAverageMastery(log, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => windowMastery(log, missing)).toThrow("The options must be an object, found null.");
+    expect(() => windowMastery(log, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => predictedMastery(performance, log, missing)).toThrow("The options must be an object, found null.");
+    expect(() => predictedMastery(performance, log, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => movingAverageMastery(log, JSON.parse('{"decay": 0.5}'))).toThrow(
       "The option threshold must be a number from 0 to 1, found undefined.",
     );

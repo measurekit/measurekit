@@ -1,4 +1,12 @@
-import { checkArray, checkChoice, checkOptions, checkRecord, DataError, studentLowerTail } from "@measurekit/core";
+import {
+  checkArray,
+  checkChoice,
+  checkOptions,
+  checkRecord,
+  DataError,
+  type FieldNames,
+  studentLowerTail,
+} from "@measurekit/core";
 import { checkLog, type Fold } from "../data/internal.js";
 import type { CrossValidation } from "./cross-validation.js";
 import { predictionLogLoss } from "./metrics.js";
@@ -17,6 +25,8 @@ export interface CompareByLearnerOptions {
    */
   readonly loss?: LearnerLoss;
 }
+
+const COMPARE_BY_LEARNER_OPTIONS: FieldNames<CompareByLearnerOptions> = { loss: true };
 
 /** A paired t test of the mean losses of two models, one pair of means per learner. */
 export interface LearnerComparison {
@@ -70,7 +80,7 @@ export function compareByLearner(
   folds: readonly Fold[],
   options: CompareByLearnerOptions = {},
 ): LearnerComparison {
-  checkOptions(options);
+  checkOptions(options, COMPARE_BY_LEARNER_OPTIONS);
   const { loss = DEFAULT_LOSS } = options;
   checkChoice(loss, "The option loss", LOSSES);
   checkArray(folds, "The folds must be an array of folds");

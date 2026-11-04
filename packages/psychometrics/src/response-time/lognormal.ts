@@ -1,4 +1,11 @@
-import { checkOptions, checkStopping, DataError, iterateToConvergence, largestChange } from "@measurekit/core";
+import {
+  checkOptions,
+  checkStopping,
+  DataError,
+  type FieldNames,
+  iterateToConvergence,
+  largestChange,
+} from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { withinStandardErrorSize } from "../irt/internal.js";
 import { invertPositiveDefinite } from "../math/internal.js";
@@ -19,6 +26,11 @@ export interface ResponseTimeCalibrationOptions {
    */
   readonly maxIterations?: number;
 }
+
+const RESPONSE_TIME_CALIBRATION_OPTIONS: FieldNames<ResponseTimeCalibrationOptions> = {
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** A calibrated time item. */
 export interface CalibratedTimeItem extends TimeItem {
@@ -75,7 +87,7 @@ export function calibrateResponseTimes(
   data: ResponseMatrix | ResponseRecords,
   options: ResponseTimeCalibrationOptions = {},
 ): ResponseTimeCalibration {
-  checkOptions(options);
+  checkOptions(options, RESPONSE_TIME_CALIBRATION_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   checkStopping(tolerance, maxIterations);
   const timed = timedResponses(data, "Response time calibration");

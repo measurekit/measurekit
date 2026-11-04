@@ -1,4 +1,4 @@
-import { checkFinite, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkFinite, checkOptions, checkRecord, DataError, describe, type FieldNames } from "@measurekit/core";
 import type { ManyFacetRasch } from "./many-facet-rasch.js";
 import { checkManyFacetRasch, expectedRatingAt, ratingStructure } from "./rating-model.js";
 
@@ -11,6 +11,8 @@ export interface ExpectedRatingOptions {
    */
   readonly levels?: Readonly<Record<string, string>>;
 }
+
+const EXPECTED_RATING_OPTIONS: FieldNames<ExpectedRatingOptions> = { levels: true };
 
 /**
  * Returns the expected rating of a person at `theta` on the elements `levels`: the score a person of that ability would
@@ -31,7 +33,7 @@ export interface ExpectedRatingOptions {
 export function expectedRating(model: ManyFacetRasch, theta: number, options: ExpectedRatingOptions = {}): number {
   checkManyFacetRasch(model);
   checkFinite(theta, "Theta");
-  checkOptions(options);
+  checkOptions(options, EXPECTED_RATING_OPTIONS);
   const { levels = {} } = options;
   checkRecord(levels, "The levels must be an object of elements by facet");
   const structure = ratingStructure(model);

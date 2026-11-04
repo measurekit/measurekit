@@ -1,4 +1,4 @@
-import { checkIntegerFrom, checkOptions, checkRandom, DataError, type Random } from "@measurekit/core";
+import { checkIntegerFrom, checkOptions, checkRandom, DataError, type FieldNames, type Random } from "@measurekit/core";
 import { checkResponseMatrix, MAX_RESPONSE, type ResponseMatrix } from "../data/internal.js";
 
 /** Options of {@link twoWayImputation}. */
@@ -17,6 +17,8 @@ export interface TwoWayImputationOptions {
    */
   readonly maximum?: number;
 }
+
+const TWO_WAY_IMPUTATION_OPTIONS: FieldNames<TwoWayImputationOptions> = { minimum: true, maximum: true };
 
 /**
  * Returns a copy of a response matrix with each missing response imputed by two-way imputation with a random error,
@@ -46,7 +48,7 @@ export function twoWayImputation(
 ): ResponseMatrix {
   checkResponseMatrix(matrix);
   checkRandom(random);
-  checkOptions(options);
+  checkOptions(options, TWO_WAY_IMPUTATION_OPTIONS);
   const observed = observedMoments(matrix);
   const { minimum = observed.lowest, maximum = observed.highest } = options;
   checkBound(minimum, "The option minimum", observed.lowest, "at most the lowest");

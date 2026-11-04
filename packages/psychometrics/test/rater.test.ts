@@ -305,6 +305,7 @@ describe("kappa", () => {
       'The option weights must be "none", "linear" or "quadratic", found "cubic".',
     );
     expect(() => cohenKappa([[0, 1]], JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => cohenKappa([[0, 1]], JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => intraclassCorrelation(JSON.parse('[[1, "2"], [2, 3]]'))).toThrow(
       'The rating of subject 1 by rater 2 must be a finite number or null, found "2".',
     );
@@ -448,6 +449,7 @@ describe("exactAgreement and adjacentAgreement", () => {
       'The option width must be a non-negative number, found "1".',
     );
     expect(() => adjacentAgreement(ratings, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => adjacentAgreement(ratings, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => exactAgreement([[0], [1]])).toThrow("Exact agreement needs at least 2 raters, found 1.");
     expect(() => adjacentAgreement([[0, 1.5]])).toThrow(
       "The rating of subject 1 by rater 2 must be a category, an integer from 0, or null, found 1.5.",
@@ -607,6 +609,9 @@ describe("standardizedMeanDifference", () => {
     expect(() => standardizedMeanDifference(rows, JSON.parse('{ "population": [1, 1] }'))).toThrow(
       "The option population must be an object { first, second }",
     );
+    expect(() =>
+      standardizedMeanDifference(rows, JSON.parse('{ "population": { "first": 1, "second": 1, "third": 1 } }')),
+    ).toThrow('The option population may hold only first and second, found "third".');
     expect(() => standardizedMeanDifference(rows, JSON.parse('{ "population": null }'))).toThrow(DataError);
     expect(() => standardizedMeanDifference(rows, JSON.parse("null"))).toThrow(DataError);
   });
@@ -936,6 +941,7 @@ describe("manyFacetRasch", () => {
     const scores = simulatedScores(2, 20);
     const facets = ["item", "rater"];
     expect(() => manyFacetRasch(scores, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => manyFacetRasch(scores, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => manyFacetRasch(scores, { facets: JSON.parse('"item"') })).toThrow(
       'The option facets must be an array of facet names, such as ["item", "rater"], found "item".',
     );
@@ -1323,6 +1329,9 @@ describe("manyFacetEstimates", () => {
     expect(() => manyFacetEstimates(scores, model, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => manyFacetEstimates(scores, model, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => manyFacetEstimates(scores, model, { estimator: JSON.parse("null") })).toThrow(
       "The estimator must be a function of items and responses, such as posteriorMeanEstimate, found null.",
     );
@@ -1431,6 +1440,7 @@ describe("expectedRating", () => {
       'The level of the facet "rater" must be an element id, found 3.',
     );
     expect(() => expectedRating(model, 0, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => expectedRating(model, 0, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => expectedRating(model, 0, { levels: JSON.parse("null") })).toThrow(
       "The levels must be an object of elements by facet, found null.",
     );

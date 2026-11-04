@@ -1,4 +1,4 @@
-import { checkOptions, cholesky } from "@measurekit/core";
+import { checkOptions, cholesky, type FieldNames } from "@measurekit/core";
 import {
   checkedPrior,
   type MultidimensionalEstimate,
@@ -17,6 +17,8 @@ export interface MaximumDeterminantOptions {
    */
   readonly prior?: MultivariateNormalPrior;
 }
+
+const MAXIMUM_DETERMINANT_OPTIONS: FieldNames<MaximumDeterminantOptions> = { prior: true };
 
 /**
  * Returns D-optimality selection: scores each item by the determinant of the posterior precision of theta after it,
@@ -39,7 +41,7 @@ export interface MaximumDeterminantOptions {
 export function maximumDeterminant(
   options: MaximumDeterminantOptions = {},
 ): ItemSelectionRule<MultidimensionalPoolItem, MultidimensionalEstimate> {
-  checkOptions(options);
+  checkOptions(options, MAXIMUM_DETERMINANT_OPTIONS);
   const { prior } = options;
   if (prior !== undefined) checkedPrior(prior, priorDimensions(prior) ?? 0);
   return {

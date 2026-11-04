@@ -1,4 +1,11 @@
-import { checkIntegerFrom, checkOptions, checkPositive, DataError, normalQuantile } from "@measurekit/core";
+import {
+  checkIntegerFrom,
+  checkOptions,
+  checkPositive,
+  DataError,
+  type FieldNames,
+  normalQuantile,
+} from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CategoryTally, type CompressedResponses, categoryTallies, compressResponses } from "../irt/internal.js";
 
@@ -24,6 +31,8 @@ export interface KernelCurveOptions {
    */
   readonly bandwidth?: number;
 }
+
+const KERNEL_CURVE_OPTIONS: FieldNames<KernelCurveOptions> = { points: true, bandwidth: true };
 
 /** An item's curves, smoothed from its responses: the share of each category, and its standard error, at each node. */
 export interface KernelItemCurve {
@@ -70,7 +79,7 @@ interface CurveRows {
  * @see {@link https://doi.org/10.18637/jss.v058.i06 | Mazza, Punzo and McGuire (2014)}
  */
 export function kernelItemCurves(matrix: ResponseMatrix, options: KernelCurveOptions = {}): readonly KernelItemCurve[] {
-  checkOptions(options);
+  checkOptions(options, KERNEL_CURVE_OPTIONS);
   const { points = DEFAULT_POINTS, bandwidth } = options;
   checkIntegerFrom(points, "The option points", 2);
   if (bandwidth !== undefined) checkPositive(bandwidth, "The option bandwidth");

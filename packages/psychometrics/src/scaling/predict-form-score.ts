@@ -1,7 +1,13 @@
-import type { ThetaDistribution } from "@measurekit/core";
+import { checkOptions, type ThetaDistribution } from "@measurekit/core";
 import { checkItemList, checkThetaDistribution, type IrtItem, scoreLikelihoods } from "../irt/internal.js";
 import { checkConversion } from "./conversion.js";
-import { checkLevel, type ScorePrediction, type ScorePredictionOptions, summarize } from "./prediction.js";
+import {
+  checkLevel,
+  SCORE_PREDICTION_OPTIONS,
+  type ScorePrediction,
+  type ScorePredictionOptions,
+  summarize,
+} from "./prediction.js";
 
 /**
  * Returns the prediction of a person's scale score on an official form from a distribution of the person's theta.
@@ -45,6 +51,7 @@ export function predictFormScore(
 ): ScorePrediction {
   checkItemList(form, "A score prediction");
   checkConversion(conversion, form, "The conversion");
+  checkOptions(options, SCORE_PREDICTION_OPTIONS);
   const level = checkLevel(options);
   const { nodes, weights } = checkThetaDistribution(posterior, "posterior");
   const likelihoods = scoreLikelihoods(form, nodes);

@@ -7,6 +7,7 @@ import {
   cholesky,
   DataError,
   describe,
+  type FieldNames,
   isNonEmptyString,
   iterateToConvergence,
   maxAbs,
@@ -47,6 +48,14 @@ export interface LinearChangeOptions {
    */
   readonly maxIterations?: number;
 }
+
+const LINEAR_CHANGE_OPTIONS: FieldNames<LinearChangeOptions> = {
+  groups: true,
+  baseline: true,
+  itemGroups: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** The change of one set of items at one occasion, for one group. */
 export interface LinearChangeEffect {
@@ -155,7 +164,7 @@ const LIKELIHOOD_ROUNDING = 1e-12;
  * @see {@link https://doi.org/10.1007/978-1-4612-4230-7_9 | Fischer (1995)}
  */
 export function linearChange(occasions: readonly ResponseMatrix[], options: LinearChangeOptions = {}): LinearChange {
-  checkOptions(options);
+  checkOptions(options, LINEAR_CHANGE_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   checkStopping(tolerance, maxIterations);
   const data = checkOccasions(occasions);

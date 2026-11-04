@@ -3160,6 +3160,9 @@ describe("longitudinal calibration errors", () => {
     expect(() => calibrateLongitudinal([first, second], JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrateLongitudinal([first, second], JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => calibrateLongitudinal([first, second], { points: JSON.parse('"7"') })).toThrow(DataError);
     expect(() => calibrateLongitudinal([first, second], { ...options, tolerance: JSON.parse('"1e-4"') })).toThrow(
       DataError,
@@ -3319,6 +3322,7 @@ describe("rotation", () => {
       'The option method must be "varimax" or "oblimin", found "promax".',
     );
     expect(() => rotateLoadings(calibration, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => rotateLoadings(calibration, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => rotateLoadings(calibration, { normalize: JSON.parse('"yes"') })).toThrow(DataError);
     expect(() => rotateLoadings(calibration, { gamma: JSON.parse('"0"') })).toThrow(DataError);
     expect(() => rotateLoadings(calibration, { tolerance: JSON.parse("null") })).toThrow(DataError);
@@ -3689,6 +3693,9 @@ describe("scoring", () => {
       );
       expect(() => multidimensionalEstimates(data, items, JSON.parse("null"))).toThrow(
         "The options must be an object, found null.",
+      );
+      expect(() => multidimensionalEstimates(data, items, JSON.parse('{"verbose":1}'))).toThrow(
+        'There is no option "verbose"',
       );
       expect(() => multidimensionalEstimates(data, items, { estimator: JSON.parse("null") })).toThrow(DataError);
       expect(() => multidimensionalEstimates(data, [...items, defined(items[0])])).toThrow(
@@ -4331,6 +4338,7 @@ describe("errors", () => {
     expect(() => calibrateMultidimensional(data, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrateMultidimensional(data, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => calibrateMultidimensional(JSON.parse("null"), options)).toThrow(DataError);
     expect(() => calibrateMultidimensional(data, { ...options, dimensions: undefined, loadings: undefined })).toThrow(
       DataError,
@@ -4422,8 +4430,14 @@ describe("input of other types", () => {
     expect(() => multidimensionalPosteriorMeanEstimate(items, [], JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => multidimensionalPosteriorMeanEstimate(items, [], JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => multidimensionalPosteriorModeEstimate(items, [], JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => multidimensionalPosteriorModeEstimate(items, [], JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => multidimensionalPosteriorModeEstimate(JSON.parse("null"), [])).toThrow(
       "Scoring needs an array of items, found null.",

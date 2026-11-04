@@ -1,4 +1,4 @@
-import { checkNonNegative, checkOptions, checkRecord, mean } from "@measurekit/core";
+import { checkFields, checkNonNegative, checkOptions, checkRecord, type FieldNames, mean } from "@measurekit/core";
 import { standardDeviation } from "../math/internal.js";
 import { isConstant, pairOfRaters } from "./ratings.js";
 
@@ -9,6 +9,8 @@ export interface PopulationDeviations {
   /** The standard deviation of the second rater's ratings. */
   readonly second: number;
 }
+
+const POPULATION_DEVIATION_FIELDS: FieldNames<PopulationDeviations> = { first: true, second: true };
 
 /** Options of {@link standardizedMeanDifference}. */
 export interface StandardizedMeanDifferenceOptions {
@@ -21,6 +23,8 @@ export interface StandardizedMeanDifferenceOptions {
    */
   readonly population?: PopulationDeviations;
 }
+
+const STANDARDIZED_MEAN_DIFFERENCE_OPTIONS: FieldNames<StandardizedMeanDifferenceOptions> = { population: true };
 
 /**
  * Returns the standardized mean difference between two raters: the first rater's mean rating less the second's, over
@@ -46,10 +50,11 @@ export function standardizedMeanDifference(
   ratings: readonly (readonly (number | null)[])[],
   options: StandardizedMeanDifferenceOptions = {},
 ): number | null {
-  checkOptions(options);
+  checkOptions(options, STANDARDIZED_MEAN_DIFFERENCE_OPTIONS);
   const { population } = options;
   if (population !== undefined) {
     checkRecord(population, "The option population must be an object { first, second }");
+    checkFields(population, POPULATION_DEVIATION_FIELDS, "The option population");
     checkNonNegative(population.first, "The population's standard deviation of the first rater");
     checkNonNegative(population.second, "The population's standard deviation of the second rater");
   }

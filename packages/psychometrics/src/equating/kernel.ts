@@ -2,15 +2,16 @@ import {
   checkArray,
   checkBoolean,
   checkChoice,
+  checkFields,
   checkNonNegative,
   checkOptions,
   checkPositive,
   checkRecord,
   checkUnitInterval,
   DataError,
+  type FieldNames,
 } from "@measurekit/core";
-import type { BivariateDistribution } from "./bivariate.js";
-import { neatTables } from "./bivariate.js";
+import { type BivariateDistribution, neatTables } from "./bivariate.js";
 import { penaltyBandwidth } from "./kernel-bandwidth.js";
 import {
   type Continuized,
@@ -98,6 +99,22 @@ export type KernelData =
       readonly crossDegree?: number;
     };
 
+/** The kernel equating data of a design. */
+type DesignData<TDesign, TData = KernelData> = TData extends { readonly design: infer TName }
+  ? TDesign extends TName
+    ? TData
+    : never
+  : never;
+
+/** The names of the fields of kernel equating data, by design. */
+const KERNEL_DATA_FIELDS: { readonly [TDesign in KernelData["design"]]: FieldNames<DesignData<TDesign>> } = {
+  "equivalent-groups": { design: true, from: true, to: true, degrees: true },
+  "single-group": { design: true, joint: true, degrees: true, crossDegree: true },
+  counterbalanced: { design: true, first: true, second: true, degrees: true, crossDegree: true },
+  chained: { design: true, from: true, to: true, degrees: true, crossDegree: true },
+  "post-stratification": { design: true, from: true, to: true, degrees: true, crossDegree: true },
+};
+
 /** The bandwidths h of the continuized distributions. */
 export interface KernelBandwidths {
   /** The bandwidth of the form to equate. */
@@ -109,6 +126,13 @@ export interface KernelBandwidths {
   /** In the chained design, the bandwidth of the anchor in the group that took the form to equate to. */
   readonly toAnchor?: number;
 }
+
+const KERNEL_BANDWIDTH_FIELDS: FieldNames<KernelBandwidths> = {
+  from: true,
+  to: true,
+  fromAnchor: true,
+  toAnchor: true,
+};
 
 /** Options of {@link kernelEquating}. */
 export interface KernelEquatingOptions {
@@ -140,6 +164,13 @@ export interface KernelEquatingOptions {
    */
   readonly penaltyWeight?: number;
 }
+
+const KERNEL_EQUATING_OPTIONS: FieldNames<KernelEquatingOptions> = {
+  bandwidths: true,
+  linear: true,
+  weight: true,
+  penaltyWeight: true,
+};
 
 /** A kernel equating with its standard errors. */
 export interface KernelEquating {
@@ -201,9 +232,10 @@ interface DesignMargins {
  * @see {@link https://doi.org/10.1007/978-3-319-51824-4 | González and Wiberg (2017)}
  */
 export function kernelEquating(data: KernelData, options: KernelEquatingOptions = {}): KernelEquating {
-  checkOptions(options);
+  checkOptions(options, KERNEL_EQUATING_OPTIONS);
   const { bandwidths = {}, linear = false, weight = DEFAULT_WEIGHT, penaltyWeight = 0 } = options;
   checkRecord(bandwidths, "The option bandwidths must be an object { from, to, fromAnchor, toAnchor }");
+  checkFields(bandwidths, KERNEL_BANDWIDTH_FIELDS, "The option bandwidths");
   for (const [name, value] of Object.entries(bandwidths)) {
     if (value !== undefined) checkPositive(value, `The bandwidth ${name}`);
   }
@@ -317,6 +349,7 @@ function chooseBandwidth(
 function designMargins(data: KernelData, weight: number): DesignMargins {
   checkRecord(data, "Kernel equating data must be an object { design, degrees, ... } with the design's distributions");
   checkChoice(data.design, "The design", DESIGNS);
+  checkFields(data, KERNEL_DATA_FIELDS[data.design], "Kernel equating data");
   checkArray(data.degrees, "The degrees must be an array of the degrees of the two scores");
   if (data.degrees.length !== 2) {
     throw new DataError(`The degrees must have the degrees of the two scores, found ${data.degrees.length}.`);

@@ -1,4 +1,4 @@
-import { checkNonNegative, checkOptions, checkPositiveInteger } from "@measurekit/core";
+import { checkNonNegative, checkOptions, checkPositiveInteger, type FieldNames } from "@measurekit/core";
 import type { ItemSelectionRule } from "./selection.js";
 
 /** Options of {@link progressive} and {@link proportional}. */
@@ -13,6 +13,8 @@ export interface ProgressiveOptions {
   readonly acceleration?: number;
 }
 
+const PROGRESSIVE_OPTIONS: FieldNames<ProgressiveOptions> = { length: true, acceleration: true };
+
 /**
  * Returns the weight of each selection of a test: 0 at the first item, Σ_(i ≤ k) i^t / Σ_(i < Q) i^t after k items, and
  * 1 from the last planned item on.
@@ -21,7 +23,7 @@ export interface ProgressiveOptions {
  * non-negative number.
  */
 function progressiveWeight(options: ProgressiveOptions): (administered: number) => number {
-  checkOptions(options);
+  checkOptions(options, PROGRESSIVE_OPTIONS);
   const { length, acceleration = 1 } = options;
   checkPositiveInteger(length, "The option length");
   checkNonNegative(acceleration, "The option acceleration");

@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, DataError, describe, isPositive } from "@measurekit/core";
+import { checkArray, checkOptions, DataError, describe, type FieldNames, isPositive } from "@measurekit/core";
 import { indexIds } from "./ids.js";
 import { isResponse, MAX_RESPONSE } from "./response.js";
 
@@ -39,6 +39,8 @@ export interface ResponseMatrixOptions {
   readonly times?: readonly (readonly (number | null)[])[];
 }
 
+const RESPONSE_MATRIX_OPTIONS: FieldNames<ResponseMatrixOptions> = { personIds: true, itemIds: true, times: true };
+
 /**
  * Builds a response matrix from one row of responses per person, with response times if given. The rows are copied.
  *
@@ -53,13 +55,14 @@ export function buildResponseMatrix(
   rows: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions = {},
 ): ResponseMatrix {
+  checkOptions(options, RESPONSE_MATRIX_OPTIONS);
   return buildResponseMatrixWith(rows, options, copyRows);
 }
 
 /**
  * Builds a response matrix that holds the rows given, not copies of them: for a function that made the rows and knows
- * that every response in them is an integer from 0 to 2³¹ - 1 or `null`. Checks the rest of what {@link
- * buildResponseMatrix} checks.
+ * that every response in them is an integer from 0 to 2³¹ - 1 or `null`, and has checked its own options. Checks the rest
+ * of what {@link buildResponseMatrix} checks.
  */
 export function buildResponseMatrixOfRows(
   rows: readonly (readonly (number | null)[])[],
@@ -75,7 +78,6 @@ function buildResponseMatrixWith(
   checks: Checks = {},
 ): ResponseMatrix {
   checkArray(rows, "The rows of a response matrix must be an array");
-  checkOptions(options);
   // A first row that is not an array has no length to count items by: the check of the rows names it.
   const first = rows[0];
   const {

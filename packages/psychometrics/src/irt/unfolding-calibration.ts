@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, checkStopping, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, checkStopping, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { type Calibration, calibrateResponses } from "./calibration.js";
 import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
@@ -44,6 +44,13 @@ export interface UnfoldingCalibrationOptions {
    */
   readonly maxIterations?: number;
 }
+
+const UNFOLDING_CALIBRATION_OPTIONS: FieldNames<UnfoldingCalibrationOptions> = {
+  quadrature: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** A calibration of the generalized graded unfolding model, with the persons it used. */
 export interface UnfoldingCalibration extends Calibration<UnfoldingParameters> {
@@ -93,7 +100,7 @@ export function calibrateUnfolding(
   data: ResponseMatrix | ResponseRecords,
   options: UnfoldingCalibrationOptions = {},
 ): UnfoldingCalibration {
-  checkOptions(options);
+  checkOptions(options, UNFOLDING_CALIBRATION_OPTIONS);
   const {
     quadrature,
     standardErrors = "none",

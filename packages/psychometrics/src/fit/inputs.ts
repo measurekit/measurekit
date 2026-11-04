@@ -1,4 +1,12 @@
-import { checkArray, checkFinite, checkOptions, DataError, describe, type ThetaDistribution } from "@measurekit/core";
+import {
+  checkArray,
+  checkFinite,
+  checkOptions,
+  DataError,
+  describe,
+  type FieldNames,
+  type ThetaDistribution,
+} from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import {
   type CheckedThetaDistribution,
@@ -21,13 +29,15 @@ export interface ResidualFitOptions {
   readonly population?: ThetaDistribution;
 }
 
+const RESIDUAL_FIT_OPTIONS: FieldNames<ResidualFitOptions> = { population: true };
+
 /**
  * Checks the options of a residual fit statistic and returns its population's nodes and weights.
  *
  * @throws `DataError` when the options or the population are invalid.
  */
 export function residualPopulation(options: ResidualFitOptions): CheckedThetaDistribution {
-  checkOptions(options);
+  checkOptions(options, RESIDUAL_FIT_OPTIONS);
   const { population } = options;
   return population === undefined ? quadratureRule() : checkThetaDistribution(population, "population");
 }

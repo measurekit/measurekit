@@ -1,11 +1,13 @@
 import {
   checkChoice,
+  checkFields,
   checkFinite,
   checkIntegerFrom,
   checkOptions,
   checkPositive,
   checkRecord,
   DataError,
+  type FieldNames,
   type ThetaDistribution,
 } from "@measurekit/core";
 import {
@@ -37,6 +39,8 @@ export interface IrtPrior {
   readonly sd: number;
 }
 
+const IRT_PRIOR_FIELDS: FieldNames<IrtPrior> = { mean: true, sd: true };
+
 /** The drift of θ: a random walk whose variance grows by `variance` every `per` units of time. */
 export interface IrtDrift {
   /** The variance θ gains in `per` units of time: above 0. */
@@ -44,6 +48,8 @@ export interface IrtDrift {
   /** The span of time in which θ gains `variance`, in the units of the events' times: above 0. */
   readonly per: number;
 }
+
+const IRT_DRIFT_FIELDS: FieldNames<IrtDrift> = { variance: true, per: true };
 
 /** Options of {@link irt}. */
 export interface IrtOptions {
@@ -75,6 +81,8 @@ export interface IrtOptions {
   readonly drift?: IrtDrift;
 }
 
+const IRT_OPTIONS: FieldNames<IrtOptions> = { parameters: true, prior: true, points: true, drift: true };
+
 /** Options of {@link IrtModel.posterior}. */
 export interface PosteriorOptions {
   /**
@@ -87,6 +95,8 @@ export interface PosteriorOptions {
   readonly at?: number;
 }
 
+const POSTERIOR_OPTIONS: FieldNames<PosteriorOptions> = { at: true };
+
 /** Options of {@link IrtModel.ability}. */
 export interface AbilityOptions extends PosteriorOptions {
   /**
@@ -96,6 +106,8 @@ export interface AbilityOptions extends PosteriorOptions {
    */
   readonly estimator?: "eap" | "map";
 }
+
+const ABILITY_OPTIONS: FieldNames<AbilityOptions> = { estimator: true, at: true };
 
 /** An IRT model: a learner model that updates the posterior of each learner's θ from given item parameters. */
 export interface IrtModel extends LearnerModel<IrtState, IrtParameters> {
@@ -181,15 +193,17 @@ const CATEGORY_TOLERANCE = 1e-9;
  * ```
  */
 export function irt(options: IrtOptions): IrtModel {
-  checkOptions(options);
+  checkOptions(options, IRT_OPTIONS);
   const { parameters, prior = DEFAULT_PRIOR, drift } = options;
   const { points = drift === undefined ? DEFAULT_POINTS : undefined } = options;
   checkParameters(parameters);
   checkRecord(prior, "The prior must be an object { mean, sd }");
+  checkFields(prior, IRT_PRIOR_FIELDS, "The prior");
   checkFinite(prior.mean, "The mean of the prior");
   checkPositive(prior.sd, "The sd of the prior");
   if (drift !== undefined) {
     checkRecord(drift, "The option drift must be an object { variance, per }");
+    checkFields(drift, IRT_DRIFT_FIELDS, "The option drift");
     checkPositive(drift.variance, "The variance of the drift");
     checkPositive(drift.per, "The per of the drift");
   }
@@ -353,7 +367,7 @@ export function irt(options: IrtOptions): IrtModel {
       return expectation(weightsOfDensity(logDensityAt(state, attempt.time)), item, grid, terms);
     },
     ability(state, abilityOptions = {}) {
-      checkOptions(abilityOptions);
+      checkOptions(abilityOptions, ABILITY_OPTIONS);
       const logDensity = posteriorOf(state, abilityOptions);
       const { estimator = DEFAULT_ESTIMATOR } = abilityOptions;
       checkChoice(estimator, "The estimator", ESTIMATORS);
@@ -362,7 +376,7 @@ export function irt(options: IrtOptions): IrtModel {
         : posteriorMode(logDensity, grid, derivativesOf(state, logDensity));
     },
     posterior(state, posteriorOptions = {}) {
-      checkOptions(posteriorOptions);
+      checkOptions(posteriorOptions, POSTERIOR_OPTIONS);
       const weights = posteriorOf(state, posteriorOptions).map(Math.exp);
       const total = weights.reduce((sum, weight) => sum + weight, 0);
       return { nodes: [...grid], weights: weights.map((weight) => weight / total) };

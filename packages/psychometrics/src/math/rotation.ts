@@ -1,4 +1,4 @@
-import { checkBoolean, checkChoice, checkFinite, checkOptions, checkStopping } from "@measurekit/core";
+import { checkBoolean, checkChoice, checkFinite, checkOptions, checkStopping, type FieldNames } from "@measurekit/core";
 import { gradientProjection, type RotationCriterion } from "./gradient-projection.js";
 import { invert } from "./linear-algebra.js";
 import { multiply, transpose } from "./matrix.js";
@@ -40,6 +40,14 @@ export interface RotationOptions {
   readonly maxIterations?: number;
 }
 
+const ROTATION_OPTIONS: FieldNames<RotationOptions> = {
+  method: true,
+  normalize: true,
+  gamma: true,
+  tolerance: true,
+  maxIterations: true,
+};
+
 /** The options of a rotation with their defaults. */
 export type ResolvedRotation = Required<RotationOptions>;
 
@@ -76,7 +84,7 @@ const DEFAULT_MAX_ITERATIONS = 1000;
  * @throws `DataError` when an option is invalid.
  */
 export function resolveRotation(options: RotationOptions = {}): ResolvedRotation {
-  checkOptions(options);
+  checkOptions(options, ROTATION_OPTIONS);
   const {
     method = "oblimin",
     normalize = false,

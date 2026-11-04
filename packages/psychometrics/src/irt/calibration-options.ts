@@ -1,3 +1,4 @@
+import type { FieldNames } from "@measurekit/core";
 import type { LatentDistribution } from "./latent.js";
 import type { IrtModel } from "./model.js";
 import type { ParameterPrior } from "./prior.js";
@@ -123,3 +124,20 @@ export interface CalibrationOptions<TParameters> {
    */
   readonly maxIterations?: number;
 }
+
+export const CALIBRATION_OPTIONS: FieldNames<CalibrationOptions<unknown>> = {
+  model: true,
+  fixed: true,
+  fixedParameters: true,
+  priors: true,
+  itemPriors: true,
+  quadrature: true,
+  groups: true,
+  latent: true,
+  covariates: true,
+  standardErrors: true,
+  testlets: true,
+  personWeights: true,
+  tolerance: true,
+  maxIterations: true,
+};

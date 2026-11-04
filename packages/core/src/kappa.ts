@@ -1,3 +1,5 @@
+import { checkOptions, type FieldNames } from "./checks.js";
+
 /**
  * The weights of Cohen's kappa: `"none"`, agreement only; `"linear"`, 1 - |i - j| / (K - 1); `"quadratic"`,
  * 1 - (i - j)² / (K - 1)², for ratings i and j over the range K - 1 of the categories used.
@@ -14,6 +16,8 @@ export interface KappaOptions {
   readonly weights?: KappaWeights;
 }
 
+const KAPPA_OPTIONS: FieldNames<KappaOptions> = { weights: true };
+
 /**
  * Returns Cohen's kappa of paired categories, (p_o - p_e) / (1 - p_e), with p_o the observed and p_e the chance
  * agreement from the margins, or `null` when p_e is 1, as when every category is the same.
@@ -26,6 +30,7 @@ export interface KappaOptions {
  * @param second - The category each pair has in the second list.
  * @param options - The weights of partial agreement.
  * @returns Kappa, at most 1; `null` where chance agreement is complete, so that kappa is undefined.
+ * @throws `DataError` when the options are not an object or hold a name that is not an option.
  * @see {@link https://doi.org/10.1177/001316446002000104 | Cohen (1960)}
  * @see {@link https://doi.org/10.1037/h0026256 | Cohen (1968)}
  */
@@ -34,6 +39,7 @@ export function kappaOfPairs(
   second: ArrayLike<number>,
   options: KappaOptions = {},
 ): number | null {
+  checkOptions(options, KAPPA_OPTIONS);
   const { weights = "none" } = options;
   const { lowest, highest } = categoryRange(first, second);
   const agreement = agreementOf(weights, highest - lowest);

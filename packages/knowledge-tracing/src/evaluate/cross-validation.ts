@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, checkRecord, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, checkRecord, DataError, type FieldNames } from "@measurekit/core";
 import { checkLog, type Event, type EventLog, type Fold, isObserved } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 import { type Metrics, metrics } from "./metrics.js";
@@ -19,6 +19,8 @@ export interface CrossValidateOptions {
    */
   readonly unseenSkills?: UnseenSkills;
 }
+
+export const CROSS_VALIDATE_OPTIONS: FieldNames<CrossValidateOptions> = { unseenSkills: true };
 
 const UNSEEN_SKILLS: readonly UnseenSkills[] = ["throw", "skip"];
 const DEFAULT_UNSEEN_SKILLS = "throw";
@@ -67,7 +69,7 @@ export function crossValidate<TState>(
   folds: readonly Fold[],
   options: CrossValidateOptions = {},
 ): CrossValidation {
-  checkOptions(options);
+  checkOptions(options, CROSS_VALIDATE_OPTIONS);
   const { unseenSkills = DEFAULT_UNSEEN_SKILLS } = options;
   checkModel(model, "Cross-validation needs a learner model, such as bkt()");
   checkChoice(unseenSkills, "The option unseenSkills", UNSEEN_SKILLS);

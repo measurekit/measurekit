@@ -231,7 +231,7 @@ Knowledge tracing: the model families never import each other, nor does anything
 - A public function validates its input once, where it reads it, and throws `DataError` with a full sentence that says
   what is wrong and what is expected (`A seed must be a safe integer, found 1.5.`). Input may come from plain JavaScript
   or JSON, so every argument is checked for its type first, with the checks of `@measurekit/core` (`checkOptions`,
-  `checkArray`, `checkRecord`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`,
+  `checkFields`, `checkArray`, `checkRecord`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`,
   `checkPositive`, `checkNonNegative`, `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval`, `checkSeed`,
   `checkStopping`) and `checkFunction` and `checkOpenUnitInterval` of psychometrics. An option's label is `The option
   <name>`: `<Label> must be a positive number, found <value>.` A field of a record is tested with a predicate of core or
@@ -246,6 +246,12 @@ Knowledge tracing: the model families never import each other, nor does anything
   could write to.
 - Options are destructured with their defaults, `const { tolerance = DEFAULT_TOLERANCE } = options`, so that a value set
   to `null` is rejected, never taken as absent.
+- A public function checks its options with `checkOptions(options, NAMES)`, and a record of settings inside them, such
+  as a prior, a quadrature or bounds, with `checkFields(record, NAMES, label)`: `NAMES` is a constant
+  `FieldNames<TheOptions>` beside the type, which the type checker holds complete, and a name not in it throws
+  `DataError`. A helper that functions with different options share takes the caller's names or leaves the check to
+  them. Records of data (items, events, states, parameters, results passed back) are not checked this way, as they may
+  carry a host's fields.
 - Missing responses are `null`, and each function documents which persons a statistic uses. A statistic undefined for
   the data is `null` in tables and a `DataError` from a function that returns only it; never `NaN`. Iterative methods
   report `converged` and `iterations` instead of throwing.

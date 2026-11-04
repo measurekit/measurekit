@@ -1,7 +1,13 @@
-import { DataError, normalQuantile } from "@measurekit/core";
+import { checkOptions, DataError, normalQuantile } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
-import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
+import {
+  checkMonotonicityOptions,
+  criterionOf,
+  type ItemCheck,
+  MONOTONICITY_OPTIONS,
+  type MonotonicityOptions,
+} from "./item-check.js";
 import { itemScalability, usableItems } from "./scalability.js";
 import { covariances, type MokkenData, mokkenData, scoreOf } from "./scores.js";
 import { addViolation, emptyViolations, type Violations } from "./violations.js";
@@ -35,6 +41,7 @@ const ALL = 0.999999999999;
  * @see {@link https://doi.org/10.4135/9781412984676 | Sijtsma and Molenaar (2002)}
  */
 export function monotonicity(matrix: ResponseMatrix, options: MonotonicityOptions = {}): readonly ItemCheck[] {
+  checkOptions(options, MONOTONICITY_OPTIONS);
   const checked = checkMonotonicityOptions(options);
   const data = mokkenData(matrix, "The monotonicity check");
   const minimumViolation = checked.minimumViolation ?? DEFAULT_MINIMUM_VIOLATION;

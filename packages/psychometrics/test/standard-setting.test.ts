@@ -322,6 +322,12 @@ describe("beukCutScore", () => {
       "The Beuk line does not cross the observed failure rates between the scores 0 and 40.",
     );
     expect(() => beukCutScore(distribution, JSON.parse("null"))).toThrow("The Beuk judgments must be an object");
+    expect(() =>
+      beukCutScore(
+        distribution,
+        JSON.parse('{"cutScore":1,"passRate":0.5,"cutScoreSd":1,"passRateSd":0.1,"weight":1}'),
+      ),
+    ).toThrow('The Beuk judgments may hold only cutScore, passRate, cutScoreSd and passRateSd, found "weight".');
     expect(() => beukCutScore(JSON.parse("{}"), judgments)).toThrow(DataError);
   });
 });
@@ -431,6 +437,7 @@ describe("bookmarkCutScore", () => {
       expect(() => bookmarkCutScore(pool, page)).toThrow(`A bookmark follows a page from 1 to 2, found ${page}.`);
     }
     expect(() => bookmarkCutScore(pool, 1, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => bookmarkCutScore(pool, 1, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => orderedItemBooklet(JSON.parse("null"))).toThrow("The items must be an array, found null.");
   });
 });
@@ -801,6 +808,16 @@ describe("hofsteeCutScore", () => {
     );
     expect(() => hofsteeCutScore([1, 1, 1, 1], JSON.parse("null"))).toThrow(
       "The Hofstee bounds must be an object of the cut scores and failure rates, found null.",
+    );
+    expect(() =>
+      hofsteeCutScore(
+        [1, 1, 1, 1],
+        JSON.parse(
+          '{"minimumCutScore":1,"maximumCutScore":3,"minimumFailureRate":0.1,"maximumFailureRate":0.5,"minimumPassRate":0}',
+        ),
+      ),
+    ).toThrow(
+      'The Hofstee bounds may hold only minimumCutScore, maximumCutScore, minimumFailureRate and maximumFailureRate, found "minimumPassRate".',
     );
   });
 });

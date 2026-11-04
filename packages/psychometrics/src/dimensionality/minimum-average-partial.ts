@@ -1,4 +1,11 @@
-import { checkChoice, checkNonNegative, checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
+import {
+  checkChoice,
+  checkNonNegative,
+  checkOptions,
+  checkPositiveInteger,
+  DataError,
+  type FieldNames,
+} from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { symmetricEigen } from "../math/internal.js";
 import { ITEM_CORRELATIONS, type ItemCorrelation, positiveDefiniteCorrelations } from "./item-correlations.js";
@@ -20,6 +27,12 @@ export interface MinimumAveragePartialOptions extends PolychoricOptions {
    */
   readonly maxFactors?: number;
 }
+
+const MINIMUM_AVERAGE_PARTIAL_OPTIONS: FieldNames<MinimumAveragePartialOptions> = {
+  correlation: true,
+  maxFactors: true,
+  correction: true,
+};
 
 /** The result of Velicer's minimum average partial test. */
 export interface MinimumAveragePartial {
@@ -56,7 +69,7 @@ export function minimumAveragePartial(
   data: ResponseMatrix,
   options: MinimumAveragePartialOptions = {},
 ): MinimumAveragePartial {
-  checkOptions(options);
+  checkOptions(options, MINIMUM_AVERAGE_PARTIAL_OPTIONS);
   const { correlation = "pearson", correction = DEFAULT_CORRECTION } = options;
   checkChoice(correlation, "The option correlation", ITEM_CORRELATIONS);
   checkNonNegative(correction, "The option correction");

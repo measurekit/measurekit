@@ -5,6 +5,7 @@ import {
   chiSquareUpperTail,
   DataError,
   describe,
+  type FieldNames,
   type LogisticItem,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
@@ -26,6 +27,17 @@ export type LordOptions = Omit<
   "fixed" | "fixedParameters" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
 > &
   PurificationOptions;
+
+export const LORD_OPTIONS: FieldNames<LordOptions> = {
+  testlets: true,
+  priors: true,
+  itemPriors: true,
+  model: true,
+  quadrature: true,
+  tolerance: true,
+  maxIterations: true,
+  purify: true,
+};
 
 /** Lord's chi-square of one item. */
 export interface LordChiSquare {
@@ -74,7 +86,7 @@ export interface LordDif extends DifAnalysis<LordChiSquare> {
  */
 export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[], options: LordOptions): LordDif {
   checkGroups(matrix, groups);
-  checkOptions(options);
+  checkOptions(options, LORD_OPTIONS);
   checkModels(options.model);
   const { purify = false, ...calibration } = options;
   checkBoolean(purify, "The option purify");

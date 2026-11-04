@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions } from "@measurekit/core";
+import { checkChoice, checkOptions, type FieldNames } from "@measurekit/core";
 import { compositeKey } from "./composite-key.js";
 import type { Event } from "./event.js";
 import { checkLog, type EventLog } from "./event-log.js";
@@ -17,6 +17,8 @@ export interface FirstAttemptsOptions {
   readonly hinted?: HintedFirstAttempt;
 }
 
+const FIRST_ATTEMPTS_OPTIONS: FieldNames<FirstAttemptsOptions> = { hinted: true };
+
 const HINTED: readonly HintedFirstAttempt[] = ["incorrect", "null", "keep"];
 const DEFAULT_HINTED = "incorrect";
 
@@ -34,7 +36,7 @@ const DEFAULT_HINTED = "incorrect";
  * @throws `DataError` when the log is malformed or an option is invalid.
  */
 export function selectFirstAttempts(log: EventLog, options: FirstAttemptsOptions = {}): EventLog {
-  checkOptions(options);
+  checkOptions(options, FIRST_ATTEMPTS_OPTIONS);
   const { hinted = DEFAULT_HINTED } = options;
   checkChoice(hinted, "The option hinted", HINTED);
   checkLog(log);

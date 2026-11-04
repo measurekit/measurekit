@@ -2,7 +2,7 @@ import { checkOptions, mean, normalQuantile } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { correlation, normalDensity, variance } from "../math/internal.js";
 import { completeCases, itemScores } from "./complete-cases.js";
-import { type GroupOptions, groupMean, scoreGroups } from "./groups.js";
+import { GROUP_OPTIONS, type GroupOptions, groupMean, scoreGroups } from "./groups.js";
 import { alphaFromVariances } from "./reliability.js";
 
 /**
@@ -62,7 +62,7 @@ export interface ItemStatistics {
  */
 export function itemStatistics(matrix: ResponseMatrix, options: GroupOptions = {}): readonly ItemStatistics[] {
   checkResponseMatrix(matrix);
-  checkOptions(options);
+  checkOptions(options, GROUP_OPTIONS);
   const cases = completeCases(matrix);
   const groups = scoreGroups(cases.totals, options);
   const scores = matrix.itemIds.map((_, item) => itemScores(cases, [item]));

@@ -4,6 +4,7 @@ import {
   checkOptions,
   checkPositive,
   DataError,
+  type FieldNames,
   normalQuantile,
   type ThetaDistribution,
 } from "@measurekit/core";
@@ -73,6 +74,14 @@ export interface MultistageCutsOptions {
   readonly shares?: readonly (readonly number[])[];
 }
 
+const MULTISTAGE_CUTS_OPTIONS: FieldNames<MultistageCutsOptions> = {
+  method: true,
+  scale: true,
+  range: true,
+  population: true,
+  shares: true,
+};
+
 const METHODS: readonly MultistageCutsMethod[] = ["maximum-information", "routing-shares"];
 
 /** The method that reads each option that only one method reads. */
@@ -140,7 +149,7 @@ const SHARE_SUM_TOLERANCE = 1e-6;
  * @see {@link https://doi.org/10.1207/s15324818ame1903_2 | Luecht, Brumfield and Breithaupt (2006)}
  */
 export function multistageCuts(stages: Stages, options: MultistageCutsOptions = {}): readonly (readonly number[])[] {
-  checkOptions(options);
+  checkOptions(options, MULTISTAGE_CUTS_OPTIONS);
   const { method = "maximum-information", scale = "theta", range, population, shares } = options;
   checkChoice(method, "The option method", METHODS);
   checkChoice(scale, "The option scale", ROUTINGS);

@@ -7,7 +7,7 @@ import {
   largestChange,
 } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
-import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
+import { CALIBRATION_OPTIONS, type CalibrationOptions, type StandardErrorMethod } from "./calibration-options.js";
 import { type ItemState, type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
 import { type ExpectationStep, expectationStep } from "./expectation.js";
@@ -196,7 +196,7 @@ export function calibrateWithCovariance<TParameters>(
   data: ResponseMatrix | ResponseRecords,
   options: CalibrationOptions<TParameters>,
 ): CovarianceCalibration<TParameters> {
-  checkOptions(options);
+  checkOptions(options, CALIBRATION_OPTIONS);
   return calibrateResponses(compressResponses(data), options);
 }
 

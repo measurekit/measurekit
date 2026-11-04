@@ -1,4 +1,11 @@
-import { checkBoolean, checkChoice, checkOptions, checkUnitInterval, DataError } from "@measurekit/core";
+import {
+  checkBoolean,
+  checkChoice,
+  checkOptions,
+  checkUnitInterval,
+  DataError,
+  type FieldNames,
+} from "@measurekit/core";
 import { type BivariateDistribution, type BivariateTable, margins, neatTables } from "./bivariate.js";
 
 /** Options of the equating methods that average over a synthetic population. */
@@ -11,6 +18,8 @@ export interface SyntheticOptions {
    */
   readonly weight?: number;
 }
+
+export const SYNTHETIC_OPTIONS: FieldNames<SyntheticOptions> = { weight: true };
 
 /** Options of {@link levineEquating}. */
 export interface LevineOptions extends SyntheticOptions {
@@ -28,6 +37,8 @@ export interface LevineOptions extends SyntheticOptions {
    */
   readonly anchor?: "internal" | "external";
 }
+
+const LEVINE_OPTIONS: FieldNames<LevineOptions> = { weight: true, trueScore: true, anchor: true };
 
 /**
  * Returns the Tucker linear equating of the scores of a form to the scale of another through common items, from two
@@ -56,7 +67,7 @@ export function tuckerEquating(
   to: BivariateDistribution,
   options: SyntheticOptions = {},
 ): readonly number[] {
-  const { source, target, weight } = syntheticGroups(from, to, options);
+  const { source, target, weight } = syntheticGroups(from, to, options, SYNTHETIC_OPTIONS);
   const sourceMoments = groupMoments(source, "from");
   const targetMoments = groupMoments(target, "to");
   return syntheticLinear(
@@ -93,7 +104,7 @@ export function levineEquating(
   to: BivariateDistribution,
   options: LevineOptions = {},
 ): readonly number[] {
-  const { source, target, weight } = syntheticGroups(from, to, options);
+  const { source, target, weight } = syntheticGroups(from, to, options, LEVINE_OPTIONS);
   const { trueScore = false, anchor = "internal" } = options;
   checkBoolean(trueScore, "The option trueScore");
   checkChoice(anchor, "The option anchor", ["internal", "external"]);
@@ -136,18 +147,19 @@ export function chainedLinearEquating(from: BivariateDistribution, to: Bivariate
 }
 
 /**
- * Checks the options and returns the tables of the two groups and the weight of the `from` group in their synthetic
- * population: `options.weight`, or the group's share of the persons.
+ * Checks the options against the names of the caller's, and returns the tables of the two groups and the weight of the
+ * `from` group in their synthetic population: `options.weight`, or the group's share of the persons.
  *
- * @throws `DataError` when a distribution is invalid, the two have different numbers of anchor scores, or the weight is
- * not a number from 0 to 1.
+ * @throws `DataError` when the options are not an object or hold a name not in `names`, a distribution is invalid, the
+ * two have different numbers of anchor scores, or the weight is not a number from 0 to 1.
  */
-export function syntheticGroups(
+export function syntheticGroups<TOptions extends SyntheticOptions>(
   from: BivariateDistribution,
   to: BivariateDistribution,
-  options: SyntheticOptions,
+  options: TOptions,
+  names: FieldNames<NoInfer<TOptions>>,
 ): { readonly source: BivariateTable; readonly target: BivariateTable; readonly weight: number } {
-  checkOptions(options);
+  checkOptions(options, names);
   const [source, target] = neatTables(from, to);
   const { weight = source.persons / (source.persons + target.persons) } = options;
   checkUnitInterval(weight, "The option weight");

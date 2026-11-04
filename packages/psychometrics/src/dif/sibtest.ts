@@ -8,6 +8,7 @@ import {
   chiSquareUpperTail,
   DataError,
   describe,
+  type FieldNames,
   mean,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
@@ -52,6 +53,14 @@ export interface SibtestOptions extends PurificationOptions {
    */
   readonly bundles?: Readonly<Record<string, readonly string[]>>;
 }
+
+const SIBTEST_OPTIONS: FieldNames<SibtestOptions> = {
+  smallCell: true,
+  correction: true,
+  guessing: true,
+  bundles: true,
+  purify: true,
+};
 
 /** SIBTEST statistics of one item or bundle. */
 export interface Sibtest {
@@ -134,7 +143,7 @@ const UNDEFINED_STATISTIC = { beta: null, standardError: null, chiSquare: null, 
  * @see {@link https://doi.org/10.1111/j.1745-3984.1996.tb00496.x | Chang, Mazzeo and Roussos (1996)}
  */
 export function sibtest(matrix: ResponseMatrix, groups: readonly DifGroup[], options: SibtestOptions = {}): SibtestDif {
-  checkOptions(options);
+  checkOptions(options, SIBTEST_OPTIONS);
   const { purify = false, smallCell = DEFAULT_SMALL_CELL, correction = true, guessing = 0, bundles = {} } = options;
   checkIntegerFrom(smallCell, "The option smallCell", LEAST_SMALL_CELL);
   checkBoolean(correction, "The option correction");

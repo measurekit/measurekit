@@ -929,13 +929,18 @@ describe("structure tools, errors", () => {
 
   it("rejects options and arguments of other types as JavaScript passes them", () => {
     const missing = JSON.parse("null");
-    for (const use of [
-      () => neighbourhood(space, [], missing),
-      () => learningPaths(space, missing),
-      () => unionClosure(["a"], [], missing),
-      () => clauseStructure({ a: [] }, missing),
+    for (const [options, message] of [
+      [missing, "The options must be an object, found null."],
+      [JSON.parse('{"verbose":1}'), 'There is no option "verbose"'],
     ]) {
-      expect(use).toThrow("The options must be an object, found null.");
+      for (const use of [
+        () => neighbourhood(space, [], options),
+        () => learningPaths(space, options),
+        () => unionClosure(["a"], [], options),
+        () => clauseStructure({ a: [] }, options),
+      ]) {
+        expect(use).toThrow(message);
+      }
     }
     for (const use of [
       () => structureBase(missing),
@@ -1986,13 +1991,18 @@ describe("KST options from JavaScript", () => {
       { learner: "ana", item: "x", skills: [], time: 0, outcome: 1 },
       { learner: "ana", item: "y", skills: [], time: 1, outcome: 0 },
     ]);
-    for (const use of [
-      () => kst(missing),
-      () => surmiseStructure({ a: [] }, missing),
-      () => iita(log, missing),
-      () => model.nextQuestion(model.initialState("ana"), [], missing),
+    for (const [options, message] of [
+      [missing, "The options must be an object, found null."],
+      [JSON.parse('{"verbose":1}'), 'There is no option "verbose"'],
     ]) {
-      expect(use).toThrow("The options must be an object, found null.");
+      for (const use of [
+        () => kst(options),
+        () => surmiseStructure({ a: [] }, options),
+        () => iita(log, options),
+        () => model.nextQuestion(model.initialState("ana"), [], options),
+      ]) {
+        expect(use).toThrow(message);
+      }
     }
     expect(() => kst({ structure, posteriors: JSON.parse('"yes"') })).toThrow(
       'The option posteriors must be a boolean, found "yes".',
@@ -2019,6 +2029,10 @@ describe("KST options from JavaScript", () => {
     expect(build('{"equal": null}')).toThrow(
       "The option equal must be an object of groups of items by guess and slip, found null.",
     );
+    expect(build('{"fixed": {"guessing": {}}}')).toThrow(
+      'The option fixed may hold only guess and slip, found "guessing".',
+    );
+    expect(build('{"equal": {"slips": []}}')).toThrow('The option equal may hold only guess and slip, found "slips".');
     expect(build('{"fixed": {"guess": null}}')).toThrow(
       "The option fixed.guess must be an object of rates by item, found null.",
     );
@@ -2060,6 +2074,7 @@ describe("KST options from JavaScript", () => {
       "The prerequisites must be an object of lists of items by item, found null.",
     );
     expect(() => diffTest(log, prerequisites, missing)).toThrow("The options must be an object, found null.");
+    expect(() => diffTest(log, prerequisites, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => diffTest(log, prerequisites, { alternative: missing })).toThrow(
       "The alternative prerequisites must be an object of lists of items by item, found null.",
     );

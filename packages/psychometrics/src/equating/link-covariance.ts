@@ -1,4 +1,4 @@
-import { checkArray, checkChoice, checkOptions, checkRecord, DataError } from "@measurekit/core";
+import { checkArray, checkChoice, checkOptions, checkRecord, DataError, type FieldNames } from "@measurekit/core";
 import { type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
 import { curveLink, type LinkingOptions } from "./characteristic-curve.js";
 import {
@@ -33,6 +33,8 @@ export interface LinkErrorOptions extends LinkingOptions {
    */
   readonly linking?: LinkMethod;
 }
+
+const LINK_ERROR_OPTIONS: FieldNames<LinkErrorOptions> = { linking: true, quadrature: true };
 
 /** The standard errors of a transformation's slope and intercept. */
 export interface TransformationErrors {
@@ -107,7 +109,7 @@ export type Linker = (from: readonly IrtItem[], to: readonly IrtItem[]) => Link;
  * @see {@link https://doi.org/10.18637/jss.v068.i07 | Battauz (2015)}
  */
 export function linkCovariance(forms: readonly CalibratedForm[], options: LinkErrorOptions = {}): LinkCovariance {
-  const link = linker(options);
+  const link = linker(options, LINK_ERROR_OPTIONS);
   checkArray(forms, "The forms must be an array of calibrated forms { items, covariance }");
   if (forms.length < 2) throw new DataError(`A link needs at least two forms, found ${forms.length}.`);
   const checked = forms.map((form, k) => checkForm(form, `Form ${k + 1}`));
@@ -158,12 +160,15 @@ export function linkCovariance(forms: readonly CalibratedForm[], options: LinkEr
 }
 
 /**
- * Checks the linking options and returns the linking function they name.
+ * Checks the options against the names of the caller's, and returns the linking function they name.
  *
- * @throws `DataError` when the options or the method are invalid.
+ * @throws `DataError` when the options are not an object or hold a name not in `names`, or the method is invalid.
  */
-export function linker(options: LinkErrorOptions): Linker {
-  checkOptions(options);
+export function linker<TOptions extends LinkErrorOptions>(
+  options: TOptions,
+  names: FieldNames<NoInfer<TOptions>>,
+): Linker {
+  checkOptions(options, names);
   const { linking = "stocking-lord", quadrature } = options;
   checkChoice(linking, "The option linking", LINK_METHODS);
   const curves = quadrature === undefined ? {} : { quadrature };

@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, checkRecord, DataError, type QMatrix } from "@measurekit/core";
+import { checkArray, checkOptions, checkRecord, DataError, type FieldNames, type QMatrix } from "@measurekit/core";
 import { checkEvent, type Event, isObserved } from "./event.js";
 import { checkItemSkills, skillsOf } from "./q-matrix.js";
 
@@ -29,6 +29,8 @@ export interface EventLogOptions {
   readonly qMatrix?: QMatrix;
 }
 
+const EVENT_LOG_OPTIONS: FieldNames<EventLogOptions> = { qMatrix: true };
+
 /**
  * Builds a log from events in any order: it checks and copies them, takes the skills of events without skills from the
  * Q-matrix, and orders them by time, keeping the given order of events with equal times. It copies the fields of
@@ -55,7 +57,7 @@ export interface EventLogOptions {
  * ```
  */
 export function buildEventLog(events: readonly EventInput[], options: EventLogOptions = {}): EventLog {
-  checkOptions(options);
+  checkOptions(options, EVENT_LOG_OPTIONS);
   const { qMatrix } = options;
   checkEvents(events);
   if (qMatrix !== undefined) checkItemSkills(qMatrix);

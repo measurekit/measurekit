@@ -1,4 +1,4 @@
-import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
+import { checkArray, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
 import { scoreLimits } from "../equating/internal.js";
 import { expectedScore, indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
 import { findIncreasingRoot } from "../math/internal.js";
@@ -12,6 +12,8 @@ export interface BookmarkOptions {
    */
   readonly responseProbability?: number;
 }
+
+const BOOKMARK_OPTIONS: FieldNames<BookmarkOptions> = { responseProbability: true };
 
 /** A page of an ordered item booklet: a score point of an item at its location. */
 export interface BookletPage {
@@ -47,7 +49,7 @@ const DEFAULT_RESPONSE_PROBABILITY = 0.67;
  * @see {@link https://doi.org/10.4324/9781410600264 | Mitzel, Lewis, Patz and Green (2001)}
  */
 export function orderedItemBooklet(items: readonly TestItem[], options: BookmarkOptions = {}): readonly BookletPage[] {
-  checkOptions(options);
+  checkOptions(options, BOOKMARK_OPTIONS);
   const { responseProbability = DEFAULT_RESPONSE_PROBABILITY } = options;
   if (!(typeof responseProbability === "number" && responseProbability > 0 && responseProbability < 1)) {
     throw new DataError(

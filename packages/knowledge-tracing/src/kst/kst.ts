@@ -1,4 +1,12 @@
-import { checkBoolean, checkChoice, checkOptions, checkStopping, DataError, describe } from "@measurekit/core";
+import {
+  checkBoolean,
+  checkChoice,
+  checkOptions,
+  checkStopping,
+  DataError,
+  describe,
+  type FieldNames,
+} from "@measurekit/core";
 import {
   type Attempt,
   checkAttempt,
@@ -111,6 +119,18 @@ export interface KstOptions {
   readonly posteriors?: boolean;
 }
 
+const KST_OPTIONS: FieldNames<KstOptions> = {
+  structure: true,
+  over: true,
+  method: true,
+  tolerance: true,
+  maxIterations: true,
+  parameters: true,
+  fixed: true,
+  equal: true,
+  posteriors: true,
+};
+
 /** A knowledge state with its probability. */
 export interface LikelyState {
   /** The elements of the state, in the domain's order. */
@@ -128,6 +148,8 @@ export interface NextQuestionOptions {
    */
   readonly threshold?: number;
 }
+
+const NEXT_QUESTION_OPTIONS: FieldNames<NextQuestionOptions> = { threshold: true };
 
 /** A KST model: a learner model whose state is a distribution over knowledge states. */
 export interface KstModel extends LearnerModel<KstState, KstParameters> {
@@ -315,7 +337,7 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
       return localIdentifiability(compiled, parameters, settings.restrictions);
     },
     nextQuestion(state, candidates, questionOptions = {}) {
-      checkOptions(questionOptions);
+      checkOptions(questionOptions, NEXT_QUESTION_OPTIONS);
       const { threshold = DEFAULT_THRESHOLD } = questionOptions;
       checkState(state, compiled.count);
       if (!(threshold > 0 && threshold <= 1)) {
@@ -555,7 +577,7 @@ interface Settings {
 }
 
 function settingsOf(options: KstOptions): Settings {
-  checkOptions(options);
+  checkOptions(options, KST_OPTIONS);
   const {
     over = DEFAULT_OVER,
     method = DEFAULT_METHOD,

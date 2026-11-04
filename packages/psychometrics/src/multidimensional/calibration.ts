@@ -6,7 +6,11 @@ import {
   respondentsOf,
   type StandardErrorMethod,
 } from "../irt/internal.js";
-import type { CalibrationMethod, MultidimensionalCalibrationOptions } from "./calibration-options.js";
+import {
+  type CalibrationMethod,
+  MULTIDIMENSIONAL_CALIBRATION_OPTIONS,
+  type MultidimensionalCalibrationOptions,
+} from "./calibration-options.js";
 import { type ItemState, setUp } from "./calibration-setup.js";
 import { pairsOf } from "./correlation.js";
 import { type Design, designOf } from "./design.js";
@@ -165,7 +169,7 @@ export function calibrateMultidimensional<TParameters>(
   data: ResponseMatrix | ResponseRecords,
   options: MultidimensionalCalibrationOptions<TParameters>,
 ): MultidimensionalCalibration<TParameters> {
-  checkOptions(options);
+  checkOptions(options, MULTIDIMENSIONAL_CALIBRATION_OPTIONS);
   const responses = compressResponses(data);
   const { standardErrors = "none", seed = 0 } = options;
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);

@@ -1,4 +1,4 @@
-import { DataError, mean, studentLowerTail } from "@measurekit/core";
+import { checkOptions, DataError, type FieldNames, mean, studentLowerTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { normalCdf } from "../math/internal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
@@ -20,6 +20,13 @@ export interface InvariantOrderingOptions extends MonotonicityOptions {
    */
   readonly selection?: boolean;
 }
+
+const INVARIANT_ORDERING_OPTIONS: FieldNames<InvariantOrderingOptions> = {
+  minimumViolation: true,
+  minimumGroupSize: true,
+  alpha: true,
+  selection: true,
+};
 
 /** The result of checking an invariant item ordering. */
 export interface InvariantItemOrdering {
@@ -62,6 +69,7 @@ export function invariantItemOrdering(
   matrix: ResponseMatrix,
   options: InvariantOrderingOptions = {},
 ): InvariantItemOrdering {
+  checkOptions(options, INVARIANT_ORDERING_OPTIONS);
   const checked = checkMonotonicityOptions(options);
   const { selection = true } = options;
   if (typeof selection !== "boolean") {

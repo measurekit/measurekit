@@ -1,4 +1,4 @@
-import { checkOptions } from "@measurekit/core";
+import type { FieldNames } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 
 /** Options of {@link predictFormScore}. */
@@ -11,6 +11,8 @@ export interface ScorePredictionOptions {
   readonly level?: number;
 }
 
+export const SCORE_PREDICTION_OPTIONS: FieldNames<ScorePredictionOptions> = { level: true };
+
 /** Options of {@link predictThetaScore}. */
 export interface ThetaScorePredictionOptions extends ScorePredictionOptions {
   /**
@@ -21,6 +23,11 @@ export interface ThetaScorePredictionOptions extends ScorePredictionOptions {
    */
   readonly standardError?: number;
 }
+
+export const THETA_SCORE_PREDICTION_OPTIONS: FieldNames<ThetaScorePredictionOptions> = {
+  level: true,
+  standardError: true,
+};
 
 /** The probability of one reportable score. */
 export interface ScoreProbability {
@@ -45,12 +52,11 @@ export interface ScorePrediction {
 const DEFAULT_LEVEL = 0.8;
 
 /**
- * Checks the options of a prediction and returns its level.
+ * Checks the level of a prediction, whose caller has checked its options, and returns it.
  *
- * @throws `DataError` when the options are not an object or the level is not a number between 0 and 1, exclusive.
+ * @throws `DataError` when the level is not a number between 0 and 1, exclusive.
  */
 export function checkLevel(options: ScorePredictionOptions): number {
-  checkOptions(options);
   const { level = DEFAULT_LEVEL } = options;
   checkOpenUnitInterval(level, "The option level");
   return level;

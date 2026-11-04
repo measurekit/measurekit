@@ -1,4 +1,4 @@
-import { checkNonNegative, DataError, type ThetaDistribution } from "@measurekit/core";
+import { checkNonNegative, checkOptions, DataError, type ThetaDistribution } from "@measurekit/core";
 import { checkThetaDistribution } from "../irt/internal.js";
 import { normalCdf } from "../math/internal.js";
 import {
@@ -6,6 +6,7 @@ import {
   type ScorePrediction,
   type ScoreProbability,
   summarize,
+  THETA_SCORE_PREDICTION_OPTIONS,
   type ThetaScorePredictionOptions,
 } from "./prediction.js";
 import { type CheckedScale, checkScale, multipleOf, type ScoreScale } from "./score-scale.js";
@@ -57,6 +58,7 @@ export function predictThetaScore(
   options: ThetaScorePredictionOptions = {},
 ): ScorePrediction {
   const checked = checkScale(scale);
+  checkOptions(options, THETA_SCORE_PREDICTION_OPTIONS);
   const level = checkLevel(options);
   const { standardError = DEFAULT_STANDARD_ERROR } = options;
   checkNonNegative(standardError, "The option standardError");

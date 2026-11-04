@@ -6,6 +6,7 @@ import {
   checkUnitInterval,
   DataError,
   describe,
+  type FieldNames,
   type Random,
 } from "@measurekit/core";
 import { buildResponseMatrix, type ResponseMatrix } from "../data/internal.js";
@@ -21,6 +22,8 @@ export interface ResponseSimulationOptions {
    */
   readonly missingProbability?: number;
 }
+
+const RESPONSE_SIMULATION_OPTIONS: FieldNames<ResponseSimulationOptions> = { missingProbability: true };
 
 /**
  * Simulates the responses of persons with known thetas to items of any models.
@@ -95,7 +98,7 @@ export function carriedItemIds(items: readonly object[]): string[] | undefined {
  * @throws `DataError` when `missingProbability` is outside [0, 1].
  */
 export function missingProbabilityOf(options: ResponseSimulationOptions): number {
-  checkOptions(options);
+  checkOptions(options, RESPONSE_SIMULATION_OPTIONS);
   const { missingProbability = 0 } = options;
   checkUnitInterval(missingProbability, "The option missingProbability");
   return missingProbability;

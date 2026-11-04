@@ -1278,6 +1278,9 @@ describe("rajuAreaDif", () => {
     expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, { model: JSON.parse('"2PL"') })).toThrow(
       'The option model must be the 2PL model, found "2PL".',
     );
@@ -1425,6 +1428,9 @@ describe("irtLikelihoodRatioDif", () => {
     expect(() => irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, { model: JSON.parse('"2PL"') })).toThrow(DataError);
     expect(() =>
       irtLikelihoodRatioDif(matrix, CONSTANT_GROUPS, { model: twoParameterLogistic, purify: JSON.parse("1") }),
@@ -1492,6 +1498,9 @@ describe("differentialFunctioning", () => {
     );
     expect(() => differentialFunctioning(reference, reference, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => differentialFunctioning(reference, reference, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => differentialFunctioning(reference, reference, JSON.parse("{}"))).toThrow(DataError);
     expect(() => differentialFunctioning(JSON.parse('"x"'), reference, options)).toThrow(DataError);
@@ -2037,6 +2046,9 @@ describe("logisticDiscriminantDif", () => {
     expect(() => logisticDiscriminantDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => logisticDiscriminantDif(matrix, CONSTANT_GROUPS, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => logisticDiscriminantDif(matrix, CONSTANT_GROUPS, { matching: JSON.parse("{}") })).toThrow(
       "The option matching must be an array",
     );
@@ -2283,6 +2295,9 @@ describe("sibtest", () => {
       expect(() => sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, JSON.parse("null"))).toThrow(
         "The options must be an object, found null.",
       );
+      expect(() => sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, JSON.parse('{"verbose":1}'))).toThrow(
+        'There is no option "verbose"',
+      );
       expect(() => sibtest(JSON.parse("null"), ONE_MIDDLE_SCORE_GROUPS)).toThrow(DataError);
       expect(() => sibtest(matrix, JSON.parse("null"))).toThrow("The groups must be an array, found null.");
       expect(() => sibtest(matrix, JSON.parse('"focal"'))).toThrow('The groups must be an array, found "focal".');
@@ -2372,6 +2387,7 @@ describe("options and groups", () => {
     for (const analyze of analyzes) {
       expect(() => analyze({ purify })).toThrow('The option purify must be a boolean, found "yes".');
       expect(() => analyze(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      expect(() => analyze(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     }
     expect(() => mantelTest(matrix, JSON.parse("null"))).toThrow("The groups must be an array, found null.");
     expect(() => ordinalLogisticRegressionDif(matrix, JSON.parse('"focal"'))).toThrow(
@@ -2392,8 +2408,14 @@ describe("options and groups", () => {
     expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => logisticRegressionDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => logisticRegressionDif(matrix, CONSTANT_GROUPS, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => logisticRegressionDif(matrix, CONSTANT_GROUPS, { purify: JSON.parse("null") })).toThrow(
       "The option purify must be a boolean, found null.",

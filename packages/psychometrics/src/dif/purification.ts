@@ -1,4 +1,4 @@
-import { checkBoolean } from "@measurekit/core";
+import { checkBoolean, type FieldNames } from "@measurekit/core";
 
 /** Options of the DIF statistics whose matching criterion can be purified. */
 export interface PurificationOptions {
@@ -11,6 +11,8 @@ export interface PurificationOptions {
    */
   readonly purify?: boolean;
 }
+
+export const PURIFICATION_OPTIONS: FieldNames<PurificationOptions> = { purify: true };
 
 /** The purification of a matching criterion. */
 export interface DifPurification {

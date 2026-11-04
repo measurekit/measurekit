@@ -35,6 +35,14 @@ export interface Rule {
 /** The rules that keep untrusted input from being misread or from costing what its size does not, each with its test. */
 export const RULES: readonly Rule[] = [
   {
+    rule: "An option a function does not take, or a field a record of settings does not have, is refused, as a misspelled name would leave a default in place.",
+    file: "packages/core/src/checks.ts",
+    find: "!Object.hasOwn(names, name)",
+    replace: "false",
+    test: "packages/core/test/checks.test.ts",
+    titles: "refuse a name that is not an option",
+  },
+  {
     rule: "A response above 2³¹ - 1 is refused, as the 32-bit arrays of the analyses would wrap it into another category.",
     file: "packages/psychometrics/src/data/response.ts",
     find: "value <= MAX_RESPONSE",

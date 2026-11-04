@@ -1,4 +1,4 @@
-import { checkBoolean, checkOptions, chiSquareUpperTail, DataError } from "@measurekit/core";
+import { checkBoolean, checkOptions, chiSquareUpperTail, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type Calibration, type CalibrationOptions, calibrate, checkModel, modelsOf } from "../irt/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
@@ -23,6 +23,14 @@ export type IrtDifOptions<TParameters> = Omit<
   | "personWeights"
 > &
   PurificationOptions;
+
+const IRT_DIF_OPTIONS: FieldNames<IrtDifOptions<unknown>> = {
+  model: true,
+  quadrature: true,
+  tolerance: true,
+  maxIterations: true,
+  purify: true,
+};
 
 /** The likelihood-ratio test of one item. */
 export interface IrtDifTest {
@@ -92,7 +100,7 @@ export function irtLikelihoodRatioDif<TParameters>(
   options: IrtDifOptions<TParameters>,
 ): IrtDif<TParameters> {
   checkGroups(matrix, groups);
-  checkOptions(options);
+  checkOptions(options, IRT_DIF_OPTIONS);
   const { purify = false, model, quadrature, tolerance, maxIterations } = options;
   checkBoolean(purify, "The option purify");
   const { itemIds } = matrix;

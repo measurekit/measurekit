@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, DataError } from "@measurekit/core";
+import { checkChoice, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import type { EventLog } from "../data/internal.js";
 import { counterexamples, responsePatterns } from "./patterns.js";
 import type { Prerequisites } from "./surmise.js";
@@ -34,6 +34,8 @@ export interface IitaOptions {
   readonly version?: IitaVersion;
 }
 
+const IITA_OPTIONS: FieldNames<IitaOptions> = { version: true };
+
 /** A quasi-order of the selection set, with its fit. */
 export interface IitaCandidate {
   /** Each item's prerequisites, by item: the items every learner who masters it is expected to master. */
@@ -67,7 +69,7 @@ export interface IitaResult extends IitaCandidate {
  * hold more than 24 million cells, a cell for each prerequisite and 8 for each item.
  */
 export function iita(log: EventLog, options: IitaOptions = {}): IitaResult {
-  checkOptions(options);
+  checkOptions(options, IITA_OPTIONS);
   const { version = DEFAULT_VERSION } = options;
   checkChoice(version, "The IITA version", ["minimized", "corrected", "original"]);
   const { items, patterns } = responsePatterns(log, "IITA");

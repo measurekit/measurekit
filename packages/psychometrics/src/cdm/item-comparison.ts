@@ -1,4 +1,12 @@
-import { checkArray, checkChoice, checkOptions, checkRecord, chiSquareUpperTail, DataError } from "@measurekit/core";
+import {
+  checkArray,
+  checkChoice,
+  checkOptions,
+  checkRecord,
+  chiSquareUpperTail,
+  DataError,
+  type FieldNames,
+} from "@measurekit/core";
 import { pseudoInverse } from "../math/internal.js";
 import { type CdmCalibration, type CdmModel, checkSuccessProbabilities } from "./calibration.js";
 import { profilesOf } from "./q-matrix.js";
@@ -15,6 +23,8 @@ export interface ItemComparisonOptions {
    */
   readonly models?: readonly ReducedCdmModel[];
 }
+
+const ITEM_COMPARISON_OPTIONS: FieldNames<ItemComparisonOptions> = { models: true };
 
 /** The Wald test of one reduced model of an item against its G-DINA estimates. */
 export interface ItemModelTest {
@@ -78,7 +88,7 @@ export function compareItemModels(
   calibration: CdmCalibration,
   options: ItemComparisonOptions = {},
 ): readonly ItemModelComparison[] {
-  checkOptions(options);
+  checkOptions(options, ITEM_COMPARISON_OPTIONS);
   const { models = REDUCED_MODELS } = options;
   checkModels(models);
   return comparableItems(calibration).map((item) => {

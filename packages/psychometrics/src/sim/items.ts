@@ -5,6 +5,7 @@ import {
   checkRecord,
   DataError,
   describe,
+  type FieldNames,
   type LogisticItem,
   type Random,
   type ThresholdItem,
@@ -51,6 +52,8 @@ export interface ItemSimulationOptions {
    */
   readonly distributions?: Readonly<Record<string, Distribution>>;
 }
+
+const ITEM_SIMULATION_OPTIONS: FieldNames<ItemSimulationOptions> = { categoryCount: true, distributions: true };
 
 // The defaults of catR's genDichoMatrix (aPrior, bPrior, cPrior, dPrior) and genPolyMatrix, where items without a
 // slope in catR's form have a = 1.
@@ -128,7 +131,7 @@ export function simulateItems<TParameters>(
   }
   checkPositiveInteger(count, "The number of items");
   checkRandom(random);
-  checkOptions(options);
+  checkOptions(options, ITEM_SIMULATION_OPTIONS);
   const { categoryCount = Math.min(model.maxCategories, 3), distributions = {} } = options;
   if (!(Number.isSafeInteger(categoryCount) && categoryCount >= 2 && categoryCount <= model.maxCategories)) {
     throw new DataError(

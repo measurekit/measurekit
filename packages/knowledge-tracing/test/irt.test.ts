@@ -405,12 +405,19 @@ describe("IRT options from JavaScript", () => {
   it("rejects options, priors and ability options that are not objects", () => {
     const missing = JSON.parse("null");
     expect(() => irt(missing)).toThrow("The options must be an object, found null.");
+    expect(() => irt(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => irt({ parameters: { items }, prior: missing })).toThrow(
       "The prior must be an object { mean, sd }, found null.",
+    );
+    expect(() => irt({ parameters: { items }, prior: JSON.parse('{"mean":0,"sd":1,"df":3}') })).toThrow(
+      'The prior may hold only mean and sd, found "df".',
     );
     const model = irt({ parameters: { items } });
     expect(() => model.ability(model.initialState("ana"), missing)).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => model.ability(model.initialState("ana"), JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
   });
 });
@@ -757,6 +764,9 @@ describe("IRT with drift", () => {
     expect(() => irt({ parameters, points: 241, drift: JSON.parse("null") })).toThrow(
       "The option drift must be an object { variance, per }, found null.",
     );
+    expect(() => irt({ parameters, points: 241, drift: JSON.parse('{"variance":0.1,"per":1,"rate":1}') })).toThrow(
+      'The option drift may hold only variance and per, found "rate".',
+    );
     expect(() => irt({ parameters, points: 241, drift: { variance: 0, per: 1 } })).toThrow(
       "The variance of the drift must be a positive number, found 0.",
     );
@@ -774,6 +784,7 @@ describe("IRT with drift", () => {
       "The option at must be a finite number, found NaN.",
     );
     expect(() => model.posterior(settled, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => model.posterior(settled, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => fixed.posterior(fixed.initialState("ana"), { at: JSON.parse('"1"') })).toThrow(
       'The option at must be a finite number, found "1".',
     );

@@ -6,6 +6,7 @@ import {
   checkUnitInterval,
   DataError,
   describe,
+  type FieldNames,
 } from "@measurekit/core";
 import {
   checkLog,
@@ -39,6 +40,8 @@ export interface StreakOptions {
   readonly length?: number;
 }
 
+const STREAK_OPTIONS: FieldNames<StreakOptions> = { length: true };
+
 /** Options of {@link thresholdMastery}. */
 export interface ThresholdOptions {
   /**
@@ -49,6 +52,8 @@ export interface ThresholdOptions {
    */
   readonly threshold?: number;
 }
+
+const THRESHOLD_OPTIONS: FieldNames<ThresholdOptions> = { threshold: true };
 
 /** Options of {@link movingAverageMastery}. */
 export interface MovingAverageOptions {
@@ -61,6 +66,8 @@ export interface MovingAverageOptions {
   readonly threshold: number;
 }
 
+const MOVING_AVERAGE_OPTIONS: FieldNames<MovingAverageOptions> = { decay: true, threshold: true };
+
 /** Options of {@link windowMastery}. */
 export interface WindowOptions {
   /** The number of outcomes of 1 among the last `window` that counts as mastery: an integer from 1 to `window`. Required. */
@@ -68,6 +75,8 @@ export interface WindowOptions {
   /** The number of the latest outcomes to look at, a positive integer. Required. */
   readonly window: number;
 }
+
+const WINDOW_OPTIONS: FieldNames<WindowOptions> = { correct: true, window: true };
 
 /** Options of {@link predictedMastery}. */
 export interface PredictedOptions {
@@ -78,6 +87,8 @@ export interface PredictedOptions {
   readonly threshold: number;
 }
 
+const PREDICTED_OPTIONS: FieldNames<PredictedOptions> = { threshold: true };
+
 /** Options of {@link opportunitiesToStreak}. */
 export interface OpportunitiesToStreakOptions extends StreakOptions {
   /**
@@ -87,6 +98,8 @@ export interface OpportunitiesToStreakOptions extends StreakOptions {
    */
   readonly run?: number;
 }
+
+const OPPORTUNITIES_TO_STREAK_OPTIONS: FieldNames<OpportunitiesToStreakOptions> = { run: true, length: true };
 
 /**
  * Returns the opportunity at which each learner first answered `length` attempts at each skill correctly in a row. Only
@@ -99,7 +112,7 @@ export interface OpportunitiesToStreakOptions extends StreakOptions {
  * @throws `DataError` when the log is malformed or the length is not a positive integer.
  */
 export function streakMastery(log: EventLog, options: StreakOptions = {}): MasteryTable {
-  checkOptions(options);
+  checkOptions(options, STREAK_OPTIONS);
   const { length = DEFAULT_LENGTH } = options;
   checkPositiveInteger(length, "The length");
   checkLog(log);
@@ -124,7 +137,7 @@ export function streakMastery(log: EventLog, options: StreakOptions = {}): Maste
  * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
  */
 export function movingAverageMastery(log: EventLog, options: MovingAverageOptions): MasteryTable {
-  checkOptions(options);
+  checkOptions(options, MOVING_AVERAGE_OPTIONS);
   const { decay, threshold } = options;
   checkUnitInterval(decay, "The option decay");
   checkUnitInterval(threshold, "The option threshold");
@@ -151,7 +164,7 @@ export function movingAverageMastery(log: EventLog, options: MovingAverageOption
  * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
  */
 export function windowMastery(log: EventLog, options: WindowOptions): MasteryTable {
-  checkOptions(options);
+  checkOptions(options, WINDOW_OPTIONS);
   const { correct, window } = options;
   checkPositiveInteger(window, "The option window");
   checkIntegerFrom(correct, "The option correct", 1);
@@ -199,7 +212,7 @@ export function thresholdMastery<TState>(
   const message = "thresholdMastery needs a model that defines mastery, as BKT and KST do";
   checkModel(model, message);
   checkMethod(model, "mastery", message);
-  checkOptions(options);
+  checkOptions(options, THRESHOLD_OPTIONS);
   const { threshold = DEFAULT_THRESHOLD } = options;
   checkUnitInterval(threshold, "The threshold");
   checkLog(log);
@@ -229,7 +242,7 @@ export function predictedMastery<TState>(
   options: PredictedOptions,
 ): MasteryTable {
   checkModel(model, "predictedMastery needs a learner model");
-  checkOptions(options);
+  checkOptions(options, PREDICTED_OPTIONS);
   const { threshold } = options;
   checkUnitInterval(threshold, "The option threshold");
   checkLog(log);
@@ -255,7 +268,7 @@ export function predictedMastery<TState>(
  * integer from 0 to the length.
  */
 export function opportunitiesToStreak(probability: number, options: OpportunitiesToStreakOptions = {}): number {
-  checkOptions(options);
+  checkOptions(options, OPPORTUNITIES_TO_STREAK_OPTIONS);
   const { length = DEFAULT_LENGTH, run = 0 } = options;
   checkPositiveInteger(length, "The length");
   checkUnitInterval(probability, "The probability");

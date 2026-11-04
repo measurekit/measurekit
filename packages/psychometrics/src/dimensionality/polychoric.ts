@@ -1,4 +1,4 @@
-import { checkNonNegative, checkOptions, DataError } from "@measurekit/core";
+import { checkNonNegative, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CodedItem, codeItems, MISSING_RANK } from "./coded-items.js";
 import { createPairEstimator, type PairEstimator } from "./pair-correlation.js";
@@ -13,6 +13,8 @@ export interface PolychoricOptions {
    */
   readonly correction?: number;
 }
+
+const POLYCHORIC_OPTIONS: FieldNames<PolychoricOptions> = { correction: true };
 
 /** The polychoric correlations of the items of a response matrix, with their thresholds. */
 export interface PolychoricCorrelations {
@@ -65,7 +67,7 @@ export function polychoricCorrelations(
   matrix: ResponseMatrix,
   options: PolychoricOptions = {},
 ): PolychoricCorrelations {
-  checkOptions(options);
+  checkOptions(options, POLYCHORIC_OPTIONS);
   const { correction = DEFAULT_CORRECTION } = options;
   checkNonNegative(correction, "The option correction");
   const items = codeItems(matrix, "Polychoric correlations");

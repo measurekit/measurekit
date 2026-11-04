@@ -17,3 +17,7 @@ pairs: 20,000 categories took seconds. It takes its weights as the option `weigh
 item.
 
 `createRandom` has an example, which a test runs against the values its comments state.
+
+`checkOptions` takes the names of a function's options, a `FieldNames` constant that the type checker holds complete,
+and refuses an option the function does not take, naming it; `checkFields` does the same for a record of settings inside
+the options. `bfgs`, `backtrack` and `kappaOfPairs` refuse an option they do not take.

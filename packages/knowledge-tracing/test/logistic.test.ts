@@ -1004,6 +1004,7 @@ describe("logistic options from JavaScript", () => {
   it("rejects options that are not an object", () => {
     for (const factory of [logistic, afm, pfa]) {
       expect(() => factory(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      expect(() => factory(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     }
   });
 
@@ -1597,7 +1598,7 @@ describe("logistic options of terms from JavaScript", () => {
     ],
     [
       '{"features": [{"feature": "successes", "weight": 1}]}',
-      'A term has no field "weight"; its fields are feature, over and coefficient.',
+      'A term may hold only feature, over and coefficient, found "weight".',
     ],
     [
       '{"features": [{"feature": "successes", "over": "learner", "coefficient": "each"}]}',
@@ -1782,6 +1783,7 @@ describe("rate search", () => {
       "The argument build must be a function from the rates to a logistic model, found null.",
     );
     expect(() => searchRates(build, log, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => searchRates(build, log, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => searchRates(build, log, options({ start: JSON.parse("null") }))).toThrow(
       "The option start must be an array of rates, found null.",
     );

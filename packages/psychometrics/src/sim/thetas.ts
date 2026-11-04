@@ -1,4 +1,4 @@
-import { checkOptions, checkPositiveInteger, checkRandom, type Random } from "@measurekit/core";
+import { checkOptions, checkPositiveInteger, checkRandom, type FieldNames, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import { type Distribution, STANDARD_NORMAL } from "./distributions.js";
 import { checkThetas } from "./responses.js";
@@ -13,6 +13,8 @@ export interface ThetaSimulationOptions {
   readonly distribution?: Distribution;
 }
 
+const THETA_SIMULATION_OPTIONS: FieldNames<ThetaSimulationOptions> = { distribution: true };
+
 /**
  * Draws `count` thetas from a distribution.
  *
@@ -26,7 +28,7 @@ export interface ThetaSimulationOptions {
 export function simulateThetas(count: number, random: Random, options: ThetaSimulationOptions = {}): readonly number[] {
   checkPositiveInteger(count, "The number of thetas");
   checkRandom(random);
-  checkOptions(options);
+  checkOptions(options, THETA_SIMULATION_OPTIONS);
   const { distribution = STANDARD_NORMAL } = options;
   checkFunction(distribution, "The distribution must be a function of a random number generator");
   const thetas = Array.from({ length: count }, () => distribution(random));

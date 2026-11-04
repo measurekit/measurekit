@@ -1,7 +1,7 @@
-import { checkIntegerFrom, checkOptions, DataError, normalizeLogs } from "@measurekit/core";
+import { checkIntegerFrom, checkOptions, DataError, type FieldNames, normalizeLogs } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
-import { checkRange, estimatePersons, type RangeOptions } from "../irt/internal.js";
+import { checkRange, estimatePersons, RANGE_OPTIONS, type RangeOptions } from "../irt/internal.js";
 import { addOuterProduct, invertPositiveDefinite, mirror } from "../math/internal.js";
 import { defaultPoints, type Grid, MAX_GRID_NODES, normalLogWeights, productGrid } from "./grid.js";
 import { type GridLikelihood, gridLikelihood } from "./grid-likelihood.js";
@@ -49,6 +49,11 @@ export interface MultidimensionalPosteriorMeanOptions {
   readonly points?: number;
 }
 
+const MULTIDIMENSIONAL_POSTERIOR_MEAN_OPTIONS: FieldNames<MultidimensionalPosteriorMeanOptions> = {
+  prior: true,
+  points: true,
+};
+
 /** Options of {@link multidimensionalPosteriorModeEstimate}. */
 export interface MultidimensionalPosteriorModeOptions {
   /**
@@ -58,6 +63,8 @@ export interface MultidimensionalPosteriorModeOptions {
    */
   readonly prior?: MultivariateNormalPrior;
 }
+
+const MULTIDIMENSIONAL_POSTERIOR_MODE_OPTIONS: FieldNames<MultidimensionalPosteriorModeOptions> = { prior: true };
 
 /** A person's id with the estimate of the thetas, `null` for a person without responses. */
 export interface MultidimensionalPersonEstimate {
@@ -117,7 +124,7 @@ export function multidimensionalPosteriorMeanEstimate(
   responses: readonly (number | null)[],
   options: MultidimensionalPosteriorMeanOptions = {},
 ): MultidimensionalEstimate {
-  checkOptions(options);
+  checkOptions(options, MULTIDIMENSIONAL_POSTERIOR_MEAN_OPTIONS);
   const dimensions = checkMultidimensionalPattern(items, responses, priorDimensions(options.prior));
   const prior = checkedPrior(options.prior, dimensions);
   const points = checkedPoints(options.points, dimensions);
@@ -235,7 +242,7 @@ export function multidimensionalPosteriorModeEstimate(
   responses: readonly (number | null)[],
   options: MultidimensionalPosteriorModeOptions = {},
 ): MultidimensionalEstimate {
-  checkOptions(options);
+  checkOptions(options, MULTIDIMENSIONAL_POSTERIOR_MODE_OPTIONS);
   const dimensions = checkMultidimensionalPattern(items, responses, priorDimensions(options.prior));
   const prior = checkedPrior(options.prior, dimensions);
   const { theta, information } = posteriorMode(answeredPattern(items, responses, dimensions), prior, dimensions);
@@ -320,7 +327,7 @@ function checkLikelihoodPattern(
   options: RangeOptions,
   method: string,
 ): { readonly dimensions: number; readonly range: readonly [number, number] } {
-  checkOptions(options);
+  checkOptions(options, RANGE_OPTIONS);
   const noResponse = `${method} estimation needs at least one response.`;
   if (Array.isArray(items) && items.length === 0) throw new DataError(noResponse);
   const dimensions = checkMultidimensionalPattern(items, responses);
@@ -366,6 +373,8 @@ export interface MultidimensionalEstimatesOptions {
   readonly estimator?: MultidimensionalEstimator;
 }
 
+const MULTIDIMENSIONAL_ESTIMATES_OPTIONS: FieldNames<MultidimensionalEstimatesOptions> = { estimator: true };
+
 /**
  * Returns the estimate of the thetas of every person, in the order of the data's person ids, from the person's answered
  * items only, so that sparse data, such as adaptive tests on a large pool, need no row per person over all items.
@@ -384,7 +393,7 @@ export function multidimensionalEstimates(
   items: readonly MultidimensionalTestItem[],
   options: MultidimensionalEstimatesOptions = {},
 ): readonly MultidimensionalPersonEstimate[] {
-  checkOptions(options);
+  checkOptions(options, MULTIDIMENSIONAL_ESTIMATES_OPTIONS);
   const { estimator = multidimensionalPosteriorModeEstimate } = options;
   checkFunction(
     estimator,

@@ -7,6 +7,7 @@ import {
   checkRecord,
   DataError,
   describe,
+  type FieldNames,
   type Random,
 } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
@@ -49,6 +50,8 @@ export interface BootstrapOptions {
   readonly replications?: number;
 }
 
+const BOOTSTRAP_OPTIONS: FieldNames<BootstrapOptions> = { replications: true };
+
 const DEFAULT_REPLICATIONS = 500;
 const DESIGNS = ["random-groups", "single-group", "neat"];
 
@@ -85,7 +88,7 @@ export function bootstrapEquating<TSample extends EquatingSample>(
   checkChoice(sample.design, "The design of the sample", DESIGNS);
   checkFunction(equate, "The equate argument must be a function of a sample");
   checkRandom(random);
-  checkOptions(options);
+  checkOptions(options, BOOTSTRAP_OPTIONS);
   const { replications = DEFAULT_REPLICATIONS } = options;
   checkIntegerFrom(replications, "The option replications", 2);
   const resample = resampler(sample);

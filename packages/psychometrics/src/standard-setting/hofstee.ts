@@ -1,4 +1,4 @@
-import { checkFinite, checkRecord, DataError } from "@measurekit/core";
+import { checkFields, checkFinite, checkRecord, DataError, type FieldNames } from "@measurekit/core";
 import { checkDistribution } from "../equating/internal.js";
 
 /** A panel's bounds in the Hofstee method: the acceptable cut scores and failure rates. */
@@ -12,6 +12,13 @@ export interface HofsteeBounds {
   /** The highest acceptable failure rate, f_max. */
   readonly maximumFailureRate: number;
 }
+
+const HOFSTEE_BOUND_FIELDS: FieldNames<HofsteeBounds> = {
+  minimumCutScore: true,
+  maximumCutScore: true,
+  minimumFailureRate: true,
+  maximumFailureRate: true,
+};
 
 /** A Hofstee cut score with its failure rate. */
 export interface HofsteeCutScore {
@@ -37,6 +44,7 @@ export function hofsteeCutScore(distribution: readonly number[], bounds: Hofstee
   const total = checkDistribution(distribution, "observed");
   const highest = distribution.length - 1;
   checkRecord(bounds, "The Hofstee bounds must be an object of the cut scores and failure rates");
+  checkFields(bounds, HOFSTEE_BOUND_FIELDS, "The Hofstee bounds");
   const { minimumCutScore, maximumCutScore, minimumFailureRate, maximumFailureRate } = bounds;
   checkFinite(minimumCutScore, "The bound minimumCutScore");
   checkFinite(maximumCutScore, "The bound maximumCutScore");

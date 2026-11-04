@@ -1,4 +1,4 @@
-import { DataError, describe } from "@measurekit/core";
+import { DataError, describe, type FieldNames } from "@measurekit/core";
 
 /**
  * Kelley's share of persons in the upper and lower groups.
@@ -17,6 +17,8 @@ export interface GroupOptions {
    */
   readonly groupFraction?: number;
 }
+
+export const GROUP_OPTIONS: FieldNames<GroupOptions> = { groupFraction: true };
 
 /** Weights of persons in the upper and lower score groups. */
 export interface ScoreGroups {

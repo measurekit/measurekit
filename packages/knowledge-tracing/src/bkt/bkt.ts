@@ -7,6 +7,7 @@ import {
   checkUnitInterval,
   DataError,
   describe,
+  type FieldNames,
   isNonEmptyString,
   isRecord,
 } from "@measurekit/core";
@@ -128,6 +129,21 @@ export interface BktOptions {
   readonly parameters?: BktParameters;
 }
 
+const BKT_OPTIONS: FieldNames<BktOptions> = {
+  forgetting: true,
+  itemGuessSlip: true,
+  resourceLearning: true,
+  pairLearning: true,
+  fixed: true,
+  bounds: true,
+  priorGroups: true,
+  restarts: true,
+  seed: true,
+  tolerance: true,
+  maxIterations: true,
+  parameters: true,
+};
+
 /** Options of {@link BktModel.opportunitiesToMastery}. */
 export interface OpportunitiesToMasteryOptions {
   /**
@@ -138,6 +154,8 @@ export interface OpportunitiesToMasteryOptions {
    */
   readonly threshold?: number;
 }
+
+const OPPORTUNITIES_TO_MASTERY_OPTIONS: FieldNames<OpportunitiesToMasteryOptions> = { threshold: true };
 
 /** A BKT model: a learner model with mastery and the opportunities expected to reach it. */
 export interface BktModel extends LearnerModel<BktState, BktParameters> {
@@ -400,7 +418,7 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
       return masteryOf(state, skill);
     },
     opportunitiesToMastery(state, skill, masteryOptions = {}) {
-      checkOptions(masteryOptions);
+      checkOptions(masteryOptions, OPPORTUNITIES_TO_MASTERY_OPTIONS);
       const { threshold = DEFAULT_THRESHOLD } = masteryOptions;
       checkState(state);
       checkUnitInterval(threshold, "The threshold");
@@ -422,7 +440,7 @@ function checkTraceable(event: Event, label: string): void {
 }
 
 function settingsOf(options: BktOptions): Settings {
-  checkOptions(options);
+  checkOptions(options, BKT_OPTIONS);
   const {
     forgetting = false,
     itemGuessSlip = false,

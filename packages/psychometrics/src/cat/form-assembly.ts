@@ -1,5 +1,6 @@
 import {
   checkArray,
+  checkFields,
   checkFinite,
   checkIntegerFrom,
   checkOptions,
@@ -9,6 +10,7 @@ import {
   checkRecord,
   DataError,
   describe,
+  type FieldNames,
   type Random,
   shuffle,
 } from "@measurekit/core";
@@ -43,6 +45,8 @@ export interface InformationTarget {
    */
   readonly weight?: number;
 }
+
+const INFORMATION_TARGET_FIELDS: FieldNames<InformationTarget> = { theta: true, information: true, weight: true };
 
 /** Options of {@link assembleForms}. */
 export interface FormAssemblyOptions {
@@ -87,6 +91,17 @@ export interface FormAssemblyOptions {
    */
   readonly random?: Random;
 }
+
+const FORM_ASSEMBLY_OPTIONS: FieldNames<FormAssemblyOptions> = {
+  pool: true,
+  length: true,
+  content: true,
+  target: true,
+  enemies: true,
+  forms: true,
+  overlap: true,
+  random: true,
+};
 
 /** A form assembled from a pool. */
 export interface AssembledForm {
@@ -166,7 +181,7 @@ interface Assembly {
  * @see {@link https://doi.org/10.1177/014662169301700205 | Swanson and Stocking (1993)}
  */
 export function assembleForms(options: FormAssemblyOptions): readonly AssembledForm[] {
-  checkOptions(options);
+  checkOptions(options, FORM_ASSEMBLY_OPTIONS);
   const { pool, length, content = [], target = [], enemies = [], forms = 1, overlap = 0, random } = options;
   const indices = indexItems(pool);
   if (!(Number.isSafeInteger(length) && length >= 1 && length <= pool.length)) {
@@ -416,6 +431,7 @@ function contentProperty(
 
 function informationProperty(pool: readonly PoolItem[], point: InformationTarget): Property {
   checkRecord(point, "An information target must be an object { theta, information }");
+  checkFields(point, INFORMATION_TARGET_FIELDS, "An information target");
   const { theta, information, weight = 1 } = point;
   checkFinite(theta, "The theta of an information target");
   checkFinite(information, `The information of the target at theta ${theta}`);

@@ -868,6 +868,7 @@ describe("createAdaptiveTest", () => {
   it("rejects options, pools and random number generators of other types from JavaScript", () => {
     const stopping = testLength(1);
     expect(() => createAdaptiveTest(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => createAdaptiveTest(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => createAdaptiveTest({ pool: JSON.parse("null"), stopping })).toThrow(
       "The items must be an array, found null.",
     );
@@ -1415,6 +1416,9 @@ describe("content bounds", () => {
       expect(() => contentBounds(maximumInformation, JSON.parse("[null]"), 4)).toThrow(
         "A content constraint must be an object { area, minimum, maximum }, found null.",
       );
+      expect(() =>
+        contentBounds(maximumInformation, JSON.parse('[{"area":"x","minimum":0,"maximum":1,"importance":1}]'), 4),
+      ).toThrow('A content constraint may hold only area, minimum, maximum and weight, found "importance".');
       expect(() => contentBounds(maximumInformation, JSON.parse('[{"area":1,"minimum":0,"maximum":1}]'), 4)).toThrow(
         "A content constraint needs a string area, found 1.",
       );
@@ -2228,6 +2232,9 @@ describe("calibrateExposure", () => {
     expect(() => calibrateExposure(test, [0], createRandom(1), JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrateExposure(test, [0], createRandom(1), JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => calibrateExposure(test, [0], JSON.parse("null"), { maxRate: 0.5 })).toThrow(
       "A random number generator must be one from createRandom, found null.",
     );
@@ -2501,12 +2508,16 @@ describe("assembleForms", () => {
     );
     expect(() => assembleForms({ ...base, target: [{ theta: Infinity, information: 1 }] })).toThrow(DataError);
     expect(() => assembleForms(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => assembleForms(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => assembleForms({ ...base, content: JSON.parse("{}") })).toThrow(
       "The option content must be an array of content constraints, found an object.",
     );
     expect(() => assembleForms({ ...base, target: JSON.parse("[null]") })).toThrow(
       "An information target must be an object { theta, information }, found null.",
     );
+    expect(() =>
+      assembleForms({ ...base, target: JSON.parse('[{"theta":0,"information":1,"importance":1}]') }),
+    ).toThrow('An information target may hold only theta, information and weight, found "importance".');
     for (const forms of [0, 1.5, -1, Number.NaN]) {
       expect(() => assembleForms({ ...base, forms })).toThrow(
         `The option forms must be a positive integer, found ${forms}.`,
@@ -2712,11 +2723,15 @@ describe("createMultistageTest", () => {
   it("rejects panels and responses of other types from JavaScript", () => {
     const routing = "number-correct";
     expect(() => createMultistageTest(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => createMultistageTest(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => createMultistageTest({ stages: JSON.parse("null"), routing })).toThrow(
       "The option stages must be an array of stages, found null.",
     );
     expect(() => createMultistageTest({ stages: JSON.parse("[[null]]"), routing })).toThrow(
       "The modules of stage 1 must be objects { id, items, cuts }, found null.",
+    );
+    expect(() => createMultistageTest({ stages: JSON.parse('[[{"id":"m","items":["q"],"cut":0}]]'), routing })).toThrow(
+      'A module of stage 1 may hold only id, items and cuts, found "cut".',
     );
     expect(() =>
       createMultistageTest({
@@ -3002,6 +3017,7 @@ describe("multistageCuts", () => {
 
     it("refuses an unknown method or scale, and options that are not an object", () => {
       expect(() => multistageCuts(stages, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      expect(() => multistageCuts(stages, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
       expect(() => multistageCuts(stages, { method: JSON.parse('"quantile"') })).toThrow(
         'The option method must be "maximum-information" or "routing-shares", found "quantile".',
       );
@@ -3357,8 +3373,12 @@ describe("selection rules of catR beyond MFI and KL", () => {
         expectedPosteriorVariance,
       ]) {
         expect(() => rule(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+        expect(() => rule(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
         expect(() => rule({ prior: JSON.parse('"normal"') })).toThrow(
           'The option prior must be an object { mean, sd }, found "normal".',
+        );
+        expect(() => rule({ prior: JSON.parse('{"mean":0,"sd":1,"df":3}') })).toThrow(
+          'The option prior may hold only mean and sd, found "df".',
         );
         expect(() => rule({ prior: { mean: 0, sd: 0 } })).toThrow(
           "The sd of the prior must be a positive number, found 0.",
@@ -3394,6 +3414,7 @@ describe("selection rules of catR beyond MFI and KL", () => {
 
     it("rejects options, estimators and kinds of information of other types", () => {
       expect(() => expectedInformation(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      expect(() => expectedInformation(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
       expect(() => expectedInformation({ estimator: JSON.parse('"MAP"') })).toThrow(
         'The option estimator must be a function of items and responses, such as posteriorModeEstimate, found "MAP".',
       );
@@ -3483,6 +3504,7 @@ describe("selection rules of catR beyond MFI and KL", () => {
     it("rejects options of other types and invalid lengths and accelerations", () => {
       for (const rule of [progressive, proportional]) {
         expect(() => rule(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+        expect(() => rule(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
         expect(() => rule(JSON.parse("{}"))).toThrow("The option length must be a positive integer, found undefined.");
         expect(() => rule({ length: 0 })).toThrow("The option length must be a positive integer, found 0.");
         expect(() => rule({ length: 2.5 })).toThrow(DataError);
@@ -3641,6 +3663,9 @@ describe("simulation", () => {
     const test = createAdaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping: testLength(1) });
     expect(() => simulateAdaptiveTest(test, [0], createRandom(1), JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => simulateAdaptiveTest(test, [0], createRandom(1), JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose": the options are testRandom.',
     );
     expect(() => simulateAdaptiveTest(test, [0], createRandom(1), { testRandom: JSON.parse("1") })).toThrow(
       "The option testRandom must be a function of a person and a step, found 1.",
@@ -4315,6 +4340,7 @@ describe("createDiagnosticAdaptiveTest", () => {
     const options = { pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) };
     const parse = (json: string) => JSON.parse(json);
     expect(() => createDiagnosticAdaptiveTest(parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => createDiagnosticAdaptiveTest(parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => createDiagnosticAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
       "The option stopping must be a stopping rule, such as testLength(20)",
     );
@@ -5213,6 +5239,7 @@ describe("createMultidimensionalAdaptiveTest", () => {
     expect(() => createMultidimensionalAdaptiveTest(parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => createMultidimensionalAdaptiveTest(parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => createMultidimensionalAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
       "The option stopping must be a stopping rule, such as testLength(20)",
     );
@@ -5351,7 +5378,11 @@ describe("maximumDeterminant", () => {
     expect(() => maximumDeterminant({ prior: parse('"prior"') })).toThrow(
       "The option prior must be an object { mean, covariance }",
     );
+    expect(() => maximumDeterminant({ prior: parse('{"mean":[0],"covariance":[[1]],"df":3}') })).toThrow(
+      'The option prior may hold only mean and covariance, found "df".',
+    );
     expect(() => maximumDeterminant(parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => maximumDeterminant(parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => maximumDeterminant({ prior: parse("null") })).toThrow(DataError);
     expect(() => maximumDeterminant({ prior: parse('{"mean":[0,0],"covariance":"x"}') })).toThrow(
       "The covariance of the prior must be an array of rows",

@@ -541,6 +541,7 @@ describe("data input from JavaScript", () => {
   it("rejects options and random number generators that are not objects", () => {
     const events = [{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }];
     expect(() => buildEventLog(events, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => buildEventLog(events, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => splitByLearner(buildEventLog(events), 2, JSON.parse("null"))).toThrow(
       "A random number generator must be one from createRandom, found null.",
     );

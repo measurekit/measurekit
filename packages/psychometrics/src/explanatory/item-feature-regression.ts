@@ -5,6 +5,7 @@ import {
   checkStopping,
   DataError,
   describe,
+  type FieldNames,
   isNonEmptyString,
   isRecord,
 } from "@measurekit/core";
@@ -40,6 +41,13 @@ export interface ItemFeatureRegressionOptions {
    */
   readonly maxIterations?: number;
 }
+
+const ITEM_FEATURE_REGRESSION_OPTIONS: FieldNames<ItemFeatureRegressionOptions> = {
+  parameter: true,
+  intercept: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** The regression of an item parameter on the items' features. */
 export interface ItemFeatureRegression {
@@ -123,7 +131,7 @@ export function itemFeatureRegression<TParameters>(
   options: ItemFeatureRegressionOptions = {},
 ): ItemFeatureRegression {
   checkArray(items, "The items must be an array of calibrated items");
-  checkOptions(options);
+  checkOptions(options, ITEM_FEATURE_REGRESSION_OPTIONS);
   const {
     parameter = DEFAULT_PARAMETER,
     intercept = true,

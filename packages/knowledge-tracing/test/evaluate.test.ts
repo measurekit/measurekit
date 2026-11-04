@@ -732,6 +732,7 @@ describe("crossValidate with skills the training log has no outcome of", () => {
     expect(() => crossValidate(laplace(), folds, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => crossValidate(laplace(), folds, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => crossValidate(laplace(), folds, { unseenSkills: JSON.parse("null") })).toThrow(DataError);
   });
 });
@@ -894,6 +895,9 @@ describe("compareByLearner", () => {
     expect(() => compareByLearner(one, two, folds, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => compareByLearner(one, two, folds, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => compareByLearner(JSON.parse("null"), two, folds)).toThrow(
       "The first evaluation must be an object returned by crossValidate, found null.",
     );
@@ -1007,6 +1011,7 @@ describe("learningCurve", () => {
       "A learning curve needs a learner and skill with at least 1000 opportunities; none has.",
     );
     expect(() => learningCurve(log, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => learningCurve(log, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 
   it("rejects a log without skills and predictions that are not one per event", () => {
@@ -1200,6 +1205,7 @@ describe("the analysis of learning curves", () => {
     );
     expect(() => categorizeCurve([point], { ...options, highError: 2 })).toThrow(DataError);
     expect(() => categorizeCurve([point], JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => categorizeCurve([point], JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => categorizeCurve([point], JSON.parse("{}"))).toThrow(DataError);
     expect(fitPowerLaw([])).toBeNull();
   });
@@ -1210,6 +1216,7 @@ describe("evaluate options from JavaScript", () => {
     expect(() => calibrationCurve([0.5], [1], JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrationCurve([0.5], [1], JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 
   it("rejects predictions, outcomes and logs of other types", () => {

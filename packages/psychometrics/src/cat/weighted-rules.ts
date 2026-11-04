@@ -1,4 +1,4 @@
-import { checkOptions, DataError } from "@measurekit/core";
+import { checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import {
   checkThetaPrior,
   type IrtItem,
@@ -31,6 +31,8 @@ export interface WeightedRuleOptions {
   readonly prior?: ThetaPrior;
 }
 
+const WEIGHTED_RULE_OPTIONS: FieldNames<WeightedRuleOptions> = { prior: true };
+
 /** ln √(2π), of the normal density. */
 const LOG_SQRT_TWO_PI = 0.5 * Math.log(2 * Math.PI);
 
@@ -49,7 +51,7 @@ interface GridWeighting {
  * positive sd.
  */
 export function priorOnGrid(options: WeightedRuleOptions): Float64Array {
-  checkOptions(options);
+  checkOptions(options, WEIGHTED_RULE_OPTIONS);
   const { mean, sd } = checkThetaPrior(options.prior);
   return GRID_NODES.map((theta) => -0.5 * ((theta - mean) / sd) ** 2 - Math.log(sd) - LOG_SQRT_TWO_PI);
 }

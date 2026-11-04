@@ -1,4 +1,13 @@
-import { checkRecord, DataError, describe, isNonEmptyString, isRecord, isUnitInterval } from "@measurekit/core";
+import {
+  checkFields,
+  checkRecord,
+  DataError,
+  describe,
+  type FieldNames,
+  isNonEmptyString,
+  isRecord,
+  isUnitInterval,
+} from "@measurekit/core";
 import type { Blim, Constraints, RateConstraints } from "./estimation.js";
 
 /** Rates of items held at given values, by item. */
@@ -9,6 +18,8 @@ export interface FixedRates {
   readonly slip?: Readonly<Record<string, number>>;
 }
 
+const FIXED_RATE_FIELDS: FieldNames<FixedRates> = { guess: true, slip: true };
+
 /** Groups of items that share one estimate of a rate. */
 export interface EqualRates {
   /** Groups of at least 2 items that share a lucky guess. */
@@ -16,6 +27,8 @@ export interface EqualRates {
   /** Groups of at least 2 items that share a careless error. */
   readonly slip?: readonly (readonly string[])[];
 }
+
+const EQUAL_RATE_FIELDS: FieldNames<EqualRates> = { guess: true, slip: true };
 
 type RateName = "guess" | "slip";
 const RATE_NAMES: readonly RateName[] = ["guess", "slip"];
@@ -38,6 +51,8 @@ export type Restrictions = Readonly<Record<RateName, RateRestrictions>>;
 export function checkRestrictions(fixed: FixedRates, equal: EqualRates): Restrictions {
   checkRecord(fixed, "The option fixed must be an object of fixed rates by guess and slip");
   checkRecord(equal, "The option equal must be an object of groups of items by guess and slip");
+  checkFields(fixed, FIXED_RATE_FIELDS, "The option fixed");
+  checkFields(equal, EQUAL_RATE_FIELDS, "The option equal");
   const { guess: fixedGuess = {}, slip: fixedSlip = {} } = fixed;
   const { guess: equalGuess = [], slip: equalSlip = [] } = equal;
   return { guess: restrictionsOf("guess", fixedGuess, equalGuess), slip: restrictionsOf("slip", fixedSlip, equalSlip) };

@@ -1226,6 +1226,7 @@ describe("Rasch tests", () => {
       const matrix = buildResponseMatrix(caseNamed(raschTests.andersen, "raschdat1, median").responses);
       expect(() => andersenTest(JSON.parse("null"))).toThrow(DataError);
       expect(() => andersenTest(matrix, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+      expect(() => andersenTest(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
       const options = (value: string) => () => andersenTest(matrix, JSON.parse(value));
       expect(options('{ "split": null }')).toThrow(/The option split must be "median", "mean" or an array of labels/);
       expect(options('{ "split": "upper" }')).toThrow(/The option split must be/);

@@ -1,11 +1,13 @@
 import {
   checkArray,
+  checkFields,
   checkFinite,
   checkIntegerFrom,
   checkPositive,
   checkRecord,
   DataError,
   describe,
+  type FieldNames,
   isNonEmptyString,
 } from "@measurekit/core";
 import type { PoolControls } from "./items.js";
@@ -27,6 +29,13 @@ export interface ContentConstraint {
   readonly weight?: number;
 }
 
+const CONTENT_CONSTRAINT_FIELDS: FieldNames<ContentConstraint> = {
+  area: true,
+  minimum: true,
+  maximum: true,
+  weight: true,
+};
+
 /** The bounds of a test on the number of its items in each of several content areas, by area. */
 export interface ContentBounds {
   /** The areas, in the order of the constraints. */
@@ -47,6 +56,7 @@ export interface ContentBounds {
  */
 function readConstraint(constraint: ContentConstraint): Required<ContentConstraint> {
   checkRecord(constraint, "A content constraint must be an object { area, minimum, maximum }");
+  checkFields(constraint, CONTENT_CONSTRAINT_FIELDS, "A content constraint");
   const { area, minimum, maximum, weight = 1 } = constraint;
   if (typeof area !== "string") {
     throw new DataError(`A content constraint needs a string area, found ${describe(area)}.`);

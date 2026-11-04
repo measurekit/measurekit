@@ -1,4 +1,4 @@
-import { checkOptions, type Random } from "@measurekit/core";
+import { checkOptions, type FieldNames, type Random } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import { type AbilityEstimate, type AbilityEstimator, indexItems, posteriorMeanEstimate } from "../irt/internal.js";
 import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
@@ -26,6 +26,16 @@ export interface AdaptiveTestOptions extends TestControlOptions {
    */
   readonly estimator?: AbilityEstimator;
 }
+
+const ADAPTIVE_TEST_OPTIONS: FieldNames<AdaptiveTestOptions> = {
+  pool: true,
+  stopping: true,
+  selection: true,
+  estimator: true,
+  contentTargets: true,
+  enemies: true,
+  withinTestlet: true,
+};
 
 /** The state of an adaptive test: plain data, which JSON serializes, so that a test can resume from a stored state. */
 export interface AdaptiveTestState extends AdaptiveState<AbilityEstimate> {}
@@ -86,7 +96,7 @@ export interface AdaptiveTest {
  * ```
  */
 export function createAdaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
-  checkOptions(options);
+  checkOptions(options, ADAPTIVE_TEST_OPTIONS);
   const {
     pool,
     stopping,

@@ -1,4 +1,4 @@
-import { bfgs, checkOptions, DataError, type OptimizerOptions } from "@measurekit/core";
+import { bfgs, checkOptions, DataError, type FieldNames, type OptimizerOptions } from "@measurekit/core";
 import { type IrtItem, largestCategoryCount, type QuadratureOptions, quadratureRule } from "../irt/internal.js";
 
 import type { Quadrature } from "../math/internal.js";
@@ -24,6 +24,8 @@ export interface LinkingOptions {
    */
   readonly quadrature?: QuadratureOptions;
 }
+
+const LINKING_OPTIONS: FieldNames<LinkingOptions> = { quadrature: true };
 
 /** BFGS on ln A and B to a gradient of 1e-10. */
 const OPTIMIZER: OptimizerOptions = { tolerance: 1e-10, maxIterations: 200 };
@@ -108,7 +110,7 @@ export function curveLink(
   criterion: CurveCriterion,
 ): CurveLink {
   checkCommonItems(from, to);
-  checkOptions(options);
+  checkOptions(options, LINKING_OPTIONS);
   const rule = quadratureRule(options.quadrature);
   const curves = characteristicCurves(from, to, rule);
   const result = bfgs((x, gradient) => criterionAt(curves, criterion, x, gradient), [0, 0], OPTIMIZER);

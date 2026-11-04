@@ -1,4 +1,4 @@
-import { checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
+import { checkOptions, checkPositiveInteger, DataError, type FieldNames } from "@measurekit/core";
 import { checkLog, type EventLog } from "../data/internal.js";
 import { checkPredictionList } from "./observed-pairs.js";
 import { checkHasSkills, collectByOpportunity } from "./opportunities.js";
@@ -45,6 +45,8 @@ export interface LearningCurveOptions {
   readonly minOpportunities?: number;
 }
 
+const LEARNING_CURVE_OPTIONS: FieldNames<LearningCurveOptions> = { predictions: true, minOpportunities: true };
+
 /**
  * Returns learning curves: the error rate of events by opportunity, the number of times the learner has practiced the
  * skill, counting the event itself.
@@ -64,7 +66,7 @@ export interface LearningCurveOptions {
  * predictions are malformed or not one per event, or no learner and skill pair has `minOpportunities` opportunities.
  */
 export function learningCurve(log: EventLog, options: LearningCurveOptions = {}): LearningCurve {
-  checkOptions(options);
+  checkOptions(options, LEARNING_CURVE_OPTIONS);
   const { predictions, minOpportunities = DEFAULT_MIN_OPPORTUNITIES } = options;
   checkPositiveInteger(minOpportunities, "The option minOpportunities");
   checkLog(log);

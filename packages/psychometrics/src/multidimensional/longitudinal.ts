@@ -1,4 +1,12 @@
-import { checkChoice, checkIntegerFrom, checkOptions, checkStopping, DataError, describe } from "@measurekit/core";
+import {
+  checkChoice,
+  checkIntegerFrom,
+  checkOptions,
+  checkStopping,
+  DataError,
+  describe,
+  type FieldNames,
+} from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
   checkStandardErrorSize,
@@ -54,6 +62,14 @@ export interface LongitudinalOptions {
    */
   readonly maxIterations?: number;
 }
+
+const LONGITUDINAL_OPTIONS: FieldNames<LongitudinalOptions> = {
+  model: true,
+  points: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** The distribution of the trait on one occasion. */
 export interface OccasionMoments {
@@ -144,7 +160,7 @@ export function calibrateLongitudinal(
   occasions: readonly ResponseMatrix[],
   options: LongitudinalOptions = {},
 ): LongitudinalCalibration {
-  checkOptions(options);
+  checkOptions(options, LONGITUDINAL_OPTIONS);
   const data = arrangeOccasions(occasions);
   const { model = twoParameterLogistic, standardErrors = "none" } = options;
   const {

@@ -1,4 +1,4 @@
-import { checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
+import { checkOptions, checkPositiveInteger, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type ExploratoryFactorOptions, exploratoryFactors } from "./exploratory-factors.js";
 import { MIN_GROUP_FACTORS, type SchmidLeiman, transformation } from "./schmid-leiman.js";
@@ -12,6 +12,15 @@ export interface OmegaHierarchicalOptions extends Omit<ExploratoryFactorOptions,
    */
   readonly factors?: number;
 }
+
+const OMEGA_HIERARCHICAL_OPTIONS: FieldNames<OmegaHierarchicalOptions> = {
+  factors: true,
+  tolerance: true,
+  maxIterations: true,
+  correlation: true,
+  extraction: true,
+  correction: true,
+};
 
 /** McDonald's omega hierarchical and omega total of a test, with the loadings they come from. */
 export interface OmegaHierarchical {
@@ -45,7 +54,7 @@ const DEFAULT_FACTORS = 3;
  * @see {@link https://doi.org/10.4324/9781410601087 | McDonald (1999)}
  */
 export function omegaHierarchical(matrix: ResponseMatrix, options: OmegaHierarchicalOptions = {}): OmegaHierarchical {
-  checkOptions(options);
+  checkOptions(options, OMEGA_HIERARCHICAL_OPTIONS);
   const { factors = DEFAULT_FACTORS } = options;
   checkPositiveInteger(factors, "The option factors");
   if (factors < MIN_GROUP_FACTORS) {

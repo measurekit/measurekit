@@ -421,6 +421,9 @@ describe("generalizabilityStudy", () => {
     expect(() => generalizabilityStudy(scores, JSON.parse("null"))).toThrow(
       "The design must be an object { object, facets, nested }, found null.",
     );
+    expect(() => study({ object: "person", facets: ["item"], nest: {} })).toThrow(
+      'The design may hold only object, facets, nested and unbalanced, found "nest".',
+    );
     expect(() => study({ facets: "item" })).toThrow(
       'The facets of the design must be an array of facet names, found "item".',
     );
@@ -720,6 +723,7 @@ describe("decisionStudy", () => {
 
   it("rejects options of other types and invalid options", () => {
     expect(() => decisionStudy(raters, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => decisionStudy(raters, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => decisionStudy(raters, { sampleSizes: JSON.parse('"3"') })).toThrow(
       'The option sampleSizes must be an object of numbers of elements by facet, found "3".',
     );

@@ -1,4 +1,4 @@
-import { checkArray, checkChoice, checkFinite, checkOptions, DataError, mean } from "@measurekit/core";
+import { checkArray, checkChoice, checkFinite, checkOptions, DataError, type FieldNames, mean } from "@measurekit/core";
 import { sampleQuantile, standardDeviation } from "../math/internal.js";
 import { readStations } from "./stations.js";
 
@@ -12,6 +12,8 @@ export interface BorderlineGroupOptions {
    */
   readonly statistic?: "mean" | "median";
 }
+
+const BORDERLINE_GROUP_OPTIONS: FieldNames<BorderlineGroupOptions> = { statistic: true };
 
 /** The borderline group of one station. */
 export interface StationGroup {
@@ -61,7 +63,7 @@ export function borderlineGroupCutScores(
   borderline: number | readonly number[],
   options: BorderlineGroupOptions = {},
 ): BorderlineGroupCutScores {
-  checkOptions(options);
+  checkOptions(options, BORDERLINE_GROUP_OPTIONS);
   const { statistic = "mean" } = options;
   checkChoice(statistic, "The option statistic", STATISTICS);
   const grades = borderlineGrades(borderline);

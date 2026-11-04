@@ -1,4 +1,4 @@
-import { checkOptions, DataError, type ThetaDistribution } from "@measurekit/core";
+import { checkOptions, DataError, type FieldNames, type ThetaDistribution } from "@measurekit/core";
 import {
   checkThetaDistribution,
   expectedScore,
@@ -15,6 +15,8 @@ export interface DifferentialFunctioningOptions {
    */
   readonly population: ThetaDistribution;
 }
+
+const DIFFERENTIAL_FUNCTIONING_OPTIONS: FieldNames<DifferentialFunctioningOptions> = { population: true };
 
 /** The differential functioning of one item. */
 export interface ItemFunctioning {
@@ -62,7 +64,7 @@ export function differentialFunctioning(
 ): TestFunctioning {
   indexItems(reference);
   indexItems(focal);
-  checkOptions(options);
+  checkOptions(options, DIFFERENTIAL_FUNCTIONING_OPTIONS);
   if (focal.length !== reference.length) {
     throw new DataError(`Found ${focal.length} focal items for ${reference.length} reference items.`);
   }

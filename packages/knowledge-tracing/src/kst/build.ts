@@ -1,4 +1,4 @@
-import { checkIntegerFrom, DataError } from "@measurekit/core";
+import { checkIntegerFrom, DataError, type FieldNames } from "@measurekit/core";
 import { compareStates, type KnowledgeStructure, seal } from "./structure.js";
 
 /** The default limit on the number of knowledge states a structure is built with. */
@@ -13,6 +13,8 @@ export interface StateLimitOptions {
    */
   readonly maxStates?: number;
 }
+
+export const STATE_LIMIT_OPTIONS: FieldNames<StateLimitOptions> = { maxStates: true };
 
 /**
  * Checks the limit on the number of states and returns it.

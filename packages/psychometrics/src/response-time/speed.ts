@@ -1,4 +1,4 @@
-import { checkOptions, checkPositive, chiSquareUpperTail } from "@measurekit/core";
+import { checkOptions, checkPositive, chiSquareUpperTail, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 
 import { posteriors } from "./lognormal.js";
@@ -13,6 +13,8 @@ export interface SpeedOptions {
    */
   readonly sd?: number;
 }
+
+const SPEED_OPTIONS: FieldNames<SpeedOptions> = { sd: true };
 
 /** A person's estimated speed. */
 export interface SpeedEstimate {
@@ -111,7 +113,7 @@ function speedPosteriors(
   timeItems: readonly TimeItem[],
   options: SpeedOptions,
 ): SpeedPosteriors {
-  checkOptions(options);
+  checkOptions(options, SPEED_OPTIONS);
   const { sd } = options;
   if (sd !== undefined) checkPositive(sd, "The option sd");
   const items = itemsOfData(timed.itemIds, timeItems);

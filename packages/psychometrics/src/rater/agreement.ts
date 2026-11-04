@@ -1,4 +1,4 @@
-import { checkNonNegative, checkOptions, DataError, describe } from "@measurekit/core";
+import { checkNonNegative, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
 import { completeRatings } from "./ratings.js";
 
 /** Options of {@link adjacentAgreement}. */
@@ -11,6 +11,8 @@ export interface AdjacentAgreementOptions {
    */
   readonly width?: number;
 }
+
+const ADJACENT_AGREEMENT_OPTIONS: FieldNames<AdjacentAgreementOptions> = { width: true };
 
 const DEFAULT_WIDTH = 1;
 
@@ -50,7 +52,7 @@ export function adjacentAgreement(
   ratings: readonly (readonly (number | null)[])[],
   options: AdjacentAgreementOptions = {},
 ): number {
-  checkOptions(options);
+  checkOptions(options, ADJACENT_AGREEMENT_OPTIONS);
   const { width = DEFAULT_WIDTH } = options;
   checkNonNegative(width, "The option width");
   if (!Number.isSafeInteger(width)) {

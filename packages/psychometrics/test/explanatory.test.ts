@@ -436,6 +436,9 @@ describe("itemFeatureRegression", () => {
     expect(() => itemFeatureRegression(items, features, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => itemFeatureRegression(items, features, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => itemFeatureRegression(items, features, { parameter: JSON.parse("5") })).toThrow(
       "The option parameter must be the name of a parameter, found 5.",
     );
@@ -791,6 +794,7 @@ describe("linearChange", () => {
     expect(() => linearChange(SMALL_OCCASIONS, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => linearChange(SMALL_OCCASIONS, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => linearChange(SMALL_OCCASIONS, { tolerance: -1 })).toThrow(
       "The option tolerance must be a non-negative number, found -1.",
     );
@@ -1325,6 +1329,7 @@ describe("lltm", () => {
     const matrix = lltmData(0);
     const features = lltmFeatures(defined(lltmFixture.cases[0]));
     expect(() => lltm(matrix, features, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => lltm(matrix, features, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => lltm(matrix, features, { intercept: JSON.parse('"yes"') })).toThrow(
       'The option intercept must be a boolean, found "yes".',
     );

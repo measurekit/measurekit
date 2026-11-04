@@ -1,4 +1,13 @@
-import { checkArray, checkOptions, checkRecord, DataError, describe, isPositive, isRecord } from "@measurekit/core";
+import {
+  checkArray,
+  checkOptions,
+  checkRecord,
+  DataError,
+  describe,
+  type FieldNames,
+  isPositive,
+  isRecord,
+} from "@measurekit/core";
 import { indexIds } from "./ids.js";
 import { isResponse, MAX_RESPONSE } from "./response.js";
 
@@ -44,6 +53,8 @@ export interface ResponseRecordsOptions {
   readonly itemIds?: readonly string[];
 }
 
+const RESPONSE_RECORDS_OPTIONS: FieldNames<ResponseRecordsOptions> = { personIds: true, itemIds: true };
+
 /**
  * Builds response records, with the persons and items of `personIds` and `itemIds`. The records are copied.
  *
@@ -59,7 +70,7 @@ export function buildResponseRecords(
   options: ResponseRecordsOptions = {},
 ): ResponseRecords {
   checkArray(records, "Response records must be an array");
-  checkOptions(options);
+  checkOptions(options, RESPONSE_RECORDS_OPTIONS);
   const objects = records.filter(isRecord);
   const {
     personIds = [...new Set(objects.map((record) => record.person))],

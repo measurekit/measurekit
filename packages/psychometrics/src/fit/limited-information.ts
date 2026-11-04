@@ -8,6 +8,7 @@ import {
   chiSquareUpperTail,
   DataError,
   describe,
+  type FieldNames,
 } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
 import type { ResponseMatrix } from "../data/internal.js";
@@ -69,6 +70,13 @@ export interface LimitedInformationOptions {
    */
   readonly level?: number;
 }
+
+const LIMITED_INFORMATION_OPTIONS: FieldNames<LimitedInformationOptions> = {
+  statistic: true,
+  fixed: true,
+  fixedParameters: true,
+  level: true,
+};
 
 /** The fit of a calibrated model to the first- and second-order margins of its test. */
 export interface LimitedInformationFit {
@@ -143,7 +151,7 @@ export function limitedInformationFit<TParameters>(
   calibration: Calibration<TParameters>,
   options: LimitedInformationOptions = {},
 ): LimitedInformationFit {
-  checkOptions(options);
+  checkOptions(options, LIMITED_INFORMATION_OPTIONS);
   const { statistic = "m2-star", fixed = [], fixedParameters = {}, level = DEFAULT_LEVEL } = options;
   checkChoice(statistic, "The option statistic", STATISTICS);
   checkOpenUnitInterval(level, "The option level");

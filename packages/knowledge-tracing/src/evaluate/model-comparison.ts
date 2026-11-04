@@ -1,7 +1,12 @@
-import { DataError, isRecord } from "@measurekit/core";
+import { checkOptions, DataError, isRecord } from "@measurekit/core";
 import type { Fold } from "../data/internal.js";
 import type { LearnerModel } from "../model.js";
-import { type CrossValidateOptions, type CrossValidation, crossValidate } from "./cross-validation.js";
+import {
+  CROSS_VALIDATE_OPTIONS,
+  type CrossValidateOptions,
+  type CrossValidation,
+  crossValidate,
+} from "./cross-validation.js";
 
 /** One model's row of a comparison: its name and its evaluation. */
 export interface ModelEvaluation extends CrossValidation {
@@ -26,6 +31,7 @@ export function compareModels(
   folds: readonly Fold[],
   options: CrossValidateOptions = {},
 ): readonly ModelEvaluation[] {
+  checkOptions(options, CROSS_VALIDATE_OPTIONS);
   const entries = isRecord(models) ? Object.entries(models) : [];
   if (entries.length === 0) {
     throw new DataError("A comparison needs at least one model, as an object of models by name.");

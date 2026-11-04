@@ -3,6 +3,7 @@ import {
   checkOptions,
   checkStopping,
   DataError,
+  type FieldNames,
   type LogisticItem,
   type ThresholdItem,
 } from "@measurekit/core";
@@ -48,6 +49,12 @@ export interface ConditionalCalibrationOptions {
    */
   readonly maxIterations?: number;
 }
+
+const CONDITIONAL_CALIBRATION_OPTIONS: FieldNames<ConditionalCalibrationOptions> = {
+  model: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** Item parameters of the Rasch family estimated by conditional maximum likelihood. */
 export interface ConditionalCalibration {
@@ -141,7 +148,7 @@ export interface ConditionalFit {
  */
 export function conditionalFit(matrix: ResponseMatrix, options: ConditionalCalibrationOptions = {}): ConditionalFit {
   checkResponseMatrix(matrix);
-  checkOptions(options);
+  checkOptions(options, CONDITIONAL_CALIBRATION_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   checkStopping(tolerance, maxIterations);
   const { itemIds } = matrix;

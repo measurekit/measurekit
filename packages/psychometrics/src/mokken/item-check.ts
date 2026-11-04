@@ -1,10 +1,10 @@
 import {
   checkNonNegative,
-  checkOptions,
   checkPositive,
   checkPositiveInteger,
   DataError,
   describe,
+  type FieldNames,
 } from "@measurekit/core";
 
 /** The result of a check of one item: how often its response function or its order against other items is violated. */
@@ -91,6 +91,12 @@ export interface MonotonicityOptions {
   readonly alpha?: number;
 }
 
+export const MONOTONICITY_OPTIONS: FieldNames<MonotonicityOptions> = {
+  minimumViolation: true,
+  minimumGroupSize: true,
+  alpha: true,
+};
+
 /**
  * Checks a level: a number above 0 and below 1.
  *
@@ -109,12 +115,11 @@ export interface CheckedOptions {
 }
 
 /**
- * Checks the options of a check of Mokken's assumptions.
+ * Checks the options of a check of Mokken's assumptions, which its caller has checked to be an object of its options.
  *
- * @throws `DataError` when the options are not an object, a minimum is invalid or the level is not above 0 and below 1.
+ * @throws `DataError` when a minimum is invalid or the level is not above 0 and below 1.
  */
 export function checkMonotonicityOptions(options: MonotonicityOptions): CheckedOptions {
-  checkOptions(options);
   const { minimumViolation, minimumGroupSize, alpha = 0.05 } = options;
   if (options.minimumViolation !== undefined) checkNonNegative(minimumViolation, "The option minimumViolation");
   if (options.minimumGroupSize !== undefined) checkPositiveInteger(minimumGroupSize, "The option minimumGroupSize");

@@ -91,13 +91,68 @@ function firstHole(values: readonly unknown[]): number {
 }
 
 /**
- * Checks a function's options: an object, as a caller from JavaScript may pass `null` or another value.
+ * The names of every field of a record type, each mapped to `true`: the options a function takes, or the fields of a
+ * record of settings inside its options.
+ *
+ * @remarks
+ * A constant of this type, declared against the options type, is a list that the type checker holds complete: it
+ * refuses a name missing from it and a name the type does not have.
+ */
+export type FieldNames<TRecord> = { readonly [TName in keyof TRecord]-?: true };
+
+/**
+ * Checks a function's options: an object, as a caller from JavaScript may pass `null` or another value, that holds no
+ * name the function does not take, as a misspelled option would otherwise leave its default in place unseen.
  *
  * @param options - The options a caller passed.
- * @throws `DataError` when they are not.
+ * @param names - The names of the options the function takes.
+ * @throws `DataError` when the options are not an object, or hold a name that is not one of `names`.
  */
-export function checkOptions(options: unknown): void {
+export function checkOptions<TOptions extends object>(options: TOptions, names: FieldNames<NoInfer<TOptions>>): void {
   checkRecord(options, "The options must be an object");
+  const unknown = unknownName(options, names);
+  if (unknown !== undefined) {
+    throw new DataError(`There is no option ${JSON.stringify(unknown)}: the options are ${listOf(names)}.`);
+  }
+}
+
+/**
+ * Checks that a record of settings inside a function's options, such as its quadrature or a prior, holds no field but
+ * the given ones, as a misspelled field would otherwise leave its default in place unseen.
+ *
+ * @remarks
+ * Records of data, such as items, events, states and parameters, are not checked this way: they may carry the fields
+ * a host adds.
+ *
+ * @param record - The record, already checked to be an object.
+ * @param names - The names of its fields.
+ * @param label - Names the record in the error message, such as `The option quadrature`.
+ * @throws `DataError` when the record holds a name that is not one of `names`.
+ */
+export function checkFields<TRecord extends object>(
+  record: TRecord,
+  names: FieldNames<NoInfer<TRecord>>,
+  label: string,
+): void {
+  const unknown = unknownName(record, names);
+  if (unknown !== undefined) {
+    throw new DataError(`${label} may hold only ${listOf(names)}, found ${JSON.stringify(unknown)}.`);
+  }
+}
+
+/**
+ * Returns the first own enumerable name of a record that `names` lacks, or `undefined` when it has every one. It
+ * allocates nothing, as options are checked on hot paths such as a line search.
+ */
+function unknownName(record: object, names: object): string | undefined {
+  for (const name in record) if (Object.hasOwn(record, name) && !Object.hasOwn(names, name)) return name;
+  return undefined;
+}
+
+/** Lists the names of a record of names in a sentence: `a, b and c`. */
+function listOf(names: object): string {
+  const all = Object.keys(names);
+  return all.length < 2 ? all.join("") : `${all.slice(0, -1).join(", ")} and ${all.at(-1)}`;
 }
 
 /**

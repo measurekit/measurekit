@@ -1,4 +1,4 @@
-import { checkOptions, checkPositiveInteger, DataError } from "@measurekit/core";
+import { checkOptions, checkPositiveInteger, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { normalCdf, sampleQuantile } from "../math/internal.js";
 import { type RestScoreGroups, restScoreGroups } from "./groups.js";
@@ -14,6 +14,8 @@ export interface ConditionalAssociationOptions {
    */
   readonly minimumSize?: number;
 }
+
+const CONDITIONAL_ASSOCIATION_OPTIONS: FieldNames<ConditionalAssociationOptions> = { minimumSize: true };
 
 /** The pairs and items whose index of conditional association is above its fence. */
 export interface ConditionalAssociationFlags {
@@ -78,7 +80,7 @@ export function conditionalAssociation(
   matrix: ResponseMatrix,
   options: ConditionalAssociationOptions = {},
 ): ConditionalAssociation {
-  checkOptions(options);
+  checkOptions(options, CONDITIONAL_ASSOCIATION_OPTIONS);
   const { minimumSize = DEFAULT_MINIMUM_SIZE } = options;
   checkPositiveInteger(minimumSize, "The option minimumSize");
   const data = mokkenData(matrix, "Conditional association", 3);

@@ -6,6 +6,7 @@ import {
   checkStopping,
   DataError,
   describe,
+  type FieldNames,
   logistic as sigmoid,
 } from "@measurekit/core";
 import type { EventLog } from "../data/internal.js";
@@ -34,6 +35,14 @@ export interface RateSearchOptions {
    */
   readonly maxIterations?: number;
 }
+
+const RATE_SEARCH_OPTIONS: FieldNames<RateSearchOptions> = {
+  start: true,
+  lower: true,
+  upper: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** The outcome of {@link searchRates}. */
 export interface RateSearch {
@@ -82,7 +91,7 @@ export function searchRates(
   log: EventLog,
   options: RateSearchOptions,
 ): RateSearch {
-  checkOptions(options);
+  checkOptions(options, RATE_SEARCH_OPTIONS);
   if (typeof build !== "function") {
     throw new DataError(
       `The argument build must be a function from the rates to a logistic model, found ${describe(build)}.`,

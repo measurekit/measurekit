@@ -1,4 +1,4 @@
-import { checkFinite, checkOptions, checkPositiveInteger, checkUnitInterval } from "@measurekit/core";
+import { checkFinite, checkOptions, checkPositiveInteger, checkUnitInterval, type FieldNames } from "@measurekit/core";
 import { checkCurvePoints, type ErrorRatePoint } from "./curve-points.js";
 
 /** The category of a skill's learning curve, in the order that {@link categorizeCurve} tests them. */
@@ -33,6 +33,15 @@ export interface CurveCategoryOptions {
   readonly highError?: number;
 }
 
+const CURVE_CATEGORY_OPTIONS: FieldNames<CurveCategoryOptions> = {
+  minLearners: true,
+  minPoints: true,
+  slope: true,
+  minSlope: true,
+  lowError: true,
+  highError: true,
+};
+
 /**
  * Returns the category of a skill's learning curve by DataShop's rules. The points of fewer than `minLearners` learners
  * are discarded, and the first rule that holds decides: fewer than `minPoints` points left, `"too little data"`; a
@@ -50,7 +59,7 @@ export interface CurveCategoryOptions {
  * @throws `DataError` when the points or an option are malformed.
  */
 export function categorizeCurve(points: readonly ErrorRatePoint[], options: CurveCategoryOptions): CurveCategory {
-  checkOptions(options);
+  checkOptions(options, CURVE_CATEGORY_OPTIONS);
   const {
     minLearners,
     minPoints,

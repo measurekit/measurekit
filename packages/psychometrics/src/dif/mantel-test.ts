@@ -1,6 +1,5 @@
 import { checkOptions, chiSquareUpperTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-
 import { invertPositiveDefinite, standardDeviation } from "../math/internal.js";
 import {
   checkCategoryCount,
@@ -14,6 +13,7 @@ import {
 import { type LiuAgresti, liuAgresti } from "./liu-agresti.js";
 import {
   type DifAnalysis,
+  PURIFICATION_OPTIONS,
   type PurificationOptions,
   purified,
   SIGNIFICANCE_LEVEL,
@@ -107,7 +107,7 @@ export function mantelTest(
   groups: readonly DifGroup[],
   options: PurificationOptions = {},
 ): DifAnalysis<MantelTest> {
-  checkOptions(options);
+  checkOptions(options, PURIFICATION_OPTIONS);
   const { purify = false } = options;
   const data = polytomousData(matrix, groups, "Mantel DIF");
   return purified(

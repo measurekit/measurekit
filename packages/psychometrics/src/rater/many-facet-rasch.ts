@@ -5,6 +5,7 @@ import {
   checkStopping,
   DataError,
   describe,
+  type FieldNames,
   isNonEmptyString,
 } from "@measurekit/core";
 import type { FacetedScore } from "../data/internal.js";
@@ -75,6 +76,17 @@ export interface ManyFacetRaschOptions {
    */
   readonly maxIterations?: number;
 }
+
+const MANY_FACET_RASCH_OPTIONS: FieldNames<ManyFacetRaschOptions> = {
+  person: true,
+  facets: true,
+  thresholdFacet: true,
+  interactions: true,
+  quadrature: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** A many-facet Rasch model estimated by marginal maximum likelihood. */
 export interface ManyFacetRasch {
@@ -147,7 +159,7 @@ const STANDARD_ERRORS: readonly FacetStandardErrors[] = ["none", "hessian"];
  * @see {@link https://doi.org/10.1007/BF02293801 | Bock and Aitkin (1981)}
  */
 export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFacetRaschOptions): ManyFacetRasch {
-  checkOptions(options);
+  checkOptions(options, MANY_FACET_RASCH_OPTIONS);
   const {
     person = "person",
     facets,

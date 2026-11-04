@@ -1,4 +1,12 @@
-import { checkFinite, checkOptions, checkRecord, checkUnitInterval, DataError } from "@measurekit/core";
+import {
+  checkFields,
+  checkFinite,
+  checkOptions,
+  checkRecord,
+  checkUnitInterval,
+  DataError,
+  type FieldNames,
+} from "@measurekit/core";
 
 /** The difficulty class of an item by its p-value. */
 export type DifficultyClass = "difficult" | "moderate" | "easy";
@@ -10,6 +18,8 @@ export interface DifficultyThresholds {
   /** p-values above this are `easy`. */
   readonly easy: number;
 }
+
+const DIFFICULTY_THRESHOLD_FIELDS: FieldNames<DifficultyThresholds> = { difficult: true, easy: true };
 
 /** The common difficulty bounds: below 0.30 difficult, above 0.70 easy, moderate between them inclusive. */
 export const DIFFICULTY_THRESHOLDS: DifficultyThresholds = { difficult: 0.3, easy: 0.7 };
@@ -26,6 +36,12 @@ export interface DiscriminationThresholds {
   /** Values from this up are `marginal`. */
   readonly marginal: number;
 }
+
+const DISCRIMINATION_THRESHOLD_FIELDS: FieldNames<DiscriminationThresholds> = {
+  veryGood: true,
+  good: true,
+  marginal: true,
+};
 
 /**
  * Ebel's bounds for the discrimination index D: 0.40 and up very good, 0.30 good, 0.20 marginal, below that poor. Often
@@ -45,6 +61,8 @@ export interface DifficultyClassificationOptions {
   readonly thresholds?: DifficultyThresholds;
 }
 
+const DIFFICULTY_CLASSIFICATION_OPTIONS: FieldNames<DifficultyClassificationOptions> = { thresholds: true };
+
 /**
  * Classifies a p-value from 0 to 1.
  *
@@ -55,9 +73,10 @@ export interface DifficultyClassificationOptions {
  * ordered within it.
  */
 export function classifyDifficulty(p: number, options: DifficultyClassificationOptions = {}): DifficultyClass {
-  checkOptions(options);
+  checkOptions(options, DIFFICULTY_CLASSIFICATION_OPTIONS);
   const { thresholds = DIFFICULTY_THRESHOLDS } = options;
   checkRecord(thresholds, "Difficulty thresholds must be an object { difficult, easy }");
+  checkFields(thresholds, DIFFICULTY_THRESHOLD_FIELDS, "The difficulty thresholds");
   const { difficult, easy } = thresholds;
   checkUnitInterval(difficult, "The difficult threshold");
   checkUnitInterval(easy, "The easy threshold");
@@ -79,6 +98,8 @@ export interface DiscriminationClassificationOptions {
   readonly thresholds?: DiscriminationThresholds;
 }
 
+const DISCRIMINATION_CLASSIFICATION_OPTIONS: FieldNames<DiscriminationClassificationOptions> = { thresholds: true };
+
 /**
  * Classifies a discrimination value, such as the discrimination index D or an item-total correlation.
  *
@@ -92,9 +113,10 @@ export function classifyDiscrimination(
   value: number,
   options: DiscriminationClassificationOptions = {},
 ): DiscriminationClass {
-  checkOptions(options);
+  checkOptions(options, DISCRIMINATION_CLASSIFICATION_OPTIONS);
   const { thresholds = DISCRIMINATION_THRESHOLDS } = options;
   checkRecord(thresholds, "Discrimination thresholds must be an object { veryGood, good, marginal }");
+  checkFields(thresholds, DISCRIMINATION_THRESHOLD_FIELDS, "The discrimination thresholds");
   const { veryGood, good, marginal } = thresholds;
   checkFinite(veryGood, "The very good threshold");
   checkFinite(good, "The good threshold");

@@ -13,7 +13,7 @@ import type { ScaleTransformation } from "../equating/internal.js";
 import { twoParameterLogistic } from "../irt/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
 import { type LinkedCalibrations, linkedCalibrations, MINIMUM_LINK_ANCHORS } from "./linked-calibrations.js";
-import type { LordOptions } from "./lord.js";
+import { LORD_OPTIONS, type LordOptions } from "./lord.js";
 import { type DifAnalysis, purified, significant } from "./purification.js";
 
 /** Raju's areas between an item's curves in the two groups, with their z tests. */
@@ -71,7 +71,7 @@ export function rajuAreaDif(
   options: LordOptions,
 ): DifAnalysis<RajuArea> {
   checkGroups(matrix, groups);
-  checkOptions(options);
+  checkOptions(options, LORD_OPTIONS);
   checkModels(options.model);
   const { purify = false, ...calibration } = options;
   checkBoolean(purify, "The option purify");

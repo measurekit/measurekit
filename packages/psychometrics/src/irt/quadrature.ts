@@ -1,4 +1,4 @@
-import { checkChoice, checkIntegerFrom, checkRecord, DataError } from "@measurekit/core";
+import { checkChoice, checkFields, checkIntegerFrom, checkRecord, DataError, type FieldNames } from "@measurekit/core";
 import { gaussHermite, type Quadrature, rectangular } from "../math/internal.js";
 
 /** How to place quadrature nodes over theta. */
@@ -20,6 +20,8 @@ export interface QuadratureOptions {
    */
   readonly points?: number;
 }
+
+const QUADRATURE_OPTIONS: FieldNames<QuadratureOptions> = { method: true, points: true };
 
 const METHODS: readonly QuadratureMethod[] = ["rectangular", "gauss-hermite"];
 
@@ -46,6 +48,7 @@ export const STANDARD_RULES = new Map<string, Quadrature>();
  */
 export function quadratureRule(options: QuadratureOptions = {}, mean = 0, sd = 1): Quadrature {
   checkRecord(options, "The option quadrature must be an object { method, points }");
+  checkFields(options, QUADRATURE_OPTIONS, "The option quadrature");
   const { method = "rectangular", points = 61 } = options;
   checkIntegerFrom(points, "The quadrature points", 2);
   if (points > MAX_POINTS) {

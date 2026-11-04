@@ -414,6 +414,7 @@ describe("characteristic curve linking", () => {
     expect(() => stockingLordLinking(from, to, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => stockingLordLinking(from, to, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 });
 
@@ -913,6 +914,7 @@ describe("linear equating through an anchor", () => {
     expect(() => tuckerEquating(groups, groups, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => tuckerEquating(groups, groups, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => tuckerEquating(groups, groups, { weight: JSON.parse('"1"') })).toThrow(
       'The option weight must be a number from 0 to 1, found "1".',
     );
@@ -1537,6 +1539,9 @@ describe("kernelEquating", () => {
 
   it("rejects invalid data", () => {
     expect(() => kernelEquating(JSON.parse("null"))).toThrow("Kernel equating data must be an object");
+    expect(() =>
+      kernelEquating(JSON.parse('{"design":"single-group","joint":[[1]],"degrees":[1,1],"crossDegrees":2}')),
+    ).toThrow('Kernel equating data may hold only design, joint, degrees and crossDegree, found "crossDegrees".');
     expect(() => kernelEquating(kernelData({ ...groups, design: "random" }))).toThrow("The design must be");
     expect(() => kernelEquating(kernelData({ ...groups, degrees: [2] }))).toThrow(
       "The degrees must have the degrees of the two scores, found 1.",
@@ -1573,6 +1578,9 @@ describe("kernelEquating", () => {
       "The bandwidth from must be a positive number, found 0.",
     );
     expect(() => kernelEquating(data, JSON.parse('{"bandwidths": [1]}'))).toThrow("The option bandwidths must be");
+    expect(() => kernelEquating(data, JSON.parse('{"bandwidths": {"form": 1}}'))).toThrow(
+      'The option bandwidths may hold only from, to, fromAnchor and toAnchor, found "form".',
+    );
     expect(() => kernelEquating(data, JSON.parse('{"linear": "yes"}'))).toThrow("The option linear");
     expect(() => kernelEquating(data, { weight: 1.5 })).toThrow("The option weight");
     expect(() => kernelEquating(data, JSON.parse('{"penaltyWeight": null}'))).toThrow("The option penaltyWeight");
@@ -1733,12 +1741,18 @@ describe("irtObservedScoreEquating", () => {
     expect(() => irtObservedScoreEquating(from, to, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => irtObservedScoreEquating(from, to, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => irtObservedScoreEquating(from, to, { weight: JSON.parse('"half"') })).toThrow(
       'The option weight must be a number from 0 to 1, found "half".',
     );
     expect(() => irtObservedScoreEquating(from, to, { weight: 1.5 })).toThrow(DataError);
     expect(() => irtObservedScoreEquating(from, to, { populations: JSON.parse("null") })).toThrow(
       "The option populations must be an object { from, to }, found null.",
+    );
+    expect(() => irtObservedScoreEquating(from, to, { populations: JSON.parse('{"form":null}') })).toThrow(
+      'The option populations may hold only from and to, found "form".',
     );
     expect(() => irtObservedScoreEquating(from, to, { populations: { from: JSON.parse("null") } })).toThrow(
       "The population of the from group must be an object { nodes, weights }, found null.",
@@ -1933,6 +1947,9 @@ describe("irtEquatingStandardErrors", () => {
     const { from, to, covariance } = concurrent;
     expect(() => irtEquatingStandardErrors(from, to, covariance, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => irtEquatingStandardErrors(from, to, covariance, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => irtEquatingStandardErrors(from, to, covariance, { method: JSON.parse('"delta"') })).toThrow(
       'The option method must be "true-score" or "observed-score", found "delta".',

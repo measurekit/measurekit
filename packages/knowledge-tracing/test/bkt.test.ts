@@ -1072,6 +1072,14 @@ describe("bkt constraints and pairs", () => {
       { fixed: { s: { learn: 1.2 } } },
       'The fixed rates of skill "s" have learn that is not a probability, found 1.2.',
     );
+    fail(
+      { fixed: { s: JSON.parse('{"rate":0.2}') } },
+      'The option fixed, for skill "s", may hold only prior, learn, forget, guess, slip and resources, found "rate".',
+    );
+    fail(
+      { resourceLearning: true, fixed: { s: { resources: { r: JSON.parse('{"rate":0.2}') } } } },
+      'The option fixed, for skill "s" and resource "r", may hold only learn and forget, found "rate".',
+    );
     fail({ fixed: { s: { forget: 0.1 } } }, 'The fixed rates of skill "s" have forget, which needs forgetting: true.');
     fail({ bounds: { forget: [0, 0.1] } }, "The bounds of forget need forgetting: true.");
     fail(
@@ -1097,7 +1105,7 @@ describe("bkt constraints and pairs", () => {
     );
     fail(
       { bounds: JSON.parse('{"speed":[0,1]}') },
-      'The option bounds has no rate "speed"; its rates are prior, learn, forget, guess, slip.',
+      'The option bounds may hold only prior, learn, forget, guess and slip, found "speed".',
     );
     fail({ fixed: JSON.parse("[]") }, "The option fixed must be an object of fixed rates by skill id, found an array.");
   });
@@ -1456,9 +1464,13 @@ describe("bkt options from JavaScript", () => {
   it("rejects options that are not an object", () => {
     const missing = JSON.parse("null");
     expect(() => bkt(missing)).toThrow("The options must be an object, found null.");
+    expect(() => bkt(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     const model = bkt({ parameters: { skills: { s: { prior: 0.3, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } } });
     expect(() => model.opportunitiesToMastery(model.initialState("ana"), "s", missing)).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => model.opportunitiesToMastery(model.initialState("ana"), "s", JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
   });
 

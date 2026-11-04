@@ -1,5 +1,5 @@
 import { checkArray, checkFinite, checkOptions, DataError, describe } from "@measurekit/core";
-import { checkRounding, roundScore, type ScoreRounding } from "./score-scale.js";
+import { checkRounding, roundScore, SCORE_ROUNDING_FIELDS, type ScoreRounding } from "./score-scale.js";
 
 /**
  * Returns the scale scores of equated total scores, by interpolation in the conversion table of the form they are
@@ -37,7 +37,7 @@ export function scaleConversion(
 ): readonly number[] {
   checkArray(equivalents, "The equivalents must be an array of total scores");
   checkArray(conversion, "The conversion must be an array of scale scores");
-  checkOptions(options);
+  checkOptions(options, SCORE_ROUNDING_FIELDS);
   if (conversion.length === 0) throw new DataError("The conversion needs at least one scale score.");
   const rounding = checkRounding(options, "The options");
   conversion.forEach((score, total) => {

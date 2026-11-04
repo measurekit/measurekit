@@ -3,7 +3,13 @@ import type { ResponseMatrix } from "../data/internal.js";
 import { invert } from "../math/internal.js";
 import { type DifGroup, dichotomousData, itemStatistics } from "./groups.js";
 import { type LikelihoodRatioTest, likelihoodRatioTest, undefinedTest } from "./likelihood-ratio.js";
-import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
+import {
+  type DifAnalysis,
+  PURIFICATION_OPTIONS,
+  type PurificationOptions,
+  purified,
+  significant,
+} from "./purification.js";
 
 /** Logistic regression DIF tests of one item. */
 export interface LogisticRegressionDif {
@@ -52,7 +58,7 @@ export function logisticRegressionDif(
   groups: readonly DifGroup[],
   options: PurificationOptions = {},
 ): DifAnalysis<LogisticRegressionDif> {
-  checkOptions(options);
+  checkOptions(options, PURIFICATION_OPTIONS);
   const { purify = false } = options;
   const data = dichotomousData(matrix, groups, "Logistic regression DIF");
   return purified(

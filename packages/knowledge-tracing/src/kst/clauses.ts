@@ -4,6 +4,7 @@ import {
   checkMaxStates,
   hasElement,
   positionsOf,
+  STATE_LIMIT_OPTIONS,
   type StateLimitOptions,
   tooManyStates,
 } from "./build.js";
@@ -34,7 +35,7 @@ export function clauseStructure(
   clauses: Readonly<Record<string, readonly (readonly string[])[]>>,
   options: StateLimitOptions = {},
 ): KnowledgeStructure {
-  checkOptions(options);
+  checkOptions(options, STATE_LIMIT_OPTIONS);
   const maxStates = checkMaxStates(options.maxStates);
   if (!isRecord(clauses)) {
     throw new DataError(`Clauses must be an object of clause lists by element, found ${describe(clauses)}.`);

@@ -7,6 +7,7 @@ import {
   checkStopping,
   DataError,
   describe,
+  type FieldNames,
   normalizeLogs,
 } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
@@ -78,6 +79,15 @@ export interface SpeedAccuracyOptions<TParameters> {
    */
   readonly maxIterations?: number;
 }
+
+const SPEED_ACCURACY_OPTIONS: FieldNames<SpeedAccuracyOptions<unknown>> = {
+  model: true,
+  priors: true,
+  quadrature: true,
+  standardErrors: true,
+  tolerance: true,
+  maxIterations: true,
+};
 
 /** An item calibrated with its response model and its time parameters. */
 export interface SpeedAccuracyItem<TParameters> extends CalibratedItem<TParameters> {
@@ -168,7 +178,7 @@ export function calibrateSpeedAccuracy<TParameters>(
   data: ResponseMatrix | ResponseRecords,
   options: SpeedAccuracyOptions<TParameters>,
 ): SpeedAccuracyCalibration<TParameters> {
-  checkOptions(options);
+  checkOptions(options, SPEED_ACCURACY_OPTIONS);
   const {
     model,
     priors,

@@ -1,4 +1,4 @@
-import { checkOptions, chiSquareUpperTail, DataError } from "@measurekit/core";
+import { checkOptions, chiSquareUpperTail, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
   type FixedParameters,
@@ -33,6 +33,8 @@ export interface SummedScoreFitOptions {
    */
   readonly fixedParameters?: FixedParameters;
 }
+
+const SUMMED_SCORE_FIT_OPTIONS: FieldNames<SummedScoreFitOptions> = { fixed: true, fixedParameters: true };
 
 /** The S-X² fit of one item. */
 export interface SummedScoreFit {
@@ -73,7 +75,7 @@ export function summedScoreFit(
   items: readonly IrtItem[],
   options: SummedScoreFitOptions = {},
 ): readonly SummedScoreFit[] {
-  checkOptions(options);
+  checkOptions(options, SUMMED_SCORE_FIT_OPTIONS);
   const { fixed = [], fixedParameters = {} } = options;
   checkItems(matrix, items);
   const estimated = estimatedEntries(items, matrix.itemIds, fixed, fixedParameters);

@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, checkUnitInterval, DataError, mean } from "@measurekit/core";
+import { checkChoice, checkOptions, checkUnitInterval, DataError, type FieldNames, mean } from "@measurekit/core";
 import { checkDichotomous, checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { correlation, covariance, variance } from "../math/internal.js";
 import { type CompleteCases, completeCases, itemScores } from "./complete-cases.js";
@@ -18,6 +18,8 @@ export interface SplitHalfOptions {
    */
   readonly split?: SplitMethod;
 }
+
+const SPLIT_HALF_OPTIONS: FieldNames<SplitHalfOptions> = { split: true };
 
 /** Split-half reliability. */
 export interface SplitHalf {
@@ -87,7 +89,7 @@ export function kr21(matrix: ResponseMatrix): number {
  * item, a half score has no variance, or the half scores correlate at -1.
  */
 export function splitHalf(matrix: ResponseMatrix, options: SplitHalfOptions = {}): SplitHalf {
-  checkOptions(options);
+  checkOptions(options, SPLIT_HALF_OPTIONS);
   const { split = "odd-even" } = options;
   checkChoice(split, "The option split", SPLIT_METHODS);
   const cases = reliabilityCases(matrix, "Split-half reliability");
@@ -122,6 +124,8 @@ export interface StandardErrorOfMeasurementOptions {
   readonly reliability?: number;
 }
 
+const STANDARD_ERROR_OF_MEASUREMENT_OPTIONS: FieldNames<StandardErrorOfMeasurementOptions> = { reliability: true };
+
 /**
  * Returns the standard error of measurement, s √(1 - reliability), where s is the standard deviation of the total
  * scores of the persons who answered every item.
@@ -138,7 +142,7 @@ export function standardErrorOfMeasurement(
 ): number {
   const statistic = "The standard error of measurement";
   const cases = reliabilityCases(matrix, statistic);
-  checkOptions(options);
+  checkOptions(options, STANDARD_ERROR_OF_MEASUREMENT_OPTIONS);
   const { reliability } = options;
   const coefficient = reliability === undefined ? alpha(cases, statistic) : reliability;
   checkUnitInterval(coefficient, "A reliability");

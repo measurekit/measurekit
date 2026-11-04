@@ -1,4 +1,4 @@
-import { checkBoolean, checkRecord } from "@measurekit/core";
+import { checkBoolean, checkFields, checkRecord, type FieldNames } from "@measurekit/core";
 import { checkFacetedScores, type FacetedScore } from "../data/internal.js";
 import { type BalancedScores, balancedScores } from "./balanced-scores.js";
 import { describeElements, facetSizes, numberScores } from "./numbering.js";
@@ -34,6 +34,13 @@ export interface GeneralizabilityDesign {
    */
   readonly unbalanced?: boolean;
 }
+
+const GENERALIZABILITY_DESIGN_FIELDS: FieldNames<GeneralizabilityDesign> = {
+  object: true,
+  facets: true,
+  nested: true,
+  unbalanced: true,
+};
 
 /** One effect of a study: its sums of squares, mean square and the estimate of its variance component. */
 export interface VarianceComponent {
@@ -143,6 +150,7 @@ export function generalizabilityStudy(
   design: GeneralizabilityDesign,
 ): GeneralizabilityStudy {
   checkRecord(design, "The design must be an object { object, facets, nested }");
+  checkFields(design, GENERALIZABILITY_DESIGN_FIELDS, "The design");
   const { object = "person", facets, nested = {}, unbalanced = false } = design;
   checkBoolean(unbalanced, "The option unbalanced of the design");
   const structure = buildStructure(object, facets, nested, "The option nested of the design");

@@ -1,5 +1,12 @@
 import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
-import { buildStructure, checkMaxStates, positionsOf, type StateLimitOptions, tooManyStates } from "./build.js";
+import {
+  buildStructure,
+  checkMaxStates,
+  positionsOf,
+  STATE_LIMIT_OPTIONS,
+  type StateLimitOptions,
+  tooManyStates,
+} from "./build.js";
 import { addElement, compile, type KnowledgeStructure, keyOf } from "./structure.js";
 
 /**
@@ -23,7 +30,7 @@ export function unionClosure(
   states: readonly (readonly string[])[],
   options: StateLimitOptions = {},
 ): KnowledgeStructure {
-  checkOptions(options);
+  checkOptions(options, STATE_LIMIT_OPTIONS);
   const maxStates = checkMaxStates(options.maxStates);
   // The structure of the empty state and the whole domain checks the domain, and gives the positions and the words.
   const { index, words, bits } = compile({ domain, states: [[], domain] });

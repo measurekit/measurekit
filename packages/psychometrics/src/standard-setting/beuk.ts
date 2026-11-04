@@ -1,4 +1,12 @@
-import { checkFinite, checkPositive, checkRecord, checkUnitInterval, DataError } from "@measurekit/core";
+import {
+  checkFields,
+  checkFinite,
+  checkPositive,
+  checkRecord,
+  checkUnitInterval,
+  DataError,
+  type FieldNames,
+} from "@measurekit/core";
 import { checkDistribution } from "../equating/internal.js";
 import { crossFailureRate } from "./hofstee.js";
 
@@ -13,6 +21,13 @@ export interface BeukJudgments {
   /** The standard deviation of the panelists' expected pass rates. */
   readonly passRateSd: number;
 }
+
+const BEUK_JUDGMENT_FIELDS: FieldNames<BeukJudgments> = {
+  cutScore: true,
+  passRate: true,
+  cutScoreSd: true,
+  passRateSd: true,
+};
 
 /** A Beuk cut score with its failure rate. */
 export interface BeukCutScore {
@@ -42,6 +57,7 @@ export function beukCutScore(distribution: readonly number[], judgments: BeukJud
   const total = checkDistribution(distribution, "observed");
   const highest = distribution.length - 1;
   checkRecord(judgments, "The Beuk judgments must be an object { cutScore, passRate, cutScoreSd, passRateSd }");
+  checkFields(judgments, BEUK_JUDGMENT_FIELDS, "The Beuk judgments");
   const { cutScore, passRate, cutScoreSd, passRateSd } = judgments;
   checkFinite(cutScore, "The judgment cutScore");
   checkUnitInterval(passRate, "The judgment passRate");

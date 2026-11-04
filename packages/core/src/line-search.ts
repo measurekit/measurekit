@@ -1,3 +1,5 @@
+import { checkOptions, type FieldNames } from "./checks.js";
+
 /**
  * The share of the decrease that a step along a descent direction must achieve, the constant c₁ of the Armijo
  * condition; 1e-4 is the usual value.
@@ -38,6 +40,8 @@ export interface BacktrackOptions {
   readonly maxHalvings?: number;
 }
 
+const BACKTRACK_OPTIONS: FieldNames<BacktrackOptions> = { decrease: true, slack: true, start: true, maxHalvings: true };
+
 /**
  * Backtracking line search: returns the first of the lengths `start`, `start / 2`, ... at which the objective satisfies
  * the sufficient decrease, or `null` when none does.
@@ -54,6 +58,7 @@ export interface BacktrackOptions {
  * @param slope - The derivative of the objective along the direction at the point.
  * @param options - The first length, the sufficient decrease and the most halvings.
  * @returns The accepted length, or `null` when none of the lengths tried satisfied the sufficient decrease.
+ * @throws `DataError` when the options are not an object or hold a name that is not an option.
  */
 export function backtrack(
   evaluate: (length: number) => number,
@@ -61,6 +66,7 @@ export function backtrack(
   slope: number,
   options: BacktrackOptions = {},
 ): number | null {
+  checkOptions(options, BACKTRACK_OPTIONS);
   const { decrease = ARMIJO, slack = 0, start = 1, maxHalvings = DEFAULT_MAX_HALVINGS } = options;
   let length = start;
   for (let halving = 0; halving <= maxHalvings; halving++) {

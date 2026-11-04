@@ -2,7 +2,7 @@ import { checkOptions, checkRecord, DataError } from "@measurekit/core";
 import { type ScoredResponses, scoreResponses } from "../data/internal.js";
 import { correlation } from "../math/internal.js";
 import { completeCases } from "./complete-cases.js";
-import { type GroupOptions, groupMean, scoreGroups } from "./groups.js";
+import { GROUP_OPTIONS, type GroupOptions, groupMean, scoreGroups } from "./groups.js";
 
 /** How often one option of an item was chosen, and by whom. */
 export interface OptionStatistics {
@@ -43,7 +43,7 @@ export interface OptionAnalysis {
 export function distractorAnalysis(scored: ScoredResponses, options: GroupOptions = {}): readonly OptionAnalysis[] {
   // Scored responses built by hand or loaded from JSON may be another value or lack a field.
   checkRecord(scored, "Scored responses must be an object from scoreResponses");
-  checkOptions(options);
+  checkOptions(options, GROUP_OPTIONS);
   const { personIds, itemIds, choices, key, optionLabels } = scored;
   if (!(Array.isArray(choices) && Array.isArray(key) && Array.isArray(optionLabels))) {
     throw new DataError("Scored responses need the arrays choices, key and optionLabels.");

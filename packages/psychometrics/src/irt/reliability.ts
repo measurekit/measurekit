@@ -1,5 +1,10 @@
 import { checkArray, checkOptions, checkRecord, DataError, describe } from "@measurekit/core";
-import { type AbilityEstimate, checkThetaPrior, type ThetaIntegrationOptions } from "./ability.js";
+import {
+  type AbilityEstimate,
+  checkThetaPrior,
+  THETA_INTEGRATION_OPTIONS,
+  type ThetaIntegrationOptions,
+} from "./ability.js";
 import { checkItemList } from "./items.js";
 import type { IrtItem } from "./model.js";
 import { quadratureRule } from "./quadrature.js";
@@ -16,7 +21,7 @@ import { quadratureRule } from "./quadrature.js";
  */
 export function marginalReliability(items: readonly IrtItem[], options: ThetaIntegrationOptions = {}): number {
   checkItemList(items, "Marginal reliability");
-  checkOptions(options);
+  checkOptions(options, THETA_INTEGRATION_OPTIONS);
   const { mean, sd } = checkThetaPrior(options.prior);
   const { nodes, weights } = quadratureRule(options.quadrature, mean, sd);
   const variance = sd * sd;

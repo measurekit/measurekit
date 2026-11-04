@@ -6,6 +6,7 @@ import {
   checkRandom,
   checkUnitInterval,
   DataError,
+  type FieldNames,
   type Random,
   shuffle,
 } from "@measurekit/core";
@@ -45,6 +46,14 @@ export interface ParallelAnalysisOptions extends PolychoricOptions {
    */
   readonly quantile?: number;
 }
+
+const PARALLEL_ANALYSIS_OPTIONS: FieldNames<ParallelAnalysisOptions> = {
+  correlation: true,
+  comparison: true,
+  replications: true,
+  quantile: true,
+  correction: true,
+};
 
 /** The eigenvalues of the observed correlations against those of random data. */
 export interface EigenvalueComparison {
@@ -121,7 +130,7 @@ export function parallelAnalysis(
   random: Random,
   options: ParallelAnalysisOptions = {},
 ): ParallelAnalysis {
-  checkOptions(options);
+  checkOptions(options, PARALLEL_ANALYSIS_OPTIONS);
   const {
     correlation = "polychoric",
     comparison = "resampled",

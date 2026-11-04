@@ -1,4 +1,12 @@
-import { checkOptions, checkRandom, DataError, describe, isRecord, type Random } from "@measurekit/core";
+import {
+  checkOptions,
+  checkRandom,
+  DataError,
+  describe,
+  type FieldNames,
+  isRecord,
+  type Random,
+} from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import { indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
 import { checkThetas, simulateResponse } from "../sim/internal.js";
@@ -57,6 +65,8 @@ export interface AdaptiveSimulationOptions {
    */
   readonly testRandom?: (person: number, step: number) => Random;
 }
+
+const ADAPTIVE_SIMULATION_OPTIONS: FieldNames<AdaptiveSimulationOptions> = { testRandom: true };
 
 /**
  * Simulates an adaptive test for persons with known thetas: each response is drawn from the item's category
@@ -181,7 +191,7 @@ export function stepRandoms(
   options: AdaptiveSimulationOptions,
   random: Random,
 ): (person: number) => (step: number) => Random {
-  checkOptions(options);
+  checkOptions(options, ADAPTIVE_SIMULATION_OPTIONS);
   const { testRandom } = options;
   if (testRandom === undefined) return () => () => random;
   checkFunction(testRandom, "The option testRandom must be a function of a person and a step");

@@ -16,7 +16,9 @@
 - **Defined results.** Invalid input throws `DataError`, also input of another type than documented, as plain
   JavaScript or JSON may pass it: `null` or a number for an array or for options, a string for a number, or a model,
   rule, estimator or random number generator that is not an object or function of its interface. An option set to
-  `null` is invalid, not absent. A statistic that is undefined for the data is `null` in a table and a `DataError`
+  `null` is invalid, not absent, and an option a function does not take is refused with its name, as are the fields a
+  record of settings does not have, such as a prior or a quadrature: a misspelled name would otherwise leave a default
+  in place. Records of data, such as items and a calibration's testlets, may carry fields of their own. A statistic that is undefined for the data is `null` in a table and a `DataError`
   from a function that returns only that statistic; results never contain `NaN`. Iterative methods report
   convergence instead of throwing.
 - **Extensible.** Where methods have alternatives, such as models or estimators, they are interfaces, and built-ins

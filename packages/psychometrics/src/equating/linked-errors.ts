@@ -1,4 +1,4 @@
-import { checkChoice } from "@measurekit/core";
+import { checkChoice, type FieldNames } from "@measurekit/core";
 import type { CheckedThetaDistribution, IrtItem } from "../irt/internal.js";
 import { type ObservedScoreSetup, observedScoreEquivalents, observedScoreSetup } from "./irt-observed-score.js";
 import {
@@ -24,6 +24,14 @@ import { trueScoreThetas } from "./true-score.js";
 
 /** Options of {@link linkedEquatingErrors}. */
 export interface LinkedEquatingOptions extends IrtEquatingErrorOptions, LinkErrorOptions {}
+
+const LINKED_EQUATING_OPTIONS: FieldNames<LinkedEquatingOptions> = {
+  method: true,
+  populations: true,
+  weight: true,
+  linking: true,
+  quadrature: true,
+};
 
 const METHODS = ["true-score", "observed-score"];
 
@@ -53,7 +61,7 @@ export function linkedEquatingErrors(
   to: CalibratedForm,
   options: LinkedEquatingOptions = {},
 ): readonly number[] {
-  const link = linker(options);
+  const link = linker(options, LINKED_EQUATING_OPTIONS);
   const { method = "true-score" } = options;
   checkChoice(method, "The option method", METHODS);
   const source = checkForm(from, "The from form");

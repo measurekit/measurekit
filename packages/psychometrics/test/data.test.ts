@@ -196,6 +196,7 @@ describe("buildResponseMatrix", () => {
       "The rows of a response matrix must be an array, found null.",
     );
     expect(() => buildResponseMatrix([[1]], JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => buildResponseMatrix([[1]], JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => buildResponseMatrix([[1]], { times: JSON.parse("3") })).toThrow(
       "A response matrix needs one row of times per person, 1 rows.",
     );

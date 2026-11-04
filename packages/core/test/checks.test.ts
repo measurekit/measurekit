@@ -3,6 +3,7 @@ import {
   checkArray,
   checkBoolean,
   checkChoice,
+  checkFields,
   checkFinite,
   checkIntegerFrom,
   checkMethod,
@@ -37,10 +38,14 @@ describe("describe", () => {
 
 describe("checks of one value", () => {
   it("accept a valid value and return nothing", () => {
+    const stopping: { readonly tolerance?: number; readonly maxIterations?: number } = { tolerance: 1e-6 };
+    const quadrature: { readonly points?: number; readonly range?: number } = { points: 21 };
     expect(() => {
       checkRecord({}, "A record");
       checkArray([], "An array");
-      checkOptions({});
+      checkOptions({}, {});
+      checkOptions(stopping, { tolerance: true, maxIterations: true });
+      checkFields(quadrature, { points: true, range: true }, "The option quadrature");
       checkMethod({ stops: () => true }, "stops", "A rule");
       checkRandom(createRandom(1));
       checkBoolean(false, "A flag");
@@ -63,7 +68,7 @@ describe("checks of one value", () => {
     expect(() => checkArray(json("null"), "The items must be an array")).toThrow(
       "The items must be an array, found null.",
     );
-    expect(() => checkOptions(json("null"))).toThrow("The options must be an object, found null.");
+    expect(() => checkOptions(JSON.parse("null"), {})).toThrow("The options must be an object, found null.");
     expect(() => checkMethod({}, "stops", "The option stopping must be an object with a stops method")).toThrow(
       "The option stopping must be an object with a stops method, found an object.",
     );
@@ -91,6 +96,30 @@ describe("checks of one value", () => {
     );
     expect(() => checkUnitInterval(2, "A probability")).toThrow("A probability must be a number from 0 to 1, found 2.");
     expect(() => checkSeed(1.5)).toThrow("A seed must be a safe integer, found 1.5.");
+  });
+
+  it("refuse a name that is not an option or a field, and list the names there are", () => {
+    const names = { tolerance: true, maxIterations: true, seed: true } as const;
+    expect(() => checkOptions(JSON.parse('{"verbose":1e-6}'), names)).toThrow(
+      'There is no option "verbose": the options are tolerance, maxIterations and seed.',
+    );
+    expect(() => checkOptions(JSON.parse('{"seed":1,"Seed":2}'), { seed: true })).toThrow(
+      'There is no option "Seed": the options are seed.',
+    );
+    expect(() =>
+      checkFields(JSON.parse('{"points":21,"nodes":41}'), { points: true }, "The option quadrature"),
+    ).toThrow('The option quadrature may hold only points, found "nodes".');
+    expect(() => checkOptions(JSON.parse('{"tolerance":1e-6}'), {})).toThrow(DataError);
+  });
+
+  it("read only the names the options hold, not those of their prototype", () => {
+    expect(() => checkOptions(JSON.parse('{"__proto__":{"seed":1}}'), { seed: true })).toThrow(
+      'There is no option "__proto__"',
+    );
+    expect(() => checkOptions(JSON.parse('{"constructor":1}'), { seed: true })).toThrow(
+      'There is no option "constructor"',
+    );
+    expect(() => checkOptions(Object.create({ verbose: 1 }), { tolerance: true })).not.toThrow();
   });
 
   it("refuse an array with a hole, which forEach, map and every would skip unseen", () => {

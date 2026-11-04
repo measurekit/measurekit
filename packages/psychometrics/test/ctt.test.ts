@@ -257,9 +257,16 @@ describe("classification", () => {
       'A p-value must be a number from 0 to 1, found "0.5".',
     );
     expect(() => classifyDifficulty(0.5, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => classifyDifficulty(0.5, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => classifyDifficulty(0.5, { thresholds: JSON.parse("null") })).toThrow(
       "Difficulty thresholds must be an object { difficult, easy }, found null.",
     );
+    expect(() =>
+      classifyDifficulty(0.5, { thresholds: JSON.parse('{"difficult":0.3,"easy":0.7,"hard":0.1}') }),
+    ).toThrow('The difficulty thresholds may hold only difficult and easy, found "hard".');
+    expect(() =>
+      classifyDiscrimination(0.5, { thresholds: JSON.parse('{"veryGood":0.4,"good":0.3,"marginal":0.2,"poor":0}') }),
+    ).toThrow('The discrimination thresholds may hold only veryGood, good and marginal, found "poor".');
     expect(() =>
       classifyDiscrimination(0.5, { thresholds: JSON.parse('{ "veryGood": "0.4", "good": 0.3, "marginal": 0.2 }') }),
     ).toThrow('The very good threshold must be a finite number, found "0.4".');
@@ -315,6 +322,7 @@ describe("distractorAnalysis", () => {
       "Scored responses must be an object from scoreResponses, found null.",
     );
     expect(() => distractorAnalysis(scored, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => distractorAnalysis(scored, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 });
 
@@ -477,6 +485,7 @@ describe("reliability", () => {
       expect(() => statistic(JSON.parse("null"))).toThrow(message);
     }
     expect(() => splitHalf(polytomous, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => splitHalf(polytomous, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
   });
 
   it("uses a given reliability for the standard error of measurement and checks its range", () => {
@@ -486,6 +495,9 @@ describe("reliability", () => {
     );
     expect(() => standardErrorOfMeasurement(polytomous, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => standardErrorOfMeasurement(polytomous, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
     expect(() => standardErrorOfMeasurement(polytomous, { reliability: JSON.parse("null") })).toThrow(
       "A reliability must be a number from 0 to 1, found null.",

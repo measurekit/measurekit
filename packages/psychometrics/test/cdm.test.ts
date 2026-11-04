@@ -352,6 +352,9 @@ describe("cdmClassificationAccuracy", () => {
     expect(() => cdmClassificationAccuracy(matrix, calibration, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => cdmClassificationAccuracy(matrix, calibration, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
     expect(() => cdmClassificationAccuracy(JSON.parse("null"), calibration)).toThrow(
       "A response matrix needs the arrays personIds, itemIds and responses.",
     );
@@ -768,6 +771,7 @@ describe("calibrateCdm", () => {
     expect(() => calibrateCdm(matrix, qMatrix, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() => calibrateCdm(matrix, qMatrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => calibrateCdm(matrix, qMatrix, { model: JSON.parse("5") })).toThrow(
       "The option model must be a cognitive diagnosis model or an array of one per item, found 5.",
     );
@@ -944,6 +948,7 @@ describe("compareItemModels", () => {
       compareItemModels(withItem({ covariance: JSON.parse('[[0,0,0,"x"],[0,0,0,0],[0,0,0,0],[0,0,0,0]]') })),
     ).toThrow(message);
     expect(() => compareItemModels(valid, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => compareItemModels(valid, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
     expect(() => compareItemModels(valid, { models: JSON.parse('"dina"') })).toThrow(
       'The option models must be an array of reduced models, such as ["dina", "acdm"], found "dina".',
     );
@@ -999,6 +1004,9 @@ describe("nonparametricClassification", () => {
     expect(() => nonparametricClassification(buildResponseMatrix([[1]]), { item1: ["a"] }, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
+    expect(() =>
+      nonparametricClassification(buildResponseMatrix([[1]]), { item1: ["a"] }, JSON.parse('{"verbose":1}')),
+    ).toThrow('There is no option "verbose"');
   });
 });
 
@@ -1221,6 +1229,9 @@ describe("validateQMatrix", () => {
     );
     expect(() => validateQMatrix(matrix, calibration, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
+    );
+    expect(() => validateQMatrix(matrix, calibration, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
   });
 });

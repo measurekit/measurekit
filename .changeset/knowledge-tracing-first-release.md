@@ -80,3 +80,7 @@ Every function documents each parameter and its result.
 
 The main function of every module has an example in its documentation, which a test runs against the values its
 comments state.
+
+Every model and function refuses an option it does not take, naming it, and so do the records of settings inside the
+options: BKT's `bounds` and `fixed` rates, KST's `fixed` and `equal`, IRT's `prior` and `drift`, Elo's `uncertainty` and
+a logistic term.
