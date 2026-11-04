@@ -4,7 +4,8 @@
 
 The foundation of `@measurekit/psychometrics` and `@measurekit/knowledge-tracing`: `MeasurekitError` and
 `DataError`, the checks of arguments, the seeded random number generator `createRandom` and the numerics that
-both packages use: the tails of the chi-square and Student's t distributions, Cohen's kappa, BFGS minimization with its
+both packages use: the normal distribution function, density and quantile, the tails of the chi-square and Student's t
+distributions, Cohen's kappa, BFGS minimization with its
 line search, the Fisher-Yates shuffle, and the category probabilities of logistic, graded and partial credit items.
 
 `checkRecord` refuses an own key `__proto__`, `prototype` or `constructor` in a record whose keys are names the code

@@ -1,5 +1,5 @@
+import { normalCdf } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { normalCdf } from "../math/internal.js";
 import type { CdmCalibration } from "./calibration.js";
 import { checkedModel, profileMoments } from "./model-fit.js";
 

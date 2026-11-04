@@ -1,6 +1,6 @@
-import { checkOptions, checkPositiveInteger, DataError, type FieldNames } from "@measurekit/core";
+import { checkOptions, checkPositiveInteger, DataError, type FieldNames, normalCdf } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { normalCdf, sampleQuantile } from "../math/internal.js";
+import { sampleQuantile } from "../math/internal.js";
 import { type RestScoreGroups, restScoreGroups } from "./groups.js";
 import { type MokkenData, mokkenData, scoreOf } from "./scores.js";
 

@@ -1,4 +1,4 @@
-import { normalCdf } from "./normal.js";
+import { normalCdf } from "@measurekit/core";
 
 /** Genz's choice of rule by |ρ|: 6 Gauss-Legendre points below 0.3, 12 below 0.75, and 20 above. */
 const MEDIUM_CORRELATION = 0.3;

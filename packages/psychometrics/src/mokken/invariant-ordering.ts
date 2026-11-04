@@ -1,6 +1,5 @@
-import { checkOptions, DataError, type FieldNames, mean, studentLowerTail } from "@measurekit/core";
+import { checkOptions, DataError, type FieldNames, mean, normalCdf, studentLowerTail } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { normalCdf } from "../math/internal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
 import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
 import { itemScalability, scaleCoefficient, usableItems } from "./scalability.js";

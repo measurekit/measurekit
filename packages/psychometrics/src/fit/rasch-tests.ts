@@ -1,7 +1,14 @@
-import { checkArray, checkOptions, chiSquareUpperTail, DataError, describe, type FieldNames } from "@measurekit/core";
+import {
+  checkArray,
+  checkOptions,
+  chiSquareUpperTail,
+  DataError,
+  describe,
+  type FieldNames,
+  normalCdf,
+} from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { type ConditionalCalibrationOptions, type ConditionalFit, conditionalFit } from "../irt/internal.js";
-import { normalCdf } from "../math/internal.js";
 
 /**
  * How the persons are split into groups: at the median or the mean of the total score, into a lower group, at or below

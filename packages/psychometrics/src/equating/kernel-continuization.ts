@@ -1,5 +1,5 @@
-import { DataError } from "@measurekit/core";
-import { findIncreasingRoot, normalCdf, normalDensity } from "../math/internal.js";
+import { DataError, normalCdf, normalDensity } from "@measurekit/core";
+import { findIncreasingRoot } from "../math/internal.js";
 
 /**
  * A score distribution made continuous by a Gaussian kernel: the scores 0 to J with their probabilities r, and the

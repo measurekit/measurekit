@@ -43,7 +43,6 @@ export {
   startingCommunalities,
 } from "./minres.js";
 export { noncentralChiSquareCdf } from "./noncentral-chi-square.js";
-export { normalCdf, normalDensity } from "./normal.js";
 export { type HessianFunction, type NewtonOptions, newton } from "./optimize.js";
 export { orthonormalBasis } from "./orthonormal-basis.js";
 export { pearsonMatrix } from "./pearson.js";

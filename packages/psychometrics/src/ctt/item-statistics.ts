@@ -1,6 +1,6 @@
-import { checkOptions, mean, normalQuantile } from "@measurekit/core";
+import { checkOptions, mean, normalDensity, normalQuantile } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { correlation, normalDensity, variance } from "../math/internal.js";
+import { correlation, variance } from "../math/internal.js";
 import { completeCases, itemScores } from "./complete-cases.js";
 import { GROUP_OPTIONS, type GroupOptions, groupMean, scoreGroups } from "./groups.js";
 import { alphaFromVariances } from "./reliability.js";

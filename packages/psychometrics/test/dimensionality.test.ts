@@ -1,4 +1,4 @@
-import { shuffle } from "@measurekit/core";
+import { normalCdf, shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -36,7 +36,6 @@ import {
   bivariateNormalDensity,
   minres,
   minresLoadings,
-  normalCdf,
   symmetricEigen,
 } from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";

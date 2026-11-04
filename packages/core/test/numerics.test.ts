@@ -13,6 +13,8 @@ import {
   maxAbs,
   mean,
   multiplyVector,
+  normalCdf,
+  normalDensity,
   normalizeLogs,
   normalQuantile,
   stepAlong,
@@ -44,6 +46,45 @@ function largestError(lower: Float64Array, matrix: Float64Array, size: number): 
   }
   return largest;
 }
+
+describe("normalCdf and normalDensity", () => {
+  // R's pnorm at each of Cody's ranges, and beyond the last, where the lower tail underflows to 0.
+  const pnorm: readonly (readonly [number, number])[] = [
+    [Number.NEGATIVE_INFINITY, 0],
+    [-40, 0],
+    [-37.5, 4.605353009581955e-308],
+    [-8, 6.220960574271785e-16],
+    [-5.6, 1.071759025831093e-8],
+    [-0.7, 0.24196365222307298],
+    [-1e-20, 0.5],
+    [0.2, 0.579259709439103],
+    [0.6744, 0.7499714786270594],
+    [2, 0.9772498680518208],
+    [5.7, 0.9999999940096286],
+    [9, 1],
+    [Number.POSITIVE_INFINITY, 1],
+  ];
+
+  it("matches R's pnorm in both tails and at the boundaries of Cody's ranges", () => {
+    for (const [x, expected] of pnorm) {
+      expect(Math.abs(normalCdf(x) - expected), `pnorm(${x})`).toBeLessThanOrEqual(1e-14 * expected);
+    }
+  });
+
+  it("gives the two tails the same mass", () => {
+    fc.assert(
+      fc.property(fc.double({ min: -8, max: 8, noNaN: true }), (x) => {
+        expect(Math.abs(normalCdf(x) + normalCdf(-x) - 1)).toBeLessThan(1e-15);
+      }),
+    );
+  });
+
+  it("matches R's dnorm", () => {
+    expect(normalDensity(0)).toBe(0.3989422804014327);
+    expect(Math.abs(normalDensity(1) - 0.24197072451914337)).toBeLessThan(1e-16);
+    expect(normalDensity(-1)).toBe(normalDensity(1));
+  });
+});
 
 describe("normalQuantile", () => {
   it("returns infinite quantiles at 0 and 1 and NaN outside [0, 1]", () => {

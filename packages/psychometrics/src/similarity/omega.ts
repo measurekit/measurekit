@@ -1,6 +1,6 @@
+import { normalCdf } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import type { IrtItem } from "../irt/internal.js";
-import { normalCdf } from "../math/internal.js";
 import { checkModelInputs, type ModelInputs, personProbabilities, probabilitiesOf } from "./inputs.js";
 import type { PersonPair } from "./pairs.js";
 

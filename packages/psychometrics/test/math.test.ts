@@ -1,4 +1,4 @@
-import { chiSquareUpperTail, createRandom, logistic, normalQuantile } from "@measurekit/core";
+import { chiSquareUpperTail, createRandom, logistic, normalCdf, normalDensity, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -14,8 +14,6 @@ import {
   multiply,
   newton,
   noncentralChiSquareCdf,
-  normalCdf,
-  normalDensity,
   numericalHessian,
   pseudoInverse,
   rectangular,

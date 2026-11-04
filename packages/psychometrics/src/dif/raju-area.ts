@@ -1,4 +1,4 @@
-import { checkBoolean, checkOptions, chiSquareUpperTail, DataError, logistic, logLogistic } from "@measurekit/core";
+import { checkBoolean, checkOptions, DataError, logistic, logLogistic, normalCdf } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import type { ScaleTransformation } from "../equating/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
@@ -154,6 +154,6 @@ function areas(
     unsignedArea: height * unsignedArea,
     signedZ: tested ? signedZ : null,
     unsignedZ: tested ? unsignedZ : null,
-    significance: tested ? chiSquareUpperTail(unsignedZ ** 2, 1) : null,
+    significance: tested ? 2 * normalCdf(-Math.abs(unsignedZ)) : null,
   };
 }

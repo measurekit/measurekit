@@ -2,11 +2,11 @@ import {
   checkChoice,
   checkFinite,
   checkOptions,
-  chiSquareUpperTail,
   DataError,
   describe,
   type FieldNames,
   isRecord,
+  normalCdf,
   normalQuantile,
 } from "@measurekit/core";
 import type { EventLog } from "../data/internal.js";
@@ -421,16 +421,10 @@ function addErrorRateSlopes(relation: Uint8Array, data: Counterexamples, perImpl
   });
 }
 
-/** Returns the probability that a standard normal variable is at least `z`. */
-function upperTail(z: number): number {
-  const half = chiSquareUpperTail(z * z, 1) / 2;
-  return z >= 0 ? half : 1 - half;
-}
-
 function pValueOf(z: number, tail: "two-sided" | "less" | "greater"): number {
-  if (tail === "greater") return upperTail(z);
-  if (tail === "less") return upperTail(-z);
-  return chiSquareUpperTail(z * z, 1);
+  if (tail === "greater") return normalCdf(-z);
+  if (tail === "less") return normalCdf(z);
+  return 2 * normalCdf(-Math.abs(z));
 }
 
 function intervalOf(

@@ -1,6 +1,5 @@
-import { checkArray, checkFinite, checkPositive, checkRecord, DataError } from "@measurekit/core";
+import { checkArray, checkFinite, checkPositive, checkRecord, DataError, normalCdf } from "@measurekit/core";
 import type { AbilityEstimate } from "../irt/internal.js";
-import { normalCdf } from "../math/internal.js";
 
 /** A person's classification by cut scores on theta. */
 export interface PersonClassification {

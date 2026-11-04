@@ -1,4 +1,4 @@
-import { chiSquareUpperTail } from "@measurekit/core";
+import { normalCdf } from "@measurekit/core";
 import type { ScoreGroups } from "./groups.js";
 
 /** Liu and Agresti's cumulative common odds ratio of an item's categories across score groups, with its test. */
@@ -53,7 +53,7 @@ export function liuAgresti(groups: ScoreGroups): LiuAgresti | null {
   const logStandardError = Math.sqrt(spread) / (oddsRatio * discordant);
   const z = Math.log(oddsRatio) / logStandardError;
   if (!(Number.isFinite(logStandardError) && Number.isFinite(z))) return untested;
-  return { oddsRatio, logStandardError, z, significance: chiSquareUpperTail(z * z, 1) };
+  return { oddsRatio, logStandardError, z, significance: 2 * normalCdf(-Math.abs(z)) };
 }
 
 /** The cumulative counts of one score group with persons of both groups. */

@@ -1,4 +1,4 @@
-import { chiSquareUpperTail, mean } from "@measurekit/core";
+import { chiSquareUpperTail, mean, normalCdf } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -30,7 +30,7 @@ import {
   thetaPosterior,
   twoParameterLogistic,
 } from "../src/index.js";
-import { covariance, normalCdf, variance } from "../src/math/internal.js";
+import { covariance, variance } from "../src/math/internal.js";
 import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureItems, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
