@@ -1,21 +1,38 @@
 # Contributing
 
-Contributions in English or Bahasa Indonesia are welcome.
-Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Contributions in English or Bahasa Indonesia are welcome. Everyone taking part is expected to follow the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ```mermaid
 flowchart LR
-  C["Change in packages/ or docs/"] --> V["Reference script and fixture in validation/ for a new statistic"]
-  C --> T["Tests, docs and TSDoc"]
-  V --> G["Gates: lint, check:standards, check:duplication, typecheck, knip, check:packages, check:release, check:tarballs, check:rules, check:licenses, check:audit, docs:api, tests, benchmarks"]
-  T --> G
-  G --> X["Changeset of the package"] --> M["Pull request and merge"]
+  subgraph repo["The repository"]
+    packages["packages/core, psychometrics,<br/>knowledge-tracing<br/>src, test"]
+    docs["docs/psychometrics, docs/knowledge-tracing<br/>guides that run in tests"]
+    validation["validation<br/>R and Python references<br/>that write the fixtures"]
+    examples["examples<br/>run by a test"]
+    tooling["scripts, compat"]
+  end
+  change["Your change"] --> reference["A new statistic: its reference<br/>and fixture in validation/"]
+  change --> local["Local gates<br/>lint, check:standards, check:duplication, typecheck, test, knip"]
+  reference --> local
+  local --> hooks["Pre-commit: Biome formats<br/>Pre-push: typecheck, test, knip"]
+  hooks --> pr["Pull request<br/>with a changeset"]
+  pr --> ci["CI: check, then the jobs that read<br/>the packages the change reaches"]
+  ci --> review["Review"]
+  review --> merge["Merge"]
+  repo -.- change
 ```
 
 ## Setup
 
-Node.js 22.18+ and pnpm 12 are required. `pnpm install` also installs the Lefthook git hooks. [AGENTS.md](AGENTS.md)
-lists the commands and the conventions for layout, naming, code, docs, validation and tests;
+Node.js 22.18+ and pnpm 12 are required. One command sets the repository up, and in a git clone it also installs the
+Lefthook git hooks:
+
+```bash
+pnpm install
+```
+
+[AGENTS.md](AGENTS.md) lists the commands and the conventions for layout, naming, code, docs, evidence and tests;
 [psychometrics](docs/psychometrics/architecture.md) and [knowledge tracing](docs/knowledge-tracing/architecture.md)
 state the design principles of each package.
 

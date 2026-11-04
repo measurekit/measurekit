@@ -1,80 +1,113 @@
 # Security
 
-Report vulnerabilities privately through the repository's security advisory form rather than a public issue. Name the
-package.
+Report vulnerabilities privately through the repository's security advisory form rather than a public issue. Include the
+package, the version, the input or the sequence of calls that shows the problem, and what it lets an attacker do.
 
-Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/knowledge-tracing` or `@measurekit/core`:
+Every input is untrusted: response matrices, records and choices, logs of events, item parameters, Q-matrices, stored states
+and parameters of learner models, and options. The sections below state the controls of each package and what a deployment
+adds.
 
-- **No I/O.** Neither package reads files, makes network requests, reads environment variables or runs code it is given.
-  None has a third-party runtime dependency: `@measurekit/psychometrics` and `@measurekit/knowledge-tracing` depend only
-  on `@measurekit/core`.
+```mermaid
+flowchart LR
+  data["Data from users, files and stores<br/>responses, logs, items, states"] -->|"untrusted"| pkg["measurekit<br/>validates, limits"]
+  pkg -->|"plain data: statistics,<br/>estimates, states"| host["Your application<br/>stores, workers, deadlines"]
+  host -->|"options, Random"| pkg
+```
+
+## Points to be aware of when deploying
+
+- **No I/O.** The packages read no file, make no network request, read no environment variable, write no log and send no
+  telemetry. A function that fails throws; it does not print.
+- **No code execution.** The packages run no code they are given as text and load none: `eval` fails lint, and a rule, such as
+  the stopping rule of an adaptive test, is an object or a function that the caller passes.
 - **Untrusted input.** Every public function validates its input and throws `DataError` on malformed data, so data from
-  users or files can be passed in directly. The learner models of `@measurekit/knowledge-tracing` also check the states
-  and parameters they are given, so states from a database or browser storage can be passed in directly. A learner can
-  edit a state kept in browser storage; keep states on a server where estimates matter.
-- **Resource use.** Time and memory grow with the size of the input. In `@measurekit/psychometrics`, item statistics
-  take time proportional to persons × items, and `bootstrapEquating` time proportional to the persons its counts hold
-  times the replications. In `@measurekit/knowledge-tracing`, a log is checked and replayed in time proportional to its
-  events, and cross-validation fits the model once per fold. Limit the size of data accepted from untrusted sources
-  before analyzing it on a server: a response matrix or a log takes at most about 50 times the bytes of its JSON, a
-  Q-matrix or a diagnostic pool of a few hundred bytes up to 300 MB within the limits below
-  ([peak memory](docs/performance.md#peak-memory)). The time of inductive item tree analysis grows faster than its
-  limits bound: 1,000 learners take 10 ms at 12 items and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items
-  ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). So does the time of a statistic of every pair of
-  items, which grows with the pairs times the persons, of Mokken's conditional association, with the cube of the items
-  times the persons, 14 s at 1,000 items of 8 persons ([mokken](docs/psychometrics/mokken.md)). Run these on data from
-  users in a worker with a deadline, and end the worker when it passes. So does the many-facet Rasch model, whose
-  estimation takes time that grows as the cube of its parameters: 1,000 of them, from 260 KB of scores, take 3.3 minutes.
-  An exploratory calibration of several dimensions starts from an eigendecomposition of the items' correlations, whose
-  time grows as the cube of the items: about 3 minutes at 2,000 items
-  ([multidimensional](docs/psychometrics/multidimensional.md#time)). The indices of answer similarity take time that
-  grows with the pairs passed, and M4 a time per pair that grows as the cube of the items: 0.2 s at its limit of 1,000
-  ([similarity](docs/psychometrics/similarity.md#limits)).
-- **Limits.** Tables are sized by the values that occur in the data, not by the highest value, so that a small input
-  with one large response costs no more than another of its size. What would grow faster than the input has a limit,
-  and passing it throws `DataError`:
+  users or files can be passed in directly.
+- **Resource use.** Time and memory grow with the size of the input; what would grow faster than it has a limit in
+  [Default limits](#default-limits). Limit the size of data accepted from untrusted sources before analyzing it on a server:
+  a response matrix or a log takes at most about 50 times the bytes of its JSON, a Q-matrix or a diagnostic pool of a few
+  hundred bytes up to 300 MB within the limits ([peak memory](docs/performance.md#peak-memory)). The computations that the
+  sections below name take time that grows faster than their limits bound: run them on data from users in a worker with a
+  deadline, and end the worker when it passes.
+- **Randomness.** `createRandom` is a seeded generator for reproducible simulation and splits. It is not cryptographically
+  secure; do not use it for secrets, tokens or test form assignment that must be unpredictable.
+- **Personal data.** The packages store nothing: responses, scores, logs and states pass through them and stay with the
+  host, which keeps them under its own privacy duties.
 
-  | Input                                                                                              | Limit                                      | Guide                                                                                                         |
-  | -------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-  | A response, or the score of a faceted score                                                        | An integer from 0 to 2³¹ - 1               | [data](docs/psychometrics/data.md)                                                                            |
-  | Attributes of a Q-matrix; of a diagnostic adaptive test                                            | 15: the most in GDINA's and CDM's data     | [cdm](docs/psychometrics/cdm.md#calibration)                                                                  |
-  | Items × 2^K of a diagnosis model; of a diagnostic adaptive test                                    | 2^22: 300 MB with 2^18 latent groups       | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
-  | Latent groups of a diagnosis model; of a diagnostic adaptive test                                  | 2^18 over all items, 2^k for k attributes  | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
-  | Success probabilities with incomplete standard errors                                              | 3,162 over all items: 80 MB of information | [cdm](docs/psychometrics/cdm.md#calibration)                                                                  |
-  | Items of a limited-information statistic, of IRT or diagnosis; its moments, of C2 with categories  | 60 and 1,830: a covariance matrix of 27 MB | [fit](docs/psychometrics/fit.md#limited-information-fit), [cdm](docs/psychometrics/cdm.md#model-and-item-fit) |
-  | Categories of a Mokken scale                                                                       | 10                                         | [mokken](docs/psychometrics/mokken.md)                                                                        |
-  | Categories of an item in the Mantel test and ordinal logistic regression of DIF                    | 255, as FACETS                             | [dif](docs/psychometrics/dif.md#mantel-test)                                                                  |
-  | Observed categories of an item in a polychoric correlation                                         | 8, as psych's `polychoric`                 | [dimensionality](docs/psychometrics/dimensionality.md#correlations)                                           |
-  | Items of an analysis of their pairs: correlations, factors, omega                                  | 1,000: an analysis adds up to about 150 MB | [dimensionality](docs/psychometrics/dimensionality.md#correlations)                                           |
-  | Items of a statistic of every pair: local dependence, Yen's Q3, a Mokken scale analysis            | 1,000: up to about 210 MB                  | [fit](docs/psychometrics/fit.md#local-dependence), [mokken](docs/psychometrics/mokken.md)                     |
-  | Item steps of Molenaar-Sijtsma reliability, which holds a matrix of their pairs                    | 1,000: 9 MB                                | [mokken](docs/psychometrics/mokken.md#reliability)                                                            |
-  | Cells of the tables of local dependence: each pair of categories of each pair of items             | 2^24: about 1 s, 260 MB                    | [fit](docs/psychometrics/fit.md#local-dependence)                                                             |
-  | Highest total score of the items of S-X², whose time grows with the items times its square         | 300: 2 to 3 s                              | [fit](docs/psychometrics/fit.md)                                                                              |
-  | Persons × stations² of borderline regression, whose standard error sums a product per pair         | 2^28: 0.3 to 1.4 s                         | [standard-setting](docs/psychometrics/standard-setting.md#borderline-regression-and-the-borderline-group)     |
-  | Counts of a form assembly: forms × (forms + pool items)                                            | 2^26: 256 MB                               | [cat](docs/psychometrics/cat.md#form-assembly)                                                                |
-  | Facets of a G study, with the object                                                               | 6, as GENOVA and urGENOVA                  | [generalizability](docs/psychometrics/generalizability.md)                                                    |
-  | Reportable scores of the scale of a predicted theta score                                          | 10,000                                     | [scaling](docs/psychometrics/scaling.md)                                                                      |
-  | Degree of a log-linear presmoothing, of each score of a table                                      | 20: a table's fit holds 441 terms per cell | [equating](docs/psychometrics/equating.md)                                                                    |
-  | Nodes of a grid of several dimensions, in calibration and EAP                                      | 10⁶                                        | [multidimensional](docs/psychometrics/multidimensional.md#calibration)                                        |
-  | Values at the nodes of an EM calibration of several dimensions                                     | 2²⁴: 300 MB, 700 MB with standard errors   | [multidimensional](docs/psychometrics/multidimensional.md#calibration)                                        |
-  | Parameters of a many-facet model, or of an LLTM's Rasch comparison                                 | 1,000: 80 MB, 3.3 minutes                  | [rater](docs/psychometrics/rater.md#model)                                                                    |
-  | Categories of a rating scale of a many-facet model                                                 | 255, as FACETS                             | [rater](docs/psychometrics/rater.md#model)                                                                    |
-  | Expected counts of a many-facet model or an LLTM: virtual items × quadrature points × categories   | 2^24: two tables of 128 MB                 | [rater](docs/psychometrics/rater.md#model)                                                                    |
-  | Effects of linear change: item groups × occasions after the first × groups                         | 1,000, as the Rasch comparison's           | [explanatory](docs/psychometrics/explanatory.md)                                                              |
-  | Items of the standard errors of a lognormal calibration; parameters of those of the joint model    | 2,000: above, none, or the joint throws    | [response-time](docs/psychometrics/response-time.md)                                                          |
-  | Pairs that shared a context; the persons who share a value and form pairs                          | `maxPairs`, 10⁶: 150 MB; `maxGroup`, 200   | [similarity](docs/psychometrics/similarity.md#pairs)                                                          |
-  | Items a pair compares in the generalized binomial test and M4                                      | 1,000: M4 0.2 s a pair, 16 MB              | [similarity](docs/psychometrics/similarity.md#limits)                                                         |
-  | Cells of the K index: groups by incorrect responses × categories given                             | 2^24: up to 165 MB                         | [similarity](docs/psychometrics/similarity.md#limits)                                                         |
-  | Dimensions of a multidimensional calibration, scoring, information or adaptive test                | 100: one item of 1,000 took 11 s           | [multidimensional](docs/psychometrics/multidimensional.md#scoring)                                            |
-  | Items of an unfolding calibration                                                                  | 500: its starts take 5 s, as items cubed   | [irt](docs/psychometrics/irt.md#unfolding-calibration)                                                        |
-  | Products of conditional maximum likelihood's functions with two items left out, in a Newton step   | 2^29: a step of 0.6 to 8.5 s               | [irt](docs/psychometrics/irt.md#conditional-maximum-likelihood)                                               |
-  | Estimated parameters of standard errors, of IRT of one or more dimensions                          | 2,000: about 210 MB                        | [irt](docs/psychometrics/irt.md#standard-errors)                                                              |
-  | Coefficients of a logistic fit without a ridge, or random θ                                        | 5,000: a dense matrix of 200 MB            | [logistic](docs/knowledge-tracing/logistic.md)                                                                |
-  | States of a structure built from prerequisites or clauses                                          | `maxStates`, 10,000                        | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-  | Learning paths; cells of the Jacobian of identifiability                                           | `maxPaths`, 10,000; 1e7                    | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-  | Items of IITA, the difference test and the validity of a structure; elements of a surmise relation | 1,000: tables of a cell for each pair      | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-  | Cells of IITA's candidates: a prerequisite each, and 8 for each item                               | 24 million: about 260 MB                   | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
-  | Cells of a KST model's masks: a byte for each state and set of skills                              | 2^28: 256 MB                               | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
+## Psychometrics
 
-- **Randomness.** `createRandom` is a seeded generator for reproducible simulation and splits. It is not
-  cryptographically secure; do not use it for secrets, tokens or test form assignment that must be unpredictable.
+| Threat                                                         | Control                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A value of another type, from JSON or plain JavaScript         | Every argument and option is checked for its type first; a name that an options type does not hold is refused                                                                                                                                                                                                                     |
+| One large response that would size a table                     | Tables are sized by the values that occur in the data, not by the highest value, so that a small input with one large response costs no more than another of its size; a response is an integer from 0 to 2³¹ - 1                                                                                                                 |
+| A design whose tables grow faster than the input               | The limits of [Default limits](#default-limits) throw `DataError` before the tables are made: a diagnosis model's cells and latent groups, the dimensions and nodes of a calibration, the parameters of standard errors                                                                                                           |
+| Time that grows with the persons times the items               | Item statistics take time proportional to persons × items, and `bootstrapEquating` time proportional to the persons its counts hold times the replications                                                                                                                                                                        |
+| Time that grows faster than the limits bound                   | A statistic of every pair of items grows with the pairs times the persons, and Mokken's conditional association with the cube of the items times the persons: 14 s at 1,000 items of 8 persons ([mokken](docs/psychometrics/mokken.md)). Run them in a worker with a deadline                                                     |
+| A many-facet model or an exploratory calibration of many items | The many-facet Rasch model takes time that grows as the cube of its parameters: 1,000 of them, from 260 KB of scores, take 3.3 minutes. An exploratory calibration starts from an eigendecomposition of the items' correlations: about 3 minutes at 2,000 items ([multidimensional](docs/psychometrics/multidimensional.md#time)) |
+| The indices of answer similarity over many pairs               | Their time grows with the pairs passed, and M4's time per pair as the cube of the items: 0.2 s at its limit of 1,000 ([similarity](docs/psychometrics/similarity.md#limits))                                                                                                                                                      |
+
+## Knowledge tracing
+
+| Threat                                                         | Control                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A state or parameters altered in a database or browser storage | The learner models check the states and parameters they are given and throw `DataError`, so stored data can be passed in directly. A learner can still edit a state kept in browser storage to a valid one: keep states on a server where estimates matter |
+| A long log                                                     | A log is checked and replayed in time proportional to its events, and cross-validation fits the model once per fold                                                                                                                                        |
+| Inductive item tree analysis of many items                     | Its time grows faster than its limits bound: 1,000 learners take 10 ms at 12 items and 11 to 21 s at 400, where DAKS takes 2 minutes at 12 items ([kst](docs/knowledge-tracing/kst.md#inductive-item-tree-analysis)). Run it in a worker with a deadline   |
+| A knowledge structure of many states                           | A structure built from prerequisites or clauses stops at `maxStates`, and the masks of a model at 2^28 cells ([kst](docs/knowledge-tracing/kst.md#limits-and-errors))                                                                                      |
+
+## Core
+
+| Threat                                       | Control                                                                                                                     |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| An option or a record with an unknown name   | `checkOptions` and `checkFields` refuse a name that the type does not hold, so a misspelled option is never taken as absent |
+| A seeded generator used where it must not be | `createRandom` is not cryptographically secure; secrets and unpredictable assignments take `crypto.getRandomValues`         |
+
+## Default limits
+
+What would grow faster than the input has a limit, and passing it throws `DataError`:
+
+| Input                                                                                              | Limit                                      | Guide                                                                                                         |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| A response, or the score of a faceted score                                                        | An integer from 0 to 2³¹ - 1               | [data](docs/psychometrics/data.md)                                                                            |
+| Attributes of a Q-matrix; of a diagnostic adaptive test                                            | 15: the most in GDINA's and CDM's data     | [cdm](docs/psychometrics/cdm.md#calibration)                                                                  |
+| Items × 2^K of a diagnosis model; of a diagnostic adaptive test                                    | 2^22: 300 MB with 2^18 latent groups       | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
+| Latent groups of a diagnosis model; of a diagnostic adaptive test                                  | 2^18 over all items, 2^k for k attributes  | [cdm](docs/psychometrics/cdm.md#calibration), [cat](docs/psychometrics/cat.md#diagnostic-adaptive-tests)      |
+| Success probabilities with incomplete standard errors                                              | 3,162 over all items: 80 MB of information | [cdm](docs/psychometrics/cdm.md#calibration)                                                                  |
+| Items of a limited-information statistic, of IRT or diagnosis; its moments, of C2 with categories  | 60 and 1,830: a covariance matrix of 27 MB | [fit](docs/psychometrics/fit.md#limited-information-fit), [cdm](docs/psychometrics/cdm.md#model-and-item-fit) |
+| Categories of a Mokken scale                                                                       | 10                                         | [mokken](docs/psychometrics/mokken.md)                                                                        |
+| Categories of an item in the Mantel test and ordinal logistic regression of DIF                    | 255, as FACETS                             | [dif](docs/psychometrics/dif.md#mantel-test)                                                                  |
+| Observed categories of an item in a polychoric correlation                                         | 8, as psych's `polychoric`                 | [dimensionality](docs/psychometrics/dimensionality.md#correlations)                                           |
+| Items of an analysis of their pairs: correlations, factors, omega                                  | 1,000: an analysis adds up to about 150 MB | [dimensionality](docs/psychometrics/dimensionality.md#correlations)                                           |
+| Items of a statistic of every pair: local dependence, Yen's Q3, a Mokken scale analysis            | 1,000: up to about 210 MB                  | [fit](docs/psychometrics/fit.md#local-dependence), [mokken](docs/psychometrics/mokken.md)                     |
+| Item steps of Molenaar-Sijtsma reliability, which holds a matrix of their pairs                    | 1,000: 9 MB                                | [mokken](docs/psychometrics/mokken.md#reliability)                                                            |
+| Cells of the tables of local dependence: each pair of categories of each pair of items             | 2^24: about 1 s, 260 MB                    | [fit](docs/psychometrics/fit.md#local-dependence)                                                             |
+| Highest total score of the items of S-X², whose time grows with the items times its square         | 300: 2 to 3 s                              | [fit](docs/psychometrics/fit.md)                                                                              |
+| Persons × stations² of borderline regression, whose standard error sums a product per pair         | 2^28: 0.3 to 1.4 s                         | [standard-setting](docs/psychometrics/standard-setting.md#borderline-regression-and-the-borderline-group)     |
+| Counts of a form assembly: forms × (forms + pool items)                                            | 2^26: 256 MB                               | [cat](docs/psychometrics/cat.md#form-assembly)                                                                |
+| Facets of a G study, with the object                                                               | 6, as GENOVA and urGENOVA                  | [generalizability](docs/psychometrics/generalizability.md)                                                    |
+| Reportable scores of the scale of a predicted theta score                                          | 10,000                                     | [scaling](docs/psychometrics/scaling.md)                                                                      |
+| Degree of a log-linear presmoothing, of each score of a table                                      | 20: a table's fit holds 441 terms per cell | [equating](docs/psychometrics/equating.md)                                                                    |
+| Nodes of a grid of several dimensions, in calibration and EAP                                      | 10⁶                                        | [multidimensional](docs/psychometrics/multidimensional.md#calibration)                                        |
+| Values at the nodes of an EM calibration of several dimensions                                     | 2²⁴: 300 MB, 700 MB with standard errors   | [multidimensional](docs/psychometrics/multidimensional.md#calibration)                                        |
+| Parameters of a many-facet model, or of an LLTM's Rasch comparison                                 | 1,000: 80 MB, 3.3 minutes                  | [rater](docs/psychometrics/rater.md#model)                                                                    |
+| Categories of a rating scale of a many-facet model                                                 | 255, as FACETS                             | [rater](docs/psychometrics/rater.md#model)                                                                    |
+| Expected counts of a many-facet model or an LLTM: virtual items × quadrature points × categories   | 2^24: two tables of 128 MB                 | [rater](docs/psychometrics/rater.md#model)                                                                    |
+| Effects of linear change: item groups × occasions after the first × groups                         | 1,000, as the Rasch comparison's           | [explanatory](docs/psychometrics/explanatory.md)                                                              |
+| Items of the standard errors of a lognormal calibration; parameters of those of the joint model    | 2,000: above, none, or the joint throws    | [response-time](docs/psychometrics/response-time.md)                                                          |
+| Pairs that shared a context; the persons who share a value and form pairs                          | `maxPairs`, 10⁶: 150 MB; `maxGroup`, 200   | [similarity](docs/psychometrics/similarity.md#pairs)                                                          |
+| Items a pair compares in the generalized binomial test and M4                                      | 1,000: M4 0.2 s a pair, 16 MB              | [similarity](docs/psychometrics/similarity.md#limits)                                                         |
+| Cells of the K index: groups by incorrect responses × categories given                             | 2^24: up to 165 MB                         | [similarity](docs/psychometrics/similarity.md#limits)                                                         |
+| Dimensions of a multidimensional calibration, scoring, information or adaptive test                | 100: one item of 1,000 took 11 s           | [multidimensional](docs/psychometrics/multidimensional.md#scoring)                                            |
+| Items of an unfolding calibration                                                                  | 500: its starts take 5 s, as items cubed   | [irt](docs/psychometrics/irt.md#unfolding-calibration)                                                        |
+| Products of conditional maximum likelihood's functions with two items left out, in a Newton step   | 2^29: a step of 0.6 to 8.5 s               | [irt](docs/psychometrics/irt.md#conditional-maximum-likelihood)                                               |
+| Estimated parameters of standard errors, of IRT of one or more dimensions                          | 2,000: about 210 MB                        | [irt](docs/psychometrics/irt.md#standard-errors)                                                              |
+| Coefficients of a logistic fit without a ridge, or random θ                                        | 5,000: a dense matrix of 200 MB            | [logistic](docs/knowledge-tracing/logistic.md)                                                                |
+| States of a structure built from prerequisites or clauses                                          | `maxStates`, 10,000                        | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
+| Learning paths; cells of the Jacobian of identifiability                                           | `maxPaths`, 10,000; 1e7                    | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
+| Items of IITA, the difference test and the validity of a structure; elements of a surmise relation | 1,000: tables of a cell for each pair      | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
+| Cells of IITA's candidates: a prerequisite each, and 8 for each item                               | 24 million: about 260 MB                   | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
+| Cells of a KST model's masks: a byte for each state and set of skills                              | 2^28: 256 MB                               | [kst](docs/knowledge-tracing/kst.md#limits-and-errors)                                                        |
+
+## Runtime dependencies
+
+None outside the family: `@measurekit/psychometrics` and `@measurekit/knowledge-tracing` load `@measurekit/core` alone, and
+`@measurekit/core` loads nothing.

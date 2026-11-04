@@ -83,67 +83,42 @@ Use these words with these meanings in code, comments and docs.
 
 ## Layout
 
-```
-packages/core/                src/ is flat, a file for each concept: errors, checks, random, normal, logistic,
-                              item-probabilities, normalize-logs, cholesky, iteration, line-search, descent, bfgs,
-                              chi-square, student-t, kappa, vectors, q-matrix, theta-distribution; continued-fraction.ts
-                              is not exported
-packages/psychometrics/       src/<module>/ for data, math, ctt, change, dimensionality, irt, multidimensional, cdm, fit, dif,
-                              equating, standard-setting, explanatory, mokken, generalizability, scaling, rater,
-                              response-time, similarity, parameterization, sim and cat; src/checks.ts holds checkFunction and
-                              checkOpenUnitInterval, which only this package uses; src/index.ts re-exports every module
-                              and DataError, MeasurekitError and createRandom
-packages/knowledge-tracing/   src/<module>/ for data, math, evaluate, elo, bkt, logistic, irt, kst, practice and sim;
-                              src/model.ts holds LearnerModel, ModelFit and checkModel, which every model implements;
-                              src/index.ts re-exports every module, the model interface, and DataError, MeasurekitError
-                              and createRandom
-packages/<package>/           src/<module>/index.ts is the public API of a module, internal.ts what the package shares, and math/,
-                              which no subpath exports, has internal.ts alone; test/<module>.test.ts, one for each src folder, with fixtures/ of reference results;
-                              README.md, LICENSE, NOTICE, package.json, typedoc.json and the tsconfig files
-docs/<package>/               guides, which TypeDoc publishes with the API reference; docs/performance.md the benchmarks and sizes
-validation/<package>/         R and Python scripts that write the fixtures; validation/README.md lists them
-validation/benchmarks/        the inputs of the benchmarks and the timing of their references
-examples/<package>/           runnable examples; examples/test/ runs each of them, the samples of the guides and the
-                              examples of the TSDoc
-compat/                       the packages on Node.js, Deno, Bun and workerd, built as they ship: scenarios.ts holds a calibration
-                              and a BKT fit, check.ts bundles them and compares each runtime's results with Node.js's
-scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts, check-release.ts and check-tarballs.ts
-                              with their tests; prepare.ts installs the git hooks in a clone and skips them in a copy;
-                              bench-harness.ts is what the benchmarks of the packages share; entry-sizes.ts bundles each
-                              entry point alone, with code splitting, against the budgets of size-budgets.ts in
-                              test/entry-sizes.test.ts; peak-memory.ts measures the readers of untrusted input in processes
-                              of a bounded heap, against their budgets in test/peak-memory.test.ts; guide-samples.ts runs
-                              the samples of the guides and the examples of the TSDoc, and stated-values.ts compares the
-                              results they show; test/workflows.test.ts holds each job of the workflows to a timeout and
-                              each job of ci.yml but check to the changes job, and test/changes.test.ts runs that job's
-                              program on sample changes
-biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
-```
+| Path                          | Holds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/`              | A flat `src/`, a file for each concept: errors, checks, random, normal, logistic, item-probabilities, normalize-logs, cholesky, iteration, line-search, descent, bfgs, chi-square, student-t, kappa, vectors, q-matrix, theta-distribution; `continued-fraction.ts` is not exported                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `packages/psychometrics/`     | `src/<module>/` for data, math, ctt, change, dimensionality, irt, multidimensional, cdm, fit, dif, equating, standard-setting, explanatory, mokken, generalizability, scaling, rater, response-time, similarity, parameterization, sim and cat; `src/checks.ts` holds `checkFunction` and `checkOpenUnitInterval`, which only this package uses; `src/index.ts` re-exports every module and `DataError`, `MeasurekitError` and `createRandom`                                                                                                                                                                                                                                                                                                                                                                              |
+| `packages/knowledge-tracing/` | `src/<module>/` for data, math, evaluate, elo, bkt, logistic, irt, kst, practice and sim; `src/model.ts` holds `LearnerModel`, `ModelFit` and `checkModel`, which every model implements; `src/index.ts` re-exports every module, the model interface, and `DataError`, `MeasurekitError` and `createRandom`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `packages/<package>/`         | `src/<module>/index.ts`, the public API of a module, `internal.ts`, what the package shares, and `math/`, which no subpath exports, with `internal.ts` alone; `test/<module>.test.ts`, one for each source folder, with `fixtures/` of reference results; `README.md`, `LICENSE`, `NOTICE`, `package.json`, `typedoc.json` and the tsconfig files                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `docs/<package>/`             | The guides, which TypeDoc publishes with the API reference; `docs/performance.md`, the benchmarks, the sizes and the peak memory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `validation/<package>/`       | The R and Python scripts that write the fixtures; `validation/README.md` lists them                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `validation/benchmarks/`      | The inputs of the benchmarks and the timing of their references                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `examples/<package>/`         | Runnable examples; `examples/test/` runs each of them, the samples of the guides and the examples of the TSDoc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `compat/`                     | The packages on Node.js, Deno, Bun and workerd, built as they ship: `scenarios.ts` holds a calibration and a BKT fit, `check.ts` bundles them and compares each runtime's results with Node.js's                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `scripts/`                    | `check-standards.ts`, `check-rules.ts`, `check-licenses.ts`, `check-release.ts` and `check-tarballs.ts` with their tests; `prepare.ts` installs the git hooks in a clone and skips them in a copy; `bench-harness.ts` is what the benchmarks of the packages share; `entry-sizes.ts` bundles each entry point alone, with code splitting, against the budgets of `size-budgets.ts`; `peak-memory.ts` measures the readers of untrusted input in processes of a bounded heap; `guide-samples.ts` runs the samples of the guides and the examples of the TSDoc, and `stated-values.ts` compares the results they show; `test/workflows.test.ts` holds each job of the workflows to a timeout and each job of `ci.yml` but `check` to the `changes` job, and `test/changes.test.ts` runs that job's program on sample changes |
+| `biome/`, `.changeset/`       | GritQL lint rules; the pending release, one changeset for each package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## Commands
 
-```bash
-pnpm install
-pnpm lint               # Biome and cspell; `pnpm format` fixes formatting
-pnpm check:standards    # the rules of STANDARDS.md that a script can check, over the whole repository
-pnpm check:duplication  # jscpd over packages/*/src; fails on a repeat that "Repeats left on purpose" below does not list
-pnpm typecheck          # tsc over the sources, tests, examples and scripts
-pnpm test               # Vitest, a project for each package, the scripts and the examples; `--project psychometrics` runs one
-pnpm test:coverage      # the tests of each package with its coverage floor of vitest.config.ts; psychometrics' take 36 minutes
-pnpm bench              # builds, then the benchmarks of every package against the budgets of `test/budgets.ts`
-pnpm knip               # unused files, exports and dependencies
-pnpm build              # every package, from a clean dist/
-pnpm check:packages     # builds, then publint and Are the Types Wrong on each packed package
-pnpm check:release      # fails when a package of a changeset is private, lacks publishConfig.access, or is at 0.0.0 with less than major
-pnpm check:tarballs     # builds, packs every package, installs the tarballs into a scratch project, imports every subpath and type-checks it with bundler and node16
-pnpm check:rules        # removes each rule of scripts/check-rules.ts from a copy of the code; its test must fail (exit 1
-                        # when it does not); a run that takes too long is TIMED OUT (exit 2), never guarded or unguarded
-pnpm check:licenses     # fails on a production dependency whose license is not MIT, Apache-2.0, BSD or ISC
-pnpm check:audit        # pnpm audit of the production dependencies at any severity and of all at high; needs the network
-pnpm compat:runtimes    # builds, then bundles a calibration and a BKT fit and runs them on Node.js, Deno, Bun and workerd; their
-                        # results must match Node.js's (compat/README.md); needs Deno and Bun, or name the runtimes: `pnpm compat:runtimes node workerd`
-pnpm docs:api           # builds, then TypeDoc into docs/api; fails on undocumented exports
-```
+| Command                  | Does                                                                                                                                                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`           | Installs the dependencies and, in a git clone, the git hooks (`scripts/prepare.ts`)                                                                                                                                                      |
+| `pnpm lint`              | Biome and cspell; `pnpm format` fixes formatting                                                                                                                                                                                         |
+| `pnpm check:standards`   | The rules of STANDARDS.md that a script can check, over the whole repository                                                                                                                                                             |
+| `pnpm check:duplication` | jscpd over `packages/*/src`; fails on a repeat that [the table below](#repeats-left-on-purpose) does not list                                                                                                                            |
+| `pnpm typecheck`         | `tsc` over the sources, tests, examples and scripts                                                                                                                                                                                      |
+| `pnpm test`              | Vitest, a project for each package, the scripts and the examples; `--project psychometrics` runs one                                                                                                                                     |
+| `pnpm test:coverage`     | The tests of each package with its coverage floor of `vitest.config.ts`; psychometrics' take 36 minutes                                                                                                                                  |
+| `pnpm bench`             | Builds, then the benchmarks of every package, one package at a time, against the budgets of `test/budgets.ts`                                                                                                                            |
+| `pnpm knip`              | Unused files, exports and dependencies                                                                                                                                                                                                   |
+| `pnpm build`             | Every package, from a clean `dist/`                                                                                                                                                                                                      |
+| `pnpm check:packages`    | Builds, then publint and Are the Types Wrong on each packed package                                                                                                                                                                      |
+| `pnpm check:release`     | Fails when a package of a changeset is private, lacks `publishConfig.access`, or is at 0.0.0 with less than `major`                                                                                                                      |
+| `pnpm check:tarballs`    | Builds, packs every package, installs the tarballs into a scratch project, imports every subpath and type-checks it with `bundler` and `node16`                                                                                          |
+| `pnpm check:rules`       | Removes each rule of `scripts/check-rules.ts` from a copy of the code; its test must fail (exit 1 when it does not); a run that takes too long is `TIMED OUT` (exit 2), never guarded or unguarded                                       |
+| `pnpm check:licenses`    | Fails on a production dependency whose license is not MIT, Apache-2.0, BSD or ISC                                                                                                                                                        |
+| `pnpm check:audit`       | `pnpm audit` of the production dependencies at any severity and of all at high; needs the network                                                                                                                                        |
+| `pnpm compat:runtimes`   | Builds, then bundles a calibration and a BKT fit and runs them on Node.js, Deno, Bun and workerd; their results must match Node.js's (`compat/README.md`); needs Deno and Bun, or name the runtimes: `pnpm compat:runtimes node workerd` |
+| `pnpm docs:api`          | Builds, then TypeDoc into `docs/api`; fails on undocumented exports                                                                                                                                                                      |
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before
 finishing a change. Development needs Node.js 22.18+ and pnpm 12.
@@ -222,6 +197,10 @@ Knowledge tracing: the model families never import each other, nor does anything
 | `data/`                                                                       | `math/`                      |
 | `model.ts`                                                                    | the types of `data/`         |
 | `elo/`, `bkt/`, `logistic/`, `irt/`, `kst/`, `evaluate/`, `practice/`, `sim/` | `data/`, `math/`, `model.ts` |
+
+## Deviations from the standards
+
+Where the code departs from `STANDARDS.md`, with the reason: none.
 
 ## Naming
 
@@ -367,9 +346,10 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
   continues` runs after the sample before it and shares its variables, and `ts no-run` marks code that needs a worker or a
   package the repository does not have, and shows no result.
 - One purpose for each document: a package's `README.md` for its users, `docs/<package>/` for its guides,
-  `CONTRIBUTING.md` for the process, `AGENTS.md` for conventions, `validation/README.md` for running the reference scripts.
+  `CONTRIBUTING.md` for the process, `AGENTS.md` for conventions, `SECURITY.md` for deployment security,
+  `validation/README.md` for running the reference scripts.
 
-## Validation and tests
+## Evidence and tests
 
 - Every statistic has a reference: a function of an established R or Python package, or a base R computation written out
   in the script. The script writes inputs and expected values to `packages/<package>/test/fixtures/<module>-<case>.json`,
