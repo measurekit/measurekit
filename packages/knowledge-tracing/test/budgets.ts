@@ -5,9 +5,10 @@ import { benchmarksOf } from "../../../bench/harness.js";
  * that the CI runner took, rounded up to one significant digit, as docs/performance.md explains.
  */
 const BUDGETS = {
-  "bkt.fit": 3_000,
-  "bkt.fitLessons": 4_000,
-  "bkt.fitPairs": 7_000,
+  "bkt.fit": 2_000,
+  "bkt.fitSkills": 8_000,
+  "bkt.fitLessons": 2_000,
+  "bkt.fitPairs": 3_000,
   "bkt.replay": 200,
   "elo.replay": 300,
   "logistic.afm": 200,

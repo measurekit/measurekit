@@ -1,6 +1,11 @@
 import { createRandom, DataError, type Random, type Stopping } from "@measurekit/core";
 import { compositeKey, type EventLog, entry, mapRecord, resourceOf } from "../data/internal.js";
-import { expectationMaximization, forwardBackward } from "../math/internal.js";
+import {
+  createHiddenMarkovBuffers,
+  expectationMaximization,
+  type HiddenMarkovBuffers,
+  smoothSequence,
+} from "../math/internal.js";
 import { type BktBounds, type BktFixedRates, constrain } from "./constraints.js";
 import { type BktGuessSlip, type BktLearning, type BktSkill, guessSlipOf, learningOf, priorOf } from "./parameters.js";
 
@@ -255,11 +260,13 @@ export function estimate(
   { fixed, bounds }: { readonly fixed: BktFixedRates | undefined; readonly bounds: BktBounds },
   options: Stopping,
 ): SkillEstimate {
+  const steps = layOut(sequences);
   const fits = starts.map((start): SkillEstimate => {
+    const classes = classesOf(sequences, start);
     const result = expectationMaximization(
       start,
       (skill) => {
-        const { logLikelihood, counts } = expectation(skill, sequences);
+        const { logLikelihood, counts } = expectation(skill, sequences, steps, classes);
         return { logLikelihood, parameters: constrain(maximization(skill, counts, forgetting), fixed, bounds, true) };
       },
       options,
@@ -285,17 +292,123 @@ interface Expectation {
   readonly guessSlip: Counts;
 }
 
-/** The E-step: the log-likelihood of the sequences and the expected counts, by the forward-backward algorithm. */
-function expectation(skill: BktSkill, sequences: readonly Sequence[]): { logLikelihood: number; counts: Expectation } {
-  const counts: Expectation = { prior: new Map(), learning: new Map(), guessSlip: new Map() };
-  const rates = {
-    prior: classes((group) => entry(skill.groupPriors, group), skill.prior, counts.prior),
-    learning: classes((key) => ownLearning(skill, key), skill, counts.learning),
-    guessSlip: classes((item) => entry(skill.itemGuessSlip, item), skill, counts.guessSlip),
+/**
+ * A skill's sequences laid out once for all its E-steps: the steps of every sequence one after another, and the
+ * forward-backward buffers of the longest, which each sequence fills in turn.
+ */
+interface SkillSteps {
+  /** The first step of each sequence, then the number of steps. */
+  readonly offsets: Int32Array;
+  /** Each step's outcome: 0, 1, or -1 when nothing was observed. */
+  readonly outcomes: Int8Array;
+  readonly buffers: HiddenMarkovBuffers;
+}
+
+/** The outcome of a step with nothing observed in {@link SkillSteps}. */
+const UNOBSERVED = -1;
+
+function layOut(sequences: readonly Sequence[]): SkillSteps {
+  const offsets = new Int32Array(sequences.length + 1);
+  let longest = 0;
+  sequences.forEach(({ steps }, index) => {
+    offsets[index + 1] = (offsets[index] ?? 0) + steps.length;
+    longest = Math.max(longest, steps.length);
+  });
+  const outcomes = new Int8Array(offsets[sequences.length] ?? 0);
+  sequences.forEach(({ steps }, index) => {
+    steps.forEach(({ outcome }, t) => {
+      outcomes[(offsets[index] ?? 0) + t] = outcome ?? UNOBSERVED;
+    });
+  });
+  return { offsets, outcomes, buffers: createHiddenMarkovBuffers(2, longest) };
+}
+
+/**
+ * The classes of one kind of rate: each class's key, whose own rates it has, or `undefined` for the skill's rates, in
+ * the order the steps first meet them, and the sums of their expected counts, four for each, in that order.
+ */
+interface RateClasses {
+  readonly keys: (string | undefined)[];
+  readonly sums: Float64Array;
+  /** The sums by class id, `null` for the skill's own rates, for the M-step. */
+  readonly counts: Counts;
+}
+
+/** The classes of a skill's rates and the class of each sequence's prior and each step's rates. */
+interface SkillClasses {
+  readonly prior: RateClasses;
+  readonly learning: RateClasses;
+  readonly guessSlip: RateClasses;
+  /** The prior class of each sequence. */
+  readonly sequencePrior: Int32Array;
+  /** The learning class of the transition after each step; the last step of a sequence has none. */
+  readonly stepLearning: Int32Array;
+  /** The guess and slip class of each step with an outcome. */
+  readonly stepGuessSlip: Int32Array;
+}
+
+/**
+ * Returns the class of each sequence's prior and of each step's rates under the records of `skill`: a group, resource
+ * or item has a class of its own when the skill has rates for it, and the skill's class otherwise. EM keeps the records
+ * of its start, so the classes hold for every E-step of a run.
+ */
+function classesOf(sequences: readonly Sequence[], skill: BktSkill): SkillClasses {
+  const prior = classifier((group) => entry(skill.groupPriors, group));
+  const learning = classifier((key) => ownLearning(skill, key));
+  const guessSlip = classifier((item) => entry(skill.itemGuessSlip, item));
+  const count = sequences.reduce((total, { steps }) => total + steps.length, 0);
+  const sequencePrior = new Int32Array(sequences.length);
+  const stepLearning = new Int32Array(count);
+  const stepGuessSlip = new Int32Array(count);
+  let position = 0;
+  sequences.forEach(({ group, steps }, index) => {
+    // An E-step meets a sequence's steps before its prior, so the classes are numbered in that order.
+    steps.forEach(({ item, learning: key, outcome }, t) => {
+      if (outcome !== null) stepGuessSlip[position + t] = guessSlip.classOf(item);
+      if (t < steps.length - 1) stepLearning[position + t] = learning.classOf(key);
+    });
+    sequencePrior[index] = prior.classOf(group);
+    position += steps.length;
+  });
+  return {
+    prior: prior.classes(),
+    learning: learning.classes(),
+    guessSlip: guessSlip.classes(),
+    sequencePrior,
+    stepLearning,
+    stepGuessSlip,
   };
-  let logLikelihood = 0;
-  for (const sequence of sequences) logLikelihood += addSequence(sequence, rates);
-  return { logLikelihood, counts };
+}
+
+/** Numbers the classes of one kind of rate as `classOf` meets their keys. */
+function classifier(own: (key: string) => unknown): {
+  classOf: (key: string | undefined) => number;
+  classes: () => RateClasses;
+} {
+  const byKey = new Map<string | undefined, number>();
+  const byId = new Map<string | null, number>();
+  const keys: (string | undefined)[] = [];
+  return {
+    classOf(key) {
+      let found = byKey.get(key);
+      if (found === undefined) {
+        const id = key !== undefined && own(key) !== undefined ? key : null;
+        found = byId.get(id);
+        if (found === undefined) {
+          found = keys.length;
+          byId.set(id, found);
+          keys.push(id ?? undefined);
+        }
+        byKey.set(key, found);
+      }
+      return found;
+    },
+    classes() {
+      const sums = new Float64Array(4 * keys.length);
+      const counts: Counts = new Map(keys.map((key, index) => [key ?? null, sums.subarray(4 * index, 4 * index + 4)]));
+      return { keys, sums, counts };
+    },
+  };
 }
 
 /** Returns the learn and forget rates that the skill has for a class of resources or pairs, if it has any. */
@@ -305,100 +418,132 @@ function ownLearning(skill: BktSkill, key: string): BktLearning | undefined {
   return entry(entry(skill.pairLearning, previous), resource);
 }
 
-/** A class of a rate: its value, and the sums of its expected counts. */
-interface RateClass<T> {
-  readonly rates: T;
-  readonly sums: Float64Array;
+/** The rates of each class of a skill, for an E-step. */
+interface ClassRates {
+  readonly prior: readonly number[];
+  readonly learning: readonly BktLearning[];
+  readonly guessSlip: readonly BktGuessSlip[];
 }
 
 /**
- * Returns a lookup of the class of a group, resource or item: its own when the skill has a value for it, the skill's
- * otherwise.
- * Classes are made once per E-step, so the steps of the sequences only look them up.
+ * The E-step: the log-likelihood of the sequences and the expected counts, by the forward-backward algorithm on each
+ * sequence in turn.
  */
-function classes<T>(
-  own: (key: string) => T | undefined,
-  skillRates: T,
-  counts: Counts,
-): (key: string | undefined) => RateClass<T> {
-  const made = new Map<string | undefined, RateClass<T>>();
-  return (key) => {
-    let found = made.get(key);
-    if (found === undefined) {
-      const rates = key === undefined ? undefined : own(key);
-      const id = rates === undefined ? null : (key ?? null);
-      const sums = counts.get(id) ?? new Float64Array(4);
-      counts.set(id, sums);
-      found = { rates: rates ?? skillRates, sums };
-      made.set(key, found);
+function expectation(
+  skill: BktSkill,
+  sequences: readonly Sequence[],
+  steps: SkillSteps,
+  classes: SkillClasses,
+): { logLikelihood: number; counts: Expectation } {
+  const rates: ClassRates = {
+    prior: classes.prior.keys.map(
+      (group) => (group === undefined ? undefined : entry(skill.groupPriors, group)) ?? skill.prior,
+    ),
+    learning: classes.learning.keys.map((key) => (key === undefined ? undefined : ownLearning(skill, key)) ?? skill),
+    guessSlip: classes.guessSlip.keys.map(
+      (item) => (item === undefined ? undefined : entry(skill.itemGuessSlip, item)) ?? skill,
+    ),
+  };
+  classes.prior.sums.fill(0);
+  classes.learning.sums.fill(0);
+  classes.guessSlip.sums.fill(0);
+  let logLikelihood = 0;
+  for (let index = 0; index < sequences.length; index++) {
+    fillSequence(skill, steps, classes, rates, index);
+    const sequenceLogLikelihood = smoothSequence(steps.buffers, sequenceLength(steps, index));
+    if (!Number.isFinite(sequenceLogLikelihood)) {
+      throw new DataError(
+        `The outcomes of learner "${sequences[index]?.learner}" have probability 0 under the parameters, as with a guess or slip of 0 or 1.`,
+      );
     }
-    return found;
+    logLikelihood += sequenceLogLikelihood;
+    addSequence(steps, classes, index);
+  }
+  return {
+    logLikelihood,
+    counts: { prior: classes.prior.counts, learning: classes.learning.counts, guessSlip: classes.guessSlip.counts },
   };
 }
 
-/** The lookups of an E-step. */
-interface Rates {
-  readonly prior: (group: string | undefined) => RateClass<number>;
-  readonly learning: (key: string | undefined) => RateClass<BktLearning>;
-  readonly guessSlip: (item: string) => RateClass<BktGuessSlip>;
+function sequenceLength({ offsets }: SkillSteps, index: number): number {
+  return (offsets[index + 1] ?? 0) - (offsets[index] ?? 0);
 }
 
-/** Adds a sequence's expected counts to its classes' sums and returns its log-likelihood. */
-function addSequence({ learner, group, steps }: Sequence, rates: Rates): number {
-  const last = steps.length - 1;
-  const transitions = new Float64Array(4 * last);
-  const emissions = new Float64Array(2 * steps.length);
-  steps.forEach(({ item, learning, outcome }, t) => {
-    if (outcome === null) {
+/** Writes a sequence's initial distribution, transitions and emissions to the buffers. */
+function fillSequence(
+  skill: BktSkill,
+  steps: SkillSteps,
+  classes: SkillClasses,
+  rates: ClassRates,
+  index: number,
+): void {
+  const { initial, transitions, emissions } = steps.buffers;
+  const first = steps.offsets[index] ?? 0;
+  const length = sequenceLength(steps, index);
+  for (let t = 0; t < length; t++) {
+    const outcome = steps.outcomes[first + t] ?? UNOBSERVED;
+    if (outcome === UNOBSERVED) {
       // An attempt with nothing observed has probability 1 in both states.
       emissions[2 * t] = 1;
       emissions[2 * t + 1] = 1;
     } else {
-      const { guess, slip } = rates.guessSlip(item).rates;
+      const { guess, slip } = classRates(rates.guessSlip, classes.stepGuessSlip[first + t], skill);
       emissions[2 * t] = outcome === 1 ? guess : 1 - guess;
       emissions[2 * t + 1] = outcome === 1 ? 1 - slip : slip;
     }
-    if (t === last) return;
-    const { learn, forget } = rates.learning(learning).rates;
+    if (t === length - 1) continue;
+    const { learn, forget } = classRates(rates.learning, classes.stepLearning[first + t], skill);
     transitions[4 * t] = 1 - learn;
     transitions[4 * t + 1] = learn;
     transitions[4 * t + 2] = forget;
     transitions[4 * t + 3] = 1 - forget;
-  });
-  const prior = rates.prior(group);
-  const initial = Float64Array.of(1 - prior.rates, prior.rates);
-  const { logLikelihood, posteriors, transitionPosteriors } = forwardBackward({
-    stateCount: 2,
-    initial,
-    transitions,
-    emissions,
-  });
-  if (!Number.isFinite(logLikelihood)) {
-    throw new DataError(
-      `The outcomes of learner "${learner}" have probability 0 under the parameters, as with a guess or slip of 0 or 1.`,
-    );
   }
-  add(prior.sums, posteriors[1] ?? 0, 1);
-  steps.forEach(({ item, learning, outcome }, t) => {
-    const unknown = posteriors[2 * t] ?? 0;
-    const known = posteriors[2 * t + 1] ?? 0;
-    if (outcome !== null) add(rates.guessSlip(item).sums, unknown, unknown * outcome, known, known * (1 - outcome));
-    if (t === last) return;
-    const stay = transitionPosteriors[4 * t] ?? 0;
-    const learned = transitionPosteriors[4 * t + 1] ?? 0;
-    const forgot = transitionPosteriors[4 * t + 2] ?? 0;
-    const kept = transitionPosteriors[4 * t + 3] ?? 0;
-    add(rates.learning(learning).sums, stay + learned, learned, forgot + kept, forgot);
-  });
-  return logLikelihood;
+  const prior = classRates(rates.prior, classes.sequencePrior[index], skill.prior);
+  initial[0] = 1 - prior;
+  initial[1] = prior;
 }
 
-/** Adds up to four values to the first entries of `sums`. */
-function add(sums: Float64Array, a: number, b: number, c = 0, d = 0): void {
-  sums[0] = (sums[0] ?? 0) + a;
-  sums[1] = (sums[1] ?? 0) + b;
-  sums[2] = (sums[2] ?? 0) + c;
-  sums[3] = (sums[3] ?? 0) + d;
+/** Returns the rates of a class: every class has rates, so the fallback is never taken. */
+function classRates<T>(rates: readonly T[], index: number | undefined, fallback: T): T {
+  return rates[index ?? 0] ?? fallback;
+}
+
+/** Adds the expected counts of the sequence that the buffers hold to the sums of its classes. */
+function addSequence(steps: SkillSteps, classes: SkillClasses, index: number): void {
+  const { posteriors } = steps.buffers;
+  const prior = classes.sequencePrior[index] ?? 0;
+  add(classes.prior.sums, prior, posteriors[1] ?? 0, 1);
+  const first = steps.offsets[index] ?? 0;
+  const last = sequenceLength(steps, index) - 1;
+  for (let t = 0; t <= last; t++) {
+    const outcome = steps.outcomes[first + t] ?? UNOBSERVED;
+    if (outcome !== UNOBSERVED) {
+      const unknown = posteriors[2 * t] ?? 0;
+      const known = posteriors[2 * t + 1] ?? 0;
+      const at = classes.stepGuessSlip[first + t] ?? 0;
+      add(classes.guessSlip.sums, at, unknown, unknown * outcome, known, known * (1 - outcome));
+    }
+    if (t < last) addTransition(steps.buffers, t, classes.learning.sums, classes.stepLearning[first + t] ?? 0);
+  }
+}
+
+/** Adds the expected counts of the transition after step `t` to the sums of its learning class. */
+function addTransition(buffers: HiddenMarkovBuffers, t: number, sums: Float64Array, index: number): void {
+  const { transitionPosteriors } = buffers;
+  const stay = transitionPosteriors[4 * t] ?? 0;
+  const learned = transitionPosteriors[4 * t + 1] ?? 0;
+  const forgot = transitionPosteriors[4 * t + 2] ?? 0;
+  const kept = transitionPosteriors[4 * t + 3] ?? 0;
+  add(sums, index, stay + learned, learned, forgot + kept, forgot);
+}
+
+/** Adds up to four values to the sums of a class. */
+function add(sums: Float64Array, index: number, a: number, b: number, c = 0, d = 0): void {
+  const at = 4 * index;
+  sums[at] = (sums[at] ?? 0) + a;
+  sums[at + 1] = (sums[at + 1] ?? 0) + b;
+  sums[at + 2] = (sums[at + 2] ?? 0) + c;
+  sums[at + 3] = (sums[at + 3] ?? 0) + d;
 }
 
 /**

@@ -10,6 +10,9 @@ const fixture = readFixture<BenchBktFixture>("bench-bkt.json");
 /** 200 learners at 5 skills, 20 attempts at each: 20,000 attempts. */
 const log = columnsLog(fixture);
 
+/** 500 learners at 20 of 400 skills each, 2 attempts at each: 20,000 attempts. */
+const manySkills = columnsLog(readFixture<BenchBktFixture>("bench-bkt-skills.json"));
+
 /** The same attempts with every fifth, from the first, a lesson: an event without an outcome. */
 const LESSON_EVERY = 5;
 const withLessons = columnsLog({
@@ -19,6 +22,10 @@ const withLessons = columnsLog({
 
 test("fits the 5 skills of 20,000 attempts by EM from five starts", async (context) => {
   await benchmark(context, "bkt.fit", () => bkt().fit(log), SLOW_OPTIONS);
+});
+
+test("fits the 400 skills of 20,000 attempts, each learner at 20 of them, by EM from five starts", async (context) => {
+  await benchmark(context, "bkt.fitSkills", () => bkt().fit(manySkills), SLOW_OPTIONS);
 });
 
 test("fits the 5 skills of 20,000 attempts, a fifth of them without an outcome, by EM from five starts", async (context) => {

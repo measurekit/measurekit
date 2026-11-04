@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createRandom } from "../src/index.js";
 import {
   choleskySolve,
+  createHiddenMarkovBuffers,
   createProblem,
   expectationMaximization,
   forwardBackward,
@@ -17,6 +18,7 @@ import {
   quinticMaximum,
   rank,
   type SparseMatrix,
+  smoothSequence,
 } from "../src/math/internal.js";
 import { defined, expectAllClose, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
@@ -404,6 +406,44 @@ describe("forwardBackward", () => {
     });
     expect(result.posteriors.every(Number.isFinite)).toBe(true);
     expectAllClose(result.posteriors, exact, 1e-10);
+  });
+
+  it("gives the same results in buffers that a longer sequence used before", () => {
+    // A state predicted at 0, as with a prior and a learning rate of 0, has pairs of 0 where the longer sequence left
+    // others.
+    const never = {
+      stateCount: 2,
+      initial: Float64Array.of(1, 0),
+      transitions: Float64Array.of(1, 0, 0.3, 0.7, 1, 0, 0.3, 0.7),
+      emissions: Float64Array.of(0.8, 0.1, 0.2, 0.9, 0.8, 0.1),
+    };
+    const sequences = [...hiddenMarkov.sequences, never];
+    const longest = Math.max(...sequences.map((sequence) => sequence.emissions.length / sequence.stateCount));
+    const buffers = createHiddenMarkovBuffers(2, longest + 3);
+    const used = () => {
+      const steps = longest + 3;
+      buffers.initial.set([0.4, 0.6]);
+      buffers.transitions.set(Array.from({ length: 4 * (steps - 1) }, (_, i) => [0.6, 0.4, 0.1, 0.9][i % 4] ?? 0));
+      buffers.emissions.set(Array.from({ length: 2 * steps }, (_, i) => (i % 3 === 0 ? 0.25 : 0.75)));
+      smoothSequence(buffers, steps);
+    };
+    for (const sequence of sequences.filter(({ stateCount }) => stateCount === 2)) {
+      const expected = forwardBackward({
+        stateCount: 2,
+        initial: Float64Array.from(sequence.initial),
+        transitions: Float64Array.from(sequence.transitions),
+        emissions: Float64Array.from(sequence.emissions),
+      });
+      used();
+      const steps = sequence.emissions.length / 2;
+      buffers.initial.set(sequence.initial);
+      buffers.transitions.set(sequence.transitions);
+      buffers.emissions.set(sequence.emissions);
+      expect(smoothSequence(buffers, steps)).toBe(expected.logLikelihood);
+      expect(buffers.posteriors.slice(0, 2 * steps)).toEqual(expected.posteriors);
+      expect(buffers.transitionPosteriors.slice(0, 4 * (steps - 1))).toEqual(expected.transitionPosteriors);
+      expect(buffers.predictions.slice(0, 2 * steps)).toEqual(expected.predictions);
+    }
   });
 });
 

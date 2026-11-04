@@ -131,23 +131,23 @@ xychart-beta horizontal
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 762, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 490, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Knowledge tracing: bkt, elo, evaluate, irt, kst"
-  x-axis ["fit", "fitLessons", "fitPairs", "replay", "replay", "auc", "metricsByOpportunity", "replay", "drift", "unionClosure", "structureBase", "clauseStructure", "blim", "iita", "mdml", "identifiability", "validity", "diffTest"]
+  title "Knowledge tracing: bkt, elo, evaluate, irt"
+  x-axis ["fit", "fitSkills", "fitLessons", "fitPairs", "replay", "replay", "auc", "metricsByOpportunity", "replay", "drift"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.013, 0.015, 0.014, 0.029, 0.59, 0.28, 0.27, 0.15, 0.035, 0.0078, 0.000037, 0.0011, 0.81, 0.000015, 0.51, 1.2, 0.008, 0.00026]
-  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  bar [0.0042, 0.019, 0.0057, 0.0056, 0.024, 0.59, 0.28, 0.27, 0.15, 0.035]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 ```mermaid
-%%{init: {"xyChart": {"height": 320, "xAxis": {"labelFontSize": 11}}}}%%
+%%{init: {"xyChart": {"height": 626, "xAxis": {"labelFontSize": 11}}}}%%
 xychart-beta horizontal
-  title "Knowledge tracing: logistic"
-  x-axis ["features", "fitItems", "fitManyItems", "searchRates", "afm"]
+  title "Knowledge tracing: kst, logistic"
+  x-axis ["unionClosure", "structureBase", "clauseStructure", "blim", "iita", "mdml", "identifiability", "validity", "diffTest", "features", "fitItems", "fitManyItems", "searchRates", "afm"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.67, 1.6, 0.75, 0.39, 0.025]
-  line [1, 1, 1, 1, 1]
+  bar [0.0078, 0.000037, 0.0011, 0.81, 0.000015, 0.51, 1.2, 0.008, 0.00026, 0.67, 1.6, 0.75, 0.39, 0.025]
+  line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
 <!-- /charts -->
@@ -355,10 +355,11 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 
 | Task                                                                                                                                  | Size                                             | measurekit (ms) | Reference                                 | Reference (ms) |     Ratio |
 | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------: | ----------------------------------------- | -------------: | --------: |
-| Fit of the skills of a log by EM from five starts                                                                                     | 20,000 attempts of 200 learners at 5 skills      |             137 | pyBKT 1.4.3 `Model.fit`                   |         10,224 |    0.013× |
-| Fit of the skills of a log by EM from five starts, a fifth of its attempts without an outcome                                         | 20,000 attempts of 200 learners at 5 skills      |             203 | pyBKT 1.4.3 `Model.fit`, correct = -1     |         13,588 |    0.015× |
-| Fit of the skills of a log by EM from five starts, learn and forget rates by pair of items                                            | 20,000 attempts of 200 learners at 5 skills      |             301 | pyBKT 1.4.3 `Model.fit(multipair = True)` |         20,991 |    0.014× |
-| Replay of the log through the fitted model, a prediction and an update for each attempt                                               | 20,000 attempts of 200 learners at 5 skills      |            8.32 | pyBKT 1.4.3 `Model.predict`               |            288 |    0.029× |
+| Fit of the skills of a log by EM from five starts                                                                                     | 20,000 attempts of 200 learners at 5 skills      |            64.0 | pyBKT 1.4.3 `Model.fit`                   |         15,248 |   0.0042× |
+| Fit of the skills of a log by EM from five starts, each learner at 20 of many skills                                                  | 20,000 attempts of 500 learners at 400 skills    |             433 | pyBKT 1.4.3 `Model.fit`                   |         22,659 |    0.019× |
+| Fit of the skills of a log by EM from five starts, a fifth of its attempts without an outcome                                         | 20,000 attempts of 200 learners at 5 skills      |             104 | pyBKT 1.4.3 `Model.fit`, correct = -1     |         18,297 |   0.0057× |
+| Fit of the skills of a log by EM from five starts, learn and forget rates by pair of items                                            | 20,000 attempts of 200 learners at 5 skills      |             147 | pyBKT 1.4.3 `Model.fit(multipair = True)` |         26,031 |   0.0056× |
+| Replay of the log through the fitted model, a prediction and an update for each attempt                                               | 20,000 attempts of 200 learners at 5 skills      |            11.7 | pyBKT 1.4.3 `Model.predict`               |            491 |    0.024× |
 | Replay of a log through the learner-item Elo model                                                                                    | 100,000 attempts of 2,000 learners at 400 items  |            17.9 | base R, a loop over the attempts          |           30.5 |     0.59× |
 | The area under the ROC curve                                                                                                          | 100,000 predictions                              |            9.09 | pROC 1.19.1 `auc(roc(direction = "<"))`   |           32.0 |     0.28× |
 | The AUC, RMSE, log-loss and accuracy of the predictions                                                                               | 100,000 predictions                              |            13.9 | none                                      |                |           |
@@ -383,6 +384,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | The candidates ranked by their distance to the band of success of a learner                                                           | 500 candidate items, an Elo model                |           0.044 | none                                      |                |           |
 | A log built from and checked for events                                                                                               | 100,000 events                                   |            14.3 | none                                      |                |           |
 
+- Fit of the skills of a log by EM from five starts, each learner at 20 of many skills: pyBKT stops a start when the log-likelihood changes by at most 0.005, or after 100 iterations, and measurekit at 1e-6 or 500, so measurekit runs more iterations: a median of 38 for a skill's best start, and 4 of the 400 skills reach 500.
 - Replay of the responses of learners, the grid posterior of the ability updated after each: mirt scores each of the 40 prefixes of the responses from the first; measurekit updates the posterior by the one response and predicts it. A scoring of the final patterns alone takes a fortieth of the time.
 - Space of clauses, by enumeration of the subsets in base R: no package takes clauses.
 - Fit of the basic local independence model of a chain of 12 items by minimum discrepancy maximum likelihood: pks and measurekit both stop within 1e-9 of the maximum: pks when no parameter changes by more than 1e-8, after 330 iterations, and measurekit when the log-likelihood changes by at most 1e-8, after 331. At pks's tolerance of 1e-4 it stops after 41 iterations, 2.5e-3 from the maximum.

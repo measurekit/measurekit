@@ -3,7 +3,12 @@
 export { createProblem, type FlatDirection, linear, penalizedNewton } from "./arrow-system.js";
 export { expectationMaximization } from "./expectation-maximization.js";
 export { indexOfMax, minimum } from "./extremes.js";
-export { forwardBackward } from "./hidden-markov.js";
+export {
+  createHiddenMarkovBuffers,
+  forwardBackward,
+  type HiddenMarkovBuffers,
+  smoothSequence,
+} from "./hidden-markov.js";
 export { choleskySolve } from "./linear-algebra.js";
 export { outcomeLogLikelihood } from "./logistic.js";
 export {

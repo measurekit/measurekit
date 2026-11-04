@@ -32,6 +32,32 @@ export interface ForwardBackward {
 }
 
 /**
+ * The arrays of the forward-backward algorithm, long enough for the longest of several sequences, which a caller fills
+ * and reads one sequence at a time, so that the E-step of a model allocates nothing for each sequence. A sequence of T
+ * steps takes the first entries of each, as {@link HiddenMarkovSequence} and {@link ForwardBackward} lay them out.
+ */
+export interface HiddenMarkovBuffers extends HiddenMarkovSequence, Omit<ForwardBackward, "logLikelihood"> {
+  /** P(state i at step t | the observations to step t): T × K, by step, then i. */
+  readonly filtered: Float64Array;
+}
+
+/** Returns the buffers of sequences of K states and at most `maxSteps` steps. */
+export function createHiddenMarkovBuffers(stateCount: number, maxSteps: number): HiddenMarkovBuffers {
+  const states = stateCount * maxSteps;
+  const pairs = stateCount * stateCount * Math.max(maxSteps - 1, 0);
+  return {
+    stateCount,
+    initial: new Float64Array(stateCount),
+    transitions: new Float64Array(pairs),
+    emissions: new Float64Array(states),
+    predictions: new Float64Array(states),
+    filtered: new Float64Array(states),
+    posteriors: new Float64Array(states),
+    transitionPosteriors: new Float64Array(pairs),
+  };
+}
+
+/**
  * Runs the forward-backward algorithm on one sequence: the forward pass normalizes the forward variables at each step,
  * with the log-likelihood the sum of the logs of the normalizers, and the backward pass smooths the normalized ones, so
  * that long sequences neither underflow nor overflow.
@@ -39,26 +65,42 @@ export interface ForwardBackward {
  * @see {@link https://doi.org/10.1109/5.18626 | Rabiner (1989)}
  */
 export function forwardBackward(sequence: HiddenMarkovSequence): ForwardBackward {
-  const filtered = forward(sequence);
-  return { logLikelihood: filtered.logLikelihood, ...backward(sequence, filtered), predictions: filtered.predictions };
-}
-
-/** The forward pass: the predictions and the normalized forward variables. */
-interface Filtered {
-  readonly predictions: Float64Array;
-  /** P(state i at step t | the observations to step t). */
-  readonly forward: Float64Array;
-  /** Σ over steps of ln P(observation at step t | the observations before step t). */
-  readonly logLikelihood: number;
-}
-
-function forward(sequence: HiddenMarkovSequence): Filtered {
-  const { stateCount: k, initial, transitions, emissions } = sequence;
+  const { stateCount: k, emissions } = sequence;
   const steps = emissions.length / k;
-  const predictions = new Float64Array(steps * k);
-  const filtered = new Float64Array(steps * k);
+  const pairs = k * k * Math.max(steps - 1, 0);
+  const buffers: HiddenMarkovBuffers = {
+    ...sequence,
+    predictions: new Float64Array(steps * k),
+    filtered: new Float64Array(steps * k),
+    posteriors: new Float64Array(steps * k),
+    transitionPosteriors: new Float64Array(pairs),
+  };
+  const logLikelihood = smoothSequence(buffers, steps);
+  const { posteriors, transitionPosteriors, predictions } = buffers;
+  return { logLikelihood, posteriors, transitionPosteriors, predictions };
+}
+
+/**
+ * Runs the forward-backward algorithm, as {@link forwardBackward} does, on the first `steps` steps of the buffers'
+ * `initial`, `transitions` and `emissions`, and writes the first entries of their `predictions`, `filtered`,
+ * `posteriors` and `transitionPosteriors`.
+ *
+ * @returns ln P(observations).
+ */
+export function smoothSequence(buffers: HiddenMarkovBuffers, steps: number): number {
+  const logLikelihood = forward(buffers, steps);
+  backward(buffers, steps);
+  return logLikelihood;
+}
+
+/**
+ * The forward pass: writes the predictions and the normalized forward variables, P(state i at step t | the
+ * observations to step t), and returns Σ over steps of ln P(observation at step t | the observations before step t).
+ */
+function forward(buffers: HiddenMarkovBuffers, steps: number): number {
+  const { stateCount: k, initial, transitions, emissions, predictions, filtered } = buffers;
   let logLikelihood = 0;
-  predictions.set(initial);
+  for (let j = 0; j < k; j++) predictions[j] = initial[j] ?? 0;
   for (let t = 0; t < steps; t++) {
     if (t > 0) propagate(filtered, (t - 1) * k, transitions, (t - 1) * k * k, predictions, t * k, k);
     let scale = 0;
@@ -70,7 +112,7 @@ function forward(sequence: HiddenMarkovSequence): Filtered {
     for (let j = 0; j < k; j++) filtered[t * k + j] = (filtered[t * k + j] ?? 0) / scale;
     logLikelihood += Math.log(scale);
   }
-  return { predictions, forward: filtered, logLikelihood };
+  return logLikelihood;
 }
 
 /**
@@ -100,28 +142,28 @@ function propagate(
  * neither overflows nor gives `NaN` for a sequence of thousands of steps, in which a state's filtered
  * probability underflows to 0.
  */
-function backward(
-  sequence: HiddenMarkovSequence,
-  filtered: Filtered,
-): Pick<ForwardBackward, "posteriors" | "transitionPosteriors"> {
-  const { stateCount: k, transitions } = sequence;
-  const { forward, predictions } = filtered;
-  const steps = forward.length / k;
-  const posteriors = new Float64Array(steps * k);
-  const transitionPosteriors = new Float64Array(Math.max(steps - 1, 0) * k * k);
-  posteriors.set(forward.subarray((steps - 1) * k), (steps - 1) * k);
-  for (let t = steps - 2; t >= 0; t--) {
-    for (let j = 0; j < k; j++) {
-      const predicted = predictions[(t + 1) * k + j] ?? 0;
-      // No probability reaches a state predicted at 0, so its pairs keep their 0.
-      if (predicted === 0) continue;
-      const smoothed = posteriors[(t + 1) * k + j] ?? 0;
-      for (let i = 0; i < k; i++) {
-        const pair = (((forward[t * k + i] ?? 0) * (transitions[t * k * k + i * k + j] ?? 0)) / predicted) * smoothed;
-        transitionPosteriors[t * k * k + i * k + j] = pair;
-        posteriors[t * k + i] = (posteriors[t * k + i] ?? 0) + pair;
-      }
+function backward(buffers: HiddenMarkovBuffers, steps: number): void {
+  const { stateCount: k, filtered, posteriors } = buffers;
+  const last = (steps - 1) * k;
+  for (let i = 0; i < k; i++) posteriors[last + i] = filtered[last + i] ?? 0;
+  for (let t = steps - 2; t >= 0; t--) smoothStep(buffers, t);
+}
+
+/** Writes ξ_t and γ_t of one step from γ_(t+1). */
+function smoothStep(buffers: HiddenMarkovBuffers, t: number): void {
+  const { stateCount: k, transitions, filtered, predictions, posteriors, transitionPosteriors } = buffers;
+  for (let i = 0; i < k; i++) posteriors[t * k + i] = 0;
+  for (let j = 0; j < k; j++) {
+    const predicted = predictions[(t + 1) * k + j] ?? 0;
+    const smoothed = posteriors[(t + 1) * k + j] ?? 0;
+    for (let i = 0; i < k; i++) {
+      // No probability reaches a state predicted at 0, so its pairs are 0.
+      const pair =
+        predicted === 0
+          ? 0
+          : (((filtered[t * k + i] ?? 0) * (transitions[t * k * k + i * k + j] ?? 0)) / predicted) * smoothed;
+      transitionPosteriors[t * k * k + i * k + j] = pair;
+      posteriors[t * k + i] = (posteriors[t * k + i] ?? 0) + pair;
     }
   }
-  return { posteriors, transitionPosteriors };
 }
