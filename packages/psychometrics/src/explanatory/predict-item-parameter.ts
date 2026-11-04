@@ -26,9 +26,24 @@ export interface ParameterPrediction {
  *
  * @example
  * ```ts
- * import { predictItemParameter } from "@measurekit/psychometrics/explanatory";
+ * import { itemFeatureRegression, predictItemParameter } from "@measurekit/psychometrics/explanatory";
+ * import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
  *
- * // `regression` is the result of the example of itemFeatureRegression.
+ * const item = (id: string, b: number, se: number) => ({
+ *   id,
+ *   model: twoParameterLogistic,
+ *   parameters: { a: 1, b, c: 0, d: 1 },
+ *   standardErrors: { a: 0.1, b: se },
+ * });
+ * const items = [
+ *   item("q1", -1.1, 0.12),
+ *   item("q2", -0.4, 0.1),
+ *   item("q3", 0.2, 0.11),
+ *   item("q4", 0.9, 0.1),
+ *   item("q5", 1.6, 0.13),
+ * ];
+ * const features = { q1: { steps: 1 }, q2: { steps: 2 }, q3: { steps: 3 }, q4: { steps: 4 }, q5: { steps: 5 } };
+ * const regression = itemFeatureRegression(items, features);
  * predictItemParameter(regression, { steps: 6 }); // { mean: 2.24, sd: 0.12 }
  * ```
  *

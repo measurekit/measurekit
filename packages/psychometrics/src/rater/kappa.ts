@@ -28,6 +28,25 @@ const WEIGHTS: readonly KappaWeights[] = ["none", "linear", "quadratic"];
  * rated by both, the weights are unknown, or the chance agreement is 1, as when every rating is one category.
  * @see {@link https://doi.org/10.1177/001316446002000104 | Cohen (1960)}
  * @see {@link https://doi.org/10.1037/h0026256 | Cohen (1968)}
+ *
+ * @example
+ * ```ts
+ * import { cohenKappa } from "@measurekit/psychometrics/rater";
+ *
+ * // Eight essays scored 0 to 3 by two raters.
+ * const ratings = [
+ *   [3, 3],
+ *   [1, 2],
+ *   [2, 2],
+ *   [0, 0],
+ *   [1, 1],
+ *   [3, 2],
+ *   [2, 2],
+ *   [0, 1],
+ * ];
+ * cohenKappa(ratings); // 0.5
+ * cohenKappa(ratings, { weights: "quadratic" }); // 0.8125, which counts a near miss as part agreement
+ * ```
  */
 export function cohenKappa(ratings: readonly (readonly (number | null)[])[], options: CohenKappaOptions = {}): number {
   checkOptions(options);

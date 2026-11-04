@@ -49,6 +49,17 @@ export interface MirtCoefficients {
  * @param item - The item.
  * @returns The coefficients by name, in the IRT form.
  * @throws `DataError` when the item's parameters are invalid, or its model is not one of the built-in models.
+ *
+ * @example
+ * ```ts
+ * import { threeParameterLogistic } from "@measurekit/psychometrics/irt";
+ * import { readMirtIrt, writeMirtIrt } from "@measurekit/psychometrics/parameterization";
+ *
+ * const item = { model: threeParameterLogistic, parameters: { a: 1.2, b: 0.5, c: 0.1, d: 1 } };
+ * const coefficients = writeMirtIrt(item);
+ * coefficients; // { a: 1.2, b: 0.5, g: 0.1, u: 1 }, the names that mirt gives the 3PL
+ * readMirtIrt(coefficients, threeParameterLogistic).parameters; // { a: 1.2, b: 0.5, c: 0.1, d: 1 }
+ * ```
  */
 export function writeMirtIrt(item: IrtItem): MirtCoefficients {
   return toMirt(item, "irt");

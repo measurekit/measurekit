@@ -44,6 +44,27 @@ export interface Scalability {
  * answered every item, or the scores span more than 10 categories.
  * @see {@link https://doi.org/10.1177/0081175013481958 | Kuijpers, van der Ark and Croon (2013)}
  * @see {@link https://doi.org/10.4135/9781412984676 | Sijtsma and Molenaar (2002)}
+ *
+ * @example
+ * ```ts
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+ * import { scalability } from "@measurekit/psychometrics/mokken";
+ *
+ * const matrix = buildResponseMatrix([
+ *   [1, 1, 1, 1],
+ *   [1, 1, 1, 0],
+ *   [1, 1, 0, 0],
+ *   [1, 0, 0, 0],
+ *   [0, 0, 0, 0],
+ *   [1, 1, 0, 1],
+ *   [1, 1, 1, 1],
+ *   [0, 0, 0, 0],
+ * ]);
+ * const { scale, items } = scalability(matrix);
+ * const coefficients = items.map(({ id, coefficient }) => [id, coefficient]);
+ * scale; // { coefficient: 0.85, standardError: 0.11 }, the coefficient H of the scale
+ * coefficients; // [["item1", 1], ["item2", 1], ["item3", 0.73], ["item4", 0.73]]
+ * ```
  */
 export function scalability(matrix: ResponseMatrix): Scalability {
   const data = mokkenData(matrix, "Scalability");

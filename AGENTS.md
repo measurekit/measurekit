@@ -103,7 +103,8 @@ packages/<package>/           src/<module>/index.ts is the public API of a modul
 docs/<package>/               guides, which TypeDoc publishes with the API reference; docs/performance.md the benchmarks and sizes
 validation/<package>/         R and Python scripts that write the fixtures; validation/README.md lists them
 validation/benchmarks/        the inputs of the benchmarks and the timing of their references; bench/ their harness
-examples/<package>/           runnable examples; examples/test/ runs each of them
+examples/<package>/           runnable examples; examples/test/ runs each of them, the samples of the guides and the
+                              examples of the TSDoc
 scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts and their tests; entry-sizes.ts
                               bundles each entry point alone, against the budgets of size-budgets.ts in test/entry-sizes.test.ts;
                               peak-memory.ts measures the readers of untrusted input, against their budgets in test/peak-memory.test.ts
@@ -308,8 +309,11 @@ others. A new clone is merged into a helper of the module that owns the concept,
   - `@throws` lists the errors.
   - `@see {@link https://doi.org/... | Author (year)}` cites the literature, one tag per work, with the DOI where it has
     one. The summary and `@remarks` name no year.
-  - `@example` goes only on a public entry point where an example truly helps. It shows its imports, and the values in
-    its comments come from running it.
+  - `@example` goes on the main function of each module, as `pnpm check:standards` demands; others may have one. It is complete, with its imports, and runs alone. A statement followed by a comment that
+    begins with a value, `expression; // 0.68, what it means`, states that value, in the form that
+    `examples/test/stated-values.ts` reads: a number is compared at the decimals shown (an integer exactly), an array
+    element by element, an object by its keys unless `...` stands among them. A comment that does not begin with a value
+    states none, and each example states at least one.
   - No other tags and no boilerplate.
 - `//` comments only explain why something non-obvious is done, or cite a source. No commented-out code.
 - Docs lead with a picture, then tables, then prose. Diagrams are Mermaid in Markdown: GitHub renders them, and
@@ -317,9 +321,11 @@ others. A new clone is merged into a helper of the module that owns the concept,
 - US English; short sentences, a table or list rather than prose; complete samples with their imports, and values
   shown in samples come from running them; a source's section is cited in words ("section 3.1"). No marketing, emojis or
   filler.
-- `examples/test/guides.test.ts` runs every `ts` sample of the guides and READMEs on the sources and fails when one throws;
-  it does not compare the values in comments. A fence `ts continues` runs after the sample before it and shares its
-  variables, and `ts no-run` marks code that needs a worker or a package the repository does not have.
+- `examples/test/tsdoc.test.ts` runs every `@example` of the TSDoc on the sources and fails when one throws or gives a
+  value other than its comments state. `examples/test/guides.test.ts` runs every `ts` sample of the guides and READMEs
+  and fails when one throws; it does not compare the values in comments. A fence `ts continues` runs after the sample
+  before it and shares its variables, and `ts no-run` marks code that needs a worker or a package the repository does not
+  have.
 - One purpose for each document: a package's `README.md` for its users, `docs/<package>/` for its guides,
   `CONTRIBUTING.md` for the process, `AGENTS.md` for conventions, `validation/README.md` for running the reference scripts.
 

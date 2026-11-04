@@ -7,6 +7,7 @@ import {
   checkFamilies,
   checkFileNames,
   checkHistory,
+  checkModuleExamples,
   checkModuleGuides,
   checkNotIncluded,
   checkReadonlyResults,
@@ -269,6 +270,35 @@ describe("readonly results", () => {
   });
 });
 
+describe("module examples", () => {
+  const documented =
+    "/**\n * Adds.\n *\n * @example\n * ```ts\n * add(1, 2); // 3\n * ```\n */\nexport function add(): number { return 3; }\n";
+  const plain = "/** Subtracts. */\nexport function subtract(): number { return 1; }\n";
+
+  it("accepts an entry that exports a function with an example, named or through export *, and one level of re-exports", () => {
+    const files = repository({
+      "packages/a/src/index.ts": 'export * from "./m/index.js";\nexport * from "./n/index.js";\n',
+      "packages/a/src/m/index.ts": 'export { add } from "./add.js";\nexport type { Sum } from "./add.js";\n',
+      "packages/a/src/m/add.ts": documented,
+      "packages/a/src/n/index.ts": 'export { add as plus } from "../m/add.js";\n',
+    });
+    expect(checkModuleExamples(files)).toStrictEqual([]);
+  });
+
+  it("reports an entry whose exported functions have no example, even when another function of the file has one", () => {
+    const files = repository({
+      "packages/a/src/m/index.ts": 'export { subtract } from "./ops.js";\n',
+      "packages/a/src/m/ops.ts": `${plain}${documented}`,
+      "packages/a/src/n/index.ts": 'export { subtract } from "./plain.js";\n',
+      "packages/a/src/n/plain.ts": plain,
+    });
+    expect(checkModuleExamples(files).map(({ file }) => file)).toStrictEqual([
+      "packages/a/src/m/index.ts",
+      "packages/a/src/n/index.ts",
+    ]);
+  });
+});
+
 describe("not included", () => {
   const bullet = "- **Kernel equating.** Outside the sources: Kolen and Brennan give it no chapter.\n";
 
@@ -365,7 +395,7 @@ describe("module guides", () => {
 
   it("is one of the checks of the repository", () => {
     const files = repository({ ...source, "docs/a/one.md": `# One\n\n${DIAGRAM}` });
-    expect(checkStandards(files).map(({ rule }) => rule)).toStrictEqual(["module-guide"]);
+    expect(checkStandards(files).filter(({ rule }) => rule === "module-guide")).toHaveLength(1);
   });
 });
 
@@ -373,7 +403,9 @@ describe("all checks", () => {
   it("reports nothing for a repository that holds the standards", () => {
     const files = repository({
       "README.md": `# A\n\n${DIAGRAM}`,
-      "packages/a/src/index.ts": "export const A = 1;\n",
+      "packages/a/src/index.ts": 'export { one } from "./one.js";\n',
+      "packages/a/src/one.ts":
+        "/**\n * One.\n *\n * @example\n * ```ts\n * one(); // 1\n * ```\n */\nexport function one(): number { return 1; }\n",
       "packages/a/test/a.test.ts": 'it("returns one", () => {});\n',
     });
     expect(checkStandards(files)).toStrictEqual([]);

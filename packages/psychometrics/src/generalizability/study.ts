@@ -114,6 +114,29 @@ export interface GeneralizabilityStudy {
  * freedom or a component cannot be told apart from the others, naming the effect.
  * @see {@link https://doi.org/10.1007/978-1-4757-3456-0 | Brennan (2001)}
  * @see {@link https://doi.org/10.2307/3001853 | Henderson (1953)}
+ *
+ * @example
+ * ```ts
+ * import { generalizabilityStudy } from "@measurekit/psychometrics/generalizability";
+ *
+ * const persons = ["p1", "p2", "p3", "p4", "p5", "p6"];
+ * const items = ["i1", "i2", "i3", "i4"];
+ * const ratings = [
+ *   [4, 5, 3, 4],
+ *   [2, 3, 2, 2],
+ *   [5, 5, 4, 5],
+ *   [3, 4, 3, 2],
+ *   [1, 2, 1, 2],
+ *   [4, 4, 5, 4],
+ * ];
+ * const scores = ratings.flatMap((row, p) =>
+ *   row.map((score, i) => ({ levels: { person: persons[p] ?? "", item: items[i] ?? "" }, score })),
+ * );
+ * const study = generalizabilityStudy(scores, { facets: ["item"] });
+ * const variances = study.components.map(({ facets, variance }) => [facets.join(" x "), variance]);
+ * study.sampleSizes; // { person: 6, item: 4 }
+ * variances; // [["person", 1.51], ["item", 0.08], ["person x item", 0.32]]
+ * ```
  */
 export function generalizabilityStudy(
   scores: readonly FacetedScore[],

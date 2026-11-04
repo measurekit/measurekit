@@ -4,6 +4,7 @@ dist/
 docs/api/
 coverage/
 examples/.samples/
+examples/.tsdoc/
 .DS_Store
 validation/knowledge-tracing/.venv/
 __pycache__/

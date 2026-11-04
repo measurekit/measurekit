@@ -201,3 +201,9 @@ place copies it first.
 `createAdaptiveTest`, `createDiagnosticAdaptiveTest`, `createMultidimensionalAdaptiveTest` and `createMultistageTest`
 create its adaptive tests. `readMirtIrt`, `readMirtSlopeIntercept` and `readMirtMultidimensional` read the coefficients
 of mirt into items, and `writeMirtIrt`, `writeMirtSlopeIntercept` and `writeMirtMultidimensional` write them.
+
+`attributeProfiles` returns each person's posterior over the profiles only with `posterior: true`, as it holds 2^K
+numbers for each person; by default it returns their mastery, MAP and EAP profiles.
+
+The main function of every module has an example in its documentation, which a test runs against the values its
+comments state.

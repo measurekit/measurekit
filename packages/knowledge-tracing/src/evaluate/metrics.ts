@@ -144,6 +144,15 @@ export function kappa(predictions: readonly number[], outcomes: readonly number[
  * @param outcomes - The outcomes, one for each prediction.
  * @returns Every metric, with `null` for those that are undefined.
  * @throws `DataError` when the predictions and outcomes are malformed.
+ *
+ * @example
+ * ```ts
+ * import { auc, metrics } from "@measurekit/knowledge-tracing/evaluate";
+ *
+ * auc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]); // 0.75
+ * metrics([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]);
+ * // { count: 4, auc: 0.75, rmse: 0.4, logLoss: 0.47, accuracy: 0.75, rSquared: 0.37, kappa: 0.5 }
+ * ```
  */
 export function metrics(predictions: readonly number[], outcomes: readonly number[]): Metrics {
   checkPredictions(predictions, outcomes);

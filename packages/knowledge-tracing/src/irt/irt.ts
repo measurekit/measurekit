@@ -168,6 +168,17 @@ const CATEGORY_TOLERANCE = 1e-9;
  * @throws `DataError` when an item's parameters, the prior, the number of points or the drift are invalid, or `drift`
  * is given without `points`.
  * @see {@link https://doi.org/10.1214/12-AOAS608 | Wang, Berger and Burdick (2013)}
+ *
+ * @example
+ * ```ts
+ * import { irt } from "@measurekit/knowledge-tracing/irt";
+ *
+ * const model = irt({ parameters: { items: { q1: { a: 1.2, b: -0.5 }, q2: { a: 1.5, b: 0.4, c: 0.2 } } } });
+ * const attempt = { learner: "ana", item: "q1", skills: [], time: 1 };
+ * const ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
+ * model.ability(ana); // { theta: 0.362, standardError: 0.895 }
+ * model.predict(ana, { ...attempt, item: "q2", time: 2 }); // 0.59, the probability of a correct answer to q2
+ * ```
  */
 export function irt(options: IrtOptions): IrtModel {
   checkOptions(options);

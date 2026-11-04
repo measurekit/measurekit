@@ -75,6 +75,30 @@ const DELTA_SCALE = -2.35;
  * @throws `DataError` when the matrix or the groups are invalid, a response is neither 0 nor 1, either group has no
  * person with a response, or `purify` or `continuityCorrection` is not a boolean.
  * @see {@link https://doi.org/10.1002/j.2333-8504.2012.tb02290.x | Zwick (2012)}
+ *
+ * @example
+ * ```ts
+ * import { createRandom } from "@measurekit/psychometrics";
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+ * import { type DifGroup, mantelHaenszel } from "@measurekit/psychometrics/dif";
+ * import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+ * import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+ *
+ * // 500 persons per group answer 10 items; item 3 is one point harder for the focal group.
+ * const random = createRandom(2026);
+ * const items = simulateItems(twoParameterLogistic, 10, random);
+ * const shifted = items.map((item, j) =>
+ *   j === 2 ? { ...item, parameters: { ...item.parameters, b: item.parameters.b + 1 } } : item,
+ * );
+ * const reference = simulateResponses(items, simulateThetas(500, random), random);
+ * const focal = simulateResponses(shifted, simulateThetas(500, random), random);
+ * const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
+ * const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
+ * const item3 = mantelHaenszel(matrix, groups).items[2];
+ * item3?.chiSquare; // 33.6
+ * item3?.delta; // -2.76, in the ETS delta metric
+ * item3?.etsCategory; // "C", large DIF
+ * ```
  */
 export function mantelHaenszel(
   matrix: ResponseMatrix,

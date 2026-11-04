@@ -8,7 +8,10 @@ const EXAMPLES = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** The runnable examples of each package: every file of its folder. */
 const examples = readdirSync(EXAMPLES, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && entry.name !== "test" && entry.name !== "node_modules")
+  .filter(
+    (entry) =>
+      entry.isDirectory() && entry.name !== "test" && entry.name !== "node_modules" && !entry.name.startsWith("."),
+  )
   .flatMap((folder) =>
     readdirSync(join(EXAMPLES, folder.name))
       .filter((file) => file.endsWith(".ts"))

@@ -135,6 +135,31 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * dimensions, the grid has more than 10⁶ nodes or the items' categories at its nodes more than 2 ** 24, a group has no
  * person with a response, the groups share no item or a fixed item is invalid, or the fixed items leave a dimension
  * without a scale; with MH-RM, when `points`, `groups`, `fixed` or the standard errors `"cross-product"` are given.
+ *
+ * @example
+ * ```ts
+ * import { createRandom } from "@measurekit/psychometrics";
+ * import {
+ *   calibrateMultidimensional,
+ *   multidimensionalTwoParameterLogistic,
+ * } from "@measurekit/psychometrics/multidimensional";
+ * import { simulateMultidimensionalResponses } from "@measurekit/psychometrics/sim";
+ *
+ * // Six items, three on each of two dimensions; 500 persons, whose thetas are independent.
+ * const random = createRandom(11);
+ * const items = Array.from({ length: 6 }, (_, i) => ({
+ *   model: multidimensionalTwoParameterLogistic,
+ *   parameters: { a: [i < 3 ? 1.2 : 0, i < 3 ? 0 : 1.4], intercept: (i % 3) - 1, c: 0, d: 1 },
+ * }));
+ * const thetas = Array.from({ length: 500 }, () => [random.normal(), random.normal()]);
+ * const matrix = simulateMultidimensionalResponses(items, thetas, random);
+ * const loadings = Object.fromEntries(matrix.itemIds.map((id, i) => [id, [i < 3 ? "verbal" : "quantitative"]]));
+ * const fit = calibrateMultidimensional(matrix, { model: multidimensionalTwoParameterLogistic, loadings });
+ * fit.dimensions; // ["verbal", "quantitative"]
+ * fit.converged; // true
+ * fit.items[0]?.parameters; // { a: [1.08, 0], intercept: -0.9, c: 0, d: 1 }
+ * fit.correlations[0]?.[1]; // 0.01, the correlation of the dimensions
+ * ```
  */
 export function calibrateMultidimensional<TParameters>(
   data: ResponseMatrix | ResponseRecords,

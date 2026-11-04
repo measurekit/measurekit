@@ -74,3 +74,6 @@ pairs the predictions with the outcomes of a log, `calibrationCurve` tabulates c
 fits the power law of practice.
 
 Every function documents each parameter and its result.
+
+The main function of every module has an example in its documentation, which a test runs against the values its
+comments state.

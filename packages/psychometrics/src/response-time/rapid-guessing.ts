@@ -79,6 +79,29 @@ export function normativeThresholds(
  *   guesses.
  * @throws `DataError` when the data are malformed or have no times, or a threshold is not a positive finite number.
  * @see {@link https://doi.org/10.1207/s15324818ame1802_2 | Wise and Kong (2005)}
+ *
+ * @example
+ * ```ts
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+ * import { responseTimeEffort } from "@measurekit/psychometrics/response-time";
+ *
+ * const matrix = buildResponseMatrix(
+ *   [
+ *     [1, 0, 1],
+ *     [0, 1, 1],
+ *   ],
+ *   {
+ *     times: [
+ *       [41.2, 63.5, 22.8],
+ *       [3.1, 70.4, 1.5],
+ *     ],
+ *   },
+ * );
+ * // A response in under 5 seconds on any of the items is a rapid guess.
+ * const [first, second] = responseTimeEffort(matrix, { item1: 5, item2: 5, item3: 5 });
+ * first; // { id: "person1", effort: 1, rapidGuesses: 0 }
+ * second; // { id: "person2", effort: 0.33, rapidGuesses: 2 }
+ * ```
  */
 export function responseTimeEffort(
   data: ResponseMatrix | ResponseRecords,

@@ -241,6 +241,38 @@ interface Settings extends StructureOptions {
  *   P(L).
  * @throws `DataError` when an option is out of range or the parameters are malformed.
  * @see {@link https://doi.org/10.1007/BF01099821 | Corbett and Anderson (1994)}
+ *
+ * @example
+ * ```ts
+ * import { bkt } from "@measurekit/knowledge-tracing/bkt";
+ * import { buildEventLog } from "@measurekit/knowledge-tracing/data";
+ *
+ * // Ten learners answer four questions of one skill, in this order.
+ * const outcomes = [
+ *   [0, 0, 1, 1],
+ *   [0, 1, 1, 1],
+ *   [0, 0, 0, 1],
+ *   [1, 1, 1, 1],
+ *   [0, 0, 1, 1],
+ *   [0, 1, 0, 1],
+ *   [0, 0, 0, 0],
+ *   [1, 0, 1, 1],
+ *   [0, 1, 1, 1],
+ *   [0, 0, 1, 0],
+ * ];
+ * const events = outcomes.flatMap((row, learner) =>
+ *   row.map((outcome, attempt) => ({
+ *     learner: `l${learner}`,
+ *     item: `q${attempt}`,
+ *     time: learner * 10 + attempt,
+ *     outcome,
+ *   })),
+ * );
+ * const qMatrix = { q0: ["fractions"], q1: ["fractions"], q2: ["fractions"], q3: ["fractions"] };
+ * const fit = bkt().fit(buildEventLog(events, { qMatrix }));
+ * fit.model.parameters.skills.fractions; // { prior: 0.095, learn: 0.46, forget: 0, guess: 0.13, slip: 0.15 }
+ * fit.states.l0; // { learner: "l0", skills: { fractions: 0.99 } }, the probability that l0 has learned the skill
+ * ```
  */
 export function bkt(options: BktOptions = {}): BktModel {
   return create(options).model;

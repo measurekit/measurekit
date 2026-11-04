@@ -168,6 +168,27 @@ const MIN_PROPORTION = Number.EPSILON;
  * @throws `DataError` when the matrix, the Q-matrix or an option is invalid, a response is neither 0 nor 1, there is
  * no response, or `standardErrors` is `"incomplete"` and an item is not G-DINA or the items have more than 3,162
  * success probabilities.
+ *
+ * @example
+ * ```ts
+ * import { calibrateCdm } from "@measurekit/psychometrics/cdm";
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+ *
+ * const matrix = buildResponseMatrix([
+ *   [1, 1, 0, 1],
+ *   [0, 0, 1, 0],
+ *   [1, 0, 0, 1],
+ *   [1, 1, 1, 1],
+ *   [0, 1, 0, 0],
+ *   [0, 0, 0, 0],
+ * ]);
+ * const qMatrix = { item1: ["a"], item2: ["a", "b"], item3: ["b"], item4: ["a"] };
+ * const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
+ * calibration.attributes; // ["a", "b"]
+ * calibration.converged; // true
+ * calibration.profiles.map(({ profile }) => profile); // [[0, 0], [1, 0], [0, 1], [1, 1]]
+ * calibration.items[1]?.attributes; // ["a", "b"]
+ * ```
  */
 export function calibrateCdm(
   matrix: ResponseMatrix,

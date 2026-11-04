@@ -169,6 +169,34 @@ export interface LogisticFit extends ModelFit<LogisticState, LogisticParameters>
  * @returns The model: `fit` estimates the coefficients from a log, and `update` and `predict` serve online.
  * @throws `DataError` when an option is out of range, a feature or term is unknown, skill and item intercepts are asked
  * for without a ridge, or the parameters are malformed or lack a coefficient the model has.
+ *
+ * @example
+ * ```ts
+ * import { buildEventLog } from "@measurekit/knowledge-tracing/data";
+ * import { logistic } from "@measurekit/knowledge-tracing/logistic";
+ *
+ * const outcomes = [
+ *   [0, 0, 1, 1],
+ *   [0, 1, 1, 1],
+ *   [0, 0, 0, 1],
+ *   [1, 1, 1, 1],
+ *   [0, 0, 1, 1],
+ *   [0, 1, 0, 1],
+ *   [0, 0, 0, 0],
+ *   [1, 0, 1, 1],
+ * ];
+ * const events = outcomes.flatMap((row, learner) =>
+ *   row.map((outcome, attempt) => ({
+ *     learner: `l${learner}`,
+ *     item: `q${attempt}`,
+ *     skills: ["fractions"],
+ *     time: learner * 10 + attempt,
+ *     outcome,
+ *   })),
+ * );
+ * const fit = logistic({ features: ["logSuccesses", "logFailures"], ridge: 1 }).fit(buildEventLog(events));
+ * fit.predictions.slice(0, 4); // [0.38, 0.46, 0.51, 0.73], the predictions for the first learner's four attempts
+ * ```
  */
 export function logistic(options: LogisticOptions = {}): LogisticModel {
   return create(options);

@@ -38,7 +38,7 @@ for (const [name, model] of MODELS) {
 
 test("classifies the persons of a calibration, and measures the accuracy of the classification", async (context) => {
   const calibration = calibrateCdm(matrix, qMatrix);
-  await benchmark(context, "cdm.attributeProfiles", () => attributeProfiles(matrix, calibration));
+  await benchmark(context, "cdm.attributeProfiles", () => attributeProfiles(matrix, calibration, { posterior: true }));
   await benchmark(context, "cdm.accuracy", () => cdmClassificationAccuracy(matrix, calibration));
   await benchmark(context, "cdm.validateQMatrix", () => validateQMatrix(matrix, calibration));
 });

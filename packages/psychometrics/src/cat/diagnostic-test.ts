@@ -96,9 +96,10 @@ export interface DiagnosticAdaptiveTest {
  * });
  * const random = createRandom(1);
  * let state = test.start(random);
- * state.next; // the id of the first item
+ * state.next; // "q1", the id of the first item
  * state = test.answer(state, 1, random); // the response to it
- * state.estimate.mastery; // the probability of mastering each attribute
+ * state.estimate.mastery; // [0.82, 0.5], the probability of mastering each attribute
+ * state.next; // "q2"
  * ```
  */
 export function createDiagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): DiagnosticAdaptiveTest {

@@ -453,6 +453,70 @@ export function checkReadonlyResults(files: Files): Violation[] {
   return found;
 }
 
+/** A relative re-export of a module's `index.ts`: the path of the file it takes from, and the names it takes. */
+interface Reexport {
+  readonly target: string;
+  readonly names: ReadonlySet<string> | "all";
+}
+
+/** The relative re-exports of values in a source file. */
+function reexportsOf(file: string, source: ts.SourceFile): Reexport[] {
+  return source.statements.flatMap((statement): Reexport[] => {
+    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) return [];
+    const specifier = (statement.moduleSpecifier as ts.StringLiteral | undefined)?.text;
+    if (specifier === undefined || !specifier.startsWith(".")) return [];
+    const target = posix.normalize(posix.join(dirname(file), specifier.replace(/\.js$/, ".ts")));
+    const { exportClause } = statement;
+    if (exportClause === undefined) return [{ target, names: "all" }];
+    if (!ts.isNamedExports(exportClause)) return [];
+    const names = exportClause.elements
+      .filter((element) => !element.isTypeOnly)
+      .map((element) => (element.propertyName ?? element.name).text);
+    return [{ target, names: new Set(names) }];
+  });
+}
+
+/** Whether a source file declares an exported function, among the names given, whose TSDoc has an `@example`. */
+function declaresExample(source: ts.SourceFile, names: ReadonlySet<string> | "all"): boolean {
+  return source.statements.some(
+    (statement) =>
+      ts.isFunctionDeclaration(statement) &&
+      statement.name !== undefined &&
+      (names === "all" || names.has(statement.name.text)) &&
+      source.text.slice(statement.getFullStart(), statement.getStart(source)).includes("@example"),
+  );
+}
+
+/** Whether what an entry exports includes a function with an `@example`, through the modules it re-exports. */
+function exportsExample(entry: string, files: Files, names: ReadonlySet<string> | "all" = "all"): boolean {
+  const text = files.get(entry);
+  if (text === undefined) return false;
+  const source = ts.createSourceFile(entry, text, ts.ScriptTarget.ES2022, true);
+  if (declaresExample(source, names)) return true;
+  return reexportsOf(entry, source).some(({ target, names: taken }) => {
+    const wanted =
+      names === "all" ? taken : taken === "all" ? names : new Set([...taken].filter((name) => names.has(name)));
+    return exportsExample(target, files, wanted);
+  });
+}
+
+/**
+ * The entry of every subpath, `src/index.ts` and `src/<module>/index.ts` of a package, exports a function whose TSDoc has
+ * an `@example`: the main function of the module. `examples/test/tsdoc.test.ts` runs every example and compares the values
+ * its comments state.
+ */
+export function checkModuleExamples(files: Files): Violation[] {
+  return [...files.keys()]
+    .filter((file) => /^packages\/[^/]+\/src\/(?:[^/]+\/)?index\.ts$/.test(file))
+    .filter((entry) => !exportsExample(entry, files))
+    .map((entry) => ({
+      file: entry,
+      line: 0,
+      rule: "module-example",
+      message: "The entry exports no function whose TSDoc has an @example; put one on the main function of the module.",
+    }));
+}
+
 /** Every check, in the order of the standards. */
 export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkSectionSigns,
@@ -467,6 +531,7 @@ export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkNotIncluded,
   checkModuleGuides,
   checkReadonlyResults,
+  checkModuleExamples,
 ];
 
 /** Runs every check over the files. */

@@ -38,6 +38,26 @@ export interface Simulation<TState> {
  * @returns The log with simulated outcomes and each learner's final state.
  * @throws `DataError` when the model is not a learner model, the attempts are not a non-empty array of attempts, the
  * model rejects one, or a prediction is not from 0 to 1.
+ *
+ * @example
+ * ```ts
+ * import { createRandom } from "@measurekit/knowledge-tracing";
+ * import { bkt } from "@measurekit/knowledge-tracing/bkt";
+ * import { simulate } from "@measurekit/knowledge-tracing/sim";
+ *
+ * const truth = { fractions: { prior: 0.3, learn: 0.15, forget: 0, guess: 0.2, slip: 0.1 } };
+ * const attempts = Array.from({ length: 4 }, (_, learner) =>
+ *   Array.from({ length: 3 }, (_, k) => ({
+ *     learner: `l${learner}`,
+ *     item: `q${k}`,
+ *     skills: ["fractions"],
+ *     time: learner * 10 + k,
+ *   })),
+ * ).flat();
+ * const { log } = simulate(bkt({ parameters: { skills: truth } }), attempts, createRandom(42));
+ * log.length; // 12
+ * log.map(({ outcome }) => outcome); // [0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]
+ * ```
  */
 export function simulate<TState>(
   model: LearnerModel<TState>,

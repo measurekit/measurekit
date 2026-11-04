@@ -23,6 +23,19 @@ export type Prerequisites = Readonly<Record<string, readonly string[]>>;
  * @returns The quasi-ordinal knowledge space.
  * @throws `DataError` when an element is the empty string, there are more than 1,000 elements, a prerequisite is not a
  * key, or the space has more states than `maxStates`.
+ *
+ * @example
+ * ```ts
+ * import { fringes, isLearningSpace, surmiseStructure } from "@measurekit/knowledge-tracing/kst";
+ *
+ * const prerequisites = { add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] };
+ * const structure = surmiseStructure(prerequisites);
+ * structure.states;
+ * // [[], ["add"], ["add", "subtract"], ["add", "multiply"], ["add", "subtract", "multiply"],
+ * //  ["add", "subtract", "multiply", "divide"]]
+ * isLearningSpace(structure); // true
+ * fringes(structure, ["add", "subtract"]); // { inner: ["subtract"], outer: ["multiply"] }
+ * ```
  */
 export function surmiseStructure(
   prerequisites: Prerequisites,

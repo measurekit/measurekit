@@ -39,6 +39,26 @@ export interface RecommendOptions {
  *   and the others by distance from the band.
  * @throws `DataError` when the model is not a learner model, the band is not within 0 to 1 with lower ≤ upper, or the
  * model rejects the state or an attempt.
+ *
+ * @example
+ * ```ts
+ * import { elo } from "@measurekit/knowledge-tracing/elo";
+ * import { recommend } from "@measurekit/knowledge-tracing/practice";
+ *
+ * const model = elo({
+ *   parameters: {
+ *     items: {
+ *       q1: { difficulty: -2.5, count: 40 },
+ *       q2: { difficulty: -1.1, count: 40 },
+ *       q3: { difficulty: 0.3, count: 40 },
+ *     },
+ *   },
+ * });
+ * const ana = model.initialState("ana");
+ * const candidates = ["q1", "q2", "q3"].map((item) => ({ learner: "ana", item, skills: [], time: 1 }));
+ * const ranked = recommend(model, ana, candidates).map(({ attempt, prediction }) => [attempt.item, prediction]);
+ * ranked; // [["q2", 0.75], ["q1", 0.92], ["q3", 0.43]], the items nearest the band of success first
+ * ```
  */
 export function recommend<TState>(
   model: LearnerModel<TState>,

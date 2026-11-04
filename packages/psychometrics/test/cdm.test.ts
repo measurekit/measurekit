@@ -1012,7 +1012,7 @@ describe("attributeProfiles", () => {
         tolerance: 1e-10,
         maxIterations: 10_000,
       });
-      const persons = attributeProfiles(matrix, calibration);
+      const persons = attributeProfiles(matrix, calibration, { posterior: true });
       (fit.persons ?? []).forEach((expected, i) => {
         const person = defined(persons[i]);
         person.mastery.forEach((p, k) => {
@@ -1031,7 +1031,9 @@ describe("attributeProfiles", () => {
     const additiveMatrix = buildResponseMatrix(additiveReference.responses, { itemIds: additiveReference.itemIds });
     for (const fit of additiveReference.fits) {
       it(`matches GDINA's personparm for ${fitName(fit.model)} items on ${additiveReference.name} data`, () => {
-        const persons = attributeProfiles(additiveMatrix, referenceCalibration(additiveReference, fit));
+        const persons = attributeProfiles(additiveMatrix, referenceCalibration(additiveReference, fit), {
+          posterior: true,
+        });
         expect(fit.persons).toHaveLength(20);
         (fit.persons ?? []).forEach((expected, i) => {
           const person = defined(persons[i]);
@@ -1053,6 +1055,7 @@ describe("attributeProfiles", () => {
     const [person] = attributeProfiles(
       buildResponseMatrix([reference.itemIds.map(() => null)], { itemIds: reference.itemIds }),
       calibration,
+      { posterior: true },
     );
     expect(defined(person).posterior).toEqual(calibration.profiles.map((profile) => profile.proportion));
     expect(() => attributeProfiles(buildResponseMatrix([[1]]), calibration)).toThrow(
@@ -1065,13 +1068,16 @@ describe("attributeProfiles", () => {
     const [first, second] = matrix.responses.map((row) => row.slice());
     const none = reference.itemIds.map(() => null);
     const options = { itemIds: reference.itemIds };
-    const alone = attributeProfiles(buildResponseMatrix([defined(first), defined(second)], options), calibration);
+    const alone = attributeProfiles(buildResponseMatrix([defined(first), defined(second)], options), calibration, {
+      posterior: true,
+    });
     const mixed = attributeProfiles(
       buildResponseMatrix([none, defined(first), none, defined(second)], {
         ...options,
         personIds: ["a", "b", "c", "d"],
       }),
       calibration,
+      { posterior: true },
     );
     expect(mixed.map((person) => person.id)).toEqual(["a", "b", "c", "d"]);
     expect(mixed[1]).toEqual({ ...defined(alone[0]), id: "b" });
@@ -1093,7 +1099,7 @@ describe("attributeProfiles", () => {
       ...item,
       probabilities: item.probabilities.map((_, group, all) => (group === all.length - 1 ? 1 : 0)),
     }));
-    const [first, second] = attributeProfiles(data, { ...calibration, items });
+    const [first, second] = attributeProfiles(data, { ...calibration, items }, { posterior: true });
     // Of the profiles [0, 0], [1, 0], [0, 1] and [1, 1], the first person's answers contradict [1, 0] and [1, 1] once
     // and the others more; the second person's contradict [0, 0] once and the others twice.
     const posterior = defined(first).posterior;
@@ -1101,6 +1107,27 @@ describe("attributeProfiles", () => {
     expectClose(defined(second).posterior[0] ?? 0, 1, 1e-12);
     expect(defined(second).map).toEqual([0, 0]);
     expect(Number.isFinite(cdmClassificationAccuracy(data, { ...calibration, items }).accuracy)).toBe(true);
+  });
+
+  it("gives the posterior over the profiles only with the option posterior", () => {
+    const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), { maxIterations: 5 });
+    const summaries = attributeProfiles(matrix, calibration);
+    const withPosterior = attributeProfiles(matrix, calibration, { posterior: true });
+    expect(summaries).toHaveLength(matrix.personIds.length);
+    for (const person of summaries) expect(Object.keys(person).sort()).toEqual(["eap", "id", "map", "mastery"]);
+    expect(attributeProfiles(matrix, calibration, { posterior: false })).toEqual(summaries);
+    expect(
+      withPosterior.map(({ posterior, ...rest }) => (posterior.length === calibration.profiles.length ? rest : null)),
+    ).toEqual(summaries);
+  });
+
+  it("refuses options that are not an object and a posterior that is not a boolean", () => {
+    const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), { maxIterations: 5 });
+    expect(() => attributeProfiles(matrix, calibration, JSON.parse("null"))).toThrow(DataError);
+    expect(() => attributeProfiles(matrix, calibration, JSON.parse('{ "posterior": "yes" }'))).toThrow(
+      'The option posterior must be a boolean, found "yes".',
+    );
+    expect(() => attributeProfiles(matrix, calibration, JSON.parse('{ "posterior": null }'))).toThrow(DataError);
   });
 
   it("rejects a calibration from JSON that does not fit its design", () => {
@@ -1462,7 +1489,7 @@ describe("properties", () => {
           for (const item of result.items) {
             for (const p of item.probabilities) expect(p >= 1e-4 && p <= 1 - 1e-4).toBe(true);
           }
-          for (const person of attributeProfiles(matrix, result)) {
+          for (const person of attributeProfiles(matrix, result, { posterior: true })) {
             expectClose(
               person.posterior.reduce((sum, p) => sum + p, 0),
               1,

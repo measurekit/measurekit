@@ -144,14 +144,14 @@ attributes and few persons the G-DINA can have several maxima; compare the log-l
 
 ## Persons
 
-`attributeProfiles(matrix, calibration)` returns, per person, as GDINA's `personparm`:
+`attributeProfiles(matrix, calibration, options)` returns, per person, as GDINA's `personparm`:
 
-| Field       | Meaning                                                                          |
-| ----------- | -------------------------------------------------------------------------------- |
-| `posterior` | The posterior probability of each profile                                        |
-| `mastery`   | The posterior probability of mastering each attribute                            |
-| `map`       | The profile of largest posterior probability, the first in profile order on ties |
-| `eap`       | Each attribute mastered when its probability is above 0.5                        |
+| Field       | Meaning                                                                           |
+| ----------- | --------------------------------------------------------------------------------- |
+| `mastery`   | The posterior probability of mastering each attribute                             |
+| `map`       | The profile of largest posterior probability, the first in profile order on ties  |
+| `eap`       | Each attribute mastered when its probability is above 0.5                         |
+| `posterior` | The posterior probability of each profile, only with the option `posterior: true` |
 
 Persons are classified from the success probabilities and proportions alone, so every model works unchanged. A calibration
 from JSON may hold success probabilities of 0 or 1, which make some responses impossible. Such a
@@ -162,8 +162,8 @@ has a posterior on the profiles that the responses contradict least.
 (default) or `"eap"` classification: `accuracy` τ = Σ_c π_c τ_c, the probability that a person lands in the
 true profile, with `profileAccuracy` τ_c, and `attributeAccuracy` τ_k; `consistency` γ, the mean of Σ_c post(c)²,
 the chance that two measurements agree, and `attributeConsistency` γ_k. They use the persons with a response.
-`attributeProfiles` returns 2^K posterior probabilities for each person, 260 KB a person at 15 attributes;
-`cdmClassificationAccuracy` sums each person's posterior as it forms it and holds none of them.
+`attributeProfiles` returns the 2^K posterior probabilities of each person, 260 KB a person at 15 attributes, only with
+`posterior: true`; `cdmClassificationAccuracy` sums each person's posterior as it forms it and holds none of them.
 
 ```ts
 import { attributeProfiles, calibrateCdm, cdmClassificationAccuracy } from "@measurekit/psychometrics/cdm";
@@ -179,7 +179,8 @@ const matrix = buildResponseMatrix([
 ]);
 const qMatrix = { item1: ["a"], item2: ["a", "b"], item3: ["b"], item4: ["a"] };
 const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
-attributeProfiles(matrix, calibration)[0]; // { id, mastery: [pa, pb], map, eap, posterior }
+attributeProfiles(matrix, calibration)[0]; // { id, mastery: [pa, pb], map, eap }
+attributeProfiles(matrix, calibration, { posterior: true })[0]; // the same, with posterior
 cdmClassificationAccuracy(matrix, calibration); // { accuracy, consistency, ... }
 ```
 

@@ -1,3 +1,4 @@
+import { checkBoolean, checkOptions } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { type CdmCalibration, calibratedModel } from "./calibration.js";
 import { forEachPosterior } from "./expectation.js";
@@ -15,9 +16,23 @@ export interface ProfileEstimate {
 }
 
 /** A person's attribute mastery from a calibrated cognitive diagnosis model. */
-export interface AttributeProfile extends ProfileEstimate {
+export interface AttributeProfile extends Omit<ProfileEstimate, "posterior"> {
   /** The person's id. */
   readonly id: string;
+}
+
+/** An {@link AttributeProfile} with the person's posterior over the profiles, which the option `posterior` asks for. */
+export interface AttributeProfileWithPosterior extends AttributeProfile, ProfileEstimate {}
+
+/** Options of {@link attributeProfiles}. */
+export interface AttributeProfilesOptions {
+  /**
+   * Whether each person's result holds the posterior probability of every profile: 2^K numbers a person, 260 KB at 15
+   * attributes.
+   *
+   * @defaultValue `false`
+   */
+  readonly posterior?: boolean;
 }
 
 /** Returns the attribute mastery, the MAP and EAP profiles of a posterior over `profiles`, in their order. */
@@ -77,8 +92,8 @@ function copyOf(values: Float64Array): number[] {
 }
 
 /**
- * Returns each person's posterior over the profiles of a calibrated cognitive diagnosis model, the posterior
- * probability of mastering each attribute, and the MAP and EAP profiles, as GDINA's `personparm`. A person without
+ * Returns each person's posterior probability of mastering each attribute, and the MAP and EAP profiles, as GDINA's
+ * `personparm`, and with the option `posterior` the posterior over the profiles they come from. A person without
  * responses takes the calibrated proportions.
  *
  * @remarks
@@ -88,22 +103,42 @@ function copyOf(values: Float64Array): number[] {
  *
  * @param matrix - The responses of the persons.
  * @param calibration - The calibrated model.
- * @returns For each person, the posterior over the profiles and the estimates that follow from it.
- * @throws `DataError` when the matrix is invalid, its items are not the calibration's in its order, or a response is
- * neither 0 nor 1.
+ * @param options - Whether to return the posterior over the profiles.
+ * @returns For each person, the estimates that follow from the posterior, and with `posterior: true` the posterior.
+ * @throws `DataError` when the matrix is invalid, its items are not the calibration's in its order, a response is
+ * neither 0 nor 1, or an option is invalid.
  */
-export function attributeProfiles(matrix: ResponseMatrix, calibration: CdmCalibration): readonly AttributeProfile[] {
+export function attributeProfiles(
+  matrix: ResponseMatrix,
+  calibration: CdmCalibration,
+  options: AttributeProfilesOptions & { readonly posterior: true },
+): readonly AttributeProfileWithPosterior[];
+export function attributeProfiles(
+  matrix: ResponseMatrix,
+  calibration: CdmCalibration,
+  options?: AttributeProfilesOptions,
+): readonly AttributeProfile[];
+export function attributeProfiles(
+  matrix: ResponseMatrix,
+  calibration: CdmCalibration,
+  options: AttributeProfilesOptions = {},
+): readonly AttributeProfile[] {
+  checkOptions(options);
+  const { posterior: withPosterior = false } = options;
+  checkBoolean(withPosterior, "The option posterior");
   const { data, design, state } = calibratedModel(matrix, calibration);
   const table = tableOf(design.profiles);
-  const persons = new Array<AttributeProfile>(matrix.personIds.length);
-  forEachPosterior(data, design, state, (person, posterior) => {
+  const profileOf = (person: number, posterior: Float64Array): AttributeProfile | AttributeProfileWithPosterior => {
     const { mastery, map, eap } = estimate(posterior, design.profiles, table);
-    persons[person] = { id: matrix.personIds[person] ?? "", posterior: copyOf(posterior), mastery, map, eap };
+    const id = matrix.personIds[person] ?? "";
+    return withPosterior ? { id, posterior: copyOf(posterior), mastery, map, eap } : { id, mastery, map, eap };
+  };
+  const persons = new Array<AttributeProfile | AttributeProfileWithPosterior>(matrix.personIds.length);
+  forEachPosterior(data, design, state, (person, posterior) => {
+    persons[person] = profileOf(person, posterior);
   });
   for (let person = 0; person < persons.length; person++) {
-    if (persons[person] !== undefined) continue;
-    const { mastery, map, eap } = estimate(state.proportions, design.profiles, table);
-    persons[person] = { id: matrix.personIds[person] ?? "", posterior: copyOf(state.proportions), mastery, map, eap };
+    if (persons[person] === undefined) persons[person] = profileOf(person, state.proportions);
   }
   return persons;
 }

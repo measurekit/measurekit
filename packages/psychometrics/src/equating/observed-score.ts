@@ -13,6 +13,17 @@ import { checkArray, DataError, describe } from "@measurekit/core";
  * @returns The equated score at each score of the form to equate.
  * @throws `DataError` when a distribution is invalid or has fewer than two persons, or the `from` scores have no
  * variance.
+ *
+ * @example
+ * ```ts
+ * import { equipercentileEquating, linearEquating } from "@measurekit/psychometrics/equating";
+ *
+ * // The number of persons with each score 0 to 4 on form X and on form Y.
+ * const formX = [2, 5, 9, 6, 3];
+ * const formY = [1, 3, 8, 8, 5];
+ * linearEquating(formX, formY); // [0.485, 1.445, 2.405, 3.365, 4.325], the form Y score of each form X score
+ * equipercentileEquating(formX, formY); // [0.5, 1.5625, 2.4375, 3.375, 4.2]
+ * ```
  */
 export function linearEquating(from: readonly number[], to: readonly number[]): readonly number[] {
   const source = moments(from, "from");

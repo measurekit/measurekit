@@ -24,6 +24,18 @@ export interface AngoffCutScore {
  * @throws `DataError` without panelists or items, when the panelists rate different numbers of items, or a rating is
  * not a non-negative number.
  * @see {@link https://openlibrary.org/works/OL3700878W | Angoff (1971)}
+ *
+ * @example
+ * ```ts
+ * import { angoffCutScore } from "@measurekit/psychometrics/standard-setting";
+ *
+ * // Three panelists give the score a borderline person earns on each of three items; the last is worth 2 points.
+ * angoffCutScore([
+ *   [0.6, 0.8, 2],
+ *   [0.7, 0.9, 1.9],
+ *   [0.5, 0.7, 2.1],
+ * ]); // { cutScore: 3.4, panelistCutScores: [3.4, 3.5, 3.3], sd: 0.1, standardError: 0.058 }
+ * ```
  */
 export function angoffCutScore(ratings: readonly (readonly number[])[]): AngoffCutScore {
   checkArray(ratings, "Angoff ratings must be an array of rows, one per panelist");

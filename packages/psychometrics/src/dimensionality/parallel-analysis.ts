@@ -95,6 +95,26 @@ const DEFAULT_QUANTILE = 0.95;
  * `comparison` is `"normal"` with `correlation` `"polychoric"`.
  * @see {@link https://doi.org/10.1007/BF02289447 | Horn (1965)}
  * @see {@link https://doi.org/10.1177/0013164495055003002 | Glorfeld (1995)}
+ *
+ * @example
+ * ```ts
+ * import { createRandom } from "@measurekit/psychometrics";
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+ * import { parallelAnalysis } from "@measurekit/psychometrics/dimensionality";
+ *
+ * // 400 persons answer 8 items: items 1 to 4 measure one trait, items 5 to 8 another that is independent of it.
+ * const random = createRandom(31);
+ * const rows = Array.from({ length: 400 }, () => {
+ *   const traits = [random.normal(), random.normal()];
+ *   return Array.from({ length: 8 }, (_, j) => {
+ *     const trait = traits[j < 4 ? 0 : 1] ?? 0;
+ *     return random.uniform() < 1 / (1 + Math.exp(-1.7 * trait)) ? 1 : 0;
+ *   });
+ * });
+ * const analysis = parallelAnalysis(buildResponseMatrix(rows), createRandom(1));
+ * analysis.components.suggested; // 2, the components to keep
+ * analysis.components.observed.slice(0, 3); // [2.75, 2.3, 0.71], the largest eigenvalues
+ * ```
  */
 export function parallelAnalysis(
   matrix: ResponseMatrix,

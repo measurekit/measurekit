@@ -15,3 +15,5 @@ pairs: 20,000 categories took seconds. It takes its weights as the option `weigh
 `softmax` turns contiguous logits into probabilities, and `stridedSoftmax` the logits of a column at a stride.
 `hasOrderedThresholds` and `hasValidAsymptotes` test the thresholds of a graded item and the asymptotes of a logistic
 item.
+
+`createRandom` has an example, which a test runs against the values its comments state.
