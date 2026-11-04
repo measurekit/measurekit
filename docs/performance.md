@@ -524,7 +524,7 @@ library holds only what that name needs: `cronbachAlpha` from `@measurekit/psych
 | `@measurekit/psychometrics/dimensionality`   |           38,604 |       14,301 | core, data, math                                          |
 | `@measurekit/psychometrics/equating`         |           61,294 |       20,877 | core, checks, irt, math                                   |
 | `@measurekit/psychometrics/explanatory`      |           50,565 |       17,622 | core, data, irt, math                                     |
-| `@measurekit/psychometrics/fit`              |           67,736 |       23,672 | core, checks, data, irt, math                             |
+| `@measurekit/psychometrics/fit`              |          117,868 |       40,060 | core, checks, data, irt, math, sim                        |
 | `@measurekit/psychometrics/generalizability` |           14,727 |        5,484 | core, data, math                                          |
 | `@measurekit/psychometrics/irt`              |           84,439 |       28,486 | core, checks, data, math                                  |
 | `@measurekit/psychometrics/mokken`           |           32,971 |       12,182 | core, data, math                                          |

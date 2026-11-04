@@ -2,4 +2,5 @@
 
 export { simulateCdmResponses } from "./cdm-responses.js";
 export { simulateMultidimensionalResponses } from "./multidimensional-responses.js";
-export { checkThetas, simulateResponse } from "./responses.js";
+export { checkThetas, simulateResponse, simulateResponses } from "./responses.js";
+export { simulateThetas } from "./thetas.js";

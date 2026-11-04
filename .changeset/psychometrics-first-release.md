@@ -247,3 +247,11 @@ gives them: the recursion of Lord and Wingersky runs over each testlet's items a
 integrates the testlet's effect out (Cai's algorithm 2.0), so a form with a passage has its table and the conditional
 errors of its scale scores under the testlet model. Validated against base R's enumeration of every response pattern and
 mirt's `fscores(method = "EAPsum_2.0")`, within 1e-15. `"true-score"` tables refuse testlets.
+
+`yenQ3CriticalValue` returns the critical value of Yen's Q3 by the parametric bootstrap of Christensen, Makransky and
+Horton: replications drawn from a calibration's items with the data's missing responses, each calibrated with the same
+options, give their largest pair excess or each pair's, whose quantile is the critical excess; the observed pairs above
+it are flagged. A draw whose estimated item lacks a category is drawn again up to `maxRedraws`, and the pairs of an item
+whose slope is above `slopeLimit`, near-deterministic, are left out and the item listed. The replications equal those
+of `simulateThetas`, `simulateResponses`, `calibrate`, `abilityEstimates` and `yenQ3` composed on the same seed, and the
+largest excess agrees with mirt's bootstrap in mean and SD within Monte Carlo error.

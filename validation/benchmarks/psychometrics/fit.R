@@ -29,6 +29,26 @@ bench_task("fit.yenQ3", "Yen's Q3 of every pair of items", size, reference("mirt
 
 modes <- fscores(fit, method = "MAP", quadpts = 61, verbose = FALSE)[, "F1"]
 coefficients <- coef(fit, IRTpars = TRUE, simplify = TRUE)$items
+
+# The parametric bootstrap of the critical value of Q3, as yenQ3CriticalValue: each replication draws standard normal
+# thetas and responses from mirt's estimates, calibrates them, and takes Q3 at the posterior means.
+q3_bootstrap <- function(replications) {
+  sapply(seq_len(replications), function(r) {
+    draws <- rnorm(persons)
+    replicated <- sapply(seq_len(item_count), function(j) {
+      rbinom(persons, 1, plogis(coefficients[j, "a"] * (draws - coefficients[j, "b"])))
+    })
+    colnames(replicated) <- colnames(data)
+    refit <- mirt(replicated, 1, itemtype = "2PL", TOL = 1e-4, quadpts = 61, verbose = FALSE)
+    q3 <- residuals(refit, type = "Q3", Theta = fscores(refit, method = "EAP", quadpts = 61, verbose = FALSE),
+                    verbose = FALSE)
+    values <- q3[upper.tri(q3)]
+    max(values - mean(values))
+  })
+}
+bench_task("fit.yenQ3CriticalValue", "The critical value of Q3 by a parametric bootstrap of 10 replications", size,
+           reference("mirt", "mirt, fscores and residuals(type = \"Q3\") in each replication"),
+           function() q3_bootstrap(10))
 nodes <- seq(-6, 6, length.out = 61)
 tam_fit <- TAM::tam.mml.2pl(data, irtmodel = "2PL", control = list(nodes = nodes, conv = 1e-4, convD = 1e-4),
                             verbose = FALSE)

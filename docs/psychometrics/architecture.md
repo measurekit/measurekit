@@ -84,21 +84,23 @@ Only the random number generator is public in `math/`.
 
 Modules form layers; a module imports only from lower layers, never from its own or a higher one.
 
-| Layer | Modules                                                                            |
-| ----- | ---------------------------------------------------------------------------------- |
-| 1     | `@measurekit/core`, `checks.ts`                                                    |
-| 2     | `math/`, `data/`                                                                   |
-| 3     | `ctt/`, `change/`, `irt/`, `dimensionality/`, `generalizability/`, `mokken/`       |
-| 4     | `cdm/`, `fit/`, `equating/`, `response-time/`, `explanatory/`, `multidimensional/` |
-| 5     | `sim/`, `dif/`, `standard-setting/`, `scaling/`, `rater/`, `parameterization/`     |
-| 6     | `cat/`                                                                             |
+| Layer | Modules                                                                      |
+| ----- | ---------------------------------------------------------------------------- |
+| 1     | `@measurekit/core`, `checks.ts`                                              |
+| 2     | `math/`, `data/`                                                             |
+| 3     | `ctt/`, `change/`, `irt/`, `dimensionality/`, `generalizability/`, `mokken/` |
+| 4     | `cdm/`, `equating/`, `response-time/`, `explanatory/`, `multidimensional/`   |
+| 5     | `sim/`, `dif/`, `standard-setting/`, `scaling/`, `parameterization/`         |
+| 6     | `fit/`, `cat/`                                                               |
+| 7     | `rater/`                                                                     |
 
 Analysis modules (`ctt/`, `change/`, `irt/`, `dimensionality/`, `generalizability/` and `mokken/`) build on `data/` and
 `math/` or on nothing, not on each other. `sim/` builds on `irt/`, `cdm/` and `multidimensional/` to simulate their models, `parameterization/`
 on `irt/` and `multidimensional/` to convert their items, `cat/` on `sim/` for the same response simulation, on `cdm/` for
 the profile estimates of diagnostic tests and on `multidimensional/` for the items, estimates and information of
 multidimensional tests, `dif/` and `standard-setting/` on `equating/` for linking and score distributions, `scaling/` on
-`equating/` for the linear transformation of a theta scale, and `rater/` on `irt/` for the Rasch model of its many
+`equating/` for the linear transformation of a theta scale, `fit/` on `sim/` for the replications of the critical value of
+Q3, and `rater/` on `irt/` for the Rasch model of its many
 facets and on `fit/` for the fit of their elements. `explanatory/` builds on `irt/` for the calibrated items it
 regresses, and `multidimensional/` on `irt/` for its priors, compressed responses and parameter bounds.
 [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces them, the absence of

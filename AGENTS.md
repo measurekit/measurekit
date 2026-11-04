@@ -196,7 +196,7 @@ Psychometrics: every module of `cat/`, `cdm/`, `change/`, `equating/`, `fit/`, `
 | `irt/`              | `data/`, `math/`                                      |
 | `parameterization/` | `irt/`, `multidimensional/`                           |
 | `cdm/`              | `data/`, `irt/`, `math/`                              |
-| `fit/`              | `data/`, `irt/`, `math/`                              |
+| `fit/`              | `data/`, `irt/`, `sim/`, `math/`                      |
 | `response-time/`    | `data/`, `irt/`, `math/`                              |
 | `equating/`         | `irt/`, `math/`                                       |
 | `sim/`              | `data/`, `irt/`, `cdm/`, `multidimensional/`, `math/` |

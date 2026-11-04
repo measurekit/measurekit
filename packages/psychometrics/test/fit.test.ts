@@ -38,8 +38,11 @@ import {
   threeParameterLogistic,
   twoParameterLogistic,
   uniformDistribution,
+  weightedLikelihoodEstimate,
   yenQ3,
+  yenQ3CriticalValue,
 } from "../src/index.js";
+import { sampleQuantile } from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
 import {
@@ -264,6 +267,18 @@ const summedScore = readFixture<FitSummedScoreFixture>("fit-summed-score.json");
 
 const fixedParameters = readFixture<IrtFixedParametersFixture>("irt-fixed-parameters.json");
 
+interface FitQ3BootstrapFixture {
+  itemIds: string[];
+  responses: (number | null)[][];
+  items: { a: number; b: number }[];
+  observedMeanQ3: number;
+  observedExcesses: number[];
+  replications: number;
+  largestMean: number;
+  largestSd: number;
+}
+const q3Bootstrap = readFixture<FitQ3BootstrapFixture>("fit-q3-bootstrap.json");
+
 // Tolerances against R, explained in docs/validation.md.
 /** Every fit statistic against eRm and mirt, from the same items and thetas. */
 const FIT_TOLERANCE = 1e-12;
@@ -285,6 +300,12 @@ const RASCH_BASE_TOLERANCE = 1e-8;
 const CORRECTED_TOLERANCE = 1e-12;
 /** Kernel curves, their nodes and standard errors against KernSmoothIRT and base R: the same sums. */
 const KERNEL_TOLERANCE = 1e-12;
+/** The mean Q3 at mirt's items, through the EAP of each person, which matches mirt's within 1e-10. */
+const MEAN_Q3_TOLERANCE = 1e-10;
+/** The Monte Carlo standard errors by which a bootstrap's moment may differ from mirt's on other draws. */
+const MONTE_CARLO_ERRORS = 4;
+/** The replications of the bootstrap compared with mirt's 1000. */
+const BOOTSTRAP_REPLICATIONS = 100;
 
 /** Expects each named statistic of `actual` to be within `tolerance` of the fixture's list of that statistic. */
 function expectTable(
@@ -1596,43 +1617,199 @@ describe("kernelItemCurves", () => {
   });
 });
 
-describe("the recipe for a critical value for Q3", () => {
-  it("flags the pairs of a passage, which the fixed cut 0.2 misses, and no other pair", () => {
-    const random = createRandom(2026);
-    const items = simulateItems(twoParameterLogistic, 12, random);
-    const thetas = simulateThetas(1000, random);
-    const passage = thetas.map((theta) => theta + 1.5 * random.normal());
-    const rows = simulateResponses(items, thetas, random).responses.map((row, person) => [
-      ...(simulateResponses(items.slice(0, 3), [passage[person] ?? 0], random).responses[0] ?? []),
-      ...row.slice(3),
+describe("yenQ3CriticalValue", () => {
+  const matrix = buildResponseMatrix(q3Bootstrap.responses, { itemIds: q3Bootstrap.itemIds });
+  const items = q3Bootstrap.items.map(({ a, b }, j) => ({
+    id: defined(q3Bootstrap.itemIds[j]),
+    model: twoParameterLogistic,
+    parameters: { a, b, c: 0, d: 1 },
+  }));
+  const options = { model: twoParameterLogistic } as const;
+  const sum = (values: readonly number[]): number => values.reduce((total, value) => total + value, 0);
+
+  it("matches the distribution of the largest excess of mirt's bootstrap within four Monte Carlo errors", () => {
+    const result = yenQ3CriticalValue(matrix, items, createRandom(20261104), {
+      ...options,
+      replications: BOOTSTRAP_REPLICATIONS,
+    });
+    expect(result.replications).toBe(BOOTSTRAP_REPLICATIONS);
+    const { largestExcesses } = result;
+    const average = sum(largestExcesses) / largestExcesses.length;
+    const sd = Math.sqrt(sum(largestExcesses.map((x) => (x - average) ** 2)) / (largestExcesses.length - 1));
+    const meanError = Math.sqrt(
+      q3Bootstrap.largestSd ** 2 / q3Bootstrap.replications + sd ** 2 / largestExcesses.length,
+    );
+    expect(Math.abs(average - q3Bootstrap.largestMean)).toBeLessThan(MONTE_CARLO_ERRORS * meanError);
+    const sdError = Math.sqrt(
+      q3Bootstrap.largestSd ** 2 / (2 * (q3Bootstrap.replications - 1)) + sd ** 2 / (2 * (largestExcesses.length - 1)),
+    );
+    expect(Math.abs(sd - q3Bootstrap.largestSd)).toBeLessThan(MONTE_CARLO_ERRORS * sdError);
+    expectClose(result.meanQ3, q3Bootstrap.observedMeanQ3, MEAN_Q3_TOLERANCE, "mean Q3");
+    const descending = q3Bootstrap.observedExcesses.toSorted((x, y) => y - x);
+    result.flagged.forEach(({ excess }, k) => {
+      expectClose(excess, defined(descending[k]), MEAN_Q3_TOLERANCE, `excess ${k + 1}`);
+    });
+  });
+
+  it("flags the pairs of the passage and no other, which the fixed cut 0.2 misses", () => {
+    const result = yenQ3CriticalValue(matrix, items, createRandom(1), options);
+    // Item 1, of b = -2.7, has the least information on its pairs: theirs is the third largest excess, 0.108.
+    expect(result.flagged.map((pair) => pair.items)).toEqual([
+      ["item2", "item3"],
+      ["item1", "item3"],
     ]);
-    const excesses = (matrix: ResponseMatrix) => {
-      const fit = calibrate(matrix, { model: twoParameterLogistic });
-      const scores = abilityEstimates(matrix, fit.items).map((estimate) => estimate.theta ?? 0);
-      const pairs = yenQ3(matrix, fit.items, scores).flatMap((row, i) =>
-        row.flatMap((q3, j) => (j > i && q3 !== null ? [{ pair: `${i + 1}-${j + 1}`, q3 }] : [])),
+    expect(result.flagged.every(({ q3 }) => q3 < 0.2)).toBe(true);
+    expect(result).toMatchObject({ replications: 40, redrawn: 0, notConverged: 0, nearDeterministic: [] });
+    expect(result.largestExcesses).toHaveLength(40);
+  });
+
+  it("gives the replications of the recipe composed of the simulation, calibrate, abilityEstimates and yenQ3", () => {
+    const random = createRandom(5);
+    const recipe = Array.from({ length: 6 }, () => {
+      const simulated = simulateResponses(items, simulateThetas(matrix.responses.length, random), random);
+      const rows = simulated.responses.map((row, person) =>
+        row.map((response, j) => ((matrix.responses[person]?.[j] ?? null) === null ? null : response)),
       );
-      const mean = pairs.reduce((sum, { q3 }) => sum + q3, 0) / pairs.length;
-      return { fit, pairs: pairs.map(({ pair, q3 }) => ({ pair, q3, excess: q3 - mean })) };
-    };
-    const observed = excesses(buildResponseMatrix(rows));
-    const largest = Array.from({ length: 40 }, () => {
-      const simulated = simulateResponses(observed.fit.items, simulateThetas(1000, random), random);
-      return excesses(simulated).pairs.reduce((most, { excess }) => Math.max(most, excess), Number.NEGATIVE_INFINITY);
-    }).sort((x, y) => x - y);
-    const critical = largest[Math.ceil(0.95 * largest.length) - 1] ?? 0;
-    expectClose(critical, 0.108, 5e-4, "critical excess");
-    expect(observed.pairs.filter(({ excess }) => excess > critical).map(({ pair }) => pair)).toEqual([
-      "1-2",
-      "1-3",
-      "2-3",
-    ]);
-    expect(observed.pairs.filter(({ q3 }) => q3 > 0.2)).toHaveLength(0);
-    expectClose(
-      observed.pairs.reduce((most, { q3 }) => Math.max(most, q3), Number.NEGATIVE_INFINITY),
-      0.106,
-      5e-4,
-      "largest Q3",
+      const replicated = buildResponseMatrix(rows, { itemIds: matrix.itemIds });
+      const fit = calibrate(replicated, options);
+      const thetas = abilityEstimates(replicated, fit.items).map((estimate) => estimate.theta ?? 0);
+      const q3 = yenQ3(replicated, fit.items, thetas).flatMap((row, i) =>
+        row.flatMap((value, j) => (j > i && value !== null ? [value] : [])),
+      );
+      const mean = sum(q3) / q3.length;
+      return q3.reduce((most, value) => Math.max(most, value - mean), Number.NEGATIVE_INFINITY);
+    });
+    const result = yenQ3CriticalValue(matrix, items, createRandom(5), { ...options, replications: 6, quantile: 0.8 });
+    expect(result.largestExcesses).toEqual(recipe);
+    expect(result.criticalExcess).toBe(sampleQuantile(Float64Array.from(recipe).sort(), 0.8));
+  });
+
+  it("takes the quantile of every pair's excess with the statistic pairs", () => {
+    const largest = yenQ3CriticalValue(matrix, items, createRandom(3), { ...options, replications: 8 });
+    const pairs = yenQ3CriticalValue(matrix, items, createRandom(3), {
+      ...options,
+      replications: 8,
+      statistic: "pairs",
+    });
+    expect(pairs.largestExcesses).toEqual(largest.largestExcesses);
+    expect(defined(pairs.criticalExcess)).toBeLessThan(defined(largest.criticalExcess));
+    const top = yenQ3CriticalValue(matrix, items, createRandom(3), {
+      ...options,
+      replications: 8,
+      statistic: "pairs",
+      quantile: 1,
+    });
+    expect(top.criticalExcess).toBe(Math.max(...largest.largestExcesses));
+  });
+
+  it("leaves out the pairs of an item whose slope is above the limit, and lists it", () => {
+    const steep = items.map((item, j) => (j === 4 ? { ...item, parameters: { ...item.parameters, a: 6 } } : item));
+    const result = yenQ3CriticalValue(matrix, steep, createRandom(2), { ...options, replications: 3 });
+    expect(result.nearDeterministic).toEqual(["item5"]);
+    const thetas = abilityEstimates(matrix, steep).map((estimate) => estimate.theta ?? 0);
+    const tested = yenQ3(matrix, steep, thetas).flatMap((row, i) =>
+      row.flatMap((value, j) => (j > i && i !== 4 && j !== 4 && value !== null ? [value] : [])),
+    );
+    expectClose(result.meanQ3, sum(tested) / tested.length, 1e-15, "mean Q3");
+    expect(result.flagged.some(({ items: pair }) => pair.includes("item5"))).toBe(false);
+    const all = yenQ3CriticalValue(matrix, steep, createRandom(2), { ...options, replications: 3, slopeLimit: 10 });
+    expect(all.nearDeterministic).toEqual([]);
+  });
+
+  it("returns no critical excess when fewer than two items are tested", () => {
+    const steep = items.map((item, j) => (j > 0 ? { ...item, parameters: { ...item.parameters, a: 5 } } : item));
+    expect(yenQ3CriticalValue(matrix, steep, createRandom(2), options)).toEqual({
+      criticalExcess: null,
+      meanQ3: null,
+      flagged: [],
+      largestExcesses: [],
+      replications: 0,
+      redrawn: 0,
+      notConverged: 0,
+      nearDeterministic: q3Bootstrap.itemIds.slice(1),
+    });
+  });
+
+  it("draws again a replication in which an estimated item lacks a category, at most maxRedraws times", () => {
+    const rare = items.map((item, j) => ({ ...item, parameters: { a: 1, b: j === 9 ? 5 : 0, c: 0, d: 1 } }));
+    const few = buildResponseMatrix(q3Bootstrap.responses.slice(0, 40), { itemIds: q3Bootstrap.itemIds });
+    const result = yenQ3CriticalValue(few, rare, createRandom(4), { ...options, replications: 3 });
+    expect(result.redrawn).toBeGreaterThan(0);
+    expect(result.replications).toBe(3);
+    const stopped = yenQ3CriticalValue(few, rare, createRandom(4), { ...options, replications: 3, maxRedraws: 0 });
+    expect(stopped.redrawn).toBe(0);
+    expect(stopped.replications).toBeLessThan(3);
+    const anchored = yenQ3CriticalValue(few, rare, createRandom(4), {
+      ...options,
+      replications: 3,
+      fixed: { item10: defined(rare[9]).parameters },
+    });
+    expect(anchored.redrawn).toBe(0);
+  });
+
+  it("counts the replications whose calibration stops before it converges", () => {
+    const result = yenQ3CriticalValue(matrix, items, createRandom(6), {
+      ...options,
+      replications: 2,
+      maxIterations: 2,
+    });
+    expect(result.notConverged).toBe(2);
+    const wle = yenQ3CriticalValue(matrix, items, createRandom(6), {
+      ...options,
+      replications: 2,
+      estimator: weightedLikelihoodEstimate,
+    });
+    expect(wle.meanQ3).not.toBe(
+      yenQ3CriticalValue(matrix, items, createRandom(6), { ...options, replications: 2 }).meanQ3,
+    );
+  });
+
+  it("refuses the statistic pairs past 2^24 excesses, before any replication", () => {
+    const wide = buildResponseMatrix(
+      Array.from({ length: 3 }, (_, person) => Array.from({ length: 200 }, (__, j) => (person + j) % 2)),
+    );
+    const many = wide.itemIds.map((id, j) => ({
+      id,
+      model: twoParameterLogistic,
+      parameters: { a: 1, b: j / 100 - 1, c: 0, d: 1 },
+    }));
+    expect(() =>
+      yenQ3CriticalValue(wide, many, createRandom(1), { ...options, statistic: "pairs", replications: 1000 }),
+    ).toThrow(
+      'The statistic "pairs" keeps the excess of each of 19900 pairs in each of 1000 replications, 19900000, and takes at most 16777216; use fewer replications or the statistic "largest".',
+    );
+  });
+
+  it("rejects invalid matrices, items, generators and options", () => {
+    const random = createRandom(1);
+    expect(() => yenQ3CriticalValue(matrix, items.toReversed(), random, options)).toThrow(
+      'Item 1 needs the id "item1" of the matrix\'s item 1, found "item10": give the items of a calibration of the matrix, in its order.',
+    );
+    const anonymous = items.map(({ model, parameters }) => ({ model, parameters }));
+    // @ts-expect-error: the items need their ids.
+    expect(() => yenQ3CriticalValue(matrix, anonymous, random, options)).toThrow("Item 1 needs the id");
+    expect(() => yenQ3CriticalValue(matrix, items, JSON.parse("{}"), options)).toThrow(DataError);
+    expect(() => yenQ3CriticalValue(matrix, items, random, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => yenQ3CriticalValue(matrix, items, random, JSON.parse('{"groups":[]}'))).toThrow(
+      'There is no option "groups"',
+    );
+    const invalid: [Record<string, unknown>, string][] = [
+      [{ replications: 0 }, "The option replications must be a positive integer, found 0."],
+      [{ quantile: 1.5 }, "The option quantile must be a number from 0 to 1, found 1.5."],
+      [{ statistic: "max" }, 'The option statistic must be "largest" or "pairs", found "max".'],
+      [{ maxRedraws: -1 }, "The option maxRedraws must be an integer from 0, found -1."],
+      [{ slopeLimit: 0 }, "The option slopeLimit must be a positive number, found 0."],
+      [{ estimator: "eap" }, "The option estimator must be a function of items and responses"],
+    ];
+    for (const [option, message] of invalid) {
+      expect(() =>
+        yenQ3CriticalValue(matrix, items, random, { ...options, ...JSON.parse(JSON.stringify(option)) }),
+      ).toThrow(message);
+    }
+    expect(() => yenQ3CriticalValue(matrix, items, random, { ...options, model: JSON.parse("null") })).toThrow(
+      "The option model must be an IRT model",
     );
   });
 });

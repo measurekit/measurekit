@@ -1,8 +1,8 @@
 /**
  * Item and person fit: Rasch infit and outfit, the S-X² item fit statistic, the lz person fit statistic and its
- * correction lz*, the RMSD of items, Yen's Q3 and Chen and Thissen's chi-square for local dependence, the
- * limited-information fit of a calibration: M2, M2*, C2, RMSEA, SRMSR, TLI and CFI, the Andersen, Martin-Löf and Wald
- * tests of the Rasch family, and kernel-smoothed item curves.
+ * correction lz*, the RMSD of items, Yen's Q3 with its critical value by parametric bootstrap and Chen and Thissen's
+ * chi-square for local dependence, the limited-information fit of a calibration: M2, M2*, C2, RMSEA, SRMSR, TLI and
+ * CFI, the Andersen, Martin-Löf and Wald tests of the Rasch family, and kernel-smoothed item curves.
  *
  * @module @measurekit/psychometrics/fit
  */
@@ -24,6 +24,13 @@ export {
 export { type LocalDependencePair, localDependenceChiSquare, yenQ3 } from "./local-dependence.js";
 export type { MeanSquareFit } from "./mean-squares.js";
 export { type PersonFit, personFit } from "./person-fit.js";
+export {
+  type Q3CriticalValue,
+  type Q3CriticalValueOptions,
+  type Q3Pair,
+  type Q3Statistic,
+  yenQ3CriticalValue,
+} from "./q3-critical-value.js";
 export {
   type AndersenTest,
   andersenTest,

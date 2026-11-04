@@ -41,6 +41,7 @@ Rscript validation/psychometrics/multistage-cuts.R   # routing cuts of multistag
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
 Rscript validation/psychometrics/fit-global.R        # limited-information fit: mirt's M2, base R where mirt's Δ differs or its 3PL is off; the noncentral chi-square
 Rscript validation/psychometrics/fit-residuals.R     # RMSD and local dependence: TAM's IRT.RMSD, base R's mean deviation, mirt's residuals(type = "LD")
+Rscript validation/psychometrics/fit-q3-bootstrap.R   # the critical value of Q3: mirt's parametric bootstrap of 1000 replications, about a minute
 Rscript validation/psychometrics/fit-person.R        # person fit: PerFit's Gnormed, U3, Ht and lzstar; base R where PerFit rounds, ties or skips; reads mokken.json, fit-residuals.json and cat-3pl.json
 Rscript validation/psychometrics/fit-curves.R        # kernel item curves: KernSmoothIRT's ksIRT, Ramsay's standard errors in base R; reads fit-rmsd.json
 Rscript validation/psychometrics/dif.R               # differential item functioning: difR's Mantel-Haenszel, logistic, Lord; Mantel and ordinal logistic: base R, lrm, lordif

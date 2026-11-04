@@ -1,7 +1,8 @@
 # Item and person fit
 
 `@measurekit/psychometrics/fit` checks how well items and persons fit an [IRT model](irt.md): Rasch infit and
-outfit, the S-X² item fit statistic, the RMSD of items, the lz person fit statistic and Snijders' lz*, Yen's Q3 and Chen and Thissen's
+outfit, the S-X² item fit statistic, the RMSD of items, the lz person fit statistic and Snijders' lz*, Yen's Q3 with its
+critical value by parametric bootstrap and Chen and Thissen's
 chi-square for local dependence, the fit of a whole calibration by M2, M2* and C2 with RMSEA, SRMSR, TLI and CFI,
 the Andersen, Martin-Löf and Wald tests of the Rasch family, and kernel-smoothed item curves to inspect an item's shape.
 Each is validated against eRm, mirt, TAM, PerFit or KernSmoothIRT ([validation](validation.md)).
@@ -13,6 +14,7 @@ flowchart LR
   I --> D["Over a population of theta: rootMeanSquareDeviation, localDependenceChiSquare"]
   I --> R["With one theta per person: itemFit, personFit, yenQ3"]
   R --> A["Infit and outfit, lz, lz*, Q3"]
+  A --> B["yenQ3CriticalValue: Q3's critical excess by parametric bootstrap"]
   M --> C["A calibration of the matrix"]
   C --> L["limitedInformationFit: M2, RMSEA, SRMSR, TLI, CFI"]
   M --> T["Conditional maximum likelihood in parts of the matrix"]
@@ -37,6 +39,7 @@ alone, as they estimate the items themselves, and so do the kernel curves, which
 | `correctedPersonFit(matrix, items, thetas, …)`  | person: `CorrectedPersonFit`  | Each person's answered items; none of an extreme score      |
 | `summedScoreFit(matrix, items, …)`              | item: `SummedScoreFit`        | Persons who answered every item                             |
 | `yenQ3(matrix, items, thetas)`                  | pair of items: a matrix entry | For each pair, the persons who answered both                |
+| `yenQ3CriticalValue(matrix, items, random, …)`  | test: `Q3CriticalValue`       | As `yenQ3`; each replication misses the same responses      |
 | `rootMeanSquareDeviation(matrix, items, …)`     | item: `ItemDeviation`         | Persons with a response                                     |
 | `localDependenceChiSquare(matrix, items, …)`    | pair: `LocalDependencePair`   | For each pair, the persons who answered both                |
 | `limitedInformationFit(matrix, calibration, …)` | test: `LimitedInformationFit` | Persons who answered every item                             |
@@ -256,6 +259,98 @@ the pairs times the persons. The tables of `localDependenceChiSquare` hold a cel
 pair of items, at most 2^24 cells in all: two items of 4,096 categories, or 579 items of 10, which take about a second
 and, for the two items, 260 MB.
 
+### Critical value of Q3
+
+Under local independence Q3 is near -1 / (k - 1) on average, and its spread depends on the persons, the items and the
+model, so no fixed cut such as 0.2 suits every data set (Christensen, Makransky and Horton, 2017).
+`yenQ3CriticalValue(matrix, items, random, options)` compares each pair's excess, its Q3 less the mean Q3 of the
+pairs, with a critical excess from a parametric bootstrap of the calibration of `items`:
+
+```mermaid
+flowchart LR
+  D["Responses and the calibration's items"] --> E["Each pair's excess over the mean Q3"]
+  D --> S["Thetas from N(0, 1), responses from the items,<br/>missing where the data are"]
+  S --> C["calibrate with the same options,<br/>abilityEstimates, yenQ3"]
+  C --> X["The replication's largest excess,<br/>or each pair's"]
+  X -->|"replications times"| S
+  X --> Q["Critical excess: their quantile"]
+  E --> F["flagged: the pairs above it"]
+  Q --> F
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { yenQ3CriticalValue } from "@measurekit/psychometrics/fit";
+import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 1,000 persons answer 12 items; items 1 to 3 share a passage, which moves each person's theta for them by N(0, 1.5²).
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 12, random);
+const thetas = simulateThetas(1000, random);
+const passage = simulateResponses(
+  items.slice(0, 3),
+  thetas.map((theta) => theta + 1.5 * random.normal()),
+  random,
+);
+const others = simulateResponses(items.slice(3), thetas, random);
+const matrix = buildResponseMatrix(
+  others.responses.map((row, person) => [...(passage.responses[person] ?? []), ...row]),
+);
+
+// The calibration takes the items as independent; the bootstrap repeats it with the same options.
+const options = { model: twoParameterLogistic };
+const fit = calibrate(matrix, options);
+const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { ...options, replications: 100 });
+q3.criticalExcess; // 0.115
+q3.flagged.map((pair) => pair.items); // [["item2", "item3"], ["item1", "item2"], ["item1", "item3"]]
+q3.flagged.map((pair) => pair.q3); // [0.070, 0.068, 0.066]: the fixed cut 0.2 flags none
+```
+
+`items` are the calibration's, in the order of the matrix, with their ids, and `options` hold the calibration's own:
+`model`, `fixed`, `fixedParameters`, `priors`, `itemPriors`, `quadrature`, `tolerance` and `maxIterations`. A
+calibration with groups, a latent regression, testlets or person weights is not bootstrapped: thetas are drawn from the
+standard normal, and Q3 tests the local independence that testlets model.
+
+| Option         | Default                 | Meaning                                                                                                  |
+| -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| `replications` | `40`                    | Replications, each a calibration                                                                         |
+| `quantile`     | `0.95`                  | The quantile of the replications' statistics that is the critical excess, by R's default (type 7)        |
+| `statistic`    | `"largest"`             | `"largest"`: each replication's largest excess, Q3*; `"pairs"`: the excess of each of its pairs          |
+| `maxRedraws`   | `40`                    | The most draws thrown away because an estimated item lacks a category; past them the bootstrap stops     |
+| `slopeLimit`   | `4`                     | The largest slope `a` of an item tested; the pairs of a steeper item are left out and the item is listed |
+| `estimator`    | `posteriorMeanEstimate` | The estimate of each person's theta for the residuals, as `abilityEstimates` takes it                    |
+
+| Field                     | Meaning                                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `criticalExcess`          | The `quantile` of the replications' statistics; `null` without a replication or two items tested                 |
+| `meanQ3`, `flagged`       | The observed mean Q3 of the pairs tested, and the pairs whose excess is above the critical excess, largest first |
+| `largestExcesses`         | Each replication's largest excess, in the order drawn                                                            |
+| `replications`            | The replications used: fewer than asked when the redraws ran out                                                 |
+| `redrawn`, `notConverged` | The draws thrown away, and the replications whose calibration stopped at `maxIterations`                         |
+| `nearDeterministic`       | The items whose slope is above `slopeLimit`                                                                      |
+
+- **The statistic.** The quantile of each replication's largest excess, Christensen, Makransky and Horton's Q3*, holds
+  the chance of any false flag among the pairs near 1 - `quantile`. `"pairs"` takes the quantile of every pair's
+  excess, a level for each pair: on the example, `"pairs"` at 0.999 also flags item 4 with item 12, as a level of
+  0.001 for each of 66 pairs leaves a chance of a false flag near 0.06.
+- **Replications.** Each costs a calibration, an estimate of each person's theta and Q3: 100 replications of the
+  example take about 2 seconds. The quantile of 40 replications has a Monte Carlo error of its own; a decision near the
+  critical excess takes more, as the example's 100. `"pairs"` keeps each pair's excess of each replication, at most
+  2^24 of them.
+- **Redraws.** A draw in which an item that the calibration estimates lacks a response in one of its categories cannot
+  be calibrated as the data were, so it is drawn again; an item in `fixed` needs none.
+- **Near-deterministic items.** Where responses depend on theta almost alone, as parts of a task that one action
+  decides, the fitted slopes grow very large; the residuals are near 0 for most persons, Q3 rests on the few others,
+  and the replications' largest excess spreads toward 1. In 500 persons with two such parts, whose slopes reach 175,
+  the critical excess is 1.02 without the limit and flags nothing; with it, the parts are listed and the other ten
+  items' critical excess is 0.126. Declare such parts a testlet (`calibrate`'s `testlets`) rather than testing their
+  dependence. The default 4 is a labeled default: the calibrations of SAT12, LSAT7 and Science in the fixtures reach
+  slopes of 2.3.
+- **A pair or a testlet.** The rule flags pairs; the mean excess of a testlet's pairs, from `yenQ3` and `meanQ3`, against
+  the same critical excess judges a testlet as a whole.
+
 ## Limited-information fit
 
 `limitedInformationFit` tests a calibration on the first- and second-order margins of its test, where a test of all
@@ -473,75 +568,6 @@ first?.standardErrors[1]; // [2.3e-7, 0.0070, 0.017, 0.043, 0.011]
 On 2,000 seeded persons and 20 2PL items with slopes from 0.5 to 2, the curves are 0.059 from the true curves at the
 nodes in RMSE, where the normal scores stand for theta.
 
-## Recipe: a critical value for Q3
-
-Under local independence Q3 is near -1 / (k - 1) on average, and its spread depends on the persons, the items and the
-model, so no fixed cut such as 0.2 suits every data set (Christensen, Makransky and Horton, 2017). They compare each
-pair's excess over the mean Q3 with a critical value from a parametric bootstrap: data simulated from the fitted items,
-with the same number of persons and the same missing responses, calibrated again. The 95% quantile of the replicates'
-largest excess holds the chance of any false flag near 0.05.
-
-```mermaid
-flowchart LR
-  D["Responses"] --> C["calibrate, abilityEstimates, yenQ3"]
-  C --> E["Each pair's excess over the mean Q3"]
-  C --> S["Responses simulated from the fitted items"]
-  S --> B["calibrate, abilityEstimates, yenQ3 again:<br/>the replicate's largest excess"]
-  B -->|"40 times"| S
-  B --> Q["Critical value: the 95% quantile"]
-  E --> F["Pairs above it"]
-  Q --> F
-```
-
-```ts
-import { createRandom } from "@measurekit/psychometrics";
-import { buildResponseMatrix, type ResponseMatrix } from "@measurekit/psychometrics/data";
-import { yenQ3 } from "@measurekit/psychometrics/fit";
-import { abilityEstimates, calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
-import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
-
-// 1,000 persons answer 12 items; items 1 to 3 share a passage, which moves each person's theta for them by N(0, 1.5²).
-const random = createRandom(2026);
-const items = simulateItems(twoParameterLogistic, 12, random);
-const thetas = simulateThetas(1000, random);
-const passage = thetas.map((theta) => theta + 1.5 * random.normal());
-const rows = simulateResponses(items, thetas, random).responses.map((row, person) => [
-  ...(simulateResponses(items.slice(0, 3), [passage[person] ?? 0], random).responses[0] ?? []),
-  ...row.slice(3),
-]);
-
-// Each pair's Q3 and its excess over the mean Q3, after a calibration that takes the items as independent.
-const excesses = (matrix: ResponseMatrix) => {
-  const fit = calibrate(matrix, { model: twoParameterLogistic });
-  const scores = abilityEstimates(matrix, fit.items).map((estimate) => estimate.theta ?? 0);
-  const pairs = yenQ3(matrix, fit.items, scores).flatMap((row, i) =>
-    row.flatMap((q3, j) => (j > i && q3 !== null ? [{ pair: `${i + 1}-${j + 1}`, q3 }] : [])),
-  );
-  const mean = pairs.reduce((sum, { q3 }) => sum + q3, 0) / pairs.length;
-  return { fit, pairs: pairs.map(({ pair, q3 }) => ({ pair, q3, excess: q3 - mean })) };
-};
-const observed = excesses(buildResponseMatrix(rows));
-const largest = Array.from({ length: 40 }, () => {
-  // With missing responses, set the simulated ones to null where the observed are.
-  const simulated = simulateResponses(observed.fit.items, simulateThetas(1000, random), random);
-  return excesses(simulated).pairs.reduce((most, { excess }) => Math.max(most, excess), Number.NEGATIVE_INFINITY);
-}).sort((x, y) => x - y);
-const critical = largest[Math.ceil(0.95 * largest.length) - 1] ?? 0;
-
-critical; // 0.108
-observed.pairs.filter(({ excess }) => excess > critical).map(({ pair }) => pair); // ["1-2", "1-3", "2-3"]
-observed.pairs.filter(({ q3 }) => q3 > 0.2).length; // 0: the fixed cut flags none, as their Q3 is 0.106 at most
-```
-
-- **Near-deterministic items.** Where responses depend on theta almost alone, as parts of a task that one action
-  decides, the fitted slopes grow very large; the residuals are near 0 for most persons, Q3 rests on the few others,
-  and the replicates' largest excess spreads toward 1, so the rule flags nothing. Declare such parts a testlet
-  (`calibrate`'s `testlets`) rather than testing for their dependence.
-- **Replicates.** Each costs a calibration. The 95% quantile of 40 replicates is their 38th largest; a higher level,
-  such as 0.99, needs more of them.
-- **A pair or a testlet.** The rule flags pairs; the mean excess of a testlet's pairs against the same critical value
-  judges a testlet as a whole.
-
 ## Errors
 
 Invalid input throws `DataError` naming the value found.
@@ -556,6 +582,10 @@ Invalid input throws `DataError` naming the value found.
 | More than 60 items                                        | Test a part of the form, or use `summedScoreFit` for each item                          |
 | C2 of more than 1,830 moments                             | Test fewer items, or group the categories of items of many                              |
 | More than 1,000 items for `yenQ3` or local dependence     | Test the pairs of a part of the items, such as those that share a stimulus              |
+| Items of `yenQ3CriticalValue` without the matrix's ids    | Give the items of a calibration of the matrix, in its order                             |
+| An option of the bootstrap out of its range               | Give the replications, quantile, statistic, redraws, slope limit and estimator above    |
+| `"pairs"` of more than 2^24 pair excesses                 | Use fewer replications, or the statistic `"largest"`                                    |
+| A calibration option a replication's `calibrate` refuses  | Give the options that the calibration of the items took                                 |
 | Tables of local dependence of more than 2^24 cells        | Test fewer items, or group the categories of items of many                              |
 | `"m2"` with a polytomous item                             | Use `"m2-star"` or `"c2"`                                                               |
 | A nominal item                                            | Its categories have no order for the mean products to read                              |
@@ -575,6 +605,7 @@ Invalid input throws `DataError` naming the value found.
 
 | Topic                                                  | This package                                                                                     | Reference                                                                                                                                                                                                                                          |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The draws of the Q3 bootstrap                          | `createRandom`: other replications than mirt's                                                   | R's generator; the replications' largest excess agrees with mirt's in mean and SD within Monte Carlo error                                                                                                                                         |
 | Missing responses                                      | Infit and outfit skip them in every sum                                                          | eRm's infit sums W over every person                                                                                                                                                                                                               |
 | Small probabilities                                    | ln P of an observed category clamped at the smallest double                                      | mirt's `personfit` counts an observed category with P below 2.2e-16 as P = 1                                                                                                                                                                       |
 | Person mean squares                                    | As eRm                                                                                           | mirt's `personfit` raises W² below 1e-5 to 1e-5 and caps q at 1.4142                                                                                                                                                                               |
@@ -617,6 +648,8 @@ Invalid input throws `DataError` naming the value found.
   is the practice.
 - **Fit on two- and three-way margins.** Outside the sources: `limitedInformationFit` is the practice.
 - **Person-fit cutoffs by simulation.** No fit: a loop over `simulateResponses` and `correctedPersonFit`.
+- **The Q3 bootstrap of a calibration with groups, a latent regression or person weights.** Outside the sources:
+  Christensen, Makransky and Horton bootstrap a calibration of one standard normal population.
 - **Quadratic and uniform kernels.** Outside the sources: options of KernSmoothIRT, whose default is the Gaussian.
 - **A bandwidth by cross-validation.** Outside the sources: an option of KernSmoothIRT, whose default is Silverman's
   rule.

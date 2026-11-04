@@ -1,10 +1,12 @@
 import { test } from "vitest";
+import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
 import {
   abilityEstimates,
   andersenTest,
   buildResponseMatrix,
   calibrate,
   correctedPersonFit,
+  createRandom,
   itemFit,
   kernelItemCurves,
   limitedInformationFit,
@@ -19,6 +21,7 @@ import {
   type TestItem,
   twoParameterLogistic,
   yenQ3,
+  yenQ3CriticalValue,
 } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
@@ -42,6 +45,16 @@ test("computes the fit of 40 items to 2,000 persons", async (context) => {
   await benchmark(context, "fit.personFit", () => personFit(matrix, items, thetas));
   await benchmark(context, "fit.summedScoreFit", () => summedScoreFit(matrix, items));
   await benchmark(context, "fit.yenQ3", () => yenQ3(matrix, items, thetas));
+});
+
+test("bootstraps the critical value of Q3 of 40 items and 2,000 persons by 10 replications", async (context) => {
+  const options = { model: twoParameterLogistic, replications: 10 } as const;
+  await benchmark(
+    context,
+    "fit.yenQ3CriticalValue",
+    () => yenQ3CriticalValue(matrix, items, createRandom(1), options),
+    SLOW_OPTIONS,
+  );
 });
 
 test("computes lz*, kernel curves, M2*, the RMSD and local dependence of 40 items and 2,000 persons", async (context) => {

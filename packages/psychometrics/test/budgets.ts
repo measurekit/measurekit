@@ -78,6 +78,7 @@ const BUDGETS = {
   "fit.personFit": 50,
   "fit.summedScoreFit": 60,
   "fit.yenQ3": 60,
+  "fit.yenQ3CriticalValue": 20_000,
   "fit.correctedPersonFit": 30,
   "fit.kernelItemCurves": 200,
   "fit.limitedInformationFit": 700,
