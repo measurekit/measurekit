@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { SLOW_OPTIONS } from "../../../bench/harness.js";
+import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
 import { bkt } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import { type BenchBktFixture, readFixture } from "./fixtures.js";

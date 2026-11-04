@@ -498,8 +498,9 @@ changes only with the reason in the commit that changes it.
 
 ## Sizes
 
-Each entry point bundled alone, as a host's bundler makes it: minified with esbuild, `export *` of the entry, core from
-its sources. The modules each holds are those the import rules of [AGENTS.md](../AGENTS.md#dependencies) allow it, so
+Each entry point bundled alone, as a host's bundler makes it: minified with esbuild and code splitting on, `export *` of
+the entry, core from its sources. The bytes and the modules are those of the entry chunk and the chunks it imports
+statically, which load with it; a module that a dynamic `import()` loads later is a chunk of its own and is not counted. The modules each holds are those the import rules of [AGENTS.md](../AGENTS.md#dependencies) allow it, so
 that importing one module never pulls in the others; a module of a library is a folder of its `src/`, or `checks` and
 `model` for the files of those names. Every package declares `sideEffects: false`, so a named import from the root of a
 library holds only what that name needs: `cronbachAlpha` from `@measurekit/psychometrics` bundles to 3.3 KB, with

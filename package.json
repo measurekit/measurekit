@@ -1,5 +1,5 @@
 {
-  "name": "measurekit-monorepo",
+  "name": "measurekit",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.8.1",
@@ -25,7 +25,7 @@
     "check:audit": "pnpm audit --prod && pnpm audit --audit-level=high",
     "changeset": "changeset",
     "release": "pnpm build && changeset publish",
-    "prepare": "lefthook install"
+    "prepare": "node scripts/prepare.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

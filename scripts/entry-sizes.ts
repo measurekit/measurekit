@@ -1,4 +1,5 @@
-// The size of every entry point of the packages bundled alone, as a host's bundler makes it, and the modules it holds.
+// The size of every entry point of the packages bundled alone, as a host's bundler makes it, with code splitting on, and
+// the modules it holds.
 // `test/entry-sizes.test.ts` checks them against `size-budgets.ts`; `node scripts/entry-sizes.ts` prints them as the table
 // of docs/performance.md.
 
@@ -64,6 +65,8 @@ export interface Bundle {
 
 /**
  * Bundles a program that imports the sources of the packages, minified, with core from its sources, and measures it.
+ * The bundler splits the code, as a host's does: a module that a dynamic `import()` loads is a chunk of its own. The
+ * bytes and the modules are those of the entry chunk and the chunks that it imports statically, which load with it.
  *
  * @param program - The module to bundle; it names sources by absolute path.
  */
@@ -71,6 +74,7 @@ export async function bundle(program: string): Promise<Bundle> {
   const result = await build({
     stdin: { contents: program, resolveDir: PACKAGES, loader: "ts" },
     bundle: true,
+    splitting: true,
     write: false,
     metafile: true,
     format: "esm",
@@ -83,18 +87,28 @@ export async function bundle(program: string): Promise<Bundle> {
     absWorkingDir: PACKAGES,
     alias: { "@measurekit/core": resolve(PACKAGES, "core/src/index.ts") },
   });
-  const [output] = result.outputFiles;
-  if (output === undefined) throw new Error("The bundle has no output.");
-  // `inputs` lists every file the bundler read; the outputs say which of them still have code after tree shaking.
-  const files = Object.values(result.metafile.outputs).flatMap((bundled) =>
-    Object.entries(bundled.inputs).flatMap(([path, { bytesInOutput }]) =>
-      bytesInOutput > 0 ? [resolve(PACKAGES, path)] : [],
+  const outputs = result.metafile.outputs;
+  const entry = Object.keys(outputs).find((path) => outputs[path]?.entryPoint !== undefined);
+  if (entry === undefined) throw new Error("The bundle has no output.");
+  // The chunks that load with the entry: those that it, or a chunk that loads with it, imports statically.
+  const eager = new Set([entry]);
+  for (const path of eager) {
+    for (const { path: imported, kind } of outputs[path]?.imports ?? []) {
+      if (kind === "import-statement" && imported in outputs) eager.add(imported);
+    }
+  }
+  const files = result.outputFiles.filter(({ path }) => eager.has(relative(PACKAGES, path)));
+  // `inputs` lists every file the bundler read; the outputs say which of them still have code after tree shaking. The
+  // program itself is not a module of the packages.
+  const sources = [...eager].flatMap((path) =>
+    Object.entries(outputs[path]?.inputs ?? {}).flatMap(([file, { bytesInOutput }]) =>
+      bytesInOutput > 0 && file !== "<stdin>" ? [resolve(PACKAGES, file)] : [],
     ),
   );
   return {
-    raw: output.contents.length,
-    gzip: gzipSync(output.contents, { level: GZIP_LEVEL }).length,
-    modules: [...new Set(files.map(moduleOf))].sort(),
+    raw: files.reduce((sum, { contents }) => sum + contents.byteLength, 0),
+    gzip: files.reduce((sum, { contents }) => sum + gzipSync(contents, { level: GZIP_LEVEL }).byteLength, 0),
+    modules: [...new Set(sources.map(moduleOf))].sort(),
   };
 }
 

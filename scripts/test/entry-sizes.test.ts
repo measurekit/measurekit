@@ -17,6 +17,23 @@ describe("moduleOf", () => {
   });
 });
 
+describe("bundle", () => {
+  const Core = JSON.stringify(ENTRIES.get("@measurekit/core"));
+  const Ctt = JSON.stringify(ENTRIES.get("@measurekit/psychometrics/ctt"));
+
+  it(
+    "counts a module that a static import loads, and leaves out one that a dynamic import() loads later in a chunk of its own",
+    async () => {
+      const statically = await bundle(`export * from ${Core}; export * from ${Ctt};`);
+      const dynamically = await bundle(`export * from ${Core}; export const load = () => import(${Ctt});`);
+      expect(statically.modules).toContain("psychometrics/ctt");
+      expect(dynamically.modules).toEqual(["core"]);
+      expect(dynamically.gzip).toBeLessThan(statically.gzip);
+    },
+    BUNDLE_TIMEOUT,
+  );
+});
+
 describe("every entry point alone", () => {
   it("has a budget for each entry point of the packages, and none for a name that is not one", () => {
     expect(Object.keys(ENTRY_BUDGETS).sort()).toEqual([...ENTRIES.keys()].sort());

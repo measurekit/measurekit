@@ -102,12 +102,15 @@ packages/<package>/           src/<module>/index.ts is the public API of a modul
                               README.md, LICENSE, NOTICE, package.json, typedoc.json and the tsconfig files
 docs/<package>/               guides, which TypeDoc publishes with the API reference; docs/performance.md the benchmarks and sizes
 validation/<package>/         R and Python scripts that write the fixtures; validation/README.md lists them
-validation/benchmarks/        the inputs of the benchmarks and the timing of their references; bench/ their harness
+validation/benchmarks/        the inputs of the benchmarks and the timing of their references
 examples/<package>/           runnable examples; examples/test/ runs each of them, the samples of the guides and the
                               examples of the TSDoc
-scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts, check-release.ts, check-tarballs.ts and their tests; entry-sizes.ts
-                              bundles each entry point alone, against the budgets of size-budgets.ts in test/entry-sizes.test.ts;
-                              peak-memory.ts measures the readers of untrusted input, against their budgets in test/peak-memory.test.ts
+scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts, check-release.ts and check-tarballs.ts
+                              with their tests; prepare.ts installs the git hooks in a clone and skips them in a copy;
+                              bench-harness.ts is what the benchmarks of the packages share; entry-sizes.ts bundles each
+                              entry point alone, with code splitting, against the budgets of size-budgets.ts in
+                              test/entry-sizes.test.ts; peak-memory.ts measures the readers of untrusted input, against
+                              their budgets in test/peak-memory.test.ts
 biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
 ```
 
@@ -275,6 +278,9 @@ Knowledge tracing: the model families never import each other, nor does anything
   when the value is not finite. A response's probability enters a psychometrics log-likelihood as at least
   `MIN_PROBABILITY` of `irt/probability.ts`, through `logProbability`; knowledge tracing throws `DataError` for outcomes
   of probability 0.
+- Never spread an array whose length the input sets into the arguments of a call (`push`, `unshift`, `append`, `prepend`,
+  `replaceChildren`, `Math.max`, `Math.min`): above about 100,000 values that throws a `RangeError`. Loop over the values, or
+  spread into an array literal. `pnpm lint` fails on it in `packages/*/src` (`biome/no-spread-arguments.grit`).
 - A number with a meaning is a named constant with its source, such as the reference's name for it.
 - A capability is built when the sources of `docs/<package>/architecture.md` treat it as standard practice, a usable
   reference exists and it fits a library. The guide lists the rest under "Not included", one bullet for each method,
@@ -351,7 +357,8 @@ others. A new clone is merged into a helper of the module that owns the concept,
   to derive exactly.
 - A test reads a fixture with `readFixture<T>("name.json")` of its package's `test/fixtures.ts` and declares `T` for the
   fields it reads; a type that several files use goes in `fixtures.ts`. It never imports a JSON file: the type checker
-  builds a type for every element, and `pnpm lint` fails on the import.
+  builds a type for every element, and `pnpm lint` fails on the import. `resolveJsonModule` is off in
+  `tsconfig.base.json`: TypeScript 6 turns it on under `NodeNext` when the option is absent.
 - The numerics of `@measurekit/core` are validated by the fixtures of the packages that use them; core's tests cover its
   edge cases. Psychometrics `sim/` has no R reference, as R's generator differs from `createRandom`: seeded tests check its
   distributions, and a calibration recovers the items it simulates. A knowledge tracing model without a package of

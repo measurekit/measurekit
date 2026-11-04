@@ -284,8 +284,8 @@ function locationRow(
     }
   });
   for (const cell of cells) {
-    indices.push(...(cell?.indices ?? []));
-    coefficients.push(...(cell?.coefficients ?? []));
+    for (const index of cell?.indices ?? []) indices.push(index);
+    for (const coefficient of cell?.coefficients ?? []) coefficients.push(coefficient);
   }
   return { indices: Int32Array.from(indices), coefficients: Float64Array.from(coefficients) };
 }

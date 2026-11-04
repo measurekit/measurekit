@@ -1,6 +1,6 @@
 import { createRandom } from "@measurekit/core";
 import { test } from "vitest";
-import { SLOW_OPTIONS } from "../../../bench/harness.js";
+import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
 import {
   automatedItemSelection,
   buildResponseMatrix,

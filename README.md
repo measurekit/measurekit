@@ -77,9 +77,8 @@ packages/psychometrics/      @measurekit/psychometrics: src/, test/ with its fix
 packages/knowledge-tracing/  @measurekit/knowledge-tracing: src/, test/ with its fixtures, README.md
 docs/                        guides of each package, in a folder named after it
 validation/                  R and Python scripts that write the fixtures and time the references; README.md runs them
-bench/                       the harness that the benchmarks of the packages share
 examples/                    runnable examples, run by a test
-scripts/                     the checks of the standards, the rules and the licenses
+scripts/                     the checks of the repository, the harness that the benchmarks share and the size and memory budgets
 biome/                       GritQL lint rules
 ```
 

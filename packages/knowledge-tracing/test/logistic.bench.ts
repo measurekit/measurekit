@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { SLOW_OPTIONS } from "../../../bench/harness.js";
+import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
 import { afm, buildEventLog, type Event, logistic, searchRates } from "../src/index.js";
 import { checkTerms } from "../src/logistic/internal.js";
 import { benchmark } from "./budgets.js";

@@ -1,4 +1,4 @@
-import { benchmarksOf } from "../../../bench/harness.js";
+import { benchmarksOf } from "../../../scripts/bench-harness.js";
 
 /**
  * The most that the fastest sample of each benchmark may take, in milliseconds: five times the median of the fastest samples

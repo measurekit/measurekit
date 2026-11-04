@@ -120,7 +120,7 @@
           }
         }
       },
-      "plugins": ["./biome/no-math-random.grit", "./biome/no-spread-into-math.grit"]
+      "plugins": ["./biome/no-math-random.grit", "./biome/no-spread-arguments.grit"]
     },
     {
       "includes": ["packages/*/src/checks.ts", "packages/*/src/errors.ts"],

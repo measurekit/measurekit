@@ -132,7 +132,7 @@ function downsets(below: Uint8Array, m: number, maxStates: number): number[][] {
       }
       const state: number[] = [];
       chosen.forEach((flag, c) => {
-        if (flag === 1) state.push(...(classes[c] ?? []));
+        if (flag === 1) for (const member of classes[c] ?? []) state.push(member);
       });
       states.push(state.sort((x, y) => x - y));
       return;
