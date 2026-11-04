@@ -92,7 +92,7 @@ Rscript validation/psychometrics/longitudinal.R      # the same persons over two
 Rscript validation/psychometrics/longitudinal-recovery.R # how well mirt recovers the moments of the occasions, which bounds the recovery tests and the number of occasions
 Rscript validation/psychometrics/change.R            # gains, reliability of a difference and reliable change: clinicalsignificance and base R
 Rscript validation/psychometrics/parameterization.R  # mirt's coefficient forms of every item type, multidimensional ones included
-Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules
+Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules, eigendecompositions; reads the fixture of exploratory-factors.R
 ```
 
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,

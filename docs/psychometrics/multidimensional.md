@@ -124,8 +124,8 @@ nothing. [A recipe](#recipe-responses-missing-not-at-random) models omissions th
 - **Exploratory.** Every item loads on every dimension and the dimensions are uncorrelated. Rotating the loadings
   leaves the likelihood unchanged, so the first D - 1 items' slopes beyond their own index are fixed at 0 (item j loads
   on the first j dimensions): the solution is then determined up to the signs of the dimensions. The dimensions are
-  named `F1` to `FD`. EM starts from the first D eigenvectors of the items' correlations as loadings, converted to
-  slopes by a = 1.702 λ / √(1 - h²). Use `rotateLoadings` for a simpler structure. To explore the number of factors and
+  named `F1` to `FD`. EM starts from the first D eigenvectors of the items' correlations as loadings, each signed so
+  that its entries sum to at least 0, converted to slopes by a = 1.702 λ / √(1 - h²). Use `rotateLoadings` for a simpler structure. To explore the number of factors and
   their loadings from the correlations of the items, in milliseconds, use
   [`exploratoryFactorAnalysis`](dimensionality.md#exploratory-factor-analysis); this route estimates the item
   parameters by full information, in seconds.
@@ -441,9 +441,9 @@ and 8 s, on 60 dimensions 300 MB and 45 s. Use EM up to three dimensions, where 
 faster. The exploratory model of a weak second dimension converges slowly with EM; `maxIterations` bounds it.
 Calibration runs synchronously: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
 
-An exploratory model starts from the leading eigenvectors of the items' correlations, which the cyclic Jacobi method
-finds with all the others, in time that grows as the cube of the items: 3 minutes at 2,000 items, where base R's
-`eigen` takes a second. The correlations take the responses to each pair of items: 20 s for 1,000 persons who answered
+An exploratory model starts from the leading eigenvectors of the items' correlations, which Householder's reduction and
+the implicit QL algorithm find with all the others, in time that grows as the cube of the items: about 30 s at 2,000
+items, where base R's `eigen` takes 1.6 s. The correlations take the responses to each pair of items: 20 s for 1,000 persons who answered
 all 2,000, and 0.2 s for 20,000 persons who answered 2 of them each. mirt's start, which smooths the correlations by
 eigendecompositions until none of their eigenvalues is negative, took more than 20 minutes on the first of these.
 

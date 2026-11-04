@@ -836,6 +836,14 @@ export const RULES: readonly Rule[] = [
     titles: "takes at most 1,000 items",
   },
   {
+    rule: "A matrix with an entry that is not finite is not decomposed, as its QL iterations would each run to their limit, some 15 times the work of a finite matrix.",
+    file: "packages/psychometrics/src/math/eigen.ts",
+    find: "if (!work.every(Number.isFinite)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/math.test.ts",
+    titles: "decomposes no matrix with an entry that is not finite",
+  },
+  {
     rule: "Omega takes at most 1,000 items, so that a few persons answering many items do not cost a matrix of their square.",
     file: "packages/psychometrics/src/ctt/omega.ts",
     find: '  checkMatrixItems(k, "Omega");\n',

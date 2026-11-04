@@ -52,13 +52,18 @@ write_fixture("math-gauss-hermite", list(
 ))
 
 # Symmetric eigendecompositions by base R's eigen(symmetric = TRUE), which calls LAPACK dsyevr, an algorithm other than
-# the package's Jacobi method. Eigenvectors are stored by rows, in the order of the eigenvalues, largest first; they are
-# unique up to sign where the eigenvalues are distinct.
+# the package's Householder reduction and implicit QL. Eigenvectors are stored by rows, in the order of the eigenvalues,
+# largest first. An eigenvector is unique up to sign where its eigenvalue is apart from the others, and any algorithm
+# finds it to rounding over that gap: a row is null where the gap is below SEPARATION times the largest absolute
+# eigenvalue, or 1, so that the tests compare only the vectors that rounding leaves exact to their tolerance.
+SEPARATION <- 1e-3
 eigen_case <- function(name, matrix) {
   decomposition <- eigen(matrix, symmetric = TRUE)
-  distinct <- all(diff(decomposition$values) < -1e-8)
-  list(name = name, size = nrow(matrix), matrix = unname(matrix), values = I(decomposition$values),
-       vectors = if (distinct) unname(t(decomposition$vectors)) else NULL)
+  values <- decomposition$values
+  gaps <- vapply(seq_along(values), function(k) min(Inf, abs(values[k] - values[-k])), 0)
+  separated <- gaps > SEPARATION * max(1, abs(values))
+  list(name = name, size = nrow(matrix), matrix = unname(matrix), values = I(values),
+       vectors = lapply(seq_along(values), function(k) if (separated[k]) I(decomposition$vectors[, k]) else NULL))
 }
 
 set.seed(20261029)
@@ -68,15 +73,42 @@ repeated <- rotation %*% diag(c(5, 2, 2)) %*% t(rotation)
 repeated <- (repeated + t(repeated)) / 2
 lsat7_correlation <- cor(mirt::expand.table(mirt::LSAT7))
 bfi_correlation <- cor(psych::bfi[, 1:25], use = "pairwise.complete.obs")
+# A 40 by 40 matrix of normal entries made symmetric, whose eigenvalues spread from about -9 to 9.
+wigner <- matrix(rnorm(40 * 40), 40)
+wigner <- (wigner + t(wigner)) / 2
+# The correlations of 40 normal variables over 30 persons: of rank 29, so that 11 eigenvalues are 0 to rounding.
+few_persons <- cor(matrix(rnorm(30 * 40), 30))
+# Two eigenvalues 1e-9 apart, one of 1e-10 and one of 0.
+basis <- qr.Q(qr(matrix(rnorm(36), 6)))
+clustered <- basis %*% diag(c(4, 2 + 1e-9, 2, 1, 1e-10, 0)) %*% t(basis)
+clustered <- (clustered + t(clustered)) / 2
+
+# The correlation matrices that the tests of dimensionality analyse, from the fixture of exploratory-factors.R.
+factors <- jsonlite::fromJSON("packages/psychometrics/test/fixtures/dimensionality-factors.json", simplifyVector = FALSE)
+as_matrix <- function(rows) matrix(unlist(rows), nrow = length(rows), byrow = TRUE)
+factor_matrix <- function(name) as_matrix(Filter(function(entry) entry$name == name, factors$cases)[[1]]$matrix)
+smoothing_matrix <- function(name) as_matrix(Filter(function(entry) entry$name == name, factors$smoothing)[[1]]$raw)
+
 write_fixture("math-eigen", list(
-  source = paste("Base R eigen(symmetric = TRUE): a random symmetric matrix with negative eigenvalues, a matrix with a",
-                 "repeated eigenvalue, mirt::LSAT7's correlations, psych::bfi's pairwise correlations (25 items), and",
-                 "small matrices."),
+  source = paste("Base R eigen(symmetric = TRUE): random symmetric matrices with negative eigenvalues, a matrix with a",
+                 "repeated eigenvalue, one with two eigenvalues 1e-9 apart and two near 0, the correlations of 40",
+                 "variables over 30 persons, mirt::LSAT7's correlations, psych::bfi's pairwise correlations (25 items),",
+                 "the correlation matrices of dimensionality-factors.json, and small matrices."),
   cases = list(
     eigen_case("a random symmetric matrix with negative eigenvalues", random_symmetric),
     eigen_case("a matrix with a repeated eigenvalue", repeated),
     eigen_case("the correlations of LSAT7", lsat7_correlation),
     eigen_case("the pairwise correlations of bfi items 1 to 25", bfi_correlation),
+    eigen_case("a random symmetric 40 by 40 matrix", wigner),
+    eigen_case("the correlations of 40 variables over 30 persons, 11 eigenvalues of 0", few_persons),
+    eigen_case("a matrix with two eigenvalues 1e-9 apart and two near 0", clustered),
+    eigen_case("the tetrachoric correlations of 12 simulated items", factor_matrix("two factors, tetrachoric")),
+    eigen_case("the polychoric correlations of bfi items 1 to 25", factor_matrix("bfi, five factors, polychoric")),
+    eigen_case("the tetrachoric correlations of SAT12, with a negative eigenvalue", smoothing_matrix("SAT12, tetrachoric")),
+    eigen_case("the tetrachoric correlations of SAT12, smoothed", factor_matrix("SAT12, two factors, tetrachoric, smoothed")),
+    eigen_case("Harman's 24 psychological tests", factor_matrix("Harman's 24 tests, four factors")),
+    eigen_case("a one-factor matrix with a loading of 0.99999", factor_matrix("one factor with a communality beyond its bound")),
+    eigen_case("three correlations that are not positive definite", smoothing_matrix("three items")),
     eigen_case("a 2 by 2 matrix", matrix(c(2, 1, 1, 3), 2)),
     eigen_case("the identity matrix of order 3", diag(3)),
     eigen_case("one entry", matrix(-4, 1, 1))

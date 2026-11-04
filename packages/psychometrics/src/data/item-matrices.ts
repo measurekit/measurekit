@@ -2,8 +2,8 @@ import { DataError } from "@measurekit/core";
 
 /**
  * The most items of an analysis that holds a matrix of every pair of items, such as their correlations: at 1,000 items
- * the worst of them, an exploratory factor analysis, adds about 150 MB to the peak memory and its eigendecompositions
- * take minutes, while each matrix grows with the square of the items and its decompositions with their cube.
+ * the worst of them, an exploratory factor analysis, adds about 150 MB to the peak memory and takes about 15 s, while
+ * each matrix grows with the square of the items and its decompositions with their cube.
  */
 export const MAX_MATRIX_ITEMS = 1000;
 

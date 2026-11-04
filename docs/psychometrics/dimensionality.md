@@ -91,7 +91,7 @@ has at most 8 observed categories, psych's `max.cat`, as a pair's search takes t
 every pair of thresholds; items with more, such as scores, suit Pearson correlations, which every function here takes
 with `correlation: "pearson"`. Every analysis here holds matrices of every pair of items, and decomposes them in time
 that grows with the cube of the items, so a matrix has at most 1,000 items: at that size an exploratory factor analysis
-adds about 150 MB to the peak memory and takes minutes.
+adds about 150 MB to the peak memory and takes about 15 s.
 
 ## Parallel analysis
 

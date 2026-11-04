@@ -14,7 +14,7 @@ const RANK_TOLERANCE = Math.sqrt(Number.EPSILON);
  * about a tenth of the work of the eigendecomposition. It is certain that none is when the trace of the matrix, which is
  * at least its largest eigenvalue, times the trace of its inverse, which is at least the reciprocal of its smallest,
  * is below the reciprocal of the tolerance. The matrix must be finite and symmetric, which the function does not check.
- * The eigendecomposition is by the cyclic Jacobi method, O(size³) per sweep.
+ * The eigendecomposition is by Householder's reduction and the implicit QL algorithm, in about 8 size³ operations.
  */
 export function pseudoInverse(a: Float64Array, size: number): Float64Array {
   const inverse = invertPositiveDefinite(a, size);

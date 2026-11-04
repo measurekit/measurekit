@@ -123,18 +123,24 @@ name.
 
 ### Why the numerics are written here
 
-`math/` holds the numerics that this library alone needs: the eigendecomposition of a symmetric matrix by the cyclic
-Jacobi method, quadrature, rotation, the minimum residual fit, Newton's method and the noncentral chi-square. Of them,
-`ml-matrix` 6.15.1 covers the eigendecomposition, beside the singular value decomposition. The numerics both libraries
-share are in `@measurekit/core`, whose [README](../../packages/core/README.md#why-the-numerics-are-written-here) says
-why `ml-matrix` and `@stdlib` are not used for them.
+`math/` holds the numerics that this library alone needs: the eigendecomposition of a symmetric matrix by Householder's
+reduction to a tridiagonal matrix and the implicit QL algorithm, as EISPACK's tred2 and imtql2, quadrature, rotation, the
+minimum residual fit, Newton's method and the noncentral chi-square. Of them, `ml-matrix` 6.15.1 covers the
+eigendecomposition, beside the singular value decomposition. The numerics both libraries share are in
+`@measurekit/core`, whose [README](../../packages/core/README.md#why-the-numerics-are-written-here) says why `ml-matrix`
+and `@stdlib` are not used for them.
 
-| Eigendecomposition of a correlation matrix, measured 2026-11-04  | 25 items |   50 | 100 | 200 |
-| ---------------------------------------------------------------- | -------: | ---: | --: | --: |
-| `math/`, cyclic Jacobi (ms)                                      |     0.19 |  1.4 |  12 |  92 |
-| `ml-matrix`, Householder tridiagonalization and implicit QL (ms) |    0.058 | 0.22 | 1.7 |  13 |
+| Eigendecomposition of a sample correlation matrix, fastest sample, 2026-11-05 | 25 items |   50 | 100 | 200 |  1,000 |
+| ----------------------------------------------------------------------------- | -------: | ---: | --: | --: | -----: |
+| `math/`, Householder and implicit QL (ms)                                     |    0.059 | 0.34 | 2.4 |  21 |  3,200 |
+| `ml-matrix`, Householder and QL of JAMA (ms)                                  |    0.072 | 0.45 | 3.3 |  28 |  4,500 |
+| Cyclic Jacobi, in the same style (ms)                                         |     0.24 |  1.9 |  17 | 145 | 26,000 |
 
-The method makes the difference, not the library: Jacobi gives small eigenvalues to their relative accuracy and takes 3
-to 7 times as long as the QL method of JAMA that `ml-matrix` runs, which needs no dependency to be written in `math/`.
-At 25 items, the size of the benchmarks of dimensionality, it takes 0.19 ms; the analyses accept up to 1,000 items, and
-the gap grows with the order.
+The method makes the difference, not the library: the cyclic Jacobi method gives small eigenvalues to their relative
+accuracy, which no analysis here needs, and takes 4 to 8 times as long as the QL method, whose eigenvalues are exact to
+rounding relative to the largest, as LAPACK's are. Written in `math/`, with no dependency, the QL method takes 0.7 to 0.8
+times as long as `ml-matrix`'s on the same matrices, alternated in one process, and adds 16 MB to the peak at 1,000
+items, the most that the analyses of a matrix of items take. Base R's `eigen`, LAPACK's dsyevr through OpenBLAS, is
+faster above about 100 items ([performance](performance.md)): it reduces the matrix in blocks by native kernels, and
+finds the eigenvectors of the tridiagonal matrix by MRRR, in a time that grows with the square of its order, where the
+rotations of the QL method take half of its time.

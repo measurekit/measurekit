@@ -122,6 +122,11 @@ const BUDGETS = {
   "dimensionality.minimumAveragePartial": 70,
   "dimensionality.maximumLikelihoodFactors": 200,
   "dimensionality.omegaHierarchical": 200,
+  "dimensionality.smoothCorrelations25": 0.4, // laptop
+  "dimensionality.smoothCorrelations50": 3, // laptop
+  "dimensionality.smoothCorrelations100": 20, // laptop
+  "dimensionality.smoothCorrelations200": 200, // laptop
+  "dimensionality.smoothCorrelations1000": 20_000, // laptop
   "mokken.scalability": 20,
   "mokken.automatedItemSelection": 6,
   "mokken.monotonicity": 20,

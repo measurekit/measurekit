@@ -113,15 +113,14 @@ function locationStart(share: number, threshold: number): number {
 
 /**
  * Returns the sign of each item's loading on the leading eigenvector of the items' correlations over the persons who
- * answered both, as R's `cor(use = "pairwise")`, the vector signed so that its entries sum to at least 0, as psych's
- * `principal`. A correlation that is undefined, for a pair without two persons in common or without variance among
- * them, counts as 0, and a loading of 0 as positive.
+ * answered both, as R's `cor(use = "pairwise")`, whose entries sum to at least 0, as psych's `principal`. A correlation
+ * that is undefined, for a pair without two persons in common or without variance among them, counts as 0, and a loading
+ * of 0 as positive.
  */
 function loadingSigns(responses: CompressedResponses): number[] {
   const size = responses.itemIds.length;
   const leading = symmetricEigen(pairwiseCorrelations(responses), size).vectors.subarray(0, size);
-  const sum = leading.reduce((total, loading) => total + loading, 0);
-  return Array.from(leading, (loading) => ((sum < 0 ? -loading : loading) < 0 ? -1 : 1));
+  return Array.from(leading, (loading) => (loading < 0 ? -1 : 1));
 }
 
 /**

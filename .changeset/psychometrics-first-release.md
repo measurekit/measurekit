@@ -165,6 +165,10 @@ than five dimensions starts from a scan along the axes, so that it and MH-RM's l
 to the dimensions. A Gauss-Hermite rule holds for any number of points, and `readMirtMultidimensional` takes the
 coefficients first, as `readMirtIrt` does.
 
+Every eigendecomposition, of the analyses of correlations, the starts of exploratory and unfolding calibrations, the
+smoothing of correlations, pseudo-inverses and rotations, is by Householder's reduction and the implicit QL algorithm,
+which agree with base R's `eigen` within 1e-12 and take about 3 s at 1,000 items.
+
 The analyses of the pairs of items, the correlations, factors, parallel analysis, the minimum average partial test and
 the omegas, take at most 1,000 items, as each holds a matrix of every pair; so do local dependence, Yen's Q3 and every
 Mokken scale analysis but the imputation and the person fit indices, and Molenaar-Sijtsma reliability takes at most

@@ -65,9 +65,8 @@ export interface UnfoldingCalibration extends Calibration<UnfoldingParameters> {
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
 /**
- * The most items of an unfolding calibration: its starts decompose the correlations of every pair of items by the
- * Jacobi method, whose time grows with the cube of the items, about 5 seconds at 500 and 40 at 1,000, from data of any
- * size.
+ * The most items of an unfolding calibration: its starts decompose the correlations of every pair of items, in time that
+ * grows with the cube of the items, about 0.3 seconds at 500 and 3 at 1,000, from data of any size.
  */
 const MAX_ITEMS = 500;
 const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
