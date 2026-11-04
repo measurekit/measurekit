@@ -4582,6 +4582,53 @@ describe("the recipe for bootstrap standard errors", () => {
   });
 });
 
+describe("the recipe for an item with an empty category", () => {
+  it("collapses the empty end categories and writes the item back over every point with structural zeros", () => {
+    const random = createRandom(14);
+    const items = [
+      ...[-1, -0.5, 0, 0.3, 0.8, 1.2].map((b) => ({
+        model: twoParameterLogistic,
+        parameters: { a: 1.2, b, c: 0, d: 1 },
+      })),
+      {
+        model: generalizedPartialCredit,
+        parameters: { a: 0.8, b: [-5, -2.5, -1.6, -0.9, -0.3, 0.2, 0.8, 1.5, 2.4, 5] },
+      },
+    ];
+    const rows = simulateResponses(items, simulateThetas(500, random), random).responses;
+    const models: IrtModel<LogisticItem | ThresholdItem>[] = [
+      ...items.slice(0, 6).map(() => twoParameterLogistic),
+      generalizedPartialCredit,
+    ];
+    expect(() => calibrate(buildResponseMatrix(rows), { model: models })).toThrow(
+      'Item "item7" has no response in category 0',
+    );
+    const scores = rows.flatMap((row) => (row[6] === null || row[6] === undefined ? [] : [row[6]]));
+    const lowest = scores.reduce((least, score) => Math.min(least, score));
+    const highest = scores.reduce((most, score) => Math.max(most, score));
+    expect([lowest, highest]).toEqual([1, 9]);
+    const collapsed = rows.map((row) => row.map((score, j) => (j === 6 && score !== null ? score - lowest : score)));
+    const fit = calibrate(buildResponseMatrix(collapsed), { model: models });
+    const { a, b } = defined(fit.items[6]).parameters as ThresholdItem;
+    const reach = 6 + 30 / a;
+    const thresholds = Array.from({ length: 10 }, (_, k) =>
+      k < lowest ? -reach : k >= highest ? reach : (b[k - lowest] ?? 0),
+    );
+    const text = { model: generalizedPartialCredit, parameters: { a, b: thresholds } };
+    const table = summedScoreTable([...fit.items.slice(0, 6), text]);
+    expect(table).toHaveLength(17);
+    expectClose(defined(table[0]).probability, 3.9e-17, 0.05e-17, "probability of 0");
+    expectClose(defined(defined(table[1]).theta), -1.993, 5e-4, "theta of 1");
+    // The table over the points is the collapsed one moved by the lowest point, with structural zeros at the ends.
+    const shorter = summedScoreTable(fit.items);
+    shorter.forEach((row, score) => {
+      expectClose(defined(table[score + lowest]).probability, row.probability, 1e-12, `probability of ${score}`);
+      expectClose(defined(table[score + lowest]?.theta), defined(row.theta), 1e-9, `theta of ${score}`);
+    });
+    expect(defined(table.at(-1)).probability).toBeLessThan(1e-12);
+  });
+});
+
 describe("properties", () => {
   it("a shift of every threshold leaves the conditional probability of a response pattern unchanged", () => {
     const item = fc.array(fc.double({ min: -3, max: 3, noNaN: true }), { minLength: 1, maxLength: 3 });

@@ -473,6 +473,75 @@ first?.standardErrors[1]; // [2.3e-7, 0.0070, 0.017, 0.043, 0.011]
 On 2,000 seeded persons and 20 2PL items with slopes from 0.5 to 2, the curves are 0.059 from the true curves at the
 nodes in RMSE, where the normal scores stand for theta.
 
+## Recipe: a critical value for Q3
+
+Under local independence Q3 is near -1 / (k - 1) on average, and its spread depends on the persons, the items and the
+model, so no fixed cut such as 0.2 suits every data set (Christensen, Makransky and Horton, 2017). They compare each
+pair's excess over the mean Q3 with a critical value from a parametric bootstrap: data simulated from the fitted items,
+with the same number of persons and the same missing responses, calibrated again. The 95% quantile of the replicates'
+largest excess holds the chance of any false flag near 0.05.
+
+```mermaid
+flowchart LR
+  D["Responses"] --> C["calibrate, abilityEstimates, yenQ3"]
+  C --> E["Each pair's excess over the mean Q3"]
+  C --> S["Responses simulated from the fitted items"]
+  S --> B["calibrate, abilityEstimates, yenQ3 again:<br/>the replicate's largest excess"]
+  B -->|"40 times"| S
+  B --> Q["Critical value: the 95% quantile"]
+  E --> F["Pairs above it"]
+  Q --> F
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix, type ResponseMatrix } from "@measurekit/psychometrics/data";
+import { yenQ3 } from "@measurekit/psychometrics/fit";
+import { abilityEstimates, calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 1,000 persons answer 12 items; items 1 to 3 share a passage, which moves each person's theta for them by N(0, 1.5²).
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 12, random);
+const thetas = simulateThetas(1000, random);
+const passage = thetas.map((theta) => theta + 1.5 * random.normal());
+const rows = simulateResponses(items, thetas, random).responses.map((row, person) => [
+  ...(simulateResponses(items.slice(0, 3), [passage[person] ?? 0], random).responses[0] ?? []),
+  ...row.slice(3),
+]);
+
+// Each pair's Q3 and its excess over the mean Q3, after a calibration that takes the items as independent.
+const excesses = (matrix: ResponseMatrix) => {
+  const fit = calibrate(matrix, { model: twoParameterLogistic });
+  const scores = abilityEstimates(matrix, fit.items).map((estimate) => estimate.theta ?? 0);
+  const pairs = yenQ3(matrix, fit.items, scores).flatMap((row, i) =>
+    row.flatMap((q3, j) => (j > i && q3 !== null ? [{ pair: `${i + 1}-${j + 1}`, q3 }] : [])),
+  );
+  const mean = pairs.reduce((sum, { q3 }) => sum + q3, 0) / pairs.length;
+  return { fit, pairs: pairs.map(({ pair, q3 }) => ({ pair, q3, excess: q3 - mean })) };
+};
+const observed = excesses(buildResponseMatrix(rows));
+const largest = Array.from({ length: 40 }, () => {
+  // With missing responses, set the simulated ones to null where the observed are.
+  const simulated = simulateResponses(observed.fit.items, simulateThetas(1000, random), random);
+  return excesses(simulated).pairs.reduce((most, { excess }) => Math.max(most, excess), Number.NEGATIVE_INFINITY);
+}).sort((x, y) => x - y);
+const critical = largest[Math.ceil(0.95 * largest.length) - 1] ?? 0;
+
+critical; // 0.108
+observed.pairs.filter(({ excess }) => excess > critical).map(({ pair }) => pair); // ["1-2", "1-3", "2-3"]
+observed.pairs.filter(({ q3 }) => q3 > 0.2).length; // 0: the fixed cut flags none, as their Q3 is 0.106 at most
+```
+
+- **Near-deterministic items.** Where responses depend on theta almost alone, as parts of a task that one action
+  decides, the fitted slopes grow very large; the residuals are near 0 for most persons, Q3 rests on the few others,
+  and the replicates' largest excess spreads toward 1, so the rule flags nothing. Declare such parts a testlet
+  (`calibrate`'s `testlets`) rather than testing for their dependence.
+- **Replicates.** Each costs a calibration. The 95% quantile of 40 replicates is their 38th largest; a higher level,
+  such as 0.99, needs more of them.
+- **A pair or a testlet.** The rule flags pairs; the mean excess of a testlet's pairs against the same critical value
+  judges a testlet as a whole.
+
 ## Errors
 
 Invalid input throws `DataError` naming the value found.

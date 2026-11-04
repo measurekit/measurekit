@@ -761,6 +761,59 @@ shrunken[2]; // { id: "item3", delta: -0.86 }, from -2.29
 Its test compares with `sirt::dif.variance`. That function's `eb.dif` is λ (d - d̄) + (1 - λ) d̄, the shrunken estimate only
 when d̄ is 0, so the test passes it centered values and adds d̄ back.
 
+## Recipe: power by focal group size
+
+ETS's categories are effect sizes, judged by MH D-DIF and its standard error, and `mantelHaenszel` classifies at any
+group size. A small focal group gives MH D-DIF a large standard error, so an item with DIF is classified A more often:
+a category of A says little about an item when the focal group is small. A simulation of the planned groups gives the
+chance of finding an item of each size.
+
+```mermaid
+flowchart LR
+  P["Planned groups: 700 reference, n focal"] --> S["Simulate, with one item of size C and one of size B"]
+  S --> M["mantelHaenszel"]
+  M -->|"100 times"| S
+  M --> R["Share of replicates that classify each item B or C"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { type DifGroup, mantelHaenszel } from "@measurekit/psychometrics/dif";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// 20 items; for the focal group item 1 is one point harder, an MH D-DIF of -2.1 (size C) in large groups, and item 2
+// half a point, -1.1 (size B).
+const random = createRandom(2026);
+const items = simulateItems(twoParameterLogistic, 20, random);
+const focalItems = items.map((item, j) => {
+  const shift = j === 0 ? 1 : j === 1 ? 0.5 : 0;
+  return { ...item, parameters: { ...item.parameters, b: item.parameters.b + shift } };
+});
+const found = (focal: number) => {
+  const flagged = [0, 0];
+  for (let replication = 0; replication < 100; replication++) {
+    const rows = [
+      ...simulateResponses(items, simulateThetas(700, random), random).responses,
+      ...simulateResponses(focalItems, simulateThetas(focal, random), random).responses,
+    ];
+    const groups: DifGroup[] = rows.map((_, person) => (person < 700 ? "reference" : "focal"));
+    const result = mantelHaenszel(buildResponseMatrix(rows), groups).items;
+    for (const j of [0, 1]) if (result[j]?.etsCategory !== "A") flagged[j] = (flagged[j] ?? 0) + 1;
+  }
+  return flagged.map((count) => count / 100);
+};
+found(100); // [0.9, 0.44]: the shares that classify item 1 (size C) and item 2 (size B) as B or C
+found(200); // [0.99, 0.58]
+found(500); // [1, 0.58]
+```
+
+Item 1 is found in 0.9 of the replicates at 100 focal persons and nearly always from 200. Item 2, whose MH D-DIF lies
+near the bound of 1 between A and B, is classified B or C in about half of them at every size: its estimate falls on
+either side of the bound. A floor on the focal group, below which items are reported as not screened, follows from
+the share a program needs; the same simulation with the program's items, groups and sizes of DIF gives its own.
+
 ## Errors
 
 Invalid input throws `DataError` naming the value found.

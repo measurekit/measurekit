@@ -1089,6 +1089,74 @@ fit.items.slice(0, 2).map((item, j) => ({
 The bootstrap likelihood ratio resamples the persons the same way and recomputes the [nested-model
 chi-square](#recipe-nested-model-chi-square) for each.
 
+## Recipe: an item with an empty category
+
+An estimated item has the categories up to its highest response, and `calibrate` refuses one whose lower categories have
+no response, as their thresholds have no finite estimate: a text of ten gaps scored 0 to 10 that nobody scored 0 on.
+An empty top category only shortens the item. Either way the calibrated item no longer reads the points that a total
+sums. The recipe collapses the empty end categories, calibrates, and writes the item back over every point with
+structural zeros: thresholds beyond every node, so that the empty categories have no probability.
+
+```mermaid
+flowchart LR
+  R["Responses 1 to 9 of an item scored 0 to 10"] --> S["Subtract the lowest: categories 0 to 8"]
+  S --> C["calibrate"]
+  C --> W["Thresholds over points 1 to 10: -reach below the lowest,<br/>the estimates, +reach above the highest"]
+  W --> T["Tables and scores over every point"]
+```
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import {
+  calibrate,
+  generalizedPartialCredit,
+  type IrtModel,
+  type LogisticItem,
+  summedScoreTable,
+  type ThresholdItem,
+  twoParameterLogistic,
+} from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// Items 1 to 6 are scored 0 or 1; item 7, a text of ten gaps, 0 to 10. Of 500 persons, nobody scored 0 or 10 on it.
+const random = createRandom(14);
+const items = [
+  ...[-1, -0.5, 0, 0.3, 0.8, 1.2].map((b) => ({ model: twoParameterLogistic, parameters: { a: 1.2, b, c: 0, d: 1 } })),
+  { model: generalizedPartialCredit, parameters: { a: 0.8, b: [-5, -2.5, -1.6, -0.9, -0.3, 0.2, 0.8, 1.5, 2.4, 5] } },
+];
+const rows = simulateResponses(items, simulateThetas(500, random), random).responses;
+const models: IrtModel<LogisticItem | ThresholdItem>[] = [
+  ...items.slice(0, 6).map(() => twoParameterLogistic),
+  generalizedPartialCredit,
+];
+// calibrate(buildResponseMatrix(rows), { model: models }) throws: item7 has no response in category 0.
+
+const scores = rows.flatMap((row) => (row[6] === null || row[6] === undefined ? [] : [row[6]]));
+const lowest = scores.reduce((least, score) => Math.min(least, score)); // 1
+const highest = scores.reduce((most, score) => Math.max(most, score)); // 9
+const collapsed = rows.map((row) => row.map((score, j) => (j === 6 && score !== null ? score - lowest : score)));
+const fit = calibrate(buildResponseMatrix(collapsed), { model: models });
+
+// Back over the points 0 to 10: a threshold 30 / a beyond the last node, 6, leaves an empty category a probability
+// below e^-30 at every node.
+const { a, b } = fit.items[6]?.parameters as ThresholdItem;
+const reach = 6 + 30 / a;
+const thresholds = Array.from({ length: 10 }, (_, k) =>
+  k < lowest ? -reach : k >= highest ? reach : (b[k - lowest] ?? 0),
+);
+const text = { model: generalizedPartialCredit, parameters: { a, b: thresholds } };
+const table = summedScoreTable([...fit.items.slice(0, 6), text]);
+table.length; // 17: the totals 0 to 16
+table[0]?.probability; // 3.9e-17: nobody scores 0, as nobody scored 0 on the text
+table[1]?.theta; // -1.993, the collapsed calibration's theta of its total 0
+```
+
+The table over the points is the table of the collapsed items moved by the lowest point, with structural zeros at the
+totals no one can reach. The same holds for a graded item, whose thresholds take the same values in order. An empty
+category inside the range has no such fix that keeps the points: merging it with a neighbor changes the item's scoring,
+which is a decision for its author, so review the item.
+
 ## Adding a model
 
 A model is an object implementing `IrtModel<TParameters>`. Calibration, ability estimation, information, adaptive and

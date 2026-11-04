@@ -2,6 +2,7 @@ import { chiSquareUpperTail, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  abilityEstimates,
   andersenTest,
   buildResponseMatrix,
   type CalibratedItem,
@@ -1591,6 +1592,47 @@ describe("kernelItemCurves", () => {
     );
     expect(() => kernelItemCurves(matrix, JSON.parse('{ "bandwidth": null }'))).toThrow(
       "The option bandwidth must be a positive number, found null.",
+    );
+  });
+});
+
+describe("the recipe for a critical value for Q3", () => {
+  it("flags the pairs of a passage, which the fixed cut 0.2 misses, and no other pair", () => {
+    const random = createRandom(2026);
+    const items = simulateItems(twoParameterLogistic, 12, random);
+    const thetas = simulateThetas(1000, random);
+    const passage = thetas.map((theta) => theta + 1.5 * random.normal());
+    const rows = simulateResponses(items, thetas, random).responses.map((row, person) => [
+      ...(simulateResponses(items.slice(0, 3), [passage[person] ?? 0], random).responses[0] ?? []),
+      ...row.slice(3),
+    ]);
+    const excesses = (matrix: ResponseMatrix) => {
+      const fit = calibrate(matrix, { model: twoParameterLogistic });
+      const scores = abilityEstimates(matrix, fit.items).map((estimate) => estimate.theta ?? 0);
+      const pairs = yenQ3(matrix, fit.items, scores).flatMap((row, i) =>
+        row.flatMap((q3, j) => (j > i && q3 !== null ? [{ pair: `${i + 1}-${j + 1}`, q3 }] : [])),
+      );
+      const mean = pairs.reduce((sum, { q3 }) => sum + q3, 0) / pairs.length;
+      return { fit, pairs: pairs.map(({ pair, q3 }) => ({ pair, q3, excess: q3 - mean })) };
+    };
+    const observed = excesses(buildResponseMatrix(rows));
+    const largest = Array.from({ length: 40 }, () => {
+      const simulated = simulateResponses(observed.fit.items, simulateThetas(1000, random), random);
+      return excesses(simulated).pairs.reduce((most, { excess }) => Math.max(most, excess), Number.NEGATIVE_INFINITY);
+    }).sort((x, y) => x - y);
+    const critical = largest[Math.ceil(0.95 * largest.length) - 1] ?? 0;
+    expectClose(critical, 0.108, 5e-4, "critical excess");
+    expect(observed.pairs.filter(({ excess }) => excess > critical).map(({ pair }) => pair)).toEqual([
+      "1-2",
+      "1-3",
+      "2-3",
+    ]);
+    expect(observed.pairs.filter(({ q3 }) => q3 > 0.2)).toHaveLength(0);
+    expectClose(
+      observed.pairs.reduce((most, { q3 }) => Math.max(most, q3), Number.NEGATIVE_INFINITY),
+      0.106,
+      5e-4,
+      "largest Q3",
     );
   });
 });

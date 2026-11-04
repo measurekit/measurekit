@@ -2516,6 +2516,44 @@ describe("the recipe for DIF variance", () => {
   });
 });
 
+describe("the recipe for power by focal group size", () => {
+  it("finds an item of size C more often in a larger focal group, and one of size B near its bound about half the time", () => {
+    const random = createRandom(2026);
+    const items = simulateItems(twoParameterLogistic, 20, random);
+    const focalItems = items.map((item, j) => {
+      const shift = j === 0 ? 1 : j === 1 ? 0.5 : 0;
+      return { ...item, parameters: { ...item.parameters, b: item.parameters.b + shift } };
+    });
+    const found = (focal: number) => {
+      const flagged = [0, 0];
+      for (let replication = 0; replication < 100; replication++) {
+        const rows = [
+          ...simulateResponses(items, simulateThetas(700, random), random).responses,
+          ...simulateResponses(focalItems, simulateThetas(focal, random), random).responses,
+        ];
+        const groups: DifGroup[] = rows.map((_, person) => (person < 700 ? "reference" : "focal"));
+        const result = mantelHaenszel(buildResponseMatrix(rows), groups).items;
+        for (const j of [0, 1]) if (result[j]?.etsCategory !== "A") flagged[j] = (flagged[j] ?? 0) + 1;
+      }
+      return flagged.map((count) => count / 100);
+    };
+    expect(found(100)).toEqual([0.9, 0.44]);
+    expect(found(200)).toEqual([0.99, 0.58]);
+    expect(found(500)).toEqual([1, 0.58]);
+    // The sizes the comment of the guide states, from 20,000 persons a group.
+    const large = createRandom(1);
+    const rows = [
+      ...simulateResponses(items, simulateThetas(20_000, large), large).responses,
+      ...simulateResponses(focalItems, simulateThetas(20_000, large), large).responses,
+    ];
+    const groups: DifGroup[] = rows.map((_, person) => (person < 20_000 ? "reference" : "focal"));
+    const [first, second] = mantelHaenszel(buildResponseMatrix(rows), groups).items;
+    expect([first?.etsCategory, second?.etsCategory]).toEqual(["C", "B"]);
+    expectClose(defined(first?.delta), -2.1, 0.05, "MH D-DIF of item 1");
+    expectClose(defined(second?.delta), -1.1, 0.05, "MH D-DIF of item 2");
+  });
+});
+
 describe("properties", () => {
   it("IRT likelihood-ratio chi-squares do not change when the groups swap", () => {
     const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
