@@ -135,6 +135,25 @@ The sample is sorted once and each rank found by binary search, so n scores and 
 at least one finite score, and the ranks are on the sample's own scale: norms of scale scores take a sample of scale
 scores and, as `scores`, a table's.
 
+A norm sample drawn by a survey design stands for its population only through its weights. With `personWeights`, a
+positive survey weight for each score of the sample, the rank is the weighted share: 100 (W(s < x) + W(s = x) / 2) / W,
+the mean of Hmisc's weighted distribution function `wtd.Ecdf` at x and just below it. Equal weights give the unweighted
+ranks, a whole weight counts a person as many times, and only the ratios of the weights matter.
+
+```mermaid
+flowchart LR
+  S["Norm sample: scores and person weights"] --> O["Sorted once: the weight below and at each score"]
+  O --> R["Rank of x: 100 (W below + W at / 2) / W"]
+  S --> N["normStatistics: weighted mean, SD, z, ranks, stanines"]
+  N --> E["Standard errors: the delta method over the weights"]
+```
+
+```ts continues
+// Three persons sampled from a stratum at a third of the others' rate stand for three persons each.
+const personWeights = [3, 3, 3, 1, 1, 1, 1, 1, 1, 1];
+percentileRanks(sample, [480, 500, 600, 800], { personWeights }); // [37.5, 56.25, 78.125, 100]
+```
+
 `normStatistics(scores, options)` gives the norms of a sample with the standard errors that a norm sample's size
 leaves, as mokken's `check.norms` (Oosterhuis, van der Ark and Sijtsma, 2016), step 9 of a
 [Mokken scale analysis](mokken.md). Each is an `EstimateInterval`: `estimate`, `standardError`, `lower` and `upper`.
@@ -146,13 +165,21 @@ leaves, as mokken's `check.norms` (Oosterhuis, van der Ark and Sijtsma, 2016), s
 | `scores`   | For each distinct score from the lowest: `score`, its `z`, (score - mean) / SD, and its `percentile` rank, as `percentileRanks` |
 | `stanines` | The eight boundaries of the stanines, mean + c SD for c from -1.75 to 1.75 by 0.5                                               |
 
-| Option  | Default | Meaning                                                                              |
-| ------- | ------- | ------------------------------------------------------------------------------------ |
-| `level` | `0.95`  | The level of the intervals, above 0 and below 1: estimate ± its normal quantile × SE |
+| Option          | Default                      | Meaning                                                                              |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------------ |
+| `level`         | `0.95`                       | The level of the intervals, above 0 and below 1: estimate ± its normal quantile × SE |
+| `personWeights` | every person weighs the same | A positive survey weight for each score, as `percentileRanks` takes it               |
 
 The standard errors are the delta method over the numbers of persons with each score, taken as multinomial: for a
 statistic f of the counts n_k, Var f = Σ n_k (∂f/∂n_k)² - (Σ n_k ∂f/∂n_k)² / N. The mean's is the SD with
 denominator N over √N.
+
+With `personWeights`, each person's weight w_l enters a statistic f through the total weight at each score, and
+Var f = Σ_l (u_l - ū)² with u_l = w_l ∂f/∂w_l: with equal weights, the multinomial delta method above. It is the
+linearization of a survey's estimators with one stage and no strata, as the survey package's `svymean` computes it,
+without its factor n / (n - 1). The weighted variance is n / (n - 1) times the weighted mean of the squared deviations,
+for n persons, as `svyvar` defines it. The standard errors are those of persons drawn independently with those weights:
+the strata and clusters of a design change them, and need the design itself ([not included](#not-included)).
 
 ```ts continues
 import { normStatistics } from "@measurekit/psychometrics/scaling";
@@ -167,6 +194,12 @@ norms.stanines.map(({ estimate }) => estimate); // [401.531, 446.808, 492.085, 5
 
 The scores are finite numbers, at least two and not all equal. A sample of ten gives wide intervals: the percentile of
 480 above runs from -0.6 to 40.6, which is why norms need large samples.
+
+```ts continues
+const weighted = normStatistics(sample, { personWeights });
+weighted.mean.estimate; // 522.5, below 560 as the low scores weigh more
+weighted.scores[1]?.percentile; // { estimate: 37.5, standardError: 13.666, lower: 10.715, upper: 64.285 }
+```
 
 ## Predicting an official score
 
@@ -460,8 +493,8 @@ included](#not-included)).
 
 - **Smoothed or continuous norming.** Outside the sources: a clinical practice with competing models (`cNORM`); it needs
   a norming model, not a rank.
-- **Weighted norm samples.** Outside the sources: a clinical practice with competing models; they need a norming model,
-  not a rank.
+- **The standard errors of a stratified or clustered design.** No fit: the design's strata and clusters, which the
+  survey package's `svydesign` describes, set them; the weights alone give those of independent draws.
 - **Growth during practice.** No fit: learning models live in `@measurekit/knowledge-tracing`.
 - **Model-based percentiles Φ((θ - μ) / σ).** No fit: one line with a `GroupDistribution`'s `mean` and `sd`.
 - **Scale anchoring.** No reference: descriptive work on a calibrated bank with no statistic of its own.
@@ -484,6 +517,7 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `scaleConversion`                                          | Equivalents or a conversion that are not finite numbers, or an empty conversion                                                          | Give the equated scores and the form's unrounded scale scores                    |
 | `scaleGrowth`                                              | Fewer than two groups, a label that is empty or repeats, a mean that is not finite, or a standard deviation not above 0                  | Give each grade its own label and moments, in the order of the scale             |
 | `percentileRanks`, `normStatistics`                        | A sample without finite scores, or, for norms, fewer than two scores or scores that do not vary                                          | Give the norm sample's scores                                                    |
+| `percentileRanks`, `normStatistics`                        | `personWeights` that are not a positive number for each score of the sample                                                              | Give a survey weight above 0 for each person                                     |
 | `normStatistics`, `predictFormScore`, `predictThetaScore`  | A `level` not between 0 and 1                                                                                                            | Give a probability such as 0.95                                                  |
 | `predictFormScore`, `predictThetaScore`, `drawJointThetas` | A distribution of theta whose nodes are not finite or whose weights do not sum to 1 within 1e-6                                          | Pass a posterior such as `thetaPosterior` returns                                |
 | `predictThetaScore`                                        | A scale without finite `lowest` and `highest` and a `step` above 0, or of more than 10,000 reportable scores                             | Bound the scale and use a step that reports at most 10,000 scores                |
@@ -499,6 +533,8 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | True-score theta            | The root of the curve; the range's end where there is none      | A procedure of each program for scores below the guessing level                                            |
 | Percentile ranks            | Of the sample's scores as given; a step function between scores | Kolen and Brennan interpolate linearly within each integer score                                           |
 | Intervals of norms          | The normal quantile of the level                                | `check.norms` uses 1.96                                                                                    |
+| Weighted standard errors    | The delta method over the weights, Σ (u_l - ū)²                 | survey's `svymean` and `svyvar` multiply the variance by n / (n - 1)                                       |
+| Weighted SD                 | `svyvar`'s: n / (n - 1) × the weighted mean square              | Hmisc's `wtd.var(normwt = TRUE)` divides by W - Σ w² / W, as reliability weights do                        |
 | Standard errors of z scores | The delta method                                                | `check.norms` subtracts the term (Σ n_k ∂f/∂n_k)² / N twice, which lowers them by up to 3e-6 of their size |
 | Error of reported scores    | Of the rounded and bounded scores of the table                  | Kolen, Zeng and Hanson give the error before rounding too: slope × SEM(θ)                                  |
 | Joint draws                 | A Gaussian copula over separate posteriors                      | mirt's `fscores(plausible.draws =)`: one model's joint posterior                                           |

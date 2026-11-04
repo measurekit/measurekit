@@ -38,7 +38,7 @@ Use these words with these meanings in code, comments and docs.
 | profile, Q-matrix  | A profile marks each attribute mastered (1) or not (0); a Q-matrix lists each item's attributes by item id.                |
 | record             | One response in long format, `{ person, item, response }`, for sparse data.                                                |
 | group              | A set of persons with its own distribution of theta in calibration; in DIF, `"reference"` or `"focal"`.                    |
-| person weight      | A person's survey weight in calibration, `personWeights`: never a node's weight of a distribution of theta (`weights`).    |
+| person weight      | A person's survey weight in calibration and norms, `personWeights`: never a node's weight of theta (`weights`).            |
 | bundle             | Items that DIF studies as one, by the sum of their scores, such as those of a reading passage.                             |
 | occasion           | One administration of the same items to the same persons; a longitudinal calibration gives each its own trait.             |
 | testlet            | Items that share a stimulus, such as a reading passage; the testlet model adds one effect per person and testlet.          |

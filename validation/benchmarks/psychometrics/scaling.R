@@ -14,7 +14,14 @@ joint_posteriors <- lapply(seq_len(joint_count), function(k) {
 })
 joint_correlation <- matrix(0.6, joint_count, joint_count)
 diag(joint_correlation) <- 1
-bench_fixture("psychometrics", "scaling", list(posteriors = joint_posteriors, correlation = joint_correlation))
+# A norm sample of a survey design: 10,000 total scores from 0 to 60, each with a lognormal weight.
+norm_persons <- 10000
+norm_scores <- rbinom(norm_persons, 60, 0.55)
+norm_weights <- round(exp(rnorm(norm_persons, 0, 0.6)), 4)
+bench_fixture("psychometrics", "scaling", list(
+  posteriors = joint_posteriors, correlation = joint_correlation,
+  norms = list(scores = norm_scores, personWeights = norm_weights)
+))
 
 # A posterior is a distribution function that is linear within the cell of each node, the cells running between the
 # midpoints of neighboring nodes and mirrored at the ends: the draws are its inverse at pnorm of the normal scores. The
@@ -35,6 +42,8 @@ bench_task("scaling.drawJointThetas", "Joint draws of theta from separate poster
            reference("mvtnorm", "rmvnorm(method = \"eigen\")"), joint_draw,
            note = "the posteriors' distribution functions are inverted by base R's approx")
 
+bench_task("scaling.normStatisticsWeighted", "Norms of a weighted sample: mean, SD, z and rank of each score, stanines, standard errors",
+           sprintf("%s persons, %d distinct scores", count(norm_persons), length(unique(norm_scores))))
 bench_task("scaling.conversionTableEapSum", "A conversion table of the posterior mean of theta given each summed score", "40 items")
 bench_task("scaling.conversionTableTrueScore", "A conversion table of the theta of each summed true score", "40 items")
 bench_task("standardSetting.bookmarkCutScore", "The cut score of a bookmark in an ordered item booklet", "40 items")

@@ -86,6 +86,7 @@ export {
   type CompressedResponses,
   categoryTallies,
   checkCategories,
+  checkPersonWeights,
   compressResponses,
   forEachRespondent,
   NO_RESPONSES,

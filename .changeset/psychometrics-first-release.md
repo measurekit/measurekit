@@ -227,3 +227,8 @@ and carries their sampling error into the standard errors of the items and distr
 pseudo maximum likelihood variance of restricted recalibration, validated against base R and by the coverage of 95%
 intervals in simulations. The errors of a covariance that the IRT equating errors and `fixedCovariance` refuse name "the
 matrix of" it.
+
+`percentileRanks` and `normStatistics` take `personWeights`, a survey weight for each score of a norm sample: the
+percentile rank is the weighted share below plus half the weighted share at the score, as Hmisc's `wtd.Ecdf` gives it,
+and the norms' standard errors are the delta method over the weights, the survey package's linearization of `svymean`
+and `svyvar` without its factor n / (n - 1), which reduces to `check.norms`' multinomial delta method for equal weights.

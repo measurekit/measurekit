@@ -24,7 +24,7 @@ export {
   normStatistics,
   type ScoreNorms,
 } from "./norm-statistics.js";
-export { percentileRanks } from "./percentile-ranks.js";
+export { type PercentileRanksOptions, percentileRanks } from "./percentile-ranks.js";
 export { predictFormScore } from "./predict-form-score.js";
 export { predictThetaScore } from "./predict-theta-score.js";
 export type {

@@ -123,6 +123,23 @@ interface ScalingNormsFixture {
 }
 const norms = readFixture<ScalingNormsFixture>("scaling-norms.json");
 
+interface ScalingWeightedNormsFixture {
+  source: string;
+  cases: {
+    name: string;
+    scores: number[];
+    personWeights: number[];
+    ranked: number[];
+    ranks: number[];
+    level: number;
+    mean: EstimateInterval;
+    sd: EstimateInterval;
+    norms: { score: number; z: EstimateInterval; percentile: EstimateInterval }[];
+    stanines: EstimateInterval[];
+  }[];
+}
+const weightedNorms = readFixture<ScalingWeightedNormsFixture>("scaling-weighted-norms.json");
+
 interface ScalingPlausibleValuesFixture {
   source: string;
   itemIds: string[];
@@ -203,6 +220,12 @@ const SCALE_TOLERANCE = 1e-10;
 const PREDICTION_TOLERANCE = 1e-12;
 /** The means of predicted scores, which are in the hundreds. */
 const MEAN_TOLERANCE = 1e-11;
+/** Weighted percentile ranks against Hmisc's wtd.Ecdf: sums of the same weights. */
+const WEIGHTED_RANK_TOLERANCE = 1e-12;
+/** Weighted norms' estimates against Hmisc's wtd.mean and wtd.var: sums of the same weights. */
+const WEIGHTED_NORM_TOLERANCE = 1e-10;
+/** Weighted norms' standard errors, relative, against the delta method over the weights by numDeriv's jacobian. */
+const WEIGHTED_ERROR_TOLERANCE = 1e-7;
 /** Growth between grades against base R, written out. */
 const GROWTH_TOLERANCE = 1e-12;
 /** The inverse distribution function of a posterior and the transform of normal scores against base R. */
@@ -739,6 +762,50 @@ describe("percentileRanks", () => {
     expect(percentileRanks([1, 2], [])).toEqual([]);
   });
 
+  for (const reference of weightedNorms.cases) {
+    it(`matches Hmisc's wtd.Ecdf with person weights on ${reference.name}`, () => {
+      const actual = percentileRanks(reference.scores, reference.ranked, { personWeights: reference.personWeights });
+      reference.ranks.forEach((expected, i) => {
+        expectClose(defined(actual[i]), expected, WEIGHTED_RANK_TOLERANCE, `score ${defined(reference.ranked[i])}`);
+      });
+    });
+  }
+
+  it("weighs the scores below and half the weight at the score, derived by hand", () => {
+    // Weights 3, 1, 1, 1, 2 of 8: 3 below 20 and 2 at it give 50; 5 below 30 and 1 at it give 68.75.
+    const personWeights = [3, 1, 1, 1, 2];
+    expect(percentileRanks([10, 20, 20, 30, 40], [20, 30, 5, 45], { personWeights })).toEqual([50, 68.75, 0, 100]);
+    expect(percentileRanks([40, 20, 10, 30, 20], [20], { personWeights: [2, 1, 3, 1, 1] })).toEqual([50]);
+  });
+
+  it("gives the unweighted ranks for equal weights, even those whose sum overflows, and counts a whole weight as repeats", () => {
+    const sample = [3, 1, 4, 1, 5, 9, 2, 6];
+    const scores = [0, 1, 2, 4.5, 9, 10];
+    expect(percentileRanks(sample, scores, { personWeights: sample.map(() => 1e308) })).toEqual(
+      percentileRanks(sample, scores),
+    );
+    const repeated = [3, 3, 1, 4, 4, 4, 1, 5, 9, 2, 6, 6];
+    const weighted = percentileRanks(sample, scores, { personWeights: [2, 1, 3, 1, 1, 1, 1, 2] });
+    percentileRanks(repeated, scores).forEach((rank, i) => {
+      expectClose(defined(weighted[i]), rank, 1e-12, `score ${defined(scores[i])}`);
+    });
+  });
+
+  it("rejects weights that are not a positive number for each score of the sample, and unknown options", () => {
+    expect(() => percentileRanks([1, 2], [1], { personWeights: [1] })).toThrow("Found 1 person weights for 2 persons.");
+    expect(() => percentileRanks([1, 2], [1], { personWeights: [1, 0] })).toThrow(
+      "The weight of person 2 must be a positive number, found 0.",
+    );
+    expect(() => percentileRanks([1, 2], [1], JSON.parse('{"personWeights":[1,"2"]}'))).toThrow('found "2"');
+    expect(() => percentileRanks([1, 2], [1], JSON.parse('{"personWeights":null}'))).toThrow(
+      "The option personWeights must be an array with a weight for each person, found null.",
+    );
+    expect(() => percentileRanks([1, 2], [1], JSON.parse('{"weights":[1,1]}'))).toThrow('There is no option "weights"');
+    expect(() => percentileRanks([1, 2], [1], JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+  });
+
   it("rejects a sample or scores that are invalid", () => {
     expect(() => percentileRanks([], [1])).toThrow("The norm sample needs at least one score.");
     expect(() => percentileRanks([1, Number.NaN], [1])).toThrow("The norm sample needs finite scores, found NaN at 1.");
@@ -814,6 +881,72 @@ describe("normStatistics", () => {
     [-1.75, -1.25, -0.75, -0.25, 0.25, 0.75, 1.25, 1.75].forEach((multiple, k) => {
       expectClose(defined(stanines[k]).estimate, mean.estimate + multiple * sd.estimate, 1e-12, `${k + 1}`);
     });
+  });
+
+  for (const reference of weightedNorms.cases) {
+    it(`matches the delta method over the weights of Hmisc's weighted norms on ${reference.name}`, () => {
+      const result = normStatistics(reference.scores, {
+        level: reference.level,
+        personWeights: reference.personWeights,
+      });
+      const expectWeighted = (actual: EstimateInterval | undefined, expected: EstimateInterval, label: string) => {
+        const scale = Math.max(1, Math.abs(expected.estimate));
+        expectClose(actual?.estimate ?? null, expected.estimate, WEIGHTED_NORM_TOLERANCE * scale, `${label} estimate`);
+        const error = WEIGHTED_ERROR_TOLERANCE * expected.standardError;
+        expectClose(actual?.standardError ?? null, expected.standardError, error, `${label} standard error`);
+        const width = WEIGHTED_NORM_TOLERANCE * scale + 2 * error;
+        expectClose(actual?.lower ?? null, expected.lower, width, `${label} lower`);
+        expectClose(actual?.upper ?? null, expected.upper, width, `${label} upper`);
+      };
+      expectWeighted(result.mean, reference.mean, "mean");
+      expectWeighted(result.sd, reference.sd, "sd");
+      expect(result.scores.map(({ score }) => score)).toEqual(reference.norms.map(({ score }) => score));
+      reference.norms.forEach((norm, k) => {
+        expectWeighted(result.scores[k]?.z, norm.z, `z of ${norm.score}`);
+        expectWeighted(result.scores[k]?.percentile, norm.percentile, `percentile of ${norm.score}`);
+      });
+      reference.stanines.forEach((stanine, k) => {
+        expectWeighted(result.stanines[k], stanine, `stanine boundary ${k + 1}`);
+      });
+    });
+  }
+
+  it("gives the unweighted norms for equal weights, and the norms of repeated persons' estimates for whole weights", () => {
+    const scores = [1, 4, 4, 5, 7, 8, 9, 9, 12];
+    const plain = normStatistics(scores);
+    const equal = normStatistics(scores, { personWeights: scores.map(() => 3.5) });
+    expectClose(equal.mean.estimate, plain.mean.estimate, 1e-14);
+    expectClose(equal.mean.standardError, plain.mean.standardError, 1e-14);
+    expectClose(equal.sd.standardError, plain.sd.standardError, 1e-14);
+    plain.scores.forEach((norm, k) => {
+      expectClose(defined(equal.scores[k]).z.standardError, norm.z.standardError, 1e-14, `z of ${norm.score}`);
+      expectClose(defined(equal.scores[k]).percentile.estimate, norm.percentile.estimate, 1e-12, `${norm.score}`);
+    });
+    // A weight of 2 counts a person twice in the estimates: the mean and the ranks of [1, 1, 4, 6] from weights 2, 1, 1.
+    const weighted = normStatistics([1, 4, 6], { personWeights: [2, 1, 1] });
+    const repeated = normStatistics([1, 1, 4, 6]);
+    expectClose(weighted.mean.estimate, repeated.mean.estimate, 1e-14);
+    expect(weighted.scores.map(({ percentile }) => percentile.estimate)).toEqual(
+      repeated.scores.map(({ percentile }) => percentile.estimate),
+    );
+  });
+
+  it("gives a weighted mean the standard error of its linearization, derived by hand", () => {
+    // Scores 0, 0, 10 weighted 1, 1, 2: W = 4, mean 5; u_l = w_l (x_l - 5) / 4 is -1.25, -1.25 and 2.5, of mean 0, so
+    // Var = 1.5625 · 2 + 6.25 = 9.375.
+    const result = normStatistics([0, 0, 10], { personWeights: [1, 1, 2] });
+    expectClose(result.mean.estimate, 5, 1e-15);
+    expectClose(result.mean.standardError, Math.sqrt(9.375), 1e-12);
+  });
+
+  it("rejects weights that are not a positive number for each score", () => {
+    expect(() => normStatistics([1, 2, 3], { personWeights: [1, 2] })).toThrow("Found 2 person weights for 3 persons.");
+    expect(() => normStatistics([1, 2], { personWeights: [1, -1] })).toThrow(
+      "The weight of person 2 must be a positive number, found -1.",
+    );
+    expect(() => normStatistics([1, 2], JSON.parse('{"personWeights":{"0":1,"1":1}}'))).toThrow(
+      "The option personWeights must be an array with a weight for each person, found an object.",
+    );
   });
 
   it("takes 0.95 as the level by default", () => {

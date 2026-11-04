@@ -188,6 +188,21 @@ export function personGroups(groups: readonly string[] | undefined, personCount:
 }
 
 /**
+ * Checks the weights that the option `personWeights` gives to the persons: a positive number for each.
+ *
+ * @param weights - The option `personWeights`.
+ * @param persons - The number of persons.
+ * @throws `DataError` when the weights are not an array of a positive number for each person.
+ */
+export function checkPersonWeights(weights: readonly number[], persons: number): void {
+  checkArray(weights, "The option personWeights must be an array with a weight for each person");
+  if (weights.length !== persons) throw new DataError(`Found ${weights.length} person weights for ${persons} persons.`);
+  for (let person = 0; person < weights.length; person++) {
+    checkPositive(weights[person], `The weight of person ${person + 1}`);
+  }
+}
+
+/**
  * Checks the weights that the option `personWeights` gives to the persons and returns them rescaled to sum to the
  * persons with a response, or `null` without the option.
  *
@@ -204,13 +219,7 @@ export function rescaledWeights(
   answered: readonly boolean[],
 ): Float64Array | null {
   if (weights === undefined) return null;
-  checkArray(weights, "The option personWeights must be an array with a weight for each person");
-  if (weights.length !== answered.length) {
-    throw new DataError(`Found ${weights.length} person weights for ${answered.length} persons.`);
-  }
-  weights.forEach((weight, person) => {
-    checkPositive(weight, `The weight of person ${person + 1}`);
-  });
+  checkPersonWeights(weights, answered.length);
   let largest = 0;
   let respondents = 0;
   answered.forEach((any, person) => {

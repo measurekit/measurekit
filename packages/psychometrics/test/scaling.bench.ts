@@ -1,5 +1,12 @@
 import { test } from "vitest";
-import { conversionTable, createRandom, drawJointThetas, type IrtItem, twoParameterLogistic } from "../src/index.js";
+import {
+  conversionTable,
+  createRandom,
+  drawJointThetas,
+  type IrtItem,
+  normStatistics,
+  twoParameterLogistic,
+} from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtFixture, readFixture } from "./fixtures.js";
@@ -9,6 +16,7 @@ const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
 interface BenchScalingFixture {
   posteriors: { nodes: number[]; weights: number[] }[];
   correlation: number[][];
+  norms: { scores: number[]; personWeights: number[] };
 }
 const joint = readFixture<BenchScalingFixture>("bench-scaling.json");
 
@@ -35,4 +43,9 @@ test("draws 2,000 joint thetas from 6 posteriors of 241 nodes", async (context) 
   await benchmark(context, "scaling.drawJointThetas", () =>
     drawJointThetas(joint.posteriors, joint.correlation, JOINT_DRAWS, createRandom(SEED)),
   );
+});
+
+test("computes the norms of 10,000 weighted scores of 30 distinct values with their standard errors", async (context) => {
+  const { scores, personWeights } = joint.norms;
+  await benchmark(context, "scaling.normStatisticsWeighted", () => normStatistics(scores, { personWeights }));
 });

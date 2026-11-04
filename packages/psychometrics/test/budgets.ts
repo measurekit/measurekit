@@ -148,6 +148,7 @@ const BUDGETS = {
   "scaling.conversionTableEapSum": 4,
   "scaling.conversionTableTrueScore": 7,
   "scaling.drawJointThetas": 8,
+  "scaling.normStatisticsWeighted": 20,
   "standardSetting.bookmarkCutScore": 0.3,
   "standardSetting.classificationAccuracy": 5,
   "standardSetting.livingstonLewis": 5,
