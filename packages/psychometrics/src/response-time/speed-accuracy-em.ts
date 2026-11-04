@@ -1,5 +1,6 @@
-import { iterateToConvergence, largestChange } from "@measurekit/core";
+import { iterateToConvergence } from "@measurekit/core";
 import { type ExpectationStep, expectationStep, type Maximization, maximization, type Setup } from "../irt/internal.js";
+import { largestChange } from "../math/internal.js";
 import {
   conditional,
   emptySums,

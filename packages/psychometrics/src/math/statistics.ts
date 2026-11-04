@@ -19,6 +19,15 @@ export function covariance(x: Float64Array, y: Float64Array): number {
   return (n * sumProducts - sumX * sumY) / (n * (n - 1));
 }
 
+/** Returns the largest absolute change from `previous` to `current`, over the length of `current`. */
+export function largestChange(previous: Float64Array, current: Float64Array): number {
+  let largest = 0;
+  for (let j = 0; j < current.length; j++) {
+    largest = Math.max(largest, Math.abs((current[j] ?? 0) - (previous[j] ?? 0)));
+  }
+  return largest;
+}
+
 /** Returns the sample variance (denominator n - 1) of at least two values. */
 export function variance(values: Float64Array): number {
   return covariance(values, values);

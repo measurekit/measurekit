@@ -1,6 +1,6 @@
-import type { LogisticItem, ThresholdItem } from "@measurekit/core";
+import type { ThresholdItem } from "@measurekit/core";
 import type { CalibratedItem } from "./calibration.js";
-import { oneParameterLogistic } from "./logistic.js";
+import { type LogisticItem, oneParameterLogistic } from "./logistic.js";
 import { partialCredit } from "./partial-credit.js";
 
 /**

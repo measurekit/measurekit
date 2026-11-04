@@ -1,5 +1,21 @@
-import { DataError, describe, hasValidAsymptotes, isRecord, type LogisticItem, logistic } from "@measurekit/core";
+import { DataError, describe, hasValidAsymptotes, isRecord, logistic } from "@measurekit/core";
 import type { IrtModel, ModelParameter } from "./model.js";
+
+/**
+ * The parameters of a dichotomous logistic item in the IRT form with D = 1: the probability of a correct response is
+ * P(θ) = c + (d - c) logistic(a (θ - b)). The 1PL has `c = 0` and `d = 1` and the same `a` for every item, the 2PL
+ * `c = 0` and `d = 1`, and the 3PL `d = 1`.
+ */
+export interface LogisticItem {
+  /** Discrimination: the slope. */
+  readonly a: number;
+  /** Difficulty: the location. */
+  readonly b: number;
+  /** Lower asymptote (guessing). */
+  readonly c: number;
+  /** Upper asymptote. */
+  readonly d: number;
+}
 
 const DISCRIMINATION: ModelParameter = { name: "a" };
 const DIFFICULTY: ModelParameter = { name: "b" };

@@ -1,12 +1,6 @@
-import {
-  checkChoice,
-  checkOptions,
-  checkStopping,
-  DataError,
-  iterateToConvergence,
-  largestChange,
-} from "@measurekit/core";
+import { checkChoice, checkOptions, checkStopping, DataError, iterateToConvergence } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import { largestChange } from "../math/internal.js";
 import { CALIBRATION_OPTIONS, type CalibrationOptions, type StandardErrorMethod } from "./calibration-options.js";
 import { type ItemState, type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";

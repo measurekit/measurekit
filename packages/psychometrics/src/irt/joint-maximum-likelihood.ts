@@ -4,14 +4,13 @@ import {
   DataError,
   type FieldNames,
   iterateToConvergence,
-  type LogisticItem,
-  largestChange,
   partialCreditProbabilities,
   type ThresholdItem,
 } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { findIncreasingRoot, invert, type NewtonOptions, newton } from "../math/internal.js";
+import { findIncreasingRoot, invert, largestChange, type NewtonOptions, newton } from "../math/internal.js";
 import type { CalibratedItem } from "./calibration.js";
+import type { LogisticItem } from "./logistic.js";
 import { partialCredit, partialCreditInformation, stepStarts } from "./partial-credit.js";
 import { logProbability } from "./probability.js";
 import { raschScaleItem } from "./rasch-scale.js";

@@ -5,10 +5,10 @@ import {
   type FieldNames,
   invertPositiveDefinite,
   iterateToConvergence,
-  largestChange,
 } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { withinStandardErrorSize } from "../irt/internal.js";
+import { largestChange } from "../math/internal.js";
 import { forEachTime, type TimedResponses, type TimeItem, timedResponses } from "./timed-responses.js";
 
 /** Options of {@link calibrateResponseTimes}. */

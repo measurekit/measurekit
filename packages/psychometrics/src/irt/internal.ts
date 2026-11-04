@@ -62,6 +62,7 @@ export {
 export {
   fourParameterLogistic,
   isLogisticModel,
+  type LogisticItem,
   oneParameterLogistic,
   threeParameterLogistic,
   twoParameterLogistic,

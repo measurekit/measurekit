@@ -6,7 +6,7 @@
  * @module @measurekit/psychometrics/irt
  */
 
-export type { LogisticItem, NominalParameters, ThetaDistribution, ThresholdItem } from "@measurekit/core";
+export type { NominalParameters, ThetaDistribution, ThresholdItem } from "@measurekit/core";
 export {
   type AbilityEstimate,
   type AbilityEstimator,
@@ -48,6 +48,7 @@ export {
 export type { GroupDistribution, LatentDistribution } from "./latent.js";
 export {
   fourParameterLogistic,
+  type LogisticItem,
   oneParameterLogistic,
   threeParameterLogistic,
   twoParameterLogistic,

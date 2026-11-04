@@ -1,5 +1,12 @@
-import { DataError, largestChange } from "@measurekit/core";
-import { type HessianFunction, invert, newton, numericalHessian, type Quadrature } from "../math/internal.js";
+import { DataError } from "@measurekit/core";
+import {
+  type HessianFunction,
+  invert,
+  largestChange,
+  newton,
+  numericalHessian,
+  type Quadrature,
+} from "../math/internal.js";
 import { type ExpectationItem, type ExpectationStep, expectationStep } from "./expectation.js";
 import type { Population } from "./latent.js";
 import {

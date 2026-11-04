@@ -5,13 +5,12 @@ import {
   DataError,
   type FieldNames,
   invertPositiveDefinite,
-  type LogisticItem,
   type ThresholdItem,
 } from "@measurekit/core";
 import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { multiply, transpose } from "../math/internal.js";
 import type { CalibratedItem } from "./calibration.js";
-import { oneParameterLogistic } from "./logistic.js";
+import { type LogisticItem, oneParameterLogistic } from "./logistic.js";
 import { partialCredit } from "./partial-credit.js";
 import { raschScaleItem } from "./rasch-scale.js";
 import { type RatingScaleParameters, ratingScale } from "./rating-scale.js";

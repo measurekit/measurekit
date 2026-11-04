@@ -16,6 +16,7 @@ import {
   gaussHermite,
   identity,
   invert,
+  largestChange,
   limitedInformationStatistic,
   mirror,
   multiply,
@@ -91,6 +92,14 @@ const MATRIX_ITEMS = 1000;
 function expectRelative(actual: number, expected: number, tolerance: number, label: string): void {
   expect(Math.abs(actual - expected), label).toBeLessThanOrEqual(tolerance * Math.abs(expected));
 }
+
+describe("largestChange", () => {
+  it("takes the largest absolute change in largestChange, 0 for no values", () => {
+    expect(largestChange(Float64Array.of(1, 5, -2), Float64Array.of(1.5, 2, -2))).toBe(3);
+    expect(largestChange(Float64Array.of(0, 0), Float64Array.of(0, -4))).toBe(4);
+    expect(largestChange(new Float64Array(0), new Float64Array(0))).toBe(0);
+  });
+});
 
 describe("chiSquareUpperTail", () => {
   it("matches R's pchisq(lower.tail = FALSE)", () => {

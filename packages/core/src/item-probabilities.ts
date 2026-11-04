@@ -2,22 +2,6 @@ import { isUnitInterval } from "./checks.js";
 import { logistic, logisticPair } from "./logistic.js";
 
 /**
- * The parameters of a dichotomous logistic item in the IRT form with D = 1: the probability of a correct response is
- * P(θ) = c + (d - c) logistic(a (θ - b)). The 1PL has `c = 0` and `d = 1` and the same `a` for every item, the 2PL
- * `c = 0` and `d = 1`, and the 3PL `d = 1`.
- */
-export interface LogisticItem {
-  /** Discrimination: the slope. */
-  readonly a: number;
-  /** Difficulty: the location. */
-  readonly b: number;
-  /** Lower asymptote (guessing). */
-  readonly c: number;
-  /** Upper asymptote. */
-  readonly d: number;
-}
-
-/**
  * The parameters of a polytomous item with a slope and one threshold per boundary between adjacent categories, in the
  * IRT form with D = 1: an item of the graded response model or of the (generalized) partial credit model. An item with
  * K categories has K - 1 thresholds.

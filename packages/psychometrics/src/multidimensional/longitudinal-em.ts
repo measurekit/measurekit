@@ -1,4 +1,3 @@
-import { largestChange } from "@measurekit/core";
 import {
   type CompressedResponses,
   type Iteration,
@@ -7,6 +6,7 @@ import {
   squarem,
   unboundedCoordinates,
 } from "../irt/internal.js";
+import { largestChange } from "../math/internal.js";
 import type { Latent } from "./correlation.js";
 import { runsAway } from "./em.js";
 import type { Grid } from "./grid.js";

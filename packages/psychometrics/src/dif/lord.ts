@@ -6,7 +6,6 @@ import {
   DataError,
   describe,
   type FieldNames,
-  type LogisticItem,
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import type { ScaleTransformation } from "../equating/internal.js";
@@ -15,6 +14,7 @@ import {
   type CalibrationOptions,
   type IrtModel,
   isLogisticModel,
+  type LogisticItem,
   modelsOf,
 } from "../irt/internal.js";
 

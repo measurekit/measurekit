@@ -1,12 +1,5 @@
-import {
-  checkRecord,
-  DataError,
-  describe,
-  type LogisticItem,
-  mean,
-  type NominalParameters,
-  type ThresholdItem,
-} from "@measurekit/core";
+import { checkRecord, DataError, describe, mean, type NominalParameters, type ThresholdItem } from "@measurekit/core";
+import type { LogisticItem } from "../irt/internal.js";
 import {
   centered,
   checkItem,

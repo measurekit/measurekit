@@ -40,21 +40,6 @@ export function maxAbs(values: Float64Array): number {
 }
 
 /**
- * Returns the largest absolute change from `previous` to `current`, over the length of `current`.
- *
- * @param previous - The values before.
- * @param current - The values after, of the length that is compared.
- * @returns The largest absolute difference of an entry.
- */
-export function largestChange(previous: Float64Array, current: Float64Array): number {
-  let largest = 0;
-  for (let j = 0; j < current.length; j++) {
-    largest = Math.max(largest, Math.abs((current[j] ?? 0) - (previous[j] ?? 0)));
-  }
-  return largest;
-}
-
-/**
  * Returns the mean of at least one value.
  *
  * @param values - The values.

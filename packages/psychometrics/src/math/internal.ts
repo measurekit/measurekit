@@ -51,4 +51,4 @@ export { pseudoInverse } from "./pseudo-inverse.js";
 export { adaptiveIntegral, gaussHermite, type Quadrature, rectangular } from "./quadrature.js";
 export { findIncreasingRoot, findRoot } from "./root.js";
 export { type RotationMethod, type RotationOptions, resolveRotation, rotateLoadingMatrix } from "./rotation.js";
-export { correlation, covariance, sampleQuantile, standardDeviation, variance } from "./statistics.js";
+export { correlation, covariance, largestChange, sampleQuantile, standardDeviation, variance } from "./statistics.js";

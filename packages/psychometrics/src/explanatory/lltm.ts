@@ -6,7 +6,6 @@ import {
   chiSquareUpperTail,
   DataError,
   type FieldNames,
-  type LogisticItem,
   type ThresholdItem,
 } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
@@ -19,6 +18,7 @@ import {
   fitLinearRasch,
   type LinearRaschFit,
   type LocationRow,
+  type LogisticItem,
   partialCredit,
   type QuadratureOptions,
   quadratureRule,

@@ -1,4 +1,4 @@
-import { DataError, type LogisticItem } from "@measurekit/core";
+import { DataError } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { meanSigmaLinking, type ScaleTransformation, transformItem } from "../equating/internal.js";
 import {
@@ -8,6 +8,7 @@ import {
   checkHeldParameters,
   type FixedParameters,
   type IrtModel,
+  type LogisticItem,
   type ParameterCovariance,
   readFixedParameters,
 } from "../irt/internal.js";

@@ -8,7 +8,6 @@ import {
   dot,
   invertPositiveDefinite,
   iterateToConvergence,
-  largestChange,
   logistic,
   logLogistic,
   maxAbs,
@@ -235,12 +234,6 @@ describe("vectors", () => {
     const out = new Float64Array(2);
     multiplyVector(Float64Array.of(1, 2, 3, 4), Float64Array.of(5, -1), out);
     expect(Array.from(out)).toEqual([3, 11]);
-  });
-
-  it("takes the largest absolute change in largestChange, 0 for no values", () => {
-    expect(largestChange(Float64Array.of(1, 5, -2), Float64Array.of(1.5, 2, -2))).toBe(3);
-    expect(largestChange(Float64Array.of(0, 0), Float64Array.of(0, -4))).toBe(4);
-    expect(largestChange(new Float64Array(0), new Float64Array(0))).toBe(0);
   });
 });
 
