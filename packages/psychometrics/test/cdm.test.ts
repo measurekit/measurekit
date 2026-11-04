@@ -706,10 +706,9 @@ describe("calibrateCdm", () => {
       ...Object.fromEntries(attributes.map((attribute) => [attribute, [attribute]])),
     };
     const itemIds = Object.keys(qMatrix);
-    const matrix = buildResponseMatrix(
-      Array.from({ length: 30 }, (_, person) => itemIds.map((_, item) => ((person * 7 + item * 3) % 5 < 2 ? 1 : 0))),
-      { itemIds },
-    );
+    // No person answers. Calibration refuses that next, so a call that the bound does not stop ends at once with the
+    // other message, where one with responses would go on to invert a matrix of 4,120 by 4,120 for minutes.
+    const matrix = buildResponseMatrix([itemIds.map(() => null)], { itemIds });
     expect(() => calibrateCdm(matrix, qMatrix, { standardErrors: "incomplete" })).toThrow(
       'The option standardErrors "incomplete" takes at most 3162 success probabilities over all items, 2^k for an item of k attributes, found 4120.',
     );

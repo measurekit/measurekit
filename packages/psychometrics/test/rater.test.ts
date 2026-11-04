@@ -899,7 +899,7 @@ describe("manyFacetRasch", () => {
     expect(model.iterations).toBe(3);
   });
 
-  it("refuses a model of more than 1,000 parameters, a scale of more than 255 categories or 2^24 expected counts", () => {
+  it("refuses a model of more than 1,000 parameters or a scale of more than 255 categories", () => {
     const options = { facets: ["item", "rater"], standardErrors: "none", maxIterations: 1 } as const;
     // Person p is scored by raters p and p + 1, round 1,000 raters: 999 measures, 1 threshold, the mean and the SD.
     const raters = Array.from({ length: 1000 }, (_, person) =>
@@ -911,17 +911,25 @@ describe("manyFacetRasch", () => {
     expect(() => manyFacetRasch(raters, options)).toThrow(
       "A many-facet model takes at most 1000 parameters, as its estimation inverts a matrix of every pair of them; found 1002.",
     );
-    // 34 items by 34 raters, every cell scored once, with the 255 categories of the scale: 1,156 virtual items.
-    const cells = Array.from({ length: 34 * 34 }, (_, cell) => ({
-      levels: { person: `p${cell % 2}`, item: `i${Math.floor(cell / 34)}`, rater: `r${cell % 34}` },
-      score: cell % 255,
+    const wide = Array.from({ length: 256 }, (_, s) => ({
+      levels: { person: `p${s % 2}`, item: `i${Math.floor(s / 34)}`, rater: `r${s % 34}` },
+      score: s,
     }));
-    expect(() => manyFacetRasch(cells, options)).toThrow(
-      "A many-facet model holds at most 16777216 expected counts, its items × quadrature points × categories, found 17981580.",
-    );
-    const wide = cells.slice(0, 256).map((score, s) => ({ ...score, score: s }));
     expect(() => manyFacetRasch(wide, options)).toThrow(
       "A many-facet model takes at most 255 categories in a rating scale, found 256.",
+    );
+  });
+
+  it("refuses 2^24 expected counts at once, as the estimation that follows would not end in minutes", () => {
+    // 92 items by 92 raters, every cell scored once, with 2 categories and 1,000 quadrature points: 8,464 virtual items
+    // of 2,000 expected counts each, 16,928,000 in all. With no bound the estimation of 185 parameters ends in seconds.
+    const cells = Array.from({ length: 92 * 92 }, (_, cell) => ({
+      levels: { person: `p${cell % 2}`, item: `i${Math.floor(cell / 92)}`, rater: `r${cell % 92}` },
+      score: cell % 2,
+    }));
+    const options = { facets: ["item", "rater"], standardErrors: "none", maxIterations: 1 } as const;
+    expect(() => manyFacetRasch(cells, { ...options, quadrature: { points: 1000 } })).toThrow(
+      "A many-facet model holds at most 16777216 expected counts, its items × quadrature points × categories, found 16928000.",
     );
   });
 

@@ -625,7 +625,7 @@ export const RULES: readonly Rule[] = [
     find: "if (counts > MAX_EXPECTED_COUNTS) {",
     replace: "if (false) {",
     test: "packages/psychometrics/test/rater.test.ts",
-    titles: "more than 1,000 parameters",
+    titles: "2\\^24 expected counts at once",
   },
   {
     rule: "An LLTM stops at the size of its Rasch comparison before it reads the features of every item.",
