@@ -23,6 +23,7 @@ const BUDGETS = {
   "kst.identifiability": 200,
   "kst.validity": 20,
   "kst.diffTest": 6,
+  "kst.diffTestIncomplete": 20,
   "kst.iita": 20,
   "kst.unionClosure": 1,
   "kst.structureBase": 0.6,

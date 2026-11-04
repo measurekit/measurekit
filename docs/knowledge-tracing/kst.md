@@ -394,6 +394,49 @@ diffTest(log, found.prerequisites, { alternative: designed }).pValue; // 0.679
 has an infinite end. `"greater"` is the probability of a statistic at least as large; DAKS's `z_test` returns the
 probability of a smaller one, so values differ for one-sided tests.
 
+### Incomplete patterns
+
+Learners need not answer every item, as after an adaptive test, a placement or a booklet design. Each pair of items
+counts the learners who answered both, each item's solution rate the learners who answered it, and a pair that no
+learner answered both of leaves the mean of `diff`. The standard error is the delta method of the same estimate: the
+root of the sum over learners of each one's squared influence, which weighs a learner's answers by the learners behind
+each share. Complete patterns give DAKS's estimate and the variance above.
+
+```mermaid
+flowchart LR
+  L["Each learner's first answers, any items"] --> P["Per pair: learners who answered both,<br/>share who fail i and solve j"]
+  L --> I["Per item: learners who answered it,<br/>share who solve it"]
+  P --> D["diff over the pairs answered"]
+  I --> D
+  D --> E["estimate and its standard error"]
+```
+
+The shares are those of the population when whether a learner answered an item does not depend on the learner's
+answers: missing completely at random, as in a booklet design or a probe drawn at random. An adaptive test that chooses
+the next item by earlier answers makes the learners who answered a pair a selected group, and biases its shares.
+
+### Testing one edge
+
+An edge i ⊑ j is tested by the quasi order with it against the same order without it, with `tail: "greater"`: the
+estimate is the first `diff` less the second, positive when the order fits worse with the edge, and a small p-value
+rejects the edge. The error rate is one for the whole order, so the order needs more items than the edge's two: on two
+items alone, the rate absorbs every counterexample. An edge that other edges imply through a third item cannot be
+removed alone, as the prerequisites are closed under transitivity.
+
+```ts continues
+// Learners answered some items only; the edge from multiply to divide is tested within the designed order.
+const sparse = buildEventLog(log.filter((_, k) => k % 7 !== 3));
+const withEdge = { add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] };
+const withoutEdge = { add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract"] };
+diffTest(sparse, withEdge, { alternative: withoutEdge, tail: "greater" }).pValue; // 0.691: the order fits as well with the edge
+```
+
+The test of the difference of two orders is reliable where the test of one order against `mean` is not. The estimate of
+one order is a sum of squared residuals: when the order fits closely they are small, and the delta method, which is
+linear in them, misses their square. Over 300 bootstrap samples of the fixtures, the spread of the difference of two
+orders was 0.92 to 1.24 times its standard error, and that of one order up to 2 times, with the bootstrap mean up to 3.4
+standard errors above the estimate.
+
 ## Limits and errors
 
 | Limit                                                                                                        | Value                    | At the limit                                                                                                   |
@@ -411,7 +454,8 @@ probability of a smaller one, so values differ for one-sided tests.
 | An item has a fixed rate and is in a group, or is in two groups                                         | Fix it or group it, in one group per kind                                                     |
 | A rate or an item in `fixed` or `equal` is invalid, or the log has no event with an outcome at the item | Give rates from 0 to 1 and items with answers                                                 |
 | `identifiability` of a model over skills, or with equal rates                                           | Create the model with `over: "items"`; remove `equal`, or fix the rates instead               |
-| `structureValidity` or `diffTest` of an incomplete table                                                | Give every learner an answer of 0 or 1 to every item: the error names the first gap           |
+| `structureValidity` of an incomplete table                                                              | Give every learner an answer of 0 or 1 to every item: the error names the first gap           |
+| `diffTest` whose prerequisites have no implication whose two items a learner answered                   | Give learners probes of both items of an edge, or test it within a larger order               |
 | `diffTest` with variance 0, or an item solved by no learner                                             | The estimate cannot be tested for identical learners or identical quasi orders; drop the item |
 
 ## Not included
@@ -425,6 +469,11 @@ probability of a smaller one, so values differ for one-sided tests.
   `maxStates` and units cover the large domains.
 - **`populationIita`.** Outside the sources: DAKS's `pop_iita` takes given rates and no data, a tool for studying IITA
   itself.
+- **IITA on incomplete patterns.** No reference: MCAR-IITA (Steiner et al., 2026) is a conference paper whose code is
+  not a released package; `diffTest` tests a quasi order on them.
+- **A test of a quasi order when missing answers depend on the answers, as an adaptive test's.** No reference: it needs
+  a model of every item together, such as the basic local independence model of [the model](#the-model) fitted to the
+  incomplete log, and no package tests a quasi order that way.
 
 ## Differences from the references
 
@@ -433,6 +482,7 @@ probability of a smaller one, so values differ for one-sided tests.
 | `DAKS::z_test`                   | Its variance is not the delta-method variance of its estimate; `diffTest` follows the delta method. See [validation](validation.md#knowledge-space-theory) |
 | `DAKS::z_test`, one-sided tests  | It returns the probability of a smaller statistic for `"greater"`; `diffTest` returns that of a larger one, R's meaning                                    |
 | `DAKS::z_test`, two quasi orders | It adds the two variances; `diffTest` uses the variance of their difference, as both are fitted to the same learners                                       |
+| `DAKS::z_test`, missing answers  | It refuses them; `diffTest` takes each pair from the learners who answered both                                                                            |
 | `pks::blim`, above 16 items      | It renormalizes the probabilities of the patterns that occur before the log-likelihood; `kst` does not                                                     |
 | `pks::jacobian`                  | It has a column for each rate, fixed or not, and takes the parameters from its arguments; `identifiability` drops fixed rates and takes the model's        |
 
@@ -448,11 +498,15 @@ probability of a smaller one, so values differ for one-sided tests.
   46-57.
 - Heller, J., & Wickelmaier, F. (2013). Minimum discrepancy estimation in probabilistic knowledge structures.
   Electronic Notes in Discrete Mathematics, 42, 49-56.
+- Little, R. J. A., & Rubin, D. B. (2019). Statistical analysis with missing data (3rd ed.). Wiley.
 - Sargin, A., & Ünlü, A. (2009). Inductive item tree analysis: Corrections, improvements, and comparisons.
   Mathematical Social Sciences, 58(3), 376-392.
 - Schrepp, M. (2003). A method for the analysis of hierarchical dependencies between items of a questionnaire.
   Methods of Psychological Research Online, 8(3), 43-79.
 - Stefanutti, L., Heller, J., Anselmi, P., & Robusto, E. (2012). Assessing the local identifiability of
   probabilistic knowledge structures. Behavior Research Methods, 44(4), 1197-1211.
+- Steiner, P., Badnarchuk, A., De Chiusole, D., Segedinac, M., Savić, G., Stefanutti, L., & Hochweber, J. (2026).
+  MCAR-IITA: A procedure for identifying structures among items from incomplete data. Proceedings of the 19th
+  International Conference on Educational Data Mining, 694-698.
 - Ünlü, A., & Sargin, A. (2010). DAKS: An R package for data analysis methods in knowledge space theory. Journal of
   Statistical Software, 37(2), 1-31.

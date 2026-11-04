@@ -876,6 +876,22 @@ export const RULES: readonly Rule[] = [
     titles: "up to 1,000 items|up to the 1,000 elements",
   },
   {
+    rule: "A pair of items that no learner answered both of leaves the difference test, and is not read as a pair without counterexamples.",
+    file: "packages/knowledge-tracing/src/kst/iita.ts",
+    find: "return observed === null || observed[i * m + j] === 1;",
+    replace: "return true;",
+    test: "packages/knowledge-tracing/test/kst.test.ts",
+    titles: "two booklets",
+  },
+  {
+    rule: "Prerequisites whose implications no learner answered both items of are refused, as the responses cannot test them.",
+    file: "packages/knowledge-tracing/src/kst/diff-test.ts",
+    find: "if (!hasObservedImplication(relation, data)) {",
+    replace: "if (false) {",
+    test: "packages/knowledge-tracing/test/kst.test.ts",
+    titles: "rejects what cannot be tested",
+  },
+  {
     rule: "The candidates of IITA hold at most 24 million cells, as each lists the prerequisites of every item.",
     file: "packages/knowledge-tracing/src/kst/iita.ts",
     find: "if (cells > MAX_CANDIDATE_CELLS) {",

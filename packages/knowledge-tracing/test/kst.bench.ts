@@ -72,6 +72,19 @@ test("tests the fit of a quasi order of 6 items to the responses of 1,000 person
   await benchmark(context, "kst.diffTest", () => diffTest(testLog, testPrerequisites));
 });
 
+/** The 12 items of the same persons with 3 responses in 10 left out, and the chain without its edge from item 6 to 7. */
+const sparseLog = buildEventLog(
+  log.filter((event) => (Number(event.learner.slice(1)) * 7 + fixture.itemIds.indexOf(event.item) * 3) % 10 >= 3),
+);
+const chain = Object.fromEntries(fixture.itemIds.map((id, i) => [id, i === 0 ? [] : [fixture.itemIds[i - 1] ?? ""]]));
+const broken = { ...chain, [fixture.itemIds[6] ?? ""]: [] };
+
+test("tests one edge of a chain of 12 items on the incomplete responses of 1,000 persons", async (context) => {
+  await benchmark(context, "kst.diffTestIncomplete", () =>
+    diffTest(sparseLog, chain, { alternative: broken, tail: "greater" }),
+  );
+});
+
 test("runs the inductive item tree analysis of the responses of 1,000 persons to 12 items", async (context) => {
   await benchmark(context, "kst.iita", () => iita(log));
 });

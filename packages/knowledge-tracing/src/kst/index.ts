@@ -3,7 +3,8 @@
  * spaces from clauses, closure under union, bases, atoms, traces and notions, learning spaces, fringes, learning paths
  * and neighbourhoods; the basic local independence model fitted by maximum likelihood, minimum discrepancy or both, with
  * fixed and equal rates, its fit, comparison and local identifiability; the validity of a structure and the test of a
- * quasi-order against responses; inductive item tree analysis; and a learner model with adaptive assessment.
+ * quasi-order, or of one edge, against complete or incomplete responses; inductive item tree analysis; and a learner
+ * model with adaptive assessment.
  *
  * @module @measurekit/knowledge-tracing/kst
  */

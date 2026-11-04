@@ -90,12 +90,33 @@ export function iita(log: EventLog, options: IitaOptions = {}): IitaResult {
   return { ...best, candidates };
 }
 
-/** The counterexamples b and solution rates p of m items answered by n learners. */
+/**
+ * The counterexamples b and solution rates p of m items answered by n learners. When learners answered some items only,
+ * b_ij is the share of the learners who answered both i and j who fail i and solve j, times n, so that every formula
+ * reads it as a count of n learners; and `observed` marks the pairs that some learner answered both of, which alone
+ * enter the fit.
+ */
 export interface Counterexamples {
-  readonly b: Int32Array;
+  readonly b: Int32Array | Float64Array;
   readonly p: readonly number[];
   readonly m: number;
   readonly n: number;
+  /** 1 at i × m + j when some learner answered both i and j; `null` when every learner answered every item. */
+  readonly observed: Uint8Array | null;
+}
+
+/** Returns whether some learner answered both items of a pair, i ≠ j. */
+export function isObservedPair({ observed, m }: Counterexamples, i: number, j: number): boolean {
+  return observed === null || observed[i * m + j] === 1;
+}
+
+/** Returns the number of ordered pairs of distinct items that some learner answered both of: m (m - 1) when complete. */
+export function observedPairCount(data: Counterexamples): number {
+  const { observed, m } = data;
+  if (observed === null) return m * (m - 1);
+  let count = 0;
+  for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) if (i !== j && observed[i * m + j] === 1) count++;
+  return count;
 }
 
 /**
@@ -103,17 +124,17 @@ export interface Counterexamples {
  *
  * @throws `DataError` when an item is solved by no learner.
  */
-export function counterexampleData(
+function counterexampleData(
   items: readonly string[],
   patterns: readonly (readonly number[])[],
-): Counterexamples {
+): Counterexamples & { readonly b: Int32Array } {
   const n = patterns.length;
   const p = items.map((item, i) => {
     const share = patterns.reduce((sum, pattern) => sum + (pattern[i] ?? 0), 0) / n;
     if (share === 0) throw new DataError(`Item "${item}" is solved by no learner, so IITA cannot weigh it.`);
     return share;
   });
-  return { b: counterexamples(patterns, items.length), p, m: items.length, n };
+  return { b: counterexamples(patterns, items.length), p, m: items.length, n, observed: null };
 }
 
 /**
@@ -200,23 +221,35 @@ export function fitRelation(
   let sum = 0;
   for (let i = 0; i < m; i++) {
     for (let j = 0; j < m; j++) {
-      if (i !== j) sum += ((b[i * m + j] ?? 0) - expected(relation, data, version, gamma, i, j)) ** 2;
+      if (i !== j && isObservedPair(data, i, j)) {
+        sum += ((b[i * m + j] ?? 0) - expected(relation, data, version, gamma, i, j)) ** 2;
+      }
     }
   }
-  return { diff: sum / (m * (m - 1)), errorRate: gamma };
+  return { diff: sum / observedPairCount(data), errorRate: gamma };
+}
+
+/** Calls `visit` with each implication i ⊑ j, i ≠ j, of a relation whose two items some learner answered, in order. */
+export function forEachObservedImplication(
+  relation: Uint8Array,
+  data: Counterexamples,
+  visit: (i: number, j: number) => void,
+): void {
+  const { m } = data;
+  for (let i = 0; i < m; i++) {
+    for (let j = 0; j < m; j++) if (i !== j && relation[i * m + j] === 1 && isObservedPair(data, i, j)) visit(i, j);
+  }
 }
 
 /** Returns γ of the original and corrected versions: the mean of b_ij / (p_j n) over the implications i ⊑ j, i ≠ j. */
-function meanRate(relation: Uint8Array, { b, p, m, n }: Counterexamples): number {
+function meanRate(relation: Uint8Array, data: Counterexamples): number {
+  const { b, p, m, n } = data;
   let pairs = 0;
   let sum = 0;
-  for (let i = 0; i < m; i++) {
-    for (let j = 0; j < m; j++) {
-      if (i === j || relation[i * m + j] !== 1) continue;
-      pairs += 1;
-      sum += (b[i * m + j] ?? 0) / ((p[j] ?? 0) * n);
-    }
-  }
+  forEachObservedImplication(relation, data, (i, j) => {
+    pairs += 1;
+    sum += (b[i * m + j] ?? 0) / ((p[j] ?? 0) * n);
+  });
   return sum / pairs;
 }
 
@@ -247,7 +280,8 @@ function expected(
 function minimizingRate(relation: Uint8Array, data: Counterexamples): number {
   const x = new Float64Array(4);
   for (let i = 0; i < data.m; i++) {
-    for (let j = 0; j < data.m; j++) if (i !== j) addMinimizingTerms(relation, data, i, j, x);
+    for (let j = 0; j < data.m; j++)
+      if (i !== j && isObservedPair(data, i, j)) addMinimizingTerms(relation, data, i, j, x);
   }
   const [x1 = 0, x2 = 0, x3 = 0, x4 = 0] = x;
   return x3 + x4 === 0 ? 0 : -(x1 + x2) / (x3 + x4);

@@ -12,7 +12,7 @@ runs only the TypeScript tests; R and Python run when fixtures change.
 ## References
 
 Fixtures were generated with R 4.6.1, pROC 1.19.1, irr 0.85, lme4 2.1.0, LiblineaR 2.10-26, LKT 1.7.0, mirt 1.48, kst 0.5.6, pks
-0.8.0, DAKS 2.1.3, sets 1.0-25 and jsonlite 2.0.0, and Python 3.12.14 with pyBKT 1.4.3, NumPy 1.26.4, pandas 2.3.3 and
+0.8.0, DAKS 2.1.3, sets 1.0-25, numDeriv 2016.8-1.1 and jsonlite 2.0.0, and Python 3.12.14 with pyBKT 1.4.3, NumPy 1.26.4, pandas 2.3.3 and
 scikit-learn 1.7.2.
 
 | Quantity                                                                       | Reference                                                                                   |
@@ -320,13 +320,27 @@ simulated data sets. DAKS also leaves out quasi-orders without implications.
 | Forward and backward gradedness                                     | `pks::is.forward.graded`, `is.backward.graded` on 4 example structures and 12 random families                                                                 | Exact                                                                   |
 | Validity of a structure                                             | `kst::kvalidate` with `gamma`, `VC`, `percent` and `DI` on 6 structures; `DA` by `kvalidate` up to 8 items, and in base R, checked against it, for the others | Counts exact; the rest 1e-12                                            |
 | Test of a quasi order: estimate, z, p-value of each tail, interval  | The delta method in base R, 32 cases: 4 data sets, both versions, one quasi order or two, 2 means; the estimate is also `DAKS::z_test`'s `diff_value`         | Estimate 1e-12 relative to DAKS; the rest 1e-6 relative                 |
+| The same on incomplete patterns                                     | Base R: the pairwise shares and numDeriv's derivatives over a weight for each learner, 24 cases: 3 data sets (below)                                          | The same                                                                |
 
 The estimates of the constrained fits differ from pks's by at most 1.4e-7 by ML, 9.8e-8 by MDML and 1.4e-17 by MD. An MDML
 fit maximizes the likelihood of the states of least discrepancy only, so the log-likelihood of the whole model at its
 estimates changes at first order with them: it differs from pks's by 1.0e-5, against 2.5e-11 by ML. The recovery means
 are 0.1004 and 0.0495. Gamma, the violational coefficient and the counts of validity equal those of kvalidate; the discrepancy
 index and the distance agreement differ by 1.1e-16. The test of a quasi order differs from the delta method by 4.1e-15 in
-the estimate, 6.0e-11 in z and 1.2e-8 in the p-value.
+the estimate, 6.0e-11 in z and 1.2e-8 in the p-value; on incomplete patterns by 5.8e-15, 8.7e-10 and 1.3e-7, relative.
+
+**The test on incomplete patterns.** DAKS takes complete patterns only, so `validation/knowledge-tracing/kst-incomplete.R`
+writes the estimate out in base R as a function of a weight for each learner: each pair's share of the learners who
+answered both, each item's solution rate among those who answered it, and the mean over the pairs that some learner
+answered both of, with the minimized error rate found again at each weight. Its variance is the sum of the squared
+derivatives with respect to the weights, which numDeriv's `grad` takes. On complete pisa the script asserts the estimate
+of `DAKS::z_test` and the variance of the delta method over the patterns above, within 1e-6. The data: pisa with 20% of
+the responses missing completely at random; 300 learners of 7 simulated items in two booklets that share five, so two
+items are never answered together, with 15% more missing; and complete pisa. Each has its IITA quasi order and, as the
+alternative, the same order without one covering pair: the test of one edge. Over 300 bootstrap samples, the spread of
+the test of one edge was 0.92 to 1.24 times its standard error on every data set of both fixtures, complete or not, and
+the test checks the booklets within 15%; the spread of one quasi order's estimate was up to 2 times its standard error,
+as the guide says.
 
 **pks, above 16 items.** For more than 16 items, `blim` renormalizes the probabilities of the patterns that occur before it computes the
 log-likelihood and G²; `kst` computes them from the whole model. The degrees of freedom are pks's in both cases. For an
@@ -476,6 +490,7 @@ correct or all wrong, certain predictions, and BKT parameters at their bounds.
 | `kst-graded.json`               | 4 example structures and 12 random families of states                                                                                               | Elements at which a structure is graded in neither or both directions                              |
 | `kst-validity.json`             | `DoignonFalmagne7`, `chess` with 2 structures, a simulated quasi order, a chain the data do not follow, all subsets                                 | No ordered pair, perfect fit                                                                       |
 | `kst-diff-test.json`            | `pisa` and 3 sets of 300 learners and 7 items from `simu`: both versions, one quasi order or two, 2 means                                           | Quasi orders that differ in direction, a mean other than 0                                         |
+| `kst-diff-test-incomplete.json` | `pisa` with 20% missing, 7 simulated items in two booklets with 15% more missing, complete `pisa`: both versions                                    | A pair never answered together; the test of one edge                                               |
 
 ## Tolerances
 

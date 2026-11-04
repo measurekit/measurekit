@@ -10,6 +10,58 @@ export interface ResponsePatterns {
   readonly patterns: number[][];
 }
 
+/** One learner's first answers: the indices of the items answered, in the order answered, and the outcome of each. */
+export interface Answers {
+  /** The index of each item the learner answered, into the log's items. */
+  readonly items: Int32Array;
+  /** The first outcome at each, 0 or 1. */
+  readonly outcomes: Uint8Array;
+}
+
+/** The items of a log, and each learner's first answers to those they answered. */
+export interface AnswerSets {
+  /** The items, in the order of their first event with an outcome. */
+  readonly items: string[];
+  /** Each learner's answers, in the order of their first event with an outcome. */
+  readonly learners: readonly Answers[];
+}
+
+/**
+ * Returns the items in order of their first event and each learner's first outcome at each item they answered, which
+ * may be some of the items only. `subject` names what needs the answers, for the errors.
+ *
+ * @remarks
+ * The answers are held by learner, at the cost of the events, not of learners × items.
+ *
+ * @throws `DataError` when the log is malformed, an outcome is not 0 or 1, or there are more than 1,000 items.
+ */
+export function answerSets(log: EventLog, subject: string): AnswerSets {
+  checkLog(log);
+  // A lesson has no response pattern, and an item met only through events without an outcome is not one either.
+  const items = new Map<string, number>();
+  const firsts = new Map<string, Map<number, number>>();
+  for (const event of log) {
+    if (!isObserved(event)) continue;
+    const item = items.get(event.item) ?? items.size;
+    items.set(event.item, item);
+    const answers = firsts.get(event.learner) ?? new Map<number, number>();
+    firsts.set(event.learner, answers);
+    if (answers.has(item)) continue;
+    if (event.outcome !== 0 && event.outcome !== 1) {
+      throw new DataError(
+        `${subject} needs outcomes 0 or 1; learner "${event.learner}" has ${event.outcome} at "${event.item}".`,
+      );
+    }
+    answers.set(item, event.outcome);
+  }
+  checkElementCount(items.size, subject, "items");
+  const learners = Array.from(firsts.values(), (answers) => ({
+    items: Int32Array.from(answers.keys()),
+    outcomes: Uint8Array.from(answers.values()),
+  }));
+  return { items: [...items.keys()], learners };
+}
+
 /**
  * Returns the items in order of their first event and each learner's first outcome at each, checking completeness.
  * `subject` names what needs the patterns, for the errors.
@@ -22,34 +74,31 @@ export interface ResponsePatterns {
  * has not answered every item.
  */
 export function responsePatterns(log: EventLog, subject: string): ResponsePatterns {
-  checkLog(log);
-  // A lesson has no response pattern, and an item met only through events without an outcome is not one either.
-  const items = new Set<string>();
-  const firsts = new Map<string, Map<string, number>>();
-  for (const event of log) {
-    if (!isObserved(event)) continue;
-    items.add(event.item);
-    const answers = firsts.get(event.learner) ?? new Map<string, number>();
-    firsts.set(event.learner, answers);
-    if (answers.has(event.item)) continue;
-    if (event.outcome !== 0 && event.outcome !== 1) {
+  const { items, learners } = answerSets(log, subject);
+  const m = items.length;
+  const learnerIds = learnerOrder(log);
+  const patterns = learners.map((answers, learner) => {
+    if (answers.items.length < m) {
+      const answered = new Set(answers.items);
+      const missing = items.find((_, item) => !answered.has(item));
       throw new DataError(
-        `${subject} needs outcomes 0 or 1; learner "${event.learner}" has ${event.outcome} at "${event.item}".`,
+        `${subject} needs every learner to answer every item; "${learnerIds[learner]}" has no answer to "${missing}".`,
       );
     }
-    answers.set(event.item, event.outcome);
-  }
-  const order = [...items];
-  checkElementCount(order.length, subject, "items");
-  for (const [learner, answers] of firsts) {
-    const missing = answers.size < order.length ? order.find((item) => !answers.has(item)) : undefined;
-    if (missing !== undefined) {
-      throw new DataError(
-        `${subject} needs every learner to answer every item; "${learner}" has no answer to "${missing}".`,
-      );
-    }
-  }
-  return { items: order, patterns: [...firsts.values()].map((answers) => order.map((item) => answers.get(item) ?? 0)) };
+    const pattern = new Array<number>(m).fill(0);
+    answers.items.forEach((item, k) => {
+      pattern[item] = answers.outcomes[k] ?? 0;
+    });
+    return pattern;
+  });
+  return { items, patterns };
+}
+
+/** Returns the learners of a log with an outcome, in the order of their first such event. */
+function learnerOrder(log: EventLog): string[] {
+  const learners = new Set<string>();
+  for (const event of log) if (isObserved(event)) learners.add(event.learner);
+  return [...learners];
 }
 
 /**

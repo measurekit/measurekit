@@ -213,6 +213,7 @@ type KstDiffTestFixture = {
 }[];
 // biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
 const diffTestFixture = readFixture<KstDiffTestFixture>("kst-diff-test.json");
+const incompleteDiffTestFixture = readFixture<KstDiffTestFixture>("kst-diff-test-incomplete.json");
 
 type KstGradedFixture = {
   name: string;
@@ -536,10 +537,11 @@ const identifiabilityReferences: readonly IdentifiabilityReference[] = JSON.pars
 const gradedReferences: readonly GradedReference[] = JSON.parse(JSON.stringify(gradedFixture));
 const validities: readonly ValidityReference[] = JSON.parse(JSON.stringify(validityFixture));
 const diffTests: readonly DiffTestReference[] = JSON.parse(JSON.stringify(diffTestFixture));
+const incompleteDiffTests: readonly DiffTestReference[] = JSON.parse(JSON.stringify(incompleteDiffTestFixture));
 
 /**
- * Returns the log of learners who each answer every item once, as many with each pattern of responses, a string of 0
- * and 1 over the items, as its frequency.
+ * Returns the log of learners who each answer the items once, as many with each pattern of responses, a string of 0
+ * and 1 over the items, as its frequency; a "." in a pattern is an item the learner did not answer.
  */
 function patternLog(items: readonly string[], patterns: Readonly<Record<string, number>>): EventLog {
   const events: Event[] = [];
@@ -547,6 +549,7 @@ function patternLog(items: readonly string[], patterns: Readonly<Record<string, 
   for (const [pattern, frequency] of Object.entries(patterns)) {
     for (let copy = 0; copy < frequency; copy++, learner++) {
       items.forEach((item, i) => {
+        if (pattern[i] === ".") return;
         events.push({
           learner: `l${learner}`,
           item,
@@ -1157,38 +1160,41 @@ describe("validity of a structure against kst", () => {
 
 describe("the test of a quasi order against the delta method", () => {
   const tails = ["two-sided", "less", "greater"] as const;
-  it.each(diffTests)("tests $name by the $version version against a mean of $mean", (reference) => {
-    const log = patternLog(reference.items, reference.patterns);
-    for (const tail of tails) {
-      const result = diffTest(log, reference.prerequisites, {
-        ...(reference.alternative === null ? {} : { alternative: reference.alternative }),
-        version: reference.version,
-        mean: reference.mean,
-        confidence: reference.confidence,
-        tail,
-      });
-      const close = (actual: number, expected: number, label: string): void => {
-        expect(Math.abs(actual - expected), `${tail} ${label}`).toBeLessThanOrEqual(
-          DELTA_TOLERANCE * Math.abs(expected),
-        );
-      };
-      close(result.estimate, reference.estimate, "estimate");
-      close(result.z, reference.z, "z");
-      close(result.pValue, reference.pValue[tail], "p-value");
-      const expected = reference.interval[tail];
-      const [low, high] = result.interval;
-      if (tail === "two-sided") {
-        close(low, defined(Array.isArray(expected) ? expected[0] : null), "lower end");
-        close(high, defined(Array.isArray(expected) ? expected[1] : null), "upper end");
-      } else if (tail === "less") {
-        expect(low).toBe(Number.NEGATIVE_INFINITY);
-        close(high, Number(expected), "upper end");
-      } else {
-        close(low, Number(expected), "lower end");
-        expect(high).toBe(Number.POSITIVE_INFINITY);
+  it.each([...diffTests, ...incompleteDiffTests])(
+    "tests $name by the $version version against a mean of $mean",
+    (reference) => {
+      const log = patternLog(reference.items, reference.patterns);
+      for (const tail of tails) {
+        const result = diffTest(log, reference.prerequisites, {
+          ...(reference.alternative === null ? {} : { alternative: reference.alternative }),
+          version: reference.version,
+          mean: reference.mean,
+          confidence: reference.confidence,
+          tail,
+        });
+        const close = (actual: number, expected: number, label: string): void => {
+          expect(Math.abs(actual - expected), `${tail} ${label}`).toBeLessThanOrEqual(
+            DELTA_TOLERANCE * Math.abs(expected),
+          );
+        };
+        close(result.estimate, reference.estimate, "estimate");
+        close(result.z, reference.z, "z");
+        close(result.pValue, reference.pValue[tail], "p-value");
+        const expected = reference.interval[tail];
+        const [low, high] = result.interval;
+        if (tail === "two-sided") {
+          close(low, defined(Array.isArray(expected) ? expected[0] : null), "lower end");
+          close(high, defined(Array.isArray(expected) ? expected[1] : null), "upper end");
+        } else if (tail === "less") {
+          expect(low).toBe(Number.NEGATIVE_INFINITY);
+          close(high, Number(expected), "upper end");
+        } else {
+          close(low, Number(expected), "lower end");
+          expect(high).toBe(Number.POSITIVE_INFINITY);
+        }
       }
-    }
-  });
+    },
+  );
 
   it("has a standard error that matches the spread of the estimate over bootstrap samples", () => {
     const reference = defined(
@@ -1211,6 +1217,32 @@ describe("the test of a quasi order against the delta method", () => {
     const spread = Math.sqrt(estimates.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (estimates.length - 1));
     const standardError = Math.sqrt(reference.variance / learners.length);
     expect(Math.abs(spread / standardError - 1)).toBeLessThan(0.15);
+  });
+
+  it("has a standard error of the test of one edge on incomplete patterns that matches the spread over bootstrap samples", () => {
+    const reference = defined(
+      incompleteDiffTests.find(
+        (candidate) => candidate.name === "two booklets of seven items" && candidate.alternative !== null,
+      ),
+    );
+    const learners = Object.entries(reference.patterns).flatMap(([pattern, count]) =>
+      Array.from({ length: count }, () => pattern),
+    );
+    const random = createRandom(20261104);
+    const estimates = Array.from({ length: 400 }, () => {
+      const counts: Record<string, number> = {};
+      for (let draw = 0; draw < learners.length; draw++) {
+        const pattern = defined(learners[Math.floor(random.uniform() * learners.length)]);
+        counts[pattern] = (counts[pattern] ?? 0) + 1;
+      }
+      return diffTest(patternLog(reference.items, counts), reference.prerequisites, {
+        alternative: defined(reference.alternative),
+        version: reference.version,
+      }).estimate;
+    });
+    const mean = estimates.reduce((sum, value) => sum + value, 0) / estimates.length;
+    const spread = Math.sqrt(estimates.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (estimates.length - 1));
+    expect(Math.abs(spread / Math.sqrt(reference.variance) - 1)).toBeLessThan(0.15);
   });
 });
 
@@ -1939,6 +1971,56 @@ describe("the test of a quasi order", () => {
     expectClose(shifted.pValue, 1, 1e-12);
   });
 
+  it("takes incomplete patterns pairwise: a learner adds to the pairs and the items answered, and nothing else", () => {
+    const names = ["a", "b", "c", "d"];
+    const chain = { a: [], b: ["a"], c: ["b"], d: ["c"] };
+    const patterns = {
+      "1111": 6,
+      "1110": 5,
+      "11.0": 4,
+      "1.00": 4,
+      "0000": 3,
+      ".100": 2,
+      "1..1": 2,
+      "0101": 1,
+      "10.0": 3,
+    };
+    const result = diffTest(patternLog(names, patterns), chain);
+    // Learners who answered no item, or one, add to no pair: one answer only moves an item's solution rate.
+    const doubled = diffTest(
+      patternLog(names, Object.fromEntries(Object.entries(patterns).map(([key, count]) => [key, 2 * count]))),
+      chain,
+    );
+    expectClose(doubled.estimate, result.estimate, 1e-15);
+    expectClose(doubled.z, result.z * Math.SQRT2, 1e-9);
+    const complete = Object.fromEntries(Object.entries(patterns).filter(([key]) => !key.includes(".")));
+    expect(diffTest(patternLog(names, complete), chain).estimate).not.toBe(result.estimate);
+  });
+
+  it("tests one edge of a quasi order by the quasi order without it: a true edge fits better, a false one worse", () => {
+    // A chain a, b, c and an item x apart, answered with careless errors and lucky guesses of 0.1, each response missing
+    // with probability 0.3: the edge from b to c is true, the edge from c to x is not.
+    const random = createRandom(20261104);
+    const events: Event[] = [];
+    for (let learner = 0; learner < 600; learner++) {
+      const level = Math.floor(random.uniform() * 4);
+      const masters = { a: level >= 1, b: level >= 2, c: level >= 3, x: random.uniform() < 0.5 };
+      for (const [item, mastered] of Object.entries(masters)) {
+        if (random.uniform() < 0.3) continue;
+        const correct = mastered ? random.uniform() >= 0.1 : random.uniform() < 0.1;
+        events.push({ learner: `l${learner}`, item, skills: [], time: events.length, outcome: correct ? 1 : 0 });
+      }
+    }
+    const log = buildEventLog(events);
+    const chain = { a: [], b: ["a"], c: ["b"], x: [] };
+    const trueEdge = diffTest(log, chain, { alternative: { a: [], b: ["a"], c: ["a"], x: [] }, tail: "greater" });
+    expect(trueEdge.estimate).toBeLessThan(0);
+    expect(trueEdge.pValue).toBeGreaterThan(0.5);
+    const falseEdge = diffTest(log, { ...chain, x: ["c"] }, { alternative: chain, tail: "greater" });
+    expect(falseEdge.estimate).toBeGreaterThan(0);
+    expect(falseEdge.pValue).toBeLessThan(0.01);
+  });
+
   it("closes the prerequisites under transitivity, as a quasi order is", () => {
     const direct = { a: [], b: ["a"], c: ["b"] };
     const closed = { a: [], b: ["a"], c: ["a", "b"] };
@@ -1966,8 +2048,11 @@ describe("the test of a quasi order", () => {
       'Item "c" is solved by no learner',
     );
     expect(() => diffTest(patternLog(["a"], { "1": 3 }), { a: [] })).toThrow("needs at least 2 items");
-    const incomplete = buildEventLog([...answers.slice(1)]);
-    expect(() => diffTest(incomplete, chain3)).toThrow("The difference test needs every learner to answer every item");
+    const apart = patternLog(names, { "11.": 4, "10.": 3, "0.1": 2, "1.0": 2, "01.": 1, ".11": 1 });
+    expect(() => diffTest(apart, { a: [], b: [], c: ["a"] })).not.toThrow();
+    expect(() =>
+      diffTest(patternLog(names, { "11.": 4, "10.": 3, "0.1": 2, "01.": 1, "..1": 1 }), { a: [], b: [], c: ["b"] }),
+    ).toThrow("No learner answered both items of an implication of the prerequisites");
     expect(() => diffTest(answers, chain3, { tail: "both" as "less" })).toThrow(
       'The option tail must be "two-sided", "less" or "greater", found "both".',
     );

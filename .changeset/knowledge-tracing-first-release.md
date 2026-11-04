@@ -84,3 +84,9 @@ comments state.
 Every model and function refuses an option it does not take, naming it, and so do the records of settings inside the
 options: BKT's `bounds` and `fixed` rates, KST's `fixed` and `equal`, IRT's `prior` and `drift`, Elo's `uncertainty` and
 a logistic term.
+
+`diffTest` takes incomplete response patterns, as an adaptive test, a placement or a booklet design leaves them: each
+pair of items counts the learners who answered both, each item's solution rate those who answered it, a pair that no
+learner answered both of leaves the fit measure, and the standard error is the delta method of the same estimate over
+each learner's answers. Complete patterns give the estimate and variance as before. One edge of a quasi order is tested
+by the order without it as the alternative, with `tail: "greater"`.

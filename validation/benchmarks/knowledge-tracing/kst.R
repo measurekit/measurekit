@@ -63,3 +63,5 @@ implications <- do.call(set, unlist(lapply(seq_len(test_items - 1), function(i) 
 bench_task("kst.diffTest", "Test of the fit of the chain of 6 items to the responses",
            sprintf("%s persons, %d items", count(persons), test_items), reference("DAKS", "z_test(v = 1)"),
            function() z_test(responses[, seq_len(test_items)], implications, v = 1))
+bench_task("kst.diffTestIncomplete", "Test of one edge of the chain of 12 items, on responses with 3 in 10 missing",
+           sprintf("%s persons, 12 items", count(persons)))
