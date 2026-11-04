@@ -844,6 +844,14 @@ export const RULES: readonly Rule[] = [
     titles: "decomposes no matrix with an entry that is not finite",
   },
   {
+    rule: "The QL iterations of one eigenvalue stop at their limit, so that finite entries whose arithmetic overflows end without converging.",
+    file: "packages/psychometrics/src/math/eigen.ts",
+    find: "if (count === MAX_ITERATIONS) return",
+    replace: "if (count === 2 * MAX_ITERATIONS) return",
+    test: "packages/psychometrics/test/math.test.ts",
+    titles: "stops at the limit of QL iterations",
+  },
+  {
     rule: "Omega takes at most 1,000 items, so that a few persons answering many items do not cost a matrix of their square.",
     file: "packages/psychometrics/src/ctt/omega.ts",
     find: '  checkMatrixItems(k, "Omega");\n',

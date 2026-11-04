@@ -277,6 +277,11 @@ describe("symmetricEigen", () => {
     }
   });
 
+  it("stops at the limit of QL iterations and reports it when the arithmetic of finite entries overflows", () => {
+    const result = symmetricEigen(new Float64Array(9).fill(Number.MAX_VALUE), 3);
+    expect(result).toMatchObject({ converged: false, iterations: 30 });
+  });
+
   it("decomposes the correlations of 1,000 items, the most a matrix of items takes", () => {
     // Five factors of seeded loadings: five leading eigenvalues and the rest spread between the uniquenesses.
     const random = createRandom(29);

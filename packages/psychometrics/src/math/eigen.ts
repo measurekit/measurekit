@@ -9,7 +9,10 @@ export interface SymmetricEigen {
   readonly vectors: Float64Array;
   /** QL iterations run, over all the eigenvalues. */
   readonly iterations: number;
-  /** Whether each eigenvalue was found within `MAX_ITERATIONS` QL iterations; false for an entry that is not finite. */
+  /**
+   * Whether each eigenvalue was found within `MAX_ITERATIONS` QL iterations; false for an entry that is not finite, or so
+   * near the largest double that the arithmetic overflows.
+   */
   readonly converged: boolean;
 }
 
