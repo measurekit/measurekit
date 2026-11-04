@@ -1,4 +1,3 @@
-import { outcomeLogLikelihood } from "../math/internal.js";
 import { type Attempt, type Event, isObserved, type ObservedEvent } from "./event.js";
 import type { EventLog } from "./event-log.js";
 
@@ -7,37 +6,6 @@ export interface Steps<TState> {
   readonly initialState: (learner: string) => TState;
   readonly predict: (state: TState, attempt: Attempt) => number;
   readonly update: (state: TState, event: Event) => TState;
-}
-
-/** The result of a replay. */
-export interface Replay<TState> {
-  /** Each learner's state after the log, by learner id. */
-  readonly states: Record<string, TState>;
-  /** Each event's prediction, made before the event; `null` for an event without an outcome. */
-  readonly predictions: (number | null)[];
-  /** The sum over events with an outcome of y ln p + (1 - y) ln(1 - p), with p the event's prediction. */
-  readonly logLikelihood: number;
-}
-
-/**
- * Replays a log through a model's steps: each event with an outcome is predicted, then its learner's state is updated;
- * an event without an outcome is only used to update.
- */
-export function replay<TState>(log: EventLog, steps: Steps<TState>): Replay<TState> {
-  const states = new Map<string, TState>();
-  let logLikelihood = 0;
-  const predictions = log.map((event) => {
-    const state = states.get(event.learner) ?? steps.initialState(event.learner);
-    if (!isObserved(event)) {
-      states.set(event.learner, steps.update(state, event));
-      return null;
-    }
-    const prediction = steps.predict(state, event);
-    states.set(event.learner, steps.update(state, event));
-    logLikelihood += outcomeLogLikelihood(prediction, event.outcome);
-    return prediction;
-  });
-  return { states: Object.fromEntries(states), predictions, logLikelihood };
 }
 
 /** What a model that learns from outcomes alone does at one event with an outcome. */
@@ -51,7 +19,13 @@ export interface PassStep<TState> {
 }
 
 /** The result of a pass over a log, as a model fitted in one pass reports it. */
-export interface Pass<TState> extends Replay<TState> {
+export interface Pass<TState> {
+  /** Each learner's state after the log, by learner id. */
+  readonly states: Record<string, TState>;
+  /** Each event's prediction, made before the event; `null` for an event without an outcome. */
+  readonly predictions: (number | null)[];
+  /** The sum over events with an outcome of y ln p + (1 - y) ln(1 - p), with p the event's prediction. */
+  readonly logLikelihood: number;
   readonly aic: null;
   readonly bic: null;
   readonly converged: true;

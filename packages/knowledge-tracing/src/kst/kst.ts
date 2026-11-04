@@ -413,9 +413,9 @@ function fitLog({ options, settings, compiled, parameters, maskOf }: FitContext,
 }
 
 /**
- * Replays a log through a model's steps, as `replay` does, one learner at a time: the learners are independent at
- * given parameters, so that the predictions and states are those of the log in time order, and only one learner's
- * posterior is held, unless `posteriors` keeps each.
+ * Replays a log through a model's steps one learner at a time: the learners are independent at given parameters, so
+ * that the predictions and states are those of the log in time order, and only one learner's posterior is held, unless
+ * `posteriors` keeps each.
  */
 function replayByLearner(
   log: EventLog,

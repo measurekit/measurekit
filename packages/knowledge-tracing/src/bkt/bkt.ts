@@ -24,11 +24,12 @@ import {
   type EventLog,
   entry,
   isObserved,
+  onePass,
   parametersOf,
-  replay,
   resourceOf,
   type Steps,
 } from "../data/internal.js";
+import { outcomeLogLikelihood } from "../math/internal.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { type BktBounds, type BktFixedRates, checkConstraints, checkWithinBounds } from "./constraints.js";
 import {
@@ -381,7 +382,20 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
           skills: { ...parameters.skills, ...Object.fromEntries([...estimates].map(([id, { skill }]) => [id, skill])) },
         },
       });
-      const { states, predictions, logLikelihood } = replay(log, fitted.steps);
+      const { initialState, predict, update } = fitted.steps;
+      const { states, predictions, logLikelihood } = onePass(
+        log,
+        initialState,
+        (state, event) => {
+          const prediction = predict(state, event);
+          return {
+            state: update(state, event),
+            prediction,
+            logLikelihood: outcomeLogLikelihood(prediction, event.outcome),
+          };
+        },
+        update,
+      );
       const fits = [...estimates.values()];
       return {
         model: fitted.model,

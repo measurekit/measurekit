@@ -211,11 +211,11 @@ Evaluation, practice and simulation check that a model passed in is an object wi
 
 - Numerics work on `Float64Array` and do not allocate in inner loops.
 - Functions in `math/` assume valid input; public functions validate before calling them.
-- A fit's predictions and states come from replaying the log with the model's steps, `data/replay.ts`: the arithmetic of
-  online updates without their checks, as the log was checked as a whole, so they equal the same events applied online,
-  to the last bit. Elo's and IRT's fits make one pass over the log with their own step, `onePass` of the same file, which
-  also moves Elo's item ratings; an event without an outcome leaves the learner's state as it was, or with IRT's drift
-  advances it to its time.
+- A fit's predictions and states come from one pass over the log with the model's steps, `onePass` of `data/replay.ts`:
+  the arithmetic of online updates without their checks, as the log was checked as a whole, so they equal the same events
+  applied online, to the last bit. Elo's and IRT's fits pass with their own step, which also moves Elo's item ratings; an
+  event without an outcome leaves the learner's state as it was, or with IRT's drift advances it to its time. KST's fit
+  replays one learner at a time with its steps, as the learners are independent at given parameters.
 - Newton's line search takes a step that raises the objective by no more than its rounding error, 1e-12 relative: near
   the optimum a Newton step lowers it by less, and the gradient decides convergence.
 - Logistic regressions with an intercept per learner have an arrow-shaped Hessian; Newton steps solve it by the Schur

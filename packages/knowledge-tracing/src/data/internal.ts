@@ -17,5 +17,5 @@ export { buildEventLog, checkLog, checkObservedEvents, type EventInput, type Eve
 export { checkLearner, checkLearnerId, checkLearnerState } from "./learner.js";
 export { checkItemSkills } from "./q-matrix.js";
 export { entry, mapRecord, parametersOf, put } from "./record.js";
-export { onePass, replay, type Steps } from "./replay.js";
+export { onePass, type Steps } from "./replay.js";
 export type { Fold } from "./split.js";
