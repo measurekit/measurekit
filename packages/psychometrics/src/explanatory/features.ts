@@ -1,4 +1,4 @@
-import { checkRecord, cholesky, DataError, describe, isRecord } from "@measurekit/core";
+import { checkRecordById, cholesky, DataError, describe, isRecord } from "@measurekit/core";
 import { designCrossProducts } from "./cross-products.js";
 
 /**
@@ -40,7 +40,7 @@ export interface Design {
  * has, a value is not finite, a feature is named like the intercept, or the design has no effect.
  */
 export function designMatrix(ids: readonly string[], features: ItemFeatures, intercept: boolean): Design {
-  checkRecord(features, "The features must be an object of features by item id");
+  checkRecordById(features, "The features must be an object of features by item id");
   const records = ids.map((id) => {
     const record: unknown = Object.hasOwn(features, id) ? features[id] : undefined;
     if (!isRecord(record))

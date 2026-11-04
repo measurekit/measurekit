@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe, isNonEmptyString, isUnitInterval } from "@measurekit/core";
+import { checkRecordById, DataError, describe, isNonEmptyString, isUnitInterval } from "@measurekit/core";
 import { checkLearnerState } from "../data/internal.js";
 
 /** A learner's state in a BKT model: plain data, which JSON serializes. */
@@ -18,14 +18,14 @@ export interface BktState {
 export function checkState(state: BktState): void {
   const learner = checkLearnerState(state, "BKT");
   const label = `The BKT state of learner "${learner}"`;
-  checkRecord(state.skills, `${label} needs skills, an object of probabilities by skill id`);
+  checkRecordById(state.skills, `${label} needs skills, an object of probabilities by skill id`);
   for (const [skill, mastery] of Object.entries(state.skills)) {
     if (!isUnitInterval(mastery)) {
       throw new DataError(`${label} needs a probability from 0 to 1 for skill "${skill}", found ${describe(mastery)}.`);
     }
   }
   if (state.previous === undefined) return;
-  checkRecord(state.previous, `${label} needs previous, an object of resource ids by skill id`);
+  checkRecordById(state.previous, `${label} needs previous, an object of resource ids by skill id`);
   for (const [skill, resource] of Object.entries(state.previous)) {
     if (!isNonEmptyString(resource)) {
       throw new DataError(

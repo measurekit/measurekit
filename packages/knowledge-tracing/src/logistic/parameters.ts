@@ -1,4 +1,4 @@
-import { checkFinite, checkPositive, checkRecord } from "@measurekit/core";
+import { checkFinite, checkPositive, checkRecord, checkRecordById } from "@measurekit/core";
 import { entry } from "../data/internal.js";
 
 /** How a logistic model treats learners' proficiency θ: not at all, as a fixed effect, or as a random intercept. */
@@ -51,14 +51,14 @@ export interface ParameterLabels {
 /** Checks parameters, which may come from storage, against the labels of the model's coefficients. */
 export function checkParameters(parameters: LogisticParameters, labels: ParameterLabels): void {
   checkRecord(parameters, "Logistic parameters must be an object");
-  checkRecord(parameters.skills, "Logistic parameters need skills, an object of coefficients by skill id");
+  checkRecordById(parameters.skills, "Logistic parameters need skills, an object of coefficients by skill id");
   checkCoefficients(parameters.skills, "skill", labels.skills);
   if (parameters.items !== undefined) {
-    checkRecord(parameters.items, "Logistic parameters need items, an object of coefficients by item id");
+    checkRecordById(parameters.items, "Logistic parameters need items, an object of coefficients by item id");
     checkCoefficients(parameters.items, "item", labels.items);
   }
   if (parameters.shared !== undefined) {
-    checkRecord(parameters.shared, "Logistic parameters need shared, an object of coefficients by label");
+    checkRecordById(parameters.shared, "Logistic parameters need shared, an object of coefficients by label");
     for (const label of labels.shared) {
       checkFinite(entry(parameters.shared, label), `The shared coefficient ${label} of the logistic parameters`);
     }
@@ -67,7 +67,7 @@ export function checkParameters(parameters: LogisticParameters, labels: Paramete
     }
   }
   if (parameters.learners !== undefined) {
-    checkRecord(parameters.learners, "Logistic parameters need learners, an object of proficiencies by learner id");
+    checkRecordById(parameters.learners, "Logistic parameters need learners, an object of proficiencies by learner id");
     for (const [learner, theta] of Object.entries(parameters.learners)) {
       checkFinite(theta, `The proficiency of learner "${learner}"`);
     }
@@ -85,7 +85,7 @@ function checkCoefficients(
     const owner = `the logistic parameters of ${kind} "${id}"`;
     checkRecord(found, `The logistic parameters of ${kind} "${id}" must be an object`);
     checkFinite(found.intercept, `The intercept of ${owner}`);
-    checkRecord(
+    checkRecordById(
       found.coefficients,
       `The logistic parameters of ${kind} "${id}" need coefficients, an object of coefficients by feature`,
     );

@@ -1,4 +1,4 @@
-import { checkArray, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkArray, checkRecord, checkRecordById, DataError, describe } from "@measurekit/core";
 
 /**
  * One score with the element of each facet it was observed at: the long format of ratings by raters of persons on
@@ -26,7 +26,7 @@ export function checkFacetedScores(scores: readonly FacetedScore[], facets: read
   scores.forEach((entry, index) => {
     const label = `Score ${index + 1}`;
     checkRecord(entry, `${label} must be an object { levels, score }`);
-    checkRecord(entry.levels, `${label} needs levels, an object of elements by facet`);
+    checkRecordById(entry.levels, `${label} needs levels, an object of elements by facet`);
     if (!Number.isFinite(entry.score)) {
       throw new DataError(`${label} needs a finite score, found ${describe(entry.score)}.`);
     }

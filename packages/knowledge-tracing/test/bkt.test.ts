@@ -1054,6 +1054,27 @@ describe("bkt constraints and pairs", () => {
     ]);
   });
 
+  it("fits a rate for each pair of resources named as members of an object, and holds them through storage", () => {
+    const events = Array.from({ length: 60 }, (_, k) => ({
+      learner: `l${Math.floor(k / 6)}`,
+      item: k % 2 === 0 ? "__proto__" : "constructor",
+      skills: ["s"],
+      time: k,
+      outcome: k % 3 === 0 ? 0 : 1,
+    }));
+    const { model } = bkt({ pairLearning: true, restarts: 1 }).fit(buildEventLog(events));
+    const pairs = model.parameters.skills.s?.pairLearning;
+    expect(Object.entries(pairs ?? {}).map(([before, rates]) => [before, Object.keys(rates)])).toEqual([
+      ["__proto__", ["constructor"]],
+      ["constructor", ["__proto__"]],
+    ]);
+    expect(Object.getPrototypeOf(pairs)).toBe(Object.prototype);
+    const stored = bkt({ pairLearning: true, parameters: JSON.parse(JSON.stringify(model.parameters)) });
+    const first = stored.update(stored.initialState("ana"), { ...defined(events[0]), learner: "ana" });
+    const attempt = { learner: "ana", item: "constructor", skills: ["s"], time: 2 };
+    expect(stored.predict(JSON.parse(JSON.stringify(first)), attempt)).toBe(model.predict(first, attempt));
+  });
+
   it("reads a state stored without previous resources as one with none, and writes none without pairs", () => {
     const skill: BktSkill = { ...rates, pairLearning: { q1: { q2: { learn: 0.6, forget: 0 } } } };
     const model = bkt({ pairLearning: true, parameters: { skills: { s: skill } } });

@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe } from "@measurekit/core";
+import { checkRecordById, DataError, describe } from "@measurekit/core";
 import type { Design } from "./design.js";
 import { checkDimensions } from "./items.js";
 import type { LoadingPattern } from "./model.js";
@@ -43,7 +43,7 @@ interface StructureOptions {
  */
 export function structureOf(options: StructureOptions, itemIds: readonly string[]): BifactorStructure {
   const { specific, primary } = options;
-  checkRecord(specific, "The option specific must be an object of specific dimension names by item id");
+  checkRecordById(specific, "The option specific must be an object of specific dimension names by item id");
   const specificByItem = specificDimensions(specific, itemIds);
   const primaryByItem = primary === undefined ? itemIds.map(() => [GENERAL]) : primaryDimensions(primary, itemIds);
   const primaryNames = namesInOrder(primaryByItem.flat());
@@ -118,7 +118,7 @@ function specificDimensions(
 
 /** Returns each item's primary dimensions. */
 function primaryDimensions(primary: LoadingPattern, itemIds: readonly string[]): string[][] {
-  checkRecord(primary, "The option primary must be an object of dimension names by item id");
+  checkRecordById(primary, "The option primary must be an object of dimension names by item id");
   const byId = new Map(Object.entries(primary));
   for (const id of byId.keys()) {
     if (!itemIds.includes(id))

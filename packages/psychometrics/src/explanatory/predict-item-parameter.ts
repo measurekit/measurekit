@@ -1,4 +1,4 @@
-import { checkArray, checkRecord, DataError, describe, isRecord } from "@measurekit/core";
+import { checkArray, checkRecord, checkRecordById, DataError, describe, isRecord } from "@measurekit/core";
 import { INTERCEPT } from "./features.js";
 import type { ItemFeatureRegression } from "./item-feature-regression.js";
 
@@ -66,7 +66,7 @@ export function predictItemParameter(
       `The regression needs a covariance with a row for each of its effects, found ${regression.covariance.length} rows for ${size} effects.`,
     );
   }
-  checkRecord(features, "The features of the item must be an object of numbers by feature name");
+  checkRecordById(features, "The features of the item must be an object of numbers by feature name");
   const x = regression.effects.map((effect, j) => {
     if (!(isRecord(effect) && typeof effect.name === "string" && Number.isFinite(effect.estimate))) {
       throw new DataError(

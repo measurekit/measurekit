@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe } from "@measurekit/core";
+import { checkRecordById, DataError, describe } from "@measurekit/core";
 import { findRoot, type Quadrature } from "../math/internal.js";
 import type { CategoryTally } from "./responses.js";
 
@@ -51,7 +51,7 @@ export function testletDesign(
   rectangular: boolean,
   addFree: (lower: number, start: number) => number,
 ): TestletDesign {
-  checkRecord(testlets, "The option testlets must be an object of item id lists by testlet id");
+  checkRecordById(testlets, "The option testlets must be an object of item id lists by testlet id");
   if (!rectangular) throw new DataError("Testlets need the rectangular quadrature rule.");
   const testletOf = new Int32Array(itemIds.length).fill(-1);
   const nodeCount = rule.nodes.length;

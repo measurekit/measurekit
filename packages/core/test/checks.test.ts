@@ -13,6 +13,7 @@ import {
   checkPositiveInteger,
   checkRandom,
   checkRecord,
+  checkRecordById,
   checkSeed,
   checkStopping,
   checkUnitInterval,
@@ -59,6 +60,26 @@ describe("checks of one value", () => {
       checkSeed(-3);
       checkStopping(0, 1);
     }).not.toThrow();
+  });
+
+  for (const key of ["__proto__", "prototype", "constructor"]) {
+    it(`refuse the own key ${key} in a record of names, and hold it in a record by id`, () => {
+      const parsed = JSON.parse(`{ "a": 1, "${key}": 2 }`);
+      expect(() => checkRecord(parsed, "The priors must be an object")).toThrow(
+        `The priors must be an object, found the reserved key "${key}".`,
+      );
+      expect(() => checkRecordById(parsed, "The states must be an object")).not.toThrow();
+    });
+  }
+
+  it("take a record that only inherits a reserved name, and refuse a list as a record by id", () => {
+    class Settings {
+      readonly level = 1;
+    }
+    expect(() => checkRecord(new Settings(), "The settings must be an object")).not.toThrow();
+    expect(() => checkRecordById(json("[]"), "The states must be an object")).toThrow(
+      "The states must be an object, found an array.",
+    );
   });
 
   it("throw DataError with a sentence that names the label and the value found", () => {

@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
+import { checkRecord, checkRecordById, DataError, describe, isUnitInterval } from "@measurekit/core";
 
 /** An item's error rates in a basic local independence model. */
 export interface KstItem {
@@ -37,7 +37,7 @@ export function checkDistribution(values: unknown, count: number, label: string)
 export function checkParameters(parameters: KstParameters, count: number): void {
   checkRecord(parameters, "KST parameters must be an object");
   checkDistribution(parameters.probabilities, count, "The KST parameters");
-  checkRecord(parameters.items, "The KST parameters need items, an object of guess and slip by item id");
+  checkRecordById(parameters.items, "The KST parameters need items, an object of guess and slip by item id");
   for (const [id, item] of Object.entries(parameters.items)) {
     for (const name of ["guess", "slip"] as const) {
       const value = item?.[name];

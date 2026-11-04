@@ -246,10 +246,14 @@ Where the code departs from `STANDARDS.md`, with the reason: none.
 ## Code
 
 - No `as` casts except where untyped data enters and is validated next.
+- A record whose keys are names the code knows, fields or parameter names, goes through `checkRecord`, which refuses
+  an own key `__proto__`, `prototype` or `constructor`. A record whose keys are the user's identifiers, such as learners,
+  items, facets or covariates, goes through `checkRecordById`: every key is data, read with `Object.hasOwn`,
+  `Object.entries` or a `Map` and written with `Object.fromEntries`, with a test that an id named `constructor` works.
 - A public function validates its input once, where it reads it, and throws `DataError` with a full sentence that says
   what is wrong and what is expected (`A seed must be a safe integer, found 1.5.`). Input may come from plain JavaScript
   or JSON, so every argument is checked for its type first, with the checks of `@measurekit/core` (`checkOptions`,
-  `checkFields`, `checkArray`, `checkRecord`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`,
+  `checkFields`, `checkArray`, `checkRecord`, `checkRecordById`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`,
   `checkPositive`, `checkNonNegative`, `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval`, `checkSeed`,
   `checkStopping`) and `checkFunction` and `checkOpenUnitInterval` of psychometrics. An option's label is `The option
   <name>`: `<Label> must be a positive number, found <value>.` A field of a record is tested with a predicate of core or

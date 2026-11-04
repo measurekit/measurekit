@@ -4,7 +4,7 @@ import {
   checkIntegerFrom,
   checkNonNegative,
   checkOptions,
-  checkRecord,
+  checkRecordById,
   chiSquareUpperTail,
   DataError,
   describe,
@@ -198,7 +198,7 @@ function bundleItems(
   bundles: Readonly<Record<string, readonly string[]>>,
   itemIds: readonly string[],
 ): { id: string; items: number[] }[] {
-  checkRecord(bundles, "The option bundles must be an object of item ids by bundle");
+  checkRecordById(bundles, "The option bundles must be an object of item ids by bundle");
   const positions = new Map(itemIds.map((id, item) => [id, item]));
   return Object.entries(bundles).map(([id, items]) => {
     const label = `The bundle ${describe(id)}`;

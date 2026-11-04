@@ -1,4 +1,4 @@
-import { checkArray, checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
+import { checkArray, checkRecord, checkRecordById, DataError, describe, isUnitInterval } from "@measurekit/core";
 import { type Attempt, checkLearnerState, type Event, entry, isObserved, put } from "../data/internal.js";
 
 /**
@@ -334,11 +334,11 @@ const NO_NEEDS: HistoryNeeds = {
 export function checkState(state: LogisticState, needs: StateNeeds): void {
   const learner = checkLearnerState(state, "logistic");
   const label = `The logistic state of learner "${learner}"`;
-  checkRecord(state.skills, `${label} needs skills, an object of histories by skill id`);
+  checkRecordById(state.skills, `${label} needs skills, an object of histories by skill id`);
   checkHistories(state.skills, `${label}, skill`, needs.skills);
   checkExposures(state, label, needs.skills.exposureDecays);
   if (state.items !== undefined) {
-    checkRecord(state.items, `${label} needs items, an object of histories by item id`);
+    checkRecordById(state.items, `${label} needs items, an object of histories by item id`);
     checkHistories(state.items, `${label}, item`, needs.items ?? NO_NEEDS);
   }
   if (state.overall !== undefined) checkHistory(state.overall, `${label}, overall history,`, needs.overall ?? NO_NEEDS);
@@ -434,7 +434,7 @@ function checkTimes(history: SkillHistory, prefix: string, needed: boolean): voi
 /** Checks a state's exposures, which are optional: a state stored before there were any has none. */
 function checkExposures(state: LogisticState, label: string, exposureDecays: readonly number[]): void {
   if (state.exposures === undefined) return;
-  checkRecord(state.exposures, `${label} needs exposures, an object of exposures by skill id`);
+  checkRecordById(state.exposures, `${label} needs exposures, an object of exposures by skill id`);
   for (const [skill, exposure] of Object.entries(state.exposures)) {
     const prefix = `${label}, exposures to skill "${skill}",`;
     checkRecord(exposure, `${prefix} must be an object`);

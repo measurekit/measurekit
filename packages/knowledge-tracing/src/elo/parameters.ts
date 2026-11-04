@@ -1,4 +1,4 @@
-import { checkRecord } from "@measurekit/core";
+import { checkRecord, checkRecordById } from "@measurekit/core";
 import { checkRating } from "./state.js";
 
 /** The parameters of an Elo model: plain data, which JSON serializes. */
@@ -18,7 +18,7 @@ export interface EloItem {
 /** Checks parameters, which may come from storage, throwing a `DataError` that names the first problem found. */
 export function checkParameters(parameters: EloParameters): void {
   checkRecord(parameters, "Elo parameters must be an object");
-  checkRecord(parameters.items, "Elo parameters need items, an object of item ratings by item id");
+  checkRecordById(parameters.items, "Elo parameters need items, an object of item ratings by item id");
   for (const [item, rating] of Object.entries(parameters.items)) {
     checkRecord(rating, `Item "${item}" of the Elo parameters must be an object`);
     checkRating(rating.difficulty, rating.count, `Item "${item}" of the Elo parameters`, "a difficulty");

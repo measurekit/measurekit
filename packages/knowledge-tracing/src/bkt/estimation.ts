@@ -228,10 +228,10 @@ function withRecords(
   guessSlip: (item: string) => BktGuessSlip,
 ): BktSkill {
   const { groups, learningKind, learningClasses, guessSlipItems } = structure;
-  const pairs: Record<string, Record<string, BktLearning>> = {};
+  const pairs = new Map<string, Record<string, BktLearning>>();
   for (const key of learningKind === "pair" ? learningClasses : []) {
     const [previous, resource] = splitPair(key);
-    pairs[previous] = { ...pairs[previous], [resource]: learning(key) };
+    pairs.set(previous, { ...pairs.get(previous), [resource]: learning(key) });
   }
   return {
     ...skill,
@@ -240,7 +240,7 @@ function withRecords(
       learningClasses.length > 0 && {
         resourceLearning: Object.fromEntries(learningClasses.map((key) => [key, learning(key)])),
       }),
-    ...(learningKind === "pair" && learningClasses.length > 0 && { pairLearning: pairs }),
+    ...(learningKind === "pair" && learningClasses.length > 0 && { pairLearning: Object.fromEntries(pairs) }),
     ...(guessSlipItems.length > 0 && {
       itemGuessSlip: Object.fromEntries(guessSlipItems.map((item) => [item, guessSlip(item)])),
     }),

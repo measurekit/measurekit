@@ -1,4 +1,4 @@
-import { checkBoolean, checkPositiveInteger, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkBoolean, checkPositiveInteger, checkRecordById, DataError, describe } from "@measurekit/core";
 import { checkDimensions } from "./items.js";
 import type { LoadingPattern } from "./model.js";
 
@@ -68,7 +68,7 @@ function exploratory(dimensions: number, itemCount: number): Design {
 }
 
 function confirmatory(loadings: LoadingPattern, itemIds: readonly string[], correlated: boolean): Design {
-  checkRecord(loadings, "The option loadings must be an object of dimension names by item id");
+  checkRecordById(loadings, "The option loadings must be an object of dimension names by item id");
   // A map, so that an id such as "constructor" finds only its own loadings.
   const byId = new Map(Object.entries(loadings));
   for (const id of byId.keys()) {

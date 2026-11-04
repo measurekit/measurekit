@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe, isNonEmptyString, type QMatrix } from "@measurekit/core";
+import { checkRecordById, DataError, describe, isNonEmptyString, type QMatrix } from "@measurekit/core";
 
 /** A cognitive diagnosis design: the attributes, the profiles over them and each item's attributes. */
 export interface CdmDesign {
@@ -97,7 +97,7 @@ export function designAttributes(
   qMatrix: QMatrix,
 ): Pick<CdmDesign, "attributes" | "itemAttributes"> {
   // A Q-matrix shared with knowledge tracing or loaded from JSON may be another value.
-  checkRecord(qMatrix, "A Q-matrix must be an object of attribute lists by item id");
+  checkRecordById(qMatrix, "A Q-matrix must be an object of attribute lists by item id");
   for (const id of Object.keys(qMatrix)) {
     if (!itemIds.includes(id)) throw new DataError(`The Q-matrix has item "${id}", which is not an item id.`);
   }

@@ -1,4 +1,4 @@
-import { checkOptions, checkPositive, checkRecord, type FieldNames } from "@measurekit/core";
+import { checkOptions, checkPositive, checkRecordById, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecord, ResponseRecords } from "../data/internal.js";
 import {
   ABILITY_ESTIMATES_OPTIONS,
@@ -173,7 +173,7 @@ function isRapid(time: number, threshold: number): boolean | null {
  * @throws `DataError` when the thresholds are not an object or a threshold is not a positive finite number.
  */
 function thresholdsOf(itemIds: readonly string[], thresholds: Readonly<Record<string, number>>): number[] {
-  checkRecord(thresholds, "The thresholds must be an object of seconds by item id");
+  checkRecordById(thresholds, "The thresholds must be an object of seconds by item id");
   for (const [id, threshold] of Object.entries(thresholds)) {
     checkPositive(threshold, `The threshold of item "${id}"`);
   }

@@ -4,6 +4,7 @@ import {
   checkIntegerFrom,
   checkPositive,
   checkRecord,
+  checkRecordById,
   DataError,
   describe,
   isNonEmptyString,
@@ -92,7 +93,7 @@ export function checkAttempt(attempt: Attempt, label: string): void {
   const { resource, covariates } = attempt;
   if (resource !== undefined) checkId(resource, `${label} needs a resource id`);
   if (covariates !== undefined) {
-    checkRecord(covariates, `${label} needs covariates, an object of numbers by name`);
+    checkRecordById(covariates, `${label} needs covariates, an object of numbers by name`);
     for (const [name, value] of Object.entries(covariates)) {
       checkFinite(value, `The covariate "${name}" of ${label}`);
     }

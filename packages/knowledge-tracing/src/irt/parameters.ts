@@ -1,4 +1,4 @@
-import { checkRecord } from "@measurekit/core";
+import { checkRecord, checkRecordById } from "@measurekit/core";
 import { checkItem, type IrtItem } from "./items.js";
 
 /**
@@ -13,6 +13,6 @@ export interface IrtParameters {
 /** Checks parameters, throwing a `DataError` that names the first problem found. */
 export function checkParameters(parameters: IrtParameters): void {
   checkRecord(parameters, "IRT parameters must be an object");
-  checkRecord(parameters.items, "IRT parameters need items, item parameters by item id");
+  checkRecordById(parameters.items, "IRT parameters need items, item parameters by item id");
   for (const [id, item] of Object.entries(parameters.items)) checkItem(item, id);
 }

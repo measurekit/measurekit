@@ -1,4 +1,4 @@
-import { checkArray, checkRecord, DataError, describe } from "@measurekit/core";
+import { checkArray, checkRecordById, DataError, describe } from "@measurekit/core";
 import { checkResponseMatrix, indexIds, type ResponseMatrix } from "../data/internal.js";
 import { variance } from "../math/internal.js";
 import { type CompleteCases, completeCases, itemScores } from "./complete-cases.js";
@@ -79,7 +79,7 @@ function sectionItems(
   sections: Readonly<Record<string, readonly string[]>>,
   subject: string,
 ): SectionItems[] {
-  checkRecord(sections, "The sections must be an object of item ids by section name");
+  checkRecordById(sections, "The sections must be an object of item ids by section name");
   const columns = indexIds("item", matrix.itemIds);
   const owner = new Map<string, string>();
   const result = Object.entries(sections).map(([section, ids]) => {

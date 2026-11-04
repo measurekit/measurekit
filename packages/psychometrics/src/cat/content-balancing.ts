@@ -1,4 +1,4 @@
-import { checkPositive, checkRecord, DataError, type Random } from "@measurekit/core";
+import { checkPositive, checkRecordById, DataError, type Random } from "@measurekit/core";
 import { describeAreas, poolAreas } from "./content-constraints.js";
 import type { PoolControls } from "./items.js";
 
@@ -22,7 +22,7 @@ export function contentBalancing(
   pool: readonly PoolControls[],
   targets: Readonly<Record<string, number>>,
 ): ContentBalancing {
-  checkRecord(targets, "The option contentTargets must be an object of target proportions by area");
+  checkRecordById(targets, "The option contentTargets must be an object of target proportions by area");
   const areas = Object.keys(targets);
   if (areas.length === 0) throw new DataError("Content balancing needs a target proportion for at least one area.");
   const proportions = Float64Array.from(areas, (area) => {

@@ -1,4 +1,4 @@
-import { checkArray, checkRecord, DataError, describe, isNonEmptyString } from "@measurekit/core";
+import { checkArray, checkRecordById, DataError, describe, isNonEmptyString } from "@measurekit/core";
 
 /**
  * The most facets, the object of measurement included, that a design may have: GENOVA's and urGENOVA's six. The effects
@@ -77,7 +77,7 @@ function directParents(
   nested: Readonly<Record<string, readonly string[]>>,
   subject: string,
 ): number[] {
-  checkRecord(nested, `${subject} must be an object of the facets each facet is nested in`);
+  checkRecordById(nested, `${subject} must be an object of the facets each facet is nested in`);
   const parents = names.map(() => 0);
   for (const [facet, within] of Object.entries(nested)) {
     const index = names.indexOf(facet);

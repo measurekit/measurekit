@@ -1,4 +1,4 @@
-import { checkFinite, checkOptions, checkRecord, DataError, describe, type FieldNames } from "@measurekit/core";
+import { checkFinite, checkOptions, checkRecordById, DataError, describe, type FieldNames } from "@measurekit/core";
 import type { ManyFacetRasch } from "./many-facet-rasch.js";
 import { checkManyFacetRasch, expectedRatingAt, ratingStructure } from "./rating-model.js";
 
@@ -35,7 +35,7 @@ export function expectedRating(model: ManyFacetRasch, theta: number, options: Ex
   checkFinite(theta, "Theta");
   checkOptions(options, EXPECTED_RATING_OPTIONS);
   const { levels = {} } = options;
-  checkRecord(levels, "The levels must be an object of elements by facet");
+  checkRecordById(levels, "The levels must be an object of elements by facet");
   const structure = ratingStructure(model);
   for (const [facet, id] of Object.entries(levels)) {
     if (!structure.facets.includes(facet)) {
@@ -50,6 +50,7 @@ export function expectedRating(model: ManyFacetRasch, theta: number, options: Ex
   return expectedRatingAt(
     structure,
     theta,
-    structure.facets.map((facet) => levels[facet] ?? null),
+    // An own entry only, so that a facet such as "constructor" without a level is averaged over.
+    structure.facets.map((facet) => (Object.hasOwn(levels, facet) ? (levels[facet] ?? null) : null)),
   );
 }

@@ -1,4 +1,12 @@
-import { checkFields, checkRecord, DataError, describe, type FieldNames, isUnitInterval } from "@measurekit/core";
+import {
+  checkFields,
+  checkRecord,
+  checkRecordById,
+  DataError,
+  describe,
+  type FieldNames,
+  isUnitInterval,
+} from "@measurekit/core";
 import { entry, mapRecord } from "../data/internal.js";
 import type { BktLearning, BktParameters, BktSkill } from "./parameters.js";
 
@@ -136,7 +144,7 @@ interface Structure {
  * its upper, a fixed rate is outside its bounds, or `forget` or `resources` is used without the option it needs.
  */
 export function checkConstraints({ fixed, bounds }: Constraints, structure: Structure): void {
-  checkRecord(fixed, "The option fixed must be an object of fixed rates by skill id");
+  checkRecordById(fixed, "The option fixed must be an object of fixed rates by skill id");
   checkRecord(bounds, "The option bounds must be an object of bounds by rate");
   checkFields(bounds, BKT_BOUND_FIELDS, "The option bounds");
   for (const rate of RATES) {
@@ -164,7 +172,7 @@ function checkFixedRates(skill: string, rates: BktFixedRates, bounds: BktBounds,
   for (const rate of RATES) checkHeld(label, rate, rates[rate], bounds, structure.forgetting);
   if (rates.resources === undefined) return;
   if (!structure.resourceLearning) throw new DataError(`${label} have resources, which need resourceLearning: true.`);
-  checkRecord(rates.resources, `${label} need resources, an object of rates by resource id`);
+  checkRecordById(rates.resources, `${label} need resources, an object of rates by resource id`);
   for (const [resource, held] of Object.entries(rates.resources)) {
     const where = `${label}, resource "${resource}",`;
     checkRecord(held, `${where} must be an object`);

@@ -56,14 +56,40 @@ export function isUnitInterval(value: unknown): value is number {
   return typeof value === "number" && value >= 0 && value <= 1;
 }
 
+/** The keys that an assignment or a read takes for a member of the object instead of an entry. */
+const RESERVED_KEYS = ["__proto__", "prototype", "constructor"] as const;
+
 /**
- * Checks that a value is a record, such as an options object or a lookup table.
+ * Checks that a value is a record whose keys are names that the code knows: fields, or parameter names such as an
+ * item's standard errors.
+ *
+ * @remarks
+ * An own key `__proto__`, `prototype` or `constructor`, as JSON may bring, is refused: an assignment or a read by that
+ * name would lose the entry unseen. A record whose keys are the user's identifiers takes {@link checkRecordById}.
+ *
+ * @param value - The value to check.
+ * @param message - Says what the value should be, such as `The option priors must be an object of priors by parameter name`.
+ * @throws `DataError` when it is not a record, or holds one of the three keys.
+ */
+export function checkRecord(value: unknown, message: string): void {
+  if (!isRecord(value)) throw new DataError(`${message}, found ${describe(value)}.`);
+  for (const key of RESERVED_KEYS) {
+    if (Object.hasOwn(value, key)) throw new DataError(`${message}, found the reserved key ${JSON.stringify(key)}.`);
+  }
+}
+
+/**
+ * Checks that a value is a record whose keys are the user's identifiers, such as learners, items or facets.
+ *
+ * @remarks
+ * A learner or a facet may be named `constructor`, so every key is data: the caller reads the entries with
+ * `Object.hasOwn`, `Object.entries` or a `Map`, and builds records with `Object.fromEntries`.
  *
  * @param value - The value to check.
  * @param message - Says what the value should be, such as `The states must be an object of states by learner`.
- * @throws `DataError` when it is not.
+ * @throws `DataError` when it is not a record.
  */
-export function checkRecord(value: unknown, message: string): void {
+export function checkRecordById(value: unknown, message: string): void {
   if (!isRecord(value)) throw new DataError(`${message}, found ${describe(value)}.`);
 }
 
@@ -109,7 +135,8 @@ export type FieldNames<TRecord> = { readonly [TName in keyof TRecord]-?: true };
  * @throws `DataError` when the options are not an object, or hold a name that is not one of `names`.
  */
 export function checkOptions<TOptions extends object>(options: TOptions, names: FieldNames<NoInfer<TOptions>>): void {
-  checkRecord(options, "The options must be an object");
+  // The check of the names below refuses the reserved keys too, as no option has their names.
+  checkRecordById(options, "The options must be an object");
   const unknown = unknownName(options, names);
   if (unknown !== undefined) {
     throw new DataError(`There is no option ${JSON.stringify(unknown)}: the options are ${listOf(names)}.`);

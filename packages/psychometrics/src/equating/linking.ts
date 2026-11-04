@@ -1,13 +1,4 @@
-import {
-  checkArray,
-  checkFinite,
-  checkPositive,
-  checkRecord,
-  DataError,
-  describe,
-  isRecord,
-  mean,
-} from "@measurekit/core";
+import { checkArray, checkFinite, checkPositive, checkRecord, DataError, describe, mean } from "@measurekit/core";
 import { checkItem, type IrtItem } from "../irt/internal.js";
 import { standardDeviation } from "../math/internal.js";
 import { itemMoments, rescaledErrors, rescaledItem } from "./models.js";
@@ -135,11 +126,9 @@ export function chainTransformations(links: readonly ScaleTransformation[]): Sca
  * @throws `DataError` unless they are an object of non-negative numbers.
  */
 function checkErrors(errors: unknown): Readonly<Record<string, number>> {
-  if (!isRecord(errors)) {
-    throw new DataError("An item's standard errors must be an object of numbers by parameter name or null.");
-  }
+  checkRecord(errors, "An item's standard errors must be an object of numbers by parameter name or null");
   const checked: Record<string, number> = {};
-  for (const [name, error] of Object.entries(errors)) {
+  for (const [name, error] of Object.entries(errors as Readonly<Record<string, unknown>>)) {
     if (!(typeof error === "number" && error >= 0)) {
       throw new DataError(`The standard error of "${name}" must be a non-negative number, found ${describe(error)}.`);
     }

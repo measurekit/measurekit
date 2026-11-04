@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe } from "@measurekit/core";
+import { checkRecord, checkRecordById, DataError, describe } from "@measurekit/core";
 import { checkLearnerState } from "../data/internal.js";
 
 /** A learner's state in an Elo model: plain data, which JSON serializes. */
@@ -26,7 +26,7 @@ export function checkState(state: EloState): void {
   const learner = checkLearnerState(state, "Elo");
   const label = `The Elo state of learner "${learner}"`;
   checkRating(state.ability, state.count, label, "an ability");
-  checkRecord(state.skills, `${label} needs skills, an object of skill abilities by skill id`);
+  checkRecordById(state.skills, `${label} needs skills, an object of skill abilities by skill id`);
   for (const [skill, rating] of Object.entries(state.skills)) {
     checkRecord(rating, `${label} needs an object for skill "${skill}"`);
     checkRating(rating.ability, rating.count, `${label}, skill "${skill}",`, "an ability");

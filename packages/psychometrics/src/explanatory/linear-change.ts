@@ -2,7 +2,7 @@ import {
   backtrack,
   checkArray,
   checkOptions,
-  checkRecord,
+  checkRecordById,
   checkStopping,
   cholesky,
   DataError,
@@ -282,7 +282,7 @@ function itemGroupsOf(
   itemGroups?: Readonly<Record<string, string>>,
 ): { names: string[]; setOf: Int32Array } {
   if (itemGroups === undefined) return { names: [...itemIds], setOf: Int32Array.from(itemIds, (_, i) => i) };
-  checkRecord(itemGroups, "The option itemGroups must be an object of set names by item id");
+  checkRecordById(itemGroups, "The option itemGroups must be an object of set names by item id");
   const known = new Set(itemIds);
   for (const id of Object.keys(itemGroups)) {
     if (!known.has(id)) throw new DataError(`The option itemGroups names ${describe(id)}, which is not an item.`);

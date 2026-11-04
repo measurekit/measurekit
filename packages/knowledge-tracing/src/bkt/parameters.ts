@@ -1,4 +1,4 @@
-import { checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
+import { checkRecord, checkRecordById, DataError, describe, isUnitInterval } from "@measurekit/core";
 import { entry } from "../data/internal.js";
 
 /**
@@ -77,7 +77,7 @@ export function guessSlipOf(skill: BktSkill, item: string): BktGuessSlip {
 /** Checks parameters, which may come from storage, throwing a `DataError` that names the first problem found. */
 export function checkParameters(parameters: BktParameters): void {
   checkRecord(parameters, "BKT parameters must be an object");
-  checkRecord(parameters.skills, "BKT parameters need skills, an object of skill parameters by skill id");
+  checkRecordById(parameters.skills, "BKT parameters need skills, an object of skill parameters by skill id");
   for (const [id, skill] of Object.entries(parameters.skills)) {
     const label = `The BKT parameters of skill "${id}"`;
     checkRecord(skill, `${label} must be an object`);
@@ -97,7 +97,7 @@ export function checkParameters(parameters: BktParameters): void {
       pairLearning,
       `${label} need pairLearning, an object of rates by the resource before and the resource`,
     )) {
-      checkRecord(pairs, `${label}, after resource "${previous}", must be an object`);
+      checkRecordById(pairs, `${label}, after resource "${previous}", must be an object`);
       for (const [resource, rates] of Object.entries(pairs)) {
         checkRecord(rates, `${label}, resource "${resource}" after "${previous}", must be an object`);
         checkRates(`${label}, resource "${resource}" after "${previous}",`, {
@@ -116,7 +116,7 @@ export function checkParameters(parameters: BktParameters): void {
 /** Returns the entries of an optional record, checking that it is one. */
 function records<T>(record: Readonly<Record<string, T>> | undefined, message: string): [string, T][] {
   if (record === undefined) return [];
-  checkRecord(record, message);
+  checkRecordById(record, message);
   return Object.entries(record);
 }
 

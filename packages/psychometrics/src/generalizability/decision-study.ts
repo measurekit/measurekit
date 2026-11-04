@@ -5,6 +5,7 @@ import {
   checkOptions,
   checkPositiveInteger,
   checkRecord,
+  checkRecordById,
   DataError,
   describe,
   type FieldNames,
@@ -108,12 +109,12 @@ export function decisionStudy(study: GeneralizabilityStudy, options: DecisionStu
   const { sampleSizes = {}, fixed = [], nested = {} } = options;
   const { structure, variances } = checkStudy(study);
   const [object = "", ...facets] = structure.names;
-  checkRecord(sampleSizes, "The option sampleSizes must be an object of numbers of elements by facet");
-  const sizes = new Map(structure.names.map((name, facet) => [facet, study.sampleSizes[name] ?? 1]));
+  checkRecordById(sampleSizes, "The option sampleSizes must be an object of numbers of elements by facet");
+  const sizes = new Map(structure.names.map((name, facet) => [facet, ownSize(study.sampleSizes, name) ?? 1]));
   for (const [name, size] of Object.entries(sampleSizes)) {
     sizes.set(facetIndex(structure, name, "sampleSizes"), checkedSize(size, `The option sampleSizes for "${name}"`));
   }
-  const unsized = facets.find((name) => sampleSizes[name] === undefined);
+  const unsized = facets.find((name) => ownSize(sampleSizes, name) === undefined);
   if (!study.balanced && unsized !== undefined) {
     throw new DataError(
       `The study is not balanced, so its facets have no one number of elements: the option sampleSizes must give one for "${unsized}".`,
@@ -216,6 +217,11 @@ function decisionComponent(
   };
 }
 
+/** Returns a facet's own entry of a record of sizes, so that a facet such as "constructor" finds only what it was given. */
+function ownSize(sizes: Readonly<Record<string, number>>, name: string): number | undefined {
+  return Object.hasOwn(sizes, name) ? sizes[name] : undefined;
+}
+
 /**
  * Checks a study, which may come from storage, and returns the structure of its design and its variance components by
  * the mask of the effect each belongs to.
@@ -225,13 +231,13 @@ function decisionComponent(
  */
 function checkStudy(study: GeneralizabilityStudy): { structure: Structure; variances: Map<number, number> } {
   checkRecord(study, "The study must be an object from generalizabilityStudy");
-  checkRecord(study.sampleSizes, "The sampleSizes of the study must be an object of numbers by facet");
+  checkRecordById(study.sampleSizes, "The sampleSizes of the study must be an object of numbers by facet");
   checkArray(study.facets, "The facets of the study must be an array of facet names");
   checkArray(study.components, "The components of the study must be an array");
   checkBoolean(study.balanced, "The field balanced of the study");
   const structure = buildStructure(study.object, study.facets, study.nested, "The nested facets of the study");
   structure.names.forEach((name) => {
-    checkPositiveInteger(study.sampleSizes[name], `The size of "${name}" in the study`);
+    checkPositiveInteger(ownSize(study.sampleSizes, name), `The size of "${name}" in the study`);
   });
   const effects = new Map(effectsOf(structure).map((effect) => [`${effect.own}:${effect.nestedIn}`, effect.mask]));
   const variances = new Map<number, number>();

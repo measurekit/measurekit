@@ -1,4 +1,4 @@
-import { checkFinite, checkRecord, DataError } from "@measurekit/core";
+import { checkFinite, checkRecord, checkRecordById, DataError } from "@measurekit/core";
 import type { FixedParameters } from "./calibration-options.js";
 import type { ModelParameter } from "./model.js";
 
@@ -15,7 +15,10 @@ export function readFixedParameters(
   itemIds: readonly string[],
   fixed: ReadonlySet<string>,
 ): Map<string, ReadonlyMap<string, number>> {
-  checkRecord(fixedParameters, "The option fixedParameters must be an object of values by item id and parameter name");
+  checkRecordById(
+    fixedParameters,
+    "The option fixedParameters must be an object of values by item id and parameter name",
+  );
   const ids = new Set(itemIds);
   return new Map(
     Object.entries(fixedParameters).map(([id, byName]) => {

@@ -1,4 +1,4 @@
-import { checkRecord, DataError } from "@measurekit/core";
+import { checkRecord, checkRecordById, DataError } from "@measurekit/core";
 import {
   type CompressedResponses,
   categoryTallies,
@@ -88,7 +88,7 @@ export function setUp<TParameters>(
   const { priors = {}, fixed = {}, fixedParameters = {} } = options;
   checkRecord(priors, "The option priors must be an object of priors by parameter name");
   // A map, so that an id such as "constructor" finds only its own parameters.
-  checkRecord(fixed, "The option fixed must be an object of item parameters by item id");
+  checkRecordById(fixed, "The option fixed must be an object of item parameters by item id");
   const anchors = new Map(Object.entries(fixed));
   checkFixedIds(anchors.keys(), itemIds);
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);

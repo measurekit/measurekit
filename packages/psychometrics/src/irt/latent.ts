@@ -1,4 +1,4 @@
-import { checkArray, checkChoice, checkRecord, DataError, describe, isRecord } from "@measurekit/core";
+import { checkArray, checkChoice, checkRecordById, DataError, describe, isRecord } from "@measurekit/core";
 import { invertPositiveDefinite, newton, type Quadrature } from "../math/internal.js";
 import { personGroups } from "./responses.js";
 
@@ -551,7 +551,7 @@ function checkCovariates(
   covariates: PopulationOptions["covariates"],
   personCount: number,
 ): { readonly names: readonly string[]; readonly columns: readonly (readonly number[])[] } {
-  checkRecord(covariates, "The option covariates must be an object of values by covariate name");
+  checkRecordById(covariates, "The option covariates must be an object of values by covariate name");
   const names = Object.keys(covariates ?? {});
   if (names.length === 0) throw new DataError("The option covariates needs at least one covariate.");
   const columns = names.map((name) => {

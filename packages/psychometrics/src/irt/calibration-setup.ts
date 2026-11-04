@@ -1,4 +1,4 @@
-import { checkRecord, DataError } from "@measurekit/core";
+import { checkRecord, checkRecordById, DataError } from "@measurekit/core";
 import type { Quadrature } from "../math/internal.js";
 import type { CalibrationOptions } from "./calibration-options.js";
 import type { ExpectationItem } from "./expectation.js";
@@ -80,7 +80,7 @@ export function setUp<TParameters>(
     checkModel(each, "The option model must be an IRT model such as twoParameterLogistic"),
   );
   const { fixed = {}, priors = {}, itemPriors = {}, fixedParameters = {} } = options;
-  checkRecord(fixed, "The option fixed must be an object of item parameters by item id");
+  checkRecordById(fixed, "The option fixed must be an object of item parameters by item id");
   checkRecord(priors, "The option priors must be an object of priors by parameter name");
   for (const [name, prior] of Object.entries(priors)) checkPrior(prior, `The prior of "${name}"`);
   checkFixedIds(Object.keys(fixed), itemIds);
@@ -176,7 +176,7 @@ function itemPriorMap(
   itemIds: readonly string[],
   fixed: Readonly<Record<string, unknown>>,
 ): Map<string, Map<string, ParameterPrior>> {
-  checkRecord(itemPriors, "The option itemPriors must be an object of priors by item id and parameter name");
+  checkRecordById(itemPriors, "The option itemPriors must be an object of priors by item id and parameter name");
   return new Map(
     Object.entries(itemPriors).map(([id, byName]) => {
       if (!itemIds.includes(id)) throw new DataError(`Priors are given for "${id}", which is not an item id.`);

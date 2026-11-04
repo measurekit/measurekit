@@ -2,7 +2,7 @@ import {
   checkArray,
   checkIntegerFrom,
   checkOptions,
-  checkRecord,
+  checkRecordById,
   DataError,
   describe,
   type FieldNames,
@@ -103,7 +103,7 @@ export function selectPairs(
 ): PairSelection {
   checkArray(personIds, "The person ids must be an array");
   indexIds("person", personIds);
-  checkRecord(contexts, "The contexts must be an object of each context's values by person");
+  checkRecordById(contexts, "The contexts must be an object of each context's values by person");
   checkOptions(options, SELECT_PAIRS_OPTIONS);
   const { maxGroup = DEFAULT_MAX_GROUP, maxPairs = DEFAULT_MAX_PAIRS } = options;
   checkIntegerFrom(maxGroup, "The option maxGroup", 2);
