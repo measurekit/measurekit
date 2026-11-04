@@ -3,10 +3,10 @@ import { compositeKey } from "./composite-key.js";
 import type { Event } from "./event.js";
 import { checkLog, type EventLog } from "./event-log.js";
 
-/** What {@link firstAttempts} makes of a first attempt that took hints. */
+/** What {@link selectFirstAttempts} makes of a first attempt that took hints. */
 export type HintedFirstAttempt = "incorrect" | "null" | "keep";
 
-/** Options of {@link firstAttempts}. */
+/** Options of {@link selectFirstAttempts}. */
 export interface FirstAttemptsOptions {
   /**
    * What a first attempt with hints counts as: `"incorrect"`, as DataShop does, outcome 0; `"null"`, no evidence,
@@ -33,7 +33,7 @@ const DEFAULT_HINTED = "incorrect";
  * @returns The log of the first attempts, and the events without an outcome.
  * @throws `DataError` when the log is malformed or an option is invalid.
  */
-export function firstAttempts(log: EventLog, options: FirstAttemptsOptions = {}): EventLog {
+export function selectFirstAttempts(log: EventLog, options: FirstAttemptsOptions = {}): EventLog {
   checkOptions(options);
   const { hinted = DEFAULT_HINTED } = options;
   checkChoice(hinted, "The option hinted", HINTED);

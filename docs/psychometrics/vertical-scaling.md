@@ -38,11 +38,11 @@ each. Both designs recover these, and report the growth from the scale of grade 
 
 ```ts
 import {
+  buildResponseMatrix,
   calibrate,
   chainTransformations,
   createRandom,
   normalDistribution,
-  responseMatrix,
   scaleGrowth,
   simulateItems,
   simulateResponses,
@@ -73,7 +73,7 @@ const grades = [
 
 // Design 1: one calibration of all grades, each its own group. Grade 3 is N(0, 1); the others' moments are estimated.
 const concurrent = calibrate(
-  responseMatrix(
+  buildResponseMatrix(
     grades.flatMap(({ first, responses }) => responses.map((row) => ids.map((_, j) => row[j - first] ?? null))),
     { itemIds: ids },
   ),
@@ -90,7 +90,9 @@ const concurrentScales = concurrent.groups.flatMap(({ group, mean, sd }) =>
 // Design 2: a calibration for each grade, each N(0, 1), linked to the grade below through the 6 items they share: the
 // first 6 items of a form are the last 6 of the form below. Chaining the links moves each grade to grade 3's scale.
 const separate = grades.map(({ first, responses }) =>
-  calibrate(responseMatrix(responses, { itemIds: ids.slice(first, first + FORM) }), { model: twoParameterLogistic }),
+  calibrate(buildResponseMatrix(responses, { itemIds: ids.slice(first, first + FORM) }), {
+    model: twoParameterLogistic,
+  }),
 );
 const toBelow = separate
   .slice(1)

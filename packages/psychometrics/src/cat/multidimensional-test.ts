@@ -16,7 +16,7 @@ import type { ItemSelectionRule } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
 import type { TestControlOptions } from "./test-controls.js";
 
-/** Options of {@link multidimensionalAdaptiveTest}. */
+/** Options of {@link createMultidimensionalAdaptiveTest}. */
 export interface MultidimensionalAdaptiveTestOptions extends TestControlOptions {
   /** The item pool: multidimensional items with ids, all on the same number of dimensions, such as a calibration's. */
   readonly pool: readonly MultidimensionalPoolItem[];
@@ -84,7 +84,7 @@ export interface MultidimensionalAdaptiveTest {
  * @example
  * ```ts
  * import { createRandom } from "@measurekit/psychometrics";
- * import { multidimensionalAdaptiveTest, testLength } from "@measurekit/psychometrics/cat";
+ * import { createMultidimensionalAdaptiveTest, testLength } from "@measurekit/psychometrics/cat";
  * import { multidimensionalTwoParameterLogistic } from "@measurekit/psychometrics/multidimensional";
  *
  * const item = (id: string, a: number[], intercept: number) => ({
@@ -93,7 +93,7 @@ export interface MultidimensionalAdaptiveTest {
  *   parameters: { a, intercept, c: 0, d: 1 },
  * });
  * const pool = [item("q1", [1.2, 0], 0.3), item("q2", [0, 1.4], -0.2), item("q3", [0.8, 0.9], 0.1)];
- * const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
+ * const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
  * const random = createRandom(1);
  * let state = test.start(random);
  * state.next; // the id of the first item
@@ -101,7 +101,7 @@ export interface MultidimensionalAdaptiveTest {
  * state.estimate.theta; // the estimate of each dimension
  * ```
  */
-export function multidimensionalAdaptiveTest(
+export function createMultidimensionalAdaptiveTest(
   options: MultidimensionalAdaptiveTestOptions,
 ): MultidimensionalAdaptiveTest {
   checkOptions(options);

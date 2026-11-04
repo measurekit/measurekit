@@ -2,7 +2,7 @@ import { checkChoice, checkOptions, checkRecord, DataError } from "@measurekit/c
 import { checkLog, type Event, type EventLog, type Fold, isObserved } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 import { type Metrics, metrics } from "./metrics.js";
-import { observedPairs } from "./observed-pairs.js";
+import { alignPredictions } from "./observed-pairs.js";
 
 /** What {@link crossValidate} does with a test event of a skill that the training log has no outcome of. */
 export type UnseenSkills = "throw" | "skip";
@@ -76,11 +76,11 @@ export function crossValidate<TState>(
     checkRecord(fold, `Fold ${index + 1} must be an object { train, test } of two logs`);
     checkLog(fold.test);
     const { predictions, skipped } = predictFold(model.fit(fold.train).model, fold, unseenSkills);
-    const pairs = observedPairs(fold.test, predictions);
+    const pairs = alignPredictions(fold.test, predictions);
     const scored = pairs.outcomes.length === 0 ? null : metrics(pairs.predictions, pairs.outcomes);
     return { predictions, metrics: scored, skipped };
   });
-  const pooled = folds.map((fold, index) => observedPairs(fold.test, evaluations[index]?.predictions ?? []));
+  const pooled = folds.map((fold, index) => alignPredictions(fold.test, evaluations[index]?.predictions ?? []));
   const outcomes = pooled.flatMap((pairs) => pairs.outcomes);
   if (outcomes.length === 0) {
     const skipped = evaluations.reduce((sum, evaluation) => sum + evaluation.skipped, 0);

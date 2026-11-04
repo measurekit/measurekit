@@ -1,9 +1,9 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
+  buildEventLog,
   clauseStructure,
   diffTest,
-  eventLog,
   iita,
   kst,
   structureBase,
@@ -28,7 +28,7 @@ interface BenchKstStructureFixture {
 const structureFixture = readFixture<BenchKstStructureFixture>("bench-kst-structure.json");
 
 /** 1,000 persons answer 12 items: 12,000 responses. */
-const log = eventLog(
+const log = buildEventLog(
   fixture.responses.flatMap((row, person) =>
     row.map((outcome, item) => ({
       learner: `p${person}`,
@@ -65,7 +65,7 @@ test("measures the validity of a chain of 12 items against the responses of 1,00
 
 /** The first 6 items of the same persons: DAKS's variance sums over all 2 ^ items patterns, so its test is sized there. */
 const testItems = fixture.itemIds.slice(0, 6);
-const testLog = eventLog(log.filter((event) => testItems.includes(event.item)));
+const testLog = buildEventLog(log.filter((event) => testItems.includes(event.item)));
 const testPrerequisites = Object.fromEntries(testItems.map((id, i) => [id, i === 0 ? [] : [testItems[i - 1] ?? ""]]));
 
 test("tests the fit of a quasi order of 6 items to the responses of 1,000 persons", async (context) => {

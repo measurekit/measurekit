@@ -58,7 +58,7 @@ const pairItems = (count: number): PairItems => {
 
 /** Reads the input of {@link pairItems} into a response matrix and 2PL items. */
 const pairInput = ({ rows, items }: PairItems, psychometrics: Libraries["psychometrics"]) => ({
-  matrix: psychometrics.responseMatrix(rows),
+  matrix: psychometrics.buildResponseMatrix(rows),
   items: items.map((parameters) => ({
     model: psychometrics.twoParameterLogistic,
     parameters: { ...parameters, c: 0, d: 1 },
@@ -68,19 +68,19 @@ const pairInput = ({ rows, items }: PairItems, psychometrics: Libraries["psychom
 /** The cases, the worst input of each reader within its limits. */
 export const READERS: readonly ReaderCase[] = [
   {
-    name: "responseMatrix: 1 person, 1,000,000 items, with the ids it gives them",
+    name: "buildResponseMatrix: 1 person, 1,000,000 items, with the ids it gives them",
     budget: 150,
     input: () => [Array.from({ length: 1_000_000 }, (_, i) => i % 2)],
-    read: (rows: number[][], { psychometrics }) => psychometrics.responseMatrix(rows),
+    read: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
   },
   {
-    name: "responseRecords: 1,000,000 records, each of its own person and item",
+    name: "buildResponseRecords: 1,000,000 records, each of its own person and item",
     budget: 1070,
     input: () => Array.from({ length: 1_000_000 }, (_, k) => ({ person: `p${k}`, item: `i${k}`, response: k % 2 })),
-    read: (records: unknown[], { psychometrics }) => psychometrics.responseRecords(records),
+    read: (records: unknown[], { psychometrics }) => psychometrics.buildResponseRecords(records),
   },
   {
-    name: "eventLog: 1,000,000 events, each of its own learner, item and skill",
+    name: "buildEventLog: 1,000,000 events, each of its own learner, item and skill",
     budget: 230,
     input: () =>
       Array.from({ length: 1_000_000 }, (_, k) => ({
@@ -90,7 +90,7 @@ export const READERS: readonly ReaderCase[] = [
         time: k,
         outcome: k % 2,
       })),
-    read: (events: unknown[], { "knowledge-tracing": tracing }) => tracing.eventLog(events),
+    read: (events: unknown[], { "knowledge-tracing": tracing }) => tracing.buildEventLog(events),
   },
   {
     name: "iita: 1,000,000 events, each of its own learner and item, which it refuses, from the events",
@@ -105,7 +105,7 @@ export const READERS: readonly ReaderCase[] = [
       })),
     read: (events: unknown[], { "knowledge-tracing": tracing }) => {
       try {
-        return tracing.iita(tracing.eventLog(events));
+        return tracing.iita(tracing.buildEventLog(events));
       } catch (error) {
         return error;
       }
@@ -128,7 +128,7 @@ export const READERS: readonly ReaderCase[] = [
             outcome: k === failed ? 0 : 1,
           })),
         ),
-    read: (events: unknown[], { "knowledge-tracing": tracing }) => tracing.iita(tracing.eventLog(events)),
+    read: (events: unknown[], { "knowledge-tracing": tracing }) => tracing.iita(tracing.buildEventLog(events)),
   },
   {
     name: "surmiseStructure: 1,000 elements, 12 free and a class of 988, 8,192 states",
@@ -194,7 +194,7 @@ export const READERS: readonly ReaderCase[] = [
       { itemIds, rows, qMatrix }: { itemIds: string[]; rows: number[][]; qMatrix: unknown },
       { psychometrics },
     ) => ({
-      matrix: psychometrics.responseMatrix(rows, { itemIds }),
+      matrix: psychometrics.buildResponseMatrix(rows, { itemIds }),
       qMatrix,
     }),
     read: ({ matrix, qMatrix }: { matrix: unknown; qMatrix: unknown }, { psychometrics }) =>
@@ -233,7 +233,7 @@ export const READERS: readonly ReaderCase[] = [
       const row = Array.from({ length: 1_000_000 }, (_, i) => i % 2);
       return [row, row.map((response) => 1 - response)];
     },
-    prepare: (rows: number[][], { psychometrics }) => psychometrics.responseMatrix(rows),
+    prepare: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
     read: (matrix: unknown, { psychometrics }) => psychometrics.personScalability(matrix),
   },
   {
@@ -249,7 +249,7 @@ export const READERS: readonly ReaderCase[] = [
     budget: 530,
     input: () => Array.from({ length: 4095 }, (_, k) => -3 + (6 * k) / 4094),
     prepare: (thresholds: number[], { psychometrics }) => ({
-      matrix: psychometrics.responseMatrix([
+      matrix: psychometrics.buildResponseMatrix([
         [0, 1],
         [1, 0],
       ]),
@@ -279,7 +279,7 @@ export const READERS: readonly ReaderCase[] = [
     budget: 240,
     input: () =>
       Array.from({ length: 200 }, (_, person) => Array.from({ length: 1000 }, (_, i) => ((person + 1) * (i + 3)) % 5)),
-    prepare: (rows: number[][], { psychometrics }) => psychometrics.responseMatrix(rows),
+    prepare: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
     read: (matrix: unknown, { psychometrics }) => psychometrics.scalability(matrix),
   },
   {
@@ -293,7 +293,7 @@ export const READERS: readonly ReaderCase[] = [
       psychometrics.assembleForms({ pool, length: 1, forms: 8191, overlap: 1 }),
   },
   {
-    name: "diagnosticAdaptiveTest: 128 items of 11 of 15 attributes, the most items × 2^K and latent groups",
+    name: "createDiagnosticAdaptiveTest: 128 items of 11 of 15 attributes, the most items × 2^K and latent groups",
     budget: 180,
     input: () => ({
       attributes: ids("a", 15),
@@ -304,7 +304,7 @@ export const READERS: readonly ReaderCase[] = [
       })),
     }),
     read: (options: { attributes: string[]; pool: unknown[] }, { psychometrics }) =>
-      psychometrics.diagnosticAdaptiveTest({ ...options, stopping: psychometrics.testLength(10) }),
+      psychometrics.createDiagnosticAdaptiveTest({ ...options, stopping: psychometrics.testLength(10) }),
   },
 ];
 

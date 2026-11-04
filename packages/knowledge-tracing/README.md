@@ -27,11 +27,11 @@ npm install @measurekit/knowledge-tracing
 ## Example
 
 ```ts
-import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
 import { elo } from "@measurekit/knowledge-tracing/elo";
 
 // One event per attempt: who answered which item, when, and how it went (1 correct, 0 incorrect, or null for a lesson).
-const log = eventLog(
+const log = buildEventLog(
   [
     { learner: "ana", item: "q1", time: 1, outcome: 1 },
     { learner: "budi", item: "q1", time: 2, outcome: 0 },
@@ -94,8 +94,8 @@ learningCurve(log).skills.fractions; // [{ opportunity: 1, count: 2, errorRate: 
 
 | Import                                   | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@measurekit/knowledge-tracing/data`     | `eventLog` with Q-matrices, and events without an outcome; `firstAttempts`; `splitByLearner`, `splitByItem`, `splitByTime`                                                                                                                                                                                                                                                                                                                      |
-| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `rSquared`, `kappa`, `metrics`, `calibration`, `observedPairs`; `crossValidate`, `compareModels`, `compareByLearner`; `learningCurve`, `metricsByOpportunity`, `powerLawFit`, `categorizeCurve`                                                                                                                                                                                                           |
+| `@measurekit/knowledge-tracing/data`     | `buildEventLog` with Q-matrices, and events without an outcome; `selectFirstAttempts`; `splitByLearner`, `splitByItem`, `splitByTime`                                                                                                                                                                                                                                                                                                           |
+| `@measurekit/knowledge-tracing/evaluate` | `auc`, `rmse`, `logLoss`, `accuracy`, `rSquared`, `kappa`, `metrics`, `calibrationCurve`, `alignPredictions`; `crossValidate`, `compareModels`, `compareByLearner`; `learningCurve`, `metricsByOpportunity`, `fitPowerLaw`, `categorizeCurve`                                                                                                                                                                                                   |
 | `@measurekit/knowledge-tracing/elo`      | `elo`: learner-item Elo with Pelánek's uncertainty function, and concept-specific Elo with skill abilities                                                                                                                                                                                                                                                                                                                                      |
 | `@measurekit/knowledge-tracing/bkt`      | `bkt`: Bayesian knowledge tracing with forgetting, item guess and slip, resource and pair learning, prior groups, fixed rates and bounds; mastery                                                                                                                                                                                                                                                                                               |
 | `@measurekit/knowledge-tracing/logistic` | `afm`, `pfa`, `logistic`, `searchRates`: AFM, PFA, LKT and DAS3H features over skills, items or the learner, intercepts of skills and items, covariates and standard errors, with no, fixed or random proficiency and a ridge; the rates of the features by maximum likelihood                                                                                                                                                                  |

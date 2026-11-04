@@ -6,10 +6,10 @@ can be built by hand or loaded from JSON; every analysis function checks its inp
 
 ```mermaid
 flowchart LR
-  A["Rows of responses"] --> M["responseMatrix"]
-  B["Columns of responses"] --> C["responseMatrixFromColumns"] --> M
+  A["Rows of responses"] --> M["buildResponseMatrix"]
+  B["Columns of responses"] --> C["buildResponseMatrixFromColumns"] --> M
   K["Choices and a key"] --> S["scoreResponses"] --> M
-  Q["Person, item, response"] --> R["responseRecords: sparse data"]
+  Q["Person, item, response"] --> R["buildResponseRecords: sparse data"]
   M --> X["Every analysis of the package"]
   R --> Y["Calibration and ability estimation"]
 ```
@@ -19,9 +19,9 @@ flowchart LR
 A `ResponseMatrix` holds `personIds`, `itemIds` and `responses`: one row per person, one column per item.
 
 ```ts
-import { responseMatrix, responseMatrixFromColumns } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix, buildResponseMatrixFromColumns } from "@measurekit/psychometrics/data";
 
-const byRows = responseMatrix(
+const byRows = buildResponseMatrix(
   [
     [1, 0, 2],
     [0, null, 1],
@@ -29,7 +29,7 @@ const byRows = responseMatrix(
   { personIds: ["ana", "budi"], itemIds: ["q1", "q2", "q3"] },
 );
 
-const byColumns = responseMatrixFromColumns(
+const byColumns = buildResponseMatrixFromColumns(
   [
     [1, 0],
     [0, null],
@@ -46,7 +46,7 @@ const byColumns = responseMatrixFromColumns(
 | Ids       | Strings, unique among persons and among items. Default: `person1`, `person2`, ... and `item1`, `item2`, ...             |
 | Copies    | The builders copy the rows, so later changes to the input do not change the matrix.                                     |
 
-`responseMatrix(rows, { times })` adds response times in seconds, by person, then item, aligned with the responses:
+`buildResponseMatrix(rows, { times })` adds response times in seconds, by person, then item, aligned with the responses:
 positive, `null` when missing, and only where there is a response. A record takes its time as an optional `time`.
 [Response times](response-time.md) uses them; the other analyses ignore them.
 
@@ -61,9 +61,9 @@ per answered item, in any order. Their size grows with the responses, while a ma
 for 20,000 persons answering 40 of 1,000 items, 800,000 records instead of 20 million cells.
 
 ```ts
-import { responseRecords } from "@measurekit/psychometrics/data";
+import { buildResponseRecords } from "@measurekit/psychometrics/data";
 
-const data = responseRecords(
+const data = buildResponseRecords(
   [
     { person: "ana", item: "q7", response: 1 },
     { person: "budi", item: "q2", response: 0 },
@@ -141,8 +141,8 @@ scored.responses; // [[1, 1, null], [0, 1, 0]]
 | Option         | Meaning                                                                                                         |
 | -------------- | --------------------------------------------------------------------------------------------------------------- |
 | `optionLabels` | Labels in display order. Choices and keys outside them are rejected. Default: labels found in the data, sorted. |
-| `personIds`    | As for `responseMatrix`.                                                                                        |
-| `itemIds`      | As for `responseMatrix`.                                                                                        |
+| `personIds`    | As for `buildResponseMatrix`.                                                                                   |
+| `itemIds`      | As for `buildResponseMatrix`.                                                                                   |
 
 Pass `optionLabels` to list options nobody chose in distractor analysis and to catch typing errors in the data.
 Empty strings are rejected; convert blank cells to `null`. To score an omitted response as wrong instead of missing,

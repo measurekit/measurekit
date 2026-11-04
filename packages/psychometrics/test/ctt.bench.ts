@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { cronbachAlpha, itemStatistics, mcdonaldOmega, responseMatrix, subscoreValue } from "../src/index.js";
+import { buildResponseMatrix, cronbachAlpha, itemStatistics, mcdonaldOmega, subscoreValue } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 
@@ -11,8 +11,8 @@ interface BenchCttFixture {
 }
 const fixture = readFixture<BenchCttFixture>("bench-ctt.json");
 
-const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
-const omegaMatrix = responseMatrix(
+const matrix = buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds });
+const omegaMatrix = buildResponseMatrix(
   fixture.responses.map((row) => row.slice(0, fixture.omegaItems)),
   { itemIds: fixture.itemIds.slice(0, fixture.omegaItems) },
 );

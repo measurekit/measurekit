@@ -5,10 +5,10 @@
 
 ```mermaid
 flowchart LR
-  I["Item of the package: IRT form, D = 1"] -->|"toMirtIrt, toMirtSlopeIntercept"| C["mirt's coefficients"]
-  C -->|"fromMirtIrt, fromMirtSlopeIntercept"| I
-  M["Multidimensional item"] -->|"toMirtMultidimensional"| N["mirt's slope-intercept coefficients"]
-  N -->|"fromMirtMultidimensional"| M
+  I["Item of the package: IRT form, D = 1"] -->|"writeMirtIrt, writeMirtSlopeIntercept"| C["mirt's coefficients"]
+  C -->|"readMirtIrt, readMirtSlopeIntercept"| I
+  M["Multidimensional item"] -->|"writeMirtMultidimensional"| N["mirt's slope-intercept coefficients"]
+  N -->|"readMirtMultidimensional"| M
 ```
 
 ## mirt
@@ -19,10 +19,10 @@ IRT form.
 
 | Function                                      | Conversion                                                       |
 | --------------------------------------------- | ---------------------------------------------------------------- |
-| `toMirtIrt(item)`                             | An item, such as a calibration's, to its IRT coefficients        |
-| `toMirtSlopeIntercept(item)`                  | An item to its slope-intercept coefficients                      |
-| `fromMirtIrt(coefficients, model)`            | IRT coefficients to an item `{ model, parameters }` of the model |
-| `fromMirtSlopeIntercept(coefficients, model)` | Slope-intercept coefficients to an item of the model             |
+| `writeMirtIrt(item)`                          | An item, such as a calibration's, to its IRT coefficients        |
+| `writeMirtSlopeIntercept(item)`               | An item to its slope-intercept coefficients                      |
+| `readMirtIrt(coefficients, model)`            | IRT coefficients to an item `{ model, parameters }` of the model |
+| `readMirtSlopeIntercept(coefficients, model)` | Slope-intercept coefficients to an item of the model             |
 
 `MirtCoefficients` is one row of `coef(model, simplify = TRUE)$items` with only the item's own columns.
 
@@ -38,8 +38,8 @@ A conversion from mirt throws `DataError` when a name of the form is missing or 
 a name the form does not use, when it would divide by a slope a1 = 0, or when the parameters are invalid for the
 model. Only the built-in models other than the GGUM convert.
 
-- **Rating scale.** mirt's thresholds are b_j - c / a1, with b_j shared by its rsm items. `fromMirtIrt` takes the
-  location b as their mean and the steps around it; `toMirtIrt` writes the steps as b1 to b(K-1) and c = -a b, which
+- **Rating scale.** mirt's thresholds are b_j - c / a1, with b_j shared by its rsm items. `readMirtIrt` takes the
+  location b as their mean and the steps around it; `writeMirtIrt` writes the steps as b1 to b(K-1) and c = -a b, which
   give the same thresholds.
 - **Nominal.** The IRT form sums the slopes and the intercepts to 0. The slope-intercept form fixes ak0 = 0,
   ak(K-1) = K - 1 and d0 = 0, so an item whose first and last slopes are equal has none.
@@ -51,8 +51,8 @@ conversion renames: the slopes `a` are mirt's `a1` to `aD`, and the intercept is
 
 | Function                                        | Conversion                                                   |
 | ----------------------------------------------- | ------------------------------------------------------------ |
-| `toMirtMultidimensional(item)`                  | An item, such as a calibration's, to its coefficients        |
-| `fromMirtMultidimensional(coefficients, model)` | Coefficients to an item `{ model, parameters }` of the model |
+| `writeMirtMultidimensional(item)`               | An item, such as a calibration's, to its coefficients        |
+| `readMirtMultidimensional(coefficients, model)` | Coefficients to an item `{ model, parameters }` of the model |
 
 | Model                                    | mirt item type | Coefficients                          |
 | ---------------------------------------- | -------------- | ------------------------------------- |
@@ -65,10 +65,10 @@ name the form does not use, or when the parameters are invalid for the model. On
 number of dimensions is the number of `a` names, `a1` up to the first one not given.
 
 ```ts
-import { fromMirtMultidimensional } from "@measurekit/psychometrics/parameterization";
+import { readMirtMultidimensional } from "@measurekit/psychometrics/parameterization";
 import { multidimensionalGradedResponse } from "@measurekit/psychometrics/multidimensional";
 
-const item = fromMirtMultidimensional({ a1: 1.1, a2: 0.4, d1: 2, d2: 0, d3: -1.5 }, multidimensionalGradedResponse);
+const item = readMirtMultidimensional({ a1: 1.1, a2: 0.4, d1: 2, d2: 0, d3: -1.5 }, multidimensionalGradedResponse);
 item.parameters; // { a: [1.1, 0.4], intercepts: [2, 0, -1.5] }
 ```
 
@@ -82,12 +82,12 @@ write_json(as.data.frame(coef(model, IRTpars = TRUE, simplify = TRUE)$items), "i
 and read them as items for ability estimation, or take their `parameters` as anchors for calibration:
 
 ```ts
-import { fromMirtIrt } from "@measurekit/psychometrics/parameterization";
+import { readMirtIrt } from "@measurekit/psychometrics/parameterization";
 import { generalizedPartialCredit, threeParameterLogistic } from "@measurekit/psychometrics/irt";
 
 const items = [
-  fromMirtIrt({ a: 1.09, b: -1.46, g: 0.2, u: 1 }, threeParameterLogistic),
-  fromMirtIrt({ a: 0.86, b1: -3.27, b2: -2.89, b3: 1.54 }, generalizedPartialCredit),
+  readMirtIrt({ a: 1.09, b: -1.46, g: 0.2, u: 1 }, threeParameterLogistic),
+  readMirtIrt({ a: 0.86, b1: -3.27, b2: -2.89, b3: 1.54 }, generalizedPartialCredit),
 ];
 items[1]; // { model: generalizedPartialCredit, parameters: { a: 0.86, b: [-3.27, -2.89, 1.54] } }
 ```

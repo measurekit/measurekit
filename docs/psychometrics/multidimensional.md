@@ -667,8 +667,8 @@ inverse of the matrix is the covariance of a maximum likelihood estimate of thet
 ## Simulation, parameterization
 
 `simulateMultidimensionalResponses` ([simulation](sim.md#multidimensional-responses)) draws responses from a
-vector of thetas per person; `toMirtMultidimensional` and `fromMirtMultidimensional` ([parameterization](parameterization.md#multidimensional-items))
-convert items to and from mirt.
+vector of thetas per person; `writeMirtMultidimensional` and `readMirtMultidimensional`
+([parameterization](parameterization.md#multidimensional-items)) convert items to and from mirt.
 
 ## Recipe: responses missing not at random
 
@@ -690,7 +690,7 @@ flowchart LR
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { type ResponseMatrix, responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix, type ResponseMatrix } from "@measurekit/psychometrics/data";
 import {
   calibrateMultidimensional,
   multidimensionalPosteriorModeEstimate,
@@ -709,7 +709,7 @@ const rows = Array.from({ length: 800 }, () => {
     return answered ? Number(correct) : null;
   });
 });
-const matrix = responseMatrix(rows);
+const matrix = buildResponseMatrix(rows);
 
 /** The responses and, beside them, an indicator item of whether each was answered, with the dimension of every item. */
 function withIndicators(data: ResponseMatrix) {
@@ -718,7 +718,7 @@ function withIndicators(data: ResponseMatrix) {
   const loadings = Object.fromEntries(
     itemIds.map((id, i) => [id, [i < data.itemIds.length ? "ability" : "propensity"]]),
   );
-  return { matrix: responseMatrix(combined, { itemIds }), loadings };
+  return { matrix: buildResponseMatrix(combined, { itemIds }), loadings };
 }
 
 const { matrix: combined, loadings } = withIndicators(matrix);

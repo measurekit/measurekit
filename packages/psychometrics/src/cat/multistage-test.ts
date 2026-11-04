@@ -30,7 +30,7 @@ export interface MultistageModule {
   readonly cuts?: readonly number[];
 }
 
-/** Options of {@link multistageTest}. */
+/** Options of {@link createMultistageTest}. */
 export interface MultistageTestOptions {
   /** The stages of the panel, in order, each a list of modules. The first stage has one module. */
   readonly stages: readonly (readonly MultistageModule[])[];
@@ -81,7 +81,7 @@ export const ROUTINGS: readonly MultistageRouting[] = ["number-correct", "theta"
  * has no items, ids of modules or items repeat, an item's parameters are invalid, cut points do not match the next
  * stage, the routing is unknown, or the estimator is not a function.
  */
-export function multistageTest(options: MultistageTestOptions): MultistageTest {
+export function createMultistageTest(options: MultistageTestOptions): MultistageTest {
   checkOptions(options);
   const { stages, routing, estimator = posteriorMeanEstimate } = options;
   checkChoice(routing, "The option routing", ROUTINGS);

@@ -3,12 +3,12 @@ import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
   automatedItemSelection,
+  buildResponseMatrix,
   conditionalAssociation,
   guttmanErrors,
   invariantItemOrdering,
   monotonicity,
   personScalability,
-  responseMatrix,
   scalability,
   twoWayImputation,
 } from "../src/index.js";
@@ -29,7 +29,7 @@ interface BenchMokkenStepsFixture {
 }
 const stepsFixture = readFixture<BenchMokkenStepsFixture>("bench-mokken-steps.json");
 
-const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
+const matrix = buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds });
 
 test("scales 20 items of 5 categories answered by the persons of the acl data", async (context) => {
   await benchmark(context, "mokken.scalability", () => scalability(matrix));
@@ -39,13 +39,13 @@ test("scales 20 items of 5 categories answered by the persons of the acl data", 
 });
 
 test("finds the Guttman errors and the conditional association of the 20 items of the acl data, and imputes them with one response in ten missing", async (context) => {
-  const missing = responseMatrix(stepsFixture.responses, { itemIds: stepsFixture.itemIds });
+  const missing = buildResponseMatrix(stepsFixture.responses, { itemIds: stepsFixture.itemIds });
   await benchmark(context, "mokken.guttmanErrors", () => guttmanErrors(matrix));
   await benchmark(context, "mokken.conditionalAssociation", () => conditionalAssociation(matrix));
   await benchmark(context, "mokken.twoWayImputation", () => twoWayImputation(missing, createRandom(1)));
 });
 
 test("finds the normed Guttman errors, U3 and Ht of 2,000 persons on 40 dichotomous items", async (context) => {
-  const binary = responseMatrix(irtFixture.binary.responses, { itemIds: irtFixture.binary.itemIds });
+  const binary = buildResponseMatrix(irtFixture.binary.responses, { itemIds: irtFixture.binary.itemIds });
   await benchmark(context, "mokken.personScalability", () => personScalability(binary));
 });

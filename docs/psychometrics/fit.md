@@ -49,7 +49,7 @@ An extreme score has every answered response in its item's lowest category, or e
 likelihood theta is infinite. A statistic undefined for the data is `null`.
 
 ```ts
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { itemFit, personFit, summedScoreFit, yenQ3 } from "@measurekit/psychometrics/fit";
 import {
   calibrate,
@@ -60,7 +60,7 @@ import {
   weightedLikelihoodEstimate,
 } from "@measurekit/psychometrics/irt";
 
-const matrix = responseMatrix([
+const matrix = buildResponseMatrix([
   [1, 0, 1, 1],
   [0, 0, 1, 0],
   [1, 1, 1, 1],

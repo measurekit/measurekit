@@ -2,14 +2,14 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   gradedProbabilities,
+  hasOrderedThresholds,
+  hasValidAsymptotes,
   logistic,
   logisticPair,
   logisticProbabilities,
-  orderedThresholds,
   partialCreditProbabilities,
   softmax,
   stridedSoftmax,
-  validAsymptotes,
 } from "../src/index.js";
 
 /** Tolerance of probabilities that are sums and products of a few terms, each rounded once. */
@@ -173,36 +173,36 @@ describe("softmax", () => {
   });
 });
 
-describe("validAsymptotes", () => {
+describe("hasValidAsymptotes", () => {
   it("is 0 ≤ c < d ≤ 1", () => {
-    expect(validAsymptotes(0, 1)).toBe(true);
-    expect(validAsymptotes(0.2, 0.9)).toBe(true);
-    expect(validAsymptotes(0.5, 0.5)).toBe(false);
-    expect(validAsymptotes(0.6, 0.5)).toBe(false);
-    expect(validAsymptotes(-0.1, 1)).toBe(false);
-    expect(validAsymptotes(0, 1.1)).toBe(false);
+    expect(hasValidAsymptotes(0, 1)).toBe(true);
+    expect(hasValidAsymptotes(0.2, 0.9)).toBe(true);
+    expect(hasValidAsymptotes(0.5, 0.5)).toBe(false);
+    expect(hasValidAsymptotes(0.6, 0.5)).toBe(false);
+    expect(hasValidAsymptotes(-0.1, 1)).toBe(false);
+    expect(hasValidAsymptotes(0, 1.1)).toBe(false);
   });
 
   it("is false for values that are not numbers", () => {
-    expect(validAsymptotes(JSON.parse('"0"'), 1)).toBe(false);
-    expect(validAsymptotes(0, JSON.parse("null"))).toBe(false);
-    expect(validAsymptotes(Number.NaN, 1)).toBe(false);
-    expect(validAsymptotes(undefined, undefined)).toBe(false);
+    expect(hasValidAsymptotes(JSON.parse('"0"'), 1)).toBe(false);
+    expect(hasValidAsymptotes(0, JSON.parse("null"))).toBe(false);
+    expect(hasValidAsymptotes(Number.NaN, 1)).toBe(false);
+    expect(hasValidAsymptotes(undefined, undefined)).toBe(false);
   });
 });
 
-describe("orderedThresholds", () => {
+describe("hasOrderedThresholds", () => {
   it("is strictly increasing for a positive slope and strictly decreasing for a negative one", () => {
-    expect(orderedThresholds(1, [-1, 0, 2])).toBe(true);
-    expect(orderedThresholds(-1, [2, 0, -1])).toBe(true);
-    expect(orderedThresholds(1, [-1, 2, 0])).toBe(false);
-    expect(orderedThresholds(-1, [-1, 0, 2])).toBe(false);
-    expect(orderedThresholds(1, [0, 0])).toBe(false);
+    expect(hasOrderedThresholds(1, [-1, 0, 2])).toBe(true);
+    expect(hasOrderedThresholds(-1, [2, 0, -1])).toBe(true);
+    expect(hasOrderedThresholds(1, [-1, 2, 0])).toBe(false);
+    expect(hasOrderedThresholds(-1, [-1, 0, 2])).toBe(false);
+    expect(hasOrderedThresholds(1, [0, 0])).toBe(false);
   });
 
   it("accepts one threshold for any slope, and rejects several for a slope of 0", () => {
-    expect(orderedThresholds(0, [0.4])).toBe(true);
-    expect(orderedThresholds(0, [0, 1])).toBe(false);
+    expect(hasOrderedThresholds(0, [0.4])).toBe(true);
+    expect(hasOrderedThresholds(0, [0, 1])).toBe(false);
   });
 });
 

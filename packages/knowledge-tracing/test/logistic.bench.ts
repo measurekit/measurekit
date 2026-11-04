@@ -1,6 +1,6 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
-import { afm, type Event, eventLog, logistic, searchRates } from "../src/index.js";
+import { afm, buildEventLog, type Event, logistic, searchRates } from "../src/index.js";
 import { checkTerms } from "../src/logistic/internal.js";
 import { benchmark } from "./budgets.js";
 import {
@@ -50,7 +50,7 @@ test("replays 1,941 events with the 16 features of LKT's other names", async (co
     ),
   };
   const model = logistic({ features: lktSpecs, parameters });
-  await benchmark(context, "logistic.features", () => online(model, eventLog(lktEvents)));
+  await benchmark(context, "logistic.features", () => online(model, buildEventLog(lktEvents)));
 });
 
 /**
@@ -79,7 +79,7 @@ function codedLog(columns: {
   readonly skill: readonly number[];
   readonly outcome: readonly number[];
 }) {
-  return eventLog(
+  return buildEventLog(
     columns.learner.map((learner, i) => ({
       learner: `l${learner}`,
       item: `i${columns.item[i]}`,
@@ -103,7 +103,7 @@ test("fits 150,000 events at 49,546 items with intercepts of skills and items, a
 });
 
 test("searches the decay of a proportion of successes and the exponent of a recency over 3,600 events", async (context) => {
-  const log = eventLog(JSON.parse(JSON.stringify(ratesFixture.events)));
+  const log = buildEventLog(JSON.parse(JSON.stringify(ratesFixture.events)));
   const { lower, upper, start } = ratesFixture.bounds;
   const build = (rates: readonly number[]) =>
     logistic({ features: [{ decayedProportion: rates[0] ?? 0 }, { recency: rates[1] ?? 0 }] });

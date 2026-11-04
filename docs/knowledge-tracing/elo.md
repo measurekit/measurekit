@@ -53,10 +53,10 @@ The defaults of U are those Pelánek (2016) recommends as a starting point. To t
 the item after each event as online use would.
 
 ```ts
-import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
 import { elo } from "@measurekit/knowledge-tracing/elo";
 
-const log = eventLog(
+const log = buildEventLog(
   [
     { learner: "ana", item: "q1", time: 1, outcome: 1 },
     { learner: "budi", item: "q2", time: 2, outcome: 0 },

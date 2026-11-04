@@ -6,6 +6,7 @@ import {
   type BktSkill,
   type BktState,
   bkt,
+  buildEventLog,
   compareModels,
   createRandom,
   crossValidate,
@@ -13,7 +14,6 @@ import {
   type Event,
   type EventLog,
   elo,
-  eventLog,
   learningCurve,
   simulate,
   splitByLearner,
@@ -581,7 +581,7 @@ interface SkillFits {
 const inference: readonly Inference[] = JSON.parse(JSON.stringify(practice.inference));
 const fits: readonly Fit[] = JSON.parse(JSON.stringify(practice.fits));
 const skillFits: readonly SkillFits[] = JSON.parse(JSON.stringify(skillFixture.fits));
-const log = eventLog(practice.events);
+const log = buildEventLog(practice.events);
 
 /** The options of a configuration, with the fixture's groups for prior groups. */
 function optionsOf({ options }: Configuration): BktOptions {
@@ -676,7 +676,7 @@ const lessonInference: readonly (Configuration & {
   readonly mastery: readonly number[];
 })[] = JSON.parse(JSON.stringify(lessons.inference));
 const lessonFits: readonly Fit[] = JSON.parse(JSON.stringify(lessons.fits));
-const lessonLog = eventLog(lessons.events);
+const lessonLog = buildEventLog(lessons.events);
 
 describe("bkt against pyBKT with events that have no outcome", () => {
   it.each(lessonInference)("tracks and predicts as pyBKT does with correct = -1: $name", (reference) => {
@@ -788,7 +788,7 @@ describe("bkt with events that have no outcome", () => {
       { learner: "b", item: "q", skills: ["s"], time: 2, outcome: 1 },
       { learner: "b", item: "outro", skills: ["s", "taught"], time: 3, outcome: null },
     ];
-    const fit = bkt({ resourceLearning: true }).fit(eventLog(events));
+    const fit = bkt({ resourceLearning: true }).fit(buildEventLog(events));
     expect(Object.keys(fit.model.parameters.skills)).toEqual(["s"]);
     expect(Object.keys(fit.skills)).toEqual(["s"]);
     expect(fit.skills.s?.events).toBe(4);
@@ -799,7 +799,7 @@ describe("bkt with events that have no outcome", () => {
   });
 
   it("refuses to fit a log without an event with an outcome", () => {
-    expect(() => bkt().fit(eventLog([lesson]))).toThrow(
+    expect(() => bkt().fit(buildEventLog([lesson]))).toThrow(
       "The log has no event with an outcome; a BKT model needs at least one to fit.",
     );
   });
@@ -859,7 +859,7 @@ interface FixedFit {
 }
 const fixedFits: readonly FixedFit[] = JSON.parse(JSON.stringify(fixedFixture.fits));
 const pairOptions: BktOptions = JSON.parse(JSON.stringify(pairFixture.options));
-const pairLog = eventLog(pairFixture.events);
+const pairLog = buildEventLog(pairFixture.events);
 const pairInference: { parameters: BktParameters; predictions: number[]; mastery: number[] } = JSON.parse(
   JSON.stringify(pairFixture.inference),
 );
@@ -919,7 +919,7 @@ describe("bkt with fixed rates and pairs against pyBKT", () => {
 });
 
 describe("bkt with bounds against base R", () => {
-  const boundedLog = eventLog(bounded.events);
+  const boundedLog = buildEventLog(bounded.events);
   interface Bounded {
     readonly name: string;
     readonly forgetting: boolean;
@@ -951,7 +951,7 @@ describe("bkt with bounds against base R", () => {
 });
 
 describe("bkt constraints and pairs", () => {
-  const events = eventLog(
+  const events = buildEventLog(
     Array.from({ length: 40 }, (_, learner) =>
       Array.from({ length: 6 }, (__, step) => ({
         learner: `l${learner}`,
@@ -977,7 +977,7 @@ describe("bkt constraints and pairs", () => {
   });
 
   it("holds a rate that a skill's fixed rates do not name for every other skill, and fixes rates by skill id", () => {
-    const two = eventLog(events.map((event) => ({ ...event, skills: event.learner < "l2" ? ["t"] : ["s"] })));
+    const two = buildEventLog(events.map((event) => ({ ...event, skills: event.learner < "l2" ? ["t"] : ["s"] })));
     const fit = bkt({ fixed: { t: { prior: 0.4 } } }).fit(two);
     expect(defined(fit.model.parameters.skills.t).prior).toBe(0.4);
     expect(defined(fit.model.parameters.skills.s).prior).not.toBe(0.4);
@@ -994,7 +994,7 @@ describe("bkt constraints and pairs", () => {
 
   it("keeps a guess and a slip off 0 and 1 when a bound allows them, and starts random starts within the bounds", () => {
     const fit = bkt({ bounds: { guess: [0, 0.3], slip: [0, 0.1] }, restarts: 3 }).fit(
-      eventLog([
+      buildEventLog([
         { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 1 },
         { learner: "a", item: "q", skills: ["s"], time: 2, outcome: 1 },
         { learner: "b", item: "q", skills: ["s"], time: 1, outcome: 1 },
@@ -1046,7 +1046,7 @@ describe("bkt constraints and pairs", () => {
       time: k,
       outcome: k % 3 === 0 ? 0 : 1,
     }));
-    const pairs = bkt({ pairLearning: true, restarts: 1 }).fit(eventLog(events)).model.parameters.skills.s
+    const pairs = bkt({ pairLearning: true, restarts: 1 }).fit(buildEventLog(events)).model.parameters.skills.s
       ?.pairLearning;
     expect(Object.entries(pairs ?? {}).map(([before, rates]) => [before, Object.keys(rates)])).toEqual([
       ["x", ["x\u0000y"]],
@@ -1110,7 +1110,7 @@ function oneSkill(events: EventLog, skill: string): EventLog {
 
 /** The seeded simulation of two skills, one skill in every event. */
 function simulatedLog(): EventLog {
-  return eventLog(
+  return buildEventLog(
     recovery.outcomes.map((outcome, time) => {
       const skill = `s${defined(recovery.skills[time]) + 1}`;
       return { learner: `r${recovery.learners[time]}`, item: skill, skills: [skill], time, outcome };
@@ -1329,9 +1329,9 @@ describe("bkt online", () => {
 });
 
 describe("bkt edge cases", () => {
-  const single = eventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
+  const single = buildEventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
   const constant = (outcome: number): EventLog =>
-    eventLog(
+    buildEventLog(
       Array.from({ length: 12 }, (_, time) => ({ learner: `l${time % 3}`, item: "q", skills: ["s"], time, outcome })),
     );
 
@@ -1366,7 +1366,7 @@ describe("bkt edge cases", () => {
   });
 
   it("keeps P(L) at most 1 where rounding of a learn rate near 1 would pass it", () => {
-    const events = eventLog([
+    const events = buildEventLog([
       { learner: "ana", item: "q1", skills: ["fractions"], time: 1, outcome: 1 },
       { learner: "budi", item: "q1", skills: ["fractions"], time: 2, outcome: 0 },
       { learner: "ana", item: "q2", skills: ["fractions"], time: 3, outcome: 1 },
@@ -1408,9 +1408,9 @@ describe("bkt edge cases", () => {
     expect(() => model.predict(state, { learner: "ana", item: "q", skills: [], time: 0 })).toThrow(
       "The attempt has no skills; a BKT model needs at least one.",
     );
-    expect(() => bkt().fit(eventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 0.5 }]))).toThrow(
-      "Event 1 has the outcome 0.5; BKT needs outcomes of 0 or 1.",
-    );
+    expect(() =>
+      bkt().fit(buildEventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 0.5 }])),
+    ).toThrow("Event 1 has the outcome 0.5; BKT needs outcomes of 0 or 1.");
     expect(() => bkt().fit([])).toThrow("A log needs at least one event.");
   });
 

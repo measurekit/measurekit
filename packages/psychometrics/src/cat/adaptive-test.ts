@@ -7,7 +7,7 @@ import { type ItemSelectionRule, maximumInformation } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
 import type { TestControlOptions } from "./test-controls.js";
 
-/** Options of {@link adaptiveTest}. */
+/** Options of {@link createAdaptiveTest}. */
 export interface AdaptiveTestOptions extends TestControlOptions {
   /** The item pool. */
   readonly pool: readonly PoolItem[];
@@ -70,14 +70,14 @@ export interface AdaptiveTest {
  * @example
  * ```ts
  * import { createRandom, twoParameterLogistic } from "@measurekit/psychometrics";
- * import { adaptiveTest, testLength } from "@measurekit/psychometrics/cat";
+ * import { createAdaptiveTest, testLength } from "@measurekit/psychometrics/cat";
  *
  * const pool = [
  *   { id: "q1", model: twoParameterLogistic, parameters: { a: 1, b: -1, c: 0, d: 1 } },
  *   { id: "q2", model: twoParameterLogistic, parameters: { a: 1.2, b: 0, c: 0, d: 1 } },
  *   { id: "q3", model: twoParameterLogistic, parameters: { a: 0.8, b: 1, c: 0, d: 1 } },
  * ];
- * const test = adaptiveTest({ pool, stopping: testLength(2) });
+ * const test = createAdaptiveTest({ pool, stopping: testLength(2) });
  * const random = createRandom(1);
  * let state = test.start(random);
  * state.next; // "q2", the id of the first item
@@ -85,7 +85,7 @@ export interface AdaptiveTest {
  * state.next; // "q3"; null when the test has ended
  * ```
  */
-export function adaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
+export function createAdaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
   checkOptions(options);
   const {
     pool,

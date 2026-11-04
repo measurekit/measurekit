@@ -3,13 +3,13 @@ import { checkEvent, type Event, isObserved } from "./event.js";
 import { checkItemSkills, skillsOf } from "./q-matrix.js";
 
 /**
- * Events in time order, as {@link eventLog} returns them: a learner's events are in the order they happened, and so
- * are the events of all learners together, which models that update items, such as Elo, need. Any subsequence of a log,
- * such as `log.filter(...)`, is a log. Every function that takes a log checks it.
+ * Events in time order, as {@link buildEventLog} returns them: a learner's events are in the order they happened, and
+ * so are the events of all learners together, which models that update items, such as Elo, need. Any subsequence of a
+ * log, such as `log.filter(...)`, is a log. Every function that takes a log checks it.
  */
 export type EventLog = readonly Event[];
 
-/** An event as {@link eventLog} takes it: without skills when a Q-matrix gives them. */
+/** An event as {@link buildEventLog} takes it: without skills when a Q-matrix gives them. */
 export interface EventInput extends Omit<Event, "skills"> {
   /**
    * The skills the item practices.
@@ -19,7 +19,7 @@ export interface EventInput extends Omit<Event, "skills"> {
   readonly skills?: readonly string[];
 }
 
-/** Options of {@link eventLog}. */
+/** Options of {@link buildEventLog}. */
 export interface EventLogOptions {
   /**
    * The skills of each item, for events without skills of their own.
@@ -42,9 +42,9 @@ export interface EventLogOptions {
  *
  * @example
  * ```ts
- * import { eventLog } from "@measurekit/knowledge-tracing/data";
+ * import { buildEventLog } from "@measurekit/knowledge-tracing/data";
  *
- * const log = eventLog(
+ * const log = buildEventLog(
  *   [
  *     { learner: "ana", item: "q1", time: 1, outcome: 1 },
  *     { learner: "budi", item: "q1", time: 2, outcome: 0 },
@@ -54,7 +54,7 @@ export interface EventLogOptions {
  * log[0]; // { learner: "ana", item: "q1", skills: ["fractions"], time: 1, outcome: 1 }
  * ```
  */
-export function eventLog(events: readonly EventInput[], options: EventLogOptions = {}): EventLog {
+export function buildEventLog(events: readonly EventInput[], options: EventLogOptions = {}): EventLog {
   checkOptions(options);
   const { qMatrix } = options;
   checkEvents(events);

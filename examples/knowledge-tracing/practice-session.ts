@@ -6,11 +6,11 @@
 // Run after `pnpm build`: node examples/knowledge-tracing/practice-session.ts
 import {
   bkt,
+  buildEventLog,
   compareModels,
   createRandom,
   type EloState,
   elo,
-  eventLog,
   learningCurve,
   recommend,
   splitByLearner,
@@ -32,7 +32,7 @@ const events = Array.from({ length: 60 }, (_, learner) => {
     return { learner: `learner${learner + 1}`, item, time: learner * 100 + attempt, outcome };
   });
 }).flat();
-const log = eventLog(events, { qMatrix });
+const log = buildEventLog(events, { qMatrix });
 
 const folds = splitByLearner(log, 5, random);
 const models = { elo: elo(), "concept elo": elo({ skills: true }), bkt: bkt() };

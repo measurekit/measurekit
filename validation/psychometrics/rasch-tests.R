@@ -149,7 +149,7 @@ martin_lof_case <- function(name, data, model, split) {
 
 # --- Data -----------------------------------------------------------------------------------------------------------
 
-# Item ids as measurekit's responseMatrix gives them, so that the sets of the Martin-Löf test and the items left out
+# Item ids as measurekit's buildResponseMatrix gives them, so that the sets of the Martin-Löf test and the items left out
 # name the same items.
 with_ids <- function(data) {
   colnames(data) <- paste0("item", seq_len(ncol(data)))

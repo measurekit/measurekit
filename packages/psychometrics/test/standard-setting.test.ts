@@ -7,6 +7,7 @@ import {
   bookmarkCutScore,
   borderlineGroupCutScores,
   borderlineRegressionCutScores,
+  buildResponseMatrix,
   classificationAccuracy,
   contrastingGroupsCutScores,
   createRandom,
@@ -21,7 +22,6 @@ import {
   oneParameterLogistic,
   orderedItemBooklet,
   type Random,
-  responseMatrix,
   type TestItem,
   threeParameterLogistic,
 } from "../src/index.js";
@@ -844,7 +844,7 @@ describe("livingstonLewisClassification", () => {
       const first = truth.map(answer);
       const second = truth.map((p) => answer(p).reduce((sum, x) => sum + x, 0));
       const scores = first.map((row) => row.reduce((sum, x) => sum + x, 0));
-      const reliability = cronbachAlpha(responseMatrix(first));
+      const reliability = cronbachAlpha(buildResponseMatrix(first));
       const result = livingstonLewisClassification(scores, [18, 28], { reliability, maximum: 40 });
       const category = (score: number): number => (score >= 28 ? 2 : score >= 18 ? 1 : 0);
       let accurate = 0;

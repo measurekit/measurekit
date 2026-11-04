@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { eventLog, irt } from "../src/index.js";
+import { buildEventLog, irt } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
@@ -16,9 +16,9 @@ const DRIFT_LEARNERS = 200;
 const events = fixture.responses.flatMap((row, learner) =>
   row.map((outcome, item) => ({ learner: `l${learner}`, item: `item${item}`, skills: [], time: item, outcome })),
 );
-const log = eventLog(events);
+const log = buildEventLog(events);
 /** The first 200 learners, their responses a minute apart: 8,000 responses. */
-const driftLog = eventLog(events.filter(({ learner }) => Number(learner.slice(1)) < DRIFT_LEARNERS));
+const driftLog = buildEventLog(events.filter(({ learner }) => Number(learner.slice(1)) < DRIFT_LEARNERS));
 const items = Object.fromEntries(fixture.items.a.map((a, i) => [`item${i}`, { a, b: defined(fixture.items.b[i]) }]));
 
 test("updates the grid posterior of the ability of 2,000 learners after each of 40 responses", async (context) => {

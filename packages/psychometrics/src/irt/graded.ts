@@ -1,4 +1,4 @@
-import { DataError, gradedProbabilities, logistic, orderedThresholds, type ThresholdItem } from "@measurekit/core";
+import { DataError, gradedProbabilities, hasOrderedThresholds, logistic, type ThresholdItem } from "@measurekit/core";
 import type { IrtModel } from "./model.js";
 import {
   formatList,
@@ -25,7 +25,7 @@ export const gradedResponse: IrtModel<ThresholdItem> = {
   toVector(parameters) {
     const vector = thresholdVector("GRM", parameters);
     const { a, b } = parameters;
-    if (!orderedThresholds(a, b)) {
+    if (!hasOrderedThresholds(a, b)) {
       throw new DataError(
         `A GRM item with more than two categories needs a nonzero a and thresholds b strictly increasing when a > 0 and strictly decreasing when a < 0, found a = ${a}, b = ${formatList(b)}.`,
       );

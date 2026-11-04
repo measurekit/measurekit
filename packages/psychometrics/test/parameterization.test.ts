@@ -3,9 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   DataError,
   fourParameterLogistic,
-  fromMirtIrt,
-  fromMirtMultidimensional,
-  fromMirtSlopeIntercept,
   generalizedGradedUnfolding,
   generalizedPartialCredit,
   gradedResponse,
@@ -19,11 +16,14 @@ import {
   multidimensionalTwoParameterLogistic,
   nominalResponse,
   oneParameterLogistic,
+  readMirtIrt,
+  readMirtMultidimensional,
+  readMirtSlopeIntercept,
   threeParameterLogistic,
-  toMirtIrt,
-  toMirtMultidimensional,
-  toMirtSlopeIntercept,
   twoParameterLogistic,
+  writeMirtIrt,
+  writeMirtMultidimensional,
+  writeMirtSlopeIntercept,
 } from "../src/index.js";
 import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
@@ -106,10 +106,10 @@ describe("mirt", () => {
   mirt.items.forEach((row, i) => {
     const itemModel = defined(MODELS[row.model]);
     it(`converts mirt's ${row.itemtype} coefficients of item ${i + 1} to item parameters and back`, () => {
-      const item = fromMirtIrt(row.irt, itemModel);
+      const item = readMirtIrt(row.irt, itemModel);
       expect(item.model).toBe(itemModel);
       expectRelative(item.parameters, row.parameters, "from the IRT form");
-      expectRelative(fromMirtSlopeIntercept(row.slopeIntercept, itemModel).parameters, row.parameters, "from SI");
+      expectRelative(readMirtSlopeIntercept(row.slopeIntercept, itemModel).parameters, row.parameters, "from SI");
       mirt.theta.forEach((theta, j) => {
         const probabilities = new Float64Array(itemModel.categoryCount(item.parameters));
         itemModel.probabilities(item.parameters, theta, probabilities);
@@ -119,78 +119,78 @@ describe("mirt", () => {
       });
       if (row.model === "rsm") {
         // mirt's rsm form is not unique per item: the conversions write the steps as b1 to b(K-1) and c = -a b.
-        for (const to of [toMirtIrt, toMirtSlopeIntercept]) {
-          expectRelative(fromMirtIrt(to(item), itemModel).parameters, row.parameters, "round trip");
+        for (const to of [writeMirtIrt, writeMirtSlopeIntercept]) {
+          expectRelative(readMirtIrt(to(item), itemModel).parameters, row.parameters, "round trip");
         }
       } else {
-        expectRelative(toMirtIrt(item), row.irt, "to the IRT form");
-        expectRelative(toMirtSlopeIntercept(item), row.slopeIntercept, "to the slope-intercept form");
+        expectRelative(writeMirtIrt(item), row.irt, "to the IRT form");
+        expectRelative(writeMirtSlopeIntercept(item), row.slopeIntercept, "to the slope-intercept form");
       }
     });
   });
 
   it("names the asymptotes c and d, which mirt names g and u", () => {
-    expect(fromMirtIrt({ a: 1.1, b: 0.4, g: 0.2, u: 0.9 }, fourParameterLogistic).parameters).toEqual({
+    expect(readMirtIrt({ a: 1.1, b: 0.4, g: 0.2, u: 0.9 }, fourParameterLogistic).parameters).toEqual({
       a: 1.1,
       b: 0.4,
       c: 0.2,
       d: 0.9,
     });
     const item = { model: threeParameterLogistic, parameters: { a: 2, b: 0.5, c: 0.1, d: 1 } };
-    expect(toMirtSlopeIntercept(item)).toEqual({ a1: 2, d: -1, g: 0.1, u: 1 });
+    expect(writeMirtSlopeIntercept(item)).toEqual({ a1: 2, d: -1, g: 0.1, u: 1 });
   });
 
   it("rejects names a form does not use, missing names, a zero slope and invalid parameters", () => {
-    expect(() => fromMirtIrt({ a: 1, b: 0, g: 0, u: 1, d1: 2 }, twoParameterLogistic)).toThrow(
+    expect(() => readMirtIrt({ a: 1, b: 0, g: 0, u: 1, d1: 2 }, twoParameterLogistic)).toThrow(
       "The mirt coefficients of a 2PL item have names its IRT form does not use: d1.",
     );
-    expect(() => fromMirtIrt({ a: 1, b1: 0 }, twoParameterLogistic)).toThrow(
+    expect(() => readMirtIrt({ a: 1, b1: 0 }, twoParameterLogistic)).toThrow(
       "The mirt coefficients of a 2PL item need a finite b, found undefined.",
     );
-    expect(() => fromMirtSlopeIntercept({ a1: 0, d: 1, g: 0, u: 1 }, twoParameterLogistic)).toThrow(
+    expect(() => readMirtSlopeIntercept({ a1: 0, d: 1, g: 0, u: 1 }, twoParameterLogistic)).toThrow(
       "An item with slope a1 = 0 has no IRT parameters, which divide by a1.",
     );
-    expect(() => fromMirtIrt({ a: 1, b: 0, g: 1.2, u: 1 }, fourParameterLogistic)).toThrow(DataError);
-    expect(() => fromMirtIrt({ a: 1, b1: 1, b2: 0 }, gradedResponse)).toThrow(DataError);
-    expect(() => fromMirtSlopeIntercept({ a1: 1, ak0: 0, ak1: 2, d0: 0, d1: 1 }, generalizedPartialCredit)).toThrow(
+    expect(() => readMirtIrt({ a: 1, b: 0, g: 1.2, u: 1 }, fourParameterLogistic)).toThrow(DataError);
+    expect(() => readMirtIrt({ a: 1, b1: 1, b2: 0 }, gradedResponse)).toThrow(DataError);
+    expect(() => readMirtSlopeIntercept({ a1: 1, ak0: 0, ak1: 2, d0: 0, d1: 1 }, generalizedPartialCredit)).toThrow(
       "The (generalized) partial credit model has mirt's scores ak0, ak1, ... equal to 0, 1, ... and d0 = 0, one d per score, found ak = [0, 2], d = [0, 1].",
     );
     const flat = { model: nominalResponse, parameters: { a: [1, 0, 1], c: [0, 1, 0] } };
-    expect(() => toMirtSlopeIntercept(flat)).toThrow(
+    expect(() => writeMirtSlopeIntercept(flat)).toThrow(
       "An NRM item whose first and last categories have equal slopes has no slope-intercept form in mirt, which fixes ak0 = 0 and ak(K-1) = K - 1.",
     );
-    expect(() => toMirtIrt({ model: twoParameterLogistic, parameters: { a: Number.NaN, b: 0, c: 0, d: 1 } })).toThrow(
-      DataError,
-    );
-    expect(() => toMirtIrt(JSON.parse("null"))).toThrow(
+    expect(() =>
+      writeMirtIrt({ model: twoParameterLogistic, parameters: { a: Number.NaN, b: 0, c: 0, d: 1 } }),
+    ).toThrow(DataError);
+    expect(() => writeMirtIrt(JSON.parse("null"))).toThrow(
       "The item must be an item with a model and parameters, found null.",
     );
-    expect(() => toMirtSlopeIntercept({ model: twoParameterLogistic, parameters: JSON.parse("null") })).toThrow(
+    expect(() => writeMirtSlopeIntercept({ model: twoParameterLogistic, parameters: JSON.parse("null") })).toThrow(
       "The item: Logistic item parameters need finite a and b",
     );
-    expect(() => fromMirtSlopeIntercept({ a1: 1, d: 0, g: 0, u: 1 }, JSON.parse("{}"))).toThrow(
+    expect(() => readMirtSlopeIntercept({ a1: 1, d: 0, g: 0, u: 1 }, JSON.parse("{}"))).toThrow(
       "The model must be one of the built-in models, such as twoParameterLogistic, found an object.",
     );
-    expect(() => fromMirtIrt(JSON.parse("null"), twoParameterLogistic)).toThrow(
+    expect(() => readMirtIrt(JSON.parse("null"), twoParameterLogistic)).toThrow(
       "The mirt coefficients must be an object of numbers by name, found null.",
     );
-    expect(() => fromMirtIrt({ a: 1, b: 0, g: 0, u: 1 }, JSON.parse("null"))).toThrow(
+    expect(() => readMirtIrt({ a: 1, b: 0, g: 0, u: 1 }, JSON.parse("null"))).toThrow(
       "The model must be one of the built-in models, such as twoParameterLogistic, found null.",
     );
-    expect(() => fromMirtIrt(JSON.parse('{ "a": "1", "b": 0, "g": 0, "u": 1 }'), twoParameterLogistic)).toThrow(
+    expect(() => readMirtIrt(JSON.parse('{ "a": "1", "b": 0, "g": 0, "u": 1 }'), twoParameterLogistic)).toThrow(
       'The mirt coefficients of a 2PL item need a finite a, found "1".',
     );
   });
 
   it("converts only the built-in models", () => {
     const custom: IrtModel<LogisticItem> = { ...oneParameterLogistic, name: "Rasch" };
-    expect(() => toMirtIrt({ model: custom, parameters: { a: 1, b: 0, c: 0, d: 1 } })).toThrow(
+    expect(() => writeMirtIrt({ model: custom, parameters: { a: 1, b: 0, c: 0, d: 1 } })).toThrow(
       `Only the built-in models other than the GGUM convert to and from mirt, found the "Rasch" model.`,
     );
-    expect(() => toMirtIrt({ model: generalizedGradedUnfolding, parameters: { a: 1, b: 0, t: [-1] } })).toThrow(
+    expect(() => writeMirtIrt({ model: generalizedGradedUnfolding, parameters: { a: 1, b: 0, t: [-1] } })).toThrow(
       `Only the built-in models other than the GGUM convert to and from mirt, found the "GGUM" model.`,
     );
-    expect(() => fromMirtIrt({ a: 1, b: 0, g: 0, u: 1 }, custom)).toThrow(DataError);
+    expect(() => readMirtIrt({ a: 1, b: 0, g: 0, u: 1 }, custom)).toThrow(DataError);
   });
 
   it("round-trips the parameters of every built-in model through both forms", () => {
@@ -207,8 +207,8 @@ describe("mirt", () => {
     fc.assert(
       fc.property(convertible, (item: IrtItem) => {
         const canonical = item.model.fromVector(item.model.toVector(item.parameters));
-        expectParameters(fromMirtIrt(toMirtIrt(item), item.model).parameters, canonical, 1e-11, "IRT", relative);
-        const back = fromMirtSlopeIntercept(toMirtSlopeIntercept(item), item.model);
+        expectParameters(readMirtIrt(writeMirtIrt(item), item.model).parameters, canonical, 1e-11, "IRT", relative);
+        const back = readMirtSlopeIntercept(writeMirtSlopeIntercept(item), item.model);
         expectParameters(back.parameters, canonical, 1e-11, "slope-intercept", relative);
       }),
     );
@@ -234,11 +234,11 @@ describe("mirt, multidimensional", () => {
   multidimensional.items.forEach((row, i) => {
     const model: MultidimensionalModel = defined(ModelsByName[row.model as keyof typeof ModelsByName]);
     it(`converts mirt's ${row.itemtype} coefficients of item ${i + 1} on ${row.dimensions} dimensions to item parameters and back`, () => {
-      const item = fromMirtMultidimensional(row.slopeIntercept, model);
+      const item = readMirtMultidimensional(row.slopeIntercept, model);
       expect(item.model).toBe(model);
       const parameters: FixtureParameters = row.parameters;
       expectParameters(item.parameters, parameters, TOLERANCE, "from mirt", relative);
-      expectParameters(toMirtMultidimensional(item), row.slopeIntercept, TOLERANCE, "to mirt", relative);
+      expectParameters(writeMirtMultidimensional(item), row.slopeIntercept, TOLERANCE, "to mirt", relative);
       row.theta.forEach((theta, j) => {
         const probabilities = new Float64Array(model.categoryCount(item.parameters));
         model.probabilities(item.parameters, Float64Array.from(theta), probabilities);
@@ -251,10 +251,10 @@ describe("mirt, multidimensional", () => {
 
   it("names the asymptotes c and d, which mirt names g and u, and the intercept d", () => {
     const coefficients = { a1: 1.1, a2: 0.4, d: 0.7, g: 0.2, u: 1 };
-    const item = fromMirtMultidimensional(coefficients, multidimensionalThreeParameterLogistic);
+    const item = readMirtMultidimensional(coefficients, multidimensionalThreeParameterLogistic);
     expect(item.parameters).toEqual({ a: [1.1, 0.4], intercept: 0.7, c: 0.2, d: 1 });
     expect(
-      toMirtMultidimensional({
+      writeMirtMultidimensional({
         model: multidimensionalTwoParameterLogistic,
         parameters: { a: [2], intercept: -1, c: 0, d: 1 },
       }),
@@ -265,7 +265,7 @@ describe("mirt, multidimensional", () => {
       u: 1,
     });
     expect(
-      toMirtMultidimensional({
+      writeMirtMultidimensional({
         model: multidimensionalGradedResponse,
         parameters: { a: [1, 2, 3], intercepts: [1, 0] },
       }),
@@ -280,20 +280,20 @@ describe("mirt, multidimensional", () => {
 
   it("rejects names a form does not use, missing names and invalid parameters", () => {
     expect(() =>
-      fromMirtMultidimensional({ a1: 1, d: 0, g: 0, u: 1, d1: 2 }, multidimensionalTwoParameterLogistic),
+      readMirtMultidimensional({ a1: 1, d: 0, g: 0, u: 1, d1: 2 }, multidimensionalTwoParameterLogistic),
     ).toThrow("The mirt coefficients of a multidimensional M2PL item have names its form does not use: d1.");
-    expect(() => fromMirtMultidimensional({ d: 0, g: 0, u: 1 }, multidimensionalTwoParameterLogistic)).toThrow(
+    expect(() => readMirtMultidimensional({ d: 0, g: 0, u: 1 }, multidimensionalTwoParameterLogistic)).toThrow(
       "The mirt coefficients of a multidimensional M2PL item need a finite a1, found undefined.",
     );
-    expect(() => fromMirtMultidimensional({ a1: 1, a2: 1 }, multidimensionalGradedResponse)).toThrow(
+    expect(() => readMirtMultidimensional({ a1: 1, a2: 1 }, multidimensionalGradedResponse)).toThrow(
       "The mirt coefficients of a multidimensional MGRM item need a finite d1, found undefined.",
     );
-    expect(() => fromMirtMultidimensional({ a1: 1, d1: 0, d2: 1 }, multidimensionalGradedResponse)).toThrow(DataError);
-    expect(() => fromMirtMultidimensional({ a1: 1, d: 0, g: 0.3, u: 1 }, multidimensionalTwoParameterLogistic)).toThrow(
+    expect(() => readMirtMultidimensional({ a1: 1, d1: 0, d2: 1 }, multidimensionalGradedResponse)).toThrow(DataError);
+    expect(() => readMirtMultidimensional({ a1: 1, d: 0, g: 0.3, u: 1 }, multidimensionalTwoParameterLogistic)).toThrow(
       "The multidimensional M2PL item of the mirt coefficients: An M2PL item has c = 0, found c = 0.3.",
     );
     expect(() =>
-      fromMirtMultidimensional(
+      readMirtMultidimensional(
         JSON.parse('{ "a1": "1", "d": 0, "g": 0, "u": 1 }'),
         multidimensionalTwoParameterLogistic,
       ),
@@ -302,20 +302,20 @@ describe("mirt, multidimensional", () => {
 
   it("converts only the built-in multidimensional models, and rejects input of other types", () => {
     const custom = { ...multidimensionalTwoParameterLogistic, name: "Custom" };
-    expect(() => toMirtMultidimensional({ model: custom, parameters: { a: [1], intercept: 0, c: 0, d: 1 } })).toThrow(
-      'Only the built-in models convert to and from mirt, found the "Custom" model.',
-    );
-    expect(() => fromMirtMultidimensional({ a1: 1, d: 0, g: 0, u: 1 }, custom)).toThrow(DataError);
-    expect(() => toMirtMultidimensional(JSON.parse("null"))).toThrow(
+    expect(() =>
+      writeMirtMultidimensional({ model: custom, parameters: { a: [1], intercept: 0, c: 0, d: 1 } }),
+    ).toThrow('Only the built-in models convert to and from mirt, found the "Custom" model.');
+    expect(() => readMirtMultidimensional({ a1: 1, d: 0, g: 0, u: 1 }, custom)).toThrow(DataError);
+    expect(() => writeMirtMultidimensional(JSON.parse("null"))).toThrow(
       "The item must be an item with a model and parameters, found null.",
     );
     expect(() =>
-      toMirtMultidimensional({ model: multidimensionalGradedResponse, parameters: JSON.parse("null") }),
+      writeMirtMultidimensional({ model: multidimensionalGradedResponse, parameters: JSON.parse("null") }),
     ).toThrow("The item: An MGRM item needs finite slopes a");
-    expect(() => fromMirtMultidimensional(JSON.parse("null"), multidimensionalTwoParameterLogistic)).toThrow(
+    expect(() => readMirtMultidimensional(JSON.parse("null"), multidimensionalTwoParameterLogistic)).toThrow(
       "The mirt coefficients must be an object of numbers by name, found null.",
     );
-    expect(() => fromMirtMultidimensional({ a1: 1, d: 0, g: 0, u: 1 }, JSON.parse("null"))).toThrow(
+    expect(() => readMirtMultidimensional({ a1: 1, d: 0, g: 0, u: 1 }, JSON.parse("null"))).toThrow(
       "The model must be one of the built-in multidimensional models, such as multidimensionalTwoParameterLogistic, found null.",
     );
   });
@@ -348,7 +348,7 @@ describe("mirt, multidimensional", () => {
     );
     fc.assert(
       fc.property(items, (item) => {
-        const back = fromMirtMultidimensional(toMirtMultidimensional(item), item.model);
+        const back = readMirtMultidimensional(writeMirtMultidimensional(item), item.model);
         expect(back.parameters).toEqual(item.parameters);
       }),
     );

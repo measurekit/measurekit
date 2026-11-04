@@ -1,7 +1,7 @@
 import { checkArray, checkRecord, DataError, describe, isUnitInterval } from "@measurekit/core";
 import type { LearningCurvePoint } from "./learning-curve.js";
 
-/** The fields of a learning curve point that {@link powerLawFit} and {@link categorizeCurve} read. */
+/** The fields of a learning curve point that {@link fitPowerLaw} and {@link categorizeCurve} read. */
 export type ErrorRatePoint = Pick<LearningCurvePoint, "opportunity" | "count" | "errorRate">;
 
 /**

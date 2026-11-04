@@ -1,6 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  buildResponseMatrix,
+  buildResponseRecords,
   calibrate,
   calibrateResponseTimes,
   calibrateSpeedAccuracy,
@@ -14,8 +16,6 @@ import {
   normativeThresholds,
   posteriorMeanEstimate,
   type ResponseMatrix,
-  responseMatrix,
-  responseRecords,
   responseTimeEffort,
   responseTimeFit,
   type SpeedAccuracyCalibration,
@@ -109,7 +109,7 @@ const LNIRT_TOLERANCE = 0.1;
 
 /** A response matrix of the fixture's times, each with a response of 0. */
 function timed(times: readonly (readonly (number | null)[])[], itemIds: readonly string[]) {
-  return responseMatrix(
+  return buildResponseMatrix(
     times.map((row) => row.map((time) => (time === null ? null : 0))),
     { itemIds, times },
   );
@@ -138,7 +138,7 @@ describe("calibrateResponseTimes", () => {
   it("calibrates response records as the matrix with the same times", () => {
     const reference = defined(fixture.cases[0]);
     const matrix = timed(reference.times, reference.itemIds);
-    const records = responseRecords(
+    const records = buildResponseRecords(
       matrix.responses.flatMap((row, p) =>
         row.flatMap((response, i) => {
           const time = matrix.times?.[p]?.[i] ?? null;
@@ -162,19 +162,19 @@ describe("calibrateResponseTimes", () => {
         time: 5 + k + (item % 3),
       })),
     ).flat();
-    const calibration = calibrateResponseTimes(responseRecords(records));
+    const calibration = calibrateResponseTimes(buildResponseRecords(records));
     expect(calibration.items).toHaveLength(2001);
     for (const item of calibration.items) expect(item.standardError).toBeNull();
   });
 
   it("rejects data without times or with an item of fewer than two times", () => {
-    expect(() => calibrateResponseTimes(responseMatrix([[1, 0]]))).toThrow(
+    expect(() => calibrateResponseTimes(buildResponseMatrix([[1, 0]]))).toThrow(
       "Response time calibration needs response times.",
     );
-    expect(() => calibrateResponseTimes(responseMatrix([[1, 0]]), JSON.parse("null"))).toThrow(
+    expect(() => calibrateResponseTimes(buildResponseMatrix([[1, 0]]), JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
-    const matrix = responseMatrix(
+    const matrix = buildResponseMatrix(
       [
         [1, 0],
         [0, null],
@@ -189,15 +189,15 @@ describe("calibrateResponseTimes", () => {
     expect(() => calibrateResponseTimes(matrix)).toThrow('Item "item2" needs at least two response times.');
     // Equal times leave the item's variance at 0, where the likelihood has no maximum; the mean of 7 equal log times
     // is off by rounding, so the check compares the times.
-    const equal = responseMatrix(
+    const equal = buildResponseMatrix(
       Array.from({ length: 7 }, (_, person) => [person % 2, 1]),
       { times: Array.from({ length: 7 }, (_, person) => [5, 4 + person]) },
     );
     expect(() => calibrateResponseTimes(equal)).toThrow('Item "item1" needs response times that differ.');
-    expect(() => responseMatrix([[1, null]], { times: [[2, 3]] })).toThrow(
+    expect(() => buildResponseMatrix([[1, null]], { times: [[2, 3]] })).toThrow(
       'The time of person "person1" on item "item2" needs a response, found 3.',
     );
-    expect(() => responseRecords([{ person: "p", item: "q", response: 1, time: 0 }])).toThrow(
+    expect(() => buildResponseRecords([{ person: "p", item: "q", response: 1, time: 0 }])).toThrow(
       'The time of person "p" on item "q" must be a positive number, found 0.',
     );
   });
@@ -205,7 +205,7 @@ describe("calibrateResponseTimes", () => {
 
 describe("rapid guessing", () => {
   const { rapidGuessing } = fixture;
-  const matrix = responseMatrix(rapidGuessing.responses, {
+  const matrix = buildResponseMatrix(rapidGuessing.responses, {
     itemIds: rapidGuessing.itemIds,
     times: rapidGuessing.times,
   });
@@ -237,7 +237,7 @@ describe("rapid guessing", () => {
   });
 
   it("counts a response at its threshold as effort, and rejects invalid thresholds and options", () => {
-    const data = responseMatrix(
+    const data = buildResponseMatrix(
       [
         [1, 0],
         [1, 1],
@@ -309,7 +309,7 @@ describe("speed and time fit", () => {
   it("estimates the speeds of a sparse log in time that grows with its times, as responseTimeFit's speeds", () => {
     // 40,000 persons who each answered an item of their own: a table of residuals would hold 1.6 billion values.
     const count = 40_000;
-    const records = responseRecords(
+    const records = buildResponseRecords(
       Array.from({ length: count }, (_, k) => ({
         person: `p${k}`,
         item: `i${k}`,
@@ -320,7 +320,7 @@ describe("speed and time fit", () => {
     const items = records.itemIds.map((id, k) => ({ id, intensity: 2 + (k % 3) / 2, discrimination: 1.5 }));
     const estimates = speedEstimates(records, items, { sd: 0.5 });
     expect(estimates).toHaveLength(count);
-    const small = responseRecords(
+    const small = buildResponseRecords(
       Array.from({ length: 30 }, (_, k) => ({
         person: `p${k % 6}`,
         item: `i${k % 5}`,
@@ -340,7 +340,7 @@ describe("speed and time fit", () => {
       { id: "item1", intensity: 4, discrimination: 2 },
       { id: "item2", intensity: 3, discrimination: 1 },
     ];
-    const data = responseMatrix(
+    const data = buildResponseMatrix(
       [
         [1, 0],
         [null, null],
@@ -377,7 +377,7 @@ type JointCase = (typeof jointFixture.cases)[number];
 
 /** The data of a joint fixture case: the responses and times, with their ids. */
 function jointData(reference: JointCase): ResponseMatrix {
-  return responseMatrix(reference.responses, { itemIds: reference.itemIds, times: reference.times });
+  return buildResponseMatrix(reference.responses, { itemIds: reference.itemIds, times: reference.times });
 }
 
 /** The fixture's maximum as a calibration, for the estimates and for checks that need known parameters. */
@@ -432,7 +432,7 @@ function simulateJoint<TParameters>(
     intensity.map((beta, i) => Math.exp(beta - speed + random.normal() / (discrimination[i] ?? 1))),
   );
   const { responses } = simulateResponses(pool, thetas, random);
-  return { matrix: responseMatrix(responses, { times }), sigma, intensity, discrimination, pool };
+  return { matrix: buildResponseMatrix(responses, { times }), sigma, intensity, discrimination, pool };
 }
 
 /** Expects the estimates of simulated data to be within four standard errors of the simulated values. */
@@ -516,11 +516,11 @@ describe("calibrateSpeedAccuracy", () => {
 
   it("calibrates response records as the matrix with the same responses and times", () => {
     const reference = defined(jointFixture.cases[1]);
-    const matrix = responseMatrix(reference.responses.slice(0, 120), {
+    const matrix = buildResponseMatrix(reference.responses.slice(0, 120), {
       itemIds: reference.itemIds,
       times: reference.times.slice(0, 120),
     });
-    const records = responseRecords(
+    const records = buildResponseRecords(
       matrix.responses.flatMap((row, p) =>
         row.flatMap((response, i) => {
           const time = matrix.times?.[p]?.[i] ?? null;
@@ -580,7 +580,7 @@ describe("calibrateSpeedAccuracy", () => {
       })),
     ).flat();
     expect(() =>
-      calibrateSpeedAccuracy(responseRecords(records), { model: twoParameterLogistic, standardErrors: "hessian" }),
+      calibrateSpeedAccuracy(buildResponseRecords(records), { model: twoParameterLogistic, standardErrors: "hessian" }),
     ).toThrow(
       'Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2402. Leave standardErrors "none", or calibrate fewer items at a time.',
     );
@@ -603,7 +603,7 @@ describe("calibrateSpeedAccuracy", () => {
     const times = matrix.times?.map((row, p) =>
       row.map((time, i) => (p % 7 === 0 || (p + i) % 11 === 0 ? null : time)),
     );
-    const sparse = responseMatrix(matrix.responses, times === undefined ? {} : { times });
+    const sparse = buildResponseMatrix(matrix.responses, times === undefined ? {} : { times });
     const fit = calibrateSpeedAccuracy(sparse, { model: twoParameterLogistic });
     expect(fit.converged).toBe(true);
     const estimates = speedAccuracyEstimates(sparse, fit);
@@ -614,7 +614,7 @@ describe("calibrateSpeedAccuracy", () => {
 
   it("rejects data without times, an item with fewer than two times, and an item every person answered correctly", () => {
     const model = twoParameterLogistic;
-    expect(() => calibrateSpeedAccuracy(responseMatrix([[1, 0]]), { model })).toThrow(
+    expect(() => calibrateSpeedAccuracy(buildResponseMatrix([[1, 0]]), { model })).toThrow(
       "Speed-accuracy calibration needs response times.",
     );
     const rows = [
@@ -622,7 +622,7 @@ describe("calibrateSpeedAccuracy", () => {
       [0, 1],
       [1, 1],
     ];
-    const single = responseMatrix(rows, {
+    const single = buildResponseMatrix(rows, {
       times: [
         [10, 20],
         [12, null],
@@ -630,7 +630,7 @@ describe("calibrateSpeedAccuracy", () => {
       ].map((row) => row.map((time) => time)),
     });
     expect(() => calibrateSpeedAccuracy(single, { model })).toThrow('Item "item2" needs at least two response times.');
-    const constant = responseMatrix(
+    const constant = buildResponseMatrix(
       [
         [1, 1],
         [1, 0],
@@ -729,7 +729,7 @@ describe("speedAccuracyEstimates", () => {
     times[0] = times[0]?.map(() => null) ?? [];
     rows[2] = rows[2]?.map(() => null) ?? [];
     times[2] = times[2]?.map(() => null) ?? [];
-    const data = responseMatrix(rows, { itemIds: reference.itemIds, times });
+    const data = buildResponseMatrix(rows, { itemIds: reference.itemIds, times });
     const calibration = jointCalibration(reference);
     const [noTimes, full, nothing] = speedAccuracyEstimates(data, calibration);
     const alone = speedAccuracyEstimates(data, jointCalibration(reference, 0))[0];
@@ -749,7 +749,7 @@ describe("speedAccuracyEstimates", () => {
     const reference = defined(jointFixture.cases[1]);
     const data = jointData(reference);
     const calibration = jointCalibration(reference);
-    expect(() => speedAccuracyEstimates(responseMatrix([[1, 0]]), calibration)).toThrow(
+    expect(() => speedAccuracyEstimates(buildResponseMatrix([[1, 0]]), calibration)).toThrow(
       "Speed-accuracy estimation needs response times.",
     );
     expect(() => speedAccuracyEstimates(data, JSON.parse("null"))).toThrow(DataError);
@@ -766,7 +766,7 @@ describe("speedAccuracyEstimates", () => {
       "The calibration's correlation must be between -1 and 1, found 1.",
     );
     expect(() => speedAccuracyEstimates(data, { ...calibration, speedSd: 0 })).toThrow(DataError);
-    const beyond = responseMatrix([[3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]], {
+    const beyond = buildResponseMatrix([[3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]], {
       itemIds: reference.itemIds,
       times: [Array.from({ length: 12 }, () => 30)],
     });
@@ -788,7 +788,7 @@ describe("properties", () => {
         fc.double({ min: 1, max: 300, noNaN: true }),
         fc.double({ min: 1.01, max: 3, noNaN: true }),
         (first, second, factor) => {
-          const data = responseMatrix(
+          const data = buildResponseMatrix(
             [
               [1, 1],
               [1, 1],
@@ -819,11 +819,14 @@ describe("properties", () => {
         const pick = <T>(rows: readonly T[]): T[] => order.map((p) => defined(rows[p]));
         const options = { itemIds: reference.itemIds };
         const forward = speedAccuracyEstimates(
-          responseMatrix(reference.responses.slice(0, count), { ...options, times: reference.times.slice(0, count) }),
+          buildResponseMatrix(reference.responses.slice(0, count), {
+            ...options,
+            times: reference.times.slice(0, count),
+          }),
           calibration,
         );
         const shuffled = speedAccuracyEstimates(
-          responseMatrix(pick(reference.responses.slice(0, count)), {
+          buildResponseMatrix(pick(reference.responses.slice(0, count)), {
             ...options,
             times: pick(reference.times.slice(0, count)),
           }),
@@ -851,7 +854,7 @@ describe("properties", () => {
           { minLength: 1, maxLength: 12 },
         ),
         (persons) => {
-          const data = responseMatrix(
+          const data = buildResponseMatrix(
             persons.map(([row]) => row),
             { itemIds: items, times: persons.map(([, row]) => row) },
           );
@@ -874,7 +877,7 @@ describe("properties", () => {
         const { matrix } = simulateJoint(twoParameterLogistic, seed, 200, 6, 2, 0.4);
         const order = Array.from({ length: 200 }, (_, i) => (i * 13 + seed) % 200);
         const pick = <T>(rows: readonly T[]): T[] => order.map((p) => defined(rows[p]));
-        const shuffled = responseMatrix(pick(matrix.responses), { times: pick(matrix.times ?? []) });
+        const shuffled = buildResponseMatrix(pick(matrix.responses), { times: pick(matrix.times ?? []) });
         const options = { model: twoParameterLogistic, ...PRECISE };
         expectClose(
           calibrateSpeedAccuracy(shuffled, options).logLikelihood,

@@ -1,4 +1,4 @@
-import { DataError, describe, isRecord, type LogisticItem, logistic, validAsymptotes } from "@measurekit/core";
+import { DataError, describe, hasValidAsymptotes, isRecord, type LogisticItem, logistic } from "@measurekit/core";
 import type { IrtModel, ModelParameter } from "./model.js";
 
 const DISCRIMINATION: ModelParameter = { name: "a" };
@@ -52,7 +52,7 @@ export function isLogisticModel(model: IrtModel): model is IrtModel<LogisticItem
  */
 function checkLogisticParameters(parameters: LogisticItem): void {
   const { a, b, c, d }: Partial<LogisticItem> = isRecord(parameters) ? parameters : {};
-  if (!(Number.isFinite(a) && Number.isFinite(b) && validAsymptotes(c, d))) {
+  if (!(Number.isFinite(a) && Number.isFinite(b) && hasValidAsymptotes(c, d))) {
     throw new DataError(
       `Logistic item parameters need finite a and b and 0 ≤ c < d ≤ 1, found a = ${describe(a)}, b = ${describe(b)}, c = ${describe(c)}, d = ${describe(d)}.`,
     );

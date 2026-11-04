@@ -70,7 +70,7 @@ fringes(structure, ["add", "subtract"]); // { inner: ["subtract"], outer: ["mult
 
 `prerequisites` has every element as a key, with its prerequisites; theirs are implied. Elements that require each
 other are learned together, so their space is not a learning space. States are ordered by size, then by the domain's
-order. The Q-matrix of `delineate` has the shape of `eventLog`'s and of `@measurekit/psychometrics`.
+order. The Q-matrix of `delineate` has the shape of `buildEventLog`'s and of `@measurekit/psychometrics`.
 
 `surmiseStructure` and `delineate` return frozen structures, which the functions above and `kst` trust. A structure from
 elsewhere, such as JSON from storage, is checked in full each time a function takes it, in time proportional to its
@@ -214,7 +214,7 @@ change of them leaves every pattern's probability as it was. Rates of items with
 rates are not parameters. The model must be over items. Equal rates are refused, as no reference covers them.
 
 ```ts
-import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
 import { compareFits, kst, structureValidity, surmiseStructure } from "@measurekit/knowledge-tracing/kst";
 
 const structure = surmiseStructure({ add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] });
@@ -223,7 +223,7 @@ const counts = { "0000": 6, "1000": 8, "1100": 7, "1010": 5, "1110": 6, "1111": 
 const answers = Object.entries(counts).flatMap(([pattern, count]) =>
   Array.from({ length: count }, (_, copy) => ({ pattern, copy })),
 );
-const log = eventLog(
+const log = buildEventLog(
   answers.flatMap(({ pattern }, learner) =>
     structure.domain.map((item, i) => ({
       learner: `l${learner}`,

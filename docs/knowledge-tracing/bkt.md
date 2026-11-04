@@ -131,7 +131,7 @@ outcomes of a skill are all correct would otherwise fit P(S) = 0, and an incorre
 ```ts
 import { createRandom } from "@measurekit/knowledge-tracing";
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
-import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
 
 const random = createRandom(1);
 const events = Array.from({ length: 30 }, (_, learner) =>
@@ -143,7 +143,7 @@ const events = Array.from({ length: 30 }, (_, learner) =>
   })),
 ).flat();
 const qMatrix = { q1: ["fractions"], q2: ["fractions"], q3: ["decimals"], q4: ["decimals"] };
-const log = eventLog(events, { qMatrix });
+const log = buildEventLog(events, { qMatrix });
 const fit = bkt({ forgetting: true, itemGuessSlip: true }).fit(log);
 fit.model.parameters.skills.fractions; // { prior, learn, forget, guess, slip, itemGuessSlip: { q1, q2 } }
 fit.states.l0; // { learner: "l0", skills: { fractions, decimals } }: the learner's P(L) after the log

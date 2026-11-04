@@ -199,6 +199,20 @@ Knowledge tracing: the model families never import each other, nor does anything
 
 - Acronyms are words: `kr20`, `bfgs`, `auc`, `rmse`. Other statistics are named in full: `standardErrorOfMeasurement`,
   `logLoss`. `QMatrix` keeps the field's spelling, with a Biome exception.
+- A function that acts opens with its verb; one that computes a named quantity takes the quantity's name, as R and SciPy
+  do (`cronbachAlpha`, `mantelHaenszel`), and a model, estimator or procedure the literature names keeps its name
+  (`bkt`, `calibrate`, `linearEquating`). The verbs have one meaning across the families (STANDARDS section 4):
+
+  | Verb            | Meaning                                                            | Example                                  |
+  | --------------- | ------------------------------------------------------------------ | ---------------------------------------- |
+  | `build`         | Assembles plain data from parts.                                   | `buildResponseMatrix`, `buildEventLog`   |
+  | `create`        | Returns an object with behavior or state.                          | `createAdaptiveTest`, `createRandom`     |
+  | `read`, `write` | Turns the form that another tool defines into the model, and back. | `readMirtIrt`, `writeMirtIrt`            |
+  | `select`        | Chooses among candidates.                                          | `selectFirstAttempts`                    |
+  | `check`         | Asserts and throws `DataError`.                                    | `checkArray`                             |
+  | `validate`      | Judges a value and returns findings as data.                       | `validateQMatrix`                        |
+  | `is`, `has`     | Predicates.                                                        | `isUnitInterval`, `hasOrderedThresholds` |
+
 - Errors are `DataError` and its base class `MeasurekitError`, both of `@measurekit/core`, which the libraries
   re-export. A package that needs an error of its own extends `MeasurekitError`.
 - Function options are `<Name>Options`; options shared by several functions are named after what they configure

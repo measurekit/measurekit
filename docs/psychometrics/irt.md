@@ -83,7 +83,7 @@ number of categories.
 ## Calibration
 
 ```ts
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import {
   betaPrior,
   calibrate,
@@ -96,7 +96,7 @@ import {
 } from "@measurekit/psychometrics/irt";
 
 // Items 1 to 3 are multiple choice, scored 0 or 1; item 4 is a constructed response, scored 0 to 2.
-const matrix = responseMatrix([
+const matrix = buildResponseMatrix([
   [1, 0, 1, 2],
   [0, 0, 1, 0],
   [1, 1, 1, 2],
@@ -368,7 +368,7 @@ operational scale when the tested population is not N(0, 1).
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseRecords } from "@measurekit/psychometrics/data";
+import { buildResponseRecords } from "@measurekit/psychometrics/data";
 import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { normalDistribution, simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
@@ -377,7 +377,7 @@ import { normalDistribution, simulateItems, simulateResponses, simulateThetas } 
 const random = createRandom(2026);
 const items = simulateItems(twoParameterLogistic, 22, random);
 const thetas = simulateThetas(2000, random, { distribution: normalDistribution(0.3, 1.1) });
-const data = responseRecords(
+const data = buildResponseRecords(
   simulateResponses(items, thetas, random).responses.flatMap((row, person) =>
     row.flatMap((response, j) => {
       const taken = j < 20 ? Math.floor(j / 10) === person % 2 : j - 20 === person % 2;
@@ -431,7 +431,7 @@ out: `testlets` lists `{ items, sd }`, the ids of each testlet's items and the c
 person of `abilityEstimates` from the items the person answered.
 
 ```ts
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import {
   abilityEstimates,
   calibrate,
@@ -439,7 +439,7 @@ import {
   twoParameterLogistic,
 } from "@measurekit/psychometrics/irt";
 
-const matrix = responseMatrix(
+const matrix = buildResponseMatrix(
   [
     [1, 1, 0, 1, 0, 1],
     [0, 0, 1, 1, 1, 0],
@@ -700,11 +700,11 @@ any; linking, equating, the Bookmark method, `simulateItems` and the conversions
 persons' thetas, as TAM's `tam.jml`. Both are on the Rasch scale, a = 1, not on N(0, 1).
 
 ```ts
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { jointMaximumLikelihood } from "@measurekit/psychometrics/irt";
 
 const result = jointMaximumLikelihood(
-  responseMatrix([
+  buildResponseMatrix([
     [1, 0, 2],
     [0, 0, 1],
     [1, 1, 2],
@@ -752,11 +752,11 @@ flowchart LR
 ```
 
 ```ts
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { conditionalMaximumLikelihood } from "@measurekit/psychometrics/irt";
 
 const result = conditionalMaximumLikelihood(
-  responseMatrix([
+  buildResponseMatrix([
     [1, 0, 2],
     [0, 0, 1],
     [1, 1, 2],
@@ -984,7 +984,7 @@ flowchart LR
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
@@ -1001,7 +1001,7 @@ const fit = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "he
 const persons = matrix.responses.length;
 const replicates = Array.from({ length: 400 }, () => {
   const rows = Array.from({ length: persons }, () => matrix.responses[Math.floor(random.uniform() * persons)] ?? []);
-  return calibrate(responseMatrix(rows, { itemIds: matrix.itemIds }), { model: twoParameterLogistic });
+  return calibrate(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), { model: twoParameterLogistic });
 });
 const standardDeviation = (values: readonly number[]) => {
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -1054,7 +1054,7 @@ parameters. Methods that write into `out` must not allocate: they run in the inn
 
 ```ts
 import { DataError } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { calibrate, type IrtModel } from "@measurekit/psychometrics/irt";
 
 const logistic = (z: number): number => 1 / (1 + Math.exp(-z));
@@ -1094,7 +1094,7 @@ export const rasch: IrtModel<{ b: number }> = {
 };
 
 calibrate(
-  responseMatrix([
+  buildResponseMatrix([
     [1, 0, 1],
     [0, 1, 1],
     [1, 1, 0],

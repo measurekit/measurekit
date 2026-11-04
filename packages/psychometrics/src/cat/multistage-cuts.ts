@@ -24,7 +24,7 @@ import {
   ROUTINGS,
 } from "./multistage-test.js";
 
-/** The stages of a panel, as {@link multistageTest} takes them. */
+/** The stages of a panel, as {@link createMultistageTest} takes them. */
 type Stages = MultistageTestOptions["stages"];
 
 /**
@@ -105,7 +105,7 @@ const SHARE_SUM_TOLERANCE = 1e-6;
 
 /**
  * Returns the cut points of every module of a multistage panel that routes to the next stage, in the order of the
- * panel, ready as the `cuts` of the modules in {@link multistageTest}.
+ * panel, ready as the `cuts` of the modules in {@link createMultistageTest}.
  *
  * @remarks
  * A module of the stages but the last has one fewer cut than the modules of the next stage, in ascending order. The
@@ -130,7 +130,8 @@ const SHARE_SUM_TOLERANCE = 1e-6;
  * items are those of the routing module and of the module of each earlier stage that routing by theta chooses at the
  * cut. A score within 1e-9 of a whole score counts as it.
  *
- * @param stages - The stages of the panel, in order, each a list of modules, as {@link multistageTest} takes them.
+ * @param stages - The stages of the panel, in order, each a list of modules, as {@link createMultistageTest} takes
+ * them.
  * @param options - The method, the scale and what the method reads.
  * @returns The cuts of each module of the stages but the last, in ascending order.
  * @throws `DataError` when the stages, the items or an option are invalid, an option belongs to the other method, the

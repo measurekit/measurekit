@@ -3,6 +3,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   type BifactorOptions,
+  buildResponseMatrix,
+  buildResponseRecords,
   calibrateBifactor,
   calibrateMultidimensional,
   createRandom,
@@ -20,8 +22,6 @@ import {
   normalPrior,
   type ParameterPrior,
   type ResponseMatrix,
-  responseMatrix,
-  responseRecords,
   simulateMultidimensionalResponses,
 } from "../src/index.js";
 import { compressResponses } from "../src/irt/internal.js";
@@ -320,7 +320,7 @@ function modelOf(name: string): MultidimensionalModel<Parameters> {
 }
 
 function matrixOf(fixture: Pick<Case, "responses" | "itemIds">): ResponseMatrix {
-  return responseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] });
+  return buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] });
 }
 
 /** A normal prior on logit(x), as mirt's `norm` on g. Implemented here as user code. */
@@ -480,7 +480,7 @@ describe("structure", () => {
 
 describe("patterns", () => {
   it("collects the distinct patterns and the distinct sub-patterns of each group in order", () => {
-    const matrix = responseMatrix(
+    const matrix = buildResponseMatrix(
       [
         [1, 0, 1, 1],
         [0, 1, 1, 1],
@@ -701,7 +701,7 @@ describe("calibrateBifactor", () => {
           response === null ? [] : [{ person: `p${person}`, item: defined(fixture.itemIds[item]), response }],
         ),
       );
-      const fromRecords = calibrateBifactor(responseRecords(records, { itemIds: [...fixture.itemIds] }), {
+      const fromRecords = calibrateBifactor(buildResponseRecords(records, { itemIds: [...fixture.itemIds] }), {
         specific: fixture.specific,
         ...quick,
       });
@@ -711,7 +711,7 @@ describe("calibrateBifactor", () => {
 
     it("leaves a person without responses out of the calibration", () => {
       const silent = fixture.itemIds.map(() => null);
-      const padded = responseMatrix([...fixture.responses, silent], { itemIds: [...fixture.itemIds] });
+      const padded = buildResponseMatrix([...fixture.responses, silent], { itemIds: [...fixture.itemIds] });
       const fit = calibrateBifactor(padded, { specific: fixture.specific, ...quick });
       const plain = calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, ...quick });
       expect(fit).toEqual(plain);
@@ -756,7 +756,7 @@ describe("calibrateBifactor", () => {
 
     it("refuses a two-tier model of no more persons than its two correlated primary dimensions", () => {
       const ids = ["q1", "q2", "q3", "q4"];
-      const two = responseMatrix(
+      const two = buildResponseMatrix(
         [
           [0, 1, 0, 1],
           [1, 0, 1, 0],
@@ -772,7 +772,7 @@ describe("calibrateBifactor", () => {
     });
 
     it("refuses a calibration without responses", () => {
-      const silent = responseMatrix(
+      const silent = buildResponseMatrix(
         [
           [null, null],
           [null, null],
@@ -791,7 +791,7 @@ describe("calibrateBifactor", () => {
     it("limits the probabilities of the items' categories that EM keeps at the nodes of their groups", () => {
       // 1,000 points make a group of 10⁶ nodes, which 17 dichotomous items fill with 3.4e7 probabilities, above 2 ** 24.
       const ids = Array.from({ length: 17 }, (_, j) => `q${j}`);
-      const wide = responseMatrix(
+      const wide = buildResponseMatrix(
         [Array.from({ length: 17 }, (_, j) => j % 2), Array.from({ length: 17 }, (_, j) => 1 - (j % 2))],
         { itemIds: ids },
       );
@@ -804,7 +804,7 @@ describe("calibrateBifactor", () => {
     it("counts toward the limit the tables of pairs of items that Louis' standard errors take, and only those", () => {
       // A group of 10⁶ nodes: 5 dichotomous items keep 1e7 probabilities, and their 10 pairs 4e7 more for Louis' formula.
       const ids = Array.from({ length: 5 }, (_, j) => `q${j}`);
-      const wide = responseMatrix(
+      const wide = buildResponseMatrix(
         [Array.from({ length: 5 }, (_, j) => j % 2), Array.from({ length: 5 }, (_, j) => 1 - (j % 2))],
         { itemIds: ids },
       );
@@ -891,7 +891,7 @@ describe("calibrateBifactor", () => {
     });
 
     it("recovers the slopes and the correlation of a two-tier model of 80 items on 21 nodes", { timeout: SLOW }, () => {
-      const fit = calibrateBifactor(responseMatrix(recovery.responses, { itemIds: recovery.itemIds }), {
+      const fit = calibrateBifactor(buildResponseMatrix(recovery.responses, { itemIds: recovery.itemIds }), {
         specific: recovery.specific,
         primary: recovery.primary,
         tolerance: 1e-3,
@@ -928,7 +928,7 @@ describe("standard errors of many parameters", () => {
   it("are bounded to 2,000 parameters before the calibration runs", () => {
     // Three persons answer 1,000 items with both categories each, two specific dimensions of 500: a general slope, a
     // specific slope and an intercept each.
-    const matrix = responseMatrix([0, 1, 2].map((k) => Array.from({ length: 1000 }, (_, j) => (j + k) % 2)));
+    const matrix = buildResponseMatrix([0, 1, 2].map((k) => Array.from({ length: 1000 }, (_, j) => (j + k) % 2)));
     const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, i < 500 ? "s1" : "s2"]));
     expect(() => calibrateBifactor(matrix, { specific, standardErrors: "cross-product" })).toThrow(
       "Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 3000.",
@@ -948,7 +948,7 @@ describe("properties", () => {
     );
 
   const fitOf = (rows: readonly (readonly (number | null)[])[]): MultidimensionalCalibration<Parameters> =>
-    calibrateBifactor(responseMatrix(rows, { itemIds }), { specific, points: 5, maxIterations: 25 });
+    calibrateBifactor(buildResponseMatrix(rows, { itemIds }), { specific, points: 5, maxIterations: 25 });
 
   it("does not depend on the order of the persons", { timeout: SLOW }, () => {
     const { matrix, specific: groups } = simulatedCase(5, 1000);
@@ -962,7 +962,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(permutations, (permutation) => {
         const rows = permutation.map((person) => defined(matrix.responses[person]));
-        const second = calibrateBifactor(responseMatrix(rows, { itemIds: matrix.itemIds }), settings);
+        const second = calibrateBifactor(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), settings);
         expectClose(first.logLikelihood, second.logLikelihood, 1e-6);
         first.items.forEach((item, i) => {
           const other = defined(second.items[i]);

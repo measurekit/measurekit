@@ -20,7 +20,6 @@ import {
   type AdaptiveTestContext,
   type AdaptiveTestState,
   type AssembledForm,
-  adaptiveTest,
   allOf,
   anyOf,
   aStratified,
@@ -31,12 +30,15 @@ import {
   closestDifficulty,
   contentBounds,
   contentMinimumsMet,
+  createAdaptiveTest,
+  createDiagnosticAdaptiveTest,
+  createMultidimensionalAdaptiveTest,
+  createMultistageTest,
   createRandom,
   DataError,
   type DiagnosticAdaptiveTest,
   type DiagnosticAdaptiveTestState,
   type DiagnosticPoolItem,
-  diagnosticAdaptiveTest,
   diagnosticKullbackLeibler,
   discriminationIndex,
   expectedInformation,
@@ -66,14 +68,12 @@ import {
   maximumLikelihoodEstimate,
   maximumPriorityIndex,
   modifiedPosteriorWeightedKullbackLeibler,
-  multidimensionalAdaptiveTest,
   multidimensionalInformation,
   multidimensionalPosteriorMeanEstimate,
   multidimensionalPosteriorModeEstimate,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
   multistageCuts,
-  multistageTest,
   nominalResponse,
   type PoolItem,
   type ProfileEstimate,
@@ -642,7 +642,7 @@ describe("aStratified", () => {
   it("selects Chang and Ying's items: the scheduled stratum's difficulty closest to the estimate, catR's bOpt", () => {
     const run: CatRun = cat2pl.run;
     const lengths = Array.from({ length: strataCount }, () => cat2pl.perStratum);
-    const test = adaptiveTest({
+    const test = createAdaptiveTest({
       pool: pool2pl,
       selection: aStratified(lengths),
       estimator: posteriorModeEstimate,
@@ -690,7 +690,7 @@ describe("aStratified", () => {
       item2pl("a6", 2.2, -0.5),
       item2pl("a4", 1.2, -2),
     ];
-    const test = adaptiveTest({ pool, selection: aStratified([2, 2, 2]), stopping: testLength(6) });
+    const test = createAdaptiveTest({ pool, selection: aStratified([2, 2, 2]), stopping: testLength(6) });
     // At θ = 0, b = 0.4 of a2 is closer than b = -1 of a1.
     expect(test.start(createRandom(1)).next).toBe("a2");
     const { items } = administer(test, () => 1);
@@ -702,9 +702,9 @@ describe("aStratified", () => {
   it("uses the next stratum when the scheduled one has no eligible item, and an earlier one after the last", () => {
     // Every peak is at θ = 0, so ties go to the first item in pool order.
     const pool = [item2pl("low1", 0.5, 0), item2pl("low2", 0.6, 0), item2pl("high1", 2, 0), item2pl("high2", 2.1, 0)];
-    const early = adaptiveTest({ pool, selection: aStratified([3, 1]), stopping: testLength(4) });
+    const early = createAdaptiveTest({ pool, selection: aStratified([3, 1]), stopping: testLength(4) });
     expect(administer(early, () => 1).items).toEqual(["low1", "low2", "high1", "high2"]);
-    const late = adaptiveTest({ pool, selection: aStratified([1, 1]), stopping: testLength(4) });
+    const late = createAdaptiveTest({ pool, selection: aStratified([1, 1]), stopping: testLength(4) });
     expect(administer(late, () => 0).items).toEqual(["low1", "high1", "high2", "low2"]);
   });
 
@@ -718,11 +718,11 @@ describe("aStratified", () => {
   });
 });
 
-describe("adaptiveTest", () => {
+describe("createAdaptiveTest", () => {
   for (const { source, pool, runs } of FIXTURES) {
     for (const run of runs) {
       it(`selects catR's items with catR's estimates at every step: ${run.name}, ${source}`, () => {
-        const test = adaptiveTest({
+        const test = createAdaptiveTest({
           pool,
           selection: defined(SELECTIONS.get(run.selection)),
           estimator: runEstimator(run.estimators),
@@ -742,7 +742,7 @@ describe("adaptiveTest", () => {
   }
 
   it("resumes from a state stored as JSON", () => {
-    const test = adaptiveTest({
+    const test = createAdaptiveTest({
       pool: POOL_3PL.map((item, i) => ({ ...item, exposure: i % 3 === 0 ? 0.5 : 1 })),
       selection: randomesque(kullbackLeibler, 3),
       stopping: testLength(8),
@@ -760,19 +760,19 @@ describe("adaptiveTest", () => {
   });
 
   it("estimates with its estimator before the first response", () => {
-    const state = adaptiveTest({ pool: POOL_GPCM, stopping: testLength(1) }).start(createRandom(1));
+    const state = createAdaptiveTest({ pool: POOL_GPCM, stopping: testLength(1) }).start(createRandom(1));
     expect(state).toMatchObject({ items: [], responses: [], withheld: [], estimate: posteriorMeanEstimate([], []) });
     expect(state.next).not.toBeNull();
   });
 
   it("ends before the first item when the stopping rule holds without responses", () => {
-    const test = adaptiveTest({ pool: POOL_3PL, stopping: standardErrorThreshold(1.5) });
+    const test = createAdaptiveTest({ pool: POOL_3PL, stopping: standardErrorThreshold(1.5) });
     expect(test.start(createRandom(1))).toMatchObject({ items: [], next: null });
   });
 
   it("ends when no item is left", () => {
     const pool = POOL_GPCM.slice(0, 3);
-    const state = administer(adaptiveTest({ pool, stopping: testLength(10) }), () => 1);
+    const state = administer(createAdaptiveTest({ pool, stopping: testLength(10) }), () => 1);
     expect(state.items.slice().sort()).toEqual(pool.map((item) => item.id).sort());
     expect(state.next).toBeNull();
   });
@@ -780,7 +780,7 @@ describe("adaptiveTest", () => {
   it("administers a pool of one item", () => {
     const pool = [item2pl("only", 1, 0)];
     const state = administer(
-      adaptiveTest({ pool, estimator: posteriorModeEstimate, stopping: testLength(5) }),
+      createAdaptiveTest({ pool, estimator: posteriorModeEstimate, stopping: testLength(5) }),
       () => 1,
     );
     expect(state.items).toEqual(["only"]);
@@ -788,7 +788,7 @@ describe("adaptiveTest", () => {
   });
 
   it("rejects answers after the end, unknown items and responses outside the item's categories", () => {
-    const test = adaptiveTest({ pool: POOL_GPCM, stopping: testLength(2) });
+    const test = createAdaptiveTest({ pool: POOL_GPCM, stopping: testLength(2) });
     const random = createRandom(1);
     const state = test.start(random);
     const next = defined(state.next);
@@ -806,7 +806,7 @@ describe("adaptiveTest", () => {
   });
 
   it("rejects stored states that repeat or withhold the next item, or are malformed", () => {
-    const test = adaptiveTest({ pool: POOL_GPCM, stopping: testLength(4) });
+    const test = createAdaptiveTest({ pool: POOL_GPCM, stopping: testLength(4) });
     const random = createRandom(1);
     const state = test.answer(test.start(random), 1, random);
     const first = defined(state.items[0]);
@@ -835,49 +835,49 @@ describe("adaptiveTest", () => {
   it("rejects invalid pools and an estimator without an estimate before the first response", () => {
     const item = item2pl("q1", 1, 0);
     const stopping = testLength(1);
-    expect(() => adaptiveTest({ pool: [item, item], stopping })).toThrow(
+    expect(() => createAdaptiveTest({ pool: [item, item], stopping })).toThrow(
       'Item ids must be unique; "q1" appears twice.',
     );
-    expect(() => adaptiveTest({ pool: [{ ...item, parameters: { a: 1, b: 0, c: 0.2, d: 1 } }], stopping })).toThrow(
-      'Item "q1": A 2PL item has c = 0, found c = 0.2.',
-    );
-    expect(() => adaptiveTest({ pool: [{ ...item, exposure: 1.5 }], stopping })).toThrow(
+    expect(() =>
+      createAdaptiveTest({ pool: [{ ...item, parameters: { a: 1, b: 0, c: 0.2, d: 1 } }], stopping }),
+    ).toThrow('Item "q1": A 2PL item has c = 0, found c = 0.2.');
+    expect(() => createAdaptiveTest({ pool: [{ ...item, exposure: 1.5 }], stopping })).toThrow(
       'The exposure parameter of item "q1" must be a number from 0 to 1, found 1.5.',
     );
-    const test = adaptiveTest({ pool: [item], estimator: maximumLikelihoodEstimate, stopping });
+    const test = createAdaptiveTest({ pool: [item], estimator: maximumLikelihoodEstimate, stopping });
     expect(() => test.start(createRandom(1))).toThrow("Maximum likelihood estimation needs at least one response.");
   });
 
   it("rejects a stopping rule, a selection rule or an estimator of another kind", () => {
     const pool = [item2pl("q1", 1, 0)];
     const stopping = testLength(1);
-    expect(() => adaptiveTest(JSON.parse("{}"))).toThrow(
+    expect(() => createAdaptiveTest(JSON.parse("{}"))).toThrow(
       "The option stopping must be a stopping rule, such as testLength(20), found undefined.",
     );
-    expect(() => adaptiveTest({ pool, stopping: JSON.parse("{}") })).toThrow(
+    expect(() => createAdaptiveTest({ pool, stopping: JSON.parse("{}") })).toThrow(
       "The option stopping must be a stopping rule, such as testLength(20), found an object.",
     );
-    expect(() => adaptiveTest({ pool, stopping, selection: JSON.parse("null") })).toThrow(
+    expect(() => createAdaptiveTest({ pool, stopping, selection: JSON.parse("null") })).toThrow(
       "The option selection must be a selection rule, such as maximumInformation, found null.",
     );
-    expect(() => adaptiveTest({ pool, stopping, estimator: JSON.parse('"eap"') })).toThrow(
+    expect(() => createAdaptiveTest({ pool, stopping, estimator: JSON.parse('"eap"') })).toThrow(
       'The option estimator must be a function of items and responses, such as posteriorMeanEstimate, found "eap".',
     );
   });
 
   it("rejects options, pools and random number generators of other types from JavaScript", () => {
     const stopping = testLength(1);
-    expect(() => adaptiveTest(JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => adaptiveTest({ pool: JSON.parse("null"), stopping })).toThrow(
+    expect(() => createAdaptiveTest(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => createAdaptiveTest({ pool: JSON.parse("null"), stopping })).toThrow(
       "The items must be an array, found null.",
     );
-    expect(() => adaptiveTest({ pool: JSON.parse("[null]"), stopping })).toThrow(
+    expect(() => createAdaptiveTest({ pool: JSON.parse("[null]"), stopping })).toThrow(
       "Item 1 must be an item with an id, a model and parameters, found null.",
     );
-    expect(() => adaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping, enemies: JSON.parse("null") })).toThrow(
+    expect(() => createAdaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping, enemies: JSON.parse("null") })).toThrow(
       "The option enemies must be an array of enemy sets, found null.",
     );
-    const test = adaptiveTest({ pool: [item2pl("q1", 1, 0), item2pl("q2", 1, 1)], stopping });
+    const test = createAdaptiveTest({ pool: [item2pl("q1", 1, 0), item2pl("q2", 1, 1)], stopping });
     expect(() => test.start(JSON.parse("null"))).toThrow(
       "A random number generator must be one from createRandom, found null.",
     );
@@ -889,7 +889,7 @@ describe("adaptiveTest", () => {
 
   it("ends the test when the selection rule scores every eligible item -Infinity", () => {
     const none: ItemSelectionRule = { scores: (_, out) => out.fill(Number.NEGATIVE_INFINITY) };
-    const test = adaptiveTest({ pool: POOL_3PL, selection: none, stopping: testLength(5) });
+    const test = createAdaptiveTest({ pool: POOL_3PL, selection: none, stopping: testLength(5) });
     expect(test.start(createRandom(1)).next).toBeNull();
     const afterTwo: ItemSelectionRule = {
       scores: ({ administered, eligible }, out) => {
@@ -898,7 +898,7 @@ describe("adaptiveTest", () => {
         });
       },
     };
-    const short = adaptiveTest({ pool: POOL_3PL, selection: afterTwo, stopping: testLength(5) });
+    const short = createAdaptiveTest({ pool: POOL_3PL, selection: afterTwo, stopping: testLength(5) });
     expect(administer(short, () => 1).items).toHaveLength(2);
   });
 });
@@ -906,7 +906,7 @@ describe("adaptiveTest", () => {
 describe("content balancing", () => {
   const areas = Object.keys(catContent.targets);
   const targets = Object.values(catContent.targets);
-  const test = adaptiveTest({
+  const test = createAdaptiveTest({
     pool: POOL_CONTENT,
     estimator: posteriorModeEstimate,
     stopping: testLength(LENGTH),
@@ -958,7 +958,7 @@ describe("content balancing", () => {
     );
     // Targets 3 : 1. One item of each area, then x twice, when both areas meet their targets and the fifth item may
     // be either; 8 items then hold 6 of x.
-    const balanced = adaptiveTest({ pool, stopping: testLength(8), contentTargets: { x: 3, y: 1 } });
+    const balanced = createAdaptiveTest({ pool, stopping: testLength(8), contentTargets: { x: 3, y: 1 } });
     for (const seed of [1, 2, 3, 4]) {
       const areasOf = administer(balanced, () => 1, createRandom(seed)).items.map((id) => id.charAt(0));
       expect(areasOf.slice(0, 2).sort()).toEqual(["x", "y"]);
@@ -973,7 +973,7 @@ describe("content balancing", () => {
       { ...item2pl("y1", 1, 0.5), contentAreas: ["y"] },
       { ...item2pl("y2", 1, -0.5), contentAreas: ["y"] },
     ];
-    const balanced = adaptiveTest({ pool, stopping: testLength(3), contentTargets: { x: 0.9, y: 0.1 } });
+    const balanced = createAdaptiveTest({ pool, stopping: testLength(3), contentTargets: { x: 0.9, y: 0.1 } });
     expect(administer(balanced, () => 0).items).toHaveLength(3);
   });
 
@@ -983,7 +983,7 @@ describe("content balancing", () => {
       { ...item2pl("y1", 1, 0.5), contentAreas: ["easy", "y"] },
       { ...item2pl("y2", 1, -0.5), contentAreas: ["y"] },
     ];
-    const balanced = adaptiveTest({ pool, stopping: testLength(3), contentTargets: { x: 1, y: 1 } });
+    const balanced = createAdaptiveTest({ pool, stopping: testLength(3), contentTargets: { x: 1, y: 1 } });
     expect(
       new Set(
         administer(balanced, () => 0)
@@ -992,26 +992,26 @@ describe("content balancing", () => {
       ),
     ).toEqual(new Set(["x", "y"]));
     const both = [...pool, { ...item2pl("xy", 1, 0), contentAreas: ["x", "y"] }];
-    expect(() => adaptiveTest({ pool: both, stopping: testLength(1), contentTargets: { x: 1, y: 1 } })).toThrow(
+    expect(() => createAdaptiveTest({ pool: both, stopping: testLength(1), contentTargets: { x: 1, y: 1 } })).toThrow(
       'Item "xy" needs exactly one content area among the targets (x, y), found ["x", "y"].',
     );
     const text = [{ ...item2pl("x1", 1, 0), contentAreas: JSON.parse('"x"') }];
-    expect(() => adaptiveTest({ pool: text, stopping: testLength(1), contentTargets: { x: 1 } })).toThrow(
+    expect(() => createAdaptiveTest({ pool: text, stopping: testLength(1), contentTargets: { x: 1 } })).toThrow(
       'The contentAreas of item "x1" must be an array of distinct non-empty strings, found "x".',
     );
   });
 
   it("rejects missing and invalid targets", () => {
     const stopping = testLength(1);
-    expect(() => adaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: {} })).toThrow(DataError);
+    expect(() => createAdaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: {} })).toThrow(DataError);
     expect(() =>
-      adaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: { ...catContent.targets, algebra: 0 } }),
+      createAdaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: { ...catContent.targets, algebra: 0 } }),
     ).toThrow('The target of content area "algebra" must be a positive number, found 0.');
-    expect(() => adaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: { algebra: 1 } })).toThrow(
+    expect(() => createAdaptiveTest({ pool: POOL_CONTENT, stopping, contentTargets: { algebra: 1 } })).toThrow(
       'Item "item001" needs exactly one content area among the targets (algebra), found ["statistics"].',
     );
-    expect(() => adaptiveTest({ pool: POOL_3PL, stopping, contentTargets: { algebra: 1 } })).toThrow(DataError);
-    expect(() => adaptiveTest({ pool: POOL_3PL, stopping, contentTargets: JSON.parse("null") })).toThrow(
+    expect(() => createAdaptiveTest({ pool: POOL_3PL, stopping, contentTargets: { algebra: 1 } })).toThrow(DataError);
+    expect(() => createAdaptiveTest({ pool: POOL_3PL, stopping, contentTargets: JSON.parse("null") })).toThrow(
       "The option contentTargets must be an object of target proportions by area, found null.",
     );
   });
@@ -1085,7 +1085,7 @@ describe("content bounds", () => {
           exposure: item.exposure,
           ...("testlet" in item && { testlet: item.testlet }),
         }));
-        const test = adaptiveTest({
+        const test = createAdaptiveTest({
           pool,
           selection: selectionOf(c),
           stopping: stoppingOf(c),
@@ -1131,7 +1131,7 @@ describe("content bounds", () => {
           contentAreas,
         }));
         const { constraints, length } = blueprint;
-        const test = adaptiveTest({
+        const test = createAdaptiveTest({
           pool,
           selection: contentBounds(maximumPriorityIndex(maximumInformation, constraints, length), constraints, length),
           stopping: testLength(length),
@@ -1171,7 +1171,7 @@ describe("content bounds", () => {
       stopping: StoppingRule = testLength(length),
     ): AdaptiveTestState =>
       administer(
-        adaptiveTest({ pool, selection: contentBounds(maximumInformation, constraints, length), stopping }),
+        createAdaptiveTest({ pool, selection: contentBounds(maximumInformation, constraints, length), stopping }),
         alternating(),
       );
 
@@ -1317,7 +1317,7 @@ describe("content bounds", () => {
         ...[0, 1, 2].map((rank) => ({ ...areaItem(`t${rank + 1}`, ["x"], rank), testlet: "T" })),
         areaItem("y1", ["y"], 3),
       ];
-      const test = adaptiveTest({
+      const test = createAdaptiveTest({
         pool,
         selection: contentBounds(maximumInformation, [{ area: "x", minimum: 3, maximum: 3 }], 4),
         stopping: testLength(4),
@@ -1335,7 +1335,7 @@ describe("content bounds", () => {
         { area: "x", minimum: 2, maximum: 3 },
         { area: "y", minimum: 2, maximum: 3 },
       ];
-      const test = adaptiveTest({
+      const test = createAdaptiveTest({
         pool,
         selection: randomesque(contentBounds(maximumInformation, constraints, 6), 3),
         stopping: testLength(6),
@@ -1367,7 +1367,7 @@ describe("content bounds", () => {
         areaItem("y2", ["y"], 3),
       ];
       const first = (constraints: readonly ContentConstraint[], length: number) => () =>
-        adaptiveTest({
+        createAdaptiveTest({
           pool,
           selection: contentBounds(maximumInformation, constraints, length),
           stopping: testLength(2),
@@ -1399,7 +1399,7 @@ describe("content bounds", () => {
         { area: "y", minimum: 2, maximum: 3 },
       ];
       expect(() =>
-        adaptiveTest({
+        createAdaptiveTest({
           pool: overlap,
           selection: contentBounds(maximumInformation, constraints, 3),
           stopping: testLength(3),
@@ -1451,13 +1451,17 @@ describe("content bounds", () => {
         "contentBounds needs a selection rule, such as maximumInformation, found null.",
       );
       const pool = [{ ...areaItem("x1", [], 0), contentAreas: JSON.parse('"x"') }];
-      const test = adaptiveTest({ pool, selection: contentBounds(maximumInformation, ok, 4), stopping: testLength(1) });
+      const test = createAdaptiveTest({
+        pool,
+        selection: contentBounds(maximumInformation, ok, 4),
+        stopping: testLength(1),
+      });
       expect(() => test.start(createRandom(1))).toThrow(
         'The contentAreas of item "x1" must be an array of distinct non-empty strings, found "x".',
       );
       const twice = [{ ...areaItem("x1", [], 0), contentAreas: ["x", "x"] }];
       expect(() =>
-        adaptiveTest({
+        createAdaptiveTest({
           pool: twice,
           selection: contentBounds(maximumInformation, ok, 4),
           stopping: testLength(1),
@@ -1544,14 +1548,14 @@ describe("content bounds", () => {
         'The rule scored item "x1" -0.5; maximumPriorityIndex multiplies scores of at least 0, so give a rule that scores below 0 to contentBounds alone.',
       );
       const aStratifiedScores = aStratified([3]);
-      const test = adaptiveTest({
+      const test = createAdaptiveTest({
         pool,
         selection: contentBounds(aStratifiedScores, constraints, 3),
         stopping: testLength(3),
       });
       expect(administer(test, alternating()).items).toHaveLength(3);
       expect(() =>
-        adaptiveTest({
+        createAdaptiveTest({
           pool,
           selection: maximumPriorityIndex(aStratifiedScores, constraints, 3),
           stopping: testLength(3),
@@ -1571,7 +1575,7 @@ describe("content bounds", () => {
         { area: "c", minimum: 2, maximum: 4 },
       ];
       const filter = administer(
-        adaptiveTest({
+        createAdaptiveTest({
           pool: spread,
           selection: contentBounds(maximumInformation, bounds, 9),
           stopping: testLength(9),
@@ -1579,7 +1583,7 @@ describe("content bounds", () => {
         alternating(),
       ).items;
       const index = administer(
-        adaptiveTest({
+        createAdaptiveTest({
           pool: spread,
           selection: contentBounds(maximumPriorityIndex(maximumInformation, bounds, 9), bounds, 9),
           stopping: testLength(9),
@@ -1639,7 +1643,7 @@ describe("content bounds", () => {
     });
 
     it("stops a test on precision only after the minimums, in allOf", () => {
-      const test = adaptiveTest({
+      const test = createAdaptiveTest({
         pool,
         selection: contentBounds(maximumInformation, constraints, 4),
         stopping: anyOf(testLength(4), allOf(standardErrorThreshold(100), contentMinimumsMet(constraints))),
@@ -1678,7 +1682,7 @@ describe("enemy sets", () => {
     });
     fc.assert(
       fc.property(sets, fc.integer({ min: 0, max: 2 ** 31 }), (enemies, seed) => {
-        const test = adaptiveTest({ pool: POOL_3PL, stopping: testLength(20), enemies });
+        const test = createAdaptiveTest({ pool: POOL_3PL, stopping: testLength(20), enemies });
         const random = createRandom(seed);
         const state = administer(test, () => (random.uniform() < 0.5 ? 1 : 0), random);
         expect(state.items).toHaveLength(20);
@@ -1690,10 +1694,10 @@ describe("enemy sets", () => {
 
   it("selects the best item that is not an enemy of an administered one", () => {
     const pool = [item2pl("first", 2, 0), item2pl("twin", 1.9, 0.1), item2pl("other", 1, 0.2)];
-    const free = administer(adaptiveTest({ pool, stopping: testLength(2) }), () => 1);
+    const free = administer(createAdaptiveTest({ pool, stopping: testLength(2) }), () => 1);
     expect(free.items).toEqual(["first", "twin"]);
     const enemies = [["first", "twin"]];
-    const state = administer(adaptiveTest({ pool, stopping: testLength(3), enemies }), () => 1);
+    const state = administer(createAdaptiveTest({ pool, stopping: testLength(3), enemies }), () => 1);
     expect(state).toMatchObject({ items: ["first", "other"], next: null });
   });
 
@@ -1701,12 +1705,14 @@ describe("enemy sets", () => {
     const pool = POOL_3PL.slice(0, 4);
     const [a = "", b = "", c = ""] = pool.map((item) => item.id);
     const stopping = testLength(3);
-    expect(() => adaptiveTest({ pool, stopping, enemies: [[a]] })).toThrow("Enemy set 1 needs at least two item ids.");
-    expect(() => adaptiveTest({ pool, stopping, enemies: [[a, "q999"]] })).toThrow(
+    expect(() => createAdaptiveTest({ pool, stopping, enemies: [[a]] })).toThrow(
+      "Enemy set 1 needs at least two item ids.",
+    );
+    expect(() => createAdaptiveTest({ pool, stopping, enemies: [[a, "q999"]] })).toThrow(
       'Enemy set 1 names "q999", which is not a pool item.',
     );
     expect(() =>
-      adaptiveTest({
+      createAdaptiveTest({
         pool,
         stopping,
         enemies: [
@@ -1715,7 +1721,7 @@ describe("enemy sets", () => {
         ],
       }),
     ).toThrow("Enemy set 2 names an item twice.");
-    const test = adaptiveTest({ pool, stopping, enemies: [[a, b]] });
+    const test = createAdaptiveTest({ pool, stopping, enemies: [[a, b]] });
     const random = createRandom(1);
     const forged = { ...test.start(random), items: [a], responses: [1], next: b };
     expect(() => test.answer(forged, 0, random)).toThrow(
@@ -1782,7 +1788,7 @@ describe("testlets", () => {
     it(`selects the items, estimates and withheld testlets of the written-out replay and mirtCAT: ${reference.name}`, () => {
       const pool = testletPool(reference.items);
       const { stopping } = reference;
-      const test = adaptiveTest({
+      const test = createAdaptiveTest({
         pool,
         stopping: stopping.type === "length" ? testLength(stopping.value) : standardErrorThreshold(stopping.value),
         enemies: reference.enemies,
@@ -1856,9 +1862,9 @@ describe("testlets", () => {
   });
 
   it("selects the testlet whose mean information is highest, not the one holding the most informative item", () => {
-    const withTestlet = adaptiveTest({ pool: [solo, ...lopsided], stopping: stopped });
+    const withTestlet = createAdaptiveTest({ pool: [solo, ...lopsided], stopping: stopped });
     expect(withTestlet.start(createRandom(1)).next).toBe("solo");
-    const withoutTestlet = adaptiveTest({
+    const withoutTestlet = createAdaptiveTest({
       pool: [solo, ...lopsided].map(({ testlet, ...item }) => item),
       stopping: stopped,
     });
@@ -1866,9 +1872,9 @@ describe("testlets", () => {
   });
 
   it("administers the items of a testlet together, in pool order", () => {
-    const test = adaptiveTest({ pool: [solo, ...lopsided], stopping: testLength(2), withinTestlet: "in-order" });
+    const test = createAdaptiveTest({ pool: [solo, ...lopsided], stopping: testLength(2), withinTestlet: "in-order" });
     expect(administer(test, () => 1).items).toEqual(["solo", "t2", "t3", "t1"]);
-    const defaults = adaptiveTest({ pool: [solo, ...lopsided], stopping: testLength(2) });
+    const defaults = createAdaptiveTest({ pool: [solo, ...lopsided], stopping: testLength(2) });
     expect(administer(defaults, () => 0).items).toEqual(["solo", "t2", "t3", "t1"]);
   });
 
@@ -1877,12 +1883,12 @@ describe("testlets", () => {
     const high = { ...item2pl("high", 1.5, 3), testlet: "T" };
     const middle = { ...item2pl("middle", 1.5, 0), testlet: "T" };
     const pool = [high, low, middle, item2pl("far", 1, 4)];
-    const adaptive = adaptiveTest({ pool, stopping: testLength(4), withinTestlet: "adaptive" });
+    const adaptive = createAdaptiveTest({ pool, stopping: testLength(4), withinTestlet: "adaptive" });
     // The testlet starts at its most informative item at theta 0; a correct response moves the estimate up, towards
     // "high", and an incorrect one down, towards "low".
     expect(administer(adaptive, () => 1).items).toEqual(["middle", "high", "low", "far"]);
     expect(administer(adaptive, () => 0).items).toEqual(["middle", "low", "high", "far"]);
-    const inOrder = adaptiveTest({ pool, stopping: testLength(4) });
+    const inOrder = createAdaptiveTest({ pool, stopping: testLength(4) });
     expect(administer(inOrder, () => 1).items).toEqual(["high", "low", "middle", "far"]);
   });
 
@@ -1896,7 +1902,7 @@ describe("testlets", () => {
     };
     const pool = [lopsided[2], lopsided[0], lopsided[1]].map((item) => defined(item));
     const state = administer(
-      adaptiveTest({ pool, selection: onlyT2, stopping: stopped, withinTestlet: "adaptive" }),
+      createAdaptiveTest({ pool, selection: onlyT2, stopping: stopped, withinTestlet: "adaptive" }),
       () => 1,
     );
     expect(state.items).toEqual(["t2", "t1", "t3"]);
@@ -1905,12 +1911,12 @@ describe("testlets", () => {
   it("ends a test only between testlets", () => {
     const pool = [solo, ...lopsided];
     for (const stopping of [testLength(1), anyOf(testLength(1), standardErrorThreshold(0.01))]) {
-      const state = administer(adaptiveTest({ pool, stopping }), () => 1);
+      const state = administer(createAdaptiveTest({ pool, stopping }), () => 1);
       expect(state.items).toEqual(["solo"]);
     }
-    const first = adaptiveTest({ pool: lopsided, stopping: stopped });
+    const first = createAdaptiveTest({ pool: lopsided, stopping: stopped });
     expect(administer(first, () => 1)).toMatchObject({ items: ["t2", "t3", "t1"], next: null });
-    const early = adaptiveTest({ pool: lopsided, stopping: standardErrorThreshold(1.5) });
+    const early = createAdaptiveTest({ pool: lopsided, stopping: standardErrorThreshold(1.5) });
     expect(early.start(createRandom(1))).toMatchObject({ items: [], next: null });
   });
 
@@ -1920,8 +1926,8 @@ describe("testlets", () => {
       const random = createRandom(5);
       const responses = POOL_3PL.map(() => (random.uniform() < 0.5 ? 1 : 0));
       const respond = (id: string): number => defined(responses[poolIndex(POOL_3PL, id)]);
-      const alone = administer(adaptiveTest({ pool: POOL_3PL, stopping: testLength(12) }), respond);
-      const single = administer(adaptiveTest({ pool, stopping: testLength(12), withinTestlet }), respond);
+      const alone = administer(createAdaptiveTest({ pool: POOL_3PL, stopping: testLength(12) }), respond);
+      const single = administer(createAdaptiveTest({ pool, stopping: testLength(12), withinTestlet }), respond);
       expect(single, withinTestlet).toEqual(alone);
     }
   });
@@ -1933,23 +1939,23 @@ describe("testlets", () => {
       { ...item2pl("t3", 1.5, 0), testlet: "T" },
       item2pl("other", 1, 0),
     ];
-    const state = administer(adaptiveTest({ pool, stopping: testLength(4) }), () => 1);
+    const state = administer(createAdaptiveTest({ pool, stopping: testLength(4) }), () => 1);
     expect(state).toMatchObject({ items: ["other"], withheld: ["t1", "t2", "t3"], next: null });
   });
 
   it("never withholds the last eligible testlet", () => {
     const pool = lopsided.map((item) => ({ ...item, exposure: 0 }));
-    const state = administer(adaptiveTest({ pool, stopping: testLength(3) }), () => 1);
+    const state = administer(createAdaptiveTest({ pool, stopping: testLength(3) }), () => 1);
     expect(state).toMatchObject({ items: ["t2", "t3", "t1"], withheld: [], next: null });
   });
 
   it("draws exposure for the testlet's first item only", () => {
     // t3 has exposure 0, but only the first item to be administered, t2, is subject to control.
     const pool = lopsided.map((item) => ({ ...item, exposure: item.id === "t3" ? 0 : 1 }));
-    const state = administer(adaptiveTest({ pool: [solo, ...pool], stopping: testLength(2) }), () => 1);
+    const state = administer(createAdaptiveTest({ pool: [solo, ...pool], stopping: testLength(2) }), () => 1);
     expect(state).toMatchObject({ items: ["solo", "t2", "t3", "t1"], withheld: [] });
     const adaptive = administer(
-      adaptiveTest({ pool: [solo, ...pool], stopping: testLength(2), withinTestlet: "adaptive" }),
+      createAdaptiveTest({ pool: [solo, ...pool], stopping: testLength(2), withinTestlet: "adaptive" }),
       () => 1,
     );
     // Adaptively, t1 is first to be administered and has exposure 1.
@@ -1966,7 +1972,7 @@ describe("testlets", () => {
     ];
     const random = createRandom(21);
     const thetas = Array.from({ length: 4000 }, () => random.normal());
-    const { persons } = simulateAdaptiveTest(adaptiveTest({ pool, stopping: testLength(3) }), thetas, random);
+    const { persons } = simulateAdaptiveTest(createAdaptiveTest({ pool, stopping: testLength(3) }), thetas, random);
     let administered = 0;
     for (const { state } of persons) {
       // At theta 0 the testlet is the best unit, so each test selects it first: it is administered whole, or withheld whole.
@@ -1982,7 +1988,10 @@ describe("testlets", () => {
   });
 
   it("skips an enemy of an administered item inside the testlet and goes on with the rest", () => {
-    const state = administer(adaptiveTest({ pool: lopsided, stopping: stopped, enemies: [["t2", "t3"]] }), () => 1);
+    const state = administer(
+      createAdaptiveTest({ pool: lopsided, stopping: stopped, enemies: [["t2", "t3"]] }),
+      () => 1,
+    );
     expect(state.items).toEqual(["t2", "t1"]);
   });
 
@@ -1991,7 +2000,11 @@ describe("testlets", () => {
       { ...item2pl("u1", 0.4, 0), testlet: "U" },
       { ...item2pl("u2", 0.4, 0.5), testlet: "U" },
     ];
-    const test = adaptiveTest({ pool: [...lopsided, ...other], stopping: testLength(4), enemies: [["t1", "u1"]] });
+    const test = createAdaptiveTest({
+      pool: [...lopsided, ...other],
+      stopping: testLength(4),
+      enemies: [["t1", "u1"]],
+    });
     // T, whose mean information is higher, first; u1 is the enemy of t1, so U has u2 only.
     expect(administer(test, () => 1).items).toEqual(["t2", "t3", "t1", "u2"]);
   });
@@ -2000,7 +2013,7 @@ describe("testlets", () => {
     const area = (testlet: string, ids: readonly string[], contentArea: string) =>
       ids.map((id, i) => ({ ...item2pl(id, 1 + i / 10, i / 4), testlet, contentAreas: [contentArea] }));
     const pool = [...area("X", ["x1", "x2", "x3"], "x"), ...area("Y", ["y1", "y2", "y3"], "y")];
-    const test = adaptiveTest({ pool, stopping: testLength(4), contentTargets: { x: 1, y: 1 } });
+    const test = createAdaptiveTest({ pool, stopping: testLength(4), contentTargets: { x: 1, y: 1 } });
     const firsts = new Set<string>();
     for (const seed of [1, 2, 3, 4, 5, 6]) {
       const { items } = administer(test, () => 1, createRandom(seed));
@@ -2016,15 +2029,15 @@ describe("testlets", () => {
       { ...item2pl("a", 1, 0), testlet: "T", contentAreas: ["x"] },
       { ...item2pl("b", 1, 0), testlet: "T", contentAreas: ["y"] },
     ];
-    expect(() => adaptiveTest({ pool, stopping: stopped, contentTargets: { x: 1, y: 1 } })).toThrow(
+    expect(() => createAdaptiveTest({ pool, stopping: stopped, contentTargets: { x: 1, y: 1 } })).toThrow(
       'The items of testlet "T" are in content areas "x" and "y"; with content targets they must share one area.',
     );
-    expect(() => adaptiveTest({ pool, stopping: stopped })).not.toThrow();
+    expect(() => createAdaptiveTest({ pool, stopping: stopped })).not.toThrow();
   });
 
   it("resumes from a state stored as JSON at every step of a testlet", () => {
     const pool = [solo, ...lopsided];
-    const test = adaptiveTest({ pool, stopping: stopped, withinTestlet: "adaptive" });
+    const test = createAdaptiveTest({ pool, stopping: stopped, withinTestlet: "adaptive" });
     const random = createRandom(3);
     let state = test.start(random);
     const direct = administer(test, (id) => Number(id !== "t2"), createRandom(3));
@@ -2036,7 +2049,7 @@ describe("testlets", () => {
   });
 
   it("continues a testlet from its first item when the test resumes from a stored state", () => {
-    const test = adaptiveTest({ pool: [solo, ...lopsided], stopping: stopped, withinTestlet: "adaptive" });
+    const test = createAdaptiveTest({ pool: [solo, ...lopsided], stopping: stopped, withinTestlet: "adaptive" });
     const estimate = { theta: 0, standardError: 1 };
     const stored = { items: [], responses: [], withheld: [], estimate, next: "t1" };
     const state = test.answer(stored, 1, createRandom(1));
@@ -2047,7 +2060,7 @@ describe("testlets", () => {
     const pool = [solo, ...lopsided];
     const testlets = [{ items: ["t2", "t3", "t1"], sd: 0.8 }];
     const estimator: AbilityEstimator = (items, responses) => posteriorMeanEstimate(items, responses, { testlets });
-    const state = administer(adaptiveTest({ pool, stopping: testLength(2), estimator }), () => 1);
+    const state = administer(createAdaptiveTest({ pool, stopping: testLength(2), estimator }), () => 1);
     expect(state.items).toEqual(["solo", "t2", "t3", "t1"]);
     const expected = posteriorMeanEstimate(
       state.items.map((id) => defined(pool[poolIndex(pool, id)])),
@@ -2062,15 +2075,15 @@ describe("testlets", () => {
 
   it("rejects testlets that are not non-empty strings and unknown orders of the items", () => {
     const poolOf = (testlet: string): PoolItem[] => [{ ...item2pl("a", 1, 0), testlet }];
-    expect(() => adaptiveTest({ pool: poolOf(""), stopping: stopped })).toThrow(
+    expect(() => createAdaptiveTest({ pool: poolOf(""), stopping: stopped })).toThrow(
       'The testlet of item "a" must be a non-empty string, found "".',
     );
-    expect(() => adaptiveTest({ pool: poolOf(JSON.parse("5")), stopping: stopped })).toThrow(
+    expect(() => createAdaptiveTest({ pool: poolOf(JSON.parse("5")), stopping: stopped })).toThrow(
       'The testlet of item "a" must be a non-empty string, found 5.',
     );
-    expect(() => adaptiveTest({ pool: poolOf(JSON.parse("null")), stopping: stopped })).toThrow(DataError);
+    expect(() => createAdaptiveTest({ pool: poolOf(JSON.parse("null")), stopping: stopped })).toThrow(DataError);
     const shuffled: WithinTestlet = JSON.parse('"shuffled"');
-    expect(() => adaptiveTest({ pool: lopsided, stopping: stopped, withinTestlet: shuffled })).toThrow(
+    expect(() => createAdaptiveTest({ pool: lopsided, stopping: stopped, withinTestlet: shuffled })).toThrow(
       'The option withinTestlet must be "in-order" or "adaptive", found "shuffled".',
     );
   });
@@ -2085,7 +2098,9 @@ describe("testlets", () => {
     ];
     const items = (pool: readonly MultidimensionalPoolItem[]): readonly string[] =>
       defined(
-        administerMultidimensional(multidimensionalAdaptiveTest({ pool, stopping: testLength(5) }), () => 1).at(-1),
+        administerMultidimensional(createMultidimensionalAdaptiveTest({ pool, stopping: testLength(5) }), () => 1).at(
+          -1,
+        ),
       ).items;
     const together = items(multidimensional);
     expectTestletBlocks(together, multidimensional, true);
@@ -2100,9 +2115,10 @@ describe("testlets", () => {
     ];
     const diagnosed = (pool: readonly DiagnosticPoolItem[]): readonly string[] =>
       defined(
-        administerDiagnostic(diagnosticAdaptiveTest({ pool, attributes: SKILLS, stopping: testLength(4) }), () => 1).at(
-          -1,
-        ),
+        administerDiagnostic(
+          createDiagnosticAdaptiveTest({ pool, attributes: SKILLS, stopping: testLength(4) }),
+          () => 1,
+        ).at(-1),
       ).items;
     const grouped = diagnosed(diagnostic);
     expectTestletBlocks(grouped, diagnostic, true);
@@ -2548,7 +2564,7 @@ const module = (id: string, difficulties: readonly number[], cuts?: readonly num
   ...(cuts && { cuts }),
 });
 
-describe("multistageTest", () => {
+describe("createMultistageTest", () => {
   const stages = [
     [module("routing", [-1, -0.3, 0.3, 1], [2, 3])],
     [
@@ -2567,7 +2583,7 @@ describe("multistageTest", () => {
   }
 
   it("routes by the total score so far, a score at a cut to the higher module", () => {
-    const test = multistageTest({ stages, routing: "number-correct" });
+    const test = createMultistageTest({ stages, routing: "number-correct" });
     // Score 1, below 2: easy; then 1 + 3 = 4, from 3 to below 5: the middle module.
     expect(
       route(test, [
@@ -2604,7 +2620,7 @@ describe("multistageTest", () => {
   it("routes by the estimate of theta, an estimate at a cut to the higher module", () => {
     const routing = module("routing", [-1, 0, 1], [0]);
     const second = [module("low", [-1, -0.5]), module("high", [0.5, 1])];
-    const test = multistageTest({ stages: [[routing], second], routing: "theta" });
+    const test = createMultistageTest({ stages: [[routing], second], routing: "theta" });
     // Equal slopes make the estimate depend on the score only, and the difficulties are symmetric around 0.
     expect(
       route(test, [
@@ -2623,7 +2639,7 @@ describe("multistageTest", () => {
       [theta, "high"],
       [theta + 1e-9, "low"],
     ] as const) {
-      const cutAt = multistageTest({ stages: [[{ ...routing, cuts: [cut] }], second], routing: "theta" });
+      const cutAt = createMultistageTest({ stages: [[{ ...routing, cuts: [cut] }], second], routing: "theta" });
       expect(
         route(cutAt, [
           [0, 1, 0],
@@ -2635,7 +2651,7 @@ describe("multistageTest", () => {
 
   it("estimates theta with its estimator from all responses so far", () => {
     const estimator = untilMixed(posteriorMeanEstimate, weightedLikelihoodEstimate);
-    const test = multistageTest({ stages, routing: "number-correct", estimator });
+    const test = createMultistageTest({ stages, routing: "number-correct", estimator });
     const start = test.start();
     expect(start).toEqual({
       modules: [],
@@ -2653,64 +2669,67 @@ describe("multistageTest", () => {
   });
 
   it("resumes from a state stored as JSON", () => {
-    const test = multistageTest({ stages, routing: "theta" });
+    const test = createMultistageTest({ stages, routing: "theta" });
     const state = test.answer(test.start(), [1, 1, 0, 1]);
     expect(test.answer(JSON.parse(JSON.stringify(state)), [0, 1, 1])).toEqual(test.answer(state, [0, 1, 1]));
   });
 
   it("administers a panel of one module", () => {
-    const test = multistageTest({ stages: [[module("only", [0])]], routing: "theta" });
+    const test = createMultistageTest({ stages: [[module("only", [0])]], routing: "theta" });
     expect(route(test, [[1]])).toEqual(["only"]);
   });
 
   it("rejects invalid panels", () => {
     const routing = "number-correct";
-    expect(() => multistageTest({ stages: [], routing })).toThrow(DataError);
-    expect(() => multistageTest({ stages: [[module("a", [0])], []], routing })).toThrow(DataError);
-    expect(() => multistageTest({ stages: [[module("a", [0]), module("b", [0])]], routing })).toThrow(
+    expect(() => createMultistageTest({ stages: [], routing })).toThrow(DataError);
+    expect(() => createMultistageTest({ stages: [[module("a", [0])], []], routing })).toThrow(DataError);
+    expect(() => createMultistageTest({ stages: [[module("a", [0]), module("b", [0])]], routing })).toThrow(
       "The first stage of a multistage test has one module, found 2.",
     );
-    expect(() => multistageTest({ stages: [[module("a", [0], [])], [module("a", [1])]], routing })).toThrow(
+    expect(() => createMultistageTest({ stages: [[module("a", [0], [])], [module("a", [1])]], routing })).toThrow(
       'Module ids must be unique; "a" appears twice.',
     );
-    expect(() => multistageTest({ stages: [[module("a", [])]], routing })).toThrow(
+    expect(() => createMultistageTest({ stages: [[module("a", [])]], routing })).toThrow(
       'Module "a" needs an array of at least one item.',
     );
     const three = [module("b", [1]), module("c", [2]), module("d", [3])];
-    expect(() => multistageTest({ stages: [[module("a", [0], [2, 1])], three], routing })).toThrow(
+    expect(() => createMultistageTest({ stages: [[module("a", [0], [2, 1])], three], routing })).toThrow(
       'Module "a" needs an array of 2 cut points in ascending order to route to the next stage, found [2, 1].',
     );
-    expect(() => multistageTest({ stages: [[module("a", [0], [1])]], routing })).toThrow(DataError);
+    expect(() => createMultistageTest({ stages: [[module("a", [0], [1])]], routing })).toThrow(DataError);
     const shared = { id: "b", items: module("a", [1]).items };
-    expect(() => multistageTest({ stages: [[module("a", [0], [])], [shared]], routing })).toThrow(
+    expect(() => createMultistageTest({ stages: [[module("a", [0], [])], [shared]], routing })).toThrow(
       'Item ids must be unique; "a-1" appears twice.',
     );
-    expect(() => multistageTest({ stages, routing: JSON.parse('"score"') })).toThrow(
+    expect(() => createMultistageTest({ stages, routing: JSON.parse('"score"') })).toThrow(
       'The option routing must be "number-correct" or "theta", found "score".',
     );
-    expect(() => multistageTest({ stages, routing, estimator: JSON.parse("5") })).toThrow(
+    expect(() => createMultistageTest({ stages, routing, estimator: JSON.parse("5") })).toThrow(
       "The option estimator must be a function of items and responses, such as posteriorMeanEstimate, found 5.",
     );
   });
 
   it("rejects panels and responses of other types from JavaScript", () => {
     const routing = "number-correct";
-    expect(() => multistageTest(JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => multistageTest({ stages: JSON.parse("null"), routing })).toThrow(
+    expect(() => createMultistageTest(JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => createMultistageTest({ stages: JSON.parse("null"), routing })).toThrow(
       "The option stages must be an array of stages, found null.",
     );
-    expect(() => multistageTest({ stages: JSON.parse("[[null]]"), routing })).toThrow(
+    expect(() => createMultistageTest({ stages: JSON.parse("[[null]]"), routing })).toThrow(
       "The modules of stage 1 must be objects { id, items, cuts }, found null.",
     );
     expect(() =>
-      multistageTest({ stages: [[{ ...module("a", [0]), cuts: JSON.parse('"1"') }], [module("b", [1])]], routing }),
+      createMultistageTest({
+        stages: [[{ ...module("a", [0]), cuts: JSON.parse('"1"') }], [module("b", [1])]],
+        routing,
+      }),
     ).toThrow('Module "a" needs an array of 0 cut points');
-    const test = multistageTest({ stages, routing });
+    const test = createMultistageTest({ stages, routing });
     expect(() => test.answer(test.start(), JSON.parse("null"))).toThrow("The responses must be an array, found null.");
   });
 
   it("rejects responses that do not match the module and answers after the end", () => {
-    const test = multistageTest({ stages, routing: "number-correct" });
+    const test = createMultistageTest({ stages, routing: "number-correct" });
     const start = test.start();
     expect(() => test.answer(start, [1, 0])).toThrow('Module "routing" has 4 items, found 2 responses.');
     expect(() => test.answer(start, [1, 0, 2, 0])).toThrow(
@@ -2721,7 +2740,7 @@ describe("multistageTest", () => {
   });
 
   it("rejects stored states that skip or repeat a stage, or whose items are not their modules'", () => {
-    const test = multistageTest({ stages, routing: "number-correct" });
+    const test = createMultistageTest({ stages, routing: "number-correct" });
     const second = test.answer(test.start(), [1, 1, 0, 0]);
     const skipped = "A multistage test state takes one module per stage, in order, with their items; found modules";
     expect(() => test.answer({ ...test.start(), next: "medium" }, [1, 1, 1])).toThrow(
@@ -2929,7 +2948,7 @@ describe("multistageCuts", () => {
   });
 
   describe("results", () => {
-    it("are the cuts of a panel that multistageTest takes, one list for each module of the stages but the last", () => {
+    it("are the cuts of a panel that createMultistageTest takes, one list for each module of the stages but the last", () => {
       for (const scale of ["theta", "number-correct"] as const) {
         const cuts = multistageCuts(translates, { scale });
         expect(cuts).toHaveLength(4);
@@ -2937,7 +2956,7 @@ describe("multistageCuts", () => {
         const withCuts = translates.map((modules, stage) =>
           modules.map((module) => (stage === translates.length - 1 ? module : { ...module, cuts: cuts[next++] })),
         );
-        const test = multistageTest({ stages: withCuts, routing: scale });
+        const test = createMultistageTest({ stages: withCuts, routing: scale });
         const lowest = [[0, 0, 0, 0], [0, 0, 0], [0]].reduce(
           (state, answers) => test.answer(state, answers),
           test.start(),
@@ -3057,7 +3076,7 @@ describe("multistageCuts", () => {
       expect(() => population(null)).toThrow(DataError);
     });
 
-    it("refuses stages and items that multistageTest would refuse", () => {
+    it("refuses stages and items that createMultistageTest would refuse", () => {
       expect(() => multistageCuts(JSON.parse("null"))).toThrow(
         "The option stages must be an array of stages, found null.",
       );
@@ -3202,7 +3221,7 @@ describe("selection rules of catR beyond MFI and KL", () => {
   for (const { name, fixture, rule, starting, items, responses } of Object.values(catSelection.replays)) {
     it(`administers the starting items, then the items of nextItem at the MAP estimate: ${name}`, () => {
       const pool = defined(Pools[fixture]);
-      const test = adaptiveTest({
+      const test = createAdaptiveTest({
         pool,
         selection: startingItems(starting, ruleOf(rule, {})),
         estimator: posteriorModeEstimate,
@@ -3481,7 +3500,7 @@ describe("selection rules of catR beyond MFI and KL", () => {
 
     it("administers the starting items in order, then follows the rule", () => {
       const ids = ["item004", "item002", "item006"];
-      const test = adaptiveTest({ pool, stopping, selection: startingItems(ids, maximumInformation) });
+      const test = createAdaptiveTest({ pool, stopping, selection: startingItems(ids, maximumInformation) });
       const state = administer(test, () => 1);
       expect(state.items.slice(0, 3)).toEqual(ids);
       expect(state.items.slice(3).filter((id) => ids.includes(id))).toEqual([]);
@@ -3491,11 +3510,11 @@ describe("selection rules of catR beyond MFI and KL", () => {
     it("skips a starting item that is not eligible and follows the rule when none is", () => {
       const ids = ["item001", "item002"];
       const enemies = [["item001", "item002"]];
-      const test = adaptiveTest({ pool, stopping, enemies, selection: startingItems(ids, maximumInformation) });
+      const test = createAdaptiveTest({ pool, stopping, enemies, selection: startingItems(ids, maximumInformation) });
       const state = administer(test, () => 0);
       expect(state.items[0]).toBe("item001");
       expect(state.items).not.toContain("item002");
-      const withheld = adaptiveTest({
+      const withheld = createAdaptiveTest({
         pool: pool.map((item) => (item.id === "item001" ? { ...item, exposure: 0 } : item)),
         stopping: testLength(1),
         selection: startingItems(["item001", "item003"], maximumInformation),
@@ -3504,7 +3523,7 @@ describe("selection rules of catR beyond MFI and KL", () => {
     });
 
     it("throws at the first selection for a starting item the pool does not have", () => {
-      const test = adaptiveTest({
+      const test = createAdaptiveTest({
         pool,
         stopping,
         selection: startingItems(["item001", "item999"], maximumInformation),
@@ -3541,7 +3560,7 @@ describe("simulation", () => {
   ];
 
   it("reports the bias, root mean square error, mean length and exposure rates of its persons", () => {
-    const test = adaptiveTest({ pool: POOL_GPCM, stopping: anyOf(testLength(12), standardErrorThreshold(0.35)) });
+    const test = createAdaptiveTest({ pool: POOL_GPCM, stopping: anyOf(testLength(12), standardErrorThreshold(0.35)) });
     const result = simulateAdaptiveTest(test, thetas, createRandom(3));
     expect(result.persons.map(({ theta }) => theta)).toEqual(thetas);
     const differences = result.persons.map(({ theta, state }) => state.estimate.theta - theta);
@@ -3559,7 +3578,7 @@ describe("simulation", () => {
   });
 
   it("simulates a multistage test: everyone takes the routing module and one module of the next stage", () => {
-    const test = multistageTest({ stages, routing: "theta" });
+    const test = createMultistageTest({ stages, routing: "theta" });
     const result = simulateMultistageTest(test, thetas, createRandom(3));
     expect(result.meanLength).toBe(8);
     const rates = new Map(result.exposureRates.map(({ id, rate }) => [id, rate]));
@@ -3572,7 +3591,7 @@ describe("simulation", () => {
 
   it("reproduces a seeded simulation exactly", () => {
     const pool = POOL_CONTENT.map((item, i) => ({ ...item, exposure: i % 4 === 0 ? 0.4 : 1 }));
-    const test = adaptiveTest({
+    const test = createAdaptiveTest({
       pool,
       selection: randomesque(aStratified([3, 3, 4]), 2),
       estimator: untilMixed(posteriorMeanEstimate, weightedLikelihoodEstimate),
@@ -3582,30 +3601,30 @@ describe("simulation", () => {
     expect(simulateAdaptiveTest(test, thetas, createRandom(9))).toEqual(
       simulateAdaptiveTest(test, thetas, createRandom(9)),
     );
-    const panel = multistageTest({ stages, routing: "number-correct" });
+    const panel = createMultistageTest({ stages, routing: "number-correct" });
     expect(simulateMultistageTest(panel, thetas, createRandom(9))).toEqual(
       simulateMultistageTest(panel, thetas, createRandom(9)),
     );
   });
 
   it("rejects missing and non-finite thetas", () => {
-    const test = adaptiveTest({ pool: POOL_3PL, stopping: testLength(2) });
+    const test = createAdaptiveTest({ pool: POOL_3PL, stopping: testLength(2) });
     expect(() => simulateAdaptiveTest(test, [], createRandom(1))).toThrow("A simulation needs at least one theta.");
     expect(() => simulateAdaptiveTest(test, [0, Number.NaN], createRandom(1))).toThrow(
       "Theta 2 must be a finite number, found NaN.",
     );
-    const panel = multistageTest({ stages, routing: "theta" });
+    const panel = createMultistageTest({ stages, routing: "theta" });
     expect(() => simulateMultistageTest(panel, [Number.POSITIVE_INFINITY], createRandom(1))).toThrow(DataError);
   });
 
   it("rejects a test that is not the kind of the function", () => {
     expect(() => simulateAdaptiveTest(JSON.parse("null"), [0], createRandom(1))).toThrow(
-      "The test must be an adaptive test from adaptiveTest, found null.",
+      "The test must be an adaptive test from createAdaptiveTest, found null.",
     );
     expect(() => simulateMultistageTest(JSON.parse("{}"), [0], createRandom(1))).toThrow(
-      "The test must be a multistage test from multistageTest, found an object.",
+      "The test must be a multistage test from createMultistageTest, found an object.",
     );
-    const adaptive = adaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping: testLength(1) });
+    const adaptive = createAdaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping: testLength(1) });
     expect(() => simulateAdaptiveTest(adaptive, [0], JSON.parse("null"))).toThrow(
       "A random number generator must be one from createRandom, found null.",
     );
@@ -3615,11 +3634,11 @@ describe("simulation", () => {
   });
 
   it("rejects a test whose pool or stages were replaced with invalid ones", () => {
-    const adaptive = adaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping: testLength(1) });
+    const adaptive = createAdaptiveTest({ pool: [item2pl("q1", 1, 0)], stopping: testLength(1) });
     expect(() => simulateAdaptiveTest({ ...adaptive, pool: JSON.parse("[null]") }, [0], createRandom(1))).toThrow(
       "Item 1 must be an item with an id, a model and parameters, found null.",
     );
-    const panel = multistageTest({ stages, routing: "theta" });
+    const panel = createMultistageTest({ stages, routing: "theta" });
     expect(() => simulateMultistageTest({ ...panel, stages: JSON.parse("[[null]]") }, [0], createRandom(1))).toThrow(
       "The modules of stage 1 must be objects { id, items, cuts }, found null.",
     );
@@ -3725,7 +3744,7 @@ describe("classification stopping rules", () => {
     });
     const pool: PoolItem[] = items.map((item, i) => ({ id: `item${i + 1}`, ...item }));
     const rule = sequentialProbabilityRatio([{ lower: -0.3, upper: 0.3 }]);
-    const test = adaptiveTest({ pool, stopping: anyOf(testLength(60), rule) });
+    const test = createAdaptiveTest({ pool, stopping: anyOf(testLength(60), rule) });
     for (const [theta, wrongCategory] of [
       [-0.3, 1],
       [0.3, 0],
@@ -3853,7 +3872,7 @@ describe("Sympson-Hetter exposure control", () => {
     const pool = [{ ...item2pl("best", 2, 0), exposure: 0.3 }, ...POOL_3PL.slice(0, 9)];
     const random = createRandom(11);
     const thetas = Array.from({ length: 4000 }, () => random.normal());
-    const result = simulateAdaptiveTest(adaptiveTest({ pool, stopping: testLength(3) }), thetas, random);
+    const result = simulateAdaptiveTest(createAdaptiveTest({ pool, stopping: testLength(3) }), thetas, random);
     const rate = defined(result.exposureRates[0]).rate;
     // Within four binomial standard errors.
     expect(Math.abs(rate - 0.3)).toBeLessThan(4 * Math.sqrt((0.3 * 0.7) / thetas.length));
@@ -3868,7 +3887,7 @@ describe("Sympson-Hetter exposure control", () => {
       { ...item2pl("first", 2, 0), exposure: 0 },
       { ...item2pl("second", 1, 0), exposure: 0 },
     ];
-    const state = administer(adaptiveTest({ pool, stopping: testLength(2) }), () => 1);
+    const state = administer(createAdaptiveTest({ pool, stopping: testLength(2) }), () => 1);
     expect(state).toMatchObject({ items: ["second"], withheld: ["first"], next: null });
   });
 
@@ -3882,7 +3901,7 @@ describe("Sympson-Hetter exposure control", () => {
       normal: () => 0,
     };
     const pool = POOL_3PL.map((item, i) => (i % 2 === 0 ? { ...item, exposure: 1 } : item));
-    administer(adaptiveTest({ pool, stopping: testLength(10) }), () => 1, counting);
+    administer(createAdaptiveTest({ pool, stopping: testLength(10) }), () => 1, counting);
     expect(draws).toBe(0);
   });
 });
@@ -3923,7 +3942,7 @@ function referenceTest(
   selection: DiagnosticRule,
   stopping: StoppingRule<DiagnosticTestItem, ProfileEstimate> = testLength(catCdm.length),
 ): DiagnosticAdaptiveTest {
-  return diagnosticAdaptiveTest({
+  return createDiagnosticAdaptiveTest({
     pool: diagnosticPool(reference),
     attributes: reference.attributes,
     prior: reference.profiles,
@@ -3992,7 +4011,7 @@ describe("the recipe for restricted exposure", () => {
     const counts = new Map<string, number>();
     const lengths: number[] = [];
     for (const theta of thetas) {
-      const test = adaptiveTest({ pool, stopping: testLength(EXPOSURE_TEST_LENGTH) });
+      const test = createAdaptiveTest({ pool, stopping: testLength(EXPOSURE_TEST_LENGTH) });
       const [person] = simulateAdaptiveTest(test, [theta], random).persons;
       for (const id of person?.state.items ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
       lengths.push(person?.state.items.length ?? 0);
@@ -4028,7 +4047,7 @@ describe("the recipe for restricted exposure", () => {
   });
 });
 
-describe("diagnosticAdaptiveTest", () => {
+describe("createDiagnosticAdaptiveTest", () => {
   for (const reference of catCdm.cases) {
     for (const [name, rule] of DIAGNOSTIC_RULES) {
       it(`selects the items and estimates of the written-out ${name} replay on ${reference.name}`, () => {
@@ -4068,7 +4087,7 @@ describe("diagnosticAdaptiveTest", () => {
 
   it("starts from the prior and updates it by the probability of each response in the item's latent group", () => {
     const pool = [{ id: "q", attributes: ["a"], probabilities: [0.2, 0.9] }];
-    const test = diagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
+    const test = createDiagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
     const random = createRandom(1);
     const start = test.start(random);
     expect(start).toEqual({
@@ -4095,7 +4114,7 @@ describe("diagnosticAdaptiveTest", () => {
       { profile: [1, 0], proportion: 0.6 },
       { profile: [0, 0], proportion: 0.8 },
     ];
-    const test = diagnosticAdaptiveTest({ pool, attributes: SKILLS, prior, stopping: testLength(1) });
+    const test = createDiagnosticAdaptiveTest({ pool, attributes: SKILLS, prior, stopping: testLength(1) });
     // The order of the profiles: 00, 10, 01, 11.
     const posterior = test.start(createRandom(1)).estimate.posterior;
     [0.4, 0.3, 0.1, 0.2].forEach((p, c) => {
@@ -4106,7 +4125,7 @@ describe("diagnosticAdaptiveTest", () => {
   it("follows the order of an item's own attributes for its latent groups", () => {
     // The item's second group is the profile over (b, a) that masters b only, whatever the test's attribute order.
     const pool = [{ id: "q", attributes: ["b", "a"], probabilities: [0.1, 0.9, 0.1, 0.1] }];
-    const test = diagnosticAdaptiveTest({ pool, attributes: ["a", "b"], stopping: testLength(1) });
+    const test = createDiagnosticAdaptiveTest({ pool, attributes: ["a", "b"], stopping: testLength(1) });
     const random = createRandom(1);
     const { mastery, map } = test.answer(test.start(random), 1, random).estimate;
     expectClose(defined(mastery[0]), 1 / 6, 1e-15);
@@ -4121,7 +4140,7 @@ describe("diagnosticAdaptiveTest", () => {
       { profile: [0, 1], proportion: 0 },
       { profile: [1, 1], proportion: 1 },
     ];
-    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, prior, stopping: testLength(3) });
+    const test = createDiagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, prior, stopping: testLength(3) });
     for (const state of administerDiagnostic(test, (id) => (id === "q2" ? 1 : 0))) {
       expect(state.estimate.posterior[2]).toBe(0);
     }
@@ -4129,7 +4148,7 @@ describe("diagnosticAdaptiveTest", () => {
 
   it("keeps the posterior defined when a response is impossible in every latent group", () => {
     const pool = [{ id: "q", attributes: ["a"], probabilities: [0, 1] }];
-    const test = diagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
+    const test = createDiagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
     const random = createRandom(1);
     const { posterior } = test.answer(test.start(random), 0, random).estimate;
     expect(posterior).toEqual([1, Number.MIN_VALUE]);
@@ -4139,7 +4158,7 @@ describe("diagnosticAdaptiveTest", () => {
     const reference = defined(catCdm.cases[0]);
     const run = (test: DiagnosticAdaptiveTest) => administerDiagnostic(test, respondOf(reference, 1)).at(-1);
     const stopping = testLength(catCdm.length);
-    const standard = diagnosticAdaptiveTest({
+    const standard = createDiagnosticAdaptiveTest({
       pool: diagnosticPool(reference),
       attributes: reference.attributes,
       prior: reference.profiles,
@@ -4157,7 +4176,7 @@ describe("diagnosticAdaptiveTest", () => {
         });
       },
     };
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool: SKILL_POOL,
       attributes: SKILLS,
       selection: first,
@@ -4171,7 +4190,7 @@ describe("diagnosticAdaptiveTest", () => {
 
   it("selects among the items of the content area furthest below its target", () => {
     const pool = SKILL_POOL.map((item, i) => ({ ...item, contentAreas: [i === 2 ? "both" : "single"] }));
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool,
       attributes: SKILLS,
       contentTargets: { single: 0.5, both: 0.5 },
@@ -4186,7 +4205,7 @@ describe("diagnosticAdaptiveTest", () => {
   });
 
   it("never administers enemies together", () => {
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool: SKILL_POOL,
       attributes: SKILLS,
       enemies: [["q1", "q2"]],
@@ -4208,7 +4227,7 @@ describe("diagnosticAdaptiveTest", () => {
         });
       },
     };
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool,
       attributes: SKILLS,
       selection: lastItemFirst,
@@ -4223,7 +4242,7 @@ describe("diagnosticAdaptiveTest", () => {
   });
 
   it("ends at once without items, at the prior", () => {
-    const test = diagnosticAdaptiveTest({ pool: [], attributes: ["a"], stopping: testLength(1) });
+    const test = createDiagnosticAdaptiveTest({ pool: [], attributes: ["a"], stopping: testLength(1) });
     expect(test.start(createRandom(1))).toMatchObject({ next: null, estimate: { posterior: [0.5, 0.5] } });
   });
 
@@ -4241,7 +4260,7 @@ describe("diagnosticAdaptiveTest", () => {
   });
 
   it("leaves the state it is given unchanged", () => {
-    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const test = createDiagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
     const random = createRandom(1);
     const state = test.start(random);
     const copy: DiagnosticAdaptiveTestState = JSON.parse(JSON.stringify(state));
@@ -4252,44 +4271,50 @@ describe("diagnosticAdaptiveTest", () => {
   it("rejects options and pools of other types and invalid ones", () => {
     const options = { pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) };
     const parse = (json: string) => JSON.parse(json);
-    expect(() => diagnosticAdaptiveTest(parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => diagnosticAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest(parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => createDiagnosticAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
       "The option stopping must be a stopping rule, such as testLength(20)",
     );
-    expect(() => diagnosticAdaptiveTest({ ...options, selection: parse('"gdi"') })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, selection: parse('"gdi"') })).toThrow(
       "The option selection must be a selection rule, such as gdinaDiscriminationIndex",
     );
-    expect(() => diagnosticAdaptiveTest({ ...options, pool: parse('"q1"') })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, pool: parse('"q1"') })).toThrow(
       'The option pool must be an array of items, found "q1".',
     );
-    expect(() => diagnosticAdaptiveTest({ ...options, pool: parse("[null]") })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, pool: parse("[null]") })).toThrow(
       "Item 1 must be an object { id, attributes, probabilities }, found null.",
     );
-    expect(() => diagnosticAdaptiveTest({ ...options, pool: parse('[{"id":3}]') })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, pool: parse('[{"id":3}]') })).toThrow(
       "Item 1 needs a string id, found 3.",
     );
-    expect(() => diagnosticAdaptiveTest({ ...options, pool: [...SKILL_POOL, defined(SKILL_POOL[0])] })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, pool: [...SKILL_POOL, defined(SKILL_POOL[0])] })).toThrow(
       'Item ids must be unique; "q1" appears twice.',
     );
     expect(() =>
-      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: [], probabilities: [] }] }),
+      createDiagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: [], probabilities: [] }] }),
     ).toThrow('Item "x" needs at least one attribute.');
     expect(() =>
-      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: ["divide"], probabilities: [0.2, 0.9] }] }),
+      createDiagnosticAdaptiveTest({
+        ...options,
+        pool: [{ id: "x", attributes: ["divide"], probabilities: [0.2, 0.9] }],
+      }),
     ).toThrow('Item "x" has attribute "divide", which is not an attribute of the test.');
     expect(() =>
-      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: ["add"], probabilities: [0.2, 0.9, 0.5] }] }),
+      createDiagnosticAdaptiveTest({
+        ...options,
+        pool: [{ id: "x", attributes: ["add"], probabilities: [0.2, 0.9, 0.5] }],
+      }),
     ).toThrow('Item "x" needs 2 probabilities from 0 to 1, one per latent group.');
     expect(() =>
-      diagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: ["add"], probabilities: [0.2, 1.5] }] }),
+      createDiagnosticAdaptiveTest({ ...options, pool: [{ id: "x", attributes: ["add"], probabilities: [0.2, 1.5] }] }),
     ).toThrow('Item "x" needs 2 probabilities from 0 to 1, one per latent group.');
-    expect(() => diagnosticAdaptiveTest({ ...options, pool: [{ ...defined(SKILL_POOL[0]), exposure: 2 }] })).toThrow(
-      'The exposure parameter of item "q1" must be a number from 0 to 1, found 2.',
-    );
-    expect(() => diagnosticAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
+    expect(() =>
+      createDiagnosticAdaptiveTest({ ...options, pool: [{ ...defined(SKILL_POOL[0]), exposure: 2 }] }),
+    ).toThrow('The exposure parameter of item "q1" must be a number from 0 to 1, found 2.');
+    expect(() => createDiagnosticAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
       'Item "q1" needs exactly one content area among the targets (easy), found undefined.',
     );
-    expect(() => diagnosticAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
       'Enemy set 1 names "zz", which is not a pool item.',
     );
   });
@@ -4298,7 +4323,7 @@ describe("diagnosticAdaptiveTest", () => {
     const options = { pool: SKILL_POOL, stopping: testLength(2) };
     const parse = (json: string) => JSON.parse(json);
     const attributes = (value: unknown) => () =>
-      diagnosticAdaptiveTest({ ...options, attributes: parse(JSON.stringify(value)) });
+      createDiagnosticAdaptiveTest({ ...options, attributes: parse(JSON.stringify(value)) });
     expect(attributes("add")).toThrow('The option attributes must be an array of attribute names, found "add".');
     expect(attributes([])).toThrow("The option attributes must list from 1 to 15 distinct non-empty names");
     expect(attributes(["add", "add"])).toThrow("distinct non-empty names");
@@ -4306,7 +4331,7 @@ describe("diagnosticAdaptiveTest", () => {
     expect(attributes(["add", 2])).toThrow("distinct non-empty names");
     expect(attributes(Array.from({ length: 16 }, (_, k) => `a${k}`))).toThrow("from 1 to 15 distinct");
     const prior = (value: unknown) => () =>
-      diagnosticAdaptiveTest({ ...options, attributes: SKILLS, prior: parse(JSON.stringify(value)) });
+      createDiagnosticAdaptiveTest({ ...options, attributes: SKILLS, prior: parse(JSON.stringify(value)) });
     const entries = [
       { profile: [0, 0], proportion: 1 },
       { profile: [1, 0], proportion: 1 },
@@ -4338,18 +4363,18 @@ describe("diagnosticAdaptiveTest", () => {
       attributes: [attributes[j % 15] ?? ""],
       probabilities: [0.2, 0.8],
     }));
-    expect(() => diagnosticAdaptiveTest({ ...options, pool: short })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, pool: short })).toThrow(
       "A design has at most 4194304 cells of items by profiles, items × 2^attributes, found 4227072 of 129 items and 15 attributes.",
     );
     const probabilities = Array.from({ length: 2 ** 15 }, (_, g) => (g === 0 ? 0.2 : 0.8));
     const long = Array.from({ length: 9 }, (_, j) => ({ id: `q${j}`, attributes, probabilities }));
-    expect(() => diagnosticAdaptiveTest({ ...options, pool: long })).toThrow(
+    expect(() => createDiagnosticAdaptiveTest({ ...options, pool: long })).toThrow(
       "A design has at most 262144 latent groups over all items, 2^k for an item of k attributes, found 294912.",
     );
   });
 
   it("rejects states and responses of other types and invalid ones", () => {
-    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const test = createDiagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
     const random = createRandom(1);
     const state = test.start(random);
     const parse = (json: string) => JSON.parse(json);
@@ -4449,9 +4474,14 @@ describe("diagnostic selection rules", () => {
       { id: "flat", attributes: ["a"], probabilities: [0.5, 0.5] },
       { id: "sharp", attributes: ["a"], probabilities: [0.05, 0.95] },
     ];
-    const test = diagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
+    const test = createDiagnosticAdaptiveTest({ pool, attributes: ["a"], stopping: testLength(1) });
     for (const [name, rule] of DIAGNOSTIC_RULES) {
-      const selecting = diagnosticAdaptiveTest({ pool, attributes: ["a"], selection: rule, stopping: testLength(1) });
+      const selecting = createDiagnosticAdaptiveTest({
+        pool,
+        attributes: ["a"],
+        selection: rule,
+        stopping: testLength(1),
+      });
       expect(selecting.start(createRandom(1)).next, name).toBe("sharp");
     }
     expect(test.start(createRandom(1)).next).toBe("sharp");
@@ -4592,7 +4622,7 @@ describe("diagnostic stopping rules", () => {
     ];
     const attributes = ["a", "b"];
     const lengths = (stopping: StoppingRule<DiagnosticTestItem, ProfileEstimate>) =>
-      defined(administerDiagnostic(diagnosticAdaptiveTest({ pool, attributes, stopping }), () => 1).at(-1)).items
+      defined(administerDiagnostic(createDiagnosticAdaptiveTest({ pool, attributes, stopping }), () => 1).at(-1)).items
         .length;
     // After q1 the posterior of the profiles that master a is 0.95 / 1.0 = 0.95, split over two profiles.
     expect(lengths(masteryThreshold(0.9))).toBe(2);
@@ -4633,7 +4663,7 @@ describe("simulateDiagnosticTest", () => {
   ];
 
   it("classifies nearly every person with near-deterministic items", () => {
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool: SingleAttributePool,
       attributes: ["a", "b", "c"],
       stopping: testLength(9),
@@ -4648,7 +4678,7 @@ describe("simulateDiagnosticTest", () => {
   });
 
   it("measures the share of persons whose MAP profile is the true profile, and of each attribute", () => {
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool: SingleAttributePool.map((item) => ({ ...item, probabilities: [0.3, 0.7] })),
       attributes: ["a", "b", "c"],
       stopping: testLength(4),
@@ -4668,7 +4698,7 @@ describe("simulateDiagnosticTest", () => {
   });
 
   it("reports the exposure rate of every item and the mean length", () => {
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool: SingleAttributePool,
       attributes: ["a", "b", "c"],
       stopping: anyOf(testLength(9), masteryThreshold(0.95)),
@@ -4682,7 +4712,7 @@ describe("simulateDiagnosticTest", () => {
   });
 
   it("draws each person's responses to the pool from the true profile as simulateCdmResponses does", () => {
-    const test = diagnosticAdaptiveTest({
+    const test = createDiagnosticAdaptiveTest({
       pool: SKILL_POOL,
       attributes: SKILLS,
       stopping: testLength(3),
@@ -4703,7 +4733,7 @@ describe("simulateDiagnosticTest", () => {
   });
 
   it("reproduces a simulation from its seed", () => {
-    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const test = createDiagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
     const run = () =>
       simulateDiagnosticTest(
         test,
@@ -4714,11 +4744,11 @@ describe("simulateDiagnosticTest", () => {
   });
 
   it("rejects tests, profiles and generators of other types and invalid ones", () => {
-    const test = diagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
+    const test = createDiagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
     const parse = (json: string) => JSON.parse(json);
     const random = createRandom(1);
     expect(() => simulateDiagnosticTest(parse("null"), [[1, 0]], random)).toThrow(
-      "The test must be a diagnostic adaptive test from diagnosticAdaptiveTest, found null.",
+      "The test must be a diagnostic adaptive test from createDiagnosticAdaptiveTest, found null.",
     );
     expect(() => simulateDiagnosticTest(parse('{"pool":[],"start":1,"answer":2}'), [[1, 0]], random)).toThrow(
       "The test must be a diagnostic adaptive test",
@@ -4767,7 +4797,7 @@ function multidimensionalTest(
   stopping: StoppingRule<MultidimensionalPoolItem, MultidimensionalEstimate> = testLength(catMirt.length),
 ): MultidimensionalAdaptiveTest {
   const prior = priorOf(reference);
-  return multidimensionalAdaptiveTest({
+  return createMultidimensionalAdaptiveTest({
     pool: multidimensionalPool(reference),
     stopping,
     ...(prior !== undefined && {
@@ -4858,7 +4888,7 @@ function multidimensionalContext(
   };
 }
 
-describe("multidimensionalAdaptiveTest", () => {
+describe("createMultidimensionalAdaptiveTest", () => {
   for (const reference of catMirt.cases) {
     it(`selects the items, estimates and stops of the written-out replay and mirtCAT on ${reference.name}`, () => {
       const test = multidimensionalTest(reference);
@@ -4930,7 +4960,7 @@ describe("multidimensionalAdaptiveTest", () => {
 
   it("starts at the prior, from the estimator's answer without items or responses", () => {
     const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
-    const start = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) }).start(createRandom(1));
+    const start = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(2) }).start(createRandom(1));
     expect(start).toMatchObject({ items: [], responses: [], withheld: [] });
     expect(start.estimate.theta).toEqual([0, 0]);
     expect(start.estimate.standardErrors).toEqual([1, 1]);
@@ -4945,7 +4975,7 @@ describe("multidimensionalAdaptiveTest", () => {
         [1, 2],
       ],
     };
-    const centered = multidimensionalAdaptiveTest({
+    const centered = createMultidimensionalAdaptiveTest({
       pool,
       stopping: testLength(2),
       selection: maximumDeterminant({ prior }),
@@ -4973,7 +5003,7 @@ describe("multidimensionalAdaptiveTest", () => {
       ],
     };
     const calls: { ids: string[]; answers: (number | null)[] }[] = [];
-    const test = multidimensionalAdaptiveTest({
+    const test = createMultidimensionalAdaptiveTest({
       pool,
       stopping: testLength(2),
       estimator: (items, answers) => {
@@ -4996,7 +5026,7 @@ describe("multidimensionalAdaptiveTest", () => {
         [0.2, 1],
       ],
     };
-    const mean = multidimensionalAdaptiveTest({
+    const mean = createMultidimensionalAdaptiveTest({
       pool,
       stopping: testLength(1),
       selection: maximumDeterminant({ prior }),
@@ -5004,7 +5034,7 @@ describe("multidimensionalAdaptiveTest", () => {
     }).start(createRandom(1));
     expectClose(defined(mean.estimate.theta[0]), 0.2, 1e-12);
     expectClose(defined(mean.estimate.theta[1]), -0.4, 1e-12);
-    const withoutPrior = multidimensionalAdaptiveTest({
+    const withoutPrior = createMultidimensionalAdaptiveTest({
       pool,
       stopping: testLength(1),
       estimator: multidimensionalPosteriorModeEstimate,
@@ -5020,7 +5050,7 @@ describe("multidimensionalAdaptiveTest", () => {
       multidimensionalItem("b", [0, 1], 0),
       multidimensionalItem("c", [1, 1], 0),
     ];
-    const state = multidimensionalAdaptiveTest({ pool, stopping: testLength(1) }).start(createRandom(1));
+    const state = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(1) }).start(createRandom(1));
     expect(state.next).toBe("c");
   });
 
@@ -5031,7 +5061,7 @@ describe("multidimensionalAdaptiveTest", () => {
     );
     const run = (threshold: number): MultidimensionalAdaptiveTestState[] =>
       administerMultidimensional(
-        multidimensionalAdaptiveTest({
+        createMultidimensionalAdaptiveTest({
           pool,
           stopping: anyOf(
             testLength(30),
@@ -5063,7 +5093,7 @@ describe("multidimensionalAdaptiveTest", () => {
         });
       },
     };
-    const test = multidimensionalAdaptiveTest({ pool, selection: lastFirst, stopping: testLength(10) });
+    const test = createMultidimensionalAdaptiveTest({ pool, selection: lastFirst, stopping: testLength(10) });
     expect(defined(administerMultidimensional(test, () => 0).at(-1))).toMatchObject({
       items: ["q3", "q2", "q1"],
       next: null,
@@ -5076,7 +5106,7 @@ describe("multidimensionalAdaptiveTest", () => {
       multidimensionalItem("q2", [0, 1], 0),
       multidimensionalItem("q3", [1, 1], 0),
     ];
-    const balanced = multidimensionalAdaptiveTest({
+    const balanced = createMultidimensionalAdaptiveTest({
       pool: base.map((item, i) => ({ ...item, contentAreas: [i === 2 ? "both" : "single"] })),
       contentTargets: { single: 0.5, both: 0.5 },
       stopping: testLength(2),
@@ -5085,12 +5115,12 @@ describe("multidimensionalAdaptiveTest", () => {
       const { items } = defined(administerMultidimensional(balanced, () => 1, createRandom(seed)).at(-1));
       expect(items.includes("q3")).toBe(true);
     }
-    const apart = multidimensionalAdaptiveTest({ pool: base, enemies: [["q1", "q3"]], stopping: testLength(3) });
+    const apart = createMultidimensionalAdaptiveTest({ pool: base, enemies: [["q1", "q3"]], stopping: testLength(3) });
     for (let seed = 0; seed < 8; seed++) {
       const { items } = defined(administerMultidimensional(apart, () => 0, createRandom(seed)).at(-1));
       expect(items.includes("q1") && items.includes("q3")).toBe(false);
     }
-    const guarded = multidimensionalAdaptiveTest({
+    const guarded = createMultidimensionalAdaptiveTest({
       pool: base.map((item) => (item.id === "q3" ? { ...item, exposure: 0 } : item)),
       stopping: testLength(2),
     });
@@ -5117,49 +5147,54 @@ describe("multidimensionalAdaptiveTest", () => {
     const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
     const options = { pool, stopping: testLength(2) };
     const parse = (json: string) => JSON.parse(json);
-    expect(() => multidimensionalAdaptiveTest(parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => multidimensionalAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest(parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, stopping: parse("null") })).toThrow(
       "The option stopping must be a stopping rule, such as testLength(20)",
     );
-    expect(() => multidimensionalAdaptiveTest({ ...options, selection: parse('"d"') })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, selection: parse('"d"') })).toThrow(
       "The option selection must be a selection rule, such as maximumDeterminant()",
     );
-    expect(() => multidimensionalAdaptiveTest({ ...options, estimator: parse('"map"') })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, estimator: parse('"map"') })).toThrow(
       "The option estimator must be a function of items and responses",
     );
-    expect(() => multidimensionalAdaptiveTest({ ...options, estimator: parse("null") })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, estimator: parse("null") })).toThrow(
       "The option estimator must be a function of items and responses",
     );
-    expect(() => multidimensionalAdaptiveTest({ ...options, pool: parse('"q1"') })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, pool: parse('"q1"') })).toThrow(
       "A multidimensional adaptive test needs an array of items",
     );
-    expect(() => multidimensionalAdaptiveTest({ ...options, pool: [] })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, pool: [] })).toThrow(
       "A multidimensional adaptive test needs at least one item.",
     );
     expect(() =>
-      multidimensionalAdaptiveTest({
+      createMultidimensionalAdaptiveTest({
         ...options,
         pool: [defined(pool[0]), multidimensionalItem("q2", [0, 1, 0], 0)],
       }),
     ).toThrow("Item 2 has 3 dimensions, but item 1 has 2.");
-    expect(() => multidimensionalAdaptiveTest({ ...options, pool: [...pool, defined(pool[0])] })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, pool: [...pool, defined(pool[0])] })).toThrow(
       'Item ids must be unique; "q1" appears twice.',
     );
-    expect(() => multidimensionalAdaptiveTest({ ...options, pool: parse('[{"id":"x"}]') })).toThrow(DataError);
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, pool: parse('[{"id":"x"}]') })).toThrow(DataError);
     expect(() =>
-      multidimensionalAdaptiveTest({ ...options, pool: [{ ...defined(pool[0]), exposure: 2 }, ...pool.slice(1)] }),
+      createMultidimensionalAdaptiveTest({
+        ...options,
+        pool: [{ ...defined(pool[0]), exposure: 2 }, ...pool.slice(1)],
+      }),
     ).toThrow('The exposure parameter of item "q1" must be a number from 0 to 1, found 2.');
-    expect(() => multidimensionalAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, contentTargets: { easy: 1 } })).toThrow(
       'Item "q1" needs exactly one content area among the targets (easy), found undefined.',
     );
-    expect(() => multidimensionalAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ ...options, enemies: [["q1", "zz"]] })).toThrow(
       'Enemy set 1 names "zz", which is not a pool item.',
     );
   });
 
   it("rejects states and responses of other types and invalid ones", () => {
     const pool = [multidimensionalItem("q1", [1, 0], 0), multidimensionalItem("q2", [0, 1], 0)];
-    const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
+    const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
     const random = createRandom(1);
     const state = test.start(random);
     const parse = (json: string) => JSON.parse(json);
@@ -5303,7 +5338,7 @@ describe("simulateMultidimensionalAdaptiveTest", () => {
 
   it("recovers thetas on both dimensions with little bias, as the posterior mode shrinks toward the prior mean", () => {
     // Thresholds fixed before the first run: an error of 0.5 and a bias of 0.1 for 20 items of slopes near 1.
-    const test = multidimensionalAdaptiveTest({ pool: largePool(), stopping: testLength(20) });
+    const test = createMultidimensionalAdaptiveTest({ pool: largePool(), stopping: testLength(20) });
     const result = simulateMultidimensionalAdaptiveTest(test, randomThetas(300, 3), createRandom(5));
     for (const error of result.rootMeanSquareError) expect(error).toBeLessThan(0.5);
     for (const bias of result.bias) expect(Math.abs(bias)).toBeLessThan(0.1);
@@ -5322,7 +5357,11 @@ describe("simulateMultidimensionalAdaptiveTest", () => {
     };
     const thetas = randomThetas(200, 8);
     const precision = (selection?: typeof randomOrder): number => {
-      const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(12), ...(selection && { selection }) });
+      const test = createMultidimensionalAdaptiveTest({
+        pool,
+        stopping: testLength(12),
+        ...(selection && { selection }),
+      });
       const { persons } = simulateMultidimensionalAdaptiveTest(test, thetas, createRandom(9));
       return mean(persons.map(({ state }) => mean(state.estimate.standardErrors)));
     };
@@ -5331,7 +5370,7 @@ describe("simulateMultidimensionalAdaptiveTest", () => {
 
   it("reports the mean length and the exposure rate of every item", () => {
     const pool = largePool();
-    const test = multidimensionalAdaptiveTest({
+    const test = createMultidimensionalAdaptiveTest({
       pool,
       stopping: anyOf(testLength(25), standardErrorThreshold<MultidimensionalPoolItem, MultidimensionalEstimate>(0.5)),
     });
@@ -5348,7 +5387,7 @@ describe("simulateMultidimensionalAdaptiveTest", () => {
 
   it("draws each person's responses from the true thetas and reproduces from its seed", () => {
     const pool = largePool().slice(0, 12);
-    const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(6) });
+    const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(6) });
     const run = () => simulateMultidimensionalAdaptiveTest(test, randomThetas(15, 6), createRandom(31));
     expect(run()).toEqual(run());
     // Persons far above and below on both dimensions answer the easiest items alike.
@@ -5366,11 +5405,11 @@ describe("simulateMultidimensionalAdaptiveTest", () => {
 
   it("rejects tests, thetas and generators of other types and invalid ones", () => {
     const pool = largePool().slice(0, 6);
-    const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
+    const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
     const parse = (json: string) => JSON.parse(json);
     const random = createRandom(1);
     expect(() => simulateMultidimensionalAdaptiveTest(parse("null"), [[0, 0]], random)).toThrow(
-      "The test must be a multidimensional adaptive test from multidimensionalAdaptiveTest, found null.",
+      "The test must be a multidimensional adaptive test from createMultidimensionalAdaptiveTest, found null.",
     );
     expect(() => simulateMultidimensionalAdaptiveTest(test, [[0, 0]], parse("null"))).toThrow(DataError);
     expect(() => simulateMultidimensionalAdaptiveTest(test, parse('"00"'), random)).toThrow(
@@ -5428,7 +5467,7 @@ describe("rules of tests of other items and estimates", () => {
     const rule = randomesque(gdinaDiscriminationIndex, 2);
     const firsts = new Set<string | null>();
     for (let seed = 0; seed < 40; seed++) {
-      const test = diagnosticAdaptiveTest({ pool, attributes: ["x"], selection: rule, stopping: testLength(1) });
+      const test = createDiagnosticAdaptiveTest({ pool, attributes: ["x"], selection: rule, stopping: testLength(1) });
       firsts.add(test.start(createRandom(seed)).next);
     }
     // GDI ranks q4 above q3 above the others.
@@ -5469,7 +5508,7 @@ describe("properties", () => {
         fc.integer(),
         (items, selection, length, theta, seed) => {
           const pool = items.map(([item, exposure], i) => ({ ...item, id: `q${i}`, exposure }));
-          const test = adaptiveTest({ pool, selection, stopping: testLength(length) });
+          const test = createAdaptiveTest({ pool, selection, stopping: testLength(length) });
           const { persons } = simulateAdaptiveTest(test, [theta], createRandom(seed));
           const { state } = defined(persons[0]);
           expect(new Set(state.items).size).toBe(state.items.length);
@@ -5549,7 +5588,7 @@ describe("properties", () => {
             return testlet === undefined ? item : { ...item, testlet };
           });
           const random = createRandom(seed);
-          const test = adaptiveTest({ pool, stopping: testLength(length), withinTestlet });
+          const test = createAdaptiveTest({ pool, stopping: testLength(length), withinTestlet });
           const state = administer(test, () => (random.uniform() < 0.5 ? 1 : 0), random);
           expectTestletBlocks(state.items, pool, withinTestlet === "in-order");
           // The length is reached, and passed by less than the largest testlet.
@@ -5580,7 +5619,7 @@ describe("properties", () => {
       minimum: Math.max(0, count - Math.floor(random.uniform() * (margin + 1))),
       maximum: count + Math.floor(random.uniform() * (margin + 1)),
     }));
-    const test = adaptiveTest({
+    const test = createAdaptiveTest({
       pool,
       selection: contentBounds(maximumPriorityIndex(maximumInformation, constraints, length), constraints, length),
       stopping: testLength(length),
@@ -5773,7 +5812,7 @@ describe("properties", () => {
             const entries = profilesFor(names.length).map((profile) => ({ profile, proportion: 0 }));
             const proportions = prior.some((value) => value > 0) ? prior : prior.map(() => 1);
             const shaped = entries.map((entry, c) => ({ ...entry, proportion: defined(proportions[c]) }));
-            const test = diagnosticAdaptiveTest({
+            const test = createDiagnosticAdaptiveTest({
               pool,
               attributes: names,
               prior: shaped,
@@ -5811,7 +5850,7 @@ describe("properties", () => {
           const random = createRandom(seed);
           const responses = pool.map(() => (random.uniform() < 0.5 ? 1 : 0));
           const posterior = (order: readonly number[]): readonly number[] => {
-            const test = diagnosticAdaptiveTest({
+            const test = createDiagnosticAdaptiveTest({
               pool: order.map((i) => defined(pool[i])),
               attributes: names,
               selection: {
@@ -5856,7 +5895,7 @@ describe("properties", () => {
           fc.integer(),
           ({ names, pool }, selection, length, seed) => {
             const enemies = pool.length > 1 ? [[defined(pool[0]).id, defined(pool[1]).id]] : [];
-            const test = diagnosticAdaptiveTest({
+            const test = createDiagnosticAdaptiveTest({
               pool,
               attributes: names,
               selection,
@@ -5895,7 +5934,11 @@ describe("properties", () => {
           ...multidimensionalItem(`q${i}`, [a[0] + 0.01, a[1]], intercept, c),
           exposure,
         }));
-        const test = multidimensionalAdaptiveTest({ pool, enemies: [["q0", "q1"]], stopping: testLength(length) });
+        const test = createMultidimensionalAdaptiveTest({
+          pool,
+          enemies: [["q0", "q1"]],
+          stopping: testLength(length),
+        });
         const { persons } = simulateMultidimensionalAdaptiveTest(test, [[0.3, -0.5]], createRandom(seed));
         const { state } = defined(persons[0]);
         expect(new Set(state.items).size).toBe(state.items.length);

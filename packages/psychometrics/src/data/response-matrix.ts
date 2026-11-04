@@ -49,26 +49,26 @@ export interface ResponseMatrixOptions {
  * response is not an integer from 0 to 2³¹ - 1 or `null`, the ids do not match the rows and columns or repeat, or the
  * times do not match the responses or are not positive finite numbers or `null`.
  */
-export function responseMatrix(
+export function buildResponseMatrix(
   rows: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions = {},
 ): ResponseMatrix {
-  return buildResponseMatrix(rows, options, copyRows);
+  return buildResponseMatrixWith(rows, options, copyRows);
 }
 
 /**
  * Builds a response matrix that holds the rows given, not copies of them: for a function that made the rows and knows
- * that every response in them is an integer from 0 to 2³¹ - 1 or `null`. Checks the rest of what {@link responseMatrix}
- * checks.
+ * that every response in them is an integer from 0 to 2³¹ - 1 or `null`. Checks the rest of what {@link
+ * buildResponseMatrix} checks.
  */
-export function responseMatrixOfRows(
+export function buildResponseMatrixOfRows(
   rows: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions = {},
 ): ResponseMatrix {
-  return buildResponseMatrix(rows, options, (owned) => owned, { responses: false });
+  return buildResponseMatrixWith(rows, options, (owned) => owned, { responses: false });
 }
 
-function buildResponseMatrix(
+function buildResponseMatrixWith(
   rows: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions,
   own: (rows: readonly (readonly (number | null)[])[]) => readonly (readonly (number | null)[])[],
@@ -108,9 +108,9 @@ function buildResponseMatrix(
  * @param options - The ids of the persons and items, and the response times.
  * @returns The matrix, whose ids are `person1`, `item1` and so on without the options.
  * @throws `DataError` when the columns are not arrays of equal length, or in the cases listed for {@link
- * responseMatrix}.
+ * buildResponseMatrix}.
  */
-export function responseMatrixFromColumns(
+export function buildResponseMatrixFromColumns(
   columns: readonly (readonly (number | null)[])[],
   options: ResponseMatrixOptions = {},
 ): ResponseMatrix {
@@ -129,7 +129,7 @@ export function responseMatrixFromColumns(
       rows[person]?.push(response);
     });
   });
-  return responseMatrix(rows, options);
+  return buildResponseMatrix(rows, options);
 }
 
 /** Checks that a response matrix is well formed, throwing a `DataError` that names the first problem found. */

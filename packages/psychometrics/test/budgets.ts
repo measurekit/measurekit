@@ -151,8 +151,8 @@ const BUDGETS = {
   "standardSetting.bookmarkCutScore": 0.3,
   "standardSetting.classificationAccuracy": 5,
   "standardSetting.livingstonLewis": 5,
-  "parameterization.toMirtSlopeIntercept": 10,
-  "parameterization.toMirtIrt": 20,
+  "parameterization.writeMirtSlopeIntercept": 10,
+  "parameterization.writeMirtIrt": 20,
 } as const;
 
 /** Runs a benchmark against its budget. */

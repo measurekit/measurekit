@@ -20,9 +20,9 @@ Times are in seconds, positive, aligned with the responses: `times` of a [respon
 item, `null` when missing; or `time` of a [response record](data.md#response-records). A time needs a response.
 
 ```ts
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 
-const matrix = responseMatrix(
+const matrix = buildResponseMatrix(
   [
     [1, 0, 1],
     [0, 1, null],
@@ -70,7 +70,7 @@ item needs two times or more; responses without times are skipped.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { calibrateResponseTimes, responseTimeFit, speedEstimates } from "@measurekit/psychometrics/response-time";
 import { normalDistribution, simulateThetas } from "@measurekit/psychometrics/sim";
 
@@ -79,7 +79,7 @@ const random = createRandom(2026);
 const intensities = [4, 3.5, 3];
 const speeds = simulateThetas(300, random, { distribution: normalDistribution(0, 0.3) });
 const times = speeds.map((speed) => intensities.map((intensity) => Math.exp(intensity - speed + random.normal() / 2)));
-const data = responseMatrix(
+const data = buildResponseMatrix(
   times.map((row) => row.map(() => 1)),
   { times },
 );
@@ -123,7 +123,7 @@ and speed correlated in the population.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { calibrateSpeedAccuracy, speedAccuracyEstimates } from "@measurekit/psychometrics/response-time";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -134,7 +134,7 @@ const items = simulateItems(twoParameterLogistic, 8, random);
 const thetas = simulateThetas(500, random);
 const speeds = thetas.map((theta) => 0.4 * (0.6 * theta + 0.8 * random.normal()));
 const times = speeds.map((speed) => items.map((_, i) => Math.exp(3 + i / 8 - speed + random.normal() / 1.5)));
-const data = responseMatrix(simulateResponses(items, thetas, random).responses, { times });
+const data = buildResponseMatrix(simulateResponses(items, thetas, random).responses, { times });
 
 const calibration = calibrateSpeedAccuracy(data, { model: twoParameterLogistic, standardErrors: "hessian" });
 calibration.correlation; // 0.63, standard error 0.05: the true value is 0.6
@@ -221,7 +221,7 @@ with the option `estimator`, `posteriorMeanEstimate` by default, from the person
 effort, such as below 0.9, are often reported or left out of calibration.
 
 ```ts
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import {
   effortModeratedEstimates,
@@ -229,7 +229,7 @@ import {
   responseTimeEffort,
 } from "@measurekit/psychometrics/response-time";
 
-const data = responseMatrix(
+const data = buildResponseMatrix(
   [
     [1, 0, 1],
     [0, 0, 1],

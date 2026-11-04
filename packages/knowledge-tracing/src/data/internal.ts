@@ -13,7 +13,7 @@ export {
   type ObservedEvent,
   resourceOf,
 } from "./event.js";
-export { checkLog, checkObservedEvents, type EventInput, type EventLog, eventLog } from "./event-log.js";
+export { buildEventLog, checkLog, checkObservedEvents, type EventInput, type EventLog } from "./event-log.js";
 export { checkLearner, checkLearnerId, checkLearnerState } from "./learner.js";
 export { checkItemSkills } from "./q-matrix.js";
 export { entry, mapRecord, parametersOf, put } from "./record.js";

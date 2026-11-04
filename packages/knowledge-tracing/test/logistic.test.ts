@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   afm,
+  buildEventLog,
   compareModels,
   createRandom,
   crossValidate,
@@ -9,7 +10,6 @@ import {
   type Event,
   type EventInput,
   type EventLog,
-  eventLog,
   type LogisticFeature,
   type LogisticOptions,
   type LogisticParameters,
@@ -299,9 +299,9 @@ interface Reference {
 // Parsed rather than imported as typed: TypeScript merges the fits' coefficient records into one type with
 // optional keys.
 const references: readonly Reference[] = JSON.parse(JSON.stringify(glm.fits));
-const simulated = eventLog(glm.events);
+const simulated = buildEventLog(glm.events);
 const singleSkill = glm.singleSkill.map((index) => defined(simulated[index]));
-const sample = eventLog(lkt.events);
+const sample = buildEventLog(lkt.events);
 
 /** Expects parameters to equal the expected ones within `tolerance`, skill by skill and learner by learner. */
 function expectParameters(actual: LogisticParameters, expected: LogisticParameters, tolerance: number): void {
@@ -492,7 +492,7 @@ describe("logistic history features", () => {
     expect(() => model.update(lesson, event(10, 1))).toThrow(
       "The event needs a duration, which the features basePractice read for the practice time.",
     );
-    expect(() => model.fit(eventLog([event(0, 1, { duration: 5 }), event(1, 0)]))).toThrow(
+    expect(() => model.fit(buildEventLog([event(0, 1, { duration: 5 }), event(1, 0)]))).toThrow(
       "Event 2 needs a duration, which the features basePractice read for the practice time.",
     );
     expect(() => logistic().update(logistic().initialState("ana"), event(0, 1))).not.toThrow();
@@ -600,7 +600,7 @@ describe("logistic history features", () => {
       features: ["proportion", { base: 0.5 }, { dash: 86_400 }, { windowOpportunities: 86_400 }],
       ridge: 1,
     });
-    const fit = model.fit(eventLog(featureEvents));
+    const fit = model.fit(buildEventLog(featureEvents));
     expect(fit.converged).toBe(true);
     expect(fit.predictions.every((p) => p !== null && p >= 0 && p <= 1)).toBe(true);
   });
@@ -808,7 +808,7 @@ describe("logistic edge cases", () => {
   const event: Event = { learner: "ana", item: "q", skills: ["s"], time: 10, outcome: 1 };
 
   it("refuses a feature that overflows, as a power of a short time apart, rather than predict NaN", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       { ...event, time: 0 },
       { ...event, time: 0.5, outcome: 0 },
     ]);
@@ -827,11 +827,13 @@ describe("logistic edge cases", () => {
   });
 
   it("fit one learner, and logs all correct or all wrong, without NaN", () => {
-    const one = eventLog(Array.from({ length: 8 }, (_, time) => ({ ...event, time, outcome: time % 3 === 0 ? 0 : 1 })));
+    const one = buildEventLog(
+      Array.from({ length: 8 }, (_, time) => ({ ...event, time, outcome: time % 3 === 0 ? 0 : 1 })),
+    );
     for (const log of [
       one,
-      eventLog([{ ...event }, { ...event, time: 11 }]),
-      eventLog([
+      buildEventLog([{ ...event }, { ...event, time: 11 }]),
+      buildEventLog([
         { ...event, outcome: 0 },
         { ...event, time: 11, outcome: 0 },
       ]),
@@ -847,7 +849,7 @@ describe("logistic edge cases", () => {
   it("keep the decayed logit finite after a run of one outcome long enough to underflow its prior", () => {
     // 0.5¹²⁰⁰ underflows to 0, so the prior does not keep the decayed successes or failures above 0.
     const run = (outcome: number) =>
-      eventLog([
+      buildEventLog([
         ...Array.from({ length: 1200 }, (_, time) => ({ ...event, time, outcome })),
         { ...event, learner: "budi", time: 1200, outcome: 1 - outcome },
       ]);
@@ -864,7 +866,7 @@ describe("logistic edge cases", () => {
 
   it("stop without converging when a feature's square overflows", () => {
     // Recency at a gap of 1e-310 is 1e155, whose square overflows the Newton system's diagonal to Infinity.
-    const log = eventLog([
+    const log = buildEventLog([
       { ...event, time: 0, outcome: 1 },
       { ...event, time: 1e-310, outcome: 0 },
       { ...event, learner: "budi", time: 1, outcome: 0 },
@@ -876,7 +878,7 @@ describe("logistic edge cases", () => {
 
   it("keep the coefficient of a feature that is 0 on every event at 0, and converge", () => {
     // No event follows a success, so the feature of successes is 0 throughout.
-    const log = eventLog([
+    const log = buildEventLog([
       { ...event, time: 1, outcome: 0 },
       { ...event, time: 2, outcome: 1 },
       { ...event, learner: "budi", time: 3, outcome: 1 },
@@ -902,8 +904,8 @@ describe("logistic edge cases", () => {
   const second = cohort("b", ["t1", "t2", "t3"]);
 
   it("fit cohorts that share no skill as if fitted apart, with θ of mean 0 in each", () => {
-    const together = afm().fit(eventLog([...first, ...second]));
-    const apart = [afm().fit(eventLog(first)), afm().fit(eventLog(second))];
+    const together = afm().fit(buildEventLog([...first, ...second]));
+    const apart = [afm().fit(buildEventLog(first)), afm().fit(buildEventLog(second))];
     expect(together.converged).toBe(true);
     expectClose(together.logLikelihood, (apart[0]?.logLikelihood ?? 0) + (apart[1]?.logLikelihood ?? 0), 1e-8);
     const learners = defined(together.model.parameters.learners);
@@ -923,7 +925,7 @@ describe("logistic edge cases", () => {
     // With decay 1, the decayed opportunities equal the opportunities: two equal columns.
     [["opportunities", { decayedOpportunities: 1 }], ["opportunities"]],
   ] as const)("converge with features %j, linear in others, at the likelihood without them", (features, reduced) => {
-    const log = eventLog(first);
+    const log = buildEventLog(first);
     const redundant = logistic({ features: [...features] }).fit(log);
     expect(redundant.converged).toBe(true);
     expectClose(redundant.logLikelihood, logistic({ features: [...reduced] }).fit(log).logLikelihood, 1e-8);
@@ -932,7 +934,7 @@ describe("logistic edge cases", () => {
   it("reject an empty log, events without skills, unknown skills and events out of time order", () => {
     const model = afm({ parameters: { skills: { s: { intercept: 0, coefficients: { opportunities: 0.1 } } } } });
     expect(() => model.fit([])).toThrow("A log needs at least one event.");
-    expect(() => model.fit(eventLog([{ ...event, skills: [] }]))).toThrow(
+    expect(() => model.fit(buildEventLog([{ ...event, skills: [] }]))).toThrow(
       "Event 1 has no skills; a logistic model needs at least one.",
     );
     const state = model.update(model.initialState("ana"), event);
@@ -1016,7 +1018,7 @@ describe("logistic options from JavaScript", () => {
 });
 
 describe("logistic exposure features against R", () => {
-  const log = eventLog(exposureFixture.events);
+  const log = buildEventLog(exposureFixture.events);
   const features: readonly LogisticFeature[] = [
     "exposures",
     { decayedExposures: exposureFixture.decay },
@@ -1144,7 +1146,7 @@ describe("logistic with events that have no outcome", () => {
   });
 
   it("estimates no coefficients for a skill that only lessons practice", () => {
-    const events = eventLog([
+    const events = buildEventLog([
       { learner: "a", item: "q", skills: ["s"], time: 1, outcome: 1 },
       { learner: "b", item: "q", skills: ["s"], time: 1, outcome: 0 },
       { learner: "a", item: "video", skills: ["s", "taught"], time: 2, outcome: null },
@@ -1156,7 +1158,7 @@ describe("logistic with events that have no outcome", () => {
   });
 
   it("refuses to fit a log without an event with an outcome", () => {
-    expect(() => logistic().fit(eventLog([lesson]))).toThrow(
+    expect(() => logistic().fit(buildEventLog([lesson]))).toThrow(
       "The log has no event with an outcome; a logistic model needs at least one to fit.",
     );
   });
@@ -1176,7 +1178,7 @@ interface TermsReference {
 }
 
 const termsReferences: readonly TermsReference[] = JSON.parse(JSON.stringify(termsFixture.fits));
-const termsLog = eventLog(JSON.parse(JSON.stringify(termsFixture.events)));
+const termsLog = buildEventLog(JSON.parse(JSON.stringify(termsFixture.events)));
 
 /** Returns every number of parameters by its path, such as `/items/i01/intercept`. */
 function numbersOf(parameters: unknown, path = ""): Map<string, number> {
@@ -1427,11 +1429,11 @@ describe("logistic terms", () => {
     const model = logistic({ covariates: ["x"] });
     const withX: Event = { ...first, covariates: { x: 1 } };
     const lesson: Event = { ...first, outcome: null };
-    expect(() => model.fit(eventLog([withX, { ...first, time: 2 }]))).toThrow(
+    expect(() => model.fit(buildEventLog([withX, { ...first, time: 2 }]))).toThrow(
       'Event 2 needs the covariate "x", which the model reads.',
     );
-    expect(model.fit(eventLog([withX, { ...lesson, time: 2 }])).converged).toBe(true);
-    const fitted = model.fit(eventLog([withX, { ...withX, time: 2, outcome: 0 }])).model;
+    expect(model.fit(buildEventLog([withX, { ...lesson, time: 2 }])).converged).toBe(true);
+    const fitted = model.fit(buildEventLog([withX, { ...withX, time: 2, outcome: 0 }])).model;
     expect(() => fitted.predict(fitted.initialState("ana"), first)).toThrow(
       'The attempt needs the covariate "x", which the model reads.',
     );
@@ -1439,7 +1441,7 @@ describe("logistic terms", () => {
   });
 
   it("fits more than 5,000 coefficients with a ridge, and refuses to without one or with random proficiency", () => {
-    const many = eventLog(
+    const many = buildEventLog(
       Array.from({ length: 5_001 }, (_, i) => ({
         learner: `l${i % 50}`,
         item: `i${i}`,
@@ -1465,7 +1467,7 @@ describe("logistic fits replayed", () => {
   // Ids that are names of Object.prototype, which a record of histories must hold as entries of its own.
   const learners = ["__proto__", "constructor", "ana"];
   const skills = ["__proto__", "toString", "fractions"];
-  const replayLog = eventLog(
+  const replayLog = buildEventLog(
     Array.from({ length: 90 }, (_, i): EventInput => {
       const base = { learner: defined(learners[i % 3]), item: i % 9 === 0 ? "__proto__" : `q${i % 7}`, time: i + 1 };
       const covariates = { x: ((i * 7) % 5) / 4 };
@@ -1545,7 +1547,7 @@ describe("logistic standard errors", () => {
 
   it("use the binomial variance of an intercept alone for outcomes between 0 and 1", () => {
     const outcomes = [0.2, 0.8, 0.5, 1, 0.3, 0.7];
-    const log = eventLog(
+    const log = buildEventLog(
       outcomes.map((outcome, time) => ({ learner: "ana", item: "q", skills: ["s"], time, outcome })),
     );
     const errors = defined(logistic({ standardErrors: true }).fit(log).standardErrors);
@@ -1561,7 +1563,7 @@ describe("logistic standard errors", () => {
     expect(collinear.converged).toBe(true);
     expect(collinear.standardErrors).toBeNull();
     // Each learner attempts each skill once, so the recency of every attempt is 0 and its coefficient has no information.
-    const once = eventLog(
+    const once = buildEventLog(
       ["a", "b", "c", "d"].flatMap((learner, l) =>
         ["x", "y"].map((skill, k) => ({
           learner,
@@ -1681,7 +1683,7 @@ describe("logistic options of terms from JavaScript", () => {
 });
 
 describe("rate search", () => {
-  const log = eventLog(JSON.parse(JSON.stringify(rates.events)));
+  const log = buildEventLog(JSON.parse(JSON.stringify(rates.events)));
   const bounds = rates.bounds;
   const build = (values: readonly number[]) =>
     logistic({ features: [{ decayedProportion: values[0] ?? 0 }, { recency: values[1] ?? 0 }] });
@@ -1769,7 +1771,7 @@ describe("rate search", () => {
       throw new DataError("No model for these rates.");
     };
     expect(() => searchRates(failing, log, bounds)).toThrow("No model for these rates.");
-    expect(() => searchRates((values) => build(values), eventLog([{ ...first(), skills: [] }]), bounds)).toThrow(
+    expect(() => searchRates((values) => build(values), buildEventLog([{ ...first(), skills: [] }]), bounds)).toThrow(
       DataError,
     );
   });

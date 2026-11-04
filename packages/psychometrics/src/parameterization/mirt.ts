@@ -50,7 +50,7 @@ export interface MirtCoefficients {
  * @returns The coefficients by name, in the IRT form.
  * @throws `DataError` when the item's parameters are invalid, or its model is not one of the built-in models.
  */
-export function toMirtIrt(item: IrtItem): MirtCoefficients {
+export function writeMirtIrt(item: IrtItem): MirtCoefficients {
   return toMirt(item, "irt");
 }
 
@@ -63,7 +63,7 @@ export function toMirtIrt(item: IrtItem): MirtCoefficients {
  * @throws `DataError` when the item's parameters are invalid or have no slope-intercept form, or its model is not one
  * of the built-in models.
  */
-export function toMirtSlopeIntercept(item: IrtItem): MirtCoefficients {
+export function writeMirtSlopeIntercept(item: IrtItem): MirtCoefficients {
   return toMirt(item, "slopeIntercept");
 }
 
@@ -77,7 +77,7 @@ export function toMirtSlopeIntercept(item: IrtItem): MirtCoefficients {
  * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
  * parameters, or the model is not one of the built-in models.
  */
-export function fromMirtIrt<TParameters>(
+export function readMirtIrt<TParameters>(
   coefficients: MirtCoefficients,
   model: IrtModel<TParameters>,
 ): IrtItem<TParameters> {
@@ -94,7 +94,7 @@ export function fromMirtIrt<TParameters>(
  * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
  * parameters, or the model is not one of the built-in models.
  */
-export function fromMirtSlopeIntercept<TParameters>(
+export function readMirtSlopeIntercept<TParameters>(
   coefficients: MirtCoefficients,
   model: IrtModel<TParameters>,
 ): IrtItem<TParameters> {
@@ -111,7 +111,7 @@ export function fromMirtSlopeIntercept<TParameters>(
  * @throws `DataError` when the item's parameters are invalid, or its model is not one of the built-in multidimensional
  * models.
  */
-export function toMirtMultidimensional(item: MultidimensionalItem): MirtCoefficients {
+export function writeMirtMultidimensional(item: MultidimensionalItem): MirtCoefficients {
   checkMultidimensionalItem(item, "The item");
   return multidimensionalFormOf(item.model).toMirt(item.parameters);
 }
@@ -125,7 +125,7 @@ export function toMirtMultidimensional(item: MultidimensionalItem): MirtCoeffici
  * @throws `DataError` when the coefficients lack a name of the form, have a name it does not use, or give invalid
  * parameters, or the model is not one of the built-in multidimensional models.
  */
-export function fromMirtMultidimensional<TParameters>(
+export function readMirtMultidimensional<TParameters>(
   coefficients: MirtCoefficients,
   model: MultidimensionalModel<TParameters>,
 ): MultidimensionalItem<TParameters> {

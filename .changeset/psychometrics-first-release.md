@@ -149,8 +149,8 @@ each score's theta for a moved parameter, and a scale score of a decimal step is
 An EM calibration of several dimensions keeps at most 2^24 values of its items at the nodes of its grids, about 300 MB,
 and a bifactor model's Louis standard errors count the tables of pairs of items toward it. The posterior mode of more
 than five dimensions starts from a scan along the axes, so that it and MH-RM's log-likelihood take time in proportion
-to the dimensions. A Gauss-Hermite rule holds for any number of points, and `fromMirtMultidimensional` takes the
-coefficients first, as `fromMirtIrt` does.
+to the dimensions. A Gauss-Hermite rule holds for any number of points, and `readMirtMultidimensional` takes the
+coefficients first, as `readMirtIrt` does.
 
 The analyses of the pairs of items, the correlations, factors, parallel analysis, the minimum average partial test and
 the omegas, take at most 1,000 items, as each holds a matrix of every pair; so do local dependence, Yen's Q3 and every
@@ -194,3 +194,7 @@ items.
 estimator as the option `estimator`, `simulateThetas` its distribution as `distribution`, `maximumDeterminant` its prior
 as `prior`, `classifyDifficulty` and `classifyDiscrimination` their thresholds as `thresholds`,
 `standardErrorOfMeasurement` its reliability as `reliability`, and `expectedRating` its elements as `levels`.
+`buildResponseMatrix`, `buildResponseMatrixFromColumns` and `buildResponseRecords` build the data of a test, and
+`createAdaptiveTest`, `createDiagnosticAdaptiveTest`, `createMultidimensionalAdaptiveTest` and `createMultistageTest`
+create its adaptive tests. `readMirtIrt`, `readMirtSlopeIntercept` and `readMirtMultidimensional` read the coefficients
+of mirt into items, and `writeMirtIrt`, `writeMirtSlopeIntercept` and `writeMirtMultidimensional` write them.

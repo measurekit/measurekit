@@ -1,5 +1,5 @@
 import { checkArray, checkOptions, DataError, describe } from "@measurekit/core";
-import { type ResponseMatrix, type ResponseMatrixOptions, responseMatrixOfRows } from "./response-matrix.js";
+import { buildResponseMatrixOfRows, type ResponseMatrix, type ResponseMatrixOptions } from "./response-matrix.js";
 
 /** Multiple-choice responses scored against a key, with the chosen options kept for distractor analysis. */
 export interface ScoredResponses extends ResponseMatrix {
@@ -76,7 +76,7 @@ export function scoreResponses(
     if (!accepted.accepts(label)) throw unexpectedLabel(label, `the key of item ${item + 1}`);
   }
   return {
-    ...responseMatrixOfRows(scoreRows(choices, key, accepted.accepts), options),
+    ...buildResponseMatrixOfRows(scoreRows(choices, key, accepted.accepts), options),
     choices: choices.map((row) => row.slice()),
     key: [...key],
     optionLabels: optionLabels === undefined ? [...accepted.labels].sort() : [...optionLabels],

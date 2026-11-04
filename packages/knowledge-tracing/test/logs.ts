@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { expect } from "vitest";
-import { type EventLog, eventLog, type LearnerModel } from "../src/index.js";
+import { buildEventLog, type EventLog, type LearnerModel } from "../src/index.js";
 import { defined } from "./assertions.js";
 
 /** Runs a log through a model online, returning each event's prediction and the learners' final states. */
@@ -29,7 +29,7 @@ export function columnsLog(columns: {
   readonly outcome: readonly (number | null)[];
   readonly skill?: readonly string[];
 }): EventLog {
-  return eventLog(
+  return buildEventLog(
     columns.learner.map((learner, i) => ({
       learner,
       item: defined(columns.item[i]),

@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { purified } from "../src/dif/internal.js";
 import {
+  buildResponseMatrix,
   createRandom,
   DataError,
   type DifGroup,
@@ -31,7 +32,6 @@ import {
   type RajuArea,
   type ResponseMatrix,
   rajuAreaDif,
-  responseMatrix,
   type Sibtest,
   sibtest,
   simulateItems,
@@ -1010,7 +1010,7 @@ function sibtestInput(input: { readonly fixture: string; readonly case: string; 
   const cases = input.fixture === "dif" ? fixture.cases : polytomous.cases;
   const found = defined(cases.find((dataset) => dataset.name === input.case));
   return {
-    matrix: responseMatrix(input.sparse ? found.sparse.responses : found.responses),
+    matrix: buildResponseMatrix(input.sparse ? found.sparse.responses : found.responses),
     personGroups: groups(found.focal),
   };
 }
@@ -1038,7 +1038,7 @@ function guideSample(
   const reference = simulateResponses(items, simulateThetas(500, random), random);
   const focalThetas = simulateThetas(500, random).map((theta) => theta - focalShift);
   const focal = simulateResponses(shifted, focalThetas, random);
-  const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+  const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
   return { matrix, personGroups: matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal")) };
 }
 
@@ -1062,20 +1062,22 @@ function expectPurification(actual: DifPurification | null, expected: Purificati
 describe("logisticRegressionDif", () => {
   for (const dataset of fixture.cases) {
     it(`matches difR's difLogistic on ${dataset.name} data`, () => {
-      const result = logisticRegressionDif(responseMatrix(dataset.responses), groups(dataset.focal));
+      const result = logisticRegressionDif(buildResponseMatrix(dataset.responses), groups(dataset.focal));
       expect(result.purification).toBeNull();
       expectLogistic(result.items, dataset.logistic);
     });
 
     it(`matches difR's purified difLogistic on ${dataset.name} data`, () => {
       const expected = dataset.purifiedLogistic;
-      const result = logisticRegressionDif(responseMatrix(dataset.responses), groups(dataset.focal), { purify: true });
+      const result = logisticRegressionDif(buildResponseMatrix(dataset.responses), groups(dataset.focal), {
+        purify: true,
+      });
       expectLogistic(result.items, expected);
       expectPurification(result.purification, expected);
     });
 
     it(`matches base R's rule for sparse data, purified and not, on ${dataset.name} data`, () => {
-      const matrix = responseMatrix(dataset.sparse.responses);
+      const matrix = buildResponseMatrix(dataset.sparse.responses);
       expectLogistic(logisticRegressionDif(matrix, groups(dataset.focal)).items, dataset.sparse.logistic);
       const purified = logisticRegressionDif(matrix, groups(dataset.focal), { purify: true });
       expectLogistic(purified.items, dataset.sparse.purifiedLogistic);
@@ -1099,7 +1101,7 @@ describe("logisticRegressionDif", () => {
       [0, 1],
     ];
     const rowGroups: DifGroup[] = rows.map((_, person) => (person < 4 ? "reference" : "focal"));
-    const { items } = logisticRegressionDif(responseMatrix(rows), rowGroups);
+    const { items } = logisticRegressionDif(buildResponseMatrix(rows), rowGroups);
     for (const item of items) {
       expect([item.uniform.chiSquare, item.nonuniform.chiSquare, item.both.chiSquare]).toEqual([null, null, null]);
     }
@@ -1120,17 +1122,17 @@ describe("logisticRegressionDif", () => {
       [0, 1, 0],
     ];
     const rowGroups: DifGroup[] = rows.map((_, person) => (person < 5 ? "reference" : "focal"));
-    const item = defined(logisticRegressionDif(responseMatrix(rows), rowGroups).items[0]);
+    const item = defined(logisticRegressionDif(buildResponseMatrix(rows), rowGroups).items[0]);
     expect(item.uniform.chiSquare).not.toBeNull();
     expect([item.nonuniform.chiSquare, item.both.chiSquare]).toEqual([null, null]);
   });
 
   it("gives null tests for an item every person answered alike or with persons of one group", () => {
-    const { items } = logisticRegressionDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS);
+    const { items } = logisticRegressionDif(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS);
     expect(items[0]?.both).toEqual({ chiSquare: null, degreesOfFreedom: 2, significance: null, rSquaredChange: null });
     expect(items[1]?.uniform.chiSquare).not.toBeNull();
     const rows = CONSTANT_ROWS.map((row, person) => [person < 3 ? (row[0] ?? null) : null, ...row.slice(1)]);
-    expect(logisticRegressionDif(responseMatrix(rows), CONSTANT_GROUPS).items[0]?.uniform.chiSquare).toBeNull();
+    expect(logisticRegressionDif(buildResponseMatrix(rows), CONSTANT_GROUPS).items[0]?.uniform.chiSquare).toBeNull();
   });
 });
 
@@ -1145,7 +1147,7 @@ const LORD_CALIBRATION = {
 describe("lordChiSquare", () => {
   for (const dataset of fixture.cases) {
     it(`matches difR's difLord on ${dataset.name} data`, () => {
-      const result = lordChiSquare(responseMatrix(dataset.responses), groups(dataset.focal), LORD_CALIBRATION);
+      const result = lordChiSquare(buildResponseMatrix(dataset.responses), groups(dataset.focal), LORD_CALIBRATION);
       const { lord } = dataset;
       expect(result.purification).toBeNull();
       result.items.forEach((item, i) => {
@@ -1162,7 +1164,7 @@ describe("lordChiSquare", () => {
   for (const expected of lordPurification.cases) {
     it(`matches difR's purified difLord on ${expected.name} data`, () => {
       const dataset = defined(fixture.cases.find((reference) => reference.name === expected.name));
-      const result = lordChiSquare(responseMatrix(dataset.responses), groups(dataset.focal), {
+      const result = lordChiSquare(buildResponseMatrix(dataset.responses), groups(dataset.focal), {
         ...LORD_CALIBRATION,
         purify: true,
       });
@@ -1177,7 +1179,7 @@ describe("lordChiSquare", () => {
   }
 
   it("rejects models other than the 2PL, 3PL and 4PL, and a group without persons", () => {
-    const matrix = responseMatrix(CONSTANT_ROWS);
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
     const custom = { ...twoParameterLogistic, name: "custom 2PL" };
     expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, { model: oneParameterLogistic })).toThrow(DataError);
     expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, { model: custom })).toThrow(DataError);
@@ -1207,7 +1209,7 @@ function fixtureCase(input: FixtureInput): { matrix: ResponseMatrix; groups: Dif
   }[] = input.fixture === "dif" ? fixture.cases : polytomous.cases;
   const dataset = defined(cases.find((candidate) => candidate.name === input.case));
   return {
-    matrix: responseMatrix(input.sparse ? dataset.sparse.responses : dataset.responses),
+    matrix: buildResponseMatrix(input.sparse ? dataset.sparse.responses : dataset.responses),
     groups: groups(dataset.focal),
   };
 }
@@ -1258,7 +1260,7 @@ describe("rajuAreaDif", () => {
   });
 
   it("rejects models other than the 2PL, and a group without persons", () => {
-    const matrix = responseMatrix(CONSTANT_ROWS);
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
     for (const model of [oneParameterLogistic, threeParameterLogistic, { ...twoParameterLogistic, name: "copy" }]) {
       expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, { model })).toThrow(DataError);
     }
@@ -1272,7 +1274,7 @@ describe("rajuAreaDif", () => {
   });
 
   it("rejects options of other types", () => {
-    const matrix = responseMatrix(CONSTANT_ROWS);
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
     expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
@@ -1381,7 +1383,7 @@ describe("irtLikelihoodRatioDif", () => {
 
   it("gives the same tests for one model and a list of it", () => {
     const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
-    const subset = responseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
+    const subset = buildResponseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
     const single = irtLikelihoodRatioDif(subset, caseGroups, { model: twoParameterLogistic });
     const list = irtLikelihoodRatioDif(subset, caseGroups, { model: subset.itemIds.map(() => twoParameterLogistic) });
     expect(list).toEqual(single);
@@ -1393,7 +1395,7 @@ describe("irtLikelihoodRatioDif", () => {
     const rows = matrix.responses.map((row, person) =>
       caseGroups[person] === "focal" && row[0] === highest ? [highest - 1, ...row.slice(1)] : row,
     );
-    const { items } = irtLikelihoodRatioDif(responseMatrix(rows), caseGroups, { model: gradedResponse });
+    const { items } = irtLikelihoodRatioDif(buildResponseMatrix(rows), caseGroups, { model: gradedResponse });
     expect(items[0]).toEqual({ id: "item1", chiSquare: null, degreesOfFreedom: highest + 1, significance: null });
     expect(items.slice(1).every((item) => item.chiSquare !== null)).toBe(true);
   });
@@ -1409,8 +1411,8 @@ describe("irtLikelihoodRatioDif", () => {
   });
 
   it("rejects fewer than two items, the Gauss-Hermite rule and options of other types", () => {
-    const matrix = responseMatrix(CONSTANT_ROWS);
-    const one = responseMatrix(CONSTANT_ROWS.map((row) => row.slice(1, 2)));
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
+    const one = buildResponseMatrix(CONSTANT_ROWS.map((row) => row.slice(1, 2)));
     expect(() => irtLikelihoodRatioDif(one, CONSTANT_GROUPS, { model: twoParameterLogistic })).toThrow(
       "IRT likelihood-ratio DIF needs at least 2 items, found 1.",
     );
@@ -1516,7 +1518,7 @@ describe("mantelHaenszel", () => {
     for (const expected of dataset.mantelHaenszel) {
       const correction = expected.continuityCorrection ? "with" : "without";
       it(`matches difR's difMH ${correction} continuity correction on ${dataset.name} data`, () => {
-        const result = mantelHaenszel(responseMatrix(dataset.responses), groups(dataset.focal), {
+        const result = mantelHaenszel(buildResponseMatrix(dataset.responses), groups(dataset.focal), {
           continuityCorrection: expected.continuityCorrection,
         });
         expectMantelHaenszel(result.items, expected);
@@ -1525,13 +1527,13 @@ describe("mantelHaenszel", () => {
 
     it(`matches difR's purified difMH on ${dataset.name} data`, () => {
       const expected = dataset.purifiedMantelHaenszel;
-      const result = mantelHaenszel(responseMatrix(dataset.responses), groups(dataset.focal), { purify: true });
+      const result = mantelHaenszel(buildResponseMatrix(dataset.responses), groups(dataset.focal), { purify: true });
       expectMantelHaenszel(result.items, expected);
       expectPurification(result.purification, expected);
     });
 
     it(`matches base R's rule for sparse data, purified and not, on ${dataset.name} data`, () => {
-      const matrix = responseMatrix(dataset.sparse.responses);
+      const matrix = buildResponseMatrix(dataset.sparse.responses);
       expectMantelHaenszel(mantelHaenszel(matrix, groups(dataset.focal)).items, dataset.sparse.mantelHaenszel);
       const purified = mantelHaenszel(matrix, groups(dataset.focal), { purify: true });
       expectMantelHaenszel(purified.items, dataset.sparse.purifiedMantelHaenszel);
@@ -1540,7 +1542,7 @@ describe("mantelHaenszel", () => {
   }
 
   it("gives null statistics for an item every person answered alike", () => {
-    const result = mantelHaenszel(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items;
+    const result = mantelHaenszel(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items;
     expect(result[0]).toEqual({
       id: "item1",
       chiSquare: null,
@@ -1553,10 +1555,10 @@ describe("mantelHaenszel", () => {
   });
 
   it("analyzes each item on the persons who answered it, matched on their scaled score", () => {
-    const base = mantelHaenszel(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items;
+    const base = mantelHaenszel(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items;
     // A person who did not answer item 1, or answered no other item, changes nothing for item 1.
     const rows = [...CONSTANT_ROWS, [null, 1, 0], [1, null, null]];
-    const sparse = mantelHaenszel(responseMatrix(rows), [...CONSTANT_GROUPS, "focal", "reference"]).items;
+    const sparse = mantelHaenszel(buildResponseMatrix(rows), [...CONSTANT_GROUPS, "focal", "reference"]).items;
     expect(sparse[0]).toEqual(base[0]);
     // [1, 1, null] answered 1 of 1 other item correct, which scales to 2 of 2: score 3, not 2. Score 2 then holds
     // [0, 1, 1] and [1, 1, 0] alone: A = 0, B = 1, C = 1, D = 0, so Σ (A - E(A)) = -0.5 and Var(A) = 0.25.
@@ -1566,26 +1568,26 @@ describe("mantelHaenszel", () => {
       [0, 1, 1],
       [1, 1, 0],
     ];
-    const result = mantelHaenszel(responseMatrix(scaled), ["reference", "focal", "reference", "focal"], {
+    const result = mantelHaenszel(buildResponseMatrix(scaled), ["reference", "focal", "reference", "focal"], {
       continuityCorrection: false,
     });
     expect(result.items[0]?.chiSquare).toBeCloseTo(1, 15);
   });
 
   it("purifies the matching criterion until the flags settle, and reports no rounds without flags", () => {
-    const { purification } = mantelHaenszel(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS, { purify: true });
+    const { purification } = mantelHaenszel(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS, { purify: true });
     expect(purification).toEqual({ anchors: ["item1", "item2", "item3"], iterations: 0, converged: true });
   });
 
   it("rejects invalid groups, polytomous items and a group without responses", () => {
-    const matrix = responseMatrix(CONSTANT_ROWS);
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
     expect(() => mantelHaenszel(matrix, CONSTANT_GROUPS.slice(1))).toThrow(DataError);
     // Groups from untyped data, as JavaScript callers may pass them.
     const invalid: DifGroup[] = JSON.parse(JSON.stringify(["other", ...CONSTANT_GROUPS.slice(1)]));
     expect(() => mantelHaenszel(matrix, invalid)).toThrow(DataError);
     expect(() =>
       mantelHaenszel(
-        responseMatrix([
+        buildResponseMatrix([
           [2, 1],
           [0, 1],
         ]),
@@ -1594,7 +1596,7 @@ describe("mantelHaenszel", () => {
     ).toThrow(DataError);
     expect(() =>
       mantelHaenszel(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 1],
           [null, null],
         ]),
@@ -1622,21 +1624,21 @@ function expectLiuAgresti(actual: readonly MantelTest[], expected: LiuAgrestiFix
 describe("mantelTest", () => {
   for (const dataset of polytomous.cases) {
     it(`matches base R's Mantel and generalized Mantel-Haenszel statistics on ${dataset.name} data`, () => {
-      const result = mantelTest(responseMatrix(dataset.responses), groups(dataset.focal));
+      const result = mantelTest(buildResponseMatrix(dataset.responses), groups(dataset.focal));
       expect(result.purification).toBeNull();
       expectMantelTest(result.items, dataset.complete.mantel);
     });
 
     it(`matches base R's purified statistics on ${dataset.name} data`, () => {
       const expected = dataset.complete.purifiedMantel;
-      const result = mantelTest(responseMatrix(dataset.responses), groups(dataset.focal), { purify: true });
+      const result = mantelTest(buildResponseMatrix(dataset.responses), groups(dataset.focal), { purify: true });
       expectMantelTest(result.items, expected);
       expectPurification(result.purification, expected);
     });
 
     it(`matches base R's rule for sparse data, purified and not, on ${dataset.name} data`, () => {
       const { sparse } = dataset;
-      const matrix = responseMatrix(sparse.responses);
+      const matrix = buildResponseMatrix(sparse.responses);
       expectMantelTest(mantelTest(matrix, groups(dataset.focal)).items, sparse.mantel);
       const purified = mantelTest(matrix, groups(dataset.focal), { purify: true });
       expectMantelTest(purified.items, sparse.purifiedMantel);
@@ -1658,7 +1660,7 @@ describe("mantelTest", () => {
 
   it("gives the Mantel-Haenszel odds ratio as the Liu-Agresti odds ratio of dichotomous items", () => {
     for (const dataset of fixture.cases) {
-      const matrix = responseMatrix(dataset.sparse.responses);
+      const matrix = buildResponseMatrix(dataset.sparse.responses);
       const mantel = mantelTest(matrix, groups(dataset.focal)).items;
       mantelHaenszel(matrix, groups(dataset.focal)).items.forEach((item, i) => {
         expectClose(mantel[i]?.liuAgresti?.oddsRatio ?? null, item.oddsRatio, 1e-12 * (item.oddsRatio ?? 1));
@@ -1686,16 +1688,16 @@ describe("mantelTest", () => {
   });
 
   it("gives no Liu-Agresti odds ratio without a score group of both groups, nor a test of a ratio of 0", () => {
-    const apart = mantelTest(responseMatrix(DISJOINT_ROWS), ["reference", "reference", "focal", "focal"]).items;
+    const apart = mantelTest(buildResponseMatrix(DISJOINT_ROWS), ["reference", "reference", "focal", "focal"]).items;
     expect(apart[0]?.liuAgresti).toBeNull();
     // In both score groups of DISJOINT_ROWS the focal response to item 1 is above the reference response: ψ̂ = 0.
-    const { items } = mantelTest(responseMatrix(DISJOINT_ROWS), ["reference", "focal", "reference", "focal"]);
+    const { items } = mantelTest(buildResponseMatrix(DISJOINT_ROWS), ["reference", "focal", "reference", "focal"]);
     expect(items[0]?.liuAgresti).toEqual({ oddsRatio: 0, logStandardError: null, z: null, significance: null });
   });
 
   it("gives the Mantel-Haenszel chi-square without the continuity correction for dichotomous items", () => {
     const { responses, focal } = fixture.cases[0] ?? { responses: [], focal: [] };
-    const matrix = responseMatrix(responses);
+    const matrix = buildResponseMatrix(responses);
     const mantel = mantelTest(matrix, groups(focal)).items;
     const reference = mantelHaenszel(matrix, groups(focal), { continuityCorrection: false }).items;
     reference.forEach((item, i) => {
@@ -1706,7 +1708,7 @@ describe("mantelTest", () => {
   });
 
   it("derives the statistics of two score groups by hand", () => {
-    const { items } = mantelTest(responseMatrix(DISJOINT_ROWS), ["reference", "focal", "reference", "focal"]);
+    const { items } = mantelTest(buildResponseMatrix(DISJOINT_ROWS), ["reference", "focal", "reference", "focal"]);
     // Score group 1 holds [0, 1] and [1, 0], group 5 holds [2, 3] and [3, 2]; in each, F = E(F) + 1/2 and Var(F) = 1/4,
     // so the chi-square is 1 / (1/2) = 2. The standardized mean difference is 1: the focal mean is 1 higher in both.
     // The responses 0, 1, 2 and 3 have a sample variance of 5/3.
@@ -1719,13 +1721,13 @@ describe("mantelTest", () => {
   });
 
   it("gives a null generalized chi-square where the score groups use disjoint categories", () => {
-    const { items } = mantelTest(responseMatrix(DISJOINT_ROWS), ["reference", "focal", "reference", "focal"]);
+    const { items } = mantelTest(buildResponseMatrix(DISJOINT_ROWS), ["reference", "focal", "reference", "focal"]);
     expect(items[0]?.generalized).toEqual({ chiSquare: null, degreesOfFreedom: 3, significance: null });
   });
 
   it("counts only the categories used in score groups of more than one person", () => {
     const rows = [...DISJOINT_ROWS, [4, 3]];
-    const { items } = mantelTest(responseMatrix(rows), ["reference", "focal", "reference", "focal", "focal"]);
+    const { items } = mantelTest(buildResponseMatrix(rows), ["reference", "focal", "reference", "focal", "focal"]);
     expect(items[0]?.generalized.degreesOfFreedom).toBe(3);
     expect(items[0]?.chiSquare).toBeCloseTo(2, 14);
     expect(items[0]?.standardizedMeanDifference).toBeCloseTo(1, 14);
@@ -1735,7 +1737,7 @@ describe("mantelTest", () => {
     // Scaling every response by c scales F - E(F) by c and Var(F) by c², so the chi-square and the effect size stay.
     const scale = 2 ** 20;
     const scaled = DISJOINT_ROWS.map((row) => row.map((response) => response * scale));
-    const { items } = mantelTest(responseMatrix(scaled), ["reference", "focal", "reference", "focal"]);
+    const { items } = mantelTest(buildResponseMatrix(scaled), ["reference", "focal", "reference", "focal"]);
     expect(items[0]?.chiSquare).toBeCloseTo(2, 12);
     expect(items[0]?.standardizedMeanDifference).toBeCloseTo(scale, 6);
     expect(items[0]?.effectSize).toBeCloseTo(Math.sqrt(3 / 5), 12);
@@ -1743,7 +1745,7 @@ describe("mantelTest", () => {
   });
 
   it("gives null statistics for an item every person answered alike", () => {
-    const result = mantelTest(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items[0];
+    const result = mantelTest(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items[0];
     expect(result).toEqual({
       id: "item1",
       chiSquare: null,
@@ -1762,13 +1764,13 @@ describe("mantelTest", () => {
     const scalingGroups = [...SCALING_GROUPS, "focal" as const];
     // [2, 1, null] answered 1 of 2 on item 2, which scales to 3 / 2 of the other items' 3 points, 2 with halves up: the
     // score of item 1 is 2 + 2, as that of [2, 1, 1].
-    const full = mantelTest(responseMatrix(answered), scalingGroups).items[0];
+    const full = mantelTest(buildResponseMatrix(answered), scalingGroups).items[0];
     expect(full?.chiSquare).not.toBeNull();
-    expect(mantelTest(responseMatrix(skipped), scalingGroups).items[0]).toEqual(full);
+    expect(mantelTest(buildResponseMatrix(skipped), scalingGroups).items[0]).toEqual(full);
   });
 
   it("rejects groups without responses and invalid purification", () => {
-    const missing = responseMatrix([
+    const missing = buildResponseMatrix([
       [2, 1],
       [null, null],
     ]);
@@ -1780,24 +1782,24 @@ describe("mantelTest", () => {
   it("refuses an item whose persons use more than 255 categories, whose generalized test holds every pair", () => {
     const rows = Array.from({ length: 512 }, (_, person) => [person % 256, person % 2]);
     const groups: DifGroup[] = rows.map((_, person) => (person < 256 ? "reference" : "focal"));
-    expect(() => mantelTest(responseMatrix(rows), groups)).toThrow(
+    expect(() => mantelTest(buildResponseMatrix(rows), groups)).toThrow(
       'Mantel DIF takes items of at most 255 categories, found 256 used for item "item1".',
     );
     const fewer = rows.map(([first = 0, second = 0]) => [Math.min(first, 254), second]);
-    expect(mantelTest(responseMatrix(fewer), groups).items[0]?.generalized.degreesOfFreedom).toBe(254);
+    expect(mantelTest(buildResponseMatrix(fewer), groups).items[0]?.generalized.degreesOfFreedom).toBe(254);
   });
 });
 
 describe("ordinalLogisticRegressionDif", () => {
   for (const dataset of polytomous.cases) {
     it(`matches MASS::polr and lordif's rundif on ${dataset.name} data`, () => {
-      const result = ordinalLogisticRegressionDif(responseMatrix(dataset.responses), groups(dataset.focal));
+      const result = ordinalLogisticRegressionDif(buildResponseMatrix(dataset.responses), groups(dataset.focal));
       expect(result.purification).toBeNull();
       expectOrdinal(result.items, dataset.complete.ordinal, dataset.complete.lordif);
     });
 
     it(`matches polr and rundif on ${dataset.name} data matched on theta`, () => {
-      const result = ordinalLogisticRegressionDif(responseMatrix(dataset.responses), groups(dataset.focal), {
+      const result = ordinalLogisticRegressionDif(buildResponseMatrix(dataset.responses), groups(dataset.focal), {
         matching: dataset.theta,
       });
       expectOrdinal(result.items, dataset.complete.ordinalTheta, dataset.complete.lordifTheta);
@@ -1805,7 +1807,7 @@ describe("ordinalLogisticRegressionDif", () => {
 
     it(`matches polr's purified statistics on ${dataset.name} data`, () => {
       const expected = dataset.complete.purifiedOrdinal;
-      const result = ordinalLogisticRegressionDif(responseMatrix(dataset.responses), groups(dataset.focal), {
+      const result = ordinalLogisticRegressionDif(buildResponseMatrix(dataset.responses), groups(dataset.focal), {
         purify: true,
       });
       expectOrdinal(result.items, expected);
@@ -1814,7 +1816,7 @@ describe("ordinalLogisticRegressionDif", () => {
 
     it(`matches polr's rule for sparse data, purified, not and matched on theta, on ${dataset.name} data`, () => {
       const { sparse } = dataset;
-      const matrix = responseMatrix(sparse.responses);
+      const matrix = buildResponseMatrix(sparse.responses);
       expectOrdinal(ordinalLogisticRegressionDif(matrix, groups(dataset.focal)).items, sparse.ordinal);
       const options = { matching: sparse.theta };
       expectOrdinal(ordinalLogisticRegressionDif(matrix, groups(dataset.focal), options).items, sparse.ordinalTheta);
@@ -1826,7 +1828,7 @@ describe("ordinalLogisticRegressionDif", () => {
 
   it("equals logistic regression for dichotomous items", () => {
     for (const dataset of fixture.cases) {
-      const matrix = responseMatrix(dataset.responses);
+      const matrix = buildResponseMatrix(dataset.responses);
       const ordinal = ordinalLogisticRegressionDif(matrix, groups(dataset.focal)).items;
       const logistic = logisticRegressionDif(matrix, groups(dataset.focal)).items;
       logistic.forEach((item, i) => {
@@ -1842,10 +1844,12 @@ describe("ordinalLogisticRegressionDif", () => {
 
   it("uses the categories the persons used, whichever integers the responses are", () => {
     const dataset = polytomous.cases[0];
-    const matrix = responseMatrix(dataset?.responses ?? []);
+    const matrix = buildResponseMatrix(dataset?.responses ?? []);
     const options = { matching: dataset?.theta ?? [] };
     const spread = [0, 3, 4, 9, 20, 21];
-    const relabeled = responseMatrix(matrix.responses.map((row) => row.map((response) => spread[response ?? 0] ?? 0)));
+    const relabeled = buildResponseMatrix(
+      matrix.responses.map((row) => row.map((response) => spread[response ?? 0] ?? 0)),
+    );
     const expected = ordinalLogisticRegressionDif(matrix, groups(dataset?.focal ?? []), options);
     expect(ordinalLogisticRegressionDif(relabeled, groups(dataset?.focal ?? []), options)).toEqual(expected);
   });
@@ -1854,9 +1858,9 @@ describe("ordinalLogisticRegressionDif", () => {
     const answered = [...SCALING_ROWS, [2, 1, 1]];
     const skipped = [...SCALING_ROWS, [2, 1, null]];
     const scalingGroups = [...SCALING_GROUPS, "focal" as const];
-    const full = ordinalLogisticRegressionDif(responseMatrix(answered), scalingGroups).items[0];
+    const full = ordinalLogisticRegressionDif(buildResponseMatrix(answered), scalingGroups).items[0];
     expect(full?.both.chiSquare).not.toBeNull();
-    expect(ordinalLogisticRegressionDif(responseMatrix(skipped), scalingGroups).items[0]).toEqual(full);
+    expect(ordinalLogisticRegressionDif(buildResponseMatrix(skipped), scalingGroups).items[0]).toEqual(full);
   });
 
   it("leaves out the persons without a matching score and does not depend on its scale", () => {
@@ -1866,14 +1870,14 @@ describe("ordinalLogisticRegressionDif", () => {
     const theta = dataset?.theta.slice(0, 400) ?? [];
     const dropped = theta.map((score, person) => (person % 5 === 0 ? null : score));
     const kept = rows.map((_, person) => person % 5 !== 0);
-    const withNulls = ordinalLogisticRegressionDif(responseMatrix(rows), groups(focal), { matching: dropped });
+    const withNulls = ordinalLogisticRegressionDif(buildResponseMatrix(rows), groups(focal), { matching: dropped });
     const without = ordinalLogisticRegressionDif(
-      responseMatrix(rows.filter((_, person) => kept[person])),
+      buildResponseMatrix(rows.filter((_, person) => kept[person])),
       groups(focal.filter((_, person) => kept[person])),
       { matching: theta.filter((_, person) => kept[person]) },
     );
     expect(withNulls.items).toEqual(without.items);
-    const rescaled = ordinalLogisticRegressionDif(responseMatrix(rows), groups(focal), {
+    const rescaled = ordinalLogisticRegressionDif(buildResponseMatrix(rows), groups(focal), {
       matching: dropped.map((score) => (score === null ? null : 3 * score + 7)),
     });
     rescaled.items.forEach((item, i) => {
@@ -1884,19 +1888,21 @@ describe("ordinalLogisticRegressionDif", () => {
   });
 
   it("gives null tests for an item every person answered alike, persons of one group or an equal matching score", () => {
-    const alike = ordinalLogisticRegressionDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items;
+    const alike = ordinalLogisticRegressionDif(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS).items;
     expect(alike[0]?.both).toEqual({ chiSquare: null, degreesOfFreedom: 2, significance: null, rSquaredChange: null });
     expect(alike[0]?.slopeChange).toBeNull();
     expect(alike[1]?.uniform.chiSquare).not.toBeNull();
     const oneGroup = CONSTANT_ROWS.map((row, person) => [person < 3 ? (row[0] ?? null) : null, ...row.slice(1)]);
     const options = { matching: [1, 2, 3, 4, 5, 6] };
-    expect(ordinalLogisticRegressionDif(responseMatrix(oneGroup), CONSTANT_GROUPS, options).items[0]?.uniform).toEqual({
+    expect(
+      ordinalLogisticRegressionDif(buildResponseMatrix(oneGroup), CONSTANT_GROUPS, options).items[0]?.uniform,
+    ).toEqual({
       chiSquare: null,
       degreesOfFreedom: 1,
       significance: null,
       rSquaredChange: null,
     });
-    const equal = ordinalLogisticRegressionDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS, {
+    const equal = ordinalLogisticRegressionDif(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS, {
       matching: [4, 4, 4, 4, 4, 4],
     });
     expect(equal.items[1]?.both.chiSquare).toBeNull();
@@ -1907,13 +1913,13 @@ describe("ordinalLogisticRegressionDif", () => {
     const rows = [[0], [1], [0], [1], [0], [1], [2], [2], [2], [2], [2], [2]];
     const separated = rows.map((_, person) => (person < 6 ? "reference" : "focal")) as DifGroup[];
     const matching = [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6];
-    const { uniform } = ordinalLogisticRegressionDif(responseMatrix(rows), separated, { matching }).items[0] ?? {};
+    const { uniform } = ordinalLogisticRegressionDif(buildResponseMatrix(rows), separated, { matching }).items[0] ?? {};
     expect(uniform?.chiSquare).toBeGreaterThan(10);
     expect(uniform?.significance).toBeLessThan(0.01);
   });
 
   it("rejects a matching score that purification would have to change, and an invalid one", () => {
-    const matrix = responseMatrix(CONSTANT_ROWS);
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
     expect(() =>
       ordinalLogisticRegressionDif(matrix, CONSTANT_GROUPS, { matching: [1, 2, 3, 4, 5, 6], purify: true }),
     ).toThrow("The option purify purifies the total score, so it cannot be used with the option matching.");
@@ -1933,7 +1939,7 @@ describe("ordinalLogisticRegressionDif", () => {
   });
 
   it("rejects groups without responses", () => {
-    const missing = responseMatrix([
+    const missing = buildResponseMatrix([
       [2, 1],
       [null, null],
     ]);
@@ -1945,7 +1951,7 @@ describe("ordinalLogisticRegressionDif", () => {
   it("refuses an item whose persons use more than 255 categories, whose regression holds every pair", () => {
     const rows = Array.from({ length: 512 }, (_, person) => [person % 256, person % 2]);
     const groups: DifGroup[] = rows.map((_, person) => (person < 256 ? "reference" : "focal"));
-    expect(() => ordinalLogisticRegressionDif(responseMatrix(rows), groups)).toThrow(
+    expect(() => ordinalLogisticRegressionDif(buildResponseMatrix(rows), groups)).toThrow(
       'Ordinal logistic regression DIF takes items of at most 255 categories, found 256 used for item "item1".',
     );
   });
@@ -1960,7 +1966,7 @@ describe("logisticDiscriminantDif", () => {
     );
     const reference = simulateResponses(items, simulateThetas(500, random), random);
     const focal = simulateResponses(shifted, simulateThetas(500, random), random);
-    const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+    const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
     const sampleGroups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
     const odds = defined(mantelTest(matrix, sampleGroups).items[2]?.liuAgresti);
     expect([odds.oddsRatio, odds.logStandardError, odds.z].map((value) => shown(value, 3))).toEqual([
@@ -2003,11 +2009,12 @@ describe("logisticDiscriminantDif", () => {
   });
 
   it("gives null tests for an item answered alike, by one group, or with one matching score", () => {
-    const { items } = logisticDiscriminantDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS);
+    const { items } = logisticDiscriminantDif(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS);
     expect(items[0]?.both).toEqual({ chiSquare: null, degreesOfFreedom: 2, significance: null, rSquaredChange: null });
     expect(items[1]?.uniform.chiSquare).not.toBeNull();
     const matching = CONSTANT_ROWS.map(() => 1);
-    for (const item of logisticDiscriminantDif(responseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS, { matching }).items) {
+    for (const item of logisticDiscriminantDif(buildResponseMatrix(CONSTANT_ROWS), CONSTANT_GROUPS, { matching })
+      .items) {
       expect(item.both.chiSquare).toBeNull();
     }
     const rows = CONSTANT_ROWS.map((row, person) => [
@@ -2015,11 +2022,11 @@ describe("logisticDiscriminantDif", () => {
       person < 3 ? (row[1] ?? null) : null,
       row[2] ?? null,
     ]);
-    expect(logisticDiscriminantDif(responseMatrix(rows), CONSTANT_GROUPS).items[1]?.uniform.chiSquare).toBeNull();
+    expect(logisticDiscriminantDif(buildResponseMatrix(rows), CONSTANT_GROUPS).items[1]?.uniform.chiSquare).toBeNull();
   });
 
   it("rejects purify with matching, a matching score that is not finite, and options of other types", () => {
-    const matrix = responseMatrix(CONSTANT_ROWS);
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
     const matching = CONSTANT_ROWS.map(() => 0);
     expect(() => logisticDiscriminantDif(matrix, CONSTANT_GROUPS, { matching, purify: true })).toThrow(
       "The option purify purifies the total score, so it cannot be used with the option matching.",
@@ -2105,7 +2112,7 @@ describe("sibtest", () => {
       const reference = simulateResponses(items, simulateThetas(500, random), random);
       const focalThetas = simulateThetas(500, random).map((theta) => theta - 0.5);
       const focal = simulateResponses(shifted, focalThetas, random);
-      const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+      const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
       const personGroups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
       const uncorrected = sibtest(matrix, personGroups, { correction: false }).items;
       sibtest(matrix, personGroups).items.forEach((item, j) => {
@@ -2153,7 +2160,7 @@ describe("sibtest", () => {
     const { responses } = simulateResponses(items, simulateThetas(2000, random), random);
     const sparse = responses.map((row) => row.map((response) => (random.uniform() < 0.02 ? null : response)));
     const personGroups: DifGroup[] = sparse.map((_, person) => (person % 2 === 0 ? "reference" : "focal"));
-    const { items: statistics } = sibtest(responseMatrix(sparse), personGroups);
+    const { items: statistics } = sibtest(buildResponseMatrix(sparse), personGroups);
     const complete = sparse.filter((row) => !row.includes(null)).length;
     for (const item of statistics) expect(item.persons).toBe(complete);
     // 1 - 0.98³⁰ of the persons miss a response: 45%, and the seeded share lies within 2% of it.
@@ -2164,7 +2171,11 @@ describe("sibtest", () => {
   it("derives the statistics of one score group by hand", () => {
     // Only score 1 of item 2 lies between the lowest and the highest. It holds [0, 1, 1] and [0, 0, 1], whose means are
     // 2/3 and 1/3 and whose sample variances are 1/3.
-    const { items } = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    const { items } = sibtest(
+      buildResponseMatrix(ONE_MIDDLE_SCORE_ROWS),
+      ONE_MIDDLE_SCORE_GROUPS,
+      ONE_MIDDLE_SCORE_OPTIONS,
+    );
     expectClose(items[0]?.beta ?? null, 1 / 3, SIBTEST_TOLERANCE);
     expectClose(items[0]?.standardError ?? null, Math.sqrt(2) / 3, SIBTEST_TOLERANCE);
     expectClose(items[0]?.chiSquare ?? null, 1 / 2, SIBTEST_TOLERANCE);
@@ -2175,14 +2186,14 @@ describe("sibtest", () => {
 
   it("uses a score group only above smallCell persons of each group, as mirt's Jmin", () => {
     // The score group holds 3 persons of each group: more than 2, but not more than 3.
-    const matrix = responseMatrix(ONE_MIDDLE_SCORE_ROWS);
+    const matrix = buildResponseMatrix(ONE_MIDDLE_SCORE_ROWS);
     expect(sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS).items[0]?.beta).not.toBeNull();
     const options = { ...ONE_MIDDLE_SCORE_OPTIONS, smallCell: 3 };
     expect(sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, options).items[0]).toEqual({ ...UNDEFINED_SIBTEST, id: "item1" });
   });
 
   it("is undefined with the correction on one matching item, whose coefficient alpha is undefined", () => {
-    const matrix = responseMatrix(ONE_MIDDLE_SCORE_ROWS);
+    const matrix = buildResponseMatrix(ONE_MIDDLE_SCORE_ROWS);
     expect(sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, { smallCell: 2 }).items[0]).toEqual({
       ...UNDEFINED_SIBTEST,
       id: "item1",
@@ -2190,28 +2201,32 @@ describe("sibtest", () => {
   });
 
   it("leaves out a person with a missing response to a matching or a studied item", () => {
-    const complete = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    const complete = sibtest(
+      buildResponseMatrix(ONE_MIDDLE_SCORE_ROWS),
+      ONE_MIDDLE_SCORE_GROUPS,
+      ONE_MIDDLE_SCORE_OPTIONS,
+    );
     const rows = [...ONE_MIDDLE_SCORE_ROWS, [1, null], [null, 1]];
     const personGroups: DifGroup[] = [...ONE_MIDDLE_SCORE_GROUPS, "focal", "reference"];
-    const sparse = sibtest(responseMatrix(rows), personGroups, ONE_MIDDLE_SCORE_OPTIONS);
+    const sparse = sibtest(buildResponseMatrix(rows), personGroups, ONE_MIDDLE_SCORE_OPTIONS);
     expect(sparse.items).toEqual(complete.items);
   });
 
   it("gives null statistics when no person answered the items of an analysis", () => {
     const rows = ONE_MIDDLE_SCORE_ROWS.map(([studied, matching]) => [studied ?? null, matching ?? null, null]);
-    const { items } = sibtest(responseMatrix(rows), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    const { items } = sibtest(buildResponseMatrix(rows), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
     for (const item of items) expect(item).toEqual({ ...UNDEFINED_SIBTEST, id: item.id, persons: 0 });
   });
 
   it("gives null statistics for an item every person answered alike, which leaves no score group a variance", () => {
     const rows = ONE_MIDDLE_SCORE_ROWS.map(([, matching]) => [1, matching ?? 0]);
-    const { items } = sibtest(responseMatrix(rows), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
+    const { items } = sibtest(buildResponseMatrix(rows), ONE_MIDDLE_SCORE_GROUPS, ONE_MIDDLE_SCORE_OPTIONS);
     expect(items[0]).toEqual({ ...UNDEFINED_SIBTEST, id: "item1" });
   });
 
   it("gives null statistics for a bundle of every item, which leaves nothing to match on", () => {
     const options = { ...ONE_MIDDLE_SCORE_OPTIONS, bundles: { all: ["item1", "item2"] } };
-    const result = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, options);
+    const result = sibtest(buildResponseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, options);
     expect(result.bundles).toEqual([{ ...UNDEFINED_SIBTEST, id: "all" }]);
   });
 
@@ -2219,8 +2234,8 @@ describe("sibtest", () => {
     const { responses, focal } = defined(polytomous.cases.find((dataset) => dataset.name === "bfi"));
     const scale = 2 ** 16;
     const scaled = responses.map((row) => row.map((response) => response * scale));
-    const close = sibtest(responseMatrix(responses), groups(focal)).items;
-    const far = sibtest(responseMatrix(scaled), groups(focal)).items;
+    const close = sibtest(buildResponseMatrix(responses), groups(focal)).items;
+    const far = sibtest(buildResponseMatrix(scaled), groups(focal)).items;
     far.forEach((item, i) => {
       expectClose(item.chiSquare, close[i]?.chiSquare ?? null, 1e-9, `chi-square ${i + 1}`);
       expectClose(item.beta, (close[i]?.beta ?? 0) * scale, 1e-6, `beta ${i + 1}`);
@@ -2229,7 +2244,7 @@ describe("sibtest", () => {
 
   it("takes a bundle by its own name, whatever the name", () => {
     const bundles = JSON.parse('{ "__proto__": ["item1"], "constructor": ["item2"] }');
-    const result = sibtest(responseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, {
+    const result = sibtest(buildResponseMatrix(ONE_MIDDLE_SCORE_ROWS), ONE_MIDDLE_SCORE_GROUPS, {
       ...ONE_MIDDLE_SCORE_OPTIONS,
       bundles,
     });
@@ -2261,7 +2276,7 @@ describe("sibtest", () => {
   });
 
   describe("errors", () => {
-    const matrix = responseMatrix(ONE_MIDDLE_SCORE_ROWS);
+    const matrix = buildResponseMatrix(ONE_MIDDLE_SCORE_ROWS);
     const analyze = (options: unknown) => sibtest(matrix, ONE_MIDDLE_SCORE_GROUPS, JSON.parse(JSON.stringify(options)));
 
     it("rejects options, a matrix and groups of other types", () => {
@@ -2333,7 +2348,7 @@ describe("sibtest", () => {
 });
 
 describe("options and groups", () => {
-  const matrix = responseMatrix(CONSTANT_ROWS);
+  const matrix = buildResponseMatrix(CONSTANT_ROWS);
 
   it("reject a purify or continuity correction option that is not a boolean", () => {
     const purify: boolean = JSON.parse('"yes"');
@@ -2405,7 +2420,7 @@ describe("the recipe for several focal groups", () => {
 
   /** The ids of the items that Mantel-Haenszel flags for a focal group against the reference group, Bonferroni over the 20 tests. */
   const flagged = (focal: "first" | "second"): string[] => {
-    const matrix = responseMatrix([...(responses.reference ?? []), ...(responses[focal] ?? [])]);
+    const matrix = buildResponseMatrix([...(responses.reference ?? []), ...(responses[focal] ?? [])]);
     const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
     return mantelHaenszel(matrix, groups)
       .items.filter((item) => (item.significance ?? 1) < 0.05 / 20)
@@ -2427,7 +2442,7 @@ describe("the recipe for standardization", () => {
   for (const dataset of fixture.cases) {
     it(`equals difR's difStd with the focal group's weights on ${dataset.name} data`, () => {
       const expected = recipeValues(dataset.name).standardization;
-      const { items } = mantelTest(responseMatrix(dataset.responses), groups(dataset.focal));
+      const { items } = mantelTest(buildResponseMatrix(dataset.responses), groups(dataset.focal));
       items.forEach((item, i) => {
         expectClose(item.standardizedMeanDifference, expected[i] ?? null, RECIPE_TOLERANCE, `item ${i + 1}`);
       });
@@ -2463,7 +2478,7 @@ describe("the recipe for DIF variance", () => {
   for (const dataset of fixture.cases) {
     it(`equals sirt's dif.variance on ${dataset.name} data`, () => {
       const expected = recipeValues(dataset.name).variance;
-      const result = difVariance(responseMatrix(dataset.responses), groups(dataset.focal));
+      const result = difVariance(buildResponseMatrix(dataset.responses), groups(dataset.focal));
       expectClose(result.standardDeviation, expected.standardDeviation, RECIPE_TOLERANCE, "DIF standard deviation");
       result.shrunken.forEach((shrunken, i) => {
         expectClose(shrunken, expected.shrunken[i] ?? null, RECIPE_TOLERANCE, `item ${i + 1}`);
@@ -2482,7 +2497,7 @@ describe("the recipe for DIF variance", () => {
 describe("properties", () => {
   it("IRT likelihood-ratio chi-squares do not change when the groups swap", () => {
     const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
-    const subset = responseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
+    const subset = buildResponseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
     const swapped = caseGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
     const options = { model: twoParameterLogistic, tolerance: 1e-8, maxIterations: 20_000 };
     const forward = irtLikelihoodRatioDif(subset, caseGroups, options).items;
@@ -2503,10 +2518,10 @@ describe("properties", () => {
         const rowGroups = matrixRows.map((_, i): DifGroup => (focal[i] === true ? "focal" : "reference"));
         const swapped = rowGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
         const reversed = matrixRows.map((row) => row.map((response) => 3 - response));
-        const forward = mantelTest(responseMatrix(matrixRows), rowGroups).items;
+        const forward = mantelTest(buildResponseMatrix(matrixRows), rowGroups).items;
         const others = [
-          mantelTest(responseMatrix(matrixRows), swapped).items,
-          mantelTest(responseMatrix(reversed), rowGroups).items,
+          mantelTest(buildResponseMatrix(matrixRows), swapped).items,
+          mantelTest(buildResponseMatrix(reversed), rowGroups).items,
         ];
         forward.forEach(({ liuAgresti }, i) => {
           for (const other of others) {
@@ -2552,7 +2567,7 @@ describe("properties", () => {
   it("finds no DIF between identical groups", () => {
     fc.assert(
       fc.property(binaryRows, (rows) => {
-        const matrix = responseMatrix([...rows, ...rows]);
+        const matrix = buildResponseMatrix([...rows, ...rows]);
         const groups: DifGroup[] = [...rows.map(() => "reference" as const), ...rows.map(() => "focal" as const)];
         for (const item of mantelHaenszel(matrix, groups).items) {
           if (item.chiSquare === null) continue;
@@ -2573,8 +2588,8 @@ describe("properties", () => {
       fc.property(binaryRows, fc.array(fc.boolean(), { minLength: 30, maxLength: 30 }), (rows, focal) => {
         const groups: DifGroup[] = rows.map((_, i) => (focal[i] === true || i === 0 ? "focal" : "reference"));
         groups[1] = "reference";
-        const forward = mantelHaenszel(responseMatrix(rows), groups).items;
-        const backward = mantelHaenszel(responseMatrix([...rows].reverse()), [...groups].reverse()).items;
+        const forward = mantelHaenszel(buildResponseMatrix(rows), groups).items;
+        const backward = mantelHaenszel(buildResponseMatrix([...rows].reverse()), [...groups].reverse()).items;
         forward.forEach((item, i) => {
           expectClose(backward[i]?.chiSquare ?? null, item.chiSquare, 1e-12 * Math.max(1, item.chiSquare ?? 0));
           expect(backward[i]?.etsCategory).toBe(item.etsCategory);
@@ -2596,7 +2611,7 @@ describe("properties", () => {
   it("finds no polytomous DIF between identical groups", () => {
     fc.assert(
       fc.property(gradedRows, (rows) => {
-        const matrix = responseMatrix([...rows, ...rows]);
+        const matrix = buildResponseMatrix([...rows, ...rows]);
         const groups: DifGroup[] = [...rows.map(() => "reference" as const), ...rows.map(() => "focal" as const)];
         for (const item of mantelTest(matrix, groups).items) {
           if (item.chiSquare !== null) expect(item.chiSquare).toBe(0);
@@ -2615,7 +2630,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(gradedRows, (rows) => {
         const groups: DifGroup[] = rows.map((_, person) => (person % 2 === 0 ? "focal" : "reference"));
-        const matrix = responseMatrix(rows);
+        const matrix = buildResponseMatrix(rows);
         const probabilities: (number | null)[] = [];
         for (const item of mantelTest(matrix, groups).items) {
           expect(item.chiSquare ?? 0).toBeGreaterThanOrEqual(0);
@@ -2641,8 +2656,8 @@ describe("properties", () => {
       fc.property(gradedRows, fc.array(fc.boolean(), { minLength: 40, maxLength: 40 }), (rows, focal) => {
         const groups: DifGroup[] = rows.map((_, i) => (focal[i] === true || i === 0 ? "focal" : "reference"));
         groups[1] = "reference";
-        const forward = mantelTest(responseMatrix(rows), groups).items;
-        const backward = mantelTest(responseMatrix([...rows].reverse()), [...groups].reverse()).items;
+        const forward = mantelTest(buildResponseMatrix(rows), groups).items;
+        const backward = mantelTest(buildResponseMatrix([...rows].reverse()), [...groups].reverse()).items;
         forward.forEach((item, i) => {
           const other = backward[i];
           expectClose(other?.chiSquare ?? null, item.chiSquare, 1e-12 * Math.max(1, item.chiSquare ?? 0));
@@ -2674,7 +2689,7 @@ describe("properties", () => {
     let computed = 0;
     fc.assert(
       fc.property(crowdedRows, (rows) => {
-        const matrix = responseMatrix(rows);
+        const matrix = buildResponseMatrix(rows);
         const personGroups = alternate(rows);
         const swapped = personGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
         const other = sibtest(matrix, swapped, { smallCell: 2 }).items;
@@ -2692,7 +2707,7 @@ describe("properties", () => {
   it("gives a bundle of one item the statistics of that item", () => {
     fc.assert(
       fc.property(crowdedRows, fc.boolean(), (rows, purify) => {
-        const matrix = responseMatrix(rows);
+        const matrix = buildResponseMatrix(rows);
         const bundles = Object.fromEntries(matrix.itemIds.map((id) => [`bundle of ${id}`, [id]]));
         const result = sibtest(matrix, alternate(rows), { smallCell: 2, bundles, purify });
         result.items.forEach((item, i) => {
@@ -2706,8 +2721,8 @@ describe("properties", () => {
     fc.assert(
       fc.property(crowdedRows, (rows) => {
         const personGroups = alternate(rows);
-        const forward = sibtest(responseMatrix(rows), personGroups, { smallCell: 2 }).items;
-        const backward = sibtest(responseMatrix([...rows].reverse()), [...personGroups].reverse(), {
+        const forward = sibtest(buildResponseMatrix(rows), personGroups, { smallCell: 2 }).items;
+        const backward = sibtest(buildResponseMatrix([...rows].reverse()), [...personGroups].reverse(), {
           smallCell: 2,
         }).items;
         forward.forEach((item, i) => {
@@ -2721,7 +2736,7 @@ describe("properties", () => {
   it("finds no SIBTEST DIF between identical groups", () => {
     fc.assert(
       fc.property(crowdedRows, (rows) => {
-        const matrix = responseMatrix([...rows, ...rows]);
+        const matrix = buildResponseMatrix([...rows, ...rows]);
         const personGroups: DifGroup[] = [...rows.map(() => "reference" as const), ...rows.map(() => "focal" as const)];
         for (const item of sibtest(matrix, personGroups, { smallCell: 2 }).items) {
           if (item.beta !== null) expect(Math.abs(item.beta)).toBeLessThan(1e-12);
@@ -2734,7 +2749,7 @@ describe("properties", () => {
   it("gives SIBTEST's chi-squares from 0 and significances from 0 to 1 for any responses", () => {
     fc.assert(
       fc.property(crowdedRows, fc.boolean(), (rows, correction) => {
-        const { items } = sibtest(responseMatrix(rows), alternate(rows), { smallCell: 2, correction });
+        const { items } = sibtest(buildResponseMatrix(rows), alternate(rows), { smallCell: 2, correction });
         for (const item of items) {
           expect(item.chiSquare ?? 0).toBeGreaterThanOrEqual(0);
           expect(item.standardError ?? 0).toBeGreaterThanOrEqual(0);

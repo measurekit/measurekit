@@ -23,7 +23,7 @@ export interface PowerLaw {
  * @returns The coefficient and the exponent of the law with their fit; `null` where the points cannot be fitted.
  * @throws `DataError` when the points are malformed.
  */
-export function powerLawFit(points: readonly ErrorRatePoint[]): PowerLaw | null {
+export function fitPowerLaw(points: readonly ErrorRatePoint[]): PowerLaw | null {
   checkCurvePoints(points);
   const positive = points.filter((point) => point.errorRate > 0);
   if (positive.length < 2) return null;

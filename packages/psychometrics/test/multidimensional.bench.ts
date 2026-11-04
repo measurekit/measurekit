@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
+  buildResponseMatrix,
   calibrateLongitudinal,
   calibrateMultidimensional,
   multidimensionalEstimates,
@@ -9,7 +10,6 @@ import {
   multidimensionalPosteriorMeanEstimate,
   multidimensionalTwoParameterLogistic,
   multidimensionalWeightedLikelihoodEstimate,
-  responseMatrix,
   rotateLoadings,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
@@ -31,9 +31,9 @@ interface BenchMultidimensionalLongitudinalFixture {
 const longitudinal = readFixture<BenchMultidimensionalLongitudinalFixture>("bench-multidimensional-longitudinal.json");
 
 const { points } = fixture;
-const confirmatory = responseMatrix(fixture.confirmatory.responses, { itemIds: fixture.confirmatory.itemIds });
-const graded = responseMatrix(fixture.graded.responses, { itemIds: fixture.graded.itemIds });
-const exploratory = responseMatrix(fixture.exploratory.responses, { itemIds: fixture.exploratory.itemIds });
+const confirmatory = buildResponseMatrix(fixture.confirmatory.responses, { itemIds: fixture.confirmatory.itemIds });
+const graded = buildResponseMatrix(fixture.graded.responses, { itemIds: fixture.graded.itemIds });
+const exploratory = buildResponseMatrix(fixture.exploratory.responses, { itemIds: fixture.exploratory.itemIds });
 
 const confirmatoryOptions = {
   model: multidimensionalTwoParameterLogistic,
@@ -87,7 +87,7 @@ test("calibrates a confirmatory two-dimensional 2PL of 1,000 persons in two grou
 
 test("calibrates a trait over three occasions of 1,000 persons and 10 items", async (context) => {
   const occasions = longitudinal.occasions.map(({ personIds, itemIds, responses }) =>
-    responseMatrix(responses, { personIds, itemIds }),
+    buildResponseMatrix(responses, { personIds, itemIds }),
   );
   const options = { points: longitudinal.points };
   expect(calibrateLongitudinal(occasions, options).converged).toBe(true);
@@ -100,7 +100,7 @@ test("calibrates a trait over three occasions of 1,000 persons and 10 items", as
 });
 
 test("calibrates a five-dimensional graded model of 800 persons and 25 items by MH-RM", async (context) => {
-  const matrix = responseMatrix(fixture.mhrm.responses, { itemIds: fixture.mhrm.itemIds });
+  const matrix = buildResponseMatrix(fixture.mhrm.responses, { itemIds: fixture.mhrm.itemIds });
   const options = { model: multidimensionalGradedResponse, loadings: fixture.mhrm.loadings, method: "mhrm" } as const;
   expect(calibrateMultidimensional(matrix, options).converged).toBe(true);
   await benchmark(

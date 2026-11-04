@@ -60,10 +60,10 @@ imputation with a random error, as mokken's `twoway`:
 | `maximum` | The highest response of the matrix | The highest imputed score, an integer at least the highest response and at most 2³¹ - 1 |
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { twoWayImputation } from "@measurekit/psychometrics/mokken";
 
-const matrix = responseMatrix([
+const matrix = buildResponseMatrix([
   [3, 4, null, 4],
   [1, 2, 1, null],
   [2, 3, 2, 3],
@@ -97,7 +97,7 @@ step 3 of the analysis of Sijtsma and van der Ark (2017):
 | `outliers`   | The indices of the persons above the fence                                            |
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { guttmanErrors } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -106,7 +106,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
-const matrix = responseMatrix(simulated.responses, { itemIds: simulated.itemIds });
+const matrix = buildResponseMatrix(simulated.responses, { itemIds: simulated.itemIds });
 
 const { errors, upperFence, outliers } = guttmanErrors(matrix);
 errors.slice(0, 8); // [1, 3, 5, 0, 2, 0, 0, 4]
@@ -159,7 +159,7 @@ Standard errors come from the delta method over the numbers of persons with each
 and Croon, 2013).
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { scalability } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -168,7 +168,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
-const matrix = responseMatrix(
+const matrix = buildResponseMatrix(
   simulated.responses.map((row) => [...row, 1 - (row[4] ?? 0)]),
   { itemIds: [...simulated.itemIds, "reversed"] },
 );
@@ -210,7 +210,7 @@ The result lists `scales`, each the ids of its items in the order of the matrix,
 and the `unscalable` items, including those without variance. Raising `lowerBound` makes scales smaller and stronger.
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { automatedItemSelection } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -218,7 +218,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
-const matrix = responseMatrix(
+const matrix = buildResponseMatrix(
   simulated.responses.map((row) => [...row, 1 - (row[4] ?? 0)]),
   { itemIds: [...simulated.itemIds, "reversed"] },
 );
@@ -260,7 +260,7 @@ b. An index flags each value above Q3 + 3 (Q3 - median) of all of its values.
 | `flagged.w3` | The pairs [a, b], a before b in the matrix, whose W3 is flagged                    |
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { conditionalAssociation } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -269,7 +269,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
-const matrix = responseMatrix(
+const matrix = buildResponseMatrix(
   simulated.responses.map((row) => [...row, 1 - (row[4] ?? 0)]),
   { itemIds: [...simulated.itemIds, "reversed"] },
 );
@@ -324,7 +324,7 @@ The criterion is 50 (0.3 - H_i) + √#vi + 100 #vi / #ac + 100 maxvi + 10 √sum
 be inspected.
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { monotonicity } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -332,7 +332,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
-const matrix = responseMatrix(
+const matrix = buildResponseMatrix(
   simulated.responses.map((row) => [...row, 1 - (row[4] ?? 0)]),
   { itemIds: [...simulated.itemIds, "reversed"] },
 );
@@ -383,7 +383,7 @@ items that remain: the scalability of the persons over the items, which is high 
 about the order of the items; `null` when fewer than two items remain. The check needs at least three items.
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { invariantItemOrdering } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -391,7 +391,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
-const matrix = responseMatrix(
+const matrix = buildResponseMatrix(
   simulated.responses.map((row) => [...row, 1 - (row[4] ?? 0)]),
   { itemIds: [...simulated.itemIds, "reversed"] },
 );
@@ -425,7 +425,7 @@ proportions and the smaller of them. Steps that every person or no person passes
 every pair of the steps left, so it takes at most 1,000 of them, as 111 items of 10 categories have.
 
 ```ts
-import { createRandom, responseMatrix } from "@measurekit/psychometrics";
+import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
 import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { molenaarSijtsmaReliability } from "@measurekit/psychometrics/mokken";
@@ -435,7 +435,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
-const matrix = responseMatrix(simulated.responses, { itemIds: simulated.itemIds });
+const matrix = buildResponseMatrix(simulated.responses, { itemIds: simulated.itemIds });
 
 Math.round(molenaarSijtsmaReliability(matrix) * 1000) / 1000; // 0.541
 Math.round(cronbachAlpha(matrix) * 1000) / 1000; // 0.531

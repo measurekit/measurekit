@@ -2,6 +2,7 @@ import { test } from "vitest";
 import {
   abilityEstimates,
   andersenTest,
+  buildResponseMatrix,
   calibrate,
   correctedPersonFit,
   itemFit,
@@ -13,7 +14,6 @@ import {
   posteriorMeanEstimate,
   posteriorModeEstimate,
   raschWaldTest,
-  responseMatrix,
   rootMeanSquareDeviation,
   summedScoreFit,
   type TestItem,
@@ -29,7 +29,7 @@ const fixture = readFixture<BenchIrtFixture>("bench-irt.json");
 const conditionalFixture = readFixture<BenchIrtConditionalFixture>("bench-irt-conditional.json");
 
 /** The data and the 2PL items of the IRT benchmarks: 2,000 persons and 40 items, with the posterior means of the abilities. */
-const matrix = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
+const matrix = buildResponseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
 const items: TestItem[] = fixture.items.a.map((a, i) => ({
   id: defined(fixture.binary.itemIds[i]),
   model: twoParameterLogistic,
@@ -59,7 +59,7 @@ test("computes lz*, kernel curves, M2*, the RMSD and local dependence of 40 item
 });
 
 test("tests the Rasch model of 15 items and 2,000 persons by Andersen's, Martin-Löf's and Wald's tests", async (context) => {
-  const rasch = responseMatrix(conditionalFixture.rasch.responses, { itemIds: conditionalFixture.rasch.itemIds });
+  const rasch = buildResponseMatrix(conditionalFixture.rasch.responses, { itemIds: conditionalFixture.rasch.itemIds });
   await benchmark(context, "fit.andersenTest", () => andersenTest(rasch));
   await benchmark(context, "fit.martinLofTest", () => martinLofTest(rasch));
   await benchmark(context, "fit.raschWaldTest", () => raschWaldTest(rasch));

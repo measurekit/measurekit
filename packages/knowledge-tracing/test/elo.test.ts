@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  buildEventLog,
   DataError,
   type EloItem,
   type EloOptions,
@@ -10,7 +11,6 @@ import {
   type EventInput,
   type EventLog,
   elo,
-  eventLog,
 } from "../src/index.js";
 import { allPredicted, correlation, defined, expectAllClose, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
@@ -158,7 +158,7 @@ const arbitraryOptions: fc.Arbitrary<EloOptions> = fc.oneof(
 
 describe("elo against R", () => {
   it.each(cases)("replays the worked log: $name", (reference) => {
-    const fit = elo({ ...reference.options, parameters: reference.parameters }).fit(eventLog(reference.events));
+    const fit = elo({ ...reference.options, parameters: reference.parameters }).fit(buildEventLog(reference.events));
     expectAllClose(allPredicted(fit.predictions), reference.predictions, ELO_TOLERANCE, "predictions");
     expect(Object.keys(fit.states)).toEqual(Object.keys(reference.states));
     for (const [learner, state] of Object.entries(reference.states)) expectState(fit.states[learner], state, learner);
@@ -173,14 +173,14 @@ describe("elo against R", () => {
   });
 
   it("makes the first update derived by hand: 0.5 up for the learner and down for the item", () => {
-    const fit = elo().fit(eventLog([{ learner: "ana", item: "q1", time: 0, outcome: 1 }]));
+    const fit = elo().fit(buildEventLog([{ learner: "ana", item: "q1", time: 0, outcome: 1 }]));
     expect(fit.predictions).toEqual([0.5]);
     expect(fit.states.ana).toEqual({ learner: "ana", ability: 0.5, count: 1, skills: {} });
     expect(fit.model.parameters).toEqual({ items: { q1: { difficulty: -0.5, count: 1 } } });
   });
 
   it("recovers simulated abilities and difficulties, as the R replay does", () => {
-    const log = eventLog(
+    const log = buildEventLog(
       recovery.outcomes.map((outcome, time) => ({
         learner: `s${defined(recovery.learners[time]) + 1}`,
         item: `i${defined(recovery.items[time]) + 1}`,
@@ -203,7 +203,7 @@ describe("elo against R", () => {
 describe("elo online", () => {
   it("predicts, updates learners and updates items online exactly as a replay does", () => {
     for (const reference of cases) {
-      const log = eventLog(reference.events);
+      const log = buildEventLog(reference.events);
       const fit = elo({ ...reference.options, parameters: reference.parameters }).fit(log);
       const run = online(reference.options, log, { items: { ...reference.parameters.items }, states: new Map() });
       expect(run.predictions).toEqual(fit.predictions);
@@ -215,7 +215,7 @@ describe("elo online", () => {
   it("predicts probabilities from 0 to 1, online exactly as in a replay", () => {
     fc.assert(
       fc.property(arbitraryOptions, arbitraryEvents, (options, events) => {
-        const log = eventLog(events);
+        const log = buildEventLog(events);
         const run = online(options, log);
         for (const prediction of run.predictions) expect(prediction >= 0 && prediction <= 1).toBe(true);
         const fit = elo(options).fit(log);
@@ -228,7 +228,7 @@ describe("elo online", () => {
   it("never changes the state, the event or the model it is given", () => {
     fc.assert(
       fc.property(arbitraryOptions, arbitraryEvents, (options, events) => {
-        const model = elo(options).fit(eventLog(events)).model;
+        const model = elo(options).fit(buildEventLog(events)).model;
         let state = model.initialState("ana");
         for (const event of events) {
           const frozen = deepFreeze(copy(state));
@@ -246,7 +246,7 @@ describe("elo online", () => {
   it("continues identically from rows stored as JSON", () => {
     fc.assert(
       fc.property(arbitraryOptions, arbitraryEvents, fc.nat(), (options, events, cut) => {
-        const log = eventLog(events);
+        const log = buildEventLog(events);
         const split = cut % (log.length + 1);
         const direct = online(options, log);
         const first = online(options, log.slice(0, split));
@@ -271,7 +271,7 @@ describe("elo online", () => {
 
   it("fits a log of one learner", () => {
     const fit = elo().fit(
-      eventLog([
+      buildEventLog([
         { learner: "ana", item: "q1", time: 0, outcome: 1 },
         { learner: "ana", item: "q1", time: 1, outcome: 1 },
       ]),
@@ -362,7 +362,7 @@ describe("elo with events that have no outcome", () => {
   const lesson = { learner: "ana", item: "video", skills: ["fractions"], time: 9, outcome: null };
 
   it.each(cases)("is unaffected by them: $name", (reference) => {
-    expectUnaffectedByLessons(elo(reference.options), eventLog(reference.events));
+    expectUnaffectedByLessons(elo(reference.options), buildEventLog(reference.events));
   });
 
   it("changes no rating: the state stays, and the item's rating is its own, or 0 for an item it does not know", () => {
@@ -375,7 +375,7 @@ describe("elo with events that have no outcome", () => {
   });
 
   it("writes no rating for them in a fit, and gives them no prediction", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       { learner: "ana", item: "video", time: 1, outcome: null },
       { learner: "ana", item: "q1", time: 2, outcome: 1 },
     ]);
@@ -386,6 +386,8 @@ describe("elo with events that have no outcome", () => {
   });
 
   it("refuses to fit a log without an event with an outcome", () => {
-    expect(() => elo().fit(eventLog([{ learner: "ana", item: "video", time: 1, outcome: null }]))).toThrow(DataError);
+    expect(() => elo().fit(buildEventLog([{ learner: "ana", item: "video", time: 1, outcome: null }]))).toThrow(
+      DataError,
+    );
   });
 });

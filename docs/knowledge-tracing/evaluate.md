@@ -8,10 +8,10 @@ against pROC, irr and base R ([validation](validation.md)).
 ```mermaid
 flowchart LR
   F[Fit or fold] --> P["predictions: one per event, null for an event without an outcome"]
-  P --> O["observedPairs: the events with an outcome and a prediction"]
-  O --> M["metrics, calibration"]
+  P --> O["alignPredictions: the events with an outcome and a prediction"]
+  O --> M["metrics, calibrationCurve"]
   P --> B["metricsByOpportunity, learningCurve"]
-  B --> L["powerLawFit, categorizeCurve"]
+  B --> L["fitPowerLaw, categorizeCurve"]
   C["crossValidate, compareModels"] --> T["compareByLearner: paired test of two models"]
 ```
 
@@ -52,7 +52,7 @@ metrics([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]);
 
 ## Calibration
 
-`calibration(predictions, outcomes, { binCount })` groups predictions into `binCount` bins of equal width (default
+`calibrationCurve(predictions, outcomes, { binCount })` groups predictions into `binCount` bins of equal width (default
 `10`): bin k of K covers [k / K, (k + 1) / K), and the last bin includes 1. A calibrated model's mean outcome is close
 to its mean prediction in every bin.
 
@@ -83,11 +83,11 @@ parameters, such as Elo's item ratings, stay fixed.
 
 ```ts
 import { createRandom } from "@measurekit/knowledge-tracing";
-import { eventLog, splitByLearner } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog, splitByLearner } from "@measurekit/knowledge-tracing/data";
 import { elo } from "@measurekit/knowledge-tracing/elo";
 import { crossValidate } from "@measurekit/knowledge-tracing/evaluate";
 
-const log = eventLog(
+const log = buildEventLog(
   ["ana", "budi", "citra", "dewi"].flatMap((learner, i) =>
     ["q1", "q2", "q3"].map((item, j) => ({
       learner,
@@ -133,13 +133,13 @@ parameters from them. An event without skills is never skipped. Every model of `
 since the skills of the training log decide, so their metrics compare the same predictions.
 
 ```ts
-import { eventLog, splitByTime } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog, splitByTime } from "@measurekit/knowledge-tracing/data";
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
 import { crossValidate } from "@measurekit/knowledge-tracing/evaluate";
 
 // Six learners meet fractions, decimals and percent in turn, and review the skill before each new one.
 const skills = ["fractions", "decimals", "percent"];
-const log = eventLog(
+const log = buildEventLog(
   ["ana", "budi", "citra", "dewi", "eka", "fiona"].flatMap((learner, i) =>
     skills.flatMap((skill, s) =>
       [0, 1, 2, 3].map((j) => {
@@ -166,15 +166,15 @@ result.metrics.count; // 24, of the 48 test events
 ## Predictions with nulls
 
 A fit's `predictions` and a fold's have one entry per event, `null` where the event has no outcome. The metric functions
-take numbers only: `observedPairs(log, predictions)` returns `{ predictions, outcomes }` of the events with both an
+take numbers only: `alignPredictions(log, predictions)` returns `{ predictions, outcomes }` of the events with both an
 outcome and a prediction, in log order, for them.
 
 ```ts continues
 import { elo } from "@measurekit/knowledge-tracing/elo";
-import { metrics, observedPairs } from "@measurekit/knowledge-tracing/evaluate";
+import { alignPredictions, metrics } from "@measurekit/knowledge-tracing/evaluate";
 
 // log: a log with lessons, events with outcome: null
-const { predictions, outcomes } = observedPairs(log, elo().fit(log).predictions);
+const { predictions, outcomes } = alignPredictions(log, elo().fit(log).predictions);
 metrics(predictions, outcomes);
 ```
 
@@ -238,9 +238,9 @@ compareByLearner(plain, concept, folds);
 - **Where the test is undefined.** `statistic` and `pValue` are `null` with one learner and when every difference is
   equal, as for a model against itself. A certain prediction that is wrong has an infinite log loss: the learner has no
   difference, and `meanDifference`, `standardError`, `statistic` and `pValue` are `null`. Use `"squared"` then.
-- **Comparing Q-matrices.** Build one log per Q-matrix from the same events with `eventLog(events, { qMatrix })`, split
-  each with `splitByLearner` and the same seed, so that the folds hold the same learners, run `compareModels` on each, and
-  pass a row of each to `compareByLearner` with either log's folds.
+- **Comparing Q-matrices.** Build one log per Q-matrix from the same events with `buildEventLog(events, { qMatrix })`,
+  split each with `splitByLearner` and the same seed, so that the folds hold the same learners, run `compareModels` on
+  each, and pass a row of each to `compareByLearner` with either log's folds.
 
 ## Learning curves
 
@@ -294,7 +294,7 @@ table.skills.fractions[0]; // { opportunity: 1, metrics: { count: 6, auc: 0.25, 
 
 ### Power law and categories
 
-`powerLawFit(points)` fits the power law of practice, e(n) = a n^(-b), to the points of a curve, such as
+`fitPowerLaw(points)` fits the power law of practice, e(n) = a n^(-b), to the points of a curve, such as
 `curve.skills.fractions`, by least squares on the logarithms weighted by `count`. It returns `{ scale, exponent,
 rSquared }`: the error rate at the first opportunity, the rate of learning, and the R² of the fit, `null` when every
 error rate is equal. Points with an error rate of 0 have no logarithm and are left out; the fit is `null` under two
@@ -324,12 +324,12 @@ The first four depend on the curriculum, so they are required. `slope` comes fro
 
 ```ts continues
 import { elo } from "@measurekit/knowledge-tracing/elo";
-import { categorizeCurve, learningCurve, powerLawFit } from "@measurekit/knowledge-tracing/evaluate";
+import { categorizeCurve, fitPowerLaw, learningCurve } from "@measurekit/knowledge-tracing/evaluate";
 
 // log: the log of the curriculum sample
 const fractions =
   learningCurve(log, { predictions: elo({ skills: true }).fit(log).predictions }).skills.fractions ?? [];
-powerLawFit(fractions); // { scale: 0.60, exponent: 0.21, rSquared: 0.19 }
+fitPowerLaw(fractions); // { scale: 0.60, exponent: 0.21, rSquared: 0.19 }
 categorizeCurve(fractions, { minLearners: 3, minPoints: 3, slope: 0.2, minSlope: 0.1 }); // "good"
 ```
 

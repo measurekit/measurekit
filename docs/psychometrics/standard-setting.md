@@ -311,7 +311,7 @@ flowchart LR
 
 ```ts
 import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { livingstonLewisClassification } from "@measurekit/psychometrics/standard-setting";
 
 // Eight persons' answers to eight items, and their total scores.
@@ -325,7 +325,7 @@ const answers = [
   [1, 1, 0, 1, 1, 0, 1, 0],
   [0, 1, 0, 0, 1, 1, 0, 0],
 ];
-const reliability = cronbachAlpha(responseMatrix(answers)); // 0.716
+const reliability = cronbachAlpha(buildResponseMatrix(answers)); // 0.716
 const scores = answers.map((row) => row.reduce((sum, x) => sum + x, 0));
 const result = livingstonLewisClassification(scores, [4], { reliability, maximum: 8 });
 result.accuracy; // 0.811

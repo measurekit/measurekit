@@ -7,7 +7,12 @@
  * @module @measurekit/psychometrics/cat
  */
 export { aStratified } from "./a-stratified.js";
-export { type AdaptiveTest, type AdaptiveTestOptions, type AdaptiveTestState, adaptiveTest } from "./adaptive-test.js";
+export {
+  type AdaptiveTest,
+  type AdaptiveTestOptions,
+  type AdaptiveTestState,
+  createAdaptiveTest,
+} from "./adaptive-test.js";
 export { contentBounds } from "./bounds.js";
 export {
   type ClassificationContext,
@@ -38,10 +43,10 @@ export {
 } from "./diagnostic-simulation.js";
 export { masteryThreshold, posteriorThreshold } from "./diagnostic-stopping.js";
 export {
+  createDiagnosticAdaptiveTest,
   type DiagnosticAdaptiveTest,
   type DiagnosticAdaptiveTestOptions,
   type DiagnosticAdaptiveTestState,
-  diagnosticAdaptiveTest,
 } from "./diagnostic-test.js";
 export type { AdaptiveState } from "./engine.js";
 export { untilMixed } from "./estimator.js";
@@ -71,10 +76,10 @@ export {
   simulateMultidimensionalAdaptiveTest,
 } from "./multidimensional-simulation.js";
 export {
+  createMultidimensionalAdaptiveTest,
   type MultidimensionalAdaptiveTest,
   type MultidimensionalAdaptiveTestOptions,
   type MultidimensionalAdaptiveTestState,
-  multidimensionalAdaptiveTest,
 } from "./multidimensional-test.js";
 export {
   type MultistageCutsMethod,
@@ -82,12 +87,12 @@ export {
   multistageCuts,
 } from "./multistage-cuts.js";
 export {
+  createMultistageTest,
   type MultistageModule,
   type MultistageRouting,
   type MultistageTest,
   type MultistageTestOptions,
   type MultistageTestState,
-  multistageTest,
 } from "./multistage-test.js";
 export { maximumPriorityIndex } from "./priority-index.js";
 export { type ProgressiveOptions, progressive, proportional } from "./progressive.js";

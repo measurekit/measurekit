@@ -1,6 +1,7 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
+  buildResponseMatrix,
   type DifGroup,
   irtLikelihoodRatioDif,
   logisticRegressionDif,
@@ -8,7 +9,6 @@ import {
   mantelHaenszel,
   ordinalLogisticRegressionDif,
   rajuAreaDif,
-  responseMatrix,
   sibtest,
   twoParameterLogistic,
 } from "../src/index.js";
@@ -30,9 +30,9 @@ const irtFixture = readFixture<BenchDifIrtFixture>("bench-dif-irt.json");
 
 const groupsOf = (focal: readonly number[]): DifGroup[] => focal.map((flag) => (flag === 1 ? "focal" : "reference"));
 
-const dichotomous = responseMatrix(fixture.dichotomous.responses, { itemIds: fixture.dichotomous.itemIds });
+const dichotomous = buildResponseMatrix(fixture.dichotomous.responses, { itemIds: fixture.dichotomous.itemIds });
 const groups = groupsOf(fixture.dichotomous.focal);
-const polytomous = responseMatrix(fixture.polytomous.responses, { itemIds: fixture.polytomous.itemIds });
+const polytomous = buildResponseMatrix(fixture.polytomous.responses, { itemIds: fixture.polytomous.itemIds });
 const polytomousGroups = groupsOf(fixture.polytomous.focal);
 
 test("tests 30 items of 2,000 persons in two groups for differential functioning", async (context) => {
@@ -57,7 +57,7 @@ test("tests 10 items of 4 categories of 1,000 persons in two groups by ordinal l
 });
 
 test("tests 15 items of 2,000 persons in two groups by IRT and by SIBTEST", async (context) => {
-  const matrix = responseMatrix(irtFixture.responses, { itemIds: irtFixture.itemIds });
+  const matrix = buildResponseMatrix(irtFixture.responses, { itemIds: irtFixture.itemIds });
   const irtGroups = groupsOf(irtFixture.focal);
   const options = { model: twoParameterLogistic };
   await benchmark(

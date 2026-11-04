@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
   abilityEstimates,
+  buildResponseMatrix,
   calibrate,
   calibrateUnfolding,
   conditionalMaximumLikelihood,
@@ -12,7 +13,6 @@ import {
   oneParameterLogistic,
   posteriorMeanEstimate,
   posteriorModeEstimate,
-  responseMatrix,
   summedScoreTable,
   type TestItem,
   testInformation,
@@ -41,10 +41,10 @@ interface BenchIrtUnfoldingFixture {
 }
 const unfoldingFixture = readFixture<BenchIrtUnfoldingFixture>("bench-irt-unfolding.json");
 
-const binary = responseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
-const three = responseMatrix(fixture.three.responses, { itemIds: fixture.three.itemIds });
-const graded = responseMatrix(fixture.graded.responses, { itemIds: fixture.graded.itemIds });
-const testlets = responseMatrix(fixture.testlet.responses, { itemIds: fixture.testlet.itemIds });
+const binary = buildResponseMatrix(fixture.binary.responses, { itemIds: fixture.binary.itemIds });
+const three = buildResponseMatrix(fixture.three.responses, { itemIds: fixture.three.itemIds });
+const graded = buildResponseMatrix(fixture.graded.responses, { itemIds: fixture.graded.itemIds });
+const testlets = buildResponseMatrix(fixture.testlet.responses, { itemIds: fixture.testlet.itemIds });
 /** The size of the calibration with standard errors from the Hessian: the first persons and items of the binary data. */
 const PILOT_PERSONS = 500;
 const PILOT_ITEMS = 20;
@@ -77,7 +77,7 @@ test("calibrates the two-parameter model with cross-product standard errors", as
 });
 
 test("calibrates the two-parameter model of 500 persons and 20 items with standard errors from the Hessian", async (context) => {
-  const pilot = responseMatrix(
+  const pilot = buildResponseMatrix(
     fixture.binary.responses.slice(0, PILOT_PERSONS).map((row) => row.slice(0, PILOT_ITEMS)),
     { itemIds: fixture.binary.itemIds.slice(0, PILOT_ITEMS) },
   );
@@ -87,7 +87,7 @@ test("calibrates the two-parameter model of 500 persons and 20 items with standa
 });
 
 test("calibrates the two-parameter model of 2,000 persons and 40 items with a latent regression", async (context) => {
-  const regression = responseMatrix(regressionFixture.responses, { itemIds: regressionFixture.itemIds });
+  const regression = buildResponseMatrix(regressionFixture.responses, { itemIds: regressionFixture.itemIds });
   const options = { model: twoParameterLogistic, covariates: { x: regressionFixture.covariate } } as const;
   expect(calibrate(regression, options).converged).toBe(true);
   await benchmark(context, "irt.calibrate2plLatentRegression", () => calibrate(regression, options), SLOW_OPTIONS);
@@ -152,8 +152,8 @@ test("sums the information of 40 items at 121 values of theta", async (context) 
 });
 
 test("calibrates the Rasch model of 2,000 persons and 15 items, and the partial credit and rating scale models of 1,500 persons and 8 items, by conditional maximum likelihood", async (context) => {
-  const rasch = responseMatrix(conditionalFixture.rasch.responses, { itemIds: conditionalFixture.rasch.itemIds });
-  const credit = responseMatrix(conditionalFixture.partialCredit.responses, {
+  const rasch = buildResponseMatrix(conditionalFixture.rasch.responses, { itemIds: conditionalFixture.rasch.itemIds });
+  const credit = buildResponseMatrix(conditionalFixture.partialCredit.responses, {
     itemIds: conditionalFixture.partialCredit.itemIds,
   });
   await benchmark(context, "irt.conditionalRasch", () => conditionalMaximumLikelihood(rasch));
@@ -166,7 +166,7 @@ test("calibrates the Rasch model of 2,000 persons and 15 items, and the partial 
 });
 
 test("calibrates the generalized graded unfolding model of 2,000 persons and 15 items of 4 categories", async (context) => {
-  const unfolding = responseMatrix(unfoldingFixture.responses, { itemIds: unfoldingFixture.itemIds });
+  const unfolding = buildResponseMatrix(unfoldingFixture.responses, { itemIds: unfoldingFixture.itemIds });
   expect(calibrateUnfolding(unfolding).converged).toBe(true);
   await benchmark(context, "irt.calibrateUnfolding", () => calibrateUnfolding(unfolding), SLOW_OPTIONS);
 });

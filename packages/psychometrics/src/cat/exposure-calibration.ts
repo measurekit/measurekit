@@ -1,5 +1,5 @@
 import { checkOptions, checkRandom, checkStopping, DataError, describe, type Random } from "@measurekit/core";
-import { type AdaptiveTestOptions, adaptiveTest } from "./adaptive-test.js";
+import { type AdaptiveTestOptions, createAdaptiveTest } from "./adaptive-test.js";
 import type { PoolItem } from "./items.js";
 import { type ExposureRate, simulateAdaptiveTest } from "./simulation.js";
 
@@ -70,11 +70,11 @@ export function calibrateExposure(
   }
   checkStopping(tolerance, maxIterations);
   checkRandom(random);
-  const items = adaptiveTest(test).pool;
+  const items = createAdaptiveTest(test).pool;
   let parameters = items.map(() => 1);
   for (let iteration = 1; ; iteration++) {
     const pool = items.map((item, i) => ({ ...item, exposure: parameters[i] ?? 1 }));
-    const { persons, exposureRates } = simulateAdaptiveTest(adaptiveTest({ ...test, pool }), thetas, random);
+    const { persons, exposureRates } = simulateAdaptiveTest(createAdaptiveTest({ ...test, pool }), thetas, random);
     const converged = exposureRates.every(({ rate }) => rate <= maxRate + tolerance);
     if (converged || iteration === maxIterations) return { pool, exposureRates, converged, iterations: iteration };
     const selected = new Map(pool.map(({ id }) => [id, 0]));

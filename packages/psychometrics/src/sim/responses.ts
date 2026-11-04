@@ -7,7 +7,7 @@ import {
   DataError,
   type Random,
 } from "@measurekit/core";
-import { type ResponseMatrix, responseMatrix } from "../data/internal.js";
+import { buildResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import { checkItemList, type IrtItem, largestCategoryCount } from "../irt/internal.js";
 
 /** Options of {@link simulateResponses}. */
@@ -78,7 +78,7 @@ export function matrixWithMissing(
       for (let j = 0; j < row.length; j++) if (random.uniform() < missingProbability) row[j] = null;
     }
   }
-  return responseMatrix(rows);
+  return buildResponseMatrix(rows);
 }
 
 /**

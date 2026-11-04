@@ -4,11 +4,11 @@
  * @module @measurekit/psychometrics/parameterization
  */
 export {
-  fromMirtIrt,
-  fromMirtMultidimensional,
-  fromMirtSlopeIntercept,
   type MirtCoefficients,
-  toMirtIrt,
-  toMirtMultidimensional,
-  toMirtSlopeIntercept,
+  readMirtIrt,
+  readMirtMultidimensional,
+  readMirtSlopeIntercept,
+  writeMirtIrt,
+  writeMirtMultidimensional,
+  writeMirtSlopeIntercept,
 } from "./mirt.js";

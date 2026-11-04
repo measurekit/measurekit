@@ -1,5 +1,5 @@
 import { checkBoolean, checkRandom, checkUnitInterval, type Random } from "@measurekit/core";
-import { type Attempt, checkAttempts, type EventInput, type EventLog, eventLog } from "../data/internal.js";
+import { type Attempt, buildEventLog, checkAttempts, type EventInput, type EventLog } from "../data/internal.js";
 import { checkModel, type LearnerModel } from "../model.js";
 
 /** An attempt to simulate: with `observe: false` it is a learning opportunity, whose outcome is not drawn. */
@@ -64,5 +64,5 @@ export function simulate<TState>(
     states.set(attempt.learner, model.update(state, event));
     return event;
   });
-  return { log: eventLog(events), states: Object.fromEntries(states) };
+  return { log: buildEventLog(events), states: Object.fromEntries(states) };
 }

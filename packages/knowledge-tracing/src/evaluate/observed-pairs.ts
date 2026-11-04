@@ -23,7 +23,7 @@ export interface ObservedPairs {
  * @throws `DataError` when the log is malformed, the predictions are not one per event, or one is neither a probability
  * nor `null`.
  */
-export function observedPairs(log: EventLog, predictions: readonly (number | null)[]): ObservedPairs {
+export function alignPredictions(log: EventLog, predictions: readonly (number | null)[]): ObservedPairs {
   checkLog(log);
   checkPredictionList(log, predictions);
   const pairedPredictions: number[] = [];

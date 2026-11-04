@@ -145,10 +145,10 @@ interface Step {
  *
  * @example
  * ```ts
- * import { eventLog } from "@measurekit/knowledge-tracing/data";
+ * import { buildEventLog } from "@measurekit/knowledge-tracing/data";
  * import { elo } from "@measurekit/knowledge-tracing/elo";
  *
- * const log = eventLog([
+ * const log = buildEventLog([
  *   { learner: "ana", item: "q1", time: 1, outcome: 1 },
  *   { learner: "budi", item: "q1", time: 2, outcome: 0 },
  *   { learner: "ana", item: "q2", time: 3, outcome: 1 },

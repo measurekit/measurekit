@@ -51,8 +51,8 @@ const MAX_POLYCHORIC_CATEGORIES = 8;
  * under the bivariate normal distribution with correlation ρ, by Newton's method with the exact derivatives safeguarded
  * by bisection. A table with an empty cell and no association gives -1 or 1, where the likelihood increases to the
  * boundary; the correction of `correction` avoids it for items with two categories. Categories are the observed
- * responses in order, so responses may skip numbers. Responses are integers from 0, which `responseMatrix` checks. An
- * item has at most 8 observed categories, psych's `max.cat`; items of more suit Pearson correlations.
+ * responses in order, so responses may skip numbers. Responses are integers from 0, which `buildResponseMatrix`
+ * checks. An item has at most 8 observed categories, psych's `max.cat`; items of more suit Pearson correlations.
  *
  * @param matrix - The responses of the persons.
  * @param options - The correction for continuity.

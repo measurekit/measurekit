@@ -6,15 +6,15 @@
  */
 export type { FacetedScore } from "./faceted-scores.js";
 export {
+  buildResponseMatrix,
+  buildResponseMatrixFromColumns,
   type ResponseMatrix,
   type ResponseMatrixOptions,
-  responseMatrix,
-  responseMatrixFromColumns,
 } from "./response-matrix.js";
 export {
+  buildResponseRecords,
   type ResponseRecord,
   type ResponseRecords,
   type ResponseRecordsOptions,
-  responseRecords,
 } from "./response-records.js";
 export { type ScoredResponses, type ScoringOptions, scoreResponses } from "./scoring.js";

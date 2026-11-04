@@ -1,10 +1,10 @@
 import { test } from "vitest";
 import {
+  buildResponseMatrix,
   type CalibratedItem,
   itemFeatureRegression,
   linearChange,
   lltm,
-  responseMatrix,
   twoParameterLogistic,
 } from "../src/index.js";
 import { defined } from "./assertions.js";
@@ -49,12 +49,14 @@ test("regresses the difficulties of 300 items on three features", async (context
 });
 
 test("estimates the effects of three features on the difficulty of 20 items answered by 1,000 persons", async (context) => {
-  const matrix = responseMatrix(fixture.lltm.responses, { itemIds: fixture.lltm.itemIds });
+  const matrix = buildResponseMatrix(fixture.lltm.responses, { itemIds: fixture.lltm.itemIds });
   await benchmark(context, "explanatory.lltm", () => lltm(matrix, fixture.lltm.features));
 });
 
 test("estimates the change of 8 items between two occasions of 2,000 persons in two groups", async (context) => {
-  const occasions = changeFixture.occasions.map((rows) => responseMatrix(rows, { itemIds: changeFixture.itemIds }));
+  const occasions = changeFixture.occasions.map((rows) =>
+    buildResponseMatrix(rows, { itemIds: changeFixture.itemIds }),
+  );
   await benchmark(context, "explanatory.linearChange", () =>
     linearChange(occasions, { groups: changeFixture.groups, baseline: "ctl" }),
   );

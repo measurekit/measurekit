@@ -11,9 +11,9 @@ An event may carry no outcome: `outcome: null` is a learning opportunity, such a
 accepts. BKT applies the learn and forget rates of the event's `resource` and estimates a lesson's rates from the
 outcomes that follow it, and logistic models count such events as exposures with the features `exposures`,
 `decayedExposures` and `recencyExposure`. Fits, cross-validation, splits, mastery criteria and simulation leave these
-events out of what they predict and count: a fit gives them a `null` prediction, and `observedPairs` aligns the others for
-the metrics. Events also carry `hints`, `duration` and `attemptNumber`, and `firstAttempts` keeps each learner's first
-try at an item.
+events out of what they predict and count: a fit gives them a `null` prediction, and `alignPredictions` aligns the
+others for the metrics. Events also carry `hints`, `duration` and `attemptNumber`, and `selectFirstAttempts` keeps each
+learner's first try at an item.
 
 Online IRT follows a learner who changes with `drift: { variance, per }`: θ is a random walk between events, carried
 across each gap by the grid's chain, computed by uniformization with a lower bound for the points that underflow.
@@ -47,7 +47,7 @@ take `unseenSkills: "skip"`, which leaves out the test events of skills that the
 split by time of a curriculum gives, so that BKT and logistic models can be evaluated on it. `compareByLearner` tests
 whether two models predict differently well, with a paired t test of their losses averaged per learner.
 `metricsByOpportunity` gives the metrics by opportunity, `learningCurve` takes `predictions` and `minOpportunities` in
-an options object, and `powerLawFit` and `categorizeCurve` fit a curve's power law and give DataShop's category of it.
+an options object, and `fitPowerLaw` and `categorizeCurve` fit a curve's power law and give DataShop's category of it.
 
 The basic local independence model of `kst` holds rates at given values with `fixed`, gives items one rate with `equal`, and
 is fitted by maximum likelihood, minimum discrepancy or both together (`method: "mdml"`). A fit reports G² against the
@@ -65,5 +65,9 @@ These analyses and `surmiseStructure` take at most 1,000 elements, IITA's candid
 the masks of a KST model at most 2^28, each refused with `DataError` past its limit. A KST fit gives each learner's most
 likely state in `mostLikelyStates`, and their posteriors in `states` only with `posteriors: true`, as they take learners
 × states × 8 bytes; `ModelFit.states` is optional for that, and every other model gives it.
+
+`buildEventLog` builds a log from events, `selectFirstAttempts` keeps each learner's first attempts, `alignPredictions`
+pairs the predictions with the outcomes of a log, `calibrationCurve` tabulates calibration in bins and `fitPowerLaw`
+fits the power law of practice.
 
 Every function documents each parameter and its result.

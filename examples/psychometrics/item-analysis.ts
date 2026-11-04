@@ -16,8 +16,8 @@ import {
   simulateThetas,
   twoParameterLogistic,
 } from "@measurekit/psychometrics";
-import { adaptiveTest, anyOf, standardErrorThreshold, testLength } from "@measurekit/psychometrics/cat";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { anyOf, createAdaptiveTest, standardErrorThreshold, testLength } from "@measurekit/psychometrics/cat";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 
 // The data: item 7 is one point harder for the second group.
 const random = createRandom(2026);
@@ -27,7 +27,7 @@ const shifted = items.map((item, j) =>
 );
 const first = simulateResponses(items, simulateThetas(400, random), random);
 const second = simulateResponses(shifted, simulateThetas(400, random), random);
-const matrix = responseMatrix([...first.responses, ...second.responses]);
+const matrix = buildResponseMatrix([...first.responses, ...second.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 400 ? "reference" : "focal"));
 
 // Classical test theory: the easiest and the hardest item, and the reliability of the total score.
@@ -58,7 +58,7 @@ const flagged = mantelHaenszel(matrix, groups).items.filter((item) => item.etsCa
 console.log("Items with DIF:", flagged.map((item) => `${item.id} (${item.etsCategory})`).join(", "));
 
 // An adaptive test of the first person on the calibrated items: each next item is the most informative one.
-const test = adaptiveTest({ pool: irt.items, stopping: anyOf(testLength(12), standardErrorThreshold(0.4)) });
+const test = createAdaptiveTest({ pool: irt.items, stopping: anyOf(testLength(12), standardErrorThreshold(0.4)) });
 const answers = Object.fromEntries(matrix.itemIds.map((id, j) => [id, matrix.responses[0]?.[j] ?? 0]));
 let state = test.start(random);
 while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);

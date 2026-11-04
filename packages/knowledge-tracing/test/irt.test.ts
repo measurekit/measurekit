@@ -2,13 +2,13 @@ import { gradedProbabilities, logisticProbabilities, partialCreditProbabilities 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  buildEventLog,
   compareModels,
   createRandom,
   crossValidate,
   DataError,
   type Event,
   type EventLog,
-  eventLog,
   type IrtDrift,
   type IrtItem,
   type IrtParameters,
@@ -100,7 +100,7 @@ function momentsOf({ nodes, weights }: ThetaDistribution): [number, number] {
 }
 
 const items = reference.items as Record<string, IrtItem>;
-const log = eventLog(reference.events);
+const log = buildEventLog(reference.events);
 
 describe("IRT ability estimates against R", () => {
   for (const name of ["standard", "shifted"] as const) {
@@ -468,7 +468,7 @@ function caseNamed(name: string): DriftCase {
 /** Returns the items and the log of a case of the drift fixture, with an item of its own for each event. */
 function caseLog({ events }: DriftCase): { parameters: IrtParameters; log: EventLog } {
   const items = Object.fromEntries(events.a.map((a, i) => [`item${i}`, { a, b: defined(events.b[i]) }]));
-  const log = eventLog(
+  const log = buildEventLog(
     events.time.map((time, i) => ({
       learner: "ana",
       item: `item${i}`,
@@ -666,7 +666,7 @@ describe("IRT with drift", () => {
       { ...attempt, item: "hard", time: START + WEEK, outcome: 1 },
       { ...attempt, item: "lesson", time: START + 2 * WEEK, outcome: null },
     ];
-    const fit = model.fit(eventLog(events));
+    const fit = model.fit(buildEventLog(events));
     let state = model.initialState("ana");
     let likelihood = 0;
     const predictions = events.map((event) => {

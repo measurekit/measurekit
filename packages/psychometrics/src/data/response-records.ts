@@ -54,7 +54,7 @@ export interface ResponseRecordsOptions {
  * response is not an integer from 0 to 2³¹ - 1, a time is not a positive finite number, a person has two records of one
  * item, or the ids repeat.
  */
-export function responseRecords(
+export function buildResponseRecords(
   records: readonly ResponseRecord[],
   options: ResponseRecordsOptions = {},
 ): ResponseRecords {
@@ -89,7 +89,7 @@ export interface IndexedRecord {
  * Checks response records and returns, for each person, the item indices, responses and times of the person's
  * records, ordered by item.
  *
- * @throws `DataError` naming the first problem found, in the cases of {@link responseRecords}.
+ * @throws `DataError` naming the first problem found, in the cases of {@link buildResponseRecords}.
  */
 export function checkResponseRecords(data: ResponseRecords): IndexedRecord[][] {
   const { personIds, itemIds, records } = data;

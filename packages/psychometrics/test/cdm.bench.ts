@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
   attributeProfiles,
+  buildResponseMatrix,
   type CdmModel,
   calibrateCdm,
   cdmClassificationAccuracy,
@@ -9,7 +10,6 @@ import {
   cdmModelFit,
   compareItemModels,
   nonparametricClassification,
-  responseMatrix,
   validateQMatrix,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
@@ -17,7 +17,7 @@ import { type BenchCdmFixture, readFixture } from "./fixtures.js";
 
 const fixture = readFixture<BenchCdmFixture>("bench-cdm.json");
 
-const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
+const matrix = buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds });
 const { qMatrix } = fixture;
 
 const MODELS = [

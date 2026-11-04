@@ -44,8 +44,8 @@ export function simulateDiagnosticTest(
   profiles: readonly (readonly number[])[],
   random: Random,
 ): DiagnosticTestSimulation {
-  checkTest(test, "pool", "The test must be a diagnostic adaptive test from diagnosticAdaptiveTest");
-  checkArray(test.attributes, "The test must be a diagnostic adaptive test from diagnosticAdaptiveTest");
+  checkTest(test, "pool", "The test must be a diagnostic adaptive test from createDiagnosticAdaptiveTest");
+  checkArray(test.attributes, "The test must be a diagnostic adaptive test from createDiagnosticAdaptiveTest");
   checkRandom(random);
   const { pool, attributes } = test;
   const matrix = simulateCdmResponses({ attributes, items: pool }, profiles, random);

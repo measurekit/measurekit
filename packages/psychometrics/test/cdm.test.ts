@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { additiveMaximizer, type CdmLink, profilesOf, saturatedCoefficients } from "../src/cdm/internal.js";
 import {
   attributeProfiles,
+  buildResponseMatrix,
   type CdmCalibration,
   type CdmModel,
   calibrateCdm,
@@ -15,7 +16,6 @@ import {
   DataError,
   nonparametricClassification,
   qMatrixIdentifiability,
-  responseMatrix,
   simulateCdmResponses,
   validateQMatrix,
 } from "../src/index.js";
@@ -264,7 +264,7 @@ function referenceCalibration(
   reference: (typeof additiveFixture.cases)[number],
   fit: (typeof additiveFixture.cases)[number]["fits"][number],
 ): CdmCalibration {
-  const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+  const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
   const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), { maxIterations: 1 });
   return {
     ...calibration,
@@ -281,7 +281,7 @@ function referenceCalibration(
 
 describe("cdmClassificationAccuracy", () => {
   for (const reference of fixture.cases) {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     for (const fit of reference.fits) {
       for (const accuracy of fit.accuracy ?? []) {
         const classification = accuracy.classification === "eap" ? "eap" : "map";
@@ -309,7 +309,7 @@ describe("cdmClassificationAccuracy", () => {
   }
 
   for (const reference of additiveFixture.cases) {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     for (const fit of reference.fits) {
       for (const accuracy of fit.accuracy ?? []) {
         const classification = accuracy.classification === "eap" ? "eap" : "map";
@@ -334,7 +334,7 @@ describe("cdmClassificationAccuracy", () => {
   it("rejects persons without responses alone, whose accuracy is undefined, and invalid options", () => {
     const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"] };
     const calibration = calibrateCdm(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 0, 1],
         [0, 1, 1],
         [1, 1, 0],
@@ -342,10 +342,10 @@ describe("cdmClassificationAccuracy", () => {
       ]),
       qMatrix,
     );
-    expect(() => cdmClassificationAccuracy(responseMatrix([[null, null, null]]), calibration)).toThrow(
+    expect(() => cdmClassificationAccuracy(buildResponseMatrix([[null, null, null]]), calibration)).toThrow(
       "Classification accuracy needs at least one person with a response.",
     );
-    const matrix = responseMatrix([[1, 0, 1]]);
+    const matrix = buildResponseMatrix([[1, 0, 1]]);
     expect(() => cdmClassificationAccuracy(matrix, calibration, { classification: JSON.parse('"mle"') })).toThrow(
       'The option classification must be "map" or "eap", found "mle".',
     );
@@ -440,7 +440,7 @@ describe("additiveMaximizer", () => {
 
 describe("calibrateCdm", () => {
   for (const reference of fixture.cases) {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     for (const fit of reference.fits) {
       it(`matches GDINA's ${fit.model.toUpperCase()} model on ${reference.name} data`, () => {
         const result = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
@@ -473,7 +473,7 @@ describe("calibrateCdm", () => {
   }
 
   for (const reference of additiveFixture.cases) {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     for (const fit of reference.fits) {
       it(`matches GDINA's ${fitName(fit.model)} models on ${reference.name} data`, () => {
         const result = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
@@ -508,7 +508,7 @@ describe("calibrateCdm", () => {
 
   it("gives coefficients that reproduce each item's success probabilities under its model", () => {
     const reference = defined(additiveFixture.cases[1]);
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const models = defined(reference.fits[3]).model;
     const result = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
       model: fitModels(models),
@@ -560,7 +560,7 @@ describe("calibrateCdm", () => {
   it("fits items of one attribute as the G-DINA does under every model", () => {
     const reference = defined(additiveFixture.cases[1]);
     const itemIds = reference.itemIds.slice(0, 10);
-    const matrix = responseMatrix(
+    const matrix = buildResponseMatrix(
       reference.responses.map((row) => row.slice(0, 10)),
       { itemIds },
     );
@@ -579,7 +579,7 @@ describe("calibrateCdm", () => {
 
   it("fits no better than the G-DINA, which contains the additive models", () => {
     const reference = defined(additiveFixture.cases[1]);
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const qMatrix = definedEntries(reference.qmatrix);
     const saturated = calibrateCdm(matrix, qMatrix, { tolerance: 1e-8, maxIterations: 10_000 });
     for (const model of ["acdm", "llm", "rrum"] as const) {
@@ -589,7 +589,7 @@ describe("calibrateCdm", () => {
   });
 
   it("lists an item's attributes in any order without changing the calibration", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 1, 0],
       [0, 0, 1],
       [1, 0, 0],
@@ -606,7 +606,7 @@ describe("calibrateCdm", () => {
   });
 
   it("calibrates additive items that every person answered correctly or incorrectly", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0, 1, 1],
       [1, 0, 0, 0],
       [1, 0, 1, 1],
@@ -652,7 +652,7 @@ describe("calibrateCdm", () => {
 
   it("leaves out the standard errors and the covariances unless the option asks for them", () => {
     const [reference] = comparisonFixture.cases;
-    const matrix = responseMatrix(defined(reference).responses, { itemIds: defined(reference).itemIds });
+    const matrix = buildResponseMatrix(defined(reference).responses, { itemIds: defined(reference).itemIds });
     const qMatrix = definedEntries(defined(reference).qmatrix);
     for (const options of [{}, { standardErrors: "none" as const }]) {
       for (const item of calibrateCdm(matrix, qMatrix, options).items) {
@@ -663,7 +663,7 @@ describe("calibrateCdm", () => {
   });
 
   it("gives the standard errors and covariances of a calibration whose persons are fewer than its parameters", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0, 1],
       [0, 1, 1],
       [1, 1, 0],
@@ -680,7 +680,7 @@ describe("calibrateCdm", () => {
   });
 
   it("rejects incomplete standard errors for items that are not G-DINA, and other values of the option", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0],
       [0, 1],
       [1, 1],
@@ -703,7 +703,7 @@ describe("calibrateCdm", () => {
       ...Object.fromEntries(attributes.map((attribute) => [attribute, [attribute]])),
     };
     const itemIds = Object.keys(qMatrix);
-    const matrix = responseMatrix(
+    const matrix = buildResponseMatrix(
       Array.from({ length: 30 }, (_, person) => itemIds.map((_, item) => ((person * 7 + item * 3) % 5 < 2 ? 1 : 0))),
       { itemIds },
     );
@@ -717,7 +717,7 @@ describe("calibrateCdm", () => {
     const design = (entries: readonly (readonly string[])[]) => {
       const qMatrix = Object.fromEntries(entries.map((listed, j) => [`item${j}`, listed]));
       const itemIds = Object.keys(qMatrix);
-      return [responseMatrix([itemIds.map(() => 0), itemIds.map(() => 1)], { itemIds }), qMatrix] as const;
+      return [buildResponseMatrix([itemIds.map(() => 0), itemIds.map(() => 1)], { itemIds }), qMatrix] as const;
     };
     // 20 items of one of 16 attributes, 129 items of one of 15, and 9 items of all 15: each passes the other limits.
     const sixteen = attributes(16);
@@ -734,12 +734,12 @@ describe("calibrateCdm", () => {
   });
 
   it("rejects polytomous responses, a Q-matrix that does not fit the items and unknown models", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0],
       [0, 1],
     ]);
     const qMatrix = { item1: ["a"], item2: ["a", "b"] };
-    expect(() => calibrateCdm(responseMatrix([[2, 0]]), qMatrix)).toThrow(
+    expect(() => calibrateCdm(buildResponseMatrix([[2, 0]]), qMatrix)).toThrow(
       'Cognitive diagnosis needs dichotomous items, but person "person1" scored 2 on item "item1".',
     );
     expect(() => calibrateCdm(matrix, { item1: ["a"] })).toThrow('Item "item2" needs at least one attribute.');
@@ -762,7 +762,7 @@ describe("calibrateCdm", () => {
       'The model of item 2 must be "gdina", "dina", "dino", "acdm", "llm" or "rrum", found "rasch".',
     );
     expect(() => calibrateCdm(matrix, qMatrix, { model: ["dina"] })).toThrow("Found 1 models for 2 items.");
-    expect(() => calibrateCdm(responseMatrix([[null, null]]), qMatrix)).toThrow(
+    expect(() => calibrateCdm(buildResponseMatrix([[null, null]]), qMatrix)).toThrow(
       "Cognitive diagnosis needs at least one response.",
     );
     expect(() => calibrateCdm(matrix, qMatrix, JSON.parse("null"))).toThrow(
@@ -781,7 +781,7 @@ const COMPARISON_CALIBRATIONS = new Map<string, CdmCalibration>();
 function comparisonCalibration(reference: (typeof comparisonFixture.cases)[number]): CdmCalibration {
   const known = COMPARISON_CALIBRATIONS.get(reference.name);
   if (known !== undefined) return known;
-  const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+  const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
   const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
     standardErrors: "incomplete",
     tolerance: 1e-10,
@@ -899,7 +899,7 @@ describe("compareItemModels", () => {
   it("leaves out items of one attribute, and has nothing to compare when every item has one", () => {
     const calibration = comparisonCalibration(defined(comparisonFixture.cases[0]));
     expect(compareItemModels(calibration).map(({ item }) => item)).not.toContain("item1");
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0],
       [0, 1],
       [1, 1],
@@ -959,7 +959,7 @@ describe("compareItemModels", () => {
 
 describe("nonparametricClassification", () => {
   for (const reference of fixture.cases) {
-    const matrix = responseMatrix(reference.responses.slice(0, 30), { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses.slice(0, 30), { itemIds: reference.itemIds });
     for (const expected of reference.nonparametric) {
       const rule = expected.gate === "AND" ? "conjunctive" : "disjunctive";
       it(`matches NPCD's AlphaNP with the ${expected.gate} gate on ${reference.name} data`, () => {
@@ -976,7 +976,7 @@ describe("nonparametricClassification", () => {
   it("takes the first nearest profile on ties and skips missing responses", () => {
     const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"] };
     const result = nonparametricClassification(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 0, 0],
         [null, 1, null],
       ]),
@@ -991,12 +991,12 @@ describe("nonparametricClassification", () => {
     const attributes = Array.from({ length: 15 }, (_, k) => `a${k}`);
     const qMatrix = Object.fromEntries(attributes.map((attribute, k) => [`item${k + 1}`, [attribute]]));
     const pattern = attributes.map((_, k) => k % 2);
-    const [person] = nonparametricClassification(responseMatrix([pattern]), qMatrix);
+    const [person] = nonparametricClassification(buildResponseMatrix([pattern]), qMatrix);
     expect(person).toEqual({ id: "person1", profile: pattern, distance: 0, ties: 1 });
   });
 
   it("rejects options of other types from JavaScript", () => {
-    expect(() => nonparametricClassification(responseMatrix([[1]]), { item1: ["a"] }, JSON.parse("null"))).toThrow(
+    expect(() => nonparametricClassification(buildResponseMatrix([[1]]), { item1: ["a"] }, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
   });
@@ -1004,7 +1004,7 @@ describe("nonparametricClassification", () => {
 
 describe("attributeProfiles", () => {
   const reference = defined(fixture.cases[1]);
-  const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+  const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
   for (const fit of reference.fits) {
     it(`matches GDINA's personparm under the ${fit.model.toUpperCase()} model`, () => {
       const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
@@ -1028,7 +1028,7 @@ describe("attributeProfiles", () => {
   }
 
   for (const additiveReference of additiveFixture.cases) {
-    const additiveMatrix = responseMatrix(additiveReference.responses, { itemIds: additiveReference.itemIds });
+    const additiveMatrix = buildResponseMatrix(additiveReference.responses, { itemIds: additiveReference.itemIds });
     for (const fit of additiveReference.fits) {
       it(`matches GDINA's personparm for ${fitName(fit.model)} items on ${additiveReference.name} data`, () => {
         const persons = attributeProfiles(additiveMatrix, referenceCalibration(additiveReference, fit));
@@ -1051,11 +1051,11 @@ describe("attributeProfiles", () => {
   it("gives a person without responses the calibrated proportions", () => {
     const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), { maxIterations: 5 });
     const [person] = attributeProfiles(
-      responseMatrix([reference.itemIds.map(() => null)], { itemIds: reference.itemIds }),
+      buildResponseMatrix([reference.itemIds.map(() => null)], { itemIds: reference.itemIds }),
       calibration,
     );
     expect(defined(person).posterior).toEqual(calibration.profiles.map((profile) => profile.proportion));
-    expect(() => attributeProfiles(responseMatrix([[1]]), calibration)).toThrow(
+    expect(() => attributeProfiles(buildResponseMatrix([[1]]), calibration)).toThrow(
       "The matrix needs the calibration's items, in its order.",
     );
   });
@@ -1065,9 +1065,12 @@ describe("attributeProfiles", () => {
     const [first, second] = matrix.responses.map((row) => row.slice());
     const none = reference.itemIds.map(() => null);
     const options = { itemIds: reference.itemIds };
-    const alone = attributeProfiles(responseMatrix([defined(first), defined(second)], options), calibration);
+    const alone = attributeProfiles(buildResponseMatrix([defined(first), defined(second)], options), calibration);
     const mixed = attributeProfiles(
-      responseMatrix([none, defined(first), none, defined(second)], { ...options, personIds: ["a", "b", "c", "d"] }),
+      buildResponseMatrix([none, defined(first), none, defined(second)], {
+        ...options,
+        personIds: ["a", "b", "c", "d"],
+      }),
       calibration,
     );
     expect(mixed.map((person) => person.id)).toEqual(["a", "b", "c", "d"]);
@@ -1080,7 +1083,7 @@ describe("attributeProfiles", () => {
 
   it("places responses that no profile can give on the profiles they contradict least", () => {
     const qMatrix = { item1: ["A"], item2: ["B"], item3: ["A", "B"] };
-    const data = responseMatrix([
+    const data = buildResponseMatrix([
       [1, 0, 1],
       [0, 0, 1],
     ]);
@@ -1131,7 +1134,7 @@ describe("validateQMatrix", () => {
   const reference = defined(fixture.cases[1]);
   const fit = defined(reference.fits[0]);
   it("matches GDINA's Qval with the PVAF method", () => {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix), {
       tolerance: 1e-10,
       maxIterations: 10_000,
@@ -1145,7 +1148,7 @@ describe("validateQMatrix", () => {
 
   it("leaves the PVAF of an item without responses undefined and keeps its attributes", () => {
     const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"] };
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0, null],
       [0, 1, null],
       [1, 1, null],
@@ -1157,7 +1160,7 @@ describe("validateQMatrix", () => {
   });
 
   it("leaves out the latent groups of profiles without proportion", () => {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const calibration = calibrateCdm(matrix, definedEntries(reference.qmatrix));
     const profiles = calibration.profiles.map((entry, c) => (c === 1 ? { ...entry, proportion: 0 } : entry));
     for (const item of validateQMatrix(matrix, { ...calibration, profiles })) {
@@ -1170,7 +1173,7 @@ describe("validateQMatrix", () => {
     const attributes = Array.from({ length: 15 }, (_, k) => `a${k}`);
     const qMatrix = Object.fromEntries(attributes.map((attribute, k) => [`item${k + 1}`, [attribute]]));
     const itemIds = Object.keys(qMatrix);
-    const matrix = responseMatrix(
+    const matrix = buildResponseMatrix(
       Array.from({ length: 4 }, (_, person) => itemIds.map((_, item) => (person + item) % 2)),
       { itemIds },
     );
@@ -1179,7 +1182,7 @@ describe("validateQMatrix", () => {
   });
 
   it("rejects an eps outside [0, 1] and options of other types", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0],
       [0, 1],
       [1, 1],
@@ -1196,7 +1199,7 @@ describe("validateQMatrix", () => {
 });
 
 describe("cdmModelFit", () => {
-  const matrix = responseMatrix(fitFixture.responses, { itemIds: fitFixture.items });
+  const matrix = buildResponseMatrix(fitFixture.responses, { itemIds: fitFixture.items });
   const qMatrix = definedEntries(fitFixture.qMatrix);
   const calibrated = (model: readonly string[]) =>
     calibrateCdm(matrix, qMatrix, {
@@ -1243,7 +1246,7 @@ describe("cdmModelFit", () => {
     let rejected = 0;
     let rejectedByGdina = 0;
     for (const { responses, statistic, degreesOfFreedom } of sets) {
-      const data = responseMatrix(
+      const data = buildResponseMatrix(
         responses.map((row) => Array.from(row, Number)),
         { itemIds: fitFixture.items },
       );
@@ -1258,7 +1261,7 @@ describe("cdmModelFit", () => {
 
   it("leaves M2 null without degrees of freedom, and still gives SRMSR", () => {
     const small = { item1: ["a", "b"], item2: ["a"], item3: ["b"] };
-    const data = responseMatrix(fitFixture.responses.map((row) => row.slice(0, 3)));
+    const data = buildResponseMatrix(fitFixture.responses.map((row) => row.slice(0, 3)));
     const result = cdmModelFit(data, calibrateCdm(data, small));
     expect(result.degreesOfFreedom).toBeLessThanOrEqual(0);
     expect(result).toMatchObject({ m2: null, significance: null, rmsea: null, rmseaInterval: null });
@@ -1267,19 +1270,22 @@ describe("cdmModelFit", () => {
 
   it("uses the persons who answered every item", () => {
     const calibration = calibrated(defined(fitFixture.cases[0]).model);
-    const missing = responseMatrix([...fitFixture.responses, [null, ...(fitFixture.responses[0]?.slice(1) ?? [])]], {
-      itemIds: fitFixture.items,
-    });
+    const missing = buildResponseMatrix(
+      [...fitFixture.responses, [null, ...(fitFixture.responses[0]?.slice(1) ?? [])]],
+      {
+        itemIds: fitFixture.items,
+      },
+    );
     expect(cdmModelFit(missing, calibration)).toEqual(cdmModelFit(matrix, calibration));
   });
 
   it("refuses more than 60 items and fewer than two persons who answered every item", () => {
     const wide = Object.fromEntries(Array.from({ length: 61 }, (_, j) => [`item${j + 1}`, ["a"]]));
     const rows = [0, 1, 0, 1].map((start) => Array.from({ length: 61 }, (_, j) => (start + j) % 2));
-    const many = responseMatrix(rows);
+    const many = buildResponseMatrix(rows);
     const calibration = calibrateCdm(many, wide, { maxIterations: 2 });
     expect(() => cdmModelFit(many, calibration)).toThrow(/at most 60 items, found 61/);
-    const few = responseMatrix([
+    const few = buildResponseMatrix([
       [1, 0],
       [0, null],
       [null, 1],
@@ -1304,7 +1310,7 @@ describe("cdmModelFit", () => {
 });
 
 describe("cdmItemFit", () => {
-  const matrix = responseMatrix(fitFixture.responses, { itemIds: fitFixture.items });
+  const matrix = buildResponseMatrix(fitFixture.responses, { itemIds: fitFixture.items });
   const qMatrix = definedEntries(fitFixture.qMatrix);
 
   for (const fit of fitFixture.cases) {
@@ -1340,7 +1346,7 @@ describe("cdmItemFit", () => {
 
   it("counts an empty cell of an observed table as one half, and leaves a constant item's correlations out", () => {
     const rows = fitFixture.responses.map((row) => [1, ...row.slice(1)]);
-    const data = responseMatrix(rows, { itemIds: fitFixture.items });
+    const data = buildResponseMatrix(rows, { itemIds: fitFixture.items });
     const [constant, ...others] = cdmItemFit(data, calibrateCdm(data, qMatrix));
     expect(constant?.correlationZ).toBeNull();
     expect(Number.isFinite(defined(constant?.logOddsZ))).toBe(true);
@@ -1348,7 +1354,7 @@ describe("cdmItemFit", () => {
   });
 
   it("gives no pair z to a single item", () => {
-    const data = responseMatrix([[1], [0], [1], [1]]);
+    const data = buildResponseMatrix([[1], [0], [1], [1]]);
     const [item] = cdmItemFit(data, calibrateCdm(data, { item1: ["a"] }));
     expect(item).toMatchObject({ correlationZ: null, logOddsZ: null, significance: null });
     expect(item?.proportion.z).not.toBeNull();
@@ -1399,14 +1405,14 @@ describe("properties", () => {
   it("model and item fit do not depend on the order of persons", () => {
     const qMatrix = definedEntries(fitFixture.qMatrix);
     const rows = fitFixture.responses.slice(0, 300);
-    const calibration = calibrateCdm(responseMatrix(rows, { itemIds: fitFixture.items }), qMatrix, {
+    const calibration = calibrateCdm(buildResponseMatrix(rows, { itemIds: fitFixture.items }), qMatrix, {
       model: "dina",
       maxIterations: 200,
     });
     fc.assert(
       fc.property(fc.shuffledSubarray(rows, { minLength: rows.length, maxLength: rows.length }), (shuffled) => {
-        const original = responseMatrix(rows, { itemIds: fitFixture.items });
-        const reordered = responseMatrix(shuffled, { itemIds: fitFixture.items });
+        const original = buildResponseMatrix(rows, { itemIds: fitFixture.items });
+        const reordered = buildResponseMatrix(shuffled, { itemIds: fitFixture.items });
         const close = (actual: unknown, expected: unknown): void => {
           expect(
             JSON.stringify(actual, (_, value) => (typeof value === "number" ? value.toPrecision(10) : value)),
@@ -1446,7 +1452,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(rows, fc.constantFrom<CdmModel>(...MODELS), (data, model) => {
         try {
-          const matrix = responseMatrix(data);
+          const matrix = buildResponseMatrix(data);
           const result = calibrateCdm(matrix, qMatrix, { model, maxIterations: 50 });
           expectClose(
             result.profiles.reduce((sum, { proportion }) => sum + proportion, 0),
@@ -1473,7 +1479,7 @@ describe("properties", () => {
 
   it("has the marginal log-likelihood of the responses that are not missing, summed over the profiles", () => {
     const qMatrix = { item1: ["a"], item2: ["b"], item3: ["a", "b"], item4: ["a"] };
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0, 1, null],
       [0, null, 0, 0],
       [1, 1, 1, 1],
@@ -1554,7 +1560,7 @@ describe("properties", () => {
     });
     fc.assert(
       fc.property(rows, fc.constantFrom<CdmModel>(...MODELS), (data, model) => {
-        const matrix = responseMatrix(data);
+        const matrix = buildResponseMatrix(data);
         const calibration = calibrateCdm(matrix, qMatrix, { model, maxIterations: 30 });
         const stored: CdmCalibration = JSON.parse(JSON.stringify(calibration));
         expect(attributeProfiles(matrix, stored)).toEqual(attributeProfiles(matrix, calibration));

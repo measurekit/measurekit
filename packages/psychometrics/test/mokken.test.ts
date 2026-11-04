@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   automatedItemSelection,
+  buildResponseMatrix,
   conditionalAssociation,
   DataError,
   guttmanErrors,
@@ -12,7 +13,6 @@ import {
   monotonicity,
   personScalability,
   type ResponseMatrix,
-  responseMatrix,
   scalability,
   twoWayImputation,
 } from "../src/index.js";
@@ -212,7 +212,7 @@ interface ReferenceCase {
 const cases: readonly ReferenceCase[] = JSON.parse(JSON.stringify(fixture.cases));
 
 function matrixOf(reference: ReferenceCase): ResponseMatrix {
-  return responseMatrix(reference.responses, { itemIds: reference.itemIds });
+  return buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
 }
 
 /** Returns the option for a minimum group size that the reference may leave at its default. */
@@ -268,7 +268,7 @@ describe("twoWayImputation", () => {
       ...(reference.minimum === null ? {} : { minimum: reference.minimum }),
       ...(reference.maximum === null ? {} : { maximum: reference.maximum }),
     };
-    const matrix = responseMatrix(reference.responses);
+    const matrix = buildResponseMatrix(reference.responses);
 
     it(`imputes as twoway without its error term on ${reference.name}`, () => {
       expect(twoWayImputation(matrix, constant(0), options).responses).toEqual(reference.imputed);
@@ -301,7 +301,7 @@ describe("twoWayImputation", () => {
     const complete = itemVariances(imputation.complete);
     const random = createRandom(20261102);
     const gaps = Array.from({ length: 20 }, () => {
-      const imputed = itemVariances(twoWayImputation(responseMatrix(reference.responses), random).responses);
+      const imputed = itemVariances(twoWayImputation(buildResponseMatrix(reference.responses), random).responses);
       return imputed.reduce((sum, value, item) => sum + value - defined(complete[item]), 0) / imputed.length;
     });
     expect(Math.abs(gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length)).toBeLessThan(IMPUTED_VARIANCE_TOLERANCE);
@@ -310,11 +310,11 @@ describe("twoWayImputation", () => {
   it("rounds a two-way value of a half to the even integer, as R does", () => {
     const reference = defined(imputation.cases.find(({ name }) => name === "a two-way value of a half"));
     expect(reference.twoWay[0]?.[2]).toBe(2.5);
-    expect(twoWayImputation(responseMatrix(reference.responses), constant(0)).responses[0]?.[2]).toBe(2);
+    expect(twoWayImputation(buildResponseMatrix(reference.responses), constant(0)).responses[0]?.[2]).toBe(2);
   });
 
   it("keeps the responses, the ids and the times, and returns a copy of a matrix without missing responses", () => {
-    const matrix = responseMatrix(
+    const matrix = buildResponseMatrix(
       [
         [1, null, 2],
         [0, 1, 1],
@@ -335,7 +335,7 @@ describe("twoWayImputation", () => {
     expect(imputed.itemIds).toEqual(["x", "y", "z"]);
     expect(imputed.times).toEqual(matrix.times);
     expect(imputed.responses.flat().every((value) => value !== null)).toBe(true);
-    const complete = responseMatrix([
+    const complete = buildResponseMatrix([
       [1, 0],
       [0, 1],
     ]);
@@ -345,14 +345,14 @@ describe("twoWayImputation", () => {
   });
 
   it("rejects a person or an item without responses, bounds inside the responses and arguments of other types", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, null],
       [0, 1],
       [2, 2],
     ]);
     expect(() =>
       twoWayImputation(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0],
           [null, null],
         ]),
@@ -361,7 +361,7 @@ describe("twoWayImputation", () => {
     ).toThrow('Two-way imputation needs a response of every person; "person2" has none.');
     expect(() =>
       twoWayImputation(
-        responseMatrix([
+        buildResponseMatrix([
           [1, null],
           [0, null],
         ]),
@@ -390,7 +390,7 @@ describe("twoWayImputation", () => {
 describe("guttmanErrors", () => {
   for (const reference of steps.errors) {
     it(`gives G+ and Tukey's fence as the mean over the orders of tied steps for ${reference.name}`, () => {
-      const result = guttmanErrors(responseMatrix(reference.responses, { itemIds: reference.itemIds }));
+      const result = guttmanErrors(buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }));
       expect(result.errors).toEqual(reference.errors);
       expectClose(result.upperFence, reference.upperFence, 1e-12, "fence");
       expect(result.outliers).toEqual(reference.outliers);
@@ -399,7 +399,7 @@ describe("guttmanErrors", () => {
 
   it("equals check.errors where no steps tie, and stays within 1/2 of its rounded mean of random orders where they do", () => {
     for (const reference of steps.errors) {
-      const counted = guttmanErrors(responseMatrix(reference.responses)).errors.filter((count) => count !== null);
+      const counted = guttmanErrors(buildResponseMatrix(reference.responses)).errors.filter((count) => count !== null);
       counted.forEach((count, person) => {
         const gap = Math.abs(count - defined(reference.mokken.errors[person]));
         expect(gap, `${reference.name} ${person}`).toBeLessThanOrEqual(reference.mokken.ties ? RANDOM_ORDER_GAP : 0);
@@ -420,7 +420,7 @@ describe("guttmanErrors", () => {
       [0, 0, 0],
       [0, 0, 1],
     ];
-    expect(guttmanErrors(responseMatrix(rows))).toEqual({
+    expect(guttmanErrors(buildResponseMatrix(rows))).toEqual({
       errors: [0, 0, 0, 0, 0, 0, 2],
       upperFence: 0,
       outliers: [6],
@@ -433,7 +433,7 @@ describe("guttmanErrors", () => {
       [0, 1],
       [1, 1],
     ];
-    expect(guttmanErrors(responseMatrix(rows)).errors).toEqual([0.5, 0.5, 0]);
+    expect(guttmanErrors(buildResponseMatrix(rows)).errors).toEqual([0.5, 0.5, 0]);
   });
 
   it("counts the errors over the steps of polytomous items", () => {
@@ -445,12 +445,12 @@ describe("guttmanErrors", () => {
       [1, 1],
       [0, 1],
     ];
-    expect(guttmanErrors(responseMatrix(rows)).errors).toEqual([2, 0, 0, 0]);
+    expect(guttmanErrors(buildResponseMatrix(rows)).errors).toEqual([2, 0, 0, 0]);
   });
 
   it("gives no count to a person with a missing response, and indexes outliers by the matrix's rows", () => {
     const reference = defined(steps.errors.find(({ name }) => name === "transitive reasoning, missing"));
-    const result = guttmanErrors(responseMatrix(reference.responses));
+    const result = guttmanErrors(buildResponseMatrix(reference.responses));
     reference.responses.forEach((row, person) => {
       expect(result.errors[person] === null, `person ${person}`).toBe(row.includes(null));
     });
@@ -466,16 +466,18 @@ describe("guttmanErrors", () => {
       [0, 0, 1],
       [1, 1, 1],
     ];
-    expect(guttmanErrors(responseMatrix(rows.map((row) => row.map((score) => score + 3))))).toEqual(
-      guttmanErrors(responseMatrix(rows)),
+    expect(guttmanErrors(buildResponseMatrix(rows.map((row) => row.map((score) => score + 3))))).toEqual(
+      guttmanErrors(buildResponseMatrix(rows)),
     );
   });
 
   it("rejects matrices that cannot be analyzed", () => {
-    expect(() => guttmanErrors(responseMatrix([[1], [0]]))).toThrow("Guttman errors needs at least 2 items, found 1.");
+    expect(() => guttmanErrors(buildResponseMatrix([[1], [0]]))).toThrow(
+      "Guttman errors needs at least 2 items, found 1.",
+    );
     expect(() =>
       guttmanErrors(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0],
           [null, 1],
         ]),
@@ -483,7 +485,7 @@ describe("guttmanErrors", () => {
     ).toThrow("Guttman errors needs at least 2 persons who answered every item, found 1.");
     expect(() =>
       guttmanErrors(
-        responseMatrix([
+        buildResponseMatrix([
           [0, 0],
           [10, 0],
         ]),
@@ -505,7 +507,7 @@ describe("personScalability", () => {
 
   for (const reference of personFixture.cases) {
     it(`gives PerFit's normed G, U3 and Ht, with tied p-values averaged, for ${reference.name}`, () => {
-      const result = personScalability(responseMatrix(responsesOf(reference.name)));
+      const result = personScalability(buildResponseMatrix(responsesOf(reference.name)));
       result.forEach((person, i) => {
         expectClose(
           person.normedGuttmanErrors,
@@ -521,8 +523,8 @@ describe("personScalability", () => {
 
   it("gives G of complete persons as guttmanErrors over its largest value", () => {
     const rows = responsesOf("tied item steps");
-    const counts = guttmanErrors(responseMatrix(rows)).errors;
-    personScalability(responseMatrix(rows)).forEach((person, i) => {
+    const counts = guttmanErrors(buildResponseMatrix(rows)).errors;
+    personScalability(buildResponseMatrix(rows)).forEach((person, i) => {
       const row = defined(rows[i]);
       const correct = row.reduce<number>((sum, x) => sum + (x ?? 0), 0);
       const largest = correct * (row.length - correct);
@@ -540,7 +542,7 @@ describe("personScalability", () => {
       [0, 0, 1, 1],
       [0, 0, 0, 0],
     ];
-    const [, guttman, , , reverse] = personScalability(responseMatrix(rows));
+    const [, guttman, , , reverse] = personScalability(buildResponseMatrix(rows));
     expect(guttman?.normedGuttmanErrors).toBe(0);
     expect(guttman?.u3).toBe(0);
     expect(reverse?.normedGuttmanErrors).toBe(1);
@@ -555,7 +557,7 @@ describe("personScalability", () => {
       [1, 1, 0],
       [1, 0, null],
     ];
-    const [first] = personScalability(responseMatrix(rows));
+    const [first] = personScalability(buildResponseMatrix(rows));
     expect(first?.normedGuttmanErrors).toBe(1);
     expect(first?.u3).toBe(1);
   });
@@ -568,7 +570,7 @@ describe("personScalability", () => {
       [1, 0, 0],
       [0, 1, 1],
     ];
-    const result = personScalability(responseMatrix(rows));
+    const result = personScalability(buildResponseMatrix(rows));
     for (const person of [0, 1, 2]) {
       expect(result[person]).toEqual({ id: `person${person + 1}`, normedGuttmanErrors: null, u3: null, ht: null });
     }
@@ -576,7 +578,7 @@ describe("personScalability", () => {
 
   it("gives Ht no value without another person of a score between the extremes", () => {
     const result = personScalability(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 0],
         [1, 1],
         [0, 0],
@@ -591,12 +593,12 @@ describe("personScalability", () => {
     // take 80 GB.
     const items = 100_000;
     const row = Array.from({ length: items }, (_, i) => (i < items / 2 ? 0 : 1));
-    const [first] = personScalability(responseMatrix([row, row.map((response) => 1 - response)]));
+    const [first] = personScalability(buildResponseMatrix([row, row.map((response) => 1 - response)]));
     expect(first?.normedGuttmanErrors).toBe(0.5);
   });
 
   it("rejects responses other than 0 and 1, and arguments of other types", () => {
-    expect(() => personScalability(responseMatrix([[0, 2]]))).toThrow(
+    expect(() => personScalability(buildResponseMatrix([[0, 2]]))).toThrow(
       'Person scalability needs dichotomous items, but person "person1" scored 2 on item "item2".',
     );
     expect(() => personScalability(JSON.parse("null"))).toThrow(DataError);
@@ -642,7 +644,7 @@ describe("scalability", () => {
   }
 
   it("gives 1 with no standard error for a perfect Guttman scale", () => {
-    const result = scalability(responseMatrix(guttman(4, 20)));
+    const result = scalability(buildResponseMatrix(guttman(4, 20)));
     expect(result.scale.coefficient).toBeCloseTo(1, 12);
     expect(result.scale.standardError).toBeCloseTo(0, 12);
     for (const item of result.items) expect(item.coefficient).toBeCloseTo(1, 12);
@@ -651,7 +653,7 @@ describe("scalability", () => {
 
   it("gives 0 for two dichotomous items that are independent in the sample", () => {
     const result = scalability(
-      responseMatrix([
+      buildResponseMatrix([
         [0, 0],
         [0, 1],
         [1, 0],
@@ -667,23 +669,23 @@ describe("scalability", () => {
     const complete = reference.responses.filter((row) => !row.includes(null));
     expect(complete.length).toBeLessThan(reference.responses.length);
     expect(scalability(matrixOf(reference))).toEqual(
-      scalability(responseMatrix(complete, { itemIds: reference.itemIds })),
+      scalability(buildResponseMatrix(complete, { itemIds: reference.itemIds })),
     );
   });
 
   it("is the same for scores shifted to start above 0", () => {
     const reference = defined(cases.find(({ name }) => name === "cavalini"));
     const shifted = reference.responses.map((row) => row.map((score) => (score ?? 0) + 2));
-    expect(scalability(responseMatrix(shifted, { itemIds: reference.itemIds }))).toEqual(
+    expect(scalability(buildResponseMatrix(shifted, { itemIds: reference.itemIds }))).toEqual(
       scalability(matrixOf(reference)),
     );
   });
 
   it("leaves out an item without variance, which has no coefficients", () => {
     const base = guttman(3, 12).map((row, person) => [...row.slice(0, 2), person % 5 < 2 ? 1 : 0, row[2] ?? 0]);
-    const plain = scalability(responseMatrix(base));
+    const plain = scalability(buildResponseMatrix(base));
     const withConstant = scalability(
-      responseMatrix(
+      buildResponseMatrix(
         base.map((row) => [...row, 1]),
         { itemIds: ["a", "b", "c", "d", "constant"] },
       ),
@@ -700,7 +702,7 @@ describe("scalability", () => {
 
   it("has no coefficients when every item is constant", () => {
     const result = scalability(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 1],
         [1, 1],
         [1, 1],
@@ -712,10 +714,12 @@ describe("scalability", () => {
 
   it("rejects matrices that cannot be analyzed", () => {
     expect(() => scalability(JSON.parse("null"))).toThrow(DataError);
-    expect(() => scalability(responseMatrix([[0], [1], [1]]))).toThrow("Scalability needs at least 2 items, found 1.");
+    expect(() => scalability(buildResponseMatrix([[0], [1], [1]]))).toThrow(
+      "Scalability needs at least 2 items, found 1.",
+    );
     expect(() =>
       scalability(
-        responseMatrix([
+        buildResponseMatrix([
           [0, 1],
           [1, null],
           [null, 1],
@@ -724,14 +728,14 @@ describe("scalability", () => {
     ).toThrow("Scalability needs at least 2 persons who answered every item, found 1.");
     expect(() =>
       scalability(
-        responseMatrix([
+        buildResponseMatrix([
           [0, 10],
           [1, 2],
           [2, 3],
         ]),
       ),
     ).toThrow("Scalability needs scores from at most 10 categories, as the mokken package does, found 11.");
-    expect(() => scalability(responseMatrix([[0, 1, 1]]))).toThrow(DataError);
+    expect(() => scalability(buildResponseMatrix([[0, 1, 1]]))).toThrow(DataError);
   });
 });
 
@@ -781,7 +785,7 @@ describe("automatedItemSelection", () => {
   });
 
   it("leaves out items without variance and does not let them change the scales", () => {
-    const withConstant = responseMatrix(
+    const withConstant = buildResponseMatrix(
       reference.responses.map((row) => [...row, 1]),
       { itemIds: [...reference.itemIds, "constant"] },
     );
@@ -791,7 +795,7 @@ describe("automatedItemSelection", () => {
   });
 
   it("lists the items of a scale in the order of the matrix", () => {
-    const reversed = responseMatrix(
+    const reversed = buildResponseMatrix(
       reference.responses.map((row) => [...row].reverse()),
       { itemIds: [...reference.itemIds].reverse() },
     );
@@ -816,14 +820,14 @@ describe("automatedItemSelection", () => {
       "The option alpha must be a number above 0 and below 1, found 1.",
     );
     expect(() => automatedItemSelection(matrix, { alpha: JSON.parse("null") })).toThrow(DataError);
-    expect(() => automatedItemSelection(responseMatrix([[0], [1]]))).toThrow(DataError);
+    expect(() => automatedItemSelection(buildResponseMatrix([[0], [1]]))).toThrow(DataError);
   });
 });
 
 describe("conditionalAssociation", () => {
   for (const reference of steps.association) {
     it(`matches W1, W2, W3 and the flags of the first pass of check.ca for ${reference.name}`, () => {
-      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
       const result = conditionalAssociation(matrix, { minimumSize: reference.minimumSize });
       expect(result.items).toEqual(reference.itemIds);
       const expectIndex = (
@@ -847,7 +851,7 @@ describe("conditionalAssociation", () => {
   }
 
   const dependent = defined(steps.association.find(({ name }) => name === "a dependent pair"));
-  const matrix = responseMatrix(dependent.responses, { itemIds: dependent.itemIds });
+  const matrix = buildResponseMatrix(dependent.responses, { itemIds: dependent.itemIds });
 
   it("flags the planted pair of positively dependent items by W1, and one of them by W2", () => {
     const { flagged } = conditionalAssociation(matrix);
@@ -873,7 +877,7 @@ describe("conditionalAssociation", () => {
 
   it("gives 0 to every index of copies of one item, which are constant within every group, and flags none", () => {
     const column = [0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1];
-    const result = conditionalAssociation(responseMatrix(column.map((score) => [score, score, score])));
+    const result = conditionalAssociation(buildResponseMatrix(column.map((score) => [score, score, score])));
     expect(result.w1).toEqual([
       [null, 0, 0],
       [0, null, 0],
@@ -896,7 +900,7 @@ describe("conditionalAssociation", () => {
       [1, 0, 1],
       [1, 1, 1],
     ];
-    expect(conditionalAssociation(responseMatrix(rows)).w1[0]?.[2]).toBe(1);
+    expect(conditionalAssociation(buildResponseMatrix(rows)).w1[0]?.[2]).toBe(1);
   });
 
   it("rejects options of other types, fewer than three items and groups larger than the persons", () => {
@@ -912,7 +916,7 @@ describe("conditionalAssociation", () => {
     );
     expect(() =>
       conditionalAssociation(
-        responseMatrix([
+        buildResponseMatrix([
           [0, 1],
           [1, 0],
         ]),
@@ -953,7 +957,7 @@ describe("monotonicity", () => {
         rows.push([person < (passed[group] ?? 0) ? 1 : 0, group >= 1 ? 1 : 0, group >= 2 ? 1 : 0]);
       }
     }
-    return responseMatrix(rows, { itemIds: ["decreasing", "first", "second"] });
+    return buildResponseMatrix(rows, { itemIds: ["decreasing", "first", "second"] });
   })();
 
   it("counts the violations of an item whose proportions fall with the rest score, as derived by hand", () => {
@@ -970,7 +974,7 @@ describe("monotonicity", () => {
   });
 
   it("finds no violation in a perfect Guttman scale", () => {
-    for (const check of monotonicity(responseMatrix(guttman(4, 25)))) {
+    for (const check of monotonicity(buildResponseMatrix(guttman(4, 25)))) {
       expect(check.violations).toBe(0);
       expect(check.maximumViolation).toBe(0);
       expect(check.maximumZ).toBeNull();
@@ -984,7 +988,7 @@ describe("monotonicity", () => {
     const matrix = matrixOf(reference);
     expect(monotonicity(matrix)).toEqual(monotonicity(matrix, { minimumGroupSize: 50 }));
     expect(monotonicity(matrix)).not.toEqual(monotonicity(matrix, { minimumGroupSize: 100 }));
-    const fewer = responseMatrix(reference.responses.slice(0, 499), { itemIds: reference.itemIds });
+    const fewer = buildResponseMatrix(reference.responses.slice(0, 499), { itemIds: reference.itemIds });
     expect(monotonicity(fewer)).toEqual(monotonicity(fewer, { minimumGroupSize: 99 }));
   });
 
@@ -1019,10 +1023,10 @@ describe("monotonicity", () => {
     expect(() => monotonicity(decreasing, { minimumGroupSize: 100 })).toThrow(
       "The minimum group size 100 is more than half of the 150 persons who answered every item.",
     );
-    expect(() => monotonicity(responseMatrix(guttman(3, 5)))).toThrow(
+    expect(() => monotonicity(buildResponseMatrix(guttman(3, 5)))).toThrow(
       "The monotonicity check needs at least 50 persons, the minimum group size, who answered every item, found 20.",
     );
-    expect(() => monotonicity(responseMatrix(guttman(3, 5)), { minimumGroupSize: 5 })).not.toThrow();
+    expect(() => monotonicity(buildResponseMatrix(guttman(3, 5)), { minimumGroupSize: 5 })).not.toThrow();
   });
 });
 
@@ -1051,7 +1055,7 @@ describe("invariantItemOrdering", () => {
   });
 
   it("finds no violation in a perfect Guttman scale, whose H^T is 1", () => {
-    const result = invariantItemOrdering(responseMatrix(guttman(4, 25)), { minimumGroupSize: 10 });
+    const result = invariantItemOrdering(buildResponseMatrix(guttman(4, 25)), { minimumGroupSize: 10 });
     expect(result.removed).toEqual([]);
     expect(result.coefficient).toBeCloseTo(1, 12);
     for (const check of result.items) {
@@ -1086,7 +1090,9 @@ describe("invariantItemOrdering", () => {
     for (let person = 0; person < 20; person++) rows.push([person % 2, (person % 2) + 1, 0]);
     for (let person = 0; person < 20; person++) rows.push([2, 0, 1]);
     for (let person = 0; person < 20; person++) rows.push([2, 1, 2]);
-    const result = invariantItemOrdering(responseMatrix(rows, { itemIds: ["a", "b", "c"] }), { minimumGroupSize: 20 });
+    const result = invariantItemOrdering(buildResponseMatrix(rows, { itemIds: ["a", "b", "c"] }), {
+      minimumGroupSize: 20,
+    });
     const [first, second] = [defined(result.items[0]), defined(result.items[1])];
     expect(first.significantViolations).toBeGreaterThan(0);
     expect(second.significantViolations).toBeGreaterThan(0);
@@ -1101,10 +1107,10 @@ describe("invariantItemOrdering", () => {
     );
     expect(() => invariantItemOrdering(noisyMatrix, { minimumGroupSize: 1 })).toThrow(DataError);
     expect(() => invariantItemOrdering(noisyMatrix, { alpha: 0 })).toThrow(DataError);
-    expect(() => invariantItemOrdering(responseMatrix(guttman(2, 30)))).toThrow(
+    expect(() => invariantItemOrdering(buildResponseMatrix(guttman(2, 30)))).toThrow(
       "The invariant item ordering check needs at least 3 items, found 2.",
     );
-    expect(() => invariantItemOrdering(responseMatrix(guttman(3, 10)))).toThrow(
+    expect(() => invariantItemOrdering(buildResponseMatrix(guttman(3, 10)))).toThrow(
       "The invariant item ordering check needs a minimum group size of at least 2, and at least that many persons who answered every item; found 50 and 40.",
     );
     expect(() => invariantItemOrdering(JSON.parse("null"))).toThrow(DataError);
@@ -1114,7 +1120,7 @@ describe("invariantItemOrdering", () => {
 describe("molenaarSijtsmaReliability", () => {
   for (const reference of reliability.cases) {
     it(`matches check.reliability of the mokken package on ${reference.name}`, () => {
-      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
       expectClose(molenaarSijtsmaReliability(matrix), reference.ms, RELIABILITY_TOLERANCE, reference.name);
     });
   }
@@ -1127,7 +1133,7 @@ describe("molenaarSijtsmaReliability", () => {
   });
 
   it("estimates the reliability of parallel forms in a study of the graded response model", () => {
-    const estimates = reliability.study.map((set) => molenaarSijtsmaReliability(responseMatrix(set.responses)));
+    const estimates = reliability.study.map((set) => molenaarSijtsmaReliability(buildResponseMatrix(set.responses)));
     estimates.forEach((estimate, i) => {
       expectClose(estimate, defined(reliability.study[i]).ms, RELIABILITY_TOLERANCE, `set ${i}`);
     });
@@ -1151,11 +1157,11 @@ describe("molenaarSijtsmaReliability", () => {
       [1, 1],
       [1, 1],
     ];
-    expect(molenaarSijtsmaReliability(responseMatrix(rows))).toBeCloseTo(26 / 33, 14);
+    expect(molenaarSijtsmaReliability(buildResponseMatrix(rows))).toBeCloseTo(26 / 33, 14);
   });
 
   it("is 1 minus the error variance share, so a Guttman scale is more reliable than independent items", () => {
-    const scale = molenaarSijtsmaReliability(responseMatrix(guttman(6, 20)));
+    const scale = molenaarSijtsmaReliability(buildResponseMatrix(guttman(6, 20)));
     expect(scale).toBeGreaterThan(0.8);
   });
 
@@ -1168,8 +1174,8 @@ describe("molenaarSijtsmaReliability", () => {
       [0, 0, 0, 1],
       [2, 2, 1, 1],
     ];
-    expect(molenaarSijtsmaReliability(responseMatrix(rows.map((row) => row.map((score) => score + 2))))).toBe(
-      molenaarSijtsmaReliability(responseMatrix(rows)),
+    expect(molenaarSijtsmaReliability(buildResponseMatrix(rows.map((row) => row.map((score) => score + 2))))).toBe(
+      molenaarSijtsmaReliability(buildResponseMatrix(rows)),
     );
   });
 
@@ -1183,21 +1189,21 @@ describe("molenaarSijtsmaReliability", () => {
       [1, 0, 1],
     ];
     const withMissing = [...rows, [null, 1, 1], [1, null, 0]];
-    expect(molenaarSijtsmaReliability(responseMatrix(withMissing))).toBe(
-      molenaarSijtsmaReliability(responseMatrix(rows)),
+    expect(molenaarSijtsmaReliability(buildResponseMatrix(withMissing))).toBe(
+      molenaarSijtsmaReliability(buildResponseMatrix(rows)),
     );
   });
 
   it("rejects a matrix of the wrong shape or of scores without variance", () => {
-    expect(() => molenaarSijtsmaReliability(responseMatrix([[1], [0], [1]]))).toThrow(
+    expect(() => molenaarSijtsmaReliability(buildResponseMatrix([[1], [0], [1]]))).toThrow(
       "Molenaar-Sijtsma reliability needs at least 2 items, found 1.",
     );
-    expect(() => molenaarSijtsmaReliability(responseMatrix([[1, 0]]))).toThrow(
+    expect(() => molenaarSijtsmaReliability(buildResponseMatrix([[1, 0]]))).toThrow(
       "Molenaar-Sijtsma reliability needs at least 2 persons who answered every item, found 1.",
     );
     expect(() =>
       molenaarSijtsmaReliability(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0],
           [0, 1],
         ]),
@@ -1205,7 +1211,7 @@ describe("molenaarSijtsmaReliability", () => {
     ).toThrow("Molenaar-Sijtsma reliability needs total scores with variance.");
     expect(() =>
       molenaarSijtsmaReliability(
-        responseMatrix([
+        buildResponseMatrix([
           [0, 0],
           [10, 0],
         ]),
@@ -1218,8 +1224,8 @@ describe("molenaarSijtsmaReliability", () => {
     // Ten persons who score 0 to 9 on every item: each item has 9 steps that some but not all persons pass.
     const rows = (items: number) =>
       Array.from({ length: 10 }, (_, score) => Array.from({ length: items }, () => score));
-    expect(molenaarSijtsmaReliability(responseMatrix(rows(111)))).toBeGreaterThan(0.99);
-    expect(() => molenaarSijtsmaReliability(responseMatrix(rows(112)))).toThrow(
+    expect(molenaarSijtsmaReliability(buildResponseMatrix(rows(111)))).toBeGreaterThan(0.99);
+    expect(() => molenaarSijtsmaReliability(buildResponseMatrix(rows(112)))).toThrow(
       "Molenaar-Sijtsma reliability holds a matrix of every pair of item steps, a step for each score above an item's lowest, so it takes at most 1000 steps that some but not all persons pass, found 1008.",
     );
   });
@@ -1232,8 +1238,8 @@ describe("item limit", () => {
       Array.from({ length: items }, (_, j) => j % 2),
       Array.from({ length: items }, (_, j) => (j + 1) % 2),
     ];
-    expect(scalability(responseMatrix(rows(1000))).pairs).toHaveLength(1000);
-    const many = responseMatrix(rows(1001));
+    expect(scalability(buildResponseMatrix(rows(1000))).pairs).toHaveLength(1000);
+    const many = buildResponseMatrix(rows(1001));
     const message = (analysis: string) =>
       `${analysis} compares every pair of items, so it takes at most 1000 items, found 1001.`;
     expect(() => scalability(many)).toThrow(message("Scalability"));
@@ -1261,7 +1267,7 @@ describe("properties", () => {
   it("person fit indices lie from 0 to 1, and are 0 for every person of a Guttman matrix", () => {
     fc.assert(
       fc.property(matrix, (rows) => {
-        for (const { normedGuttmanErrors, u3 } of personScalability(responseMatrix(rows))) {
+        for (const { normedGuttmanErrors, u3 } of personScalability(buildResponseMatrix(rows))) {
           for (const value of [normedGuttmanErrors, u3]) {
             if (value !== null) expect(value >= 0 && value <= 1).toBe(true);
           }
@@ -1278,7 +1284,7 @@ describe("properties", () => {
       );
     fc.assert(
       fc.property(guttman, (rows) => {
-        for (const { normedGuttmanErrors, u3 } of personScalability(responseMatrix(rows))) {
+        for (const { normedGuttmanErrors, u3 } of personScalability(buildResponseMatrix(rows))) {
           expect(normedGuttmanErrors ?? 0).toBe(0);
           expect(u3 ?? 0).toBe(0);
         }
@@ -1298,7 +1304,7 @@ describe("properties", () => {
     );
     fc.assert(
       fc.property(withMissing, fc.integer({ min: 0, max: 1000 }), (rows, seed) => {
-        const imputed = twoWayImputation(responseMatrix(rows), createRandom(seed)).responses;
+        const imputed = twoWayImputation(buildResponseMatrix(rows), createRandom(seed)).responses;
         rows.forEach((row, person) => {
           row.forEach((value, item) => {
             const result = defined(imputed[person]?.[item]);
@@ -1312,10 +1318,10 @@ describe("properties", () => {
   });
 
   it("G+ is 0 for every person of a perfect Guttman scale, and is a multiple of 1/2", () => {
-    expect(guttmanErrors(responseMatrix(guttman(5, 3))).errors.every((count) => count === 0)).toBe(true);
+    expect(guttmanErrors(buildResponseMatrix(guttman(5, 3))).errors.every((count) => count === 0)).toBe(true);
     fc.assert(
       fc.property(matrix, (rows) => {
-        for (const count of guttmanErrors(responseMatrix(rows)).errors) {
+        for (const count of guttmanErrors(buildResponseMatrix(rows)).errors) {
           expect(Number.isInteger(2 * defined(count))).toBe(true);
           expect(defined(count)).toBeGreaterThanOrEqual(0);
         }
@@ -1327,8 +1333,8 @@ describe("properties", () => {
   it("the indices of conditional association and their flags do not depend on the order of the persons", () => {
     fc.assert(
       fc.property(matrix, (rows) => {
-        const forward = conditionalAssociation(responseMatrix(rows));
-        const backward = conditionalAssociation(responseMatrix([...rows].reverse()));
+        const forward = conditionalAssociation(buildResponseMatrix(rows));
+        const backward = conditionalAssociation(buildResponseMatrix([...rows].reverse()));
         expect(backward.flagged).toEqual(forward.flagged);
         forward.w1.flat().forEach((value, entry) => {
           expect(backward.w1.flat()[entry] ?? null).toBeCloseTo(value ?? 0, 12);
@@ -1344,7 +1350,7 @@ describe("properties", () => {
   it("pair coefficients are at most 1 and standard errors are not negative", () => {
     fc.assert(
       fc.property(matrix, (rows) => {
-        const result = scalability(responseMatrix(rows));
+        const result = scalability(buildResponseMatrix(rows));
         for (const pair of result.pairs.flat()) {
           if (pair === null) continue;
           expect(pair.coefficient ?? 0).toBeLessThanOrEqual(1 + 1e-12);
@@ -1360,15 +1366,15 @@ describe("properties", () => {
     fc.assert(
       fc.property(matrix, (rows) => {
         const reversed = [...rows].reverse();
-        expect(scalability(responseMatrix(reversed)).scale.coefficient).toBeCloseTo(
-          scalability(responseMatrix(rows)).scale.coefficient ?? 0,
+        expect(scalability(buildResponseMatrix(reversed)).scale.coefficient).toBeCloseTo(
+          scalability(buildResponseMatrix(rows)).scale.coefficient ?? 0,
           12,
         );
-        expect(automatedItemSelection(responseMatrix(reversed)).scales).toEqual(
-          automatedItemSelection(responseMatrix(rows)).scales,
+        expect(automatedItemSelection(buildResponseMatrix(reversed)).scales).toEqual(
+          automatedItemSelection(buildResponseMatrix(rows)).scales,
         );
-        expect(monotonicity(responseMatrix(reversed), { minimumGroupSize: 20 })).toEqual(
-          monotonicity(responseMatrix(rows), { minimumGroupSize: 20 }),
+        expect(monotonicity(buildResponseMatrix(reversed), { minimumGroupSize: 20 })).toEqual(
+          monotonicity(buildResponseMatrix(rows), { minimumGroupSize: 20 }),
         );
       }),
       { numRuns: 20 },
@@ -1378,7 +1384,7 @@ describe("properties", () => {
   it("violations never outnumber the active comparisons of an item, and criteria are not negative", () => {
     fc.assert(
       fc.property(matrix, (rows) => {
-        for (const check of monotonicity(responseMatrix(rows), { minimumGroupSize: 20 })) {
+        for (const check of monotonicity(buildResponseMatrix(rows), { minimumGroupSize: 20 })) {
           expect(check.violations).toBeLessThanOrEqual(check.activeComparisons);
           expect(check.criterion).toBeGreaterThanOrEqual(0);
           expect(check.significantViolations).toBeLessThanOrEqual(check.violations);
@@ -1393,8 +1399,8 @@ describe("properties", () => {
       fc.property(matrix, (rows) => {
         const reversed = rows.map((row) => [...row].reverse());
         const ids = (rows[0] ?? []).map((_, item) => `item${item + 1}`);
-        const original = scalability(responseMatrix(rows, { itemIds: ids }));
-        const permuted = scalability(responseMatrix(reversed, { itemIds: [...ids].reverse() }));
+        const original = scalability(buildResponseMatrix(rows, { itemIds: ids }));
+        const permuted = scalability(buildResponseMatrix(reversed, { itemIds: [...ids].reverse() }));
         expect(permuted.scale.coefficient).toBeCloseTo(original.scale.coefficient ?? 0, 12);
         expect(permuted.scale.standardError).toBeCloseTo(original.scale.standardError ?? 0, 10);
         [...permuted.items].reverse().forEach((item, i) => {
@@ -1408,9 +1414,9 @@ describe("properties", () => {
   it("the reliability of the total score does not depend on the order of persons or items", () => {
     fc.assert(
       fc.property(matrix, (rows) => {
-        const forward = molenaarSijtsmaReliability(responseMatrix(rows));
-        expect(molenaarSijtsmaReliability(responseMatrix([...rows].reverse()))).toBeCloseTo(forward, 12);
-        expect(molenaarSijtsmaReliability(responseMatrix(rows.map((row) => [...row].reverse())))).toBeCloseTo(
+        const forward = molenaarSijtsmaReliability(buildResponseMatrix(rows));
+        expect(molenaarSijtsmaReliability(buildResponseMatrix([...rows].reverse()))).toBeCloseTo(forward, 12);
+        expect(molenaarSijtsmaReliability(buildResponseMatrix(rows.map((row) => [...row].reverse())))).toBeCloseTo(
           forward,
           12,
         );
@@ -1421,11 +1427,13 @@ describe("properties", () => {
 
   it("the reliability of the total score is finite and is the same after a JSON round trip", () => {
     for (const reference of reliability.cases) {
-      const value = molenaarSijtsmaReliability(responseMatrix(reference.responses, { itemIds: reference.itemIds }));
+      const value = molenaarSijtsmaReliability(
+        buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }),
+      );
       expect(Number.isFinite(value), reference.name).toBe(true);
       expect(
         molenaarSijtsmaReliability(
-          JSON.parse(JSON.stringify(responseMatrix(reference.responses, { itemIds: reference.itemIds }))),
+          JSON.parse(JSON.stringify(buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }))),
         ),
       ).toBe(value);
     }

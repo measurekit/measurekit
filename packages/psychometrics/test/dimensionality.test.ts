@@ -10,6 +10,7 @@ import {
   factorSolution,
 } from "../src/dimensionality/internal.js";
 import {
+  buildResponseMatrix,
   createRandom,
   DataError,
   type ExploratoryFactorOptions,
@@ -22,7 +23,6 @@ import {
   type ParallelAnalysisOptions,
   parallelAnalysis,
   polychoricCorrelations,
-  responseMatrix,
   type SchmidLeiman,
   schmidLeiman,
   simulateItems,
@@ -230,12 +230,12 @@ const MONTE_CARLO_SIGMAS = 4;
  */
 const QUANTILE_SIGMAS = 6;
 
-function responses(rows: readonly (readonly (number | null)[])[]): ReturnType<typeof responseMatrix> {
-  return responseMatrix(rows);
+function responses(rows: readonly (readonly (number | null)[])[]): ReturnType<typeof buildResponseMatrix> {
+  return buildResponseMatrix(rows);
 }
 
 /** The 1,000 persons' responses of a seeded 2PL test of `items` items, as a response matrix. */
-function simulated(items: number, persons: number, seed: number): ReturnType<typeof responseMatrix> {
+function simulated(items: number, persons: number, seed: number): ReturnType<typeof buildResponseMatrix> {
   const random = createRandom(seed);
   const pool = simulateItems(twoParameterLogistic, items, random);
   return simulateResponses(pool, simulateThetas(persons, random), random);
@@ -243,9 +243,9 @@ function simulated(items: number, persons: number, seed: number): ReturnType<typ
 
 /** The responses of the datasets that the cases of the factor fixture use. */
 const FACTOR_DATA = {
-  bfi: responseMatrix(defined(parallel.cases[0]).responses, { itemIds: defined(parallel.cases[0]).itemIds }),
-  sat12: responseMatrix(defined(polychoric.cases.find(({ name }) => name === "SAT12")).responses),
-  simulated: responseMatrix(factorFixture.simulated.responses, { itemIds: factorFixture.simulated.itemIds }),
+  bfi: buildResponseMatrix(defined(parallel.cases[0]).responses, { itemIds: defined(parallel.cases[0]).itemIds }),
+  sat12: buildResponseMatrix(defined(polychoric.cases.find(({ name }) => name === "SAT12")).responses),
+  simulated: buildResponseMatrix(factorFixture.simulated.responses, { itemIds: factorFixture.simulated.itemIds }),
 };
 
 /** Compares two matrices of the same shape entry by entry. */
@@ -312,7 +312,7 @@ describe("bivariateNormalCdf", () => {
 
 describe("polychoricCorrelations", () => {
   for (const reference of polychoric.cases) {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const result = polychoricCorrelations(matrix, { correction: reference.correction });
 
     it(`matches the maximum likelihood correlations and thresholds in base R on ${reference.name}`, () => {
@@ -808,7 +808,7 @@ function expectQuantiles(
 
 describe("parallelAnalysis", () => {
   for (const reference of parallel.cases) {
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const options: ParallelAnalysisOptions = {
       correlation: reference.correlation === "pearson" ? "pearson" : "polychoric",
     };
@@ -879,7 +879,7 @@ describe("parallelAnalysis", () => {
   }
 
   const bfi = defined(parallel.cases[0]);
-  const bfiMatrix = responseMatrix(bfi.responses, { itemIds: bfi.itemIds });
+  const bfiMatrix = buildResponseMatrix(bfi.responses, { itemIds: bfi.itemIds });
 
   it("has random eigenvalues with the means and quantiles of permuted data in base R", () => {
     const reference = defined(bfi.permutation);
@@ -922,7 +922,7 @@ describe("parallelAnalysis", () => {
     expect(test.components.suggested).toBe(1);
     expect(test.factors.suggested).toBe(1);
     const random = createRandom(9);
-    const independent = responseMatrix(
+    const independent = buildResponseMatrix(
       Array.from({ length: 400 }, () => Array.from({ length: 8 }, () => (random.uniform() < 0.5 ? 1 : 0))),
     );
     const none = parallelAnalysis(independent, createRandom(2), { replications: 50 });
@@ -1221,7 +1221,7 @@ describe("exploratoryFactorAnalysis", () => {
     type ReferenceFit = FitCase["base"]["fit"];
 
     function fitOf(c: FitCase): ReturnType<typeof exploratoryFactorAnalysis> {
-      return exploratoryFactorAnalysis(responseMatrix(c.responses, { itemIds: c.itemIds }), {
+      return exploratoryFactorAnalysis(buildResponseMatrix(c.responses, { itemIds: c.itemIds }), {
         factors: c.factors,
         extraction: c.extraction as FactorExtraction,
         rotation: c.rotation as FactorRotation,
@@ -1305,7 +1305,10 @@ describe("exploratoryFactorAnalysis", () => {
           return Math.round(100 * (loading * trait + Math.sqrt(1 - loading ** 2) * random.normal())) + 1000;
         });
       });
-      const fit = exploratoryFactorAnalysis(responseMatrix(rows), { factors: 2, extraction: "maximum-likelihood" });
+      const fit = exploratoryFactorAnalysis(buildResponseMatrix(rows), {
+        factors: 2,
+        extraction: "maximum-likelihood",
+      });
       const primary = fit.loadings.map((row) => Math.max(...row));
       const meanOf = (items: readonly number[]) =>
         items.reduce((sum, item) => sum + defined(primary[item]), 0) / items.length;
@@ -1446,7 +1449,7 @@ describe("schmidLeiman", () => {
 
   for (const c of hierarchyFixture.data) {
     it(`transforms the factors of the responses of ${c.name} as base R and psych's schmid do`, () => {
-      const matrix = responseMatrix(c.responses, { itemIds: c.itemIds });
+      const matrix = buildResponseMatrix(c.responses, { itemIds: c.itemIds });
       const result = schmidLeiman(exploratoryFactorAnalysis(matrix, { factors: c.factors, tolerance: 1e-10 }));
       expect(result.itemIds).toEqual(c.itemIds);
       expectTransformation(result, c.base, FACTOR_TOLERANCE, "base");
@@ -1535,7 +1538,7 @@ describe("schmidLeiman", () => {
 describe("omegaHierarchical", () => {
   for (const c of hierarchyFixture.data) {
     it(`matches psych's omega and base R on ${c.name}`, () => {
-      const matrix = responseMatrix(c.responses, { itemIds: c.itemIds });
+      const matrix = buildResponseMatrix(c.responses, { itemIds: c.itemIds });
       const result = omegaHierarchical(matrix, { factors: c.factors, tolerance: 1e-10 });
       expect(result.converged).toBe(true);
       expectClose(result.hierarchical, c.base.hierarchical, FACTOR_TOLERANCE, "base hierarchical");
@@ -1546,7 +1549,7 @@ describe("omegaHierarchical", () => {
   }
 
   const known = defined(hierarchyFixture.data.find(({ truth }) => truth !== null));
-  const matrix = responseMatrix(known.responses, { itemIds: known.itemIds });
+  const matrix = buildResponseMatrix(known.responses, { itemIds: known.itemIds });
 
   it("recovers the omega hierarchical of a general factor and three group factors at 2,000 persons", () => {
     expectClose(omegaHierarchical(matrix).hierarchical, defined(known.truth), OMEGA_RECOVERY_TOLERANCE);
@@ -1574,7 +1577,7 @@ describe("omegaHierarchical", () => {
     expect(() => omegaHierarchical(matrix, { factors: JSON.parse('"3"') })).toThrow("The option factors");
     expect(() => omegaHierarchical(matrix, JSON.parse("null"))).toThrow("The options must be an object");
     expect(() => omegaHierarchical(matrix, JSON.parse('{"extraction": "ml"}'))).toThrow("The option extraction");
-    const five = responseMatrix(known.responses.map((row) => row.slice(0, 5)));
+    const five = buildResponseMatrix(known.responses.map((row) => row.slice(0, 5)));
     expect(() => omegaHierarchical(five)).toThrow("5 items identify at most 2 factors");
     expect(() => omegaHierarchical(JSON.parse("null"))).toThrow(DataError);
   });
@@ -1755,7 +1758,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(columns, (chosen) => {
         const pick = (ids: readonly number[]) =>
-          responseMatrix(
+          buildResponseMatrix(
             FACTOR_DATA.bfi.responses.map((row) => ids.map((item) => row[item] ?? null)),
             { itemIds: ids.map((item) => `${item}`) },
           );
@@ -1797,7 +1800,7 @@ describe("properties", () => {
               1000,
           );
         });
-        const { hierarchical, total } = omegaHierarchical(responseMatrix(rows));
+        const { hierarchical, total } = omegaHierarchical(buildResponseMatrix(rows));
         expect(hierarchical).toBeLessThanOrEqual(total + 1e-12);
       }),
       { numRuns: 20 },
@@ -1945,7 +1948,7 @@ describe("properties", () => {
         const keys = Int32Array.from(simulatedRows.keys());
         shuffle(keys, random);
         const order = Array.from(keys);
-        const shuffled = responseMatrix(
+        const shuffled = buildResponseMatrix(
           order.map((person) => defined(simulatedRows[person])),
           {
             itemIds: [...FACTOR_DATA.simulated.itemIds],
@@ -1967,7 +1970,7 @@ describe("properties", () => {
         const keys = Int32Array.from(FACTOR_DATA.simulated.itemIds.keys());
         shuffle(keys, createRandom(seed));
         const order = Array.from(keys);
-        const permuted = responseMatrix(
+        const permuted = buildResponseMatrix(
           simulatedRows.map((row) => order.map((item) => defined(row[item]))),
           { itemIds: order.map((item) => defined(FACTOR_DATA.simulated.itemIds[item])) },
         );

@@ -6,7 +6,7 @@ import {
   checkSuccessProbabilities,
   profileIndices,
 } from "../cdm/internal.js";
-import { indexIds, type ResponseMatrix, responseMatrix } from "../data/internal.js";
+import { buildResponseMatrix, indexIds, type ResponseMatrix } from "../data/internal.js";
 
 /** A cognitive diagnosis model to simulate from: its attributes and items, such as a calibration's. */
 export interface CdmModelDescription {
@@ -70,5 +70,5 @@ export function simulateCdmResponses(
       return random.uniform() < (item.probabilities[latentGroup] ?? 0) ? 1 : 0;
     });
   });
-  return responseMatrix(responses, { itemIds: items.map((item) => item.id) });
+  return buildResponseMatrix(responses, { itemIds: items.map((item) => item.id) });
 }

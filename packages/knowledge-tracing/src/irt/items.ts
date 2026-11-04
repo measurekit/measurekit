@@ -3,13 +3,13 @@ import {
   DataError,
   describe,
   gradedProbabilities,
+  hasOrderedThresholds,
+  hasValidAsymptotes,
   logistic,
   logisticProbabilities,
   logLogistic,
-  orderedThresholds,
   partialCreditProbabilities,
   type ThresholdItem,
-  validAsymptotes,
 } from "@measurekit/core";
 
 /**
@@ -176,7 +176,7 @@ export function checkItem(item: IrtItem, id: string): void {
 
 function checkDichotomous({ b, c = 0, d = 1 }: DichotomousItem, label: string): void {
   if (!Number.isFinite(b)) throw new DataError(`${label} needs b, a finite number, found ${describe(b)}.`);
-  if (!validAsymptotes(c, d)) {
+  if (!hasValidAsymptotes(c, d)) {
     throw new DataError(`${label} needs 0 ≤ c < d ≤ 1, found c = ${describe(c)} and d = ${describe(d)}.`);
   }
 }
@@ -190,7 +190,7 @@ function checkPolytomous(item: GradedItem | PartialCreditItem, label: string): v
   if (!(Array.isArray(b) && b.length > 0 && b.every(Number.isFinite))) {
     throw new DataError(`${label} needs b, a non-empty array of finite thresholds, found ${describe(b)}.`);
   }
-  if (model === "graded" && !orderedThresholds(a, b)) {
+  if (model === "graded" && !hasOrderedThresholds(a, b)) {
     throw new DataError(
       `${label} is graded, so needs thresholds b strictly increasing when a > 0 and decreasing when a < 0, found a = ${a}, b = ${b.join(", ")}.`,
     );

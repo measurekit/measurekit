@@ -2,10 +2,13 @@ import { cholesky, logistic, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  buildResponseMatrix,
+  buildResponseRecords,
   calibrate,
   calibrateBifactor,
   calibrateLongitudinal,
   calibrateMultidimensional,
+  createMultidimensionalAdaptiveTest,
   createRandom,
   DataError,
   generalizedPartialCredit,
@@ -21,7 +24,6 @@ import {
   type MultidimensionalModel,
   type MultidimensionalTestItem,
   maximumLikelihoodEstimate,
-  multidimensionalAdaptiveTest,
   multidimensionalDifficulty,
   multidimensionalDiscrimination,
   multidimensionalEstimates,
@@ -40,8 +42,6 @@ import {
   posteriorModeEstimate,
   type ResponseMatrix,
   type RotationOptions,
-  responseMatrix,
-  responseRecords,
   rotateLoadings,
   simulateMultidimensionalResponses,
   testLength,
@@ -695,7 +695,7 @@ function calibrateFixture(
   standardErrors: "none" | "hessian" | "cross-product",
   extra: { readonly priors?: Readonly<Record<string, ParameterPrior>>; readonly tolerance: number },
 ): MultidimensionalCalibration<Parameters> {
-  return calibrateMultidimensional(responseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
+  return calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
     model: modelOf(fixture.model),
     loadings: fixture.loadings,
     points: fixture.points,
@@ -1080,7 +1080,7 @@ describe("calibration", () => {
 
     for (const [name, fixture] of Object.entries(exploratory)) {
       it(`reaches the maximum of the likelihood that mirt's EM stops short of: ${name}`, () => {
-        const fit = calibrateMultidimensional(responseMatrix(fixture.responses, { itemIds: fixture.itemIds }), {
+        const fit = calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds }), {
           model: multidimensionalTwoParameterLogistic,
           dimensions: 2,
           points: fixture.points,
@@ -1127,7 +1127,7 @@ describe("calibration", () => {
     const loadings: Record<string, string[]> = { ...m2pl.loadings };
     loadings[defined(m2pl.itemIds[5])] = ["F1", "F2"];
     const fit = calibrateMultidimensional(
-      responseMatrix(m2pl.responses.slice(0, 400), { itemIds: [...m2pl.itemIds] }),
+      buildResponseMatrix(m2pl.responses.slice(0, 400), { itemIds: [...m2pl.itemIds] }),
       {
         model: multidimensionalTwoParameterLogistic,
         loadings,
@@ -1162,7 +1162,7 @@ describe("calibration", () => {
 
   it("fixes the correlations at 0 when they are not estimated", () => {
     const free = calibrateFixture(m2pl, "none", { tolerance: 1e-6 });
-    const fit = calibrateMultidimensional(responseMatrix(m2pl.responses, { itemIds: [...m2pl.itemIds] }), {
+    const fit = calibrateMultidimensional(buildResponseMatrix(m2pl.responses, { itemIds: [...m2pl.itemIds] }), {
       model: multidimensionalTwoParameterLogistic,
       loadings: m2pl.loadings,
       correlated: false,
@@ -1180,7 +1180,7 @@ describe("calibration", () => {
 
   it("estimates one dimension as the two-parameter logistic model does, in the slope-intercept form", () => {
     const columns = m2pl.itemIds.slice(0, 6);
-    const data = responseMatrix(
+    const data = buildResponseMatrix(
       m2pl.responses.map((row) => row.slice(0, 6)),
       { itemIds: [...columns] },
     );
@@ -1220,13 +1220,13 @@ describe("calibration", () => {
         response === null ? [] : [{ person: `p${person}`, item: defined(missing.itemIds[item]), response }],
       ),
     );
-    const sparse = calibrateMultidimensional(responseRecords(records), {
+    const sparse = calibrateMultidimensional(buildResponseRecords(records), {
       model: multidimensionalTwoParameterLogistic,
       loadings: missing.loadings,
       points: 15,
       tolerance: 1e-8,
     });
-    const dense = calibrateMultidimensional(responseMatrix(missing.responses, { itemIds: [...missing.itemIds] }), {
+    const dense = calibrateMultidimensional(buildResponseMatrix(missing.responses, { itemIds: [...missing.itemIds] }), {
       model: multidimensionalTwoParameterLogistic,
       loadings: missing.loadings,
       points: 15,
@@ -1240,14 +1240,14 @@ describe("calibration", () => {
 
   it("ignores persons without responses", () => {
     const rows = [...missing.responses.slice(0, 300)];
-    const base = calibrateMultidimensional(responseMatrix(rows, { itemIds: [...missing.itemIds] }), {
+    const base = calibrateMultidimensional(buildResponseMatrix(rows, { itemIds: [...missing.itemIds] }), {
       model: multidimensionalTwoParameterLogistic,
       loadings: missing.loadings,
       points: 15,
       tolerance: 1e-9,
     });
     const padded = calibrateMultidimensional(
-      responseMatrix([...rows, new Array<number | null>(12).fill(null)], { itemIds: [...missing.itemIds] }),
+      buildResponseMatrix([...rows, new Array<number | null>(12).fill(null)], { itemIds: [...missing.itemIds] }),
       { model: multidimensionalTwoParameterLogistic, loadings: missing.loadings, points: 15, tolerance: 1e-9 },
     );
     expect(padded.logLikelihood).toBe(base.logLikelihood);
@@ -1256,7 +1256,7 @@ describe("calibration", () => {
 
   it("estimates posterior modes with priors", () => {
     const columns = [...m2pl.itemIds];
-    const data = responseMatrix(m2pl.responses.slice(0, 200), { itemIds: columns });
+    const data = buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: columns });
     const options = {
       model: multidimensionalTwoParameterLogistic,
       loadings: m2pl.loadings,
@@ -1283,7 +1283,7 @@ describe("calibration", () => {
 
   it("starts exploratory models from the principal components and uses the dimensions of each item once", () => {
     const fit = calibrateMultidimensional(
-      responseMatrix(m2pl.responses.slice(0, 300), { itemIds: [...m2pl.itemIds] }),
+      buildResponseMatrix(m2pl.responses.slice(0, 300), { itemIds: [...m2pl.itemIds] }),
       {
         model: multidimensionalTwoParameterLogistic,
         dimensions: 2,
@@ -1310,13 +1310,13 @@ describe("calibration", () => {
           Float64Array.from(responses, (row) => row[j] ?? Number.NaN),
         );
         const dense = pearsonMatrix(columns).map((value) => (Number.isNaN(value) ? 0 : value));
-        expect(itemCorrelations(compressResponses(responseMatrix(responses)))).toEqual(dense);
+        expect(itemCorrelations(compressResponses(buildResponseMatrix(responses)))).toEqual(dense);
       }),
     );
   });
 
   it("names the dimensions of a confirmatory model in order of first appearance among the items", () => {
-    const data = responseMatrix(m2pl.responses.slice(0, 150), { itemIds: [...m2pl.itemIds] });
+    const data = buildResponseMatrix(m2pl.responses.slice(0, 150), { itemIds: [...m2pl.itemIds] });
     const loadings: Record<string, string[]> = {};
     m2pl.itemIds.forEach((id, i) => {
       loadings[id] = i < 6 ? ["verbal"] : ["quantitative"];
@@ -1339,7 +1339,7 @@ describe("calibration", () => {
     expect(Object.keys(defined(fit.items[0]?.standardErrors)).sort()).toEqual(["a1", "intercept"]);
     expect(Object.keys(defined(fit.items[6]?.standardErrors)).sort()).toEqual(["a2", "intercept"]);
     const gradedFit = calibrateMultidimensional(
-      responseMatrix(graded.responses.slice(0, 300), { itemIds: [...graded.itemIds] }),
+      buildResponseMatrix(graded.responses.slice(0, 300), { itemIds: [...graded.itemIds] }),
       {
         model: multidimensionalGradedResponse,
         loadings: graded.loadings,
@@ -1360,7 +1360,7 @@ describe("calibration", () => {
 
   it("stops at the largest number of iterations and says so", () => {
     const short = calibrateMultidimensional(
-      responseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] }),
+      buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] }),
       {
         model: multidimensionalTwoParameterLogistic,
         loadings: m2pl.loadings,
@@ -1383,7 +1383,7 @@ describe("MH-RM", () => {
       readonly standardErrors?: "none" | "hessian";
     },
   ): MultidimensionalCalibration<Parameters> {
-    return calibrateMultidimensional(responseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
+    return calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
       model: modelOf(fixture.model),
       loadings: fixture.loadings,
       method: "mhrm",
@@ -1503,12 +1503,12 @@ describe("MH-RM", () => {
 
   describe("small data", () => {
     const rows = m2pl.responses.slice(0, 250);
-    const data = responseMatrix(rows, { itemIds: [...m2pl.itemIds] });
+    const data = buildResponseMatrix(rows, { itemIds: [...m2pl.itemIds] });
     const options = { model: multidimensionalTwoParameterLogistic, loadings: m2pl.loadings, method: "mhrm" } as const;
 
     it("gives the same calibration for the same seed and another for another seed", () => {
       // 50 persons and 10 cycles of the last stage: the seed fixes the draws of every stage and of the standard errors.
-      const few = responseMatrix(rows.slice(0, 50), { itemIds: [...m2pl.itemIds] });
+      const few = buildResponseMatrix(rows.slice(0, 50), { itemIds: [...m2pl.itemIds] });
       const short = { ...options, maxIterations: 10 };
       const first = calibrateMultidimensional(few, { ...short, seed: 5, standardErrors: "hessian" });
       expect(first.items[0]?.standardErrors).not.toBeNull();
@@ -1541,7 +1541,7 @@ describe("MH-RM", () => {
       ]);
       expect(uncorrelated.correlationStandardErrors).toBeNull();
       const one = calibrateMultidimensional(
-        responseMatrix(
+        buildResponseMatrix(
           rows.map((row) => row.slice(0, 6)),
           { itemIds: m2pl.itemIds.slice(0, 6) },
         ),
@@ -1587,7 +1587,7 @@ describe("MH-RM", () => {
           response === null ? [] : [{ person: `p${person}`, item: defined(m2pl.itemIds[item]), response }],
         ),
       );
-      const fit = calibrateMultidimensional(responseRecords(records), { ...options, maxIterations: 5 });
+      const fit = calibrateMultidimensional(buildResponseRecords(records), { ...options, maxIterations: 5 });
       expect(fit.items).toHaveLength(12);
       expect(fit.logLikelihood).toBeLessThan(0);
     });
@@ -1617,7 +1617,7 @@ describe("MH-RM", () => {
   });
 
   it("gives the same calibration for the same seed, whatever the seed", () => {
-    const data = responseMatrix(
+    const data = buildResponseMatrix(
       m2pl.responses.slice(0, 40).map((row) => row.slice(0, 6)),
       { itemIds: m2pl.itemIds.slice(0, 6) },
     );
@@ -1639,7 +1639,7 @@ describe("MH-RM", () => {
 
 describe("MH-RM internals", () => {
   const items5 = mirtMhrm.itemIds;
-  const responses = compressResponses(responseMatrix(mirtMhrm.responses, { itemIds: [...items5] }));
+  const responses = compressResponses(buildResponseMatrix(mirtMhrm.responses, { itemIds: [...items5] }));
 
   it("computes the complete-data score and information of mirt's Deriv", () => {
     const design = designOf({ loadings: mirtMhrm.loadings }, items5);
@@ -1697,7 +1697,7 @@ describe("MH-RM internals", () => {
           maxLength: 12,
         }),
         (rows) => {
-          const compressed = compressResponses(responseMatrix(rows));
+          const compressed = compressResponses(buildResponseMatrix(rows));
           const data = responsesByItem(compressed);
           const people = responsesByPerson(data);
           const answered = rows.flat().filter((value) => value !== null).length;
@@ -1721,7 +1721,7 @@ describe("MH-RM internals", () => {
     const pattern = [1, 0, 1, 1, 0, 1];
     // Starting values need every category answered, which one person's responses do not.
     const calibrated = compressResponses(
-      responseMatrix(
+      buildResponseMatrix(
         m2pl.responses.slice(0, 250).map((row) => row.slice(0, 6)),
         { itemIds },
       ),
@@ -1747,7 +1747,7 @@ describe("MH-RM internals", () => {
     correlations.set(Float64Array.of(1, 0.5, 0.5, 1));
     const chain = createChain(
       states,
-      responsesByItem(compressResponses(responseMatrix([pattern], { itemIds }))),
+      responsesByItem(compressResponses(buildResponseMatrix([pattern], { itemIds }))),
       correlations,
     );
     const random = createRandom(11);
@@ -1894,7 +1894,7 @@ describe("multiple groups", () => {
     extra: Partial<MultidimensionalCalibrationOptions<Parameters>> = {},
   ): MultidimensionalCalibration<Parameters> {
     const { fixed, correlated } = fixture;
-    return calibrateMultidimensional(responseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
+    return calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
       model: modelOf(fixture.model),
       loadings: fixture.loadings,
       points: fixture.points,
@@ -2002,7 +2002,7 @@ describe("multiple groups", () => {
 
   it("reports no groups without the options groups and fixed", () => {
     const { itemIds, responses, loadings, points, model } = twoGroups;
-    const fit = calibrateMultidimensional(responseMatrix(responses, { itemIds: [...itemIds] }), {
+    const fit = calibrateMultidimensional(buildResponseMatrix(responses, { itemIds: [...itemIds] }), {
       model: modelOf(model),
       loadings,
       points,
@@ -2012,7 +2012,7 @@ describe("multiple groups", () => {
 
   it("names the group of all persons when fixed items come without groups", () => {
     const { itemIds, responses, loadings, points, model, fixed } = anchored;
-    const fit = calibrateMultidimensional(responseMatrix(responses, { itemIds: [...itemIds] }), {
+    const fit = calibrateMultidimensional(buildResponseMatrix(responses, { itemIds: [...itemIds] }), {
       model: modelOf(model),
       loadings,
       points,
@@ -2042,8 +2042,8 @@ describe("multiple groups", () => {
       responses: twoGroups.responses.filter((_, person) => person % 3 === 0),
       personGroups: twoGroups.personGroups.filter((_, person) => person % 3 === 0),
     };
-    const matrix = responseMatrix(small.responses, { itemIds: [...small.itemIds] });
-    const records = responseRecords(
+    const matrix = buildResponseMatrix(small.responses, { itemIds: [...small.itemIds] });
+    const records = buildResponseRecords(
       matrix.responses.flatMap((row, person) =>
         row.flatMap((response, item) =>
           response === null
@@ -2407,7 +2407,7 @@ describe("expectation step with groups", () => {
   /** Runs the E-step of the rows of one group under its weights alone. */
   function alone(subset: readonly (readonly (number | null)[])[], logWeights: Float64Array) {
     const each = items();
-    const step = expectationStep(compressResponses(responseMatrix(subset)), each, grid, logWeights);
+    const step = expectationStep(compressResponses(buildResponseMatrix(subset)), each, grid, logWeights);
     return {
       logLikelihood: step.run(),
       nodeCounts: step.nodeCounts.slice(),
@@ -2424,7 +2424,7 @@ describe("expectation step with groups", () => {
       const high = weights(0.6);
       const each = items();
       const step = expectationStep(
-        compressResponses(responseMatrix(data)),
+        compressResponses(buildResponseMatrix(data)),
         each,
         grid,
         [low, high],
@@ -2452,7 +2452,7 @@ describe("expectation step with groups", () => {
   }
 
   it("keeps the counts of one group as the counts of all persons", () => {
-    const step = expectationStep(compressResponses(responseMatrix(rows)), items(), grid, weights(0));
+    const step = expectationStep(compressResponses(buildResponseMatrix(rows)), items(), grid, weights(0));
     step.run();
     expect(step.groupCounts).toHaveLength(1);
     expect(step.groupCounts[0]).toBe(step.nodeCounts);
@@ -2464,7 +2464,7 @@ describe("multiple groups errors", () => {
   /** Forty persons of each group, answering every item, on a coarse grid. */
   const keep = [...Array.from({ length: 40 }, (_, k) => k), ...Array.from({ length: 40 }, (_, k) => 900 + k)];
   const matrix = (rows: readonly (readonly (number | null)[])[] = keep.map((k) => defined(responses[k]))) =>
-    responseMatrix(rows, { itemIds: [...itemIds] });
+    buildResponseMatrix(rows, { itemIds: [...itemIds] });
   const labels = keep.map((k) => defined(personGroups[k]));
   const base = { model: modelOf(model), loadings, points: 7 };
 
@@ -2509,7 +2509,7 @@ describe("multiple groups errors", () => {
     expect(calibrateMultidimensional(matrix(three), { ...base, groups: labels }).groups).toHaveLength(2);
     // Two persons of opposite responses, so that every item has both categories.
     const first = defined(responses[0]).map((response) => response ?? 0);
-    const two = responseMatrix([first, first.map((response) => 1 - response)], { itemIds: [...itemIds] });
+    const two = buildResponseMatrix([first, first.map((response) => 1 - response)], { itemIds: [...itemIds] });
     for (const method of ["em", "mhrm"] as const) {
       expect(() => calibrateMultidimensional(two, { model: base.model, loadings, method })).toThrow(
         "The calibration has 2 persons with a response, no more than its 2 correlated dimensions",
@@ -2569,7 +2569,7 @@ describe("multiple groups errors", () => {
     expect(() => calibrateMultidimensional(matrix(), { ...base, fixed: { ...both, q02: JSON.parse("null") } })).toThrow(
       'Fixed item "q02"',
     );
-    const graded = responseMatrix(
+    const graded = buildResponseMatrix(
       [
         [0, 1],
         [1, 2],
@@ -2631,7 +2631,7 @@ function simulateTrait(
     });
   });
   const occasions = means.map((_, t) =>
-    responseMatrix(
+    buildResponseMatrix(
       thetas.map((theta) =>
         ids.map((__, i) =>
           random.uniform() < logistic(defined(slopes[i]) * ((theta[t] ?? 0) - defined(difficulties[i]))) ? 1 : 0,
@@ -2705,7 +2705,7 @@ describe("longitudinal calibration", () => {
   const names = Object.keys(Tolerances) as CaseName[];
   const matricesOf = (source: LongitudinalCase): ResponseMatrix[] =>
     source.occasions.map(({ personIds, itemIds, responses }) =>
-      responseMatrix(responses, { personIds: [...personIds], itemIds: [...itemIds] }),
+      buildResponseMatrix(responses, { personIds: [...personIds], itemIds: [...itemIds] }),
     );
   const fits = new Map<CaseName, LongitudinalCalibration>();
   /** Calibrates a case at a tolerance tight enough for its estimates to settle, once for all tests. */
@@ -2972,7 +2972,7 @@ describe("longitudinal calibration data", () => {
       .personIds.map((_, p) => p)
       .reverse();
     const columns = [5, 3, 1, 0, 2, 4];
-    const reordered = responseMatrix(
+    const reordered = buildResponseMatrix(
       rows.map((p) => columns.map((i) => defined(defined(second).responses[p]?.[i]))),
       {
         personIds: rows.map((p) => defined(defined(second).personIds[p])),
@@ -2985,11 +2985,11 @@ describe("longitudinal calibration data", () => {
   it("treats a person who did not take part in an occasion as one without responses there", () => {
     const [first, second] = occasions;
     const kept = defined(second).personIds.slice(0, 250);
-    const shortened = responseMatrix(defined(second).responses.slice(0, 250), {
+    const shortened = buildResponseMatrix(defined(second).responses.slice(0, 250), {
       personIds: kept,
       itemIds: [...defined(second).itemIds],
     });
-    const blanked = responseMatrix(
+    const blanked = buildResponseMatrix(
       defined(second).responses.map((row, p) => (p < 250 ? row : row.map(() => null))),
       { personIds: [...defined(second).personIds], itemIds: [...defined(second).itemIds] },
     );
@@ -3000,7 +3000,7 @@ describe("longitudinal calibration data", () => {
 
   it("changes nothing for a person without a response on any occasion", () => {
     const withExtra = occasions.map((occasion) =>
-      responseMatrix([...occasion.responses, occasion.itemIds.map(() => null)], {
+      buildResponseMatrix([...occasion.responses, occasion.itemIds.map(() => null)], {
         personIds: [...occasion.personIds, "nobody"],
         itemIds: [...occasion.itemIds],
       }),
@@ -3012,7 +3012,7 @@ describe("longitudinal calibration data", () => {
   it("estimates items that only one occasion has", () => {
     const [first, second] = occasions;
     // The second occasion's q6 becomes q7: q6 is on the first occasion only and q7 on the second only.
-    const renamed = responseMatrix(defined(second).responses, {
+    const renamed = buildResponseMatrix(defined(second).responses, {
       personIds: [...defined(second).personIds],
       itemIds: [...defined(second).itemIds.slice(0, 5), "q7"],
     });
@@ -3025,7 +3025,7 @@ describe("longitudinal calibration data", () => {
   it("links occasions through the others", () => {
     const three = simulateOccasions(2, 200, 6, { means: [0, 0.3, 0.6], sds: [1, 1.1, 1.2], rho: 0.8 });
     const keep = (matrix: ResponseMatrix, from: number, to: number): ResponseMatrix =>
-      responseMatrix(
+      buildResponseMatrix(
         matrix.responses.map((row) => row.slice(from, to)),
         { personIds: [...matrix.personIds], itemIds: matrix.itemIds.slice(from, to) },
       );
@@ -3079,7 +3079,7 @@ describe("longitudinal calibration errors", () => {
   const second = defined(occasions[1]);
   const options = { points: 7 } as const;
   const only = (matrix: ResponseMatrix, ids: readonly string[]): ResponseMatrix =>
-    responseMatrix(
+    buildResponseMatrix(
       matrix.responses.map((row) => ids.map((id) => defined(row[matrix.itemIds.indexOf(id)]))),
       { personIds: [...matrix.personIds], itemIds: [...ids] },
     );
@@ -3096,7 +3096,7 @@ describe("longitudinal calibration errors", () => {
 
   it("needs response matrices with responses", () => {
     const empty = (matrix: ResponseMatrix): ResponseMatrix =>
-      responseMatrix(
+      buildResponseMatrix(
         matrix.responses.map((row) => row.map(() => null)),
         { personIds: [...matrix.personIds], itemIds: [...matrix.itemIds] },
       );
@@ -3108,7 +3108,7 @@ describe("longitudinal calibration errors", () => {
 
   it("needs occasions that share an item, directly or through the others", () => {
     const apart = only(second, ["q3", "q4"]);
-    const renamed = responseMatrix(apart.responses, { personIds: [...apart.personIds], itemIds: ["x1", "x2"] });
+    const renamed = buildResponseMatrix(apart.responses, { personIds: [...apart.personIds], itemIds: ["x1", "x2"] });
     expect(() => calibrateLongitudinal([first, renamed], options)).toThrow(
       "Occasion 2 shares no item with occasion 1, directly or through the other occasions",
     );
@@ -3119,11 +3119,11 @@ describe("longitudinal calibration errors", () => {
   });
 
   it("needs an item with responses in two categories, and every category up to its highest", () => {
-    const constant = responseMatrix(
+    const constant = buildResponseMatrix(
       first.responses.map((row) => row.map((response, i) => (i === 0 ? 0 : response))),
       { personIds: [...first.personIds], itemIds: [...first.itemIds] },
     );
-    const alike = responseMatrix(
+    const alike = buildResponseMatrix(
       second.responses.map((row) => row.map((response, i) => (i === 0 ? 0 : response))),
       { personIds: [...second.personIds], itemIds: [...second.itemIds] },
     );
@@ -3621,7 +3621,7 @@ describe("scoring", () => {
 
   describe("estimates of the persons of a data set", () => {
     const items = itemsOf(m2pl);
-    const data = responseMatrix(
+    const data = buildResponseMatrix(
       [
         [1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0],
         new Array<number | null>(12).fill(null),
@@ -3669,7 +3669,7 @@ describe("scoring", () => {
       const estimator = (it: readonly MultidimensionalItem[], responses: readonly (number | null)[]) =>
         multidimensionalPosteriorMeanEstimate(it, responses, { points: 21 });
       const dense = multidimensionalEstimates(data, items, { estimator });
-      const records = responseRecords([
+      const records = buildResponseRecords([
         { person: "a", item: defined(m2pl.itemIds[0]), response: 1 },
         { person: "a", item: defined(m2pl.itemIds[7]), response: 0 },
         { person: "b", item: defined(m2pl.itemIds[3]), response: 1 },
@@ -3890,7 +3890,7 @@ describe("maximum and weighted likelihood estimates", () => {
 
   it("estimates the persons of a data set", () => {
     const items = itemsOf(m2pl);
-    const data = responseMatrix(
+    const data = buildResponseMatrix(
       [
         [1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0],
         [0, 0, 0, null, null, 1, 1, 1, 0, null, 1, 1],
@@ -3964,11 +3964,11 @@ describe("the recipe for responses missing not at random", () => {
     const loadings = Object.fromEntries(
       itemIds.map((id, i) => [id, [i < data.itemIds.length ? "ability" : "propensity"]]),
     );
-    return { matrix: responseMatrix(combined, { itemIds }), loadings };
+    return { matrix: buildResponseMatrix(combined, { itemIds }), loadings };
   }
 
   const items = notAtRandom.itemIds.length / 2;
-  const omitted = responseMatrix(
+  const omitted = buildResponseMatrix(
     notAtRandom.responses.map((row) => row.slice(0, items)),
     { itemIds: notAtRandom.itemIds.slice(0, items) },
   );
@@ -4161,7 +4161,7 @@ describe("multidimensional discrimination and difficulty", () => {
 });
 
 describe("errors", () => {
-  const data = responseMatrix(m2pl.responses.slice(0, 40), { itemIds: [...m2pl.itemIds] });
+  const data = buildResponseMatrix(m2pl.responses.slice(0, 40), { itemIds: [...m2pl.itemIds] });
   const loadings: LoadingPattern = m2pl.loadings;
   const model = multidimensionalTwoParameterLogistic;
 
@@ -4174,7 +4174,7 @@ describe("errors", () => {
     expect(() => calibrateMultidimensional(data, { model, loadings: wide, method: "mhrm" })).toThrow(message);
     // 100 specific dimensions of two items each, and the general one.
     const itemIds = Array.from({ length: 200 }, (_, i) => `q${i + 1}`);
-    const testlets = responseMatrix(
+    const testlets = buildResponseMatrix(
       Array.from({ length: 4 }, (_, p) => itemIds.map((_, i) => (p + i) % 2)),
       { itemIds },
     );
@@ -4205,11 +4205,13 @@ describe("errors", () => {
       covariance: Array.from({ length: 101 }, (_, i) => Array.from({ length: 101 }, (__, j) => (i === j ? 1 : 0))),
     };
     expect(() => multidimensionalPosteriorModeEstimate([], [], { prior })).toThrow(message);
-    expect(() => multidimensionalEstimates(responseMatrix([[1, 0]], { itemIds: ["q1", "q2"] }), wide)).toThrow(message);
+    expect(() => multidimensionalEstimates(buildResponseMatrix([[1, 0]], { itemIds: ["q1", "q2"] }), wide)).toThrow(
+      message,
+    );
     expect(() => multidimensionalInformation(wide, new Array<number>(101).fill(0))).toThrow(
       "Information takes at most 100 dimensions, found 101.",
     );
-    expect(() => multidimensionalAdaptiveTest({ pool: wide, stopping: testLength(1) })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest({ pool: wide, stopping: testLength(1) })).toThrow(
       "A multidimensional adaptive test takes at most 100 dimensions, found 101.",
     );
     const limit = [item("q1", 100), item("q2", 100)];
@@ -4219,7 +4221,7 @@ describe("errors", () => {
 
   it("bounds standard errors to 2,000 parameters before it estimates anything, by EM, MH-RM and over occasions", () => {
     // Three persons answer 701 items with both categories each: two slopes and an intercept each, 2,103 parameters.
-    const wide = responseMatrix([0, 1, 2].map((k) => Array.from({ length: 701 }, (_, j) => (j + k) % 2)));
+    const wide = buildResponseMatrix([0, 1, 2].map((k) => Array.from({ length: 701 }, (_, j) => (j + k) % 2)));
     const message = "Standard errors take at most 2000 estimated parameters, as their information holds every pair";
     for (const standardErrors of ["hessian", "cross-product"] as const) {
       expect(() => calibrateMultidimensional(wide, { model, dimensions: 2, standardErrors })).toThrow(message);
@@ -4229,7 +4231,7 @@ describe("errors", () => {
     ).toThrow(message);
     // Two occasions of 1,001 items each: their 2PL items alone have 2,002 parameters.
     const occasion = (seed: number) =>
-      responseMatrix([0, 1, 2].map((k) => Array.from({ length: 1001 }, (_, j) => (j + k + seed) % 2)));
+      buildResponseMatrix([0, 1, 2].map((k) => Array.from({ length: 1001 }, (_, j) => (j + k + seed) % 2)));
     expect(() => calibrateLongitudinal([occasion(0), occasion(1)], { standardErrors: "cross-product" })).toThrow(
       message,
     );
@@ -4246,7 +4248,7 @@ describe("errors", () => {
 
   it("limits the probabilities of the items' categories that EM keeps at the nodes, before it allocates them", () => {
     // 17 dichotomous items on a grid of 10⁶ nodes would keep 3.4e7 probabilities, above 2 ** 24: 544 MB of tables.
-    const wide = responseMatrix([
+    const wide = buildResponseMatrix([
       Array.from({ length: 17 }, (_, j) => j % 2),
       Array.from({ length: 17 }, (_, j) => 1 - (j % 2)),
     ]);
@@ -4268,7 +4270,7 @@ describe("errors", () => {
     );
     expect(() =>
       calibrateMultidimensional(
-        responseMatrix([
+        buildResponseMatrix([
           [0, 1],
           [1, 0],
           [1, 1],
@@ -4371,7 +4373,7 @@ describe("errors", () => {
     );
     expect(() => calibrateMultidimensional(data, { ...options, model: JSON.parse("{}") })).toThrow(DataError);
     // Binary data cannot be a graded item with a single category, and graded data need every category up to the highest.
-    const polytomous = responseMatrix([
+    const polytomous = buildResponseMatrix([
       [0, 1],
       [1, 0],
       [2, 1],
@@ -4380,7 +4382,7 @@ describe("errors", () => {
     expect(() => calibrateMultidimensional(polytomous, { dimensions: 1, model })).toThrow(
       'Item "item1" has a response of 2, but the M2PL model allows responses from 0 to 1.',
     );
-    const gap = responseMatrix([
+    const gap = buildResponseMatrix([
       [0, 1],
       [3, 0],
       [3, 1],
@@ -4389,7 +4391,7 @@ describe("errors", () => {
     expect(() => calibrateMultidimensional(gap, { dimensions: 1, model: multidimensionalGradedResponse })).toThrow(
       'Item "item1" has no response in category 1',
     );
-    const constant = responseMatrix([
+    const constant = buildResponseMatrix([
       [0, 0],
       [0, 1],
       [0, 0],
@@ -4402,7 +4404,7 @@ describe("errors", () => {
   it("needs at least one response", () => {
     expect(() =>
       calibrateMultidimensional(
-        responseMatrix([
+        buildResponseMatrix([
           [null, null],
           [null, null],
         ]),
@@ -4515,10 +4517,10 @@ describe("properties", () => {
       points: 11,
       tolerance: 1e-10,
     };
-    const fit = calibrateMultidimensional(responseMatrix(rows, { itemIds: columns }), options);
+    const fit = calibrateMultidimensional(buildResponseMatrix(rows, { itemIds: columns }), options);
     fc.assert(
       fc.property(fc.shuffledSubarray(rows, { minLength: rows.length, maxLength: rows.length }), (shuffled) => {
-        const other = calibrateMultidimensional(responseMatrix(shuffled, { itemIds: columns }), options);
+        const other = calibrateMultidimensional(buildResponseMatrix(shuffled, { itemIds: columns }), options);
         expectClose(other.logLikelihood, fit.logLikelihood, 1e-8);
         other.items.forEach(({ parameters }, i) => {
           expectClose(defined(parameters.a[i < 6 ? 0 : 1]), defined(fit.items[i]?.parameters.a[i < 6 ? 0 : 1]), 1e-6);
@@ -4541,7 +4543,7 @@ describe("properties", () => {
         ),
         (order) => {
           const shuffled = data.map((occasion) =>
-            responseMatrix(
+            buildResponseMatrix(
               order.map((p) => defined(occasion.responses[p])),
               { personIds: order.map((p) => defined(occasion.personIds[p])), itemIds: [...occasion.itemIds] },
             ),

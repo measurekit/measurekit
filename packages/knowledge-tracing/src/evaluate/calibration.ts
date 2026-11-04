@@ -17,7 +17,7 @@ export interface CalibrationBin {
 
 const DEFAULT_BIN_COUNT = 10;
 
-/** Options of {@link calibration}. */
+/** Options of {@link calibrationCurve}. */
 export interface CalibrationOptions {
   /**
    * The number of bins of equal width that divide [0, 1].
@@ -38,7 +38,7 @@ export interface CalibrationOptions {
  * @returns The bins in order, each with its range, count, mean prediction and mean outcome.
  * @throws `DataError` when the predictions and outcomes are malformed or `binCount` is not a positive integer.
  */
-export function calibration(
+export function calibrationCurve(
   predictions: readonly number[],
   outcomes: readonly number[],
   options: CalibrationOptions = {},

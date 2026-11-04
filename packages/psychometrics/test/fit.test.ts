@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   andersenTest,
+  buildResponseMatrix,
   type CalibratedItem,
   type Calibration,
   type ConditionalModel,
@@ -28,7 +29,6 @@ import {
   type RaschSplit,
   type ResponseMatrix,
   raschWaldTest,
-  responseMatrix,
   rootMeanSquareDeviation,
   simulateItems,
   simulateResponses,
@@ -314,7 +314,7 @@ function simulated(seed: number, persons: number, itemCount: number): { matrix: 
 }
 
 /** The responses of the calibration with held parameters, and its items as mirt estimated them. */
-const heldMatrix = responseMatrix(fixedParameters.responses, { itemIds: fixedParameters.itemIds });
+const heldMatrix = buildResponseMatrix(fixedParameters.responses, { itemIds: fixedParameters.itemIds });
 const heldItems: IrtItem[] = fixedParameters.models.map((name, i) => ({
   model: defined(MODELS[name]),
   parameters: defined(fixedParameters.calibrations[0]?.items[i]).parameters,
@@ -347,7 +347,7 @@ function nonFinite(result: readonly object[]): unknown[] {
 describe("itemFit", () => {
   for (const fixture of rasch.cases) {
     it(`matches eRm's itemfit for the ${fixture.name} model`, () => {
-      const result = itemFit(responseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
+      const result = itemFit(buildResponseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
       expectTable(result, fixture.itemFit, FIT_TOLERANCE, fixture.name);
     });
   }
@@ -360,14 +360,14 @@ describe("itemFit", () => {
       [0, 0, null],
     ];
     const pool = [...HALVES, ...HALVES.slice(0, 1)];
-    const result = itemFit(responseMatrix(rows), pool, [0, 0, 2, -2]);
+    const result = itemFit(buildResponseMatrix(rows), pool, [0, 0, 2, -2]);
     expect(result.map((item) => item.outfitMeanSquare)).toEqual([1, 1, 1]);
     expect(result.map((item) => item.infitMeanSquare)).toEqual([1, 1, 1]);
   });
 
   it("gives null where a statistic is undefined: no other responses, or a mean square without variance", () => {
     const result = itemFit(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 0, null],
         [0, 1, null],
         [1, 1, 1],
@@ -386,24 +386,24 @@ describe("itemFit", () => {
   });
 
   it("rejects items that do not match the responses, and invalid thetas", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0],
       [0, 2],
     ]);
     expect(() => itemFit(matrix, HALVES, [0, 0])).toThrow(DataError);
-    expect(() => itemFit(responseMatrix([[1, 0]]), HALVES.slice(0, 1), [0])).toThrow(DataError);
-    expect(() => itemFit(responseMatrix([[1, 0]]), HALVES, [0, 1])).toThrow(DataError);
-    expect(() => itemFit(responseMatrix([[1, 0]]), HALVES, [Number.NaN])).toThrow(DataError);
-    expect(() => itemFit(responseMatrix([[1, 0]]), JSON.parse("null"), [0])).toThrow(
+    expect(() => itemFit(buildResponseMatrix([[1, 0]]), HALVES.slice(0, 1), [0])).toThrow(DataError);
+    expect(() => itemFit(buildResponseMatrix([[1, 0]]), HALVES, [0, 1])).toThrow(DataError);
+    expect(() => itemFit(buildResponseMatrix([[1, 0]]), HALVES, [Number.NaN])).toThrow(DataError);
+    expect(() => itemFit(buildResponseMatrix([[1, 0]]), JSON.parse("null"), [0])).toThrow(
       "The items must be an array, found null.",
     );
-    expect(() => personFit(responseMatrix([[1, 0]]), HALVES, JSON.parse("null"))).toThrow(
+    expect(() => personFit(buildResponseMatrix([[1, 0]]), HALVES, JSON.parse("null"))).toThrow(
       "The thetas must be an array, found null.",
     );
-    expect(() => summedScoreFit(responseMatrix([[1, 0]]), JSON.parse("null"))).toThrow(
+    expect(() => summedScoreFit(buildResponseMatrix([[1, 0]]), JSON.parse("null"))).toThrow(
       "The items must be an array, found null.",
     );
-    expect(() => yenQ3(responseMatrix([[1, 0]]), JSON.parse("[null, null]"), [0])).toThrow(
+    expect(() => yenQ3(buildResponseMatrix([[1, 0]]), JSON.parse("[null, null]"), [0])).toThrow(
       'Item "item1" must be an item with a model and parameters, found null.',
     );
   });
@@ -412,7 +412,7 @@ describe("itemFit", () => {
 describe("yenQ3", () => {
   for (const fixture of residuals.cases) {
     it(`matches mirt's Q3 residuals for ${fixture.name}`, () => {
-      const result = yenQ3(responseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
+      const result = yenQ3(buildResponseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
       fixture.q3.forEach((row, i) => {
         row.forEach((value, j) => {
           expectClose(result[i]?.[j] ?? null, value, FIT_TOLERANCE, `Q3 ${i + 1}, ${j + 1}`);
@@ -424,7 +424,7 @@ describe("yenQ3", () => {
   it("uses the persons who answered both items, null with fewer than two or a constant residual", () => {
     const pool = [...HALVES, ...HALVES.slice(0, 1)];
     const result = yenQ3(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 0, 1],
         [0, 1, null],
         [1, 1, null],
@@ -444,7 +444,11 @@ describe("localDependenceChiSquare", () => {
   for (const fixture of localDependence.cases) {
     it(`matches mirt's LD residuals for ${fixture.name}`, () => {
       const options = "population" in fixture ? { population: fixture.population } : {};
-      const result = localDependenceChiSquare(responseMatrix(fixture.responses), fixtureItems(fixture.items), options);
+      const result = localDependenceChiSquare(
+        buildResponseMatrix(fixture.responses),
+        fixtureItems(fixture.items),
+        options,
+      );
       expect(result.map((pair) => pair.degreesOfFreedom)).toEqual(fixture.degreesOfFreedom);
       result.forEach((pair, p) => {
         const label = pair.items.join(", ");
@@ -471,7 +475,7 @@ describe("localDependenceChiSquare", () => {
     // Thresholds set before the first run: the planted pair has p below 1e-6 and the largest V.
     const random = createRandom(43);
     const { matrix, items: pool } = simulated(42, 2000, 8);
-    const planted = responseMatrix(
+    const planted = buildResponseMatrix(
       matrix.responses.map((row) =>
         row.map((response, i) => (i === 1 && random.uniform() < 0.5 ? (row[0] ?? 0) : response)),
       ),
@@ -484,7 +488,7 @@ describe("localDependenceChiSquare", () => {
   it("uses the persons who answered both items, and gives null where a table has no persons or no order", () => {
     const pool = [...HALVES, ...HALVES.slice(0, 1)];
     const [both, none, constant] = localDependenceChiSquare(
-      responseMatrix([
+      buildResponseMatrix([
         [1, null, 1],
         [0, null, 1],
         [null, 1, 1],
@@ -511,12 +515,14 @@ describe("localDependenceChiSquare", () => {
       Array.from({ length: items }, (_, j) => (j + 1) % 2),
     ];
     const pool = (items: number) => Array.from({ length: items }, () => defined(HALVES[0]));
-    expect(localDependenceChiSquare(responseMatrix(rows(1000)), pool(1000))).toHaveLength(499_500);
-    expect(yenQ3(responseMatrix(rows(1000)), pool(1000), [0, 0])).toHaveLength(1000);
+    expect(localDependenceChiSquare(buildResponseMatrix(rows(1000)), pool(1000))).toHaveLength(499_500);
+    expect(yenQ3(buildResponseMatrix(rows(1000)), pool(1000), [0, 0])).toHaveLength(1000);
     const message = (analysis: string) =>
       `${analysis} holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.`;
-    expect(() => localDependenceChiSquare(responseMatrix(rows(1001)), pool(1001))).toThrow(message("Local dependence"));
-    expect(() => yenQ3(responseMatrix(rows(1001)), pool(1001), [0, 0])).toThrow(message("Yen's Q3"));
+    expect(() => localDependenceChiSquare(buildResponseMatrix(rows(1001)), pool(1001))).toThrow(
+      message("Local dependence"),
+    );
+    expect(() => yenQ3(buildResponseMatrix(rows(1001)), pool(1001), [0, 0])).toThrow(message("Yen's Q3"));
   });
 
   it("refuses tables of the categories of the pairs of more than 2^24 cells in all, so that items of many do not cost their square", () => {
@@ -525,7 +531,7 @@ describe("localDependenceChiSquare", () => {
       model: gradedResponse,
       parameters: { a: 1, b: Array.from({ length: categories - 1 }, (_, k) => -3 + (6 * k) / (categories - 2)) },
     });
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [0, 1],
       [1, 0],
     ]);
@@ -551,14 +557,14 @@ describe("localDependenceChiSquare", () => {
 describe("personFit", () => {
   for (const fixture of rasch.cases) {
     it(`matches eRm's personfit for the ${fixture.name} model`, () => {
-      const result = personFit(responseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
+      const result = personFit(buildResponseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
       expectTable(result, fixture.personFit, FIT_TOLERANCE, fixture.name);
     });
   }
 
   for (const fixture of residuals.cases) {
     it(`matches mirt's Zh for ${fixture.name}`, () => {
-      const result = personFit(responseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
+      const result = personFit(buildResponseMatrix(fixture.responses), fixtureItems(fixture.items), fixture.thetas);
       expectTable(
         result,
         { standardizedLogLikelihood: fixture.standardizedLogLikelihood },
@@ -570,7 +576,7 @@ describe("personFit", () => {
 
   it("gives lz but no mean squares at an extreme score, and nothing without responses", () => {
     const result = personFit(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 1],
         [null, null],
       ]),
@@ -595,7 +601,7 @@ describe("correctedPersonFit", () => {
   for (const fixture of correctedFit.cases) {
     it(`matches PerFit's lzstar, unrounded, for ${fixture.name}`, () => {
       const three = fixture.name.startsWith("3PL");
-      const matrix = responseMatrix(three ? correctedFit.threePl.responses : sat12.responses);
+      const matrix = buildResponseMatrix(three ? correctedFit.threePl.responses : sat12.responses);
       const estimator = defined(
         (["maximum-likelihood", "weighted-likelihood", "posterior-mode"] as const).find(
           (name) => name === fixture.estimator,
@@ -628,8 +634,8 @@ describe("correctedPersonFit", () => {
   it("skips missing responses, as if the item had not been given", () => {
     const { matrix, items: pool } = simulated(49, 40, 6);
     const thetas = matrix.personIds.map((_, person) => Math.sin(person));
-    const sparse = responseMatrix(matrix.responses.map((row) => [null, ...row.slice(1)]));
-    const shorter = responseMatrix(matrix.responses.map((row) => row.slice(1)));
+    const sparse = buildResponseMatrix(matrix.responses.map((row) => [null, ...row.slice(1)]));
+    const shorter = buildResponseMatrix(matrix.responses.map((row) => row.slice(1)));
     expectSameNumbers(
       correctedPersonFit(sparse, pool, thetas, { estimator: "weighted-likelihood" }),
       correctedPersonFit(shorter, pool.slice(1), thetas, { estimator: "weighted-likelihood" }),
@@ -638,7 +644,7 @@ describe("correctedPersonFit", () => {
 
   it("gives nothing to an extreme score, a person without responses, or a pattern without variance", () => {
     const result = correctedPersonFit(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 1],
         [0, null],
         [null, null],
@@ -689,7 +695,7 @@ describe("correctedPersonFit", () => {
 describe("summedScoreFit", () => {
   for (const fixture of summedScore.cases) {
     it(`matches mirt's S-X² for ${fixture.name}`, () => {
-      const result = summedScoreFit(responseMatrix(fixture.responses), fixtureItems(fixture.items));
+      const result = summedScoreFit(buildResponseMatrix(fixture.responses), fixtureItems(fixture.items));
       expectTable(
         result,
         { chiSquare: fixture.chiSquare, significance: fixture.significance },
@@ -736,9 +742,9 @@ describe("summedScoreFit", () => {
 
   it("uses the persons who answered every item", () => {
     const { matrix, items: pool } = simulated(5, 300, 8);
-    const withMissing = responseMatrix([...matrix.responses, [null, 1, 0, 1, 0, 1, 0, 1]]);
+    const withMissing = buildResponseMatrix([...matrix.responses, [null, 1, 0, 1, 0, 1, 0, 1]]);
     expect(summedScoreFit(withMissing, pool)).toEqual(summedScoreFit(matrix, pool));
-    expect(() => summedScoreFit(responseMatrix([[null, 1]]), HALVES)).toThrow(DataError);
+    expect(() => summedScoreFit(buildResponseMatrix([[null, 1]]), HALVES)).toThrow(DataError);
   });
 
   it("takes items of a highest total score of at most 300, whose sums cost the square of the score for each item", () => {
@@ -747,7 +753,7 @@ describe("summedScoreFit", () => {
       model: gradedResponse,
       parameters: { a: 1, b: Array.from({ length: categories - 1 }, (_, k) => -3 + (6 * k) / (categories - 2)) },
     });
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [0, 1],
       [1, 0],
     ]);
@@ -759,7 +765,7 @@ describe("summedScoreFit", () => {
 
   it("gives null without degrees of freedom", () => {
     const result = summedScoreFit(
-      responseMatrix([
+      buildResponseMatrix([
         [0, 1],
         [1, 0],
         [1, 1],
@@ -807,7 +813,7 @@ function calibratedCase(
 describe("rootMeanSquareDeviation", () => {
   for (const fixture of rmsd.cases) {
     it(`matches TAM's IRT.RMSD for ${fixture.name}`, () => {
-      const result = rootMeanSquareDeviation(responseMatrix(fixture.responses), fixtureItems(fixture.items), {
+      const result = rootMeanSquareDeviation(buildResponseMatrix(fixture.responses), fixtureItems(fixture.items), {
         population: fixture.population,
       });
       result.forEach((item, i) => {
@@ -847,9 +853,9 @@ describe("rootMeanSquareDeviation", () => {
     const total = densities.reduce((sum, density) => sum + density, 0);
     const population = { nodes, weights: densities.map((density) => density / total) };
     expectSameNumbers(rootMeanSquareDeviation(matrix, pool), rootMeanSquareDeviation(matrix, pool, { population }));
-    const empty = responseMatrix([...matrix.responses, [null, null, null, null]]);
+    const empty = buildResponseMatrix([...matrix.responses, [null, null, null, null]]);
     expectSameNumbers(rootMeanSquareDeviation(empty, pool), rootMeanSquareDeviation(matrix, pool));
-    const unanswered = responseMatrix(matrix.responses.map((row) => [null, ...row.slice(1)]));
+    const unanswered = buildResponseMatrix(matrix.responses.map((row) => [null, ...row.slice(1)]));
     expect(rootMeanSquareDeviation(unanswered, pool)[0]).toEqual({ id: "item1", rmsd: null, meanDeviation: null });
   });
 
@@ -866,8 +872,8 @@ describe("rootMeanSquareDeviation", () => {
 });
 
 describe("limitedInformationFit", () => {
-  const binary = responseMatrix(limited.binary.responses);
-  const polytomous = responseMatrix(limited.polytomous.responses);
+  const binary = buildResponseMatrix(limited.binary.responses);
+  const polytomous = buildResponseMatrix(limited.polytomous.responses);
   const twoParameter = calibratedCase(binary, "2pl");
 
   for (const { name, model, fixed, latent, expected, mirtStatistic } of limited.binary.cases) {
@@ -891,7 +897,7 @@ describe("limitedInformationFit", () => {
 
   it("matches the M2* written out for a calibration with held parameters, which add no columns to Δ", () => {
     const { held } = limited;
-    const matrix = responseMatrix(held.responses);
+    const matrix = buildResponseMatrix(held.responses);
     const calibration = calibrate(matrix, {
       model: held.models.map((name) => defined(MODELS[name])),
       fixedParameters: held.fixedParameters,
@@ -917,7 +923,7 @@ describe("limitedInformationFit", () => {
     let rejected = 0;
     let rejectedByMirt = 0;
     for (const { responses, statistic } of sets) {
-      const matrix = responseMatrix(responses.map((row) => Array.from(row, Number)));
+      const matrix = buildResponseMatrix(responses.map((row) => Array.from(row, Number)));
       const result = limitedInformationFit(
         matrix,
         calibrate(matrix, { model: twoParameterLogistic, tolerance: 1e-6, maxIterations: 10_000 }),
@@ -944,7 +950,7 @@ describe("limitedInformationFit", () => {
   });
 
   it("uses the persons who answered every item", () => {
-    const missing = responseMatrix([
+    const missing = buildResponseMatrix([
       ...binary.responses,
       [null, ...defined(binary.responses[0]).slice(1)],
       [...defined(binary.responses[1]).slice(0, -1), null],
@@ -969,7 +975,7 @@ describe("limitedInformationFit", () => {
 
   it("leaves SRMSR, TLI and CFI null for an anchor without variance", () => {
     const rows = simulated(22, 300, 5).matrix.responses.map((row) => [1, ...row]);
-    const matrix = responseMatrix(rows);
+    const matrix = buildResponseMatrix(rows);
     const anchor = { a: 1, b: -3, c: 0, d: 1 };
     const calibration = calibrate(matrix, {
       model: twoParameterLogistic,
@@ -982,7 +988,7 @@ describe("limitedInformationFit", () => {
 
   it("leaves TLI and CFI null when the independence model fits no worse", () => {
     // A full factorial: every pair of items has a correlation of exactly 0, so that N Σ r² is 0.
-    const factorial = responseMatrix(
+    const factorial = buildResponseMatrix(
       Array.from({ length: 64 }, (_, person) => [0, 1, 2, 3, 4, 5].map((i) => (person >> i) & 1)),
     );
     const result = limitedInformationFit(factorial, calibrate(factorial, { model: oneParameterLogistic }));
@@ -1001,7 +1007,7 @@ describe("limitedInformationFit", () => {
     const rows = Array.from({ length: 50 }, (_, person) =>
       Array.from({ length: 60 }, (_, item) => (person + item) % 3),
     );
-    const matrix = responseMatrix(rows);
+    const matrix = buildResponseMatrix(rows);
     const calibration = calibrate(matrix, { model: gradedResponse, maxIterations: 1 });
     expect(limitedInformationFit(matrix, calibration, { statistic: "m2-star" }).degreesOfFreedom).toBeGreaterThan(0);
     expect(() => limitedInformationFit(matrix, calibration, { statistic: "c2" })).toThrow(
@@ -1035,7 +1041,7 @@ describe("limitedInformationFit", () => {
   });
 
   it("refuses M2 for polytomous items and a nominal item for every statistic", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [0, 1, 2],
       [1, 2, 0],
       [2, 0, 1],
@@ -1053,7 +1059,9 @@ describe("limitedInformationFit", () => {
   it("needs two persons who answered every item", () => {
     const { matrix } = simulated(26, 50, 5);
     const calibration = calibrate(matrix, { model: twoParameterLogistic, maxIterations: 2 });
-    const few = responseMatrix(matrix.responses.map((row, person) => (person === 0 ? row : [null, ...row.slice(1)])));
+    const few = buildResponseMatrix(
+      matrix.responses.map((row, person) => (person === 0 ? row : [null, ...row.slice(1)])),
+    );
     expect(() => limitedInformationFit(few, calibration)).toThrow(
       /at least two persons who answered every item, found 1/,
     );
@@ -1114,7 +1122,7 @@ describe("Rasch tests", () => {
     defined(cases.find((candidate) => candidate.name === name));
 
   /** Two groups, a and b, where leaving out item1 makes person 3 extreme in b, and item2 then constant there. */
-  const Cascade = responseMatrix([
+  const Cascade = buildResponseMatrix([
     [0, 1, 1, 0],
     [1, 0, 0, 1],
     [0, 0, 1, 0],
@@ -1129,7 +1137,7 @@ describe("Rasch tests", () => {
     for (const expected of raschTests.andersen) {
       const reference = "erm" in expected ? "base R's conditional likelihood" : "eRm's LRtest";
       it(`matches ${reference} on ${expected.name}`, () => {
-        const result = andersenTest(responseMatrix(expected.responses), {
+        const result = andersenTest(buildResponseMatrix(expected.responses), {
           model: modelOf(expected.model),
           split: personSplit(expected.split),
         });
@@ -1147,12 +1155,12 @@ describe("Rasch tests", () => {
 
     it("maximizes each conditional likelihood on missing responses of polytomous items, where eRm's LRtest does not", () => {
       const expected = caseNamed(raschTests.andersen, "small, sparse, median");
-      const { statistic } = andersenTest(responseMatrix(expected.responses));
+      const { statistic } = andersenTest(buildResponseMatrix(expected.responses));
       expect(Math.abs(statistic - defined("erm" in expected ? expected.erm : null))).toBeGreaterThan(10);
     });
 
     it("splits persons with missing responses at the median of those who answered the same items", () => {
-      const matrix = responseMatrix([
+      const matrix = buildResponseMatrix([
         [1, 1, 0, null],
         [0, 1, 0, null],
         [1, 1, 1, null],
@@ -1176,7 +1184,7 @@ describe("Rasch tests", () => {
 
     it("leaves out an item whose highest score is beyond the persons of a group, before its categories take room", () => {
       // A fifth item that one person scores 2³¹ - 1: a table of its categories would take 2 GB and overflow 32 bits.
-      const far = responseMatrix(Cascade.responses.map((row, person) => [...row, person === 0 ? 2 ** 31 - 1 : 0]));
+      const far = buildResponseMatrix(Cascade.responses.map((row, person) => [...row, person === 0 ? 2 ** 31 - 1 : 0]));
       const result = andersenTest(far, { split: cascadeSplit });
       expect(result).toEqual({
         ...andersenTest(Cascade, { split: cascadeSplit }),
@@ -1187,7 +1195,7 @@ describe("Rasch tests", () => {
 
     it("takes the model and the stopping rules of conditional maximum likelihood", () => {
       const expected = caseNamed(raschTests.andersen, "pcmdat2, median");
-      const matrix = responseMatrix(expected.responses);
+      const matrix = buildResponseMatrix(expected.responses);
       expect(andersenTest(matrix, { maxIterations: 1 }).converged).toBe(false);
       const rating = andersenTest(matrix, { model: "rating-scale" });
       expect(rating.degreesOfFreedom).toBe(4);
@@ -1195,11 +1203,11 @@ describe("Rasch tests", () => {
     });
 
     it("refuses a split into one group, and too few items to test", () => {
-      const matrix = responseMatrix(caseNamed(raschTests.andersen, "raschdat1, median").responses);
+      const matrix = buildResponseMatrix(caseNamed(raschTests.andersen, "raschdat1, median").responses);
       expect(() => andersenTest(matrix, { split: matrix.personIds.map(() => "all") })).toThrow(
         "The split puts every person in one group; the test needs at least two groups of persons.",
       );
-      const constant = responseMatrix([
+      const constant = buildResponseMatrix([
         [1, 1, 0],
         [1, 0, 1],
         [1, 0, 0],
@@ -1211,7 +1219,7 @@ describe("Rasch tests", () => {
     });
 
     it("refuses arguments of other types", () => {
-      const matrix = responseMatrix(caseNamed(raschTests.andersen, "raschdat1, median").responses);
+      const matrix = buildResponseMatrix(caseNamed(raschTests.andersen, "raschdat1, median").responses);
       expect(() => andersenTest(JSON.parse("null"))).toThrow(DataError);
       expect(() => andersenTest(matrix, JSON.parse("null"))).toThrow("The options must be an object, found null.");
       const options = (value: string) => () => andersenTest(matrix, JSON.parse(value));
@@ -1230,7 +1238,7 @@ describe("Rasch tests", () => {
     for (const expected of raschTests.wald) {
       const reference = expected.model === "partial-credit" ? "base R's locations of eRm's PCM" : "eRm's Waldtest";
       it(`matches ${reference} on ${expected.name}`, () => {
-        const result = raschWaldTest(responseMatrix(expected.responses), {
+        const result = raschWaldTest(buildResponseMatrix(expected.responses), {
           model: modelOf(expected.model),
           split: personSplit(expected.split),
         });
@@ -1255,7 +1263,7 @@ describe("Rasch tests", () => {
       const shifted = items.map((item, i) => (i === 0 ? { ...item, parameters: { ...item.parameters, b: 0 } } : item));
       const reference = simulateResponses(items, simulateThetas(1000, random), random);
       const focal = simulateResponses(shifted, simulateThetas(1000, random), random);
-      const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+      const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
       const split = matrix.personIds.map((_, person) => (person < 1000 ? "1 reference" : "2 focal"));
       const [first, ...others] = raschWaldTest(matrix, { split }).items;
       expect(defined(first?.z)).toBeGreaterThan(5);
@@ -1270,7 +1278,7 @@ describe("Rasch tests", () => {
     });
 
     it("refuses a split into more than two groups, and arguments of other types", () => {
-      const matrix = responseMatrix(caseNamed(raschTests.andersen, "raschdat1, three labels").responses);
+      const matrix = buildResponseMatrix(caseNamed(raschTests.andersen, "raschdat1, three labels").responses);
       const split = personSplit(caseNamed(raschTests.andersen, "raschdat1, three labels").split);
       expect(() => raschWaldTest(matrix, { split })).toThrow("The Wald test compares two groups of persons, found 3.");
       expect(() => raschWaldTest(JSON.parse("[]"))).toThrow(DataError);
@@ -1284,7 +1292,7 @@ describe("Rasch tests", () => {
       const reference =
         expected.model === "rating-scale" ? "eRm's MLoef, with base R's degrees of freedom," : "eRm's MLoef";
       it(`matches ${reference} on ${expected.name}`, () => {
-        const result = martinLofTest(responseMatrix(expected.responses), {
+        const result = martinLofTest(buildResponseMatrix(expected.responses), {
           model: modelOf(expected.model),
           split: itemSplit(expected.split),
         });
@@ -1306,17 +1314,17 @@ describe("Rasch tests", () => {
 
     it("uses the persons who answered every item", () => {
       const expected = caseNamed(raschTests.martinLof, "raschdat1, median");
-      const matrix = responseMatrix(expected.responses);
-      const missing = responseMatrix([...expected.responses, [null, ...defined(expected.responses[0]).slice(1)]]);
+      const matrix = buildResponseMatrix(expected.responses);
+      const missing = buildResponseMatrix([...expected.responses, [null, ...defined(expected.responses[0]).slice(1)]]);
       expectSameNumbers(martinLofTest(missing), martinLofTest(matrix));
-      const none = responseMatrix(expected.responses.map((row) => [null, ...row.slice(1)]));
+      const none = buildResponseMatrix(expected.responses.map((row) => [null, ...row.slice(1)]));
       expect(() => martinLofTest(none)).toThrow(
         "The Martin-Löf test needs persons who answered every item, found none.",
       );
     });
 
     it("refuses sets that do not hold every item once, a set of one item, and arguments of other types", () => {
-      const matrix = responseMatrix([
+      const matrix = buildResponseMatrix([
         [1, 0, 1, 1],
         [0, 1, 0, 1],
         [1, 1, 0, 0],
@@ -1349,7 +1357,7 @@ describe("Rasch tests", () => {
           ["item3", "item4"],
         ]),
       ).not.toThrow();
-      const equal = responseMatrix([
+      const equal = buildResponseMatrix([
         [1, 0, 1, 0],
         [0, 1, 0, 1],
         [1, 1, 0, 0],
@@ -1405,7 +1413,7 @@ describe("kernelItemCurves", () => {
   for (const fixture of kernelCurves.cases) {
     it(`matches KernSmoothIRT's ksIRT and Ramsay's errors in base R for ${fixture.name}`, () => {
       const data = defined(rmsd.cases.find((candidate) => candidate.name === fixture.data));
-      const result = kernelItemCurves(responseMatrix(data.responses), fixture.options);
+      const result = kernelItemCurves(buildResponseMatrix(data.responses), fixture.options);
       expect(result).toHaveLength(fixture.probabilities.length);
       result.forEach((curve, i) => {
         expect(curve.id).toBe(`item${i + 1}`);
@@ -1445,7 +1453,7 @@ describe("kernelItemCurves", () => {
   it("ranks ties in the order of the persons and smooths with Silverman's bandwidth", () => {
     // Totals 1, 1, 0, 2: the tied first two persons take ranks 2 and 3 in their order.
     const [first] = kernelItemCurves(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 0],
         [0, 1],
         [0, 0],
@@ -1478,8 +1486,8 @@ describe("kernelItemCurves", () => {
       [0, 1, 2],
       [1, 1, 1],
     ];
-    const curves = kernelItemCurves(responseMatrix(rows));
-    const empty = kernelItemCurves(responseMatrix([...rows, [null, null, null]]));
+    const curves = kernelItemCurves(buildResponseMatrix(rows));
+    const empty = kernelItemCurves(buildResponseMatrix([...rows, [null, null, null]]));
     expectSameNumbers(empty, curves);
     // The second item without the person who skipped it: the same weights as the others' at each node.
     const scores = [3, 1, 2, 4, 5].map((rank) => normalQuantile(rank / 6));
@@ -1496,7 +1504,7 @@ describe("kernelItemCurves", () => {
   it("smooths 200,000 items, more than a function call takes arguments", () => {
     // Two persons who score 0 on every item: one category of each item, at two nodes, so that the curves stay small.
     const items = 200_000;
-    const curves = kernelItemCurves(responseMatrix([Array(items).fill(0), Array(items).fill(0)]), { points: 2 });
+    const curves = kernelItemCurves(buildResponseMatrix([Array(items).fill(0), Array(items).fill(0)]), { points: 2 });
     expect(curves).toHaveLength(items);
     expect(curves[items - 1]?.probabilities).toEqual([[1, 1]]);
   });
@@ -1521,21 +1529,21 @@ describe("kernelItemCurves", () => {
       [1, 1],
       [1, 1],
     ];
-    const [first, second] = kernelItemCurves(responseMatrix(rows), { points: 5, bandwidth: 1e-3 });
+    const [first, second] = kernelItemCurves(buildResponseMatrix(rows), { points: 5, bandwidth: 1e-3 });
     expect(defined(first).probabilities[1]).toEqual([0, 0, 1, 1, 1]);
     // The second item's persons are ranked 2, 4 and 5: at the lowest node its nearest person is the second.
     expect(defined(second).probabilities[1]?.[0]).toBe(0);
     expect(defined(second).probabilities[1]?.[4]).toBe(1);
     expect(defined(second).standardErrors.flat().every(Number.isFinite)).toBe(true);
     // Below 1e-154 the square of the bandwidth underflows to 0: each node still takes its nearest person's response.
-    const [narrowest] = kernelItemCurves(responseMatrix(rows), { points: 5, bandwidth: 1e-200 });
+    const [narrowest] = kernelItemCurves(buildResponseMatrix(rows), { points: 5, bandwidth: 1e-200 });
     expect(defined(narrowest).probabilities[1]).toEqual([0, 0, 1, 1, 1]);
     expect(defined(narrowest).standardErrors.flat().every(Number.isFinite)).toBe(true);
   });
 
   it("gives a constant item one curve of 1", () => {
     const [constant] = kernelItemCurves(
-      responseMatrix([
+      buildResponseMatrix([
         [0, 1],
         [0, 0],
         [0, 1],
@@ -1549,22 +1557,22 @@ describe("kernelItemCurves", () => {
   it("rejects an item without responses, an empty category below the highest, and fewer than two persons", () => {
     expect(() =>
       kernelItemCurves(
-        responseMatrix([
+        buildResponseMatrix([
           [1, null],
           [0, null],
         ]),
       ),
     ).toThrow('Item "item2" has no responses; kernel item curves need at least one.');
-    expect(() => kernelItemCurves(responseMatrix([[0], [3], [1]]))).toThrow(
+    expect(() => kernelItemCurves(buildResponseMatrix([[0], [3], [1]]))).toThrow(
       'Item "item1" has no response in category 2; kernel item curves need responses in every category up to the highest.',
     );
-    expect(() => kernelItemCurves(responseMatrix([[0], [null]]))).toThrow(
+    expect(() => kernelItemCurves(buildResponseMatrix([[0], [null]]))).toThrow(
       "Kernel item curves need at least two persons with a response, found 1.",
     );
   });
 
   it("refuses arguments of other types", () => {
-    const matrix = responseMatrix([[0], [1], [1]]);
+    const matrix = buildResponseMatrix([[0], [1], [1]]);
     expect(() => kernelItemCurves(JSON.parse("{}"))).toThrow(DataError);
     expect(() => kernelItemCurves(matrix, JSON.parse("null"))).toThrow(DataError);
     expect(() => kernelItemCurves(matrix, { points: 1 })).toThrow(
@@ -1611,10 +1619,10 @@ describe("properties", () => {
         const calibration = calibrate(matrix, { model, maxIterations: 50 });
         const fit = limitedInformationFit(matrix, calibration, { statistic });
         expect(defined(fit.statistic)).toBeGreaterThanOrEqual(0);
-        const persons = responseMatrix([...matrix.responses].reverse(), { itemIds: matrix.itemIds });
+        const persons = buildResponseMatrix([...matrix.responses].reverse(), { itemIds: matrix.itemIds });
         expectSameNumbers(limitedInformationFit(persons, calibration, { statistic }), fit);
         const order = matrix.itemIds.map((_, i) => matrix.itemIds.length - 1 - i);
-        const items = responseMatrix(
+        const items = buildResponseMatrix(
           matrix.responses.map((row) => order.map((i) => row[i] ?? null)),
           { itemIds: order.map((i) => defined(matrix.itemIds[i])) },
         );
@@ -1632,7 +1640,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(seeds, (seed) => {
         const { matrix, items: pool } = simulated(seed, 80, 4);
-        const reversed = responseMatrix(
+        const reversed = buildResponseMatrix(
           matrix.responses.map((row) => [...row].reverse()),
           { itemIds: [...matrix.itemIds].reverse() },
         );
@@ -1668,7 +1676,7 @@ describe("properties", () => {
         expect(martinLofTest(matrix).statistic).toBeGreaterThanOrEqual(0);
         expectSameNumbers(andersenTest(matrix, { split }), andersen);
         expectSameNumbers(raschWaldTest(matrix, { split }), raschWaldTest(matrix));
-        const reversed = responseMatrix([...matrix.responses].reverse());
+        const reversed = buildResponseMatrix([...matrix.responses].reverse());
         expectSameNumbers(andersenTest(reversed), andersen);
         expectSameNumbers(martinLofTest(reversed), martinLofTest(matrix));
       }),
@@ -1687,7 +1695,7 @@ describe("properties", () => {
           const { matrix } = simulated(seed, persons, count);
           // A person with every item wrong and one with every item right give each item both categories.
           const rows = [...matrix.responses, matrix.itemIds.map(() => 0), matrix.itemIds.map(() => 1)];
-          for (const curve of kernelItemCurves(responseMatrix(rows), { bandwidth })) {
+          for (const curve of kernelItemCurves(buildResponseMatrix(rows), { bandwidth })) {
             curve.nodes.forEach((_, q) => {
               const shares = curve.probabilities.map((row) => defined(row[q]));
               expect(shares.every((p) => p >= 0 && p <= 1)).toBe(true);
@@ -1706,7 +1714,7 @@ describe("properties", () => {
       fc.property(seeds, (seed) => {
         const { matrix, items: pool } = simulated(seed, 60, 5);
         const thetas = matrix.personIds.map((_, person) => Math.sin(person));
-        const reversed = responseMatrix([...matrix.responses].reverse());
+        const reversed = buildResponseMatrix([...matrix.responses].reverse());
         const reversedThetas = [...thetas].reverse();
         expectSameNumbers(itemFit(reversed, pool, reversedThetas), itemFit(matrix, pool, thetas));
         expectSameNumbers(summedScoreFit(reversed, pool), summedScoreFit(matrix, pool));

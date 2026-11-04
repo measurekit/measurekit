@@ -123,9 +123,9 @@ attributes (Lee, Park and Taylan, 2011), as CDM ships them, hold 819,200 cells a
 
 ```ts
 import { calibrateCdm } from "@measurekit/psychometrics/cdm";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 
-const matrix = responseMatrix([
+const matrix = buildResponseMatrix([
   [1, 1, 0, 1],
   [0, 0, 1, 0],
   [1, 0, 0, 1],
@@ -167,9 +167,9 @@ the chance that two measurements agree, and `attributeConsistency` γ_k. They us
 
 ```ts
 import { attributeProfiles, calibrateCdm, cdmClassificationAccuracy } from "@measurekit/psychometrics/cdm";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 
-const matrix = responseMatrix([
+const matrix = buildResponseMatrix([
   [1, 1, 0, 1],
   [0, 0, 1, 0],
   [1, 0, 0, 1],

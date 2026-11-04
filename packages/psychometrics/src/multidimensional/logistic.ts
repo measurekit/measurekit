@@ -1,4 +1,11 @@
-import { DataError, describe, isRecord, logisticPair, logisticProbabilities, validAsymptotes } from "@measurekit/core";
+import {
+  DataError,
+  describe,
+  hasValidAsymptotes,
+  isRecord,
+  logisticPair,
+  logisticProbabilities,
+} from "@measurekit/core";
 import type { ModelParameter } from "../irt/internal.js";
 import type { MultidimensionalModel } from "./model.js";
 
@@ -39,7 +46,7 @@ export const multidimensionalThreeParameterLogistic: MultidimensionalModel<Multi
 function checkLogisticParameters(name: string, parameters: MultidimensionalLogisticParameters): void {
   const { a, intercept, c, d }: Partial<MultidimensionalLogisticParameters> = isRecord(parameters) ? parameters : {};
   const slopes = Array.isArray(a) && a.length > 0 && a.every(Number.isFinite);
-  if (!(slopes && Number.isFinite(intercept) && validAsymptotes(c, d))) {
+  if (!(slopes && Number.isFinite(intercept) && hasValidAsymptotes(c, d))) {
     throw new DataError(
       `An ${name} item needs finite slopes a, at least one, a finite intercept and 0 ≤ c < d ≤ 1, found a = ${describe(a)}, intercept = ${describe(intercept)}, c = ${describe(c)}, d = ${describe(d)}.`,
     );

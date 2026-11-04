@@ -553,47 +553,47 @@ grows in proportion to its input, but for the designs of cognitive diagnosis, th
 hold a matrix of them, and the analyses of the relations between the elements of a knowledge structure, whose limits
 bound them, and the statistics of pairs of items of fit and of Mokken scales, which their limit of 1,000 items bounds.
 
-| Reader                        | Input                                                          | JSON (MB) | Peak added (MB)             |
-| ----------------------------- | -------------------------------------------------------------- | --------: | --------------------------- |
-| `responseMatrix`              | 1,000 persons, 1,000 items                                     |       1.9 | below the peak of the parse |
-| `responseMatrix`              | 1 person, 1,000,000 items, with the ids it gives them          |       1.9 | 86                          |
-| `responseMatrix`              | 1,000,000 persons, 1 item, with the ids it gives them          |       3.8 | 94                          |
-| `responseMatrix` with `times` | 1,000 persons, 1,000 items                                     |       4.6 | 49                          |
-| `responseMatrixFromColumns`   | 1,000 persons, 1,000 items                                     |       1.9 | 23                          |
-| `responseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items             |        43 | 106                         |
-| `responseRecords`             | 1,000,000 records, each of its own person and item             |        48 | 421                         |
-| `scoreResponses`              | 1,000 persons, 1,000 items of 4 options                        |       3.8 | 8                           |
-| `calibrate` of records        | 200,000 records of 100,000 items, two persons each             |       9.9 | 440                         |
-| `qMatrixIdentifiability`      | A Q-matrix of 100,000 items of 20 attributes                   |        12 | 62                          |
-| `calibrateCdm`                | 128 items of 11 of 15 attributes, the most cells and groups    |     0.010 | 160 to 230 by run           |
-| `calibrateMultidimensional`   | 8 dichotomous items, 2 persons, 10⁶ nodes                      |    0.0002 | 310                         |
-| `calibrateMultidimensional`   | The same, 3 dimensions, exploratory, standard errors           |    0.0002 | 650 to 750 by run           |
-| `calibrateBifactor`           | 1,000 persons, two-tier, 40 items, standard errors             |      0.09 | 620 to 670 by run           |
-| `generalizabilityStudy`       | 1,000,000 scores of 6 facets of 10 elements                    |        87 | 125                         |
-| `generalizabilityStudy`       | The same with one score missing, `unbalanced`                  |        87 | 301                         |
-| `exploratoryFactorAnalysis`   | 1,000 items of 40 persons, the most a matrix of items takes    |      0.08 | 152                         |
-| `omegaHierarchical`           | 1,000 items of 40 persons                                      |      0.08 | 148                         |
-| `mcdonaldOmega`               | 1,000 items of 40 persons                                      |      0.08 | 118                         |
-| `eventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items             |        72 | 79                          |
-| `eventLog`                    | 1,000,000 events, each of its own learner, item and skill      |        82 | 171                         |
-| `bkt` with stored parameters  | 100,000 skills                                                 |       6.6 | 56                          |
-| `kst` with a structure        | 10,000 states of 64 items                                      |       1.9 | 1                           |
-| `iita`                        | 1,000,000 events, each of its own learner and item             |        77 | 270                         |
-| `iita`                        | 1,000 items, 276 learners: 24 candidates of 23.9 million cells |        19 | 259                         |
-| `diffTest`                    | 1,000 items, 200 learners                                      |        14 | 38                          |
-| `structureValidity`           | 1,000 items, 200 learners, a chain                             |        14 | 42                          |
-| `surmiseStructure`            | 1,000 elements, 12 free and a class of 988: 8,192 states       |      0.02 | 138                         |
-| `kst`, its masks              | 4,096 sets of 16 skills, 65,536 states                         |      0.33 | 173                         |
-| `manyFacetRasch`              | 1,994 persons, 997 raters: 1,000 parameters, one EM iteration  |      0.26 | 66 to 77 by run             |
-| `personScalability`           | 2 persons, 1,000,000 items, from their response matrix         |       3.8 | 195                         |
-| `localDependenceChiSquare`    | 2 persons, 1,000 2PL items, the most: 499,500 pairs            |     0.028 | 102 to 228 by version, OS   |
-| `localDependenceChiSquare`    | 2 graded items of 4,096 categories, the most cells             |       0.1 | 132 to 262 by version, OS   |
-| `summedScoreFit`              | 2 persons, 300 2PL items, the highest total score              |     0.008 | 5 to 9 by version, OS       |
-| `yenQ3`                       | 2 persons, 1,000 2PL items, the most                           |     0.028 | 14 to 22 by version, OS     |
-| `scalability`                 | 200 persons of distinct patterns, 1,000 items, the most        |       0.4 | 75 to 117 by version, OS    |
-| `conditionalAssociation`      | 8 persons, 1,000 items, the most                               |     0.015 | 141                         |
-| `assembleForms`               | 8,191 forms of the one item of a pool, the most counts         |    0.0001 | 223 to 288 by version, OS   |
-| `diagnosticAdaptiveTest`      | 128 items of 11 of 15 attributes, the most cells and groups    |       1.0 | 55 to 90 by run             |
+| Reader                             | Input                                                          | JSON (MB) | Peak added (MB)             |
+| ---------------------------------- | -------------------------------------------------------------- | --------- | --------------------------- |
+| `buildResponseMatrix`              | 1,000 persons, 1,000 items                                     | 1.9       | below the peak of the parse |
+| `buildResponseMatrix`              | 1 person, 1,000,000 items, with the ids it gives them          | 1.9       | 86                          |
+| `buildResponseMatrix`              | 1,000,000 persons, 1 item, with the ids it gives them          | 3.8       | 94                          |
+| `buildResponseMatrix` with `times` | 1,000 persons, 1,000 items                                     | 4.6       | 49                          |
+| `buildResponseMatrixFromColumns`   | 1,000 persons, 1,000 items                                     | 1.9       | 23                          |
+| `buildResponseRecords`             | 1,000,000 records of 1,000 persons and 1,000 items             | 43        | 106                         |
+| `buildResponseRecords`             | 1,000,000 records, each of its own person and item             | 48        | 421                         |
+| `scoreResponses`                   | 1,000 persons, 1,000 items of 4 options                        | 3.8       | 8                           |
+| `calibrate` of records             | 200,000 records of 100,000 items, two persons each             | 9.9       | 440                         |
+| `qMatrixIdentifiability`           | A Q-matrix of 100,000 items of 20 attributes                   | 12        | 62                          |
+| `calibrateCdm`                     | 128 items of 11 of 15 attributes, the most cells and groups    | 0.010     | 160 to 230 by run           |
+| `calibrateMultidimensional`        | 8 dichotomous items, 2 persons, 10⁶ nodes                      | 0.0002    | 310                         |
+| `calibrateMultidimensional`        | The same, 3 dimensions, exploratory, standard errors           | 0.0002    | 650 to 750 by run           |
+| `calibrateBifactor`                | 1,000 persons, two-tier, 40 items, standard errors             | 0.09      | 620 to 670 by run           |
+| `generalizabilityStudy`            | 1,000,000 scores of 6 facets of 10 elements                    | 87        | 125                         |
+| `generalizabilityStudy`            | The same with one score missing, `unbalanced`                  | 87        | 301                         |
+| `exploratoryFactorAnalysis`        | 1,000 items of 40 persons, the most a matrix of items takes    | 0.08      | 152                         |
+| `omegaHierarchical`                | 1,000 items of 40 persons                                      | 0.08      | 148                         |
+| `mcdonaldOmega`                    | 1,000 items of 40 persons                                      | 0.08      | 118                         |
+| `buildEventLog`                    | 1,000,000 events of 1,000 learners and 1,000 items             | 72        | 79                          |
+| `buildEventLog`                    | 1,000,000 events, each of its own learner, item and skill      | 82        | 171                         |
+| `bkt` with stored parameters       | 100,000 skills                                                 | 6.6       | 56                          |
+| `kst` with a structure             | 10,000 states of 64 items                                      | 1.9       | 1                           |
+| `iita`                             | 1,000,000 events, each of its own learner and item             | 77        | 270                         |
+| `iita`                             | 1,000 items, 276 learners: 24 candidates of 23.9 million cells | 19        | 259                         |
+| `diffTest`                         | 1,000 items, 200 learners                                      | 14        | 38                          |
+| `structureValidity`                | 1,000 items, 200 learners, a chain                             | 14        | 42                          |
+| `surmiseStructure`                 | 1,000 elements, 12 free and a class of 988: 8,192 states       | 0.02      | 138                         |
+| `kst`, its masks                   | 4,096 sets of 16 skills, 65,536 states                         | 0.33      | 173                         |
+| `manyFacetRasch`                   | 1,994 persons, 997 raters: 1,000 parameters, one EM iteration  | 0.26      | 66 to 77 by run             |
+| `personScalability`                | 2 persons, 1,000,000 items, from their response matrix         | 3.8       | 195                         |
+| `localDependenceChiSquare`         | 2 persons, 1,000 2PL items, the most: 499,500 pairs            | 0.028     | 102 to 228 by version, OS   |
+| `localDependenceChiSquare`         | 2 graded items of 4,096 categories, the most cells             | 0.1       | 132 to 262 by version, OS   |
+| `summedScoreFit`                   | 2 persons, 300 2PL items, the highest total score              | 0.008     | 5 to 9 by version, OS       |
+| `yenQ3`                            | 2 persons, 1,000 2PL items, the most                           | 0.028     | 14 to 22 by version, OS     |
+| `scalability`                      | 200 persons of distinct patterns, 1,000 items, the most        | 0.4       | 75 to 117 by version, OS    |
+| `conditionalAssociation`           | 8 persons, 1,000 items, the most                               | 0.015     | 141                         |
+| `assembleForms`                    | 8,191 forms of the one item of a pool, the most counts         | 0.0001    | 223 to 288 by version, OS   |
+| `createDiagnosticAdaptiveTest`     | 128 items of 11 of 15 attributes, the most cells and groups    | 1.0       | 55 to 90 by run             |
 
 A reader of a matrix or a log takes at most about 50 times the bytes of its JSON, where it names a million items or
 persons itself, and 2 to 9 times where the input names them. A design of cognitive diagnosis, of a calibration or of an

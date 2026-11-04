@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   type Attempt,
   backwardGraded,
+  buildEventLog,
   clauseStructure,
   compareFits,
   compareModels,
@@ -12,7 +13,6 @@ import {
   diffTest,
   type Event,
   type EventLog,
-  eventLog,
   forwardGraded,
   fringes,
   iita,
@@ -557,7 +557,7 @@ function patternLog(items: readonly string[], patterns: Readonly<Record<string, 
       });
     }
   }
-  return eventLog(events);
+  return buildEventLog(events);
 }
 
 /** A structure's states as sorted keys, for comparisons that ignore order. */
@@ -1293,7 +1293,7 @@ describe("KST model", () => {
       return { learner: `l${learner}`, item, time: learner * 10 + i, outcome };
     });
   }).flat();
-  const log = eventLog(events, { qMatrix });
+  const log = buildEventLog(events, { qMatrix });
   const model = kst({ structure });
 
   it("predicts from a fit as online inference does, and works with cross-validation and comparison unchanged", () => {
@@ -1476,14 +1476,16 @@ describe("KST edge cases", () => {
       time,
       outcome,
     });
-    expect(() => iita(eventLog([answer("a", "x", 1, 0), answer("a", "y", 1, 1), answer("b", "x", 1, 2)]))).toThrow(
+    expect(() => iita(buildEventLog([answer("a", "x", 1, 0), answer("a", "y", 1, 1), answer("b", "x", 1, 2)]))).toThrow(
       'IITA needs every learner to answer every item; "b" has no answer to "y".',
     );
-    expect(() => iita(eventLog([answer("a", "x", 0.5, 0), answer("a", "y", 1, 1)]))).toThrow("needs outcomes 0 or 1");
-    expect(() => iita(eventLog([answer("a", "x", 0, 0), answer("a", "y", 1, 1)]))).toThrow(
+    expect(() => iita(buildEventLog([answer("a", "x", 0.5, 0), answer("a", "y", 1, 1)]))).toThrow(
+      "needs outcomes 0 or 1",
+    );
+    expect(() => iita(buildEventLog([answer("a", "x", 0, 0), answer("a", "y", 1, 1)]))).toThrow(
       'Item "x" is solved by no learner, so IITA cannot weigh it.',
     );
-    expect(() => iita(eventLog([answer("a", "x", 1, 0)]))).toThrow("IITA needs at least 2 items.");
+    expect(() => iita(buildEventLog([answer("a", "x", 1, 0)]))).toThrow("IITA needs at least 2 items.");
   });
 
   it("refuses an incomplete table at the cost of its events, without a pattern of every item for every learner", () => {
@@ -1579,9 +1581,9 @@ describe("BLIM constraints and diagnostics", () => {
     });
     const events = [...chainLog, answer("l0", "a", 1, 1000)];
     for (const log of [
-      eventLog(chainLog.slice(1)),
-      eventLog(events),
-      eventLog(chainLog.map((event, i) => ({ ...event, outcome: i === 0 ? 0.5 : event.outcome }))),
+      buildEventLog(chainLog.slice(1)),
+      buildEventLog(events),
+      buildEventLog(chainLog.map((event, i) => ({ ...event, outcome: i === 0 ? 0.5 : event.outcome }))),
     ]) {
       const fit = model.fit(log);
       expect(fit.goodnessOfFit).toBeNull();
@@ -1650,7 +1652,7 @@ describe("BLIM constraints and diagnostics", () => {
     expect(comparison.g2).toBeGreaterThanOrEqual(0);
     expect(compareFits(free, free)).toBeNull();
     expect(compareFits(free, equal)).toBeNull();
-    const incomplete = kst({ structure: chain, over: "items" }).fit(eventLog(chainLog.slice(1)));
+    const incomplete = kst({ structure: chain, over: "items" }).fit(buildEventLog(chainLog.slice(1)));
     expect(compareFits(equal, incomplete)).toBeNull();
     expect(compareFits(incomplete, free)).toBeNull();
     const md = kst({ structure: chain, over: "items", method: "md" }).fit(chainLog);
@@ -1837,7 +1839,7 @@ describe("validity of a structure", () => {
     fc.assert(
       fc.property(patterns, fc.nat(), (rows, shift) => {
         const log = (order: readonly (readonly number[])[]) =>
-          eventLog(
+          buildEventLog(
             order.flatMap((row, learner) =>
               row.map((outcome, i) => ({
                 learner: `l${learner}`,
@@ -1872,15 +1874,18 @@ describe("validity of a structure", () => {
       outcome,
     });
     expect(() =>
-      structureValidity(structure, eventLog([answer("x", "a", 1, 0), answer("x", "b", 0, 1), answer("y", "a", 1, 2)])),
+      structureValidity(
+        structure,
+        buildEventLog([answer("x", "a", 1, 0), answer("x", "b", 0, 1), answer("y", "a", 1, 2)]),
+      ),
     ).toThrow('The validity of a structure needs every learner to answer every item; "y" has no answer to "b".');
-    expect(() => structureValidity(structure, eventLog([answer("x", "a", 0.5, 0), answer("x", "b", 1, 1)]))).toThrow(
-      "The validity of a structure needs outcomes 0 or 1",
-    );
-    expect(() => structureValidity(structure, eventLog([answer("x", "a", 1, 0), answer("x", "z", 1, 1)]))).toThrow(
+    expect(() =>
+      structureValidity(structure, buildEventLog([answer("x", "a", 0.5, 0), answer("x", "b", 1, 1)])),
+    ).toThrow("The validity of a structure needs outcomes 0 or 1");
+    expect(() => structureValidity(structure, buildEventLog([answer("x", "a", 1, 0), answer("x", "z", 1, 1)]))).toThrow(
       'The log has item "z", which is not in the structure\'s domain.',
     );
-    expect(() => structureValidity(structure, eventLog([answer("x", "a", 1, 0)]))).toThrow(
+    expect(() => structureValidity(structure, buildEventLog([answer("x", "a", 1, 0)]))).toThrow(
       'The structure\'s element "b" is not an item of the log',
     );
   });
@@ -1956,7 +1961,7 @@ describe("the test of a quasi order", () => {
       'Item "c" is solved by no learner',
     );
     expect(() => diffTest(patternLog(["a"], { "1": 3 }), { a: [] })).toThrow("needs at least 2 items");
-    const incomplete = eventLog([...answers.slice(1)]);
+    const incomplete = buildEventLog([...answers.slice(1)]);
     expect(() => diffTest(incomplete, chain3)).toThrow("The difference test needs every learner to answer every item");
     expect(() => diffTest(answers, chain3, { tail: "both" as "less" })).toThrow(
       'The option tail must be "two-sided", "less" or "greater", found "both".',
@@ -1977,7 +1982,7 @@ describe("KST options from JavaScript", () => {
     const missing = JSON.parse("null");
     const structure = surmiseStructure({ a: [] });
     const model = kst({ structure });
-    const log = eventLog([
+    const log = buildEventLog([
       { learner: "ana", item: "x", skills: [], time: 0, outcome: 1 },
       { learner: "ana", item: "y", skills: [], time: 1, outcome: 0 },
     ]);

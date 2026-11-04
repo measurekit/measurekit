@@ -31,7 +31,7 @@ const BUDGETS = {
   "evaluate.metrics": 200,
   "evaluate.metricsByOpportunity": 200,
   "practice.recommend": 0.6,
-  "data.eventLog": 200,
+  "data.buildEventLog": 200,
 } as const;
 
 /** Runs a benchmark against its budget. */

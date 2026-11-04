@@ -2,12 +2,12 @@ import { createRandom } from "@measurekit/core";
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
+  buildResponseMatrix,
   exploratoryFactorAnalysis,
   minimumAveragePartial,
   omegaHierarchical,
   parallelAnalysis,
   polychoricCorrelations,
-  responseMatrix,
 } from "../src/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
@@ -19,7 +19,7 @@ interface BenchDimensionalityFixture {
 }
 const fixture = readFixture<BenchDimensionalityFixture>("bench-dimensionality.json");
 
-const matrix = responseMatrix(fixture.responses, { itemIds: fixture.itemIds });
+const matrix = buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds });
 
 test("correlates 25 items of 6 categories answered by 2,800 persons", async (context) => {
   await benchmark(context, "dimensionality.polychoricCorrelations", () => polychoricCorrelations(matrix), SLOW_OPTIONS);

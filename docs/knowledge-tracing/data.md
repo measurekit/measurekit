@@ -39,16 +39,16 @@ error: only an explicit `null` means that nothing was observed.
 
 ## Logs
 
-`eventLog(events, options)` checks and copies events, and orders them by time, keeping the given order of events with
-equal times. The result is an `EventLog`: events in time order, for each learner and for all learners together, which
-models that also update items, such as Elo, need. Every event counts as an attempt, so remove the repeated rows some
-exports hold, as ASSISTments 2009 does: there, one row per skill of an event and copies of rows. Events with equal times
-keep the order given, which another tool may not: order them by a unique time, such as a row number, to compare.
+`buildEventLog(events, options)` checks and copies events, and orders them by time, keeping the given order of events
+with equal times. The result is an `EventLog`: events in time order, for each learner and for all learners together,
+which models that also update items, such as Elo, need. Every event counts as an attempt, so remove the repeated rows
+some exports hold, as ASSISTments 2009 does: there, one row per skill of an event and copies of rows. Events with equal
+times keep the order given, which another tool may not: order them by a unique time, such as a row number, to compare.
 
 ```ts
-import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
 
-const log = eventLog(
+const log = buildEventLog(
   [
     { learner: "budi", item: "q2", time: 1730190000000, outcome: 0 },
     { learner: "ana", item: "q1", time: 1730180000000, outcome: 1 },
@@ -73,8 +73,8 @@ other types are rejected.
 
 ## First attempts
 
-`firstAttempts(log, options)` keeps the first try of each learner at each item: the events with `attemptNumber` 1 or,
-without one, the learner's first event with an outcome at the item. Events without an outcome stay.
+`selectFirstAttempts(log, options)` keeps the first try of each learner at each item: the events with `attemptNumber` 1
+or, without one, the learner's first event with an outcome at the item. Events without an outcome stay.
 
 | Option   | Default       | Values                                                                                                       |
 | -------- | ------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -130,13 +130,13 @@ const byTime = splitByTime(log, 1); // [{ train: the earlier events, test: the l
 
 A log read from a file is a table of rows. The package does no I/O, so a caller reads the file and maps the columns to
 events in a few lines. The mapping decides three things: which column orders the attempts, which holds the outcome, and
-how an attempt with several skills is written. `eventLog` then orders the events by that time and checks them.
+how an attempt with several skills is written. `buildEventLog` then orders the events by that time and checks them.
 
 ```mermaid
 flowchart LR
   A["ASSISTments: one row for each skill of an attempt, order_id"] -->|"rows with one order_id are one attempt"| E["Event: skills of the rows"]
   D["DataShop: one row for each step, KC joined by ~~"] -->|"split the KC at ~~"| E
-  E --> L["eventLog: ordered by time, checked"]
+  E --> L["buildEventLog: ordered by time, checked"]
 ```
 
 | Event field | ASSISTments                                  | DataShop                                                          |
@@ -148,7 +148,7 @@ flowchart LR
 | `outcome`   | `correct`                                    | 1 for `correct`; 0 for `incorrect` and `hint`, as DataShop counts |
 
 ```ts
-import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
 
 interface AssistmentsRow {
   order_id: number;
@@ -175,7 +175,7 @@ function assistmentsLog(rows: readonly AssistmentsRow[]) {
     attempt.skills.push(row.skill_name);
     attempts.set(row.order_id, attempt);
   }
-  return eventLog([...attempts.values()]);
+  return buildEventLog([...attempts.values()]);
 }
 
 interface DataShopRow {
@@ -188,7 +188,7 @@ interface DataShopRow {
 }
 
 function dataShopLog(rows: readonly DataShopRow[]) {
-  return eventLog(
+  return buildEventLog(
     rows.map((row) => ({
       learner: row["Anon Student Id"],
       item: `${row["Problem Name"]} ${row["Step Name"]}`,

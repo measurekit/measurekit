@@ -1,6 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  buildResponseMatrix,
+  buildResponseRecords,
   type CalibratedItem,
   calibrate,
   createRandom,
@@ -22,8 +24,6 @@ import {
   predictItemParameter,
   type Random,
   type ResponseMatrix,
-  responseMatrix,
-  responseRecords,
   simulateResponses,
   simulateThetas,
   type ThresholdItem,
@@ -188,7 +188,7 @@ function simulatedResponses(
 ): ResponseMatrix {
   const items = difficulties.map((b) => ({ model: twoParameterLogistic, parameters: { a: 1, b, c: 0, d: 1 } }));
   const { responses } = simulateResponses(items, thetas, random);
-  return responseMatrix(responses, { itemIds: difficulties.map((_, i) => `q${i + 1}`) });
+  return buildResponseMatrix(responses, { itemIds: difficulties.map((_, i) => `q${i + 1}`) });
 }
 
 /** The effects and residual sd of the simulated banks: b = intercept + steps · steps + open · open + τ e. */
@@ -558,7 +558,7 @@ describe("itemFeatureRegression", () => {
 /** The responses of a dataset of the LLTM fixture. */
 function lltmData(dataset: number) {
   const { itemIds, responses } = defined(lltmFixture.datasets[dataset]);
-  return responseMatrix(responses as (number | null)[][], { itemIds });
+  return buildResponseMatrix(responses as (number | null)[][], { itemIds });
 }
 
 /** The features of a case of the LLTM fixture. */
@@ -603,7 +603,7 @@ const changeCases: readonly ChangeReference[] = JSON.parse(JSON.stringify(change
 
 /** The occasions of a case of the linear change fixture, as response matrices of the same persons and items. */
 function changeOccasions({ occasions, itemIds }: ChangeReference): ResponseMatrix[] {
-  return occasions.map((rows) => responseMatrix(rows, { itemIds }));
+  return occasions.map((rows) => buildResponseMatrix(rows, { itemIds }));
 }
 
 /** The options of a case of the linear change fixture. */
@@ -624,7 +624,7 @@ function changeCase(name: string): ChangeReference {
  * finite; the last two persons answer 1 and 0 throughout, and so add nothing.
  */
 const SMALL_OCCASIONS = [
-  responseMatrix([
+  buildResponseMatrix([
     [0, 1, 0, 1],
     [1, 0, 1, 0],
     [0, 0, 1, 1],
@@ -632,7 +632,7 @@ const SMALL_OCCASIONS = [
     [1, 1, 1, 1],
     [0, 0, 0, 0],
   ]),
-  responseMatrix([
+  buildResponseMatrix([
     [1, 0, 1, 0],
     [0, 1, 0, 1],
     [0, 1, 1, 0],
@@ -673,7 +673,7 @@ describe("linearChange", () => {
 
   it("uses only the persons who changed on an item with two occasions: the others add nothing", () => {
     const base = linearChange(SMALL_OCCASIONS);
-    const changers = SMALL_OCCASIONS.map(({ responses }) => responseMatrix(responses.slice(0, 4)));
+    const changers = SMALL_OCCASIONS.map(({ responses }) => buildResponseMatrix(responses.slice(0, 4)));
     const constant = linearChange(changers);
     expect(constant.effects.map(({ estimate }) => estimate)).toEqual(base.effects.map(({ estimate }) => estimate));
     expect(constant.logLikelihood).toBe(base.logLikelihood);
@@ -681,7 +681,7 @@ describe("linearChange", () => {
 
   it("negates every effect when the responses are recoded, 0 as 1", () => {
     const recoded = SMALL_OCCASIONS.map(({ responses }) =>
-      responseMatrix(responses.map((row) => row.map((response) => 1 - defined(response)))),
+      buildResponseMatrix(responses.map((row) => row.map((response) => 1 - defined(response)))),
     );
     const base = linearChange(SMALL_OCCASIONS, { itemGroups: POOLED_ITEMS });
     const flipped = linearChange(recoded, { itemGroups: POOLED_ITEMS });
@@ -718,7 +718,7 @@ describe("linearChange", () => {
     const groups = defined(reference.groups);
     const order = Array.from({ length: groups.length }, (_, p) => (p * 7 + 3) % groups.length);
     expect(new Set(order).size).toBe(groups.length);
-    const shuffled = occasions.map(({ responses }) => responseMatrix(order.map((p) => defined(responses[p]))));
+    const shuffled = occasions.map(({ responses }) => buildResponseMatrix(order.map((p) => defined(responses[p]))));
     const actual = linearChange(shuffled, { groups: order.map((p) => defined(groups[p])), baseline: "ctl" });
     const expected = linearChange(occasions, { groups, baseline: "ctl" });
     expected.effects.forEach((effect, i) => {
@@ -742,7 +742,7 @@ describe("linearChange", () => {
     const options = changeOptions(reference);
     const items = defined(occasions[0]).itemIds.length;
     const unchanged = occasions.map(({ responses }, t) =>
-      responseMatrix(
+      buildResponseMatrix(
         responses.map((row, person) =>
           row.map((response, item) => {
             const missing = occasions.some((occasion) => defined(occasion.responses[person])[item] === null);
@@ -767,8 +767,8 @@ describe("linearChange", () => {
   });
 
   it("reports an effect at infinity, where every person who changed changed one way, as not converged", () => {
-    const before = responseMatrix(Array.from({ length: 40 }, () => [0]));
-    const after = responseMatrix(Array.from({ length: 40 }, (_, person) => [person < 20 ? 1 : 0]));
+    const before = buildResponseMatrix(Array.from({ length: 40 }, () => [0]));
+    const after = buildResponseMatrix(Array.from({ length: 40 }, (_, person) => [person < 20 ? 1 : 0]));
     const actual: LinearChange = linearChange([before, after]);
     expect(actual.converged).toBe(false);
     expect(defined(actual.effects[0]).estimate).toBeGreaterThan(20);
@@ -813,11 +813,13 @@ describe("linearChange", () => {
     expect(() => linearChange([defined(first), JSON.parse("{}")])).toThrow(
       "A response matrix needs the arrays personIds, itemIds and responses.",
     );
-    const fewer = responseMatrix(defined(second).responses.slice(0, 5));
+    const fewer = buildResponseMatrix(defined(second).responses.slice(0, 5));
     expect(() => linearChange([defined(first), fewer])).toThrow("Occasion 2 lists other persons than occasion 1");
-    const narrower = responseMatrix(defined(second).responses.map((row) => row.slice(0, 3)));
+    const narrower = buildResponseMatrix(defined(second).responses.map((row) => row.slice(0, 3)));
     expect(() => linearChange([defined(first), narrower])).toThrow("Occasion 2 lists other items than occasion 1");
-    const three = responseMatrix(defined(second).responses.map((row, p) => (p === 1 ? [3, ...row.slice(1)] : row)));
+    const three = buildResponseMatrix(
+      defined(second).responses.map((row, p) => (p === 1 ? [3, ...row.slice(1)] : row)),
+    );
     expect(() => linearChange([defined(first), three])).toThrow(
       'The response of person "person2" to item "item1" at occasion 2 must be 0, 1 or null, found 3.',
     );
@@ -840,13 +842,13 @@ describe("linearChange", () => {
   });
 
   it("rejects an effect that no person changed on", () => {
-    const before = responseMatrix([
+    const before = buildResponseMatrix([
       [0, 0],
       [1, 1],
       [0, 1],
       [1, 0],
     ]);
-    const after = responseMatrix([
+    const after = buildResponseMatrix([
       [1, 0],
       [1, 1],
       [1, 1],
@@ -874,13 +876,15 @@ describe("linearChange", () => {
         groups.push(`g${group}`);
       }
     }
-    expect(() => linearChange([responseMatrix(before), responseMatrix(after)], { groups })).toThrow(
+    expect(() => linearChange([buildResponseMatrix(before), buildResponseMatrix(after)], { groups })).toThrow(
       'The effect of item group "item1" at occasion 2 in group "g299" has no unique estimate',
     );
     // 501 groups of two persons on 2 items: 1,002 effects, refused before the persons' patterns are read.
     const pairs = Array.from({ length: 1002 }, (_, person) => [person % 2, 1 - (person % 2)]);
     const pairGroups = pairs.map((_, person) => `g${Math.floor(person / 2)}`);
-    expect(() => linearChange([responseMatrix(pairs), responseMatrix(pairs)], { groups: pairGroups })).toThrow(
+    expect(() =>
+      linearChange([buildResponseMatrix(pairs), buildResponseMatrix(pairs)], { groups: pairGroups }),
+    ).toThrow(
       "Linear change takes at most 1000 effects, item groups × occasions after the first × groups, as its estimation inverts a matrix of every pair of them; found 1002.",
     );
   });
@@ -909,7 +913,7 @@ const polytomousCases: readonly PolytomousReference[] = JSON.parse(JSON.stringif
 /** The responses of a dataset of the polytomous LLTM fixture. */
 function polytomousData(dataset: number): ResponseMatrix {
   const { itemIds, responses } = defined(polytomousFixture.datasets[dataset]);
-  return responseMatrix(responses as (number | null)[][], { itemIds });
+  return buildResponseMatrix(responses as (number | null)[][], { itemIds });
 }
 
 /** Estimates the LLTM of a case of the polytomous fixture, to the tolerance that matches the base R maximum. */
@@ -1003,7 +1007,7 @@ describe("lltm", () => {
   it("gives the same model from response records as from the matrix", () => {
     const reference = defined(lltmFixture.cases[3]);
     const matrix = lltmData(2);
-    const records = responseRecords(
+    const records = buildResponseRecords(
       matrix.responses
         .flatMap((row, person) =>
           row.flatMap((response, item) =>
@@ -1022,7 +1026,9 @@ describe("lltm", () => {
   it("is not changed by persons without responses, which are not counted in the BIC", () => {
     const reference = defined(lltmFixture.cases[0]);
     const matrix = lltmData(0);
-    const padded = responseMatrix([...matrix.responses, matrix.itemIds.map(() => null)], { itemIds: matrix.itemIds });
+    const padded = buildResponseMatrix([...matrix.responses, matrix.itemIds.map(() => null)], {
+      itemIds: matrix.itemIds,
+    });
     const options = { tolerance: 1e-6 };
     const base = lltm(matrix, lltmFeatures(reference), options);
     const result = lltm(padded, lltmFeatures(reference), options);
@@ -1035,7 +1041,7 @@ describe("lltm", () => {
     const reference = defined(lltmFixture.cases[0]);
     const matrix = lltmData(0);
     const order = matrix.itemIds.map((_, i) => (i * 7) % matrix.itemIds.length);
-    const permuted = responseMatrix(
+    const permuted = buildResponseMatrix(
       matrix.responses.map((row) => order.map((i) => defined(row[i]))),
       { itemIds: order.map((i) => defined(matrix.itemIds[i])) },
     );
@@ -1201,7 +1207,7 @@ describe("lltm", () => {
       const reference = defined(polytomousCases[index]);
       const matrix = polytomousData(reference.dataset);
       const order = matrix.itemIds.map((_, i) => matrix.itemIds.length - 1 - i);
-      const permuted = responseMatrix(
+      const permuted = buildResponseMatrix(
         matrix.responses.map((row) => order.map((i) => row[i] ?? null)),
         { itemIds: order.map((i) => defined(matrix.itemIds[i])) },
       );
@@ -1299,7 +1305,7 @@ describe("lltm", () => {
     expect(() => lltm(matrix, features)).toThrow(
       'Item "q01" has a response of 3, but the 2PL model allows responses from 0 to 1.',
     );
-    const skipped = responseMatrix(
+    const skipped = buildResponseMatrix(
       matrix.responses.map((row) => row.map((response) => (response === 2 ? 3 : response))),
       { itemIds: matrix.itemIds },
     );
@@ -1345,19 +1351,19 @@ describe("lltm", () => {
       [0, 0, 1, 1],
       [1, 0, 0, 1],
     ];
-    const polytomous = responseMatrix(
+    const polytomous = buildResponseMatrix(
       rows.map((row, person) => (person === 0 ? [row[0] ?? 0, 2, row[2] ?? 0, row[3] ?? 0] : row)),
       { itemIds: ["q1", "q2", "q3", "q4"] },
     );
     expect(() => lltm(polytomous, features)).toThrow(
       'Item "q2" has a response of 2, but the 2PL model allows responses from 0 to 1.',
     );
-    const allCorrect = responseMatrix(
+    const allCorrect = buildResponseMatrix(
       rows.map(([, ...rest]) => [1, ...rest]),
       { itemIds: ["q1", "q2", "q3", "q4"] },
     );
     expect(() => lltm(allCorrect, features)).toThrow('Item "q1" has no response in category 0');
-    expect(() => lltm(responseMatrix([[null, null]]), oneFeature([1, 2]))).toThrow(
+    expect(() => lltm(buildResponseMatrix([[null, null]]), oneFeature([1, 2]))).toThrow(
       'Item "item1" has responses in fewer than two categories; calibration needs at least two.',
     );
   });
@@ -1367,7 +1373,7 @@ describe("lltm", () => {
     const records = Array.from({ length: 999 }, (_, item) =>
       [0, 1].map((person) => ({ person: `p${person}`, item: `q${item}`, response: (person + item) % 2 })),
     ).flat();
-    expect(() => lltm(responseRecords(records), JSON.parse("null"))).toThrow(
+    expect(() => lltm(buildResponseRecords(records), JSON.parse("null"))).toThrow(
       "The Rasch model of an LLTM's comparison takes at most 1000 parameters, as its estimation inverts a matrix of every pair of them; found 1001.",
     );
   });
@@ -1508,7 +1514,7 @@ describe("predictItemParameter", () => {
       Array.from({ length: 500 }, () => random.normal()),
       random,
     );
-    const sparse = responseMatrix(
+    const sparse = buildResponseMatrix(
       all.responses.map((row, person) => row.map((response, item) => (item === 7 && person >= 12 ? null : response))),
       { itemIds: all.itemIds },
     );
@@ -1708,7 +1714,7 @@ describe("documentation examples", () => {
       random,
     );
     const ids = before.itemIds;
-    const stacked = responseMatrix(
+    const stacked = buildResponseMatrix(
       before.responses.map((row, person) => [...row, ...(after.responses[person] ?? [])]),
       { itemIds: [...ids.map((id) => `${id}.t1`), ...ids.map((id) => `${id}.t2`)] },
     );
@@ -1760,7 +1766,7 @@ describe("documentation examples", () => {
     const ids = [...bankItems, newItem].map(({ id }) => id);
 
     const calibration = calibrate(
-      responseMatrix(
+      buildResponseMatrix(
         responses.map((row) => row.slice(0, 16)),
         { itemIds: ids.slice(0, 16) },
       ),
@@ -1781,7 +1787,7 @@ describe("documentation examples", () => {
     expect([b.mean, b.sd]).toEqual([expect.closeTo(0.78, 2), expect.closeTo(0.2, 2)]);
     expect([a.mean, a.sd]).toEqual([expect.closeTo(0.05, 2), expect.closeTo(0.04, 2)]);
 
-    const sparse = responseMatrix(
+    const sparse = buildResponseMatrix(
       responses.map((row, person) => row.map((response, item) => (item === 16 && person >= 25 ? null : response))),
       { itemIds: ids },
     );
@@ -1902,9 +1908,9 @@ describe("properties", () => {
   it("the effects of change negate under a recoding of the responses and keep their order and count", () => {
     fc.assert(
       fc.property(changes, ({ before, after }) => {
-        const occasions = [before, after].map((rows) => responseMatrix(rows));
+        const occasions = [before, after].map((rows) => buildResponseMatrix(rows));
         const recoded = [before, after].map((rows) =>
-          responseMatrix(rows.map((row) => row.map((response) => 1 - response))),
+          buildResponseMatrix(rows.map((row) => row.map((response) => 1 - response))),
         );
         const base = linearChange(occasions, { groups: halves });
         const flipped = linearChange(recoded, { groups: halves });
@@ -1925,11 +1931,11 @@ describe("properties", () => {
       fc.property(changes, fc.integer({ min: 1, max: 39 }), ({ before, after }, turn) => {
         const rotate = <T>(rows: readonly T[]): T[] => [...rows.slice(turn), ...rows.slice(0, turn)];
         const base = linearChange(
-          [before, after].map((rows) => responseMatrix(rows)),
+          [before, after].map((rows) => buildResponseMatrix(rows)),
           { groups: halves },
         );
         const turned = linearChange(
-          [before, after].map((rows) => responseMatrix(rotate(rows))),
+          [before, after].map((rows) => buildResponseMatrix(rotate(rows))),
           {
             groups: rotate(halves),
             baseline: "first",

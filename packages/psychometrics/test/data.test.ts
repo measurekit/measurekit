@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { checkFacetedScores, checkResponseRecords } from "../src/data/internal.js";
 import {
+  buildResponseMatrix,
+  buildResponseMatrixFromColumns,
+  buildResponseRecords,
   DataError,
   type FacetedScore,
   itemStatistics,
   type ResponseMatrix,
-  responseMatrix,
-  responseMatrixFromColumns,
-  responseRecords,
   scoreResponses,
 } from "../src/index.js";
 
@@ -59,10 +59,10 @@ describe("checkFacetedScores", () => {
   });
 });
 
-describe("responseMatrix", () => {
+describe("buildResponseMatrix", () => {
   it("builds a matrix with default ids", () => {
     expect(
-      responseMatrix([
+      buildResponseMatrix([
         [1, 0, null],
         [0, 2, 1],
       ]),
@@ -78,13 +78,13 @@ describe("responseMatrix", () => {
 
   it("keeps the given ids and copies the rows", () => {
     const rows = [[1], [0]];
-    const matrix = responseMatrix(rows, { personIds: ["ana", "budi"], itemIds: ["q1"] });
+    const matrix = buildResponseMatrix(rows, { personIds: ["ana", "budi"], itemIds: ["q1"] });
     rows[0]?.splice(0, 1, 0);
     expect(matrix).toEqual({ personIds: ["ana", "budi"], itemIds: ["q1"], responses: [[1], [0]] });
   });
 
   it("builds the same matrix from columns", () => {
-    const fromColumns = responseMatrixFromColumns(
+    const fromColumns = buildResponseMatrixFromColumns(
       [
         [1, 0],
         [0, 2],
@@ -93,7 +93,7 @@ describe("responseMatrix", () => {
       { itemIds: ["a", "b", "c"] },
     );
     expect(fromColumns).toEqual(
-      responseMatrix(
+      buildResponseMatrix(
         [
           [1, 0, null],
           [0, 2, 1],
@@ -118,22 +118,22 @@ describe("responseMatrix", () => {
     ["too few person ids", [[1], [0]], { personIds: ["a"] }, "Found 2 rows of responses and 1 person ids."],
     ["repeated item ids", [[1, 0]], { itemIds: ["q", "q"] }, 'The item id "q" appears more than once.'],
   ])("rejects %s", (_, rows, options, message) => {
-    expect(() => responseMatrix(rows, options)).toThrow(DataError);
-    expect(() => responseMatrix(rows, options)).toThrow(message);
+    expect(() => buildResponseMatrix(rows, options)).toThrow(DataError);
+    expect(() => buildResponseMatrix(rows, options)).toThrow(message);
   });
 
   it("rejects NaN, infinities and values of other types", () => {
-    expect(() => responseMatrix([[1, Number.NaN]])).toThrow("found NaN");
+    expect(() => buildResponseMatrix([[1, Number.NaN]])).toThrow("found NaN");
     for (const json of ["[[1, 1e999]]", '[[1, "1"]]', "[[1, true]]"]) {
-      expect(() => responseMatrix(JSON.parse(json))).toThrow("must be an integer from 0 to 2147483647 or null");
+      expect(() => buildResponseMatrix(JSON.parse(json))).toThrow("must be an integer from 0 to 2147483647 or null");
     }
   });
 
   it("rejects holes in sparse arrays", () => {
     const row: (number | null)[] = [1];
     row.length = 2;
-    expect(() => responseMatrix([row])).toThrow("found undefined");
-    expect(() => responseMatrixFromColumns([[1, 0], row])).toThrow(
+    expect(() => buildResponseMatrix([row])).toThrow("found undefined");
+    expect(() => buildResponseMatrixFromColumns([[1, 0], row])).toThrow(
       "Column 2 must be an array of responses, found an array with a hole at index 1.",
     );
   });
@@ -141,26 +141,30 @@ describe("responseMatrix", () => {
   it("rejects a hole among the rows or the ids, which forEach would skip", () => {
     const rows: (number | null)[][] = [[1, 0]];
     rows[2] = [0, 1];
-    expect(() => responseMatrix(rows)).toThrow(
+    expect(() => buildResponseMatrix(rows)).toThrow(
       "The rows of a response matrix must be an array, found an array with a hole at index 1.",
     );
     const matrix = { personIds: ["a", "b", "c"], itemIds: ["q1", "q2"], responses: rows };
     expect(() => itemStatistics(matrix)).toThrow('The responses of person "b" must be an array.');
     const personIds: string[] = ["a"];
     personIds.length = 2;
-    expect(() => responseMatrix([[1], [0]], { personIds })).toThrow(
+    expect(() => buildResponseMatrix([[1], [0]], { personIds })).toThrow(
       "Every person id must be a string, found undefined.",
     );
     const times: (number | null)[][] = [[1]];
     times.length = 2;
-    expect(() => responseMatrix([[1], [0]], { times })).toThrow('Person "person2" needs one time per item, 1 times.');
+    expect(() => buildResponseMatrix([[1], [0]], { times })).toThrow(
+      'Person "person2" needs one time per item, 1 times.',
+    );
   });
 
   it("checks that a first row or column is an array before its length sizes the ids or the rows", () => {
     // A length of 2³² would make an array that JavaScript cannot hold, and a smaller one an array of that many ids.
     const object = JSON.parse('[{ "length": 4294967296 }]');
-    expect(() => responseMatrix(object)).toThrow('The responses of person "person1" must be an array.');
-    expect(() => responseMatrixFromColumns(object)).toThrow("Column 1 must be an array of responses, found an object.");
+    expect(() => buildResponseMatrix(object)).toThrow('The responses of person "person1" must be an array.');
+    expect(() => buildResponseMatrixFromColumns(object)).toThrow(
+      "Column 1 must be an array of responses, found an object.",
+    );
   });
 
   it("rejects matrices from JSON that are another value, lack an array or hold ids of another type", () => {
@@ -184,57 +188,57 @@ describe("responseMatrix", () => {
   });
 
   it("rejects columns of unequal length", () => {
-    expect(() => responseMatrixFromColumns([[1, 0], [1]])).toThrow("Column 2 has 1 responses, column 1 has 2.");
+    expect(() => buildResponseMatrixFromColumns([[1, 0], [1]])).toThrow("Column 2 has 1 responses, column 1 has 2.");
   });
 
   it("rejects rows, columns and options of other types from JavaScript", () => {
-    expect(() => responseMatrix(JSON.parse("null"))).toThrow(
+    expect(() => buildResponseMatrix(JSON.parse("null"))).toThrow(
       "The rows of a response matrix must be an array, found null.",
     );
-    expect(() => responseMatrix([[1]], JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => responseMatrix([[1]], { times: JSON.parse("3") })).toThrow(
+    expect(() => buildResponseMatrix([[1]], JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => buildResponseMatrix([[1]], { times: JSON.parse("3") })).toThrow(
       "A response matrix needs one row of times per person, 1 rows.",
     );
-    expect(() => responseMatrixFromColumns(JSON.parse("[null]"))).toThrow(
+    expect(() => buildResponseMatrixFromColumns(JSON.parse("[null]"))).toThrow(
       "Column 1 must be an array of responses, found null.",
     );
   });
 });
 
-describe("responseRecords", () => {
+describe("buildResponseRecords", () => {
   it("takes the persons and items in the order they first appear, and copies the records", () => {
     const input = [
       { person: "ana", item: "q2", response: 1 },
       { person: "budi", item: "q1", response: 0 },
       { person: "ana", item: "q1", response: 2 },
     ];
-    const data = responseRecords(input);
+    const data = buildResponseRecords(input);
     expect(data).toEqual({ personIds: ["ana", "budi"], itemIds: ["q2", "q1"], records: input });
     expect(data.records[0]).not.toBe(input[0]);
-    const listed = responseRecords(input, { personIds: ["budi", "ana", "citra"], itemIds: ["q1", "q2", "q3"] });
+    const listed = buildResponseRecords(input, { personIds: ["budi", "ana", "citra"], itemIds: ["q1", "q2", "q3"] });
     expect(listed.personIds).toEqual(["budi", "ana", "citra"]);
   });
 
   it("rejects records outside the ids, invalid responses, a repeated record and repeated ids", () => {
     const record = { person: "ana", item: "q1", response: 1 };
-    expect(() => responseRecords([record], { itemIds: ["q2"] })).toThrow(
+    expect(() => buildResponseRecords([record], { itemIds: ["q2"] })).toThrow(
       'Record 1 needs a person and an item among the ids, found person "ana" and item "q1".',
     );
-    expect(() => responseRecords([{ ...record, response: -1 }])).toThrow(
+    expect(() => buildResponseRecords([{ ...record, response: -1 }])).toThrow(
       'The response of person "ana" to item "q1" must be an integer from 0 to 2147483647, found -1.',
     );
-    expect(() => responseRecords([{ ...record, response: 2 ** 31 }])).toThrow(
+    expect(() => buildResponseRecords([{ ...record, response: 2 ** 31 }])).toThrow(
       'The response of person "ana" to item "q1" must be an integer from 0 to 2147483647, found 2147483648.',
     );
-    expect(() => responseRecords([record, { ...record, response: 0 }])).toThrow(
+    expect(() => buildResponseRecords([record, { ...record, response: 0 }])).toThrow(
       'Person "ana" has two records of item "q1"; a person answers an item once.',
     );
-    expect(() => responseRecords([record], { personIds: ["ana", "ana"] })).toThrow(
+    expect(() => buildResponseRecords([record], { personIds: ["ana", "ana"] })).toThrow(
       'The person id "ana" appears more than once.',
     );
-    expect(() => responseRecords(JSON.parse('[{ "person": 1, "item": "q1", "response": 1 }]'))).toThrow(DataError);
-    expect(() => responseRecords(JSON.parse("null"))).toThrow("Response records must be an array, found null.");
-    expect(() => responseRecords(JSON.parse("[null]"))).toThrow(
+    expect(() => buildResponseRecords(JSON.parse('[{ "person": 1, "item": "q1", "response": 1 }]'))).toThrow(DataError);
+    expect(() => buildResponseRecords(JSON.parse("null"))).toThrow("Response records must be an array, found null.");
+    expect(() => buildResponseRecords(JSON.parse("[null]"))).toThrow(
       "Record 1 must be an object { person, item, response }, found null.",
     );
   });
@@ -242,7 +246,7 @@ describe("responseRecords", () => {
   it("rejects a hole among the records or the ids of records from JavaScript", () => {
     const records = [{ person: "ana", item: "q1", response: 1 }];
     records.length = 2;
-    expect(() => responseRecords(records)).toThrow(
+    expect(() => buildResponseRecords(records)).toThrow(
       "Response records must be an array, found an array with a hole at index 1.",
     );
     const data = { personIds: ["ana"], itemIds: ["q1"], records };
@@ -251,7 +255,7 @@ describe("responseRecords", () => {
     );
     const itemIds = ["q1"];
     itemIds.length = 2;
-    expect(() => responseRecords([{ person: "ana", item: "q1", response: 1 }], { itemIds })).toThrow(
+    expect(() => buildResponseRecords([{ person: "ana", item: "q1", response: 1 }], { itemIds })).toThrow(
       "Every item id must be a string, found undefined.",
     );
   });

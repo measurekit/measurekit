@@ -97,7 +97,7 @@ flowchart LR
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
 import { cronbachAlpha, mcdonaldOmega } from "@measurekit/psychometrics/ctt";
-import { type ResponseMatrix, responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix, type ResponseMatrix } from "@measurekit/psychometrics/data";
 
 // 200 persons answer 8 items of five categories, which load 0.4 to 0.8 on one factor.
 const random = createRandom(2);
@@ -109,7 +109,7 @@ const rows = Array.from({ length: 200 }, () => {
     return [-1.2, -0.4, 0.4, 1.2].filter((cut) => score > cut).length;
   });
 });
-const matrix = responseMatrix(rows);
+const matrix = buildResponseMatrix(rows);
 
 /** The percentile interval of a statistic over bootstrap samples of the persons. */
 function percentileInterval(
@@ -120,7 +120,7 @@ function percentileInterval(
   const persons = data.responses.length;
   const values = Array.from({ length: resamples }, () => {
     const drawn = Array.from({ length: persons }, () => data.responses[Math.floor(random.uniform() * persons)] ?? []);
-    return statistic(responseMatrix(drawn, { itemIds: data.itemIds }));
+    return statistic(buildResponseMatrix(drawn, { itemIds: data.itemIds }));
   }).sort((a, b) => a - b);
   const tail = (1 - level) / 2;
   return [values[Math.floor(tail * resamples)] ?? 0, values[Math.ceil((1 - tail) * resamples) - 1] ?? 0];
@@ -148,7 +148,7 @@ section's own few items.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { subscoreValue } from "@measurekit/psychometrics/ctt";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -163,7 +163,9 @@ const listeningResponses = simulateResponses(
   listening,
   random,
 ).responses;
-const matrix = responseMatrix(readingResponses.map((row, person) => [...row, ...(listeningResponses[person] ?? [])]));
+const matrix = buildResponseMatrix(
+  readingResponses.map((row, person) => [...row, ...(listeningResponses[person] ?? [])]),
+);
 
 subscoreValue(matrix, { reading: matrix.itemIds.slice(0, 12), listening: matrix.itemIds.slice(12) });
 // [{ section: "reading", subscorePrmse: 0.68, totalPrmse: 0.59, addedValue: true },
@@ -217,7 +219,7 @@ flowchart LR
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
 import { augmentedSubscores } from "@measurekit/psychometrics/ctt";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
@@ -231,7 +233,9 @@ const listeningResponses = simulateResponses(
   listening,
   random,
 ).responses;
-const matrix = responseMatrix(readingResponses.map((row, person) => [...row, ...(listeningResponses[person] ?? [])]));
+const matrix = buildResponseMatrix(
+  readingResponses.map((row, person) => [...row, ...(listeningResponses[person] ?? [])]),
+);
 
 const result = augmentedSubscores(matrix, {
   reading: matrix.itemIds.slice(0, 12),
@@ -353,25 +357,25 @@ data to `null`. A function that returns one statistic throws `DataError` with th
 
 Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
 
-| Function                                                                   | Error                                                                                                                      | What to do                                                                                     |
-| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Every function of a matrix                                                 | A matrix that is not one `responseMatrix` returns, such as rows of other lengths or responses that are not integers from 0 | Build the matrix with `responseMatrix`, `null` for a missing response                          |
-| `itemStatistics`, `distractorAnalysis`                                     | `groupFraction` not above 0 and at most 0.5                                                                                | Give a share of persons such as Kelley's 0.27                                                  |
-| `distractorAnalysis`                                                       | Choices, a key, option labels or ids that `scoreResponses` refuses                                                         | Pass the result of `scoreResponses`                                                            |
-| `cronbachAlpha`, `kr20`, `kr21`, `splitHalf`, `standardErrorOfMeasurement` | Fewer than two items, or fewer than two persons who answered every item                                                    | Give more items or more complete persons; the statistics use those who answered every item     |
-| `cronbachAlpha`, `kr20`, `kr21`, `standardErrorOfMeasurement`              | Total scores without variance                                                                                              | The persons must differ in their totals                                                        |
-| `kr20`, `kr21`                                                             | A response that is neither 0 nor 1                                                                                         | Use `cronbachAlpha` for items with more categories                                             |
-| `splitHalf`                                                                | An unknown `split`, a half score without variance, or halves that correlate at -1                                          | Use `"odd-even"` or `"first-second"`, and halves that vary                                     |
-| `standardErrorOfMeasurement`                                               | A `reliability` outside [0, 1]                                                                                             | Give a reliability coefficient, or leave it out for alpha                                      |
-| `mcdonaldOmega`                                                            | Fewer than three items or more than 1,000, or an item without variance                                                     | One factor needs three items; remove constant items; its correlations hold every pair of items |
-| `mcdonaldOmega`                                                            | Correlations that sum to 0                                                                                                 | The standardized totals must vary; check for reversed items                                    |
-| `subscoreValue`, `augmentedSubscores`                                      | Sections that are not an object of arrays of item ids, fewer than two sections, or a section of one item                   | Give at least two sections of at least two items each, by item id                              |
-| `subscoreValue`, `augmentedSubscores`                                      | An id that is not an item of the matrix, or an item in two sections                                                        | Give each section items of its own, by their ids in the matrix                                 |
-| `subscoreValue`, `augmentedSubscores`                                      | Fewer than two persons who answered every item of the sections                                                             | The statistics use the persons who answered every item of the sections                         |
-| `subscoreValue`                                                            | Total scores without variance                                                                                              | The persons must differ in their totals                                                        |
-| `augmentedSubscores`                                                       | A section whose alpha is not above 0, or subscores that are linearly dependent                                             | Augment sections with true-score variance, and more persons than sections                      |
-| `classifyDifficulty`                                                       | A p-value outside [0, 1], or thresholds not ordered within it                                                              | Give a mean score of a dichotomous item, and difficult ≤ easy                                  |
-| `classifyDiscrimination`                                                   | A value that is not finite, or thresholds not in order                                                                     | Give marginal ≤ good ≤ very good                                                               |
+| Function                                                                   | Error                                                                                                                           | What to do                                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Every function of a matrix                                                 | A matrix that is not one `buildResponseMatrix` returns, such as rows of other lengths or responses that are not integers from 0 | Build the matrix with `buildResponseMatrix`, `null` for a missing response                     |
+| `itemStatistics`, `distractorAnalysis`                                     | `groupFraction` not above 0 and at most 0.5                                                                                     | Give a share of persons such as Kelley's 0.27                                                  |
+| `distractorAnalysis`                                                       | Choices, a key, option labels or ids that `scoreResponses` refuses                                                              | Pass the result of `scoreResponses`                                                            |
+| `cronbachAlpha`, `kr20`, `kr21`, `splitHalf`, `standardErrorOfMeasurement` | Fewer than two items, or fewer than two persons who answered every item                                                         | Give more items or more complete persons; the statistics use those who answered every item     |
+| `cronbachAlpha`, `kr20`, `kr21`, `standardErrorOfMeasurement`              | Total scores without variance                                                                                                   | The persons must differ in their totals                                                        |
+| `kr20`, `kr21`                                                             | A response that is neither 0 nor 1                                                                                              | Use `cronbachAlpha` for items with more categories                                             |
+| `splitHalf`                                                                | An unknown `split`, a half score without variance, or halves that correlate at -1                                               | Use `"odd-even"` or `"first-second"`, and halves that vary                                     |
+| `standardErrorOfMeasurement`                                               | A `reliability` outside [0, 1]                                                                                                  | Give a reliability coefficient, or leave it out for alpha                                      |
+| `mcdonaldOmega`                                                            | Fewer than three items or more than 1,000, or an item without variance                                                          | One factor needs three items; remove constant items; its correlations hold every pair of items |
+| `mcdonaldOmega`                                                            | Correlations that sum to 0                                                                                                      | The standardized totals must vary; check for reversed items                                    |
+| `subscoreValue`, `augmentedSubscores`                                      | Sections that are not an object of arrays of item ids, fewer than two sections, or a section of one item                        | Give at least two sections of at least two items each, by item id                              |
+| `subscoreValue`, `augmentedSubscores`                                      | An id that is not an item of the matrix, or an item in two sections                                                             | Give each section items of its own, by their ids in the matrix                                 |
+| `subscoreValue`, `augmentedSubscores`                                      | Fewer than two persons who answered every item of the sections                                                                  | The statistics use the persons who answered every item of the sections                         |
+| `subscoreValue`                                                            | Total scores without variance                                                                                                   | The persons must differ in their totals                                                        |
+| `augmentedSubscores`                                                       | A section whose alpha is not above 0, or subscores that are linearly dependent                                                  | Augment sections with true-score variance, and more persons than sections                      |
+| `classifyDifficulty`                                                       | A p-value outside [0, 1], or thresholds not ordered within it                                                                   | Give a mean score of a dichotomous item, and difficult ≤ easy                                  |
+| `classifyDiscrimination`                                                   | A value that is not finite, or thresholds not in order                                                                          | Give marginal ≤ good ≤ very good                                                               |
 
 ## References
 

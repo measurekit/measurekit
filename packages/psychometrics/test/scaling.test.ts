@@ -2,6 +2,7 @@ import { chiSquareUpperTail, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  buildResponseMatrix,
   type ConversionTableOptions,
   calibrate,
   conditionalScaleError,
@@ -17,7 +18,6 @@ import {
   percentileRanks,
   predictFormScore,
   predictThetaScore,
-  responseMatrix,
   type ScorePrediction,
   type ScoreScale,
   scaleConversion,
@@ -1554,7 +1554,7 @@ describe("drawJointThetas", () => {
 });
 
 describe("the recipe for plausible values", () => {
-  const matrix = responseMatrix(plausible.responses, { itemIds: [...plausible.itemIds] });
+  const matrix = buildResponseMatrix(plausible.responses, { itemIds: [...plausible.itemIds] });
   const covariate = Float64Array.from(plausible.covariate);
 
   /**

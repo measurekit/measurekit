@@ -1,17 +1,17 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  buildEventLog,
   createRandom,
   DataError,
   type Event,
   type EventInput,
   type EventLog,
-  eventLog,
   type FirstAttemptsOptions,
   type Fold,
-  firstAttempts,
   MeasurekitError,
   type Random,
+  selectFirstAttempts,
   splitByItem,
   splitByLearner,
   splitByTime,
@@ -96,11 +96,11 @@ const arbitraryLog: fc.Arbitrary<EventLog> = fc
     }),
     { minLength: 1, maxLength: 60 },
   )
-  .map((records) => eventLog(records));
+  .map((records) => buildEventLog(records));
 
-describe("eventLog", () => {
+describe("buildEventLog", () => {
   it("orders events by time, keeping the given order of equal times, and takes skills from the Q-matrix", () => {
-    expect(eventLog(events, { qMatrix })).toEqual([
+    expect(buildEventLog(events, { qMatrix })).toEqual([
       { learner: "budi", item: "q1", skills: ["decimals"], time: 1, outcome: 0 },
       { learner: "ana", item: "q1", skills: ["fractions"], time: 1, outcome: 0.5 },
       { learner: "ana", item: "q2", skills: ["fractions", "decimals"], time: 3, outcome: 1 },
@@ -110,10 +110,10 @@ describe("eventLog", () => {
   it("gives events without skills and without a Q-matrix no skills, and copies the events", () => {
     const skills = ["decimals"];
     const input = [{ learner: "ana", item: "q1", skills, time: 0, outcome: 1, hint: true }];
-    const log = eventLog(input);
+    const log = buildEventLog(input);
     skills.push("fractions");
     expect(log).toEqual([{ learner: "ana", item: "q1", skills: ["decimals"], time: 0, outcome: 1 }]);
-    expect(eventLog([{ learner: "ana", item: "q1", time: 0, outcome: 1 }])[0]?.skills).toEqual([]);
+    expect(buildEventLog([{ learner: "ana", item: "q1", time: 0, outcome: 1 }])[0]?.skills).toEqual([]);
   });
 
   it("keeps an event without an outcome, as null, with its resource, covariates and attempt metadata", () => {
@@ -132,7 +132,7 @@ describe("eventLog", () => {
       },
       { learner: "ana", item: "q1", time: 1, outcome: 1, extra: true },
     ];
-    const log = eventLog(input);
+    const log = buildEventLog(input);
     covariates.load = 9;
     expect(log).toEqual([
       {
@@ -156,7 +156,7 @@ describe("eventLog", () => {
     fc.assert(
       fc.property(arbitraryLog, (log) => {
         const shuffled = [...log].reverse();
-        const rebuilt = eventLog(shuffled);
+        const rebuilt = buildEventLog(shuffled);
         expect(rebuilt).toHaveLength(log.length);
         for (let i = 1; i < rebuilt.length; i++) {
           expect(defined(rebuilt[i]).time).toBeGreaterThanOrEqual(defined(rebuilt[i - 1]).time);
@@ -258,31 +258,31 @@ describe("eventLog", () => {
     ],
   ] satisfies [string, unknown[], string][])("rejects %s", (_, input, message) => {
     // Malformed events enter as untyped data, as from JSON.
-    const build = (): EventLog => eventLog(input as EventInput[]);
+    const build = (): EventLog => buildEventLog(input as EventInput[]);
     expect(build).toThrow(DataError);
     expect(build).toThrow(message);
   });
 
   it("rejects an event whose item the Q-matrix lacks, the unknown skills of an item", () => {
-    expect(() => eventLog([{ learner: "a", item: "q9", time: 0, outcome: 1 }], { qMatrix })).toThrow(
+    expect(() => buildEventLog([{ learner: "a", item: "q9", time: 0, outcome: 1 }], { qMatrix })).toThrow(
       'Event 1 has no skills, and the Q-matrix lacks its item "q9".',
     );
   });
 
   it("rejects a malformed Q-matrix", () => {
-    expect(() => eventLog(events, { qMatrix: { q1: ["x", "x"] } })).toThrow(
+    expect(() => buildEventLog(events, { qMatrix: { q1: ["x", "x"] } })).toThrow(
       'The Q-matrix row of item "q1" lists the skill "x" twice.',
     );
-    expect(() => eventLog(events, { qMatrix: JSON.parse('[["s"]]') })).toThrow(
+    expect(() => buildEventLog(events, { qMatrix: JSON.parse('[["s"]]') })).toThrow(
       "A Q-matrix must be an object of skill lists by item id, found an array.",
     );
   });
 });
 
-describe("firstAttempts", () => {
-  const numbered = eventLog(firstAttemptFixture.numbered);
-  const unnumbered = eventLog(firstAttemptFixture.unnumbered);
-  // eventLog orders by time, and the fixture's events are in time order.
+describe("selectFirstAttempts", () => {
+  const numbered = buildEventLog(firstAttemptFixture.numbered);
+  const unnumbered = buildEventLog(firstAttemptFixture.unnumbered);
+  // buildEventLog orders by time, and the fixture's events are in time order.
   const reference = (
     log: EventLog,
     numberedLog: boolean,
@@ -298,60 +298,60 @@ describe("firstAttempts", () => {
   it.each(["incorrect", "null", "keep"] as const)(
     "keeps the first attempts as base R does, with hinted %s",
     (hinted) => {
-      expect(firstAttempts(numbered, { hinted })).toEqual(reference(numbered, true, hinted));
-      expect(firstAttempts(unnumbered, { hinted })).toEqual(reference(unnumbered, false, hinted));
+      expect(selectFirstAttempts(numbered, { hinted })).toEqual(reference(numbered, true, hinted));
+      expect(selectFirstAttempts(unnumbered, { hinted })).toEqual(reference(unnumbered, false, hinted));
     },
   );
 
   it("counts a first attempt with hints as incorrect, as DataShop does, unless told otherwise", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       { learner: "a", item: "q", time: 0, outcome: 1, hints: 2 },
       { learner: "a", item: "q", time: 1, outcome: 1 },
     ]);
-    expect(firstAttempts(log).map((event) => event.outcome)).toEqual([0]);
-    expect(firstAttempts(log, { hinted: "null" }).map((event) => event.outcome)).toEqual([null]);
-    expect(firstAttempts(log, { hinted: "keep" }).map((event) => event.outcome)).toEqual([1]);
+    expect(selectFirstAttempts(log).map((event) => event.outcome)).toEqual([0]);
+    expect(selectFirstAttempts(log, { hinted: "null" }).map((event) => event.outcome)).toEqual([null]);
+    expect(selectFirstAttempts(log, { hinted: "keep" }).map((event) => event.outcome)).toEqual([1]);
   });
 
   it("keeps events without an outcome, and takes the first observed event when attempts are not numbered", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       { learner: "a", item: "q", time: 0, outcome: null },
       { learner: "a", item: "q", time: 1, outcome: 0 },
       { learner: "a", item: "q", time: 2, outcome: 1 },
     ]);
-    expect(firstAttempts(log).map((event) => event.time)).toEqual([0, 1]);
+    expect(selectFirstAttempts(log).map((event) => event.time)).toEqual([0, 1]);
   });
 
   it("tells learners and items apart whatever characters their ids hold", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       { learner: "a\u0000b", item: "c", time: 0, outcome: 1 },
       { learner: "a", item: "b\u0000c", time: 1, outcome: 0 },
     ]);
-    expect(firstAttempts(log)).toEqual(log);
+    expect(selectFirstAttempts(log)).toEqual(log);
   });
 
   it("reads the attempt number the host records, and leaves the log it was given alone", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       { learner: "a", item: "q", time: 0, outcome: 0, attemptNumber: 2 },
       { learner: "a", item: "q", time: 1, outcome: 1, attemptNumber: 1, hints: 1 },
     ]);
     const frozen = JSON.stringify(log);
-    expect(firstAttempts(log).map((event) => [event.time, event.outcome])).toEqual([[1, 0]]);
+    expect(selectFirstAttempts(log).map((event) => [event.time, event.outcome])).toEqual([[1, 0]]);
     expect(JSON.stringify(log)).toBe(frozen);
   });
 
   it("rejects an option that is not a choice and a malformed log", () => {
-    const log = eventLog([{ learner: "a", item: "q", time: 0, outcome: 1 }]);
-    expect(() => firstAttempts(log, { hinted: "ignore" as "keep" })).toThrow(
+    const log = buildEventLog([{ learner: "a", item: "q", time: 0, outcome: 1 }]);
+    expect(() => selectFirstAttempts(log, { hinted: "ignore" as "keep" })).toThrow(
       'The option hinted must be "incorrect", "null" or "keep", found "ignore".',
     );
-    expect(() => firstAttempts([])).toThrow("A log needs at least one event.");
-    expect(() => firstAttempts(log, JSON.parse("null"))).toThrow("The options must be an object");
+    expect(() => selectFirstAttempts([])).toThrow("A log needs at least one event.");
+    expect(() => selectFirstAttempts(log, JSON.parse("null"))).toThrow("The options must be an object");
   });
 });
 
 describe("splits", () => {
-  const log = eventLog(holdout.events);
+  const log = buildEventLog(holdout.events);
 
   /** Expects the folds to put every event in exactly one test log, and each fold's training log to be the rest. */
   function expectPartition(folds: readonly Fold[]): void {
@@ -416,7 +416,7 @@ describe("splits", () => {
   });
 
   describe("with events that have no outcome", () => {
-    const withLessons = eventLog([
+    const withLessons = buildEventLog([
       ...["a", "b", "c", "d"].flatMap((learner, index) => [
         { learner, item: "video", time: index * 10, outcome: null },
         { learner, item: "q1", time: index * 10 + 1, outcome: 1 },
@@ -456,7 +456,7 @@ describe("splits", () => {
     });
 
     it("divides the events with an outcome into blocks, and puts a lesson into the block that holds its time", () => {
-      const log = eventLog([
+      const log = buildEventLog([
         { learner: "a", item: "q", time: 1, outcome: 1 },
         { learner: "a", item: "q", time: 2, outcome: 0 },
         { learner: "a", item: "video", time: 3, outcome: null },
@@ -476,7 +476,7 @@ describe("splits", () => {
     });
 
     it("rejects times of events with an outcome that do not divide into blocks, however many events there are", () => {
-      const log = eventLog([
+      const log = buildEventLog([
         { learner: "a", item: "video", time: 1, outcome: null },
         { learner: "a", item: "video", time: 2, outcome: null },
         { learner: "a", item: "q", time: 3, outcome: 1 },
@@ -504,7 +504,7 @@ describe("splits", () => {
   });
 
   it("rejects too many folds, a number of folds that is not an integer, and an unordered log", () => {
-    const one = eventLog([{ learner: "a", item: "q", time: 0, outcome: 1 }]);
+    const one = buildEventLog([{ learner: "a", item: "q", time: 0, outcome: 1 }]);
     expect(() => splitByLearner(one, 2, createRandom(1))).toThrow(
       "Splitting by learner into 2 folds needs at least 2 learners, found 1.",
     );
@@ -528,7 +528,7 @@ describe("data input from JavaScript", () => {
   it("throws DataError, a MeasurekitError, named for its class", () => {
     const error = (() => {
       try {
-        eventLog([]);
+        buildEventLog([]);
       } catch (thrown) {
         return thrown;
       }
@@ -540,13 +540,13 @@ describe("data input from JavaScript", () => {
 
   it("rejects options and random number generators that are not objects", () => {
     const events = [{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }];
-    expect(() => eventLog(events, JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => splitByLearner(eventLog(events), 2, JSON.parse("null"))).toThrow(
+    expect(() => buildEventLog(events, JSON.parse("null"))).toThrow("The options must be an object, found null.");
+    expect(() => splitByLearner(buildEventLog(events), 2, JSON.parse("null"))).toThrow(
       "A random number generator must be one from createRandom, found null.",
     );
     // A generator from JavaScript, which TypeScript would reject: it has no normal method.
     const uniformOnly = { uniform: () => 0.5 } as unknown as Random;
-    expect(() => splitByLearner(eventLog(events), 2, uniformOnly)).toThrow(
+    expect(() => splitByLearner(buildEventLog(events), 2, uniformOnly)).toThrow(
       "A random number generator must be one from createRandom, found an object.",
     );
   });
@@ -556,7 +556,7 @@ describe("data input from JavaScript", () => {
     for (const split of [splitByLearner, splitByItem]) {
       expect(() => split(missing, 2, createRandom(1))).toThrow("A log must be an array of events, found null.");
     }
-    const log = eventLog([{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }]);
+    const log = buildEventLog([{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }]);
     expect(() => splitByItem(log, JSON.parse('"2"'), createRandom(1))).toThrow(
       'The number of folds must be an integer from 2, found "2".',
     );
@@ -586,11 +586,11 @@ describe("the recipe for the rows of an export", () => {
       attempt.skills.push(row.skill_name);
       attempts.set(row.order_id, attempt);
     }
-    return eventLog([...attempts.values()]);
+    return buildEventLog([...attempts.values()]);
   };
 
   const dataShopLog = (rows: readonly DataShopRow[]): EventLog =>
-    eventLog(
+    buildEventLog(
       rows.map((row) => ({
         learner: row["Anon Student Id"],
         item: `${row["Problem Name"]} ${row["Step Name"]}`,

@@ -2,15 +2,17 @@ import { createRandom } from "@measurekit/core";
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../bench/harness.js";
 import {
-  adaptiveTest,
   anyOf,
   assembleForms,
   attributeProfiles,
+  buildResponseMatrix,
   calibrateCdm,
   classificationThreshold,
   closestDifficulty,
   contentBounds,
-  diagnosticAdaptiveTest,
+  createAdaptiveTest,
+  createDiagnosticAdaptiveTest,
+  createMultidimensionalAdaptiveTest,
   discriminationIndex,
   expectedInformation,
   expectedPosteriorVariance,
@@ -19,7 +21,6 @@ import {
   likelihoodWeightedInformation,
   maximumInformation,
   maximumPriorityIndex,
-  multidimensionalAdaptiveTest,
   multidimensionalTwoParameterLogistic,
   multistageCuts,
   type PoolItem,
@@ -29,7 +30,6 @@ import {
   posteriorWeightedInformation,
   progressive,
   proportional,
-  responseMatrix,
   type StoppingRule,
   sequentialProbabilityRatio,
   simulateAdaptiveTest,
@@ -97,7 +97,7 @@ const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
 }));
 
 test("simulates adaptive tests of 30 items for 200 persons on a pool of 500 3PL items", async (context) => {
-  const test = adaptiveTest({
+  const test = createAdaptiveTest({
     pool,
     selection: maximumInformation,
     estimator: posteriorMeanEstimate,
@@ -113,7 +113,7 @@ test("simulates adaptive tests of 30 items for 200 persons on a pool of 500 3PL 
 });
 
 test("simulates adaptive tests of 30 items that select testlets, for 200 persons on a pool of 500 3PL items", async (context) => {
-  const test = adaptiveTest({
+  const test = createAdaptiveTest({
     pool: pool.map((item, i) => ({ ...item, ...(fixture.testlets[i] !== null && { testlet: fixture.testlets[i] }) })),
     selection: maximumInformation,
     estimator: posteriorMeanEstimate,
@@ -140,12 +140,12 @@ test("derives the routing cuts of a panel of 1-3-3-3 modules of 20 items from a 
 });
 
 test("simulates diagnostic adaptive tests of 10 items for 200 persons on a pool of 20 items", async (context) => {
-  const matrix = responseMatrix(cdm.responses, { itemIds: cdm.itemIds });
+  const matrix = buildResponseMatrix(cdm.responses, { itemIds: cdm.itemIds });
   const calibration = calibrateCdm(matrix, cdm.qMatrix);
   const profiles = attributeProfiles(matrix, calibration)
     .slice(0, fixture.diagnostic.persons)
     .map(({ map }) => [...map]);
-  const test = diagnosticAdaptiveTest({
+  const test = createDiagnosticAdaptiveTest({
     pool: calibration.items,
     attributes: calibration.attributes,
     prior: calibration.profiles,
@@ -162,7 +162,7 @@ test("simulates multidimensional adaptive tests of 20 items for 100 persons on a
     model: multidimensionalTwoParameterLogistic,
     parameters: { a, intercept: defined(intercepts[i]), c: 0, d: 1 },
   }));
-  const test = multidimensionalAdaptiveTest({ pool, stopping: testLength(length) });
+  const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(length) });
   expect(simulateMultidimensionalAdaptiveTest(test, thetas, createRandom(SEED)).persons).toHaveLength(thetas.length);
   await benchmark(
     context,
@@ -248,7 +248,7 @@ test("selects one item of a test of 30 after 15, by each rule, from a pool of 50
 
 test("simulates adaptive tests of at most 30 items for 200 persons that stop on a classification at a cut", async (context) => {
   const classifying = (stopping: StoppingRule) =>
-    adaptiveTest({
+    createAdaptiveTest({
       pool,
       selection: maximumInformation,
       estimator: posteriorMeanEstimate,

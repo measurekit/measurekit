@@ -10,7 +10,7 @@ import type { ItemSelectionRule } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
 import type { TestControlOptions } from "./test-controls.js";
 
-/** Options of {@link diagnosticAdaptiveTest}. */
+/** Options of {@link createDiagnosticAdaptiveTest}. */
 export interface DiagnosticAdaptiveTestOptions extends TestControlOptions {
   /** The item pool: calibrated items `{ id, attributes, probabilities }`, with `contentAreas` and `exposure` optional. */
   readonly pool: readonly DiagnosticPoolItem[];
@@ -82,14 +82,14 @@ export interface DiagnosticAdaptiveTest {
  * @example
  * ```ts
  * import { createRandom } from "@measurekit/psychometrics";
- * import { anyOf, diagnosticAdaptiveTest, posteriorThreshold, testLength } from "@measurekit/psychometrics/cat";
+ * import { anyOf, createDiagnosticAdaptiveTest, posteriorThreshold, testLength } from "@measurekit/psychometrics/cat";
  *
  * const pool = [
  *   { id: "q1", attributes: ["add"], probabilities: [0.2, 0.9] },
  *   { id: "q2", attributes: ["subtract"], probabilities: [0.15, 0.85] },
  *   { id: "q3", attributes: ["add", "subtract"], probabilities: [0.1, 0.4, 0.4, 0.9] },
  * ];
- * const test = diagnosticAdaptiveTest({
+ * const test = createDiagnosticAdaptiveTest({
  *   pool,
  *   attributes: ["add", "subtract"],
  *   stopping: anyOf(testLength(3), posteriorThreshold(0.8)),
@@ -101,7 +101,7 @@ export interface DiagnosticAdaptiveTest {
  * state.estimate.mastery; // the probability of mastering each attribute
  * ```
  */
-export function diagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): DiagnosticAdaptiveTest {
+export function createDiagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): DiagnosticAdaptiveTest {
   checkOptions(options);
   const {
     pool,

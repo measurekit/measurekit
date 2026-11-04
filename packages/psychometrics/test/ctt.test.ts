@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   augmentedSubscores,
+  buildResponseMatrix,
   classifyDifficulty,
   classifyDiscrimination,
   createRandom,
@@ -14,7 +15,6 @@ import {
   kr21,
   mcdonaldOmega,
   type ResponseMatrix,
-  responseMatrix,
   type ScoredResponses,
   scoreResponses,
   splitHalf,
@@ -320,7 +320,7 @@ describe("distractorAnalysis", () => {
 
 describe("upper and lower groups", () => {
   // Totals 3, 2, 2, 0: with groups of two, the persons tied at 2 count half in each group.
-  const matrix = responseMatrix([
+  const matrix = buildResponseMatrix([
     [1, 1, 1],
     [1, 1, 0],
     [0, 1, 1],
@@ -341,7 +341,7 @@ describe("upper and lower groups", () => {
 
 const FIXTURES = [lsat7, bfi, simulated, sat12].map((fixture) => ({
   fixture,
-  matrix: responseMatrix(fixture.responses, { itemIds: fixture.itemIds }),
+  matrix: buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds }),
 }));
 
 describe("itemStatistics", () => {
@@ -400,7 +400,7 @@ describe("reliability", () => {
   it("gives omega 1 - Σ (1 - λ²) / Σ r for three items with equal correlations, whose loadings are √r", () => {
     // Every item has variance 0.24 and every pair covariance 0.04, so r = 1/6 and λ = √(1/6): Σ (1 - λ²) = 2.5 and
     // Σ r = 3 + 6 / 6 = 4, so omega = 1 - 2.5 / 4.
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 1, 1],
       [1, 0, 0],
       [0, 1, 0],
@@ -423,7 +423,7 @@ describe("reliability", () => {
       Array.from({ length: items }, (_, j) => (j + 1) % 2),
       Array.from({ length: items }, (_, j) => (j % 3 === 0 ? 1 : 0)),
     ];
-    expect(() => mcdonaldOmega(responseMatrix(rows(1001)))).toThrow(
+    expect(() => mcdonaldOmega(buildResponseMatrix(rows(1001)))).toThrow(
       "Omega holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.",
     );
   });
@@ -431,7 +431,7 @@ describe("reliability", () => {
   it("rejects omega for fewer than three items or an item without variance", () => {
     expect(() =>
       mcdonaldOmega(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0],
           [0, 1],
           [1, 1],
@@ -440,7 +440,7 @@ describe("reliability", () => {
     ).toThrow("Omega needs at least three items, as one factor is not identified by two.");
     expect(() =>
       mcdonaldOmega(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0, 1],
           [1, 1, 0],
           [1, 1, 1],
@@ -450,7 +450,7 @@ describe("reliability", () => {
     // Two persons with opposite responses: every person's standardized scores sum to 0.
     expect(() =>
       mcdonaldOmega(
-        responseMatrix([
+        buildResponseMatrix([
           [0, 1, 0, 1],
           [1, 0, 1, 0],
         ]),
@@ -458,7 +458,7 @@ describe("reliability", () => {
     ).toThrow("Omega is undefined when the item correlations sum to 0: the standardized total does not vary.");
   });
 
-  const polytomous = responseMatrix([
+  const polytomous = buildResponseMatrix([
     [2, 1],
     [0, 1],
     [1, 0],
@@ -512,7 +512,7 @@ describe("the recipe for intervals of alpha and omega", () => {
         return FACTOR_CUTS.filter((cut) => score > cut).length;
       });
     });
-    return responseMatrix(rows);
+    return buildResponseMatrix(rows);
   }
 
   /** The recipe of ctt.md: the percentile interval of a statistic over bootstrap samples of the persons. */
@@ -525,7 +525,7 @@ describe("the recipe for intervals of alpha and omega", () => {
     const persons = data.responses.length;
     const values = Array.from({ length: resamples }, () => {
       const drawn = Array.from({ length: persons }, () => data.responses[Math.floor(random.uniform() * persons)] ?? []);
-      return statistic(responseMatrix(drawn, { itemIds: data.itemIds }));
+      return statistic(buildResponseMatrix(drawn, { itemIds: data.itemIds }));
     }).sort((a, b) => a - b);
     const tail = (1 - level) / 2;
     return [values[Math.floor(tail * resamples)] ?? 0, values[Math.ceil((1 - tail) * resamples) - 1] ?? 0];
@@ -572,7 +572,7 @@ describe("the recipe for intervals of alpha and omega", () => {
 describe("subscoreValue", () => {
   for (const reference of subscores.cases) {
     it(`matches the subscore package's CTTsub on ${reference.name}`, () => {
-      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
       const result = subscoreValue(matrix, sectionsOf(reference.sections));
       expect(result.map(({ section }) => section)).toEqual(reference.sectionNames);
       result.forEach((value, i) => {
@@ -615,7 +615,7 @@ describe("subscoreValue", () => {
     // First section: items equal, alpha = 1, true covariance with x = 6/5 + 1/5 = 7/5, PRMSE of x = (7/5)² / (6/5 × 23/10)
     // = 49/69. Second: alpha = 2 (1 - 3/5 / (7/10)) = 2/7, true covariance = 9/10 - (5/7)(7/10) = 2/5, PRMSE of x =
     // (2/5)² / (2/7 × 7/10 × 23/10) = 8/23.
-    const [first, second] = subscoreValue(responseMatrix(HandRows), HandSections);
+    const [first, second] = subscoreValue(buildResponseMatrix(HandRows), HandSections);
     expect(first).toEqual({
       section: "first",
       subscorePrmse: 1,
@@ -628,13 +628,13 @@ describe("subscoreValue", () => {
   });
 
   it("leaves out items in no section and the persons who missed an item of a section", () => {
-    const base = subscoreValue(responseMatrix(HandRows), HandSections);
+    const base = subscoreValue(buildResponseMatrix(HandRows), HandSections);
     const extra = HandRows.map((row, person) => [...row, person % 2]);
-    expect(subscoreValue(responseMatrix(extra), HandSections)).toEqual(base);
+    expect(subscoreValue(buildResponseMatrix(extra), HandSections)).toEqual(base);
     const missing = [...extra, [null, 1, 0, 1, 1], [0, 0, 1, null, 0]];
-    expect(subscoreValue(responseMatrix(missing), HandSections)).toEqual(base);
+    expect(subscoreValue(buildResponseMatrix(missing), HandSections)).toEqual(base);
     const outside = extra.map((row, person) => (person === 0 ? [...row.slice(0, 4), null] : row));
-    expect(subscoreValue(responseMatrix(outside), HandSections)).toEqual(base);
+    expect(subscoreValue(buildResponseMatrix(outside), HandSections)).toEqual(base);
   });
 
   it("gives a section whose subscore is constant or whose alpha is not above 0 null PRMSEs and no added value", () => {
@@ -648,7 +648,7 @@ describe("subscoreValue", () => {
       [0, 1, 1, 1, 1, 1],
       [1, 0, 0, 0, 0, 0],
     ];
-    const [constant, anticorrelated, ordinary] = subscoreValue(responseMatrix(rows), {
+    const [constant, anticorrelated, ordinary] = subscoreValue(buildResponseMatrix(rows), {
       constant: ["item1", "item2"],
       anticorrelated: ["item3", "item4"],
       ordinary: ["item5", "item6"],
@@ -661,7 +661,7 @@ describe("subscoreValue", () => {
   });
 
   it("rejects sections that are not an object of arrays of item ids, a single section, and a section of one item", () => {
-    const matrix = responseMatrix(HandRows);
+    const matrix = buildResponseMatrix(HandRows);
     expect(() => subscoreValue(matrix, JSON.parse("null"))).toThrow(
       "The sections must be an object of item ids by section name, found null.",
     );
@@ -681,7 +681,7 @@ describe("subscoreValue", () => {
   });
 
   it("rejects an item that is not in the matrix or is in two sections, and a matrix that is not valid", () => {
-    const matrix = responseMatrix(HandRows);
+    const matrix = buildResponseMatrix(HandRows);
     expect(() => subscoreValue(matrix, { first: ["item1", "item2"], second: ["item3", "other"] })).toThrow(
       'Section "second" has the item "other", which is not an item of the matrix.',
     );
@@ -700,7 +700,7 @@ describe("subscoreValue", () => {
   it("rejects fewer than two persons who answered every item and total scores without variance", () => {
     expect(() =>
       subscoreValue(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0, 1, 1],
           [1, null, 0, 1],
         ]),
@@ -709,7 +709,7 @@ describe("subscoreValue", () => {
     ).toThrow("Subscore value needs at least two persons who answered every item of the sections.");
     expect(() =>
       subscoreValue(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0, 1, 0],
           [0, 1, 0, 1],
           [1, 0, 0, 1],
@@ -724,7 +724,7 @@ describe("subscoreValue", () => {
 describe("augmentedSubscores", () => {
   for (const reference of augmented.cases) {
     it(`matches subscore.Wainer on ${reference.name}`, () => {
-      const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+      const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
       const result = augmentedSubscores(matrix, sectionsOf(reference.sections));
       expect(result.sections.map(({ section }) => section)).toEqual(reference.sectionNames);
       expect(result.persons).toEqual(reference.persons);
@@ -758,7 +758,7 @@ describe("augmentedSubscores", () => {
 
   it("is closer to the true subscores than the observed subscores are, as in the simulation", () => {
     const reference = defined(augmented.cases.find(({ name }) => name === "simulated"));
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const sections = sectionsOf(reference.sections);
     const result = augmentedSubscores(matrix, sections);
     const truth = defined(reference.truth);
@@ -786,7 +786,7 @@ describe("augmentedSubscores", () => {
 
   it("leaves subscores that are perfectly reliable as they are", () => {
     // Alpha is 1 for both sections, so S_true is S, B is the identity, and the reliabilities stay 1.
-    const result = augmentedSubscores(responseMatrix(AgreeingRows), AgreeingSections);
+    const result = augmentedSubscores(buildResponseMatrix(AgreeingRows), AgreeingSections);
     expect(result.weights).toEqual([
       [1, 0],
       [0, 1],
@@ -810,7 +810,7 @@ describe("augmentedSubscores", () => {
       [1, 0],
     ];
     const rows = patterns.flatMap((first) => patterns.map((second) => [...first, ...second]));
-    const result = augmentedSubscores(responseMatrix(rows), AgreeingSections);
+    const result = augmentedSubscores(buildResponseMatrix(rows), AgreeingSections);
     result.weights.forEach((row, j) => {
       row.forEach((weight, k) => {
         expect(weight).toBeCloseTo(j === k ? 2 / 3 : 0, 14);
@@ -831,7 +831,7 @@ describe("augmentedSubscores", () => {
 
   it("gives the augmented subscores as the means plus the weights times the deviations", () => {
     const reference = defined(augmented.cases.find(({ name }) => name === "TIMSS11G8M.data"));
-    const matrix = responseMatrix(reference.responses, { itemIds: reference.itemIds });
+    const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     const sections = sectionsOf(reference.sections);
     const result = augmentedSubscores(matrix, sections);
     const sums = reference.responses.map((row) =>
@@ -851,25 +851,25 @@ describe("augmentedSubscores", () => {
   });
 
   it("scores the persons who answered every item of the sections and ignores other items", () => {
-    const base = augmentedSubscores(responseMatrix(ThreeSectionRows), ThreeSections);
+    const base = augmentedSubscores(buildResponseMatrix(ThreeSectionRows), ThreeSections);
     const extra = ThreeSectionRows.map((row, person) => [...row, person % 2]);
-    expect(augmentedSubscores(responseMatrix(extra), ThreeSections)).toEqual(base);
+    expect(augmentedSubscores(buildResponseMatrix(extra), ThreeSections)).toEqual(base);
     const missing = [...extra, [null, 1, 0, 1, 1, 0, 1], [0, 0, 1, null, 0, 1, 0]];
-    const withMissing = augmentedSubscores(responseMatrix(missing), ThreeSections);
+    const withMissing = augmentedSubscores(buildResponseMatrix(missing), ThreeSections);
     expect(withMissing).toEqual(base);
     expect(withMissing.persons).toHaveLength(ThreeSectionRows.length);
   });
 
   it("does not change its input or share it with the result", () => {
     const rows = ThreeSectionRows.map((row) => [...row]);
-    const matrix = responseMatrix(rows);
+    const matrix = buildResponseMatrix(rows);
     const result = augmentedSubscores(matrix, ThreeSections);
     expect(rows).toEqual(ThreeSectionRows);
     expect(result.scores).not.toBe(matrix.responses);
   });
 
   it("rejects sections that cannot be augmented", () => {
-    const matrix = responseMatrix(ThreeSectionRows);
+    const matrix = buildResponseMatrix(ThreeSectionRows);
     expect(() => augmentedSubscores(matrix, { first: ["item1", "item2"] })).toThrow(
       "Augmented subscores needs at least two sections, found 1.",
     );
@@ -892,12 +892,12 @@ describe("augmentedSubscores", () => {
       [1, 0, 1, 0],
       [1, 1, 1, 1],
     ];
-    expect(() => augmentedSubscores(responseMatrix(copy), AgreeingSections)).toThrow(
+    expect(() => augmentedSubscores(buildResponseMatrix(copy), AgreeingSections)).toThrow(
       "Augmented subscores need observed subscores that are not linearly dependent, with more persons than sections.",
     );
     expect(() =>
       augmentedSubscores(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0, 1, 1],
           [1, null, 0, 1],
         ]),
@@ -907,7 +907,7 @@ describe("augmentedSubscores", () => {
   });
 
   it("rejects input of other types, as JavaScript or JSON pass it", () => {
-    const matrix = responseMatrix(ThreeSectionRows);
+    const matrix = buildResponseMatrix(ThreeSectionRows);
     expect(() => augmentedSubscores(JSON.parse("null"), ThreeSections)).toThrow(DataError);
     expect(() => augmentedSubscores(matrix, JSON.parse("null"))).toThrow(
       "The sections must be an object of item ids by section name, found null.",
@@ -927,17 +927,17 @@ describe("edge cases", () => {
       [1, 1, 1, 1],
       [0, 1, 1, 0],
     ];
-    const items = itemStatistics(responseMatrix(rows));
+    const items = itemStatistics(buildResponseMatrix(rows));
     expect(items[2]).toMatchObject({ mean: 1, sd: 0, itemTotal: null, itemRest: null, biserial: null });
     expect(defined(items[2]).discriminationIndex).toBe(0);
-    const without = cronbachAlpha(responseMatrix(rows.map((row) => row.filter((_, item) => item !== 2))));
+    const without = cronbachAlpha(buildResponseMatrix(rows.map((row) => row.filter((_, item) => item !== 2))));
     // Alpha with k items, one of them constant, equals alpha without it times k (k - 2) / (k - 1)².
-    expect(cronbachAlpha(responseMatrix(rows))).toBeCloseTo((without * 4 * 2) / 9, 14);
+    expect(cronbachAlpha(buildResponseMatrix(rows))).toBeCloseTo((without * 4 * 2) / 9, 14);
     expect(defined(items[0]).alphaIfDeleted).not.toBeNull();
   });
 
   it("rejects reliability when every item is constant, but still lists item statistics", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0],
       [1, 0],
     ]);
@@ -952,13 +952,13 @@ describe("edge cases", () => {
       [0, 0, 1],
       [0, 1, 0],
     ];
-    const withEmptyRow = responseMatrix([...rows, [null, null, null]]);
-    expect(itemStatistics(withEmptyRow)).toEqual(itemStatistics(responseMatrix(rows)));
-    expect(cronbachAlpha(withEmptyRow)).toBe(cronbachAlpha(responseMatrix(rows)));
+    const withEmptyRow = buildResponseMatrix([...rows, [null, null, null]]);
+    expect(itemStatistics(withEmptyRow)).toEqual(itemStatistics(buildResponseMatrix(rows)));
+    expect(cronbachAlpha(withEmptyRow)).toBe(cronbachAlpha(buildResponseMatrix(rows)));
   });
 
   it("gives an item without responses null statistics and rejects reliability", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 0, null],
       [0, 1, null],
       [1, 1, null],
@@ -985,7 +985,7 @@ describe("edge cases", () => {
   });
 
   it("handles a single item", () => {
-    const matrix = responseMatrix([[1], [0], [1]]);
+    const matrix = buildResponseMatrix([[1], [0], [1]]);
     expect(itemStatistics(matrix)[0]).toMatchObject({ itemTotal: 1, itemRest: null, alphaIfDeleted: null });
     for (const statistic of [cronbachAlpha, kr20, kr21, splitHalf, standardErrorOfMeasurement]) {
       expect(() => statistic(matrix)).toThrow("needs at least two items.");
@@ -993,7 +993,7 @@ describe("edge cases", () => {
   });
 
   it("handles two persons", () => {
-    const matrix = responseMatrix([
+    const matrix = buildResponseMatrix([
       [1, 1, 1],
       [0, 1, 0],
     ]);
@@ -1012,7 +1012,7 @@ describe("edge cases", () => {
     expect(standardErrorOfMeasurement(matrix)).toBeCloseTo(Math.SQRT1_2, 15);
     expect(() =>
       splitHalf(
-        responseMatrix([
+        buildResponseMatrix([
           [1, 0],
           [0, 1],
         ]),
@@ -1139,7 +1139,7 @@ describe("properties", () => {
   it("alpha is at most 1", () => {
     fc.assert(
       fc.property(arbitraryRows, (rows) => {
-        const alpha = outcome(() => cronbachAlpha(responseMatrix(rows)));
+        const alpha = outcome(() => cronbachAlpha(buildResponseMatrix(rows)));
         if (alpha !== "DataError") expect(alpha).toBeLessThanOrEqual(1 + 1e-12);
       }),
     );
@@ -1148,7 +1148,7 @@ describe("properties", () => {
   it("results never contain NaN or infinities", () => {
     fc.assert(
       fc.property(arbitraryRows, (rows) => {
-        const numbers = JSON.stringify(statistics(responseMatrix(rows)), (_, value) =>
+        const numbers = JSON.stringify(statistics(buildResponseMatrix(rows)), (_, value) =>
           typeof value === "number" && !Number.isFinite(value) ? "not finite" : value,
         );
         expect(numbers).not.toContain("not finite");
@@ -1159,7 +1159,7 @@ describe("properties", () => {
   it("statistics do not depend on the order of persons", () => {
     fc.assert(
       fc.property(permutedRows(arbitraryRows), ([original, shuffled]) => {
-        expectNear(statistics(responseMatrix(shuffled)), statistics(responseMatrix(original)));
+        expectNear(statistics(buildResponseMatrix(shuffled)), statistics(buildResponseMatrix(original)));
       }),
     );
   });
@@ -1195,8 +1195,8 @@ describe("properties", () => {
         const ids = Array.from({ length: items }, (_, i) => `item${i + 1}`);
         const sections = { first: ids.slice(0, half), second: ids.slice(half) };
         const reversed = { second: [...sections.second].reverse(), first: [...sections.first].reverse() };
-        const forward = attempt(() => subscoreValue(responseMatrix(rows), sections));
-        const other = attempt(() => subscoreValue(responseMatrix(shuffled), reversed));
+        const forward = attempt(() => subscoreValue(buildResponseMatrix(rows), sections));
+        const other = attempt(() => subscoreValue(buildResponseMatrix(shuffled), reversed));
         if (forward === null || other === null) return;
         forward.forEach((value) => {
           const same = defined(other.find(({ section }) => section === value.section));
@@ -1223,7 +1223,7 @@ describe("properties", () => {
         if (items < 4) return;
         const half = Math.floor(items / 2);
         const ids = Array.from({ length: items }, (_, i) => `item${i + 1}`);
-        const matrix = responseMatrix(rows);
+        const matrix = buildResponseMatrix(rows);
         const result = attempt(() => subscoreValue(matrix, { first: ids.slice(0, half), second: ids.slice(half) }));
         if (result === null) return;
         const complete = rows.filter((row) => !row.includes(null));
@@ -1231,7 +1231,7 @@ describe("properties", () => {
           for (const number of [value.subscorePrmse, value.totalPrmse])
             expect(number === null || Number.isFinite(number)).toBe(true);
           const columns = i === 0 ? [0, half] : [half, items];
-          const section = responseMatrix(complete.map((row) => row.slice(columns[0], columns[1])));
+          const section = buildResponseMatrix(complete.map((row) => row.slice(columns[0], columns[1])));
           const alpha = attempt(() => cronbachAlpha(section));
           if (value.subscorePrmse !== null && alpha !== null) expectClose(value.subscorePrmse, alpha, 1e-9);
         });
@@ -1247,8 +1247,8 @@ describe("properties", () => {
         const half = Math.floor(items / 2);
         const ids = Array.from({ length: items }, (_, i) => `item${i + 1}`);
         const sections = { first: ids.slice(0, half), second: ids.slice(half) };
-        const forward = attempt(() => augmentedSubscores(responseMatrix(rows), sections));
-        const other = attempt(() => augmentedSubscores(responseMatrix(shuffled), sections));
+        const forward = attempt(() => augmentedSubscores(buildResponseMatrix(rows), sections));
+        const other = attempt(() => augmentedSubscores(buildResponseMatrix(shuffled), sections));
         if (forward === null || other === null) return;
         for (const { augmentedReliability, mean } of forward.sections) {
           expect(Number.isFinite(augmentedReliability)).toBe(true);

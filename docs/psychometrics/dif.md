@@ -30,7 +30,7 @@ whose items are studied. Both groups need persons.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { type DifGroup, logisticRegressionDif, lordChiSquare, mantelHaenszel } from "@measurekit/psychometrics/dif";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -43,7 +43,7 @@ const shifted = items.map((item, j) =>
 );
 const reference = simulateResponses(items, simulateThetas(500, random), random);
 const focal = simulateResponses(shifted, simulateThetas(500, random), random);
-const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
 mantelHaenszel(matrix, groups).items[2]; // { id: "item3", chiSquare: 33.6, ..., delta: -2.76, etsCategory: "C" }
@@ -216,7 +216,7 @@ The signed test's probability is `chiSquareUpperTail(signedZ ** 2, 1)` of `@meas
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import {
   type DifGroup,
   logisticDiscriminantDif,
@@ -234,7 +234,7 @@ const shifted = items.map((item, j) =>
 );
 const reference = simulateResponses(items, simulateThetas(500, random), random);
 const focal = simulateResponses(shifted, simulateThetas(500, random), random);
-const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
 mantelTest(matrix, groups).items[2]; // { id: "item3", chiSquare: 94.3, ..., standardizedMeanDifference: -0.62, effectSize: -0.52, etsCategory: "CC", liuAgresti }
@@ -378,7 +378,7 @@ flowchart LR
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { type DifGroup, sibtest } from "@measurekit/psychometrics/dif";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -393,7 +393,7 @@ const shifted = items.map((item, j) =>
 const reference = simulateResponses(items, simulateThetas(500, random), random);
 const focalThetas = simulateThetas(500, random).map((theta) => theta - 0.5);
 const focal = simulateResponses(shifted, focalThetas, random);
-const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
 sibtest(matrix, groups).items[2]; // { id: "item3", beta: 0.092, standardError: 0.025, chiSquare: 13.5, significance: 0.00024, persons: 1000 }
@@ -489,7 +489,7 @@ flowchart LR
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { type DifGroup, differentialFunctioning, irtLikelihoodRatioDif } from "@measurekit/psychometrics/dif";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -502,7 +502,7 @@ const shifted = items.map((item, j) =>
 );
 const reference = simulateResponses(items, simulateThetas(500, random), random);
 const focal = simulateResponses(shifted, simulateThetas(500, random), random);
-const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
 const dif = irtLikelihoodRatioDif(matrix, groups, { model: twoParameterLogistic, purify: true });
@@ -648,7 +648,7 @@ flowchart LR
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { type DifGroup, mantelHaenszel } from "@measurekit/psychometrics/dif";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -669,7 +669,7 @@ const responses = Object.fromEntries(
 
 // The items each focal group's comparison flags, with 20 tests in all.
 const flagged = (focal: "first" | "second"): string[] => {
-  const matrix = responseMatrix([...(responses.reference ?? []), ...(responses[focal] ?? [])]);
+  const matrix = buildResponseMatrix([...(responses.reference ?? []), ...(responses[focal] ?? [])]);
   const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
   return mantelHaenszel(matrix, groups)
     .items.filter((item) => (item.significance ?? 1) < 0.05 / 20)
@@ -693,7 +693,7 @@ hold both groups. Its test runs on `verbal` and a simulation.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { type DifGroup, mantelTest } from "@measurekit/psychometrics/dif";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -706,7 +706,7 @@ const shifted = items.map((item, j) =>
 );
 const reference = simulateResponses(items, simulateThetas(500, random), random);
 const focal = simulateResponses(shifted, simulateThetas(500, random), random);
-const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
 mantelTest(matrix, groups)
@@ -725,7 +725,7 @@ d the `delta` of `mantelHaenszel`, SE its `deltaStandardError`, d̄ their mean a
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { responseMatrix } from "@measurekit/psychometrics/data";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { type DifGroup, mantelHaenszel } from "@measurekit/psychometrics/dif";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -738,7 +738,7 @@ const shifted = items.map((item, j) =>
 );
 const reference = simulateResponses(items, simulateThetas(500, random), random);
 const focal = simulateResponses(shifted, simulateThetas(500, random), random);
-const matrix = responseMatrix([...reference.responses, ...focal.responses]);
+const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
 const sum = (values: readonly number[]): number => values.reduce((total, value) => total + value, 0);

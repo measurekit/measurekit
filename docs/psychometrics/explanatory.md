@@ -249,9 +249,9 @@ one, `time2`, for the later occasion. The effect of `time2` is a change of diffi
 
 ```ts
 import {
+  buildResponseMatrix,
   createRandom,
   lltm,
-  responseMatrix,
   simulateResponses,
   simulateThetas,
   twoParameterLogistic,
@@ -271,7 +271,7 @@ const after = simulateResponses(
   random,
 );
 const ids = before.itemIds;
-const stacked = responseMatrix(
+const stacked = buildResponseMatrix(
   before.responses.map((row, person) => [...row, ...(after.responses[person] ?? [])]),
   { itemIds: [...ids.map((id) => `${id}.t1`), ...ids.map((id) => `${id}.t2`)] },
 );
@@ -313,11 +313,11 @@ features by item id.
 
 ```ts
 import {
+  buildResponseMatrix,
   calibrate,
   createRandom,
   logNormalPrior,
   normalPrior,
-  responseMatrix,
   simulateResponses,
   twoParameterLogistic,
 } from "@measurekit/psychometrics";
@@ -359,7 +359,7 @@ const ids = [...bank, newItem].map(({ id }) => id);
 
 // 1. Calibrate the bank, with standard errors, and regress its difficulties and slopes on the features.
 const calibration = calibrate(
-  responseMatrix(
+  buildResponseMatrix(
     responses.map((row) => row.slice(0, 16)),
     { itemIds: ids.slice(0, 16) },
   ),
@@ -376,7 +376,7 @@ const b = predictItemParameter(regression, itsFeatures); // { mean: 0.78, sd: 0.
 const a = predictItemParameter(slopes, itsFeatures); // { mean: 0.05, sd: 0.04 }, the logarithm of the slope
 
 // 3. Calibrate the new item on the bank's scale, with the prediction as its prior.
-const sparse = responseMatrix(
+const sparse = buildResponseMatrix(
   responses.map((row, person) => row.map((response, item) => (item === 16 && person >= 25 ? null : response))),
   { itemIds: ids },
 );

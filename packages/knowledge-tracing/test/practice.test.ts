@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   type Attempt,
   bkt,
+  buildEventLog,
   DataError,
   type Event,
   elo,
-  eventLog,
   type LearnerModel,
   type MasteryTable,
   movingAverageMastery,
@@ -89,7 +89,7 @@ describe("mastery criteria", () => {
     values.map((outcome, i) => ({ learner, item: "q", skills, time: start + i, outcome }));
 
   it("finds the first run of correct answers, counting each skill of an event and only outcomes of 1", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       ...outcomes("ana", ["s"], [1, 1, 0, 1, 1, 1]),
       ...outcomes("ana", ["t", "s"], [1, 1, 1], 10),
       ...outcomes("budi", ["s"], [1, 0.9, 1, 1]),
@@ -104,7 +104,7 @@ describe("mastery criteria", () => {
     const model = bkt({
       parameters: { skills: { s: { prior: 0.5, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } },
     });
-    const log = eventLog(outcomes("ana", ["s"], [1, 1]));
+    const log = buildEventLog(outcomes("ana", ["s"], [1, 1]));
     expect(thresholdMastery(model, log)).toEqual({ ana: { s: 2 } });
     expect(thresholdMastery(model, log, { threshold: 0.85 })).toEqual({ ana: { s: 1 } });
     expect(thresholdMastery(model, log, { threshold: 0.98 })).toEqual({ ana: { s: null } });
@@ -140,7 +140,7 @@ describe("mastery criteria", () => {
 
   it("rejects an empty log, invalid lengths, runs and probabilities", () => {
     expect(() => streakMastery([])).toThrow("A log needs at least one event.");
-    expect(() => streakMastery(eventLog(outcomes("ana", ["s"], [1])), { length: 0 })).toThrow(
+    expect(() => streakMastery(buildEventLog(outcomes("ana", ["s"], [1])), { length: 0 })).toThrow(
       "The length must be a positive integer, found 0.",
     );
     expect(() => opportunitiesToStreak(0.5, { run: 4 })).toThrow("The run must be an integer from 0 to the length 3");
@@ -148,7 +148,7 @@ describe("mastery criteria", () => {
     // A model from JavaScript, which TypeScript would reject: it defines no mastery.
     const withoutMastery = elo() as unknown as Parameters<typeof thresholdMastery>[0];
     for (const model of [withoutMastery, JSON.parse("null")]) {
-      expect(() => thresholdMastery(model, eventLog(outcomes("ana", ["s"], [1])))).toThrow(
+      expect(() => thresholdMastery(model, buildEventLog(outcomes("ana", ["s"], [1])))).toThrow(
         "thresholdMastery needs a model that defines mastery, as BKT and KST do, found",
       );
     }
@@ -159,7 +159,7 @@ describe("practice options from JavaScript", () => {
   it("rejects options that are not an object", () => {
     const missing = JSON.parse("null");
     const model = bkt({ parameters: { skills: { s: { prior: 0.3, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } } });
-    const log = eventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
+    const log = buildEventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
     for (const use of [
       () => recommend(model, model.initialState("ana"), [], missing),
       () => streakMastery(log, missing),
@@ -198,7 +198,7 @@ describe("mastery criteria with events that have no outcome", () => {
   });
 
   it("leaves a streak as it is for an event without an outcome, and records no mastery from lessons alone", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       answer("ana", 1, 1),
       answer("ana", 2, null),
       answer("ana", 3, 1),
@@ -211,7 +211,7 @@ describe("mastery criteria with events that have no outcome", () => {
 
   it("updates the model with lessons, and tests the threshold only after events with an outcome", () => {
     const model = bkt({ parameters: { skills: { s: { prior: 0.1, learn: 0.6, forget: 0, guess: 0.2, slip: 0.1 } } } });
-    const log = eventLog([
+    const log = buildEventLog([
       answer("ana", 1, null),
       answer("ana", 2, null),
       answer("ana", 3, null),
@@ -221,7 +221,7 @@ describe("mastery criteria with events that have no outcome", () => {
     ]);
     // Three lessons take P(L) from 0.1 past 0.95 at ana's first attempt: opportunity 1, as the lessons are no opportunity.
     expect(thresholdMastery(model, log)).toEqual({ ana: { s: 1 }, budi: { s: null } });
-    expect(thresholdMastery(model, eventLog([answer("ana", 1, null)]))).toEqual({});
+    expect(thresholdMastery(model, buildEventLog([answer("ana", 1, null)]))).toEqual({});
   });
 });
 
@@ -232,7 +232,7 @@ interface MasteryReference {
   readonly table: MasteryTable;
 }
 const references: readonly MasteryReference[] = JSON.parse(JSON.stringify(fixture.tables));
-const masteryLog = eventLog(JSON.parse(JSON.stringify(fixture.events)));
+const masteryLog = buildEventLog(JSON.parse(JSON.stringify(fixture.events)));
 
 /** The performance factors analysis of the fixture, with the parameters written out in the script. */
 const performance = pfa({
@@ -282,45 +282,45 @@ describe("mastery criteria of the moving average, the window and the prediction"
 
   it("moves the average of a skill to d m + (1 - d) y from 0, and counts partial credit as it is", () => {
     // 0.5, 0.75, 0.875; and for outcomes of 0.5, 0.25, 0.375, 0.4375.
-    const log = eventLog(answers([1, 1, 1]));
+    const log = buildEventLog(answers([1, 1, 1]));
     expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.5 })).toEqual({ ana: { s: 1 } });
     expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.75 })).toEqual({ ana: { s: 2 } });
     expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.9 })).toEqual({ ana: { s: null } });
-    expect(movingAverageMastery(eventLog(answers([0.5, 0.5, 0.5])), { decay: 0.5, threshold: 0.4 })).toEqual({
+    expect(movingAverageMastery(buildEventLog(answers([0.5, 0.5, 0.5])), { decay: 0.5, threshold: 0.4 })).toEqual({
       ana: { s: 3 },
     });
   });
 
   it("takes the last outcome at a decay of 0, and never moves at a decay of 1 unless the threshold is 0", () => {
-    const log = eventLog(answers([0, 0.6, 0]));
+    const log = buildEventLog(answers([0, 0.6, 0]));
     expect(movingAverageMastery(log, { decay: 0, threshold: 0.6 })).toEqual({ ana: { s: 2 } });
     expect(movingAverageMastery(log, { decay: 1, threshold: 0.01 })).toEqual({ ana: { s: null } });
     expect(movingAverageMastery(log, { decay: 1, threshold: 0 })).toEqual({ ana: { s: 1 } });
   });
 
   it("counts the outcomes of 1 among the last attempts, the attempts so far where there are fewer than the window", () => {
-    const log = eventLog(answers([1, 0, 1, 1, 0, 0]));
+    const log = buildEventLog(answers([1, 0, 1, 1, 0, 0]));
     expect(windowMastery(log, { correct: 2, window: 3 })).toEqual({ ana: { s: 3 } });
     expect(windowMastery(log, { correct: 3, window: 4 })).toEqual({ ana: { s: 4 } });
     expect(windowMastery(log, { correct: 3, window: 3 })).toEqual({ ana: { s: null } });
-    expect(windowMastery(eventLog(answers([1, 0.9, 1])), { correct: 2, window: 2 })).toEqual({ ana: { s: null } });
+    expect(windowMastery(buildEventLog(answers([1, 0.9, 1])), { correct: 2, window: 2 })).toEqual({ ana: { s: null } });
   });
 
   it("leaves the average and the window as they are for an event without an outcome", () => {
-    const log = eventLog(answers([1, null, null, 1, null]));
+    const log = buildEventLog(answers([1, null, null, 1, null]));
     expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.75 })).toEqual({ ana: { s: 2 } });
     expect(windowMastery(log, { correct: 2, window: 2 })).toEqual({ ana: { s: 2 } });
-    expect(windowMastery(eventLog(answers([null, null])), { correct: 1, window: 1 })).toEqual({});
+    expect(windowMastery(buildEventLog(answers([null, null])), { correct: 1, window: 1 })).toEqual({});
   });
 
   it("credits an event to each of its skills, and each learner has a table of their own", () => {
-    const log = eventLog([...answers([1, 1], ["s", "t"]), ...answers([0, 1], ["s"], "budi")]);
+    const log = buildEventLog([...answers([1, 1], ["s", "t"]), ...answers([0, 1], ["s"], "budi")]);
     expect(windowMastery(log, { correct: 2, window: 2 })).toEqual({ ana: { s: 2, t: 2 }, budi: { s: null } });
     expect(movingAverageMastery(log, { decay: 0, threshold: 1 })).toEqual({ ana: { s: 1, t: 1 }, budi: { s: 2 } });
   });
 
   it("tells learners and skills apart whatever characters their ids hold", () => {
-    const log = eventLog([
+    const log = buildEventLog([
       { learner: "a\u0000b", item: "q", skills: ["c"], time: 0, outcome: 1 },
       { learner: "a", item: "q", skills: ["b\u0000c"], time: 1, outcome: 1 },
     ]);
@@ -344,18 +344,18 @@ describe("mastery criteria of the moving average, the window and the prediction"
         return state / 4;
       },
     };
-    const log = eventLog(answers([1, null, 1, 1], ["s", "t"]));
+    const log = buildEventLog(answers([1, null, 1, 1], ["s", "t"]));
     // The state is the outcomes so far, and the prediction a quarter of it: 0.25 after the first, 0.5 after the second.
     expect(predictedMastery(model, log, { threshold: 0.5 })).toEqual({ ana: { s: 2, t: 2 } });
     expect(predictions).toEqual(["0:1", "2:2", "3:3"]);
-    expect(predictedMastery(model, eventLog(answers([null])), { threshold: 0.5 })).toEqual({});
+    expect(predictedMastery(model, buildEventLog(answers([null])), { threshold: 0.5 })).toEqual({});
   });
 
   it("meets a stricter criterion no earlier, for any log", () => {
     const outcome = fc.constantFrom(0, 0.5, 1, null);
     fc.assert(
       fc.property(fc.array(outcome, { minLength: 1, maxLength: 30 }), (values) => {
-        const log = eventLog(answers(values));
+        const log = buildEventLog(answers(values));
         const later = (strict: MasteryTable, loose: MasteryTable) => {
           const a = strict.ana?.s;
           const b = loose.ana?.s;
@@ -387,7 +387,7 @@ describe("mastery criteria of the moving average, the window and the prediction"
         fc.array(outcome, { minLength: 1, maxLength: 40 }),
         fc.integer({ min: 1, max: 5 }),
         (values, length) => {
-          const log = eventLog(answers(values, ["s", "t"]));
+          const log = buildEventLog(answers(values, ["s", "t"]));
           expect(windowMastery(log, { correct: length, window: length })).toEqual(streakMastery(log, { length }));
         },
       ),
@@ -397,11 +397,11 @@ describe("mastery criteria of the moving average, the window and the prediction"
 
 /** The events of a log with the skills of the fixture's model, which has parameters for s1 to s4 only. */
 function withPfa(log: readonly Event[]) {
-  return eventLog(log.map((event) => ({ ...event, skills: event.skills.map(() => "s1") })));
+  return buildEventLog(log.map((event) => ({ ...event, skills: event.skills.map(() => "s1") })));
 }
 
 describe("mastery criteria, errors", () => {
-  const log = eventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
+  const log = buildEventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
 
   it("rejects options of other types and values from JavaScript", () => {
     const missing = JSON.parse("null");
@@ -445,12 +445,12 @@ describe("mastery criteria, errors", () => {
     expect(() => predictedMastery(missing, log, { threshold: 0.5 })).toThrow(
       "predictedMastery needs a learner model, found null.",
     );
-    const unskilled = eventLog([{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }]);
+    const unskilled = buildEventLog([{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }]);
     expect(() => predictedMastery(performance, unskilled, { threshold: 0.5 })).toThrow(
       "Event 1 has no skills; a mastery table needs at least one.",
     );
     expect(
-      predictedMastery(performance, eventLog([{ ...unskilled[0], outcome: null } as Event]), { threshold: 0.5 }),
+      predictedMastery(performance, buildEventLog([{ ...unskilled[0], outcome: null } as Event]), { threshold: 0.5 }),
     ).toEqual({});
   });
 });
@@ -464,7 +464,7 @@ describe("mastery criteria of the guide", () => {
       time,
       outcome,
     });
-    const log = eventLog([
+    const log = buildEventLog([
       attempt("ana", "f1", "fractions", 1, 0),
       attempt("ana", "f2", "fractions", 2, 1),
       attempt("ana", "f3", "fractions", 3, 1),

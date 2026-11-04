@@ -509,44 +509,43 @@ without weight is never drawn, and the draws follow the mean and variance of the
 `validation/psychometrics/cat.R` runs each adaptive test in catR step by step: before each item, catR's estimate
 from the responses so far, by one method until the responses are mixed and another after, and catR's next item at
 that estimate; then a response drawn once from a true theta with a fixed seed. The tests replay the responses
-through `adaptiveTest`, which must select catR's item at every step. Where catR picks a content area at random, the
-test accepts any area catR could pick, and checks that the item is the most informative of its area. Properties
-cover the stochastic parts: randomesque selects only among the top items and reaches each of them; an item every
-test selects first is administered at the rate of its exposure parameter, within four binomial standard errors
-over 4,000 seeded persons; the last eligible item is never withheld; seeded simulations reproduce exactly.
-`validation/psychometrics/cat-selection.R` reads the banks and runs of `cat.R` and writes the scores of the other
-rules after 0, 1, 3, 6, 9 and 10 responses of a run, at catR's estimate there: catR's `MWI`, `KL`, `GDI` and `EPV`
-functions, the first two divided by the largest likelihood, times the prior's density for the posterior rules, on their
-grid, as this library scales them, and `nextItem`'s distance for bOpt. catR's `MEI` finds each estimate after the next
-response by `uniroot` at its default tolerance, about 1.2e-4, so the script finds the MAP estimates to 1e-14 between
-points of a grid 0.01 apart, takes catR's `OIi` and `Ii` there, and checks catR's `MEI` within 1e-3. The replays
-administer two or three starting items, then the item `nextItem` selects at the MAP estimate, found the same way, and
-the script checks that the highest written-out score, the first on ties, is `nextItem`'s item; the test replays the
-responses through `adaptiveTest` with `startingItems` and `posteriorModeEstimate`. For progressive and proportional
-selection, the script draws uniform numbers under a seed, checks that progressive's highest score is `nextItem`'s item
-under the same seed, and writes catR's proportional probabilities and the exponential race on the same draws; for 10
-items, the probability of each item under progressive selection is an integral over the uniform score of each item, by
-`integrate` to 1e-13, and the test draws 20,000 selections with a seeded `createRandom` and compares the counts by
-chi-square.
+through `createAdaptiveTest`, which must select catR's item at every step. Where catR picks a content area at random,
+the test accepts any area catR could pick, and checks that the item is the most informative of its area. Properties
+cover the stochastic parts: randomesque selects only among the top items and reaches each of them; an item every test
+selects first is administered at the rate of its exposure parameter, within four binomial standard errors over 4,000
+seeded persons; the last eligible item is never withheld; seeded simulations reproduce exactly.
+`validation/psychometrics/cat-selection.R` reads the banks and runs of `cat.R` and writes the scores of the other rules
+after 0, 1, 3, 6, 9 and 10 responses of a run, at catR's estimate there: catR's `MWI`, `KL`, `GDI` and `EPV` functions,
+the first two divided by the largest likelihood, times the prior's density for the posterior rules, on their grid, as
+this library scales them, and `nextItem`'s distance for bOpt. catR's `MEI` finds each estimate after the next response
+by `uniroot` at its default tolerance, about 1.2e-4, so the script finds the MAP estimates to 1e-14 between points of a
+grid 0.01 apart, takes catR's `OIi` and `Ii` there, and checks catR's `MEI` within 1e-3. The replays administer two or
+three starting items, then the item `nextItem` selects at the MAP estimate, found the same way, and the script checks
+that the highest written-out score, the first on ties, is `nextItem`'s item; the test replays the responses through
+`createAdaptiveTest` with `startingItems` and `posteriorModeEstimate`. For progressive and proportional selection, the
+script draws uniform numbers under a seed, checks that progressive's highest score is `nextItem`'s item under the same
+seed, and writes catR's proportional probabilities and the exponential race on the same draws; for 10 items, the
+probability of each item under progressive selection is an integral over the uniform score of each item, by `integrate`
+to 1e-13, and the test draws 20,000 selections with a seeded `createRandom` and compares the counts by chi-square.
 Multistage routing is checked against routes derived by hand, at and beside the cut points.
 `validation/psychometrics/multistage-cuts.R` derives routing cuts in base R, as no reference package does: mstR is not
 among the references. Panels of 2PL, 3PL, graded and generalized partial credit items are set in mirt, whose `iteminfo`
-gives the information curves and `expected.item` the test characteristic curves. A cut by maximum information is the root
-of the difference of two modules' information between their peaks, by `uniroot` at a tolerance of 1e-13, and the script
-checks that the difference changes sign once there; a pair of modules whose curves also cross in a tail checks that the
-cut is not that crossing. A cut by shares is `qnorm` at the cumulative share, or the root of the piecewise linear
-distribution function of a population of nodes through the edges of its cells; a population of 501 nodes is also
+gives the information curves and `expected.item` the test characteristic curves. A cut by maximum information is the
+root of the difference of two modules' information between their peaks, by `uniroot` at a tolerance of 1e-13, and the
+script checks that the difference changes sign once there; a pair of modules whose curves also cross in a tail checks
+that the cut is not that crossing. A cut by shares is `qnorm` at the cumulative share, or the root of the piecewise
+linear distribution function of a population of nodes through the edges of its cells; a population of 501 nodes is also
 compared with the quantiles of the mixture density it discretizes, which differ by 6e-6. A cut on the scale
 number-correct is the ceiling of the expected score, less 1e-9, through the route that routing by theta takes, and the
-script checks that no score lies within 1e-7 of a whole one. Theta cuts agree within 1e-6, and the whole scores
-exactly; the largest difference over the fixture is 2e-14. Properties cover the rest: modules that translate each other
-cross at the midpoints of their centers, and cuts by shares ascend and are whole scores on the scale number-correct. Enemy sets: over random
-sets and responses, no test administers two items of a set. Exposure calibration: every rate of the last simulation
-is within its tolerance of r, the result reproduces with its seed, and a test too long for r does not converge.
-Form assembly: a target above any form's information selects the most informative items, the counts and information a
-form reports equal those of its items, and whatever the pool, the enemies, the testlets, the number of forms and the overlap,
-no form has more items than its length, two items of an enemy set, part of a testlet or more shared items with another form
-than the overlap.
+script checks that no score lies within 1e-7 of a whole one. Theta cuts agree within 1e-6, and the whole scores exactly;
+the largest difference over the fixture is 2e-14. Properties cover the rest: modules that translate each other cross at
+the midpoints of their centers, and cuts by shares ascend and are whole scores on the scale number-correct. Enemy sets:
+over random sets and responses, no test administers two items of a set. Exposure calibration: every rate of the last
+simulation is within its tolerance of r, the result reproduces with its seed, and a test too long for r does not
+converge. Form assembly: a target above any form's information selects the most informative items, the counts and
+information a form reports equal those of its items, and whatever the pool, the enemies, the testlets, the number of
+forms and the overlap, no form has more items than its length, two items of an enemy set, part of a testlet or more
+shared items with another form than the overlap.
 
 `validation/psychometrics/cat.R` also replays diagnostic adaptive tests on the items of GDINA calibrations: `sim30GDINA`
 with the G-DINA model (30 items, 5 attributes), and ECPE (`CDM::data.ecpe`, 28 items, 3 attributes) with the G-DINA
@@ -554,7 +553,7 @@ model, the DINA model and the G-DINA model under a linear hierarchy of the attri
 profiles prior 0. The first four persons of each dataset take a test of 10 items with each rule, and the prior is the
 calibration's profile proportions in multiples of 1/4096, so that its sum is exactly 1 as cdcatR checks. The base R
 replay stores, before each item, the posterior, the mastery, the MAP profile and every item's score; the test replays
-the persons' responses through `diagnosticAdaptiveTest` and compares each estimate, then scores the items from the
+the persons' responses through `createDiagnosticAdaptiveTest` and compares each estimate, then scores the items from the
 stored posterior, so a difference in a score is the rule's alone. cdcatR's `cdcat()` runs the same tests for GDI, MPWKL
 and JSD, the mutual information of the response and the profile in bits: the Shannon entropy rule's score plus the
 entropy of the posterior, the same for every item, so the rules rank items alike; the script stops if its item sequence
@@ -575,7 +574,7 @@ items set in mirt: an M2PL and an M3PL pool on 2 dimensions, the M2PL pool with 
 on 3 dimensions, with between-dimension items and items on every dimension. The first four persons of each case take a
 test of 10 items. The base R replay stores, before each item, the posterior mode, its standard errors and covariance,
 and the determinant of every item not administered; the test replays the persons' responses through
-`multidimensionalAdaptiveTest` and compares each estimate, then scores the items from the stored estimate with
+`createMultidimensionalAdaptiveTest` and compares each estimate, then scores the items from the stored estimate with
 `maximumDeterminant`, so a difference in a score is the rule's alone. mirtCAT's `DPrule` runs the same tests with MAP
 estimates and must give the same item sequence: the script stops if it does not. `DPrule` adds the prior precision to
 the information of the administered items, as the package does; its `Drule` does not, and scores every item 0 at first
@@ -596,10 +595,10 @@ the mean of its eligible items' information, from catR's `Ii`, at its first item
 taken, and a testlet withheld whole when its first item's exposure parameter, 0 or 1, withholds it. Five cases run it:
 testlets in order, testlets adaptively, a precision stop at a standard error of 0.45, which falls between testlets, a
 pool with testlets withheld by exposure parameters of 0, and enemy sets inside and across testlets. The test replays the
-persons' responses through `adaptiveTest` and compares the items, the withheld items and every estimate. catR has no
-testlets. mirtCAT's `ordered` constraint administers a group in order once the group's most informative item is
-selected, and does not end the test inside it, as the package does where each testlet's items are equally informative;
-a sixth case gives each testlet the parameters of its first item and runs mirtCAT with `criteria = "MI"` and the EAP
+persons' responses through `createAdaptiveTest` and compares the items, the withheld items and every estimate. catR has
+no testlets. mirtCAT's `ordered` constraint administers a group in order once the group's most informative item is
+selected, and does not end the test inside it, as the package does where each testlet's items are equally informative; a
+sixth case gives each testlet the parameters of its first item and runs mirtCAT with `criteria = "MI"` and the EAP
 estimate on the same persons: the script stops if its item sequence differs from the replay's. Its stop is by precision,
 as at a `max_items` that falls inside a group mirtCAT stops with the error "Ran out of items to administer". The tests
 add properties: whatever the testlets, responses and order, each testlet is one block of the items, in pool order when
@@ -615,8 +614,8 @@ two facets with exact bounds and with margins, each with and without the index, 
 the index, two exact areas with and without the index, maximums that end the test, testlets taken in order and adaptively with
 enemies and exposure parameters of 0, enemies that leave a minimum out of reach, and a precision stop once the minimums are met.
 The script stops unless the filter alone and with the index give the same tests on two exact areas, differ on three areas, and
-every branch of the minimums runs. The test replays the persons' responses through `adaptiveTest` and compares the items
-and every estimate (1e-12).
+every branch of the minimums runs. The test replays the persons' responses through `createAdaptiveTest` and compares the
+items and every estimate (1e-12).
 
 The same script runs the shadow test of mirtCAT on two blueprints, of two and three facets, for banks of 300 items, 250
 persons each, and writes each person's answers to every item. Each blueprint is built from a hidden feasible form of 30 items, with each area's bounds the form's count

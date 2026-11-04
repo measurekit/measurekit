@@ -62,7 +62,7 @@ export function simulateAdaptiveTest(
   thetas: readonly number[],
   random: Random,
 ): TestSimulation<AdaptiveTestState> {
-  checkTest(test, "pool", "The test must be an adaptive test from adaptiveTest");
+  checkTest(test, "pool", "The test must be an adaptive test from createAdaptiveTest");
   checkRandom(random);
   const { pool } = test;
   const indices = indexItems(pool);
@@ -96,7 +96,7 @@ export function simulateMultistageTest(
   thetas: readonly number[],
   random: Random,
 ): TestSimulation<MultistageTestState> {
-  checkTest(test, "stages", "The test must be a multistage test from multistageTest");
+  checkTest(test, "stages", "The test must be a multistage test from createMultistageTest");
   checkRandom(random);
   const modules = locateModules(test.stages);
   const items = [...modules.values()].flatMap(({ module }) => module.items);

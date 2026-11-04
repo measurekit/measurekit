@@ -43,7 +43,7 @@ export function simulateMultidimensionalAdaptiveTest(
   thetas: readonly (readonly number[])[],
   random: Random,
 ): MultidimensionalTestSimulation {
-  checkTest(test, "pool", "The test must be a multidimensional adaptive test from multidimensionalAdaptiveTest");
+  checkTest(test, "pool", "The test must be a multidimensional adaptive test from createMultidimensionalAdaptiveTest");
   checkRandom(random);
   const { pool } = test;
   const matrix = simulateMultidimensionalResponses(pool, thetas, random);

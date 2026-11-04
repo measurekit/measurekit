@@ -100,7 +100,7 @@ with that skill as their only skill:
 
 ```ts
 import { bkt, type BktParameters } from "@measurekit/knowledge-tracing/bkt";
-import { eventLog } from "@measurekit/knowledge-tracing/data";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
 
 const skills = ["fractions", "decimals"];
 // Stands in for a database query that returns the events of a skill, in any order.
@@ -118,7 +118,7 @@ let parameters: BktParameters = { skills: {} };
 for (const skill of skills) {
   const events = await loadEvents(skill);
   // An event with several skills keeps only this one.
-  const log = eventLog(events.map((event) => ({ ...event, skills: [skill] })));
+  const log = buildEventLog(events.map((event) => ({ ...event, skills: [skill] })));
   const fit = bkt({ forgetting: true }).fit(log);
   parameters = { skills: { ...parameters.skills, ...fit.model.parameters.skills } };
 }
@@ -134,7 +134,7 @@ Orders of magnitude on Node.js, for logs of 5,000 items and 200 skills: 1M event
 
 | Operation                  | 1M events                                  | 5M events                                       |
 | -------------------------- | ------------------------------------------ | ----------------------------------------------- |
-| `eventLog`                 | About 0.2 s, 0.4 GB of heap with the input | About 1 s                                       |
+| `buildEventLog`            | About 0.2 s, 0.4 GB of heap with the input | About 1 s                                       |
 | Elo `fit`                  | About 0.4 s                                | About 3 s, 1.8 GB; 5-fold cross-validation 33 s |
 | `learningCurve`            |                                            | About 4 s                                       |
 | BKT `fit`                  | About 0.6 s per EM iteration and start     | About 5 s per EM iteration and start, 2.4 GB    |

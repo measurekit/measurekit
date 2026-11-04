@@ -144,7 +144,7 @@ export function stridedSoftmax(values: Float64Array, count: number, stride: numb
  * @param d - The upper asymptote to test.
  * @returns Whether both are numbers with 0 ≤ c < d ≤ 1.
  */
-export function validAsymptotes(c: unknown, d: unknown): boolean {
+export function hasValidAsymptotes(c: unknown, d: unknown): boolean {
   return isUnitInterval(c) && isUnitInterval(d) && c < d;
 }
 
@@ -157,6 +157,6 @@ export function validAsymptotes(c: unknown, d: unknown): boolean {
  * @returns Whether the thresholds are strictly increasing for a positive slope and strictly decreasing for a negative
  *   one.
  */
-export function orderedThresholds(a: number, b: readonly number[]): boolean {
+export function hasOrderedThresholds(a: number, b: readonly number[]): boolean {
   return b.every((threshold, k) => k === 0 || a * (threshold - (b[k - 1] ?? 0)) > 0);
 }
