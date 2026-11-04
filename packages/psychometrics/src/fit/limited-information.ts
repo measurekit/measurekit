@@ -14,6 +14,7 @@ import { checkOpenUnitInterval } from "../checks.js";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
   type Calibration,
+  checkItemsOfMatrix,
   checkThetaDistribution,
   type FixedParameters,
   type IrtItem,
@@ -38,7 +39,7 @@ import {
   sampleMoments,
   tableMoments,
 } from "../math/internal.js";
-import { checkItems, estimatedEntries } from "./inputs.js";
+import { estimatedEntries } from "./inputs.js";
 
 /** Options of {@link limitedInformationFit}. */
 export interface LimitedInformationOptions {
@@ -223,7 +224,7 @@ function checkCalibration<TParameters>(
 ): { readonly items: readonly IrtItem[]; readonly group: Population } {
   checkRecord(calibration, "The calibration must be the result of calibrate");
   const { items, groups, testlets, regression } = calibration;
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   items.forEach(({ id }, column) => {
     const expected = matrix.itemIds[column];
     if (id !== expected) {

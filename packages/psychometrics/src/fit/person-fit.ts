@@ -1,6 +1,12 @@
 import type { ResponseMatrix } from "../data/internal.js";
-import { type IrtItem, largestCategoryCount, logProbability } from "../irt/internal.js";
-import { checkItems, checkPersonThetas, isExtreme, scoreMoments } from "./inputs.js";
+import {
+  checkItemsOfMatrix,
+  checkPersonThetas,
+  type IrtItem,
+  largestCategoryCount,
+  logProbability,
+} from "../irt/internal.js";
+import { isExtreme, scoreMoments } from "./inputs.js";
 import { addResponse, type MeanSquareFit, meanSquares, SUM_COUNT } from "./mean-squares.js";
 
 /** The fit of one person's responses. */
@@ -38,7 +44,7 @@ export function personFit(
   items: readonly IrtItem[],
   thetas: readonly number[],
 ): readonly PersonFit[] {
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   checkPersonThetas(matrix, thetas);
   const sums = new Float64Array(SUM_COUNT);
   const probabilities = new Float64Array(largestCategoryCount(items));

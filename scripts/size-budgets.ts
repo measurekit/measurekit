@@ -43,6 +43,7 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
       "psychometrics/response-time",
       "psychometrics/scaling",
       "psychometrics/sim",
+      "psychometrics/similarity",
       "psychometrics/standard-setting",
     ],
   },
@@ -139,6 +140,10 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
       "psychometrics/irt",
       "psychometrics/multidimensional",
     ],
+  },
+  "@measurekit/psychometrics/similarity": {
+    gzip: 11_500,
+    holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/standard-setting": {
     gzip: 13_500,

@@ -17,13 +17,13 @@ import {
   abilityEstimates,
   type CalibrationOptions,
   calibrate,
+  checkItemsOfMatrix,
   type IrtItem,
   posteriorMeanEstimate,
   type TestItem,
 } from "../irt/internal.js";
 import { sampleQuantile } from "../math/internal.js";
 import { simulateResponses, simulateThetas } from "../sim/internal.js";
-import { checkItems } from "./inputs.js";
 import { yenQ3 } from "./local-dependence.js";
 
 /**
@@ -206,7 +206,7 @@ export function yenQ3CriticalValue<TParameters>(
   random: Random,
   options: Q3CriticalValueOptions<TParameters>,
 ): Q3CriticalValue {
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   checkItemIds(matrix, items);
   checkRandom(random);
   const settings = bootstrapSettings(options);

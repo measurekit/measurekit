@@ -1,6 +1,7 @@
 import { checkOptions, chiSquareUpperTail, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
+  checkItemsOfMatrix,
   type FixedParameters,
   type IrtItem,
   itemTrace,
@@ -9,7 +10,7 @@ import {
 } from "../irt/internal.js";
 
 import { collapseCells } from "./collapse.js";
-import { checkItems, estimatedEntries } from "./inputs.js";
+import { estimatedEntries } from "./inputs.js";
 
 /**
  * The highest total score of the items that S-X² takes. For each item it sums the scores of the other items at each
@@ -77,7 +78,7 @@ export function summedScoreFit(
 ): readonly SummedScoreFit[] {
   checkOptions(options, SUMMED_SCORE_FIT_OPTIONS);
   const { fixed = [], fixedParameters = {} } = options;
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   const estimated = estimatedEntries(items, matrix.itemIds, fixed, fixedParameters);
   const complete = matrix.responses.filter((row) => !row.includes(null));
   if (complete.length === 0) throw new DataError("S-X² needs at least one person who answered every item.");

@@ -1,4 +1,5 @@
-import { checkArray, checkRecord, DataError, describe, isRecord } from "@measurekit/core";
+import { checkArray, checkFinite, checkRecord, DataError, describe, isRecord } from "@measurekit/core";
+import { checkResponseMatrix, type ResponseMatrix } from "../data/internal.js";
 import type { IrtItem, IrtModel } from "./model.js";
 
 /** What the checks of items need of an item of either kind of model: its categories. */
@@ -104,6 +105,48 @@ export function checkItemList(items: readonly IrtItem[], subject: string): void 
   if (items.length === 0) throw new DataError(`${subject} needs at least one item.`);
   items.forEach((item, index) => {
     checkItem(item, `Item ${index + 1}`);
+  });
+}
+
+/**
+ * Checks a response matrix and its items: one valid item per column, and every response a category of its item.
+ *
+ * @throws `DataError` naming the first problem found.
+ */
+export function checkItemsOfMatrix(matrix: ResponseMatrix, items: readonly IrtItem[]): void {
+  checkResponseMatrix(matrix);
+  checkArray(items, "The items must be an array");
+  const { itemIds, personIds, responses } = matrix;
+  if (items.length !== itemIds.length) {
+    throw new DataError(`Found ${items.length} items for ${itemIds.length} columns of responses.`);
+  }
+  items.forEach((item, column) => {
+    const id = itemIds[column] ?? "";
+    checkItem(item, `Item "${id}"`);
+    const count = item.model.categoryCount(item.parameters);
+    responses.forEach((row, person) => {
+      const response = row[column] ?? null;
+      if (response !== null && response >= count) {
+        throw new DataError(
+          `The response of person "${personIds[person]}" to item "${id}" is ${response}, but the item has categories 0 to ${count - 1}.`,
+        );
+      }
+    });
+  });
+}
+
+/**
+ * Checks that there is one finite theta per person.
+ *
+ * @throws `DataError` when the thetas are not an array, their count differs or a theta is not finite.
+ */
+export function checkPersonThetas(matrix: ResponseMatrix, thetas: readonly number[]): void {
+  checkArray(thetas, "The thetas must be an array");
+  if (thetas.length !== matrix.personIds.length) {
+    throw new DataError(`Found ${thetas.length} thetas for ${matrix.personIds.length} persons.`);
+  }
+  thetas.forEach((theta, person) => {
+    checkFinite(theta, `The theta of person "${matrix.personIds[person]}"`);
   });
 }
 

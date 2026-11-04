@@ -20,6 +20,7 @@
     "src/standard-setting/index.ts",
     "src/rater/index.ts",
     "src/response-time/index.ts",
+    "src/similarity/index.ts",
     "src/parameterization/index.ts",
     "src/index.ts"
   ],

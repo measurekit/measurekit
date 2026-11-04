@@ -1,7 +1,13 @@
 import { chiSquareUpperTail, DataError } from "@measurekit/core";
 import { checkMatrixItems, type ResponseMatrix } from "../data/internal.js";
-import { type IrtItem, itemTrace, largestCategoryCount } from "../irt/internal.js";
-import { checkItems, checkPersonThetas, type ResidualFitOptions, residualPopulation, scoreMoments } from "./inputs.js";
+import {
+  checkItemsOfMatrix,
+  checkPersonThetas,
+  type IrtItem,
+  itemTrace,
+  largestCategoryCount,
+} from "../irt/internal.js";
+import { type ResidualFitOptions, residualPopulation, scoreMoments } from "./inputs.js";
 
 /**
  * The most cells of the tables of the pairs of items, a cell for each pair of their categories: each cell of the expected
@@ -53,7 +59,7 @@ export function localDependenceChiSquare(
   items: readonly IrtItem[],
   options: ResidualFitOptions = {},
 ): readonly LocalDependencePair[] {
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   checkMatrixItems(items.length, "Local dependence");
   const { nodes, weights } = residualPopulation(options);
   const counts = items.map((item) => item.model.categoryCount(item.parameters));
@@ -193,7 +199,7 @@ export function yenQ3(
   items: readonly IrtItem[],
   thetas: readonly number[],
 ): readonly (readonly (number | null)[])[] {
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   checkMatrixItems(items.length, "Yen's Q3");
   checkPersonThetas(matrix, thetas);
   const itemCount = items.length;

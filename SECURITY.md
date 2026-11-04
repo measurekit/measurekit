@@ -27,7 +27,9 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   estimation takes time that grows as the cube of its parameters: 1,000 of them, from 260 KB of scores, take 3.3 minutes.
   An exploratory calibration of several dimensions starts from an eigendecomposition of the items' correlations, whose
   time grows as the cube of the items: about 3 minutes at 2,000 items
-  ([multidimensional](docs/psychometrics/multidimensional.md#time)).
+  ([multidimensional](docs/psychometrics/multidimensional.md#time)). The indices of answer similarity take time that
+  grows with the pairs passed, and M4 a time per pair that grows as the cube of the items: 0.2 s at its limit of 1,000
+  ([similarity](docs/psychometrics/similarity.md#limits)).
 - **Limits.** Tables are sized by the values that occur in the data, not by the highest value, so that a small input
   with one large response costs no more than another of its size. What would grow faster than the input has a limit,
   and passing it throws `DataError`:
@@ -60,6 +62,9 @@ Points to be aware of when deploying `@measurekit/psychometrics`, `@measurekit/k
   | Expected counts of a many-facet model or an LLTM: virtual items × quadrature points × categories   | 2^24: two tables of 128 MB                 | [rater](docs/psychometrics/rater.md#model)                                                                    |
   | Effects of linear change: item groups × occasions after the first × groups                         | 1,000, as the Rasch comparison's           | [explanatory](docs/psychometrics/explanatory.md)                                                              |
   | Items of the standard errors of a lognormal calibration; parameters of those of the joint model    | 2,000: above, none, or the joint throws    | [response-time](docs/psychometrics/response-time.md)                                                          |
+  | Pairs that shared a context; the persons who share a value and form pairs                          | `maxPairs`, 10⁶: 150 MB; `maxGroup`, 200   | [similarity](docs/psychometrics/similarity.md#pairs)                                                          |
+  | Items a pair compares in the generalized binomial test and M4                                      | 1,000: M4 0.2 s a pair, 16 MB              | [similarity](docs/psychometrics/similarity.md#limits)                                                         |
+  | Cells of the K index: groups by incorrect responses × categories given                             | 2^24: up to 165 MB                         | [similarity](docs/psychometrics/similarity.md#limits)                                                         |
   | Dimensions of a multidimensional calibration, scoring, information or adaptive test                | 100: one item of 1,000 took 11 s           | [multidimensional](docs/psychometrics/multidimensional.md#scoring)                                            |
   | Items of an unfolding calibration                                                                  | 500: its starts take 5 s, as items cubed   | [irt](docs/psychometrics/irt.md#unfolding-calibration)                                                        |
   | Products of conditional maximum likelihood's functions with two items left out, in a Newton step   | 2^29: a step of 0.6 to 8.5 s               | [irt](docs/psychometrics/irt.md#conditional-maximum-likelihood)                                               |

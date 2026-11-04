@@ -1,6 +1,7 @@
 import { checkArray, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
+import { poissonFit } from "../math/internal.js";
 import { type BivariateDistribution, bivariateTable } from "./bivariate.js";
-import { MAX_LOG_LINEAR_DEGREE, orthonormalPolynomials, poissonFit } from "./presmoothing.js";
+import { MAX_LOG_LINEAR_DEGREE, orthonormalPolynomials } from "./presmoothing.js";
 
 /** Options of {@link bivariateLogLinearPresmoothing}. */
 export interface BivariatePresmoothingOptions {

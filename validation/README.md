@@ -78,6 +78,7 @@ Rscript validation/psychometrics/classification-livingston-lewis.R  # Livingston
 Rscript validation/psychometrics/rater.R             # rater agreement: irr, psych and effsize; the many-facet Rasch model: base R, with TAM and sirt data
 Rscript validation/psychometrics/rater-bias.R        # rater bias analysis: base R and TAM's tam.mml.mfr with the interaction of items and raters
 Rscript validation/psychometrics/response-time.R     # response times: nlme, LNIRT, mirt and base R
+Rscript validation/psychometrics/similarity.R        # answer similarity: CopyDetect 1.4's omega, generalized binomial test, M4, K, K1, K2, S1 and S2, about a minute
 Rscript validation/psychometrics/cdm.R               # cognitive diagnosis: GDINA, NPCD and base R
 Rscript validation/psychometrics/cdm-item-comparison.R  # item-level model comparison: GDINA's modelcomp with the Wald test, and its covariance of the success probabilities
 Rscript validation/psychometrics/cdm-fit.R           # model and item fit: GDINA's modelfit and itemfit, CDM's modelfit.cor.din, base R's exact sums
@@ -94,7 +95,7 @@ Rscript validation/psychometrics/math.R              # normal, logistic and chi-
 ```
 
 They need R with the packages psych, mirt, subscore, effsize, ltm, catR, TAM, eRm, difR, lordif, MASS, rms, equate, equateIRT, irr, cacIRT,
-sirt, kequate, betafunctions, KernSmoothIRT, PerFit, nlme, LNIRT, numDeriv, lme4, metafor, statmod, Matrix, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, lpSolve, highs, GPArotation, polycor, mvtnorm, clinicalsignificance, GGUM and jsonlite;
+sirt, kequate, betafunctions, KernSmoothIRT, PerFit, nlme, LNIRT, numDeriv, lme4, metafor, statmod, Matrix, mokken, GDINA, alabama, NPCD, CDM, cdcatR, mirtCAT, lpSolve, highs, GPArotation, polycor, mvtnorm, clinicalsignificance, GGUM, CopyDetect and jsonlite;
 `common.R` holds their shared helpers, `ltm-items.R` the calibration by ltm that `dif.R` and `dif-lord-purification.R` share, `mokken-data.R` the data that `mokken.R`, `mokken-reliability.R` and `mokken-steps.R` share, and `many-facet-likelihood.R` the many-facet likelihood that `rater.R` and `rater-bias.R` share.
 
 `generalizability-unbalanced.py` checks the fixture that `generalizability-unbalanced.R` writes against GeneralizIT 0.1.2. It
@@ -123,6 +124,10 @@ GGUM imports xlsx, which needs Java: install rJava against a JDK, with the varia
 and run `irt-unfolding.R` with `JAVA_HOME` set to the JDK. It takes about 3 minutes a seed,
 two at a time: `"seed 1"` to `"seed 10"`, `mixed`, `starts` and `"default tolerance"`, which reads seed 1's, as arguments
 run only those cases and keep the others of the fixture.
+CopyDetect 1.4 is on GitHub only, CRAN having archived 1.3, and exports nothing: `similarity.R` and the benchmark of
+similarity call its internal functions. Install it at its commit into a library of its own and name the library:
+`git clone https://github.com/jaminsore/CopyDetect.git && git -C CopyDetect checkout 32bdd322fba438b654b4ccc1e78406e208a361ad`,
+`R CMD INSTALL --no-test-load -l <library> CopyDetect`, then `R_LIBS=<library> Rscript validation/psychometrics/similarity.R`.
 `multidimensional-groups.R` writes one fixture of five cases, two groups of correlated dimensions, the same data with fixed
 items, three groups with items missing by design, the graded model and three dimensions, and takes about a minute.
 `exploratory-factors.R` writes one fixture of ten correlation matrices, simulated, `bfi`, `SAT12`, Harman's tests and a Heywood case,
@@ -199,4 +204,5 @@ Rscript validation/benchmarks.R table                                           
 
 They need the packages of the scripts above, and for the tasks of
 `validation/benchmarks/` psych, TAM, nlme, metafor, pROC, irr, equate, equateIRT, difR, rms, GDINA, NPCD, catR, cdcatR,
-mirtCAT, pks, DAKS, kst, sets and eRm. The results go to `validation/benchmarks/results/`, which git ignores.
+mirtCAT, pks, DAKS, kst, sets, eRm and CopyDetect, installed as above, in its library on `R_LIBS`, as for
+`similarity.R`; similarity's references take about 10 minutes. The results go to `validation/benchmarks/results/`, which git ignores.

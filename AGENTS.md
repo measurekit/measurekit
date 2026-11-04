@@ -90,7 +90,7 @@ packages/core/                src/ is flat, a file for each concept: errors, che
                               is not exported
 packages/psychometrics/       src/<module>/ for data, math, ctt, change, dimensionality, irt, multidimensional, cdm, fit, dif,
                               equating, standard-setting, explanatory, mokken, generalizability, scaling, rater,
-                              response-time, parameterization, sim and cat; src/checks.ts holds checkFunction and
+                              response-time, similarity, parameterization, sim and cat; src/checks.ts holds checkFunction and
                               checkOpenUnitInterval, which only this package uses; src/index.ts re-exports every module
                               and DataError, MeasurekitError and createRandom
 packages/knowledge-tracing/   src/<module>/ for data, math, evaluate, elo, bkt, logistic, irt, kst, practice and sim;
@@ -185,7 +185,7 @@ A package at 0.0.0 takes `major` in its first changeset, so that it is released 
   the package share and is never exported from the package. `pnpm check:standards` fails on a deep path.
 
 Psychometrics: every module of `cat/`, `cdm/`, `change/`, `equating/`, `fit/`, `irt/`, `multidimensional/`, `rater/`,
-`scaling/`, `sim/` and `standard-setting/` may also import `checks.ts`.
+`scaling/`, `sim/`, `similarity/` and `standard-setting/` may also import `checks.ts`.
 
 | Module              | Imports                                               |
 | ------------------- | ----------------------------------------------------- |
@@ -198,6 +198,7 @@ Psychometrics: every module of `cat/`, `cdm/`, `change/`, `equating/`, `fit/`, `
 | `cdm/`              | `data/`, `irt/`, `math/`                              |
 | `fit/`              | `data/`, `irt/`, `sim/`, `math/`                      |
 | `response-time/`    | `data/`, `irt/`, `math/`                              |
+| `similarity/`       | `data/`, `irt/`, `math/`                              |
 | `equating/`         | `irt/`, `math/`                                       |
 | `sim/`              | `data/`, `irt/`, `cdm/`, `multidimensional/`, `math/` |
 | `dif/`              | `data/`, `irt/`, `equating/`, `math/`                 |

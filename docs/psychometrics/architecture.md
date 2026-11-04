@@ -62,6 +62,7 @@ flowchart LR
 | `generalizability` | [Brennan (2001)](https://doi.org/10.1007/978-1-4757-3456-0), chapters 1 to 12                                                                                                                                                                                                                      | Balanced and unbalanced univariate designs in chapters 1 to 8; multivariate designs in 9 to 12                  |
 | `rater`            | [Eckes (2023)](https://doi.org/10.3726/b20875); Myford and Wolfe (2003, 2004); [Williamson, Xi and Breyer (2012)](https://doi.org/10.1111/j.1745-3992.2011.00223.x)                                                                                                                                | Many-facet models, facet interactions, rater effects; the evaluation of automated scores                        |
 | `response-time`    | [van der Linden (2016)](https://doi.org/10.1201/9781315374512), Models; [De Boeck and Jeon (2019)](https://doi.org/10.3389/fpsyg.2019.00102)                                                                                                                                                       | Lognormal and hierarchical models; the overview of the field                                                    |
+| `similarity`       | [Cizek and Wollack (2017)](https://doi.org/10.4324/9781315743097), chapters 2 and 3; [Sotaridona (2003)](https://ris.utwente.nl/ws/files/6072637/thesis_Sotaridona.pdf)                                                                                                                            | Answer copying and similarity of pairs of persons, and the pairs to compare                                     |
 
 `data`, `math`, `sim` and `parameterization` have no list of their own: they follow what the other modules need.
 
@@ -77,22 +78,22 @@ one subpath per module: `@measurekit/psychometrics/cat`,
 `@measurekit/psychometrics/generalizability`, `@measurekit/psychometrics/irt`, `@measurekit/psychometrics/mokken`,
 `@measurekit/psychometrics/multidimensional`, `@measurekit/psychometrics/parameterization`,
 `@measurekit/psychometrics/rater`, `@measurekit/psychometrics/response-time`, `@measurekit/psychometrics/scaling`,
-`@measurekit/psychometrics/sim` and `@measurekit/psychometrics/standard-setting`. Public names are unique across modules, so `.` re-exports all of them.
+`@measurekit/psychometrics/sim`, `@measurekit/psychometrics/similarity` and `@measurekit/psychometrics/standard-setting`. Public names are unique across modules, so `.` re-exports all of them.
 Only the random number generator is public in `math/`.
 
 ## Dependencies between modules
 
 Modules form layers; a module imports only from lower layers, never from its own or a higher one.
 
-| Layer | Modules                                                                      |
-| ----- | ---------------------------------------------------------------------------- |
-| 1     | `@measurekit/core`, `checks.ts`                                              |
-| 2     | `math/`, `data/`                                                             |
-| 3     | `ctt/`, `change/`, `irt/`, `dimensionality/`, `generalizability/`, `mokken/` |
-| 4     | `cdm/`, `equating/`, `response-time/`, `explanatory/`, `multidimensional/`   |
-| 5     | `sim/`, `dif/`, `standard-setting/`, `scaling/`, `parameterization/`         |
-| 6     | `fit/`, `cat/`                                                               |
-| 7     | `rater/`                                                                     |
+| Layer | Modules                                                                                   |
+| ----- | ----------------------------------------------------------------------------------------- |
+| 1     | `@measurekit/core`, `checks.ts`                                                           |
+| 2     | `math/`, `data/`                                                                          |
+| 3     | `ctt/`, `change/`, `irt/`, `dimensionality/`, `generalizability/`, `mokken/`              |
+| 4     | `cdm/`, `equating/`, `response-time/`, `explanatory/`, `multidimensional/`, `similarity/` |
+| 5     | `sim/`, `dif/`, `standard-setting/`, `scaling/`, `parameterization/`                      |
+| 6     | `fit/`, `cat/`                                                                            |
+| 7     | `rater/`                                                                                  |
 
 Analysis modules (`ctt/`, `change/`, `irt/`, `dimensionality/`, `generalizability/` and `mokken/`) build on `data/` and
 `math/` or on nothing, not on each other. `sim/` builds on `irt/`, `cdm/` and `multidimensional/` to simulate their models, `parameterization/`
@@ -102,7 +103,8 @@ multidimensional tests, `dif/` and `standard-setting/` on `equating/` for linkin
 `equating/` for the linear transformation of a theta scale, `fit/` on `sim/` for the replications of the critical value of
 Q3, and `rater/` on `irt/` for the Rasch model of its many
 facets and on `fit/` for the fit of their elements. `explanatory/` builds on `irt/` for the calibrated items it
-regresses, and `multidimensional/` on `irt/` for its priors, compressed responses and parameter bounds.
+regresses, `multidimensional/` on `irt/` for its priors, compressed responses and parameter bounds, and `similarity/` on
+`irt/` for the probability of each category at a person's theta.
 [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces them, the absence of
 Node modules and platform globals in `src/`, and that code outside `packages/` imports `@measurekit/psychometrics` by
 name.

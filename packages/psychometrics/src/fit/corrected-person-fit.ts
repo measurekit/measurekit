@@ -1,7 +1,14 @@
 import { checkChoice, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { checkThetaPrior, type IrtItem, logProbability, type ThetaPrior } from "../irt/internal.js";
-import { checkItems, checkPersonThetas, isExtreme } from "./inputs.js";
+import {
+  checkItemsOfMatrix,
+  checkPersonThetas,
+  checkThetaPrior,
+  type IrtItem,
+  logProbability,
+  type ThetaPrior,
+} from "../irt/internal.js";
+import { isExtreme } from "./inputs.js";
 
 /** The estimators whose thetas lz* corrects for. */
 export type PersonFitEstimator = "maximum-likelihood" | "weighted-likelihood" | "posterior-mode";
@@ -84,7 +91,7 @@ export function correctedPersonFit(
   thetas: readonly number[],
   options: CorrectedPersonFitOptions = {},
 ): readonly CorrectedPersonFit[] {
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   checkPersonThetas(matrix, thetas);
   checkOptions(options, CORRECTED_PERSON_FIT_OPTIONS);
   const { estimator = "maximum-likelihood", prior } = options;

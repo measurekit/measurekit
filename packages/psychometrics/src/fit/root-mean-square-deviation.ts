@@ -1,7 +1,7 @@
 import { normalizeLogs } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { type IrtItem, itemTrace, logProbability } from "../irt/internal.js";
-import { checkItems, type ResidualFitOptions, residualPopulation } from "./inputs.js";
+import { checkItemsOfMatrix, type IrtItem, itemTrace, logProbability } from "../irt/internal.js";
+import { type ResidualFitOptions, residualPopulation } from "./inputs.js";
 
 /** The deviation of an item's observed responses from its model at the nodes of the population. */
 export interface ItemDeviation {
@@ -51,7 +51,7 @@ export function rootMeanSquareDeviation(
   items: readonly IrtItem[],
   options: ResidualFitOptions = {},
 ): readonly ItemDeviation[] {
-  checkItems(matrix, items);
+  checkItemsOfMatrix(matrix, items);
   const { nodes, weights } = residualPopulation(options);
   const tables = items.map((item): ItemTable => {
     const count = item.model.categoryCount(item.parameters);

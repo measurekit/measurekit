@@ -577,6 +577,26 @@
       }
     },
     {
+      "includes": ["packages/psychometrics/src/similarity/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*", "../*/**", "!../checks.js", "!../data/**", "!../irt/**", "!../math/**"],
+                    "message": "similarity/ builds on data/, irt/ and math/ only."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/psychometrics/src/cdm/**"],
       "linter": {
         "rules": {

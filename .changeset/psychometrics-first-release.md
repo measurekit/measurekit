@@ -255,3 +255,10 @@ it are flagged. A draw whose estimated item lacks a category is drawn again up t
 whose slope is above `slopeLimit`, near-deterministic, are left out and the item listed. The replications equal those
 of `simulateThetas`, `simulateResponses`, `calibrate`, `abilityEstimates` and `yenQ3` composed on the same seed, and the
 largest excess agrees with mirt's bootstrap in mean and SD within Monte Carlo error.
+
+The module `similarity` tests whether two persons gave the same responses more often than two persons who answer alone,
+as evidence of answer copying and collusion: `omegaIndex` (Wollack's ω), `generalizedBinomialTest` (van der Linden and
+Sotaridona), `m4Index` (Maynes' M4) and `kIndex` (Holland's K with Sotaridona and Meijer's K1, K2, S1 and S2), of chosen
+options or of scores, validated against CopyDetect 1.4. `selectPairs` forms the pairs of the persons who share a value
+of a context, such as a room, a school, a network or a start minute, each pair once, leaving out a value shared by more
+than `maxGroup` persons (200) and refusing more than `maxPairs` pairs (1,000,000).

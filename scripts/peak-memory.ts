@@ -275,6 +275,32 @@ export const READERS: readonly ReaderCase[] = [
       psychometrics.yenQ3(matrix, items, [0, 0]),
   },
   {
+    name: "selectPairs: 10,000 persons in 50 groups of 200, the most, 995,000 pairs, formed by two contexts alike",
+    budget: 320,
+    input: () => {
+      const groups = Array.from({ length: 10_000 }, (_, person) => `g${Math.floor(person / 200)}`);
+      return { personIds: ids("p", 10_000), contexts: { room: groups, network: groups } };
+    },
+    read: ({ personIds, contexts }: { personIds: string[]; contexts: unknown }, { psychometrics }) =>
+      psychometrics.selectPairs(personIds, contexts),
+  },
+  {
+    name: "m4Index: 2 persons, 1,000 2PL items, the most",
+    budget: 50,
+    input: () => pairItems(1000),
+    prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
+    read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
+      psychometrics.m4Index(matrix, items, [0, 0], [["person1", "person2"]]),
+  },
+  {
+    name: "kIndex: 2,896 persons with 0 to 2,895 incorrect responses to 2,895 items, the most cells of its counts",
+    budget: 330,
+    input: () =>
+      Array.from({ length: 2896 }, (_, person) => Array.from({ length: 2895 }, (_, i) => (i < person ? 0 : 1))),
+    prepare: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
+    read: (matrix: unknown, { psychometrics }) => psychometrics.kIndex(matrix, [["person2", "person1"]]),
+  },
+  {
     name: "scalability: 200 persons of distinct patterns, 1,000 items, the most",
     budget: 240,
     input: () =>

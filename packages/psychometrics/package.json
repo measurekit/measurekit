@@ -1,7 +1,7 @@
 {
   "name": "@measurekit/psychometrics",
   "version": "0.0.0",
-  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory including multidimensional models, cognitive diagnosis (G-DINA, DINA, DINO, A-CDM, LLM, R-RUM), adaptive testing including cognitive diagnosis and multidimensional tests, item fit, differential item functioning, equating, score scaling and prediction, dimensionality (polychoric correlations and parallel analysis), explanatory models of item difficulty, generalizability theory, Mokken scale analysis, simulation, standard setting, rater agreement and effects, and response times, validated against R.",
+  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory including multidimensional models, cognitive diagnosis (G-DINA, DINA, DINO, A-CDM, LLM, R-RUM), adaptive testing including cognitive diagnosis and multidimensional tests, item fit, differential item functioning, equating, score scaling and prediction, dimensionality (polychoric correlations and parallel analysis), explanatory models of item difficulty, generalizability theory, Mokken scale analysis, simulation, standard setting, rater agreement and effects, response times, and answer similarity for copying and collusion, validated against R.",
   "keywords": [
     "psychometrics",
     "classical-test-theory",
@@ -39,6 +39,9 @@
     "response-times",
     "speed-accuracy",
     "rapid-guessing",
+    "answer-copying",
+    "answer-similarity",
+    "test-security",
     "cognitive-diagnosis",
     "gdina",
     "acdm",
@@ -139,6 +142,10 @@
     "./sim": {
       "types": "./dist/sim/index.d.ts",
       "default": "./dist/sim/index.js"
+    },
+    "./similarity": {
+      "types": "./dist/similarity/index.d.ts",
+      "default": "./dist/similarity/index.js"
     },
     "./standard-setting": {
       "types": "./dist/standard-setting/index.d.ts",
