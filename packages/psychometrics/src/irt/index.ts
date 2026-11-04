@@ -60,7 +60,12 @@ export { betaPrior, logNormalPrior, normalPrior, type ParameterPrior } from "./p
 export type { QuadratureMethod, QuadratureOptions } from "./quadrature.js";
 export { type RatingScaleParameters, ratingScale } from "./rating-scale.js";
 export { empiricalReliability, marginalReliability } from "./reliability.js";
-export { type SummedScoreEstimate, summedScoreTable } from "./summed-score.js";
+export {
+  type SummedScoreEstimate,
+  type SummedScoreOptions,
+  summedScoreTable,
+  type TestletOptions,
+} from "./summed-score.js";
 export type { TestletEstimate } from "./testlets.js";
 export { generalizedGradedUnfolding, type UnfoldingParameters } from "./unfolding.js";
 export {

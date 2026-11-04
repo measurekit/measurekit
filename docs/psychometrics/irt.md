@@ -952,9 +952,9 @@ distribution of theta in a population. `@measurekit/knowledge-tracing` returns t
 `summedScoreTable(items, options)` converts each total score of a fixed form to theta (Thissen et al., 1995), as mirt's
 `fscores(method = "EAPsum")`: for each score s from 0 to the highest, the posterior mean and SD of theta given s, and
 the probability of s, Σ_q w_q L(s | θ_q). The probability of each score at each node comes from the recursion of Lord
-and Wingersky (1984). `options` are the prior and the quadrature of `posteriorMeanEstimate`, without testlets: the
-table assumes the items independent given theta. A person's table entry depends only on the total score, which suits
-reporting; the EAP of the response pattern uses more information.
+and Wingersky (1984). `options` are the prior, the quadrature and the testlets of `posteriorMeanEstimate`. A person's
+table entry depends only on the total score, which suits reporting; the EAP of the response pattern uses more
+information.
 
 ```ts
 import { summedScoreTable, twoParameterLogistic } from "@measurekit/psychometrics/irt";
@@ -967,6 +967,53 @@ const form = [
 summedScoreTable(form); // [{ score: 0, theta, standardError, probability }, ..., { score: 3, ... }]
 ```
 
+### Tables with testlets
+
+Without `testlets` the table takes the items as independent given theta. The items of a [testlet](#testlets) are not:
+taken as independent, they overstate the precision of a score. With `testlets`, `{ items, sd }` as a calibration's
+`testlets` gives them, the table follows the testlet response model by the Lord-Wingersky algorithm 2.0 (Cai, 2015), as
+mirt's `fscores(method = "EAPsum_2.0")` for the equivalent bifactor model:
+
+```mermaid
+flowchart LR
+  F["Items in no testlet"] --> P["Their category probabilities at θ_q"]
+  T["The items of a testlet"] --> R["The recursion at θ_q + σ z_g, for each node z_g"]
+  R --> I["Σ_g w_g P(s | θ_q + σ z_g): the testlet's scores at θ_q"]
+  P --> L["The recursion over items and testlets: P(x | θ_q)"]
+  I --> L
+  L --> E["The posterior of θ given each total score"]
+```
+
+A testlet enters the recursion as one item whose categories are its summed scores, with its effect integrated out over
+the quadrature rule placed on N(0, σ²). Ids of testlet items that are not on the form are skipped, so the testlets of a
+pool serve each of its forms; a testlet with one item on the form still integrates that item's effect.
+
+```ts
+import { summedScoreTable, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+
+const item = (id: string, a: number, b: number) => ({
+  id,
+  model: twoParameterLogistic,
+  parameters: { a, b, c: 0, d: 1 },
+});
+// Two items in no testlet and three that share a passage, whose effect has the SD 0.8.
+const form = [
+  item("q1", 1.2, -0.5),
+  item("q2", 0.8, 0.4),
+  item("p1", 1.1, -1),
+  item("p2", 0.9, 0),
+  item("p3", 1.4, 0.6),
+];
+const testlets = [{ items: ["p1", "p2", "p3"], sd: 0.8 }];
+
+summedScoreTable(form).map((row) => row.standardError); // [0.727, 0.697, 0.683, 0.685, 0.704, 0.731]
+summedScoreTable(form, { testlets }).map((row) => row.standardError); // [0.763, 0.742, 0.731, 0.731, 0.746, 0.774]
+```
+
+Each testlet's items are evaluated at Q × G points, θ_q + σ z_g, for Q nodes of theta and G of the effect, so a
+testlet costs about G times what its items cost in a table without testlets: at the default 61 points, 61 times.
+`conversionTable` and `conditionalScaleError` of [scaling](scaling.md#conversion-tables) take the same `testlets`.
+
 ## Reliability
 
 | Function                              | Value                                                                                                                           | mirt            |
@@ -976,6 +1023,17 @@ summedScoreTable(form); // [{ score: 0, theta, standardError, probability }, ...
 
 mirt's `marginal_rxx` integrates I(θ) / (I(θ) + σ²) under its `density`, which equals the formula above for N(0, 1)
 only. `empiricalReliability` takes estimates with finite thetas and standard errors, such as EAP estimates.
+
+`marginalReliability` takes no testlets: the information of a testlet's items about theta is that of their response
+patterns with the effect integrated out, which does not sum over the items. The reliability of the scores of a
+[summed-score table](#tables-with-testlets) is 1 - Σ_s P(s) SE(s)² / σ² over its rows, the variance of the EAPs over
+that of theta, which holds with testlets too; for estimates of persons, `empiricalReliability` of `posteriorMeanEstimate`
+with `testlets`.
+
+```ts continues
+const rows = summedScoreTable(form, { testlets });
+1 - rows.reduce((sum, row) => sum + row.probability * (row.standardError ?? 0) ** 2, 0); // 0.448, 0.513 without testlets
+```
 
 ## Information
 
@@ -1252,6 +1310,9 @@ Validate a new model against an R reference before relying on it, as [validation
 
 ## Not included
 
+- **Marginal reliability under the testlet model.** No reference: mirt's `marginal_rxx` takes one dimension, and the
+  information of a testlet sums over its response patterns, whose number grows exponentially with its items; the
+  reliability of a summed-score table's rows and `empiricalReliability` cover it.
 - **Pairwise, PML, PROX and eigenvector Rasch estimators.** Outside the sources: CML, MML and JML are the practice, and
   are built.
 - **Hyperbolic cosine model.** No reference: no package fits it; the GGUM, the chapter's other unfolding model, is

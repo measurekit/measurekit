@@ -1,4 +1,4 @@
-import { checkChoice, checkOptions, type FieldNames } from "@measurekit/core";
+import { checkChoice, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import { scoreLimits } from "../equating/internal.js";
 import {
   checkItemList,
@@ -8,9 +8,10 @@ import {
   type IrtItem,
   largestCategoryCount,
   type RangeOptions,
+  type SummedScoreOptions,
   scoreLikelihoods,
+  scoreTestlets,
   summedScoreTable,
-  type ThetaIntegrationOptions,
 } from "../irt/internal.js";
 import { findIncreasingRoot } from "../math/internal.js";
 import { conditionalDeviation, highestScore } from "./conversion.js";
@@ -23,10 +24,10 @@ import { checkScale, type ScoreScale, scoreOfTheta } from "./score-scale.js";
 export type ConversionMethod = "eap-sum" | "true-score";
 
 /** Options of {@link conversionTable}. */
-export interface ConversionTableOptions extends ThetaIntegrationOptions, RangeOptions {
+export interface ConversionTableOptions extends SummedScoreOptions, RangeOptions {
   /**
-   * How the theta of a total score is found. `prior` and `quadrature` are the options of `"eap-sum"`; `"true-score"`
-   * takes neither. `range` is the interval of the thetas of total scores that have none.
+   * How the theta of a total score is found. `prior`, `quadrature` and `testlets` are the options of `"eap-sum"`;
+   * `"true-score"` takes none of them. `range` is the interval of the thetas of total scores that have none.
    *
    * @defaultValue `"eap-sum"`
    */
@@ -38,6 +39,7 @@ const CONVERSION_TABLE_OPTIONS: FieldNames<ConversionTableOptions> = {
   prior: true,
   quadrature: true,
   range: true,
+  testlets: true,
 };
 
 /** One total score of a form with its theta and its scale score. */
@@ -78,17 +80,20 @@ const METHODS: readonly ConversionMethod[] = ["eap-sum", "true-score"];
  * `"eap-sum"`, a score whose probability underflows to 0; for `"true-score"`, a score at or below the sum of the lower
  * asymptotes, which the curve approaches as theta falls, or at or above the sum of the upper ones.
  *
+ * With testlets, `"eap-sum"` takes the table of `summedScoreTable` with each testlet's effect integrated out, and the
+ * standard error of the scale scores integrates it out too.
+ *
  * The scale score is {@link scaleScore} of theta. The standard error of the scale scores is
- * {@link conditionalScaleError} at the row's theta of the scale scores of the table, so it is that of the rounded and
- * bounded scores a person is reported. A table for {@link scaleConversion}, which interpolates between unrounded scores,
- * is made with a `step` of 0.
+ * {@link conditionalScaleError} at the row's theta of the scale scores of the table, with the same testlets and
+ * quadrature, so it is that of the rounded and bounded scores a person is reported. A table for
+ * {@link scaleConversion}, which interpolates between unrounded scores, is made with a `step` of 0.
  *
  * Valid input: items of any models for `"eap-sum"`; a prior with a finite mean and positive sd, and a scale with a
  * positive slope.
  *
- * @param items - The items of the form.
+ * @param items - The items of the form; with testlets, each with its id.
  * @param scale - The slope, intercept and rounding of the reported score.
- * @param options - The method, the prior, the quadrature and the range of theta.
+ * @param options - The method, the prior, the quadrature, the testlets and the range of theta.
  * @returns For each total score, its theta, its scale score and the conditional standard error of the scale score.
  *
  * @example
@@ -104,7 +109,8 @@ const METHODS: readonly ConversionMethod[] = ["eap-sum", "true-score"];
  * table.map((row) => row.scaleScore); // [400, 470, 530, 610]
  * ```
  * @throws `DataError` when the items are not an array, there are none, an item is invalid, the scale, the options, the
- * prior or the quadrature are invalid, or `"true-score"` is asked of a form whose curve does not increase.
+ * prior, the quadrature or the testlets are invalid, or `"true-score"` is asked of a form whose curve does not increase
+ * or with testlets.
  * @see {@link https://doi.org/10.1177/014662169501900105 | Thissen, Pommerich, Billeaud and Williams (1995)}
  * @see {@link https://doi.org/10.4324/9780203056615 | Lord (1980)}
  */
@@ -119,10 +125,16 @@ export function conversionTable(
   const { method = "eap-sum", range: givenRange, ...integration } = options;
   checkChoice(method, "The option method", METHODS);
   const range = checkRange(givenRange);
+  const testlets = scoreTestlets(items, integration.testlets, integration.quadrature);
+  if (method === "true-score" && testlets !== null) {
+    throw new DataError(
+      'The method "true-score" takes no testlets: its curve and information take the items as independent given theta; use "eap-sum".',
+    );
+  }
   const thetas = method === "eap-sum" ? eapSumThetas(items, integration, range) : trueScoreThetas(items, range);
   const scaleScores = thetas.map(({ theta }) => scoreOfTheta(theta, checked));
   const nodes = Float64Array.from(thetas, ({ theta }) => theta);
-  const likelihoods = scoreLikelihoods(items, nodes);
+  const likelihoods = scoreLikelihoods(items, nodes, testlets);
   return thetas.map(({ theta, standardError }, score) => ({
     score,
     theta,
@@ -135,7 +147,7 @@ export function conversionTable(
 /** Returns the posterior mean and standard deviation of theta given each total score. */
 function eapSumThetas(
   items: readonly IrtItem[],
-  options: ThetaIntegrationOptions,
+  options: SummedScoreOptions,
   range: readonly [number, number],
 ): ScoreThetas[] {
   const table = summedScoreTable(items, options);

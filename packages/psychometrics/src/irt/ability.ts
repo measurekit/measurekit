@@ -281,7 +281,7 @@ function posteriorWeights(
  * @throws `DataError` when an item has no id or item ids repeat, a testlet names an id that is not a string or an item
  * that is in a testlet already, or its sd is not positive and finite.
  */
-function testletMembership(items: readonly IrtItem[], testlets: readonly TestletEffect[]): Int32Array {
+export function testletMembership(items: readonly IrtItem[], testlets: readonly TestletEffect[]): Int32Array {
   checkArray(testlets, "The option testlets must be an array of testlets");
   if (testlets.length === 0) return new Int32Array(items.length).fill(-1);
   const indices = indexItems(items);

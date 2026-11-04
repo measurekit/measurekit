@@ -24,6 +24,8 @@ import {
   scaleGrowth,
   scaleScore,
   summedScoreTable,
+  type TestItem,
+  type TestletEffect,
   type ThetaDistribution,
   thetaPosterior,
   twoParameterLogistic,
@@ -31,7 +33,7 @@ import {
 import { covariance, normalCdf, variance } from "../src/math/internal.js";
 import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/internal.js";
 import { defined, expectClose } from "./assertions.js";
-import { type FixtureItems, fixtureItems } from "./fixture-items.js";
+import { type FixtureItems, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
 import { readFixture } from "./fixtures.js";
 
 interface ScalingConversionFixture {
@@ -63,6 +65,32 @@ interface ScalingConversionFixture {
   conditionalErrors: { form: string; conversion: number[]; thetas: number[]; errors: number[] }[];
 }
 const conversions = readFixture<ScalingConversionFixture>("scaling-conversion.json");
+
+interface ScalingTestletTablesFixture {
+  source: string;
+  forms: {
+    name: string;
+    items: { id: string; model: string; parameters: FixtureParameters }[];
+    testlets: { items: string[]; sd: number }[];
+  }[];
+  tables: {
+    form: string;
+    prior: { mean: number; sd: number };
+    scale: { slope: number; intercept: number; lowest?: number; highest?: number; step?: number };
+    rows: { score: number; theta: number; standardError: number; scaleScore: number; scaleStandardError: number }[];
+  }[];
+  conditionalErrors: { form: string; conversion: number[]; thetas: number[]; errors: number[] }[];
+}
+const testletTables = readFixture<ScalingTestletTablesFixture>("scaling-testlet-tables.json");
+
+/** Returns the items of a form of the testlet fixture, with their ids, and its testlets. */
+function testletForm(name: string): { items: TestItem[]; testlets: readonly TestletEffect[] } {
+  const form = defined(testletTables.forms.find((entry) => entry.name === name));
+  return {
+    items: form.items.map(({ id, model, parameters }) => ({ id, model: defined(MODELS[model]), parameters })),
+    testlets: form.testlets,
+  };
+}
 
 interface ScalingGrowthFixture {
   source: string;
@@ -399,6 +427,47 @@ describe("conversionTable", () => {
     });
   }
 
+  for (const reference of testletTables.tables) {
+    const { form, prior, scale } = reference;
+    it(`matches base R's enumeration of the table with the testlets of ${form} on the scale ${JSON.stringify(scale)}${prior.mean === 0 ? "" : ` under a prior of mean ${prior.mean}`}`, () => {
+      const { items, testlets } = testletForm(form);
+      const rows = conversionTable(items, scaleOf(scale), { prior, testlets });
+      expect(rows).toHaveLength(reference.rows.length);
+      reference.rows.forEach((expected, score) => {
+        const actual = defined(rows[score]);
+        const label = `score ${score}`;
+        expectClose(actual.theta, expected.theta, EAP_SUM_TOLERANCE, `${label} theta`);
+        expectClose(actual.standardError, expected.standardError, EAP_SUM_TOLERANCE, `${label} standard error`);
+        expectClose(actual.scaleScore, expected.scaleScore, SCALE_TOLERANCE, `${label} scale score`);
+        expectClose(actual.scaleStandardError, expected.scaleStandardError, SCALE_TOLERANCE, `${label} scale error`);
+      });
+    });
+  }
+
+  it("integrates the testlets out of the table and of the errors of its scale scores alike", () => {
+    const { items, testlets } = testletForm("eight 2PL items, two testlets");
+    const quadrature = { points: 41 };
+    const rows = conversionTable(items, SCALE, { testlets, quadrature });
+    const table = summedScoreTable(items, { testlets, quadrature });
+    expect(rows.map(({ theta }) => theta)).toEqual(table.map(({ theta }) => theta));
+    const conversion = rows.map(({ scaleScore: score }) => score);
+    for (const row of rows) {
+      expect(row.scaleStandardError).toBe(
+        conditionalScaleError(items, conversion, row.theta, { testlets, quadrature }),
+      );
+    }
+    const independent = conversionTable(items, SCALE);
+    expect(independent.map(({ theta }) => theta)).not.toEqual(rows.map(({ theta }) => theta));
+  });
+
+  it("refuses testlets for the true score, whose curve and information take the items as independent", () => {
+    const { items, testlets } = testletForm("eight 2PL items, two testlets");
+    expect(() => conversionTable(items, SCALE, { method: "true-score", testlets })).toThrow(
+      'The method "true-score" takes no testlets: its curve and information take the items as independent given theta; use "eap-sum".',
+    );
+    expect(conversionTable(items, SCALE, { method: "true-score", testlets: [] })).toHaveLength(9);
+  });
+
   it("takes the EAP of the summed score by default, as summedScoreTable gives it", () => {
     const items = formItems("est3pl form 2, 3PL");
     const table = summedScoreTable(items);
@@ -539,6 +608,12 @@ describe("conversionTable", () => {
     expect(() => conversionTable(FORM, SCALE, { prior: JSON.parse('"normal"') })).toThrow(
       'The option prior must be an object { mean, sd }, found "normal".',
     );
+    expect(() => conversionTable(FORM, SCALE, { testlets: [{ items: ["q1"], sd: 1 }] })).toThrow(
+      "Item 1 needs a string id, found undefined.",
+    );
+    expect(() => conversionTable(FORM, SCALE, { testlets: JSON.parse("null") })).toThrow(
+      "The option testlets must be an array of testlets, found null.",
+    );
   });
 });
 
@@ -552,6 +627,30 @@ describe("conditionalScaleError", () => {
       });
     });
   }
+
+  for (const reference of testletTables.conditionalErrors) {
+    it(`matches base R's enumeration of the error of the scale scores with the testlets of ${reference.form}`, () => {
+      const { items, testlets } = testletForm(reference.form);
+      reference.thetas.forEach((theta, j) => {
+        const actual = conditionalScaleError(items, reference.conversion, theta, { testlets });
+        expectClose(actual, defined(reference.errors[j]), CONDITIONAL_ERROR_TOLERANCE, `theta ${theta}`);
+      });
+    });
+  }
+
+  it("integrates each testlet's effect over the quadrature rule of the option", () => {
+    const { items, testlets } = testletForm("eight 2PL items, two testlets");
+    const conversion = Array.from({ length: 9 }, (_, score) => 300 + 50 * score);
+    const fine = conditionalScaleError(items, conversion, 0.4, { testlets });
+    const coarse = conditionalScaleError(items, conversion, 0.4, {
+      testlets,
+      quadrature: { method: "gauss-hermite", points: 31 },
+    });
+    expectClose(coarse, fine, 1e-6);
+    expect(conditionalScaleError(items, conversion, 0.4, { quadrature: { points: 11 } })).toBe(
+      conditionalScaleError(items, conversion, 0.4),
+    );
+  });
 
   it("is the standard deviation of the scale score over the total scores, as enumerating the patterns gives it", () => {
     const polytomous: IrtItem = { model: generalizedPartialCredit, parameters: { a: 1.1, b: [-0.5, 0.7] } };
@@ -609,6 +708,18 @@ describe("conditionalScaleError", () => {
       "Theta must be a finite number, found Infinity.",
     );
     expect(() => conditionalScaleError(FORM, [1, 2, 3, 4], JSON.parse('"0"'))).toThrow(DataError);
+    expect(() => conditionalScaleError(FORM, [1, 2, 3, 4], 0, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => conditionalScaleError(FORM, [1, 2, 3, 4], 0, JSON.parse('{"prior":{}}'))).toThrow(
+      'There is no option "prior": the options are testlets and quadrature.',
+    );
+    expect(() => conditionalScaleError(FORM, [1, 2, 3, 4], 0, { testlets: [{ items: ["q1"], sd: 1 }] })).toThrow(
+      "Item 1 needs a string id, found undefined.",
+    );
+    expect(() => conditionalScaleError(FORM, [1, 2, 3, 4], 0, { quadrature: { points: 1 } })).toThrow(
+      "The quadrature points must be an integer from 2, found 1.",
+    );
   });
 });
 

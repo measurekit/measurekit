@@ -8,7 +8,7 @@
  * @module @measurekit/psychometrics/scaling
  */
 
-export { conditionalScaleError } from "./conditional-error.js";
+export { type ConditionalScaleErrorOptions, conditionalScaleError } from "./conditional-error.js";
 export {
   type ConversionMethod,
   type ConversionRow,

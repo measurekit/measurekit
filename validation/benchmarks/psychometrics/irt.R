@@ -135,6 +135,23 @@ bench_task("irt.jointMaximumLikelihood", "Joint maximum likelihood calibration o
 
 bench_task("irt.summedScoreTable", "The posterior mean of the ability given each summed score", sprintf("%d items", item_count))
 
+# The same items in 8 testlets of 5 with effects of SD 0.8: the bifactor model whose specific slopes are a σ, set, not
+# estimated, which mirt's EAPsum_2.0 tabulates as measurekit's testlet model.
+summed_testlet <- rep(seq_len(item_count / 5), each = 5)
+summed_values <- bfactor(binary, summed_testlet, pars = "values")
+for (j in seq_len(item_count)) {
+  rows <- summed_values$item == colnames(binary)[j]
+  summed_values$value[rows & summed_values$name == "a1"] <- coefficients[j, "a"]
+  summed_values$value[rows & summed_values$name == paste0("a", summed_testlet[j] + 1)] <- 0.8 * coefficients[j, "a"]
+  summed_values$value[rows & summed_values$name == "d"] <- -coefficients[j, "a"] * coefficients[j, "b"]
+}
+summed_fit <- bfactor(binary, summed_testlet, pars = summed_values, TOL = NaN, verbose = FALSE)
+bench_task("irt.summedScoreTableTestlets", "The posterior mean of the ability given each summed score, with testlets",
+           sprintf("%d items in %d testlets of 5", item_count, item_count / 5),
+           reference("mirt", "fscores(method = \"EAPsum_2.0\")"),
+           function() fscores(summed_fit, method = "EAPsum_2.0", full.scores = FALSE, quadpts = POINTS,
+                              theta_lim = c(-6, 6), verbose = FALSE))
+
 grid <- matrix(seq(-6, 6, length.out = 121))
 bench_task("irt.testInformation", "Information of a test at 121 values of theta", sprintf("%d items", item_count),
            reference("mirt", "testinfo"), function() testinfo(fit_2pl, grid))

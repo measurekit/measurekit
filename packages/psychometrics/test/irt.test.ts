@@ -610,6 +610,23 @@ interface IrtTestletFixture {
 // biome-ignore-end lint/style/useNamingConvention: the keys are those of the fixture file.
 const testlet = readFixture<IrtTestletFixture>("irt-testlet.json");
 
+interface IrtTestletTablesFixture {
+  source: string;
+  forms: {
+    name: string;
+    items: { id: string; model: string; parameters: FixtureParameters }[];
+    testlets: { items: string[]; sd: number }[];
+  }[];
+  tables: {
+    form: string;
+    tables: {
+      prior: { mean: number; sd: number };
+      estimates: { score: number; theta: number; standardError: number; probability: number }[];
+    }[];
+  }[];
+}
+const testletTables = readFixture<IrtTestletTablesFixture>("irt-testlet-tables.json");
+
 interface IrtTestletGroupsFixture {
   source: string;
   points: number;
@@ -3888,13 +3905,91 @@ describe("summedScoreTable", () => {
     }
   });
 
-  it("takes the prior and the quadrature but refuses testlets, which the table does not integrate out", () => {
+  for (const form of testletTables.forms) {
+    it(`matches base R's enumeration of the patterns and mirt's EAPsum_2.0 with the testlets of ${form.name}`, () => {
+      const items = form.items.map(({ id, model, parameters }) => ({ id, model: defined(MODELS[model]), parameters }));
+      const reference = defined(testletTables.tables.find((table) => table.form === form.name));
+      for (const { prior, estimates } of reference.tables) {
+        const table = summedScoreTable(items, { prior, testlets: form.testlets });
+        expect(table.map((row) => row.score)).toEqual(estimates.map((row) => row.score));
+        table.forEach((row, s) => {
+          const expected = defined(estimates[s]);
+          expectClose(row.theta, expected.theta, TABLE_TOLERANCE, `theta of ${s}`);
+          expectClose(row.standardError, expected.standardError, TABLE_TOLERANCE, `SE of ${s}`);
+          expectClose(row.probability, expected.probability, TABLE_TOLERANCE, `probability of ${s}`);
+        });
+      }
+    });
+  }
+
+  describe("with testlets", () => {
+    const form = defined(testletTables.forms.find(({ name }) => name.startsWith("eight 2PL")));
+    const items = form.items.map(({ id, parameters }) => ({ id, model: twoParameterLogistic, parameters }));
+
+    it("gives the table of independent items as the testlets' SDs shrink to 0", () => {
+      const independent = summedScoreTable(items);
+      const testlets = form.testlets.map(({ items: ids }) => ({ items: ids, sd: 1e-9 }));
+      summedScoreTable(items, { testlets }).forEach((row, s) => {
+        const expected = defined(independent[s]);
+        expectClose(row.theta, expected.theta, 1e-8, `theta of ${s}`);
+        expectClose(row.probability, expected.probability, 1e-8, `probability of ${s}`);
+      });
+      expect(summedScoreTable(items, { testlets: [] })).toEqual(independent);
+    });
+
+    it("gives probabilities of the scores that sum to 1", () => {
+      const table = summedScoreTable(items, { testlets: form.testlets, prior: { mean: -0.5, sd: 2 } });
+      expectClose(
+        table.reduce((sum, { probability }) => sum + probability, 0),
+        1,
+        1e-12,
+      );
+    });
+
+    it("skips the ids of testlet items that are not on the form", () => {
+      const testlets = [{ items: ["t1a", "t1b", "t1c", "elsewhere"], sd: 0.8 }, ...form.testlets.slice(1)];
+      expect(summedScoreTable(items, { testlets })).toEqual(summedScoreTable(items, { testlets: form.testlets }));
+      const none = [{ items: ["elsewhere"], sd: 2 }];
+      expect(summedScoreTable(items, { testlets: none })).toEqual(summedScoreTable(items));
+    });
+
+    it("integrates each effect over the quadrature rule of the option", () => {
+      const quadrature = { method: "gauss-hermite", points: 41 } as const;
+      const coarse = summedScoreTable(items, { testlets: form.testlets, quadrature });
+      summedScoreTable(items, { testlets: form.testlets }).forEach((row, s) => {
+        expectClose(defined(coarse[s]).theta, row.theta, 1e-5, `theta of ${s}`);
+      });
+    });
+
+    it("rejects testlets that are invalid or items without ids", () => {
+      const sd = 1;
+      expect(() => summedScoreTable(ITEMS_2PL, { testlets: [{ items: ["t1a"], sd }] })).toThrow(
+        "Item 1 needs a string id, found undefined.",
+      );
+      expect(() => summedScoreTable(items, { testlets: [{ items: ["t1a"], sd: 0 }] })).toThrow(
+        "The sd of testlet 1 must be a positive number, found 0.",
+      );
+      expect(() => summedScoreTable(items, { testlets: [{ items: ["t1a", "t1a"], sd }] })).toThrow(
+        'Item "t1a" is in a testlet twice.',
+      );
+      expect(() => summedScoreTable(items, { testlets: JSON.parse('{"items":["t1a"],"sd":1}') })).toThrow(
+        "The option testlets must be an array of testlets, found an object.",
+      );
+      expect(() => summedScoreTable(items, { testlets: JSON.parse("null") })).toThrow(
+        "The option testlets must be an array of testlets, found null.",
+      );
+      expect(() => summedScoreTable(items, { testlets: [JSON.parse('"t1a"')] })).toThrow(
+        'Testlet 1 must be an object { items, sd }, found "t1a".',
+      );
+      expect(() => summedScoreTable(items, { testlets: [{ items: [JSON.parse("3")], sd }] })).toThrow(
+        "Testlet 1 needs item ids, found 3.",
+      );
+    });
+  });
+
+  it("leaves marginal reliability without testlets, which its information takes as independent", () => {
     const testlets = [{ items: ["item1", "item2"], sd: 1 }];
-    // @ts-expect-error: a summed-score table assumes the items independent given theta.
-    expect(() => summedScoreTable(ITEMS_2PL, { testlets })).toThrow(
-      'There is no option "testlets": the options are prior and quadrature.',
-    );
-    // @ts-expect-error: so does marginal reliability.
+    // @ts-expect-error: the information of a testlet's patterns does not sum over its items.
     expect(() => marginalReliability(ITEMS_2PL, { testlets })).toThrow('There is no option "testlets"');
   });
 
@@ -4814,6 +4909,34 @@ describe("properties", () => {
         expect(reliability).toBeGreaterThanOrEqual(0);
         expect(reliability).toBeLessThan(1);
       }),
+    );
+  });
+
+  it("summed-score tables with testlets sum to 1 and do not depend on the order of the items", () => {
+    const sd = fc.double({ min: 0.1, max: 3, noNaN: true });
+    fc.assert(
+      fc.property(
+        fc.array(fc.tuple(arbitraryItem, fc.integer({ min: -1, max: 1 })), { minLength: 1, maxLength: 6 }),
+        fc.tuple(sd, sd),
+        (rows, sds) => {
+          const items = rows.map(([item], i) => ({ ...item, id: `i${i}` }));
+          const testlets = sds.map((value, t) => ({
+            items: rows.flatMap(([, testlet], i) => (testlet === t ? [`i${i}`] : [])),
+            sd: value,
+          }));
+          const table = summedScoreTable(items, { testlets });
+          expectClose(
+            table.reduce((sum, row) => sum + row.probability, 0),
+            1,
+            1e-12,
+          );
+          const reversed = summedScoreTable(items.toReversed(), { testlets });
+          table.forEach((row, s) => {
+            expectClose(defined(reversed[s]).probability, row.probability, 1e-12, `probability of ${s}`);
+            expectClose(defined(reversed[s]).theta, row.theta, 1e-9, `theta of ${s}`);
+          });
+        },
+      ),
     );
   });
 

@@ -219,8 +219,7 @@ Every function refuses an option it does not take, naming it, and so do the reco
 their place (priors, quadrature, thresholds, populations, bandwidths, content constraints, information targets, modules,
 designs, scales, Hofstee bounds and Beuk judgments): a misspelled name left its default in place unseen, as a
 calibration asked to hold `c` at 0.25 under a misspelled option estimated it at 0.68. `scaleConversion` takes the
-`lowest`, `highest` and `step` of a scale, not the scale, and a summed-score table and marginal reliability refuse
-`testlets`.
+`lowest`, `highest` and `step` of a scale, not the scale, and marginal reliability refuses `testlets`.
 
 `calibrate` takes `fixedCovariance`, the covariance of the fixed items' estimates from the calibration that made them,
 and carries their sampling error into the standard errors of the items and distributions it estimates: V + J Σ Jᵀ, the
@@ -242,3 +241,9 @@ gives the agreement by window of time, `routingCurve` the coverage and agreement
 `scoreMapping` and `mappedScore` a line to the human mean and SD or an isotonic regression from machine to human scores,
 and `replayShift` the shift of responses scored again from their locked scores in SDs, with its standard error and whether
 it stays within `maxShiftSd`.
+
+`summedScoreTable`, `conversionTable` and `conditionalScaleError` take `testlets`, `{ items, sd }` as a calibration
+gives them: the recursion of Lord and Wingersky runs over each testlet's items at θ + σ z for each node of the rule and
+integrates the testlet's effect out (Cai's algorithm 2.0), so a form with a passage has its table and the conditional
+errors of its scale scores under the testlet model. Validated against base R's enumeration of every response pattern and
+mirt's `fscores(method = "EAPsum_2.0")`, within 1e-15. `"true-score"` tables refuse testlets.

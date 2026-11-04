@@ -20,6 +20,7 @@ const BUDGETS = {
   "irt.abilityWeightedLikelihood": 3_000,
   "irt.jointMaximumLikelihood": 200,
   "irt.summedScoreTable": 2,
+  "irt.summedScoreTableTestlets": 60,
   "irt.testInformation": 6,
   "irt.conditionalRasch": 40,
   "irt.conditionalPartialCredit": 40,

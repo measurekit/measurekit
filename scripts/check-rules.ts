@@ -172,6 +172,22 @@ export const RULES: readonly Rule[] = [
     titles: "wider than 10,000",
   },
   {
+    rule: "An item of a testlet enters a summed-score table once, inside its testlet, and is not also counted as an item in none.",
+    file: "packages/psychometrics/src/irt/summed-score.ts",
+    find: "if ((testletOf[i] ?? -1) >= 0) return;",
+    replace: "",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "enumeration of the patterns and mirt's EAPsum_2.0",
+  },
+  {
+    rule: "A true-score conversion table refuses testlets, which its curve and information would leave out unseen.",
+    file: "packages/psychometrics/src/scaling/conversion-table.ts",
+    find: 'if (method === "true-score" && testlets !== null) {',
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/scaling.test.ts",
+    titles: "refuses testlets for the true score",
+  },
+  {
     rule: "Conditional maximum likelihood checks the categories that occur before an item's highest response sizes its parameters, which a far response would overflow.",
     file: "packages/psychometrics/src/irt/conditional-likelihood.ts",
     find: "checkItems(matrix.itemIds, highest, model, everyPerson);",

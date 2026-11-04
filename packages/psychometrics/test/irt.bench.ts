@@ -142,6 +142,14 @@ test("tabulates the posterior of each summed score of 40 items", async (context)
   await benchmark(context, "irt.summedScoreTable", () => summedScoreTable(items));
 });
 
+test("tabulates the posterior of each summed score of 40 items in 8 testlets of 5", async (context) => {
+  const testlets = Array.from({ length: 8 }, (_, t) => ({
+    items: items.slice(5 * t, 5 * t + 5).map(({ id }) => id),
+    sd: 0.8,
+  }));
+  await benchmark(context, "irt.summedScoreTableTestlets", () => summedScoreTable(items, { testlets }));
+});
+
 test("sums the information of 40 items at 121 values of theta", async (context) => {
   const thetas = Array.from({ length: 121 }, (_, i) => -6 + i / 10);
   await benchmark(context, "irt.testInformation", () => {

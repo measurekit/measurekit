@@ -60,6 +60,7 @@ The items are those of a calibration, `calibrate(...).items`, or any [items](irt
 | `method`     | `"eap-sum"`           | `"eap-sum"` or `"true-score"`: how the theta of a total score is found                                  |
 | `prior`      | `{ mean: 0, sd: 1 }`  | The prior of `"eap-sum"`: a finite mean and a positive sd                                               |
 | `quadrature` | 61 rectangular points | The rule of `"eap-sum"`, placed on the prior, as [`summedScoreTable`](irt.md#summed-score-tables)       |
+| `testlets`   | `[]`                  | `{ items, sd }` of `"eap-sum"`, whose effects it integrates out: [below](#tables-with-testlets)         |
 | `range`      | `[-6, 6]`             | The thetas of the total scores that have none: a lower bound below an upper bound, at most 10,000 apart |
 
 | Method         | Theta of a total score x                                                    | Standard error                                |
@@ -80,9 +81,11 @@ The items are those of a calibration, `calibrate(...).items`, or any [items](irt
 
 ## Conditional standard errors
 
-`conditionalScaleError(items, conversion, theta)` returns the standard deviation of the scale score of a person at
-theta (Kolen, Zeng and Hanson, 1996). With P(x | θ) the probability of the total score x, from the recursion of Lord
-and Wingersky (1984), and c(x) its scale score, it is √(Σ c(x)² P(x | θ) - (Σ c(x) P(x | θ))²).
+`conditionalScaleError(items, conversion, theta, options)` returns the standard deviation of the scale score of a
+person at theta (Kolen, Zeng and Hanson, 1996). With P(x | θ) the probability of the total score x, from the recursion
+of Lord and Wingersky (1984), and c(x) its scale score, it is √(Σ c(x)² P(x | θ) - (Σ c(x) P(x | θ))²). With the option
+`testlets`, P(x | θ) integrates each testlet's effect out over the rule of the option `quadrature`, 61 rectangular
+points by default, as a [table with testlets](#tables-with-testlets) does.
 
 ```ts continues
 import { conditionalScaleError } from "@measurekit/psychometrics/scaling";
@@ -117,6 +120,40 @@ scaleConversion(equated, unrounded, { lowest, highest, step }); // [400, 450, 52
 
 Interpolate unrounded scores: rounding Y's table first rounds twice. Any equating that returns equivalents on Y's raw
 scale, including [NEAT equating](equating.md#equating-through-common-items), takes this route.
+
+## Tables with testlets
+
+A form whose items include a calibrated [testlet](irt.md#testlets), such as the questions on a passage, takes the
+testlet response model for its table: `testlets` lists `{ items, sd }`, a calibration's `testlets`, and `"eap-sum"`
+takes [`summedScoreTable`](irt.md#tables-with-testlets) with each testlet's effect integrated out, as does the error of
+the scale scores in every row. Taken as independent, the items of a testlet overstate the precision of the score.
+
+```ts
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { conditionalScaleError, conversionTable } from "@measurekit/psychometrics/scaling";
+
+const item = (id: string, a: number, b: number) => ({
+  id,
+  model: twoParameterLogistic,
+  parameters: { a, b, c: 0, d: 1 },
+});
+const form = [
+  item("q1", 1.2, -0.5),
+  item("q2", 0.8, 0.4),
+  item("p1", 1.1, -1),
+  item("p2", 0.9, 0),
+  item("p3", 1.4, 0.6),
+];
+const testlets = [{ items: ["p1", "p2", "p3"], sd: 0.8 }];
+const table = conversionTable(form, { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 }, { testlets });
+const conversion = table.map((row) => row.scaleScore); // [380, 430, 470, 520, 560, 610]
+
+conditionalScaleError(form, conversion, 0, { testlets }); // 51.8
+conditionalScaleError(form, conversion, 0); // 47.7, the items taken as independent
+```
+
+`"true-score"` takes no testlets: its curve and its standard error 1 / √I(θ) take the items as independent, and the
+information of a testlet sums over its response patterns, not its items.
 
 ## Norms
 
@@ -513,6 +550,8 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | `scaleScore`, `conversionTable`, `predictThetaScore`       | A scale without a positive finite slope and a finite intercept, `lowest` not below `highest`, or a negative `step`                       | Give the scale's slope, intercept and rounding                                   |
 | `scaleScore`, `conditionalScaleError`                      | A theta that is not finite                                                                                                               | Give an estimate of theta                                                        |
 | `conversionTable`                                          | No items, an invalid item, an invalid prior, quadrature or range, or `"true-score"` for a form whose curve does not rise                 | Use `"eap-sum"` for an NRM item or a slope a ≤ 0                                 |
+| `conversionTable`                                          | `"true-score"` with testlets                                                                                                             | Use `"eap-sum"`, which integrates the testlets' effects out                      |
+| `conversionTable`, `conditionalScaleError`                 | Testlets that are not an array of `{ items, sd }`, an sd not above 0, an item in two testlets, or items without ids                      | Give the items' ids and a calibration's `testlets`                               |
 | `conditionalScaleError`, `predictFormScore`                | A conversion other than one finite scale score for each total score of the form                                                          | Give the scale scores of the totals 0 to the highest, as a conversion table does |
 | `scaleConversion`                                          | Equivalents or a conversion that are not finite numbers, or an empty conversion                                                          | Give the equated scores and the form's unrounded scale scores                    |
 | `scaleGrowth`                                              | Fewer than two groups, a label that is empty or repeats, a mean that is not finite, or a standard deviation not above 0                  | Give each grade its own label and moments, in the order of the scale             |
@@ -530,6 +569,7 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | --------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Rounding of halves          | Up: 525 to 530 with a step of 10                                | R's `round` rounds halves to even; testing programs differ                                                 |
 | EAP of the summed score     | 61 rectangular points on the prior, any prior                   | mirt's `fscores(method = "EAPsum")`: the model's own latent distribution                                   |
+| Tables with testlets        | The testlet model: one effect of SD σ added to theta            | mirt's `fscores(method = "EAPsum_2.0")`: a bifactor model, whose specific slopes a σ give the same tables  |
 | True-score theta            | The root of the curve; the range's end where there is none      | A procedure of each program for scores below the guessing level                                            |
 | Percentile ranks            | Of the sample's scores as given; a step function between scores | Kolen and Brennan interpolate linearly within each integer score                                           |
 | Intervals of norms          | The normal quantile of the level                                | `check.norms` uses 1.96                                                                                    |
@@ -551,6 +591,8 @@ Invalid input throws `DataError` naming the value found, also input of another t
 - Kolen, M. J., & Brennan, R. L. (2014). Test equating, scaling, and linking: Methods and practices (3rd ed.). Springer.
 - Kolen, M. J., Zeng, L., & Hanson, B. A. (1996). Conditional standard errors of measurement for scale scores using IRT.
   Journal of Educational Measurement, 33(2), 129-140.
+- Cai, L. (2015). Lord-Wingersky algorithm version 2.0 for hierarchical item factor models with applications in test
+  scoring, scale alignment, and model fit testing. Psychometrika, 80(2), 535-559.
 - Cario, M. C., & Nelson, B. L. (1997). Modeling and generating random vectors with arbitrary marginal distributions and
   correlation matrix (technical report). Northwestern University.
 - Dhaene, J., Denuit, M., Goovaerts, M. J., Kaas, R., & Vyncke, D. (2002). The concept of comonotonicity in actuarial science
