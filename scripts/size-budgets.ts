@@ -102,7 +102,10 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     gzip: 34_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/math"],
   },
-  "@measurekit/psychometrics/mokken": { gzip: 15_000, holds: ["core", "psychometrics/data", "psychometrics/math"] },
+  "@measurekit/psychometrics/mokken": {
+    gzip: 15_000,
+    holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/math"],
+  },
   "@measurekit/psychometrics/multidimensional": {
     gzip: 51_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],

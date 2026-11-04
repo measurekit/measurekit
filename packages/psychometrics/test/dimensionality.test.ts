@@ -1,9 +1,10 @@
 import { normalCdf, shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { bivariateNormalCdf, bivariateNormalDensity } from "../src/dimensionality/bivariate-normal.js";
 import {
   averagePartials,
+  bivariateNormalCdf,
+  bivariateNormalDensity,
   correlationEigenvalues,
   type FactorExtraction,
   type FactorRotation,

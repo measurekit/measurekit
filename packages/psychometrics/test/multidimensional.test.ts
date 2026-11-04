@@ -1,7 +1,7 @@
 import { cholesky, logistic, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { pearsonMatrix } from "../src/dimensionality/pearson.js";
+import { pearsonMatrix } from "../src/dimensionality/internal.js";
 import {
   betaPrior,
   buildResponseMatrix,

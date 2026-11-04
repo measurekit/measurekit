@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { sectionCases } from "../src/ctt/sections.js";
-import { designMatrix } from "../src/explanatory/features.js";
 import {
   buildResponseMatrix,
   calibrate,
@@ -10,12 +8,14 @@ import {
   expectedRating,
   type FacetedScore,
   generalizabilityStudy,
+  itemFeatureRegression,
   linearChange,
   manyFacetRasch,
   multidimensionalTwoParameterLogistic,
   qMatrixIdentifiability,
   responseTimeEffort,
   selectPairs,
+  subscoreValue,
   testLength,
   transformItem,
   twoParameterLogistic,
@@ -187,15 +187,18 @@ describe("a record whose keys are the user's identifiers", () => {
       ["constructor", ["__proto__", "constructor"]],
       ["__proto__", ["prototype", "item4"]],
     ]);
-    expect(sectionCases(matrix, sections, "The sections").names).toEqual(["constructor", "__proto__"]);
+    expect(subscoreValue(matrix, sections).map(({ section }) => section)).toEqual(["constructor", "__proto__"]);
   });
 
   it("holds them as ids of an item's features", () => {
-    const features = record([
-      ["constructor", { x: 1 }],
-      ["__proto__", { x: 2 }],
-    ]);
-    expect(Array.from(designMatrix(["constructor", "__proto__"], features, false).matrix)).toEqual([1, 2]);
+    const items = ids.map((id, index) => ({
+      id,
+      model: twoParameterLogistic,
+      parameters: { a: 1, b: index / 2, c: 0, d: 1 },
+      standardErrors: { b: 0.2 },
+    }));
+    const features = record(ids.map((id, index) => [id, { x: index * index }]));
+    expect(itemFeatureRegression(items, features).effects).toHaveLength(2);
   });
 
   it("holds them as the items that a calibration fixes, and as testlets and covariates", () => {

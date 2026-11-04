@@ -3,6 +3,7 @@
 export { additiveMaximizer, type CdmLink, saturatedCoefficients } from "./additive.js";
 export { type CdmItem, checkSuccessProbabilities, type ProfileProportion } from "./calibration.js";
 export { type ProfileEstimate, profileEstimate } from "./persons.js";
+export { pseudoInverse } from "./pseudo-inverse.js";
 export {
   bitPattern,
   checkDesignSize,

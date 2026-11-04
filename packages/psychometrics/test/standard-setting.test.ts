@@ -25,7 +25,7 @@ import {
   type TestItem,
   threeParameterLogistic,
 } from "../src/index.js";
-import { adaptiveIntegral } from "../src/standard-setting/adaptive-integral.js";
+import { adaptiveIntegral } from "../src/standard-setting/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureParameters, item2pl, MODELS } from "./fixture-items.js";
 import { readFixture } from "./fixtures.js";

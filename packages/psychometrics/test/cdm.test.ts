@@ -1,8 +1,13 @@
 import { chiSquareUpperTail } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { additiveMaximizer, type CdmLink, profilesOf, saturatedCoefficients } from "../src/cdm/internal.js";
-import { pseudoInverse } from "../src/cdm/pseudo-inverse.js";
+import {
+  additiveMaximizer,
+  type CdmLink,
+  profilesOf,
+  pseudoInverse,
+  saturatedCoefficients,
+} from "../src/cdm/internal.js";
 import {
   attributeProfiles,
   buildResponseMatrix,
