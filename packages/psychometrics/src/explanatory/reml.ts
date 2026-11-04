@@ -1,5 +1,5 @@
 import { backtrack, cholesky, DataError, invertPositiveDefinite, multiplyVector } from "@measurekit/core";
-import { multiply, trace, traceOfProduct } from "../math/internal.js";
+import { logDeterminantOfFactor, multiply, trace, traceOfProduct } from "../math/internal.js";
 import { designCrossProducts } from "./cross-products.js";
 
 /** The estimates of a regression with a random residual and known sampling variances. */
@@ -228,7 +228,5 @@ function logDeterminant(a: Float64Array, size: number): number {
     throw new DataError(
       "The weighted design cannot be inverted: the sampling variances and the design leave an effect undetermined.",
     );
-  let sum = 0;
-  for (let j = 0; j < size; j++) sum += 2 * Math.log(factor[j * size + j] ?? 1);
-  return sum;
+  return logDeterminantOfFactor(factor, size);
 }

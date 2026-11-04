@@ -28,6 +28,13 @@ export function largestChange(previous: Float64Array, current: Float64Array): nu
   return largest;
 }
 
+/** Returns the integer nearest to x, the even one of two at a half, as R's `round`. */
+export function roundHalfToEven(x: number): number {
+  const below = Math.floor(x);
+  const fraction = x - below;
+  return fraction > 0.5 || (fraction === 0.5 && below % 2 !== 0) ? below + 1 : below;
+}
+
 /** Returns the sample variance (denominator n - 1) of at least two values. */
 export function variance(values: Float64Array): number {
   return covariance(values, values);

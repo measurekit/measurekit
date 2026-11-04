@@ -1,4 +1,4 @@
-import { DataError, type QMatrix } from "@measurekit/core";
+import { checkRecordById, DataError, type QMatrix } from "@measurekit/core";
 import { designAttributes } from "./q-matrix.js";
 
 /** The conditions under which a Q-matrix identifies the DINA and DINO models. */
@@ -35,7 +35,8 @@ const MIN_ITEMS = 3;
  * @see {@link https://doi.org/10.1007/s11336-015-9471-z | Xu and Zhang (2016)}
  */
 export function qMatrixIdentifiability(qMatrix: QMatrix): QMatrixIdentifiability {
-  const ids = typeof qMatrix === "object" && qMatrix !== null ? Object.keys(qMatrix) : [];
+  checkRecordById(qMatrix, "A Q-matrix must be an object of attribute lists by item id");
+  const ids = Object.keys(qMatrix);
   const { attributes, itemAttributes } = designAttributes(ids, qMatrix);
   if (ids.length === 0) throw new DataError("A Q-matrix needs at least one item.");
   const counts = new Array<number>(attributes.length).fill(0);

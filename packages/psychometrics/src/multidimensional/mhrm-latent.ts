@@ -1,5 +1,5 @@
 import { cholesky, invertPositiveDefinite } from "@measurekit/core";
-import { identity, multiply } from "../math/internal.js";
+import { identity, logDeterminantOfFactor, multiply } from "../math/internal.js";
 import { pairsOf } from "./correlation.js";
 
 /** The correlation matrix of the dimensions of an MH-RM calibration, with its inverse and log determinant. */
@@ -34,8 +34,7 @@ export function createCorrelations(dimensions: number): Correlations {
       if (factor === null || inverse === null) return false;
       matrix.set(next);
       precision.set(inverse);
-      logDeterminant = 0;
-      for (let d = 0; d < dimensions; d++) logDeterminant += 2 * Math.log(factor[d * dimensions + d] ?? 1);
+      logDeterminant = logDeterminantOfFactor(factor, dimensions);
       return true;
     },
   };

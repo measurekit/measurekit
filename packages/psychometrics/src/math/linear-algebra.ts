@@ -63,3 +63,10 @@ export function forwardSolve(factor: Float64Array, size: number, right: Float64A
     scaleRow(right, columns, i, 1 / (factor[i * size + i] ?? 1));
   }
 }
+
+/** Returns ln |A| from the Cholesky factor L of A, by rows: twice the sum of the logs of L's diagonal. */
+export function logDeterminantOfFactor(factor: Float64Array, size: number): number {
+  let sum = 0;
+  for (let i = 0; i < size; i++) sum += Math.log(factor[i * size + i] ?? 1);
+  return 2 * sum;
+}

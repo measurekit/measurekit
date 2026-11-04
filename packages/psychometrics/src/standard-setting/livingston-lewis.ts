@@ -9,7 +9,7 @@ import {
   logGamma,
 } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
-import { adaptiveIntegral } from "../math/internal.js";
+import { adaptiveIntegral, roundHalfToEven } from "../math/internal.js";
 import { checkCuts } from "./classification.js";
 
 /** Options of {@link livingstonLewisClassification}. */
@@ -177,12 +177,6 @@ function lengthOf(scores: readonly number[], minimum: number, maximum: number, r
   const mean = scores.reduce((sum, score) => sum + score, 0) / count;
   const variance = scores.reduce((sum, score) => sum + (score - mean) ** 2, 0) / (count - 1);
   return ((mean - minimum) * (maximum - mean) - reliability * variance) / (variance * (1 - reliability));
-}
-
-/** Returns x rounded to the nearest integer, halves to the even one, as R's `round`. */
-function roundHalfToEven(x: number): number {
-  const rounded = Math.round(x);
-  return Math.abs(x % 1) === 0.5 && rounded % 2 !== 0 ? rounded - 1 : rounded;
 }
 
 /** A beta distribution on [lower, upper]. */

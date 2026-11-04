@@ -1,5 +1,6 @@
 import { checkIntegerFrom, checkOptions, checkRandom, DataError, type FieldNames, type Random } from "@measurekit/core";
 import { checkResponseMatrix, MAX_RESPONSE, type ResponseMatrix } from "../data/internal.js";
+import { roundHalfToEven } from "../math/internal.js";
 
 /** Options of {@link twoWayImputation}. */
 export interface TwoWayImputationOptions {
@@ -145,11 +146,4 @@ function checkBound(bound: unknown, label: string, observed: number, relation: s
   if (relation.startsWith("at most") ? bound > observed : bound < observed) {
     throw new DataError(`${label} must be ${relation} response, ${observed}, found ${bound}.`);
   }
-}
-
-/** Returns the integer nearest to x, the even one of two at a half, as R's `round`. */
-function roundHalfToEven(x: number): number {
-  const below = Math.floor(x);
-  const fraction = x - below;
-  return fraction > 0.5 || (fraction === 0.5 && below % 2 !== 0) ? below + 1 : below;
 }

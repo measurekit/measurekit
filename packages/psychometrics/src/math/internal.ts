@@ -22,7 +22,7 @@ export {
   sampleMoments,
   tableMoments,
 } from "./limited-information.js";
-export { invert } from "./linear-algebra.js";
+export { invert, logDeterminantOfFactor } from "./linear-algebra.js";
 export {
   addOuterProduct,
   identity,
@@ -51,4 +51,12 @@ export { pseudoInverse } from "./pseudo-inverse.js";
 export { adaptiveIntegral, gaussHermite, type Quadrature, rectangular } from "./quadrature.js";
 export { findIncreasingRoot, findRoot } from "./root.js";
 export { type RotationMethod, type RotationOptions, resolveRotation, rotateLoadingMatrix } from "./rotation.js";
-export { correlation, covariance, largestChange, sampleQuantile, standardDeviation, variance } from "./statistics.js";
+export {
+  correlation,
+  covariance,
+  largestChange,
+  roundHalfToEven,
+  sampleQuantile,
+  standardDeviation,
+  variance,
+} from "./statistics.js";

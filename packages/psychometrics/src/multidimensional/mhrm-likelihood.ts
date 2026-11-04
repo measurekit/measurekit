@@ -1,5 +1,6 @@
 import { cholesky, invertPositiveDefinite, normalizeLogs, type Random } from "@measurekit/core";
 import { type CompressedResponses, logProbability } from "../irt/internal.js";
+import { logDeterminantOfFactor } from "../math/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 import type { Correlations } from "./mhrm-latent.js";
 import { answeredPattern } from "./pattern.js";
@@ -118,7 +119,6 @@ function logRatio(
         (draws[r * dimensions + i] ?? 0) * (precision[i * dimensions + j] ?? 0) * (draws[r * dimensions + j] ?? 0);
     }
   }
-  let logFactor = 0;
-  for (let d = 0; d < dimensions; d++) logFactor += Math.log(factor[d * dimensions + d] ?? 1);
+  const logFactor = logDeterminantOfFactor(factor, dimensions) / 2;
   return -quadratic / 2 - correlations.logDeterminant() / 2 + squares / 2 + logFactor;
 }

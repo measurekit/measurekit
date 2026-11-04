@@ -1,4 +1,5 @@
 import { checkArray, checkOptions, DataError, describe, type FieldNames } from "@measurekit/core";
+import { checkOpenUnitInterval } from "../checks.js";
 import { scoreLimits } from "../equating/internal.js";
 import { expectedScore, indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
 import { findIncreasingRoot } from "../math/internal.js";
@@ -51,11 +52,7 @@ const DEFAULT_RESPONSE_PROBABILITY = 0.67;
 export function orderedItemBooklet(items: readonly TestItem[], options: BookmarkOptions = {}): readonly BookletPage[] {
   checkOptions(options, BOOKMARK_OPTIONS);
   const { responseProbability = DEFAULT_RESPONSE_PROBABILITY } = options;
-  if (!(typeof responseProbability === "number" && responseProbability > 0 && responseProbability < 1)) {
-    throw new DataError(
-      `The option responseProbability must be a number above 0 and below 1, found ${describe(responseProbability)}.`,
-    );
-  }
+  checkOpenUnitInterval(responseProbability, "The option responseProbability");
   checkArray(items, "The items must be an array");
   if (items.length === 0) throw new DataError("An ordered item booklet needs at least one item.");
   indexItems(items);

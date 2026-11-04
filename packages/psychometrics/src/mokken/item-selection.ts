@@ -1,6 +1,6 @@
 import { checkOptions, checkUnitInterval, type FieldNames, normalQuantile } from "@measurekit/core";
+import { checkOpenUnitInterval } from "../checks.js";
 import type { ResponseMatrix } from "../data/internal.js";
-import { checkLevel } from "./item-check.js";
 import { usableItems } from "./scalability.js";
 import { type Covariances, covariances, mokkenData } from "./scores.js";
 
@@ -62,7 +62,7 @@ export function automatedItemSelection(matrix: ResponseMatrix, options: ItemSele
   checkOptions(options, ITEM_SELECTION_OPTIONS);
   const { lowerBound = DEFAULT_LOWER_BOUND, alpha = DEFAULT_ALPHA } = options;
   checkUnitInterval(lowerBound, "The option lowerBound");
-  checkLevel(alpha, "The option alpha");
+  checkOpenUnitInterval(alpha, "The option alpha");
   const data = mokkenData(matrix, "Automated item selection");
   const moments = covariances(data);
   const usable = usableItems(moments, data.items);

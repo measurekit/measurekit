@@ -1,11 +1,5 @@
-import {
-  checkNonNegative,
-  checkPositive,
-  checkPositiveInteger,
-  DataError,
-  describe,
-  type FieldNames,
-} from "@measurekit/core";
+import { checkNonNegative, checkPositiveInteger, type FieldNames } from "@measurekit/core";
+import { checkOpenUnitInterval } from "../checks.js";
 
 /** The result of a check of one item: how often its response function or its order against other items is violated. */
 export interface ItemCheck {
@@ -97,16 +91,6 @@ export const MONOTONICITY_OPTIONS: FieldNames<MonotonicityOptions> = {
   alpha: true,
 };
 
-/**
- * Checks a level: a number above 0 and below 1.
- *
- * @throws `DataError` when it is not.
- */
-export function checkLevel(value: unknown, label: string): asserts value is number {
-  checkPositive(value, label);
-  if (value >= 1) throw new DataError(`${label} must be a number above 0 and below 1, found ${describe(value)}.`);
-}
-
 /** The options of a check, checked, with the minimum group size and violation still to default. */
 export interface CheckedOptions {
   readonly minimumViolation: number | undefined;
@@ -123,6 +107,6 @@ export function checkMonotonicityOptions(options: MonotonicityOptions): CheckedO
   const { minimumViolation, minimumGroupSize, alpha = 0.05 } = options;
   if (options.minimumViolation !== undefined) checkNonNegative(minimumViolation, "The option minimumViolation");
   if (options.minimumGroupSize !== undefined) checkPositiveInteger(minimumGroupSize, "The option minimumGroupSize");
-  checkLevel(alpha, "The option alpha");
+  checkOpenUnitInterval(alpha, "The option alpha");
   return { minimumViolation, minimumGroupSize, alpha };
 }

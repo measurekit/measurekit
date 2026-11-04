@@ -1,5 +1,5 @@
 import { chiSquareUpperTail, cholesky, invertPositiveDefinite } from "@measurekit/core";
-import { rmseaInterval } from "../math/internal.js";
+import { logDeterminantOfFactor, rmseaInterval } from "../math/internal.js";
 
 /** The fit of exploratory factors to the correlations of the items, as psych's `fa` reports it. */
 export interface FactorFit {
@@ -61,7 +61,8 @@ export function factorFit(
   for (let i = 0; i < size; i++) {
     for (let j = 0; j < size; j++) trace += (inverse[i * size + j] ?? 0) * (r[j * size + i] ?? 0);
   }
-  const discrepancy = trace - (logDeterminant(correlations, size) - logDeterminant(factor, size)) - size;
+  const discrepancy =
+    trace - (logDeterminantOfFactor(correlations, size) - logDeterminantOfFactor(factor, size)) - size;
   const multiplier = persons - 1 - (2 * size + 5) / 6 - (2 * factors) / 3;
   const chiSquare = Math.max(discrepancy * multiplier, 0);
   const degreesOfFreedom = (size * (size - 1)) / 2 - size * factors + (factors * (factors - 1)) / 2;
@@ -70,7 +71,7 @@ export function factorFit(
   if (degreesOfFreedom === 0) {
     return { chiSquare, degreesOfFreedom, significance: null, rmsea: null, rmseaInterval: null, tli: null, bic, srmsr };
   }
-  const independence = (-2 * logDeterminant(correlations, size)) / (size * (size - 1));
+  const independence = (-2 * logDeterminantOfFactor(correlations, size)) / (size * (size - 1));
   const tli = (independence - discrepancy / degreesOfFreedom) / (independence - 1 / multiplier);
   return {
     chiSquare,
@@ -82,13 +83,6 @@ export function factorFit(
     bic,
     srmsr,
   };
-}
-
-/** Returns log det A from the Cholesky factor L of A, by rows: twice the sum of the logs of L's diagonal. */
-function logDeterminant(factor: Float64Array, size: number): number {
-  let sum = 0;
-  for (let i = 0; i < size; i++) sum += Math.log(factor[i * size + i] ?? 1);
-  return 2 * sum;
 }
 
 /** Returns √(Σ_(i≠j) n_ij (r_ij - m_ij)² / (n̄ p (p - 1))), n̄ the harmonic mean of the counts. */

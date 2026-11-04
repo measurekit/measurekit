@@ -818,10 +818,10 @@ describe("automatedItemSelection", () => {
     );
     expect(() => automatedItemSelection(matrix, { lowerBound: 1.5 })).toThrow(DataError);
     expect(() => automatedItemSelection(matrix, { alpha: 0 })).toThrow(
-      "The option alpha must be a positive number, found 0.",
+      "The option alpha must be a number between 0 and 1, exclusive, found 0.",
     );
     expect(() => automatedItemSelection(matrix, { alpha: 1 })).toThrow(
-      "The option alpha must be a number above 0 and below 1, found 1.",
+      "The option alpha must be a number between 0 and 1, exclusive, found 1.",
     );
     expect(() => automatedItemSelection(matrix, { alpha: JSON.parse("null") })).toThrow(DataError);
     expect(() => automatedItemSelection(buildResponseMatrix([[0], [1]]))).toThrow(DataError);
@@ -1024,7 +1024,7 @@ describe("monotonicity", () => {
     );
     expect(() => monotonicity(decreasing, { minimumGroupSize: JSON.parse('"50"') })).toThrow(DataError);
     expect(() => monotonicity(decreasing, { alpha: 1 })).toThrow(
-      "The option alpha must be a number above 0 and below 1, found 1.",
+      "The option alpha must be a number between 0 and 1, exclusive, found 1.",
     );
     expect(() => monotonicity(decreasing, { minimumGroupSize: 100 })).toThrow(
       "The minimum group size 100 is more than half of the 150 persons who answered every item.",

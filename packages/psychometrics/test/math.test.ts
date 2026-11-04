@@ -1,5 +1,6 @@
 import {
   chiSquareUpperTail,
+  cholesky,
   createRandom,
   invertPositiveDefinite,
   logistic,
@@ -18,6 +19,7 @@ import {
   invert,
   largestChange,
   limitedInformationStatistic,
+  logDeterminantOfFactor,
   mirror,
   multiply,
   newton,
@@ -27,6 +29,7 @@ import {
   rectangular,
   resolveRotation,
   rotateLoadingMatrix,
+  roundHalfToEven,
   symmetricEigen,
   symmetrized,
   trace,
@@ -92,6 +95,32 @@ const MATRIX_ITEMS = 1000;
 function expectRelative(actual: number, expected: number, tolerance: number, label: string): void {
   expect(Math.abs(actual - expected), label).toBeLessThanOrEqual(tolerance * Math.abs(expected));
 }
+
+describe("roundHalfToEven", () => {
+  it("rounds to the nearest integer, a half to the even one, as R's round", () => {
+    const cases = [
+      [0.4, 0],
+      [0.5, 0],
+      [0.6, 1],
+      [1.5, 2],
+      [2.5, 2],
+      [3.5, 4],
+      [-0.6, -1],
+      [-1.5, -2],
+      [-2.5, -2],
+      [-3.4, -3],
+      [7, 7],
+    ] as const;
+    for (const [x, rounded] of cases) expect(roundHalfToEven(x) === rounded, `round(${x})`).toBe(true);
+  });
+});
+
+describe("logDeterminantOfFactor", () => {
+  it("gives ln |A| from the Cholesky factor of A", () => {
+    const factor = defined(cholesky(Float64Array.of(4, 2, 2, 5), 2));
+    expectClose(logDeterminantOfFactor(factor, 2), Math.log(16), 1e-15);
+  });
+});
 
 describe("largestChange", () => {
   it("takes the largest absolute change in largestChange, 0 for no values", () => {

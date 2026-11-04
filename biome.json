@@ -478,7 +478,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../data/**", "!../math/**"],
+                    "group": ["../*", "../*/**", "!../checks.js", "!../data/**", "!../math/**"],
                     "message": "mokken/ builds on data/ and math/ only."
                   }
                 ]

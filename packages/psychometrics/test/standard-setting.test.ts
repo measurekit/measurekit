@@ -401,7 +401,7 @@ describe("orderedItemBooklet", () => {
       'Item "g" has probabilities of a correct response from 0.7 to 1, which never equal the response probability 0.67.',
     );
     expect(() => orderedItemBooklet([item2pl("q", 1, 0)], { responseProbability: 1 })).toThrow(
-      "The option responseProbability must be a number above 0 and below 1, found 1.",
+      "The option responseProbability must be a number between 0 and 1, exclusive, found 1.",
     );
   });
 });
