@@ -24,6 +24,7 @@
     "check:release": "node scripts/check-release.ts",
     "check:tarballs": "pnpm build && node scripts/check-tarballs.ts",
     "check:audit": "pnpm audit --prod && pnpm audit --audit-level=high",
+    "compat:runtimes": "pnpm build && node compat/check.ts",
     "changeset": "changeset",
     "release": "pnpm build && changeset publish",
     "prepare": "node scripts/prepare.ts"
@@ -43,7 +44,8 @@
     "typedoc": "0.28.20",
     "typedoc-plugin-mermaid": "1.12.0",
     "typescript": "6.0.3",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "yaml": "2.9.1"
   },
   "license": "Apache-2.0"
 }

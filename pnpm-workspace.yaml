@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - examples
+  - compat
 
 # A version is installed only when it has been on the registry for 14 days, which STANDARDS.md asks of every dependency:
 # `minimumReleaseAge: 20160` (in minutes). It is not set yet. pnpm checks the lock file against it on every install, and 44
@@ -10,3 +11,4 @@ packages:
 allowBuilds:
   esbuild: false
   lefthook: false
+  workerd: false

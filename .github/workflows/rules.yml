@@ -22,6 +22,8 @@ concurrency:
 jobs:
   rules:
     runs-on: ubuntu-latest
+    # No run has finished yet: lower this to three times the first green run.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -34,6 +36,9 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
+    # Its tests take 27 minutes on a runner without coverage and about 4.6 times as long with it, and no run has finished yet:
+    # lower this to three times the first green run.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

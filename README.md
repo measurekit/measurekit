@@ -1,7 +1,8 @@
 # measurekit
 
 Libraries for measuring what people know, for JavaScript and TypeScript. This repository holds two libraries and
-the core that they share. They run in any JavaScript runtime.
+the core that they share. They run in any JavaScript runtime: [`compat/`](compat/README.md) runs them on Node.js, Deno, Bun and
+workerd.
 
 ```mermaid
 flowchart LR
@@ -64,6 +65,7 @@ pnpm check:tarballs     # packs the packages, installs them and imports every su
 pnpm check:rules        # the rules on untrusted input: each one's test fails without it; a run that takes too long exits 2
 pnpm check:licenses     # the licenses of the production dependencies
 pnpm check:audit        # known vulnerabilities of the dependencies
+pnpm compat:runtimes    # a calibration and a knowledge tracing fit on Node.js, Deno, Bun and workerd; needs Deno and Bun
 pnpm docs:api           # builds, then TypeDoc into docs/api; fails on undocumented exports
 ```
 
@@ -79,6 +81,7 @@ packages/knowledge-tracing/  @measurekit/knowledge-tracing: src/, test/ with its
 docs/                        guides of each package, in a folder named after it
 validation/                  R and Python scripts that write the fixtures and time the references; README.md runs them
 examples/                    runnable examples, run by a test
+compat/                      the packages on Node.js, Deno, Bun and workerd; README.md
 scripts/                     the checks of the repository, the harness that the benchmarks share and the size and memory budgets
 biome/                       GritQL lint rules
 ```

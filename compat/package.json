@@ -1,0 +1,20 @@
+{
+  "name": "@measurekit/compat",
+  "private": true,
+  "type": "module",
+  "description": "Runs a calibration and a Bayesian knowledge tracing fit, built as the packages ship, on Node.js, Deno, Bun and workerd, the runtime of Cloudflare Workers.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "check": "node check.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@measurekit/knowledge-tracing": "workspace:*",
+    "@measurekit/psychometrics": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "workerd": "1.20261016.1"
+  }
+}

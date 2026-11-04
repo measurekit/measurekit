@@ -105,12 +105,16 @@ validation/<package>/         R and Python scripts that write the fixtures; vali
 validation/benchmarks/        the inputs of the benchmarks and the timing of their references
 examples/<package>/           runnable examples; examples/test/ runs each of them, the samples of the guides and the
                               examples of the TSDoc
+compat/                       the packages on Node.js, Deno, Bun and workerd, built as they ship: scenarios.ts holds a calibration
+                              and a BKT fit, check.ts bundles them and compares each runtime's results with Node.js's
 scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts, check-release.ts and check-tarballs.ts
                               with their tests; prepare.ts installs the git hooks in a clone and skips them in a copy;
                               bench-harness.ts is what the benchmarks of the packages share; entry-sizes.ts bundles each
                               entry point alone, with code splitting, against the budgets of size-budgets.ts in
                               test/entry-sizes.test.ts; peak-memory.ts measures the readers of untrusted input, against
-                              their budgets in test/peak-memory.test.ts
+                              their budgets in test/peak-memory.test.ts; test/workflows.test.ts holds each job of the workflows
+                              to a timeout and each job of ci.yml but check to the changes job, and test/changes.test.ts runs
+                              that job's program on sample changes
 biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
 ```
 
@@ -134,15 +138,23 @@ pnpm check:rules        # removes each rule of scripts/check-rules.ts from a cop
                         # when it does not); a run that takes too long is TIMED OUT (exit 2), never guarded or unguarded
 pnpm check:licenses     # fails on a production dependency whose license is not MIT, Apache-2.0, BSD or ISC
 pnpm check:audit        # pnpm audit of the production dependencies at any severity and of all at high; needs the network
+pnpm compat:runtimes    # builds, then bundles a calibration and a BKT fit and runs them on Node.js, Deno, Bun and workerd; their
+                        # results must match Node.js's (compat/README.md); needs Deno and Bun, or name the runtimes: `pnpm compat:runtimes node workerd`
 pnpm docs:api           # builds, then TypeDoc into docs/api; fails on undocumented exports
 ```
 
 `pnpm --filter @measurekit/psychometrics <script>` runs a script of one package. Run all of the commands before
-finishing a change. Development needs Node.js 22.18+ and pnpm 12. Every push runs every job of CI, and a newer push to
-the same ref cancels the run in progress; a cancelled run is not a failure. Per-push CI stays short, as Actions minutes
-are limited: `rules.yml` runs the slow checks each Monday, on `workflow_dispatch` and from `release.yml` before it
-publishes: `rules`, and `coverage`, the floor of psychometrics, whose tests take 36 minutes under coverage. A builder runs
-the rules of its package before a merge (`pnpm check:rules packages/<package>`).
+finishing a change. Development needs Node.js 22.18+ and pnpm 12.
+
+CI's `changes` job finds what a push reaches since the last run that passed, and only the jobs that read it run; `check`
+always does. A change to a package reaches the packages that use it, the examples, `compat` and the tests of the scripts; the
+guides and the README reach the examples alone; the lock file, the root configuration and `ci.yml` reach every job. A newer push
+to the same ref cancels the run in progress, and `changes` compares with the last run that passed, so what a cancelled run did
+not check is checked by the newer one. Every job has a `timeout-minutes` of about three times its last green run.
+
+Per-push CI stays short, as Actions minutes are limited: `rules.yml` runs the slow checks each Monday, on `workflow_dispatch`
+and from `release.yml` before it publishes: `rules`, and `coverage`, the floor of psychometrics, whose tests take 36 minutes
+under coverage. A builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`).
 
 ## Releases
 

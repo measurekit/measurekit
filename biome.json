@@ -673,7 +673,7 @@
       }
     },
     {
-      "includes": ["examples/**", "scripts/**"],
+      "includes": ["examples/**", "scripts/**", "compat/**"],
       "linter": {
         "rules": {
           "suspicious": {

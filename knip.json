@@ -4,6 +4,10 @@
     "examples": {
       "entry": ["**/*.ts"]
     },
+    "compat": {
+      "entry": ["run.ts", "worker.ts"],
+      "ignoreDependencies": ["workerd"]
+    },
     ".": {
       "ignoreDependencies": ["jscpd"]
     }

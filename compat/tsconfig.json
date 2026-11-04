@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@measurekit/core": ["../packages/core/src/index.ts"],
+      "@measurekit/psychometrics": ["../packages/psychometrics/src/index.ts"],
+      "@measurekit/psychometrics/*": ["../packages/psychometrics/src/*/index.ts"],
+      "@measurekit/knowledge-tracing": ["../packages/knowledge-tracing/src/index.ts"],
+      "@measurekit/knowledge-tracing/*": ["../packages/knowledge-tracing/src/*/index.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}

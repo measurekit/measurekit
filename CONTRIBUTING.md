@@ -29,13 +29,14 @@ the reference function or the formula in the pull request, and add the reference
 ## Before opening a pull request
 
 Run `pnpm lint`, `pnpm check:standards`, `pnpm check:duplication`, `pnpm typecheck`, `pnpm test` and `pnpm knip`, then `pnpm build`,
-`pnpm check:packages`, `pnpm check:release`, `pnpm check:tarballs`, `pnpm check:rules`, `pnpm check:licenses`, `pnpm check:audit` and `pnpm docs:api`. A bug fix comes with a test that fails without it. A change to a package goes into the pending
+`pnpm check:packages`, `pnpm check:release`, `pnpm check:tarballs`, `pnpm check:rules`, `pnpm check:licenses`, `pnpm check:audit`, `pnpm compat:runtimes` and `pnpm docs:api`. A bug fix comes with a test that fails without it. A change to a package goes into the pending
 release's changeset for that package in `.changeset/`, or a new one made with `pnpm changeset` when none is pending
 ([AGENTS.md](AGENTS.md#releases)).
 
 The pre-commit hook formats staged code, JSON, Markdown and YAML with Biome; the pre-push hook runs the type check,
-tests and Knip. CI tests each package, the scripts that check the repository and the examples on Node.js 22 and 24, with
-the coverage floors of core and knowledge tracing. The mutation rules and the coverage floor of psychometrics, which take
+tests and Knip. CI runs only the jobs that a change reaches: it tests each package, the scripts that check the repository and the
+examples on Node.js 22 and 24, with the coverage floors of core and knowledge tracing, and runs the packages on Deno, Bun and
+workerd. The mutation rules and the coverage floor of psychometrics, which take
 long, run each week and before a release, so that per-push CI stays short.
 
 ## License of contributions
