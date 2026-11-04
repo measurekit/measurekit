@@ -383,7 +383,7 @@ repeated within their parents and empty cells.
 | M2, degrees of freedom, RMSEA and its interval, SRMSR                                  | GDINA's `modelfit` at `conv.crit = 1e-9`, 1e-8 for additive models; where Δ's rank is below its columns, the statistic on the whole complement from GDINA's Δ, Ξ and e |
 | Item fit: shares correct, z of the correlations and log odds ratios, adjusted p-values | Base R with GDINA's estimates and exact expected values; GDINA's `itemfit(N.resampling = 1e6)`; CDM's `modelfit.cor.din` for the DINA                                  |
 | The identifiability of the DINA                                                        | CDM's `din_identifiability`                                                                                                                                            |
-| One additive M-step on fixed expected counts                                           | Base R: Newton's method on the bounds the maximum meets, certified by the KKT conditions                                                                               |
+| One additive M-step on fixed expected counts                                           | Base R: Newton's method on the bounds the maximum meets, verified by the KKT conditions                                                                                |
 | Simulation of cognitive diagnosis responses                                            | Properties: frequencies, reproduction, recovery by calibration                                                                                                         |
 
 The scripts also check the references against each other: KR-20 equals alpha for 0/1 items, the base R item-total

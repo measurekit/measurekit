@@ -1,7 +1,7 @@
 {
   "name": "@measurekit/psychometrics",
   "version": "0.0.0",
-  "description": "Psychometrics for JavaScript and TypeScript: classical test theory, item response theory including multidimensional models, cognitive diagnosis (G-DINA, DINA, DINO, A-CDM, LLM, R-RUM), adaptive testing including cognitive diagnosis and multidimensional tests, item fit, differential item functioning, equating, score scaling and prediction, dimensionality (polychoric correlations and parallel analysis), explanatory models of item difficulty, generalizability theory, Mokken scale analysis, simulation, standard setting, rater agreement and effects, response times, and answer similarity for copying and collusion, validated against R.",
+  "description": "Psychometrics for JavaScript and TypeScript, validated against R and RSMTool: item response theory including multidimensional models, classical test theory, adaptive testing, cognitive diagnosis, differential item functioning, equating, generalizability theory, standard setting, rater agreement, the evaluation of automated scores and answer similarity.",
   "keywords": [
     "psychometrics",
     "classical-test-theory",
@@ -49,7 +49,14 @@
     "dimensionality",
     "parallel-analysis",
     "polychoric-correlation",
-    "tetrachoric-correlation"
+    "tetrachoric-correlation",
+    "automated-scoring",
+    "rasch-model",
+    "graded-response-model",
+    "partial-credit-model",
+    "test-theory",
+    "statistics",
+    "typescript"
   ],
   "author": "Fariz Wakan (https://github.com/luthfanwakan)",
   "license": "Apache-2.0",
@@ -58,7 +65,7 @@
     "url": "git+https://github.com/measurekit/measurekit.git",
     "directory": "packages/psychometrics"
   },
-  "homepage": "https://github.com/measurekit/measurekit/tree/main/packages/psychometrics#readme",
+  "homepage": "https://measurekit.wakan.dev/_measurekit/psychometrics/",
   "bugs": "https://github.com/measurekit/measurekit/issues",
   "type": "module",
   "sideEffects": false,

@@ -1,7 +1,7 @@
 {
   "name": "@measurekit/knowledge-tracing",
   "version": "0.0.0",
-  "description": "Knowledge tracing for JavaScript and TypeScript: Bayesian knowledge tracing, logistic models (AFM, PFA, LKT features), Elo, online IRT and knowledge space theory, mastery and practice recommendations, evaluation by cross-validation and learning curves, serializable learner state, validated against pyBKT and R.",
+  "description": "Knowledge tracing for JavaScript and TypeScript, validated against pyBKT and R: Bayesian knowledge tracing, AFM and PFA, Elo, online IRT and knowledge space theory, with evaluation, mastery criteria and practice recommendations.",
   "keywords": [
     "knowledge-tracing",
     "bayesian-knowledge-tracing",
@@ -25,7 +25,9 @@
     "q-matrix",
     "knowledge-space-theory",
     "learning-space",
-    "adaptive-assessment"
+    "adaptive-assessment",
+    "student-modeling",
+    "typescript"
   ],
   "author": "Fariz Wakan (https://github.com/luthfanwakan)",
   "license": "Apache-2.0",
@@ -34,7 +36,7 @@
     "url": "git+https://github.com/measurekit/measurekit.git",
     "directory": "packages/knowledge-tracing"
   },
-  "homepage": "https://github.com/measurekit/measurekit/tree/main/packages/knowledge-tracing#readme",
+  "homepage": "https://measurekit.wakan.dev/_measurekit/knowledge-tracing/",
   "bugs": "https://github.com/measurekit/measurekit/issues",
   "type": "module",
   "sideEffects": false,

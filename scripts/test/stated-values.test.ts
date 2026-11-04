@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { differences, readStated, stated } from "../stated-values.js";
+import { differences, readStated, stated } from "../stated-values.ts";
 
 /** The first difference between what the code gives and the value of a result, `undefined` when they agree. */
 function compare(actual: unknown, result: string): string | undefined {

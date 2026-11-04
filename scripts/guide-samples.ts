@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
-import { readStated } from "./stated-values.js";
+import { readStated } from "./stated-values.ts";
 
 /**
  * The runner of the samples of the guides and READMEs, and of the examples of the TSDoc. A statement followed by

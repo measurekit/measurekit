@@ -1,30 +1,21 @@
 # @measurekit/knowledge-tracing
 
-Knowledge tracing for JavaScript and TypeScript: learner models that estimate what learners know as they practice, with
-their evaluation. Bayesian knowledge tracing with pyBKT's extensions, logistic models (AFM, PFA and the features of
-logistic knowledge tracing, with fixed or random learner proficiency) and Elo are fitted to a log in batch and update a
-learner's state online, one event at a time; IRT updates ability online from calibrated item parameters, and knowledge
-space theory tracks the set of skills a learner masters, with prerequisites, adaptive assessment and the basic local
-independence model. States and parameters are plain JSON, stored and resumed exactly. Practice ranks the next items by
-predicted success and applies mastery criteria. Evaluation covers AUC, RMSE, log-loss, accuracy, R², kappa,
-calibration, cross-validation by learner, item or time, a paired test between models, and learning curves with their
-power laws and categories. Every statistic is validated against
-pyBKT or R. Its only dependency is `@measurekit/core`, which has none; it runs in any JavaScript runtime.
+Knowledge tracing for JavaScript and TypeScript, validated against pyBKT and R: Bayesian knowledge tracing, AFM and PFA,
+Elo, online IRT and knowledge space theory, with evaluation, mastery criteria and practice recommendations.
 
-```mermaid
-flowchart LR
-  L["Log of events: learner, item, skills, time, outcome"] --> M["Learner model: elo, bkt, logistic, irt, kst"]
-  M --> S["State of each learner: plain data to store"]
-  S --> P["predict, update, mastery"]
-  M --> E["evaluate: cross-validation, metrics, learning curves"]
-  P --> R["practice: next item, mastery criteria"]
-```
+Bayesian knowledge tracing with pyBKT's extensions, logistic models (AFM, PFA and the features of logistic knowledge
+tracing, with fixed or random learner proficiency) and Elo are fitted to a log in batch and update a learner's state
+online, one event at a time; IRT updates ability online from calibrated item parameters, and knowledge space theory tracks
+the set of skills a learner masters, with prerequisites, adaptive assessment and the basic local independence model. States
+and parameters are plain JSON, stored and resumed exactly. Practice ranks the next items by predicted success and applies
+mastery criteria. Evaluation covers AUC, RMSE, log-loss, accuracy, R², kappa, calibration, cross-validation by learner,
+item or time, a paired test between models, and learning curves with their power laws and categories.
 
 ```bash
 npm install @measurekit/knowledge-tracing
 ```
 
-## Example
+## Quick start
 
 ```ts
 import { buildEventLog } from "@measurekit/knowledge-tracing/data";
@@ -90,6 +81,21 @@ compareModels({ elo: elo(), bkt: bkt(), afm: afm({ proficiency: "random" }) }, f
 learningCurve(log).skills.fractions; // => [{ opportunity: 1, count: 2, errorRate: 0.5, ... }, ...]
 ```
 
+## Architecture
+
+```mermaid
+flowchart LR
+  L["Log of events: learner, item, skills, time, outcome"] --> M["Learner model: elo, bkt, logistic, irt, kst"]
+  M --> S["State of each learner: plain data to store"]
+  S --> P["predict, update, mastery"]
+  M --> E["evaluate: cross-validation, metrics, learning curves"]
+  P --> R["practice: next item, mastery criteria"]
+```
+
+A model is plain data and pure functions: `update` returns a new state, and `fit` a new model. Its only dependency is
+[`@measurekit/core`](https://measurekit.wakan.dev/_measurekit/core/), which has none; it reads no clock, network or
+environment, and runs in Node.js, browsers, Deno, Bun and edge runtimes such as Cloudflare Workers.
+
 ## API
 
 | Import                                   | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -112,36 +118,54 @@ never contain `NaN`.
 A state or parameters stored by a 1.x release stay readable by every later 1.x release. A new field is optional, and its
 absence means the old behavior.
 
+## Supported
+
+Every statistic is compared with a reference in tests, within the tolerance that the
+[validation](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/validation/) gives with the versions of the
+references:
+
+| Area                           | References                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| Bayesian knowledge tracing     | pyBKT, and base R's enumeration of every path of hidden states                |
+| Logistic models                | `glm`, lme4, LiblineaR and the LKT package                                    |
+| Elo                            | Its equations written out in R, with a seeded recovery study                  |
+| Online IRT                     | mirt                                                                          |
+| Knowledge space theory         | kst, pks and DAKS                                                             |
+| Evaluation and learning curves | pROC, irr and base R; DataShop's rules for the categories of a learning curve |
+| Mastery criteria               | Base R replays of each criterion on a seeded log                              |
+
+Simulations check that Elo and BKT recover the parameters they simulate.
+
 ## Documentation
 
-- [Data](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/data.md): events, with and without an
+- [Data](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/data/): events, with and without an
   outcome, logs, Q-matrices, first attempts, splits by learner, item and time.
-- [Evaluation](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/evaluate.md):
+- [Evaluation](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/evaluate/):
   metrics, calibration, cross-validation, model comparison, learning curves and their analysis.
-- [Elo](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/elo.md): the models, the
+- [Elo](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/elo/): the models, the
   uncertainty function, online and batch use, learner state.
-- [Bayesian knowledge tracing](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/bkt.md):
+- [Bayesian knowledge tracing](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/bkt/):
   the model and its extensions, fitting, online use, mastery.
-- [Logistic models](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/logistic.md): AFM, PFA
+- [Logistic models](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/logistic/): AFM, PFA
   and LKT features, proficiency, ridge, fitting, online use.
-- [Item response theory](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/irt.md):
+- [Item response theory](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/irt/):
   online ability from calibrated items, EAP and MAP, scales, drift.
-- [Knowledge space theory](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/kst.md):
+- [Knowledge space theory](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/kst/):
   structures, prerequisites, fringes, BLIM, adaptive assessment, IITA.
-- [Practice](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/practice.md): the next
+- [Practice](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/practice/): the next
   item, mastery criteria, time to mastery, spaced repetition with ts-fsrs.
-- [Simulation](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/sim.md): learners drawn from
+- [Simulation](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/sim/): learners drawn from
   a model, with known truth, for planning and recovery checks.
-- [Storage](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/storage.md): what an app
+- [Storage](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/storage/): what an app
   stores, the answer-time path, refits, fitting skill by skill, memory.
-- [Validation](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/validation.md): pyBKT and
+- [Validation](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/validation/): pyBKT and
   R references, datasets and tolerances.
-- [Architecture](https://github.com/measurekit/measurekit/blob/main/docs/knowledge-tracing/architecture.md):
+- [Architecture](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/architecture/):
   design principles, layout and the learner model interface, for contributors and for writing a model.
 - [API reference](https://measurekit.github.io/measurekit/): every export, generated by TypeDoc.
 
 ## License
 
-[Apache-2.0](LICENSE). Copyright Fariz Wakan; see
-[NOTICE](NOTICE). [CONTRIBUTING.md](https://github.com/measurekit/measurekit/blob/main/CONTRIBUTING.md) describes how
-to contribute.
+[Apache-2.0](https://github.com/measurekit/measurekit/blob/main/packages/knowledge-tracing/LICENSE). Copyright Fariz Wakan.
+See [NOTICE](https://github.com/measurekit/measurekit/blob/main/packages/knowledge-tracing/NOTICE).
+[CONTRIBUTING.md](https://github.com/measurekit/measurekit/blob/main/CONTRIBUTING.md) describes how to contribute.

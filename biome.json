@@ -701,11 +701,28 @@
       }
     },
     {
-      "includes": ["examples/**", "scripts/**", "compat/**"],
+      "includes": ["docs/*.ts", "examples/**", "scripts/**", "compat/**"],
       "linter": {
         "rules": {
           "suspicious": {
             "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["docs/*.ts", "scripts/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "useImportExtensions": {
+              "level": "error",
+              "options": {
+                "extensionMappings": {
+                  "ts": "ts"
+                }
+              }
+            }
           }
         }
       }

@@ -20,16 +20,16 @@ const DEFAULT_STANDARD_ERROR = 0;
 const MAX_REPORTABLE_SCORES = 10_000;
 
 /**
- * Returns the prediction of a person's reported scale score when the official test scores theta directly, from a
+ * Returns the prediction of a person's reported scale score when the operational test scores theta directly, from a
  * distribution of the person's theta.
  *
  * @remarks
- * The official estimate is θ + e, e ~ N(0, se²), with se the `standardError`, and it is reported on `scale`. The scores
+ * The operational estimate is θ + e, e ~ N(0, se²), with se the `standardError`, and it is reported on `scale`. The scores
  * a person can be reported are the lowest, the highest and the multiples of `step` between them; the estimates that
  * round and bound to a score s are an interval [t_lo(s), t_hi(s)) of theta, so that P(s) = Σ_q w_q [Φ((t_hi - θ_q) /
  * se) - Φ((t_lo - θ_q) / se)] over the distribution's nodes θ_q and weights w_q. With `standardError` 0, each node's
- * weight goes to the score of its own theta. The prediction is valid only if the distribution and the official test
- * share a theta scale, and treats theta as constant between practice and the official test.
+ * weight goes to the score of its own theta. The prediction is valid only if the distribution and the operational test
+ * share a theta scale, and treats theta as constant between practice and the operational test.
  *
  * Valid input: a distribution of finite nodes and non-negative weights that sum to 1 within 1e-6; a scale with a positive
  * slope, a finite intercept, finite `lowest` and `highest`, and a `step` above 0 that gives at most 10,000 reportable
@@ -38,7 +38,7 @@ const MAX_REPORTABLE_SCORES = 10_000;
  *
  * @param posterior - The distribution of the person's theta.
  * @param scale - The slope, intercept and rounding of the reported score.
- * @param options - The standard error of the official estimate and the level of the interval.
+ * @param options - The standard error of the operational estimate and the level of the interval.
  * @returns The expected scale score with its interval, and the distribution of the score.
  *
  * @example

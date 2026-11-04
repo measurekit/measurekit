@@ -23,7 +23,7 @@
   convergence instead of throwing.
 - **Extensible.** Where methods have alternatives, such as models or estimators, they are interfaces, and built-ins
   implement the same interfaces as user code.
-- **Complete at the first version.** Each module has an approved list of authoritative [sources](#sources). A capability is
+- **Complete at the first version.** Each module has a fixed list of authoritative [sources](#sources), which the owner set. A capability is
   built when those sources treat it as standard practice, a usable reference exists and it fits a library. "Not included"
   holds the rest, one method per line, each No fit, No reference or Outside the sources. A new capability afterwards means
   changing the list.

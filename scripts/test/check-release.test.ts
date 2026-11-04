@@ -7,7 +7,7 @@ import {
   releasedBumps,
   unpublishable,
   wrongFirstReleases,
-} from "../check-release.js";
+} from "../check-release.ts";
 
 const PUBLIC: PackageManifest = { name: "@measurekit/core", version: "0.0.0", publishConfig: { access: "public" } };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { disallowed, isAllowed } from "../check-licenses.js";
+import { disallowed, isAllowed } from "../check-licenses.ts";
 
 describe("isAllowed", () => {
   it("accepts MIT, Apache-2.0, BSD and ISC", () => {

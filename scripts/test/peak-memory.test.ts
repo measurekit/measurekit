@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { bundleLibraries, peakRise, READERS } from "../peak-memory.js";
+import { bundleLibraries, peakRise, READERS } from "../peak-memory.ts";
 
 /** A case runs two child processes, each of which builds and parses its input: a few seconds, longer on a loaded machine. */
 const CASE_TIMEOUT = 120_000;

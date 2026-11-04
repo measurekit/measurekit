@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { basename, dirname, extname, join, posix, resolve } from "node:path";
 import ts from "typescript";
+import { checkClaimWords, checkIdentity, checkReadmeLinks, checkTrademarks } from "./check-identity.ts";
 
 /** One breach of the standards: the file, the 1-based line (0 for the whole file), the rule and what to do. */
 export interface Violation {
@@ -411,6 +412,41 @@ export function checkNotIncluded(files: Files): Violation[] {
   );
 }
 
+/**
+ * The sections of a README, in order: the root's guide the reader to a package, and each package's is its npm page, which gives
+ * the install line and a minimal example before the diagram, since npm shows a Mermaid diagram as its source.
+ */
+const README_SECTIONS: readonly { readonly pattern: RegExp; readonly sections: readonly string[] }[] = [
+  { pattern: /^README\.md$/, sections: ["Which package", "Documentation", "Development", "Layout", "License"] },
+  {
+    pattern: /^packages\/[^/]+\/README\.md$/,
+    sections: ["Quick start", "Architecture", "API", "Supported", "Documentation", "License"],
+  },
+];
+
+/** Every README has the sections of its kind, in their order, with others allowed between them. */
+export function checkReadmeSections(files: Files): Violation[] {
+  const found: Violation[] = [];
+  for (const [file, text] of files) {
+    const required = README_SECTIONS.find(({ pattern }) => pattern.test(file))?.sections;
+    if (required === undefined) continue;
+    const titles = sectionsOf(text).map(({ title }) => title);
+    let from = 0;
+    for (const title of required) {
+      const at = titles.indexOf(title, from);
+      if (at < 0)
+        found.push({
+          file,
+          line: 0,
+          rule: "readme-sections",
+          message: `A README has the sections ${required.map((name) => `"${name}"`).join(", ")} in this order; "${title}" is missing or comes too early.`,
+        });
+      else from = at + 1;
+    }
+  }
+  return found;
+}
+
 /** The types of the standard library that are mutable lists or records, and so are not a result. */
 const MUTABLE_CONTAINERS = new Set(["Array", "Record", "Map", "Set"]);
 
@@ -568,8 +604,13 @@ export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkConsole,
   checkGuideSections,
   checkNotIncluded,
+  checkReadmeSections,
   checkReadonlyResults,
   checkModuleExamples,
+  checkIdentity,
+  checkTrademarks,
+  checkClaimWords,
+  checkReadmeLinks,
 ];
 
 /** Runs every check over the files. */
@@ -577,7 +618,7 @@ export function checkStandards(files: Files): Violation[] {
   return CHECKS.flatMap((check) => check(files));
 }
 
-/** Reads the text files of the repository that git tracks or would track, without the generated and third-party ones. */
+/** Reads the text files of the repository that git tracks or would track, and the manifests and NOTICE files, without the generated and third-party ones. */
 export function readRepository(root: string): Files {
   const listing = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
     cwd: root,
@@ -586,7 +627,13 @@ export function readRepository(root: string): Files {
   });
   const files = new Map<string, string>();
   for (const file of listing.split("\0")) {
-    if (file === "" || EXCLUDED.test(file) || EXEMPT.test(file) || !TEXT_EXTENSIONS.has(extname(file))) continue;
+    if (
+      file === "" ||
+      EXCLUDED.test(file) ||
+      EXEMPT.test(file) ||
+      !(TEXT_EXTENSIONS.has(extname(file)) || ["package.json", "NOTICE"].includes(basename(file)))
+    )
+      continue;
     try {
       files.set(file, readFileSync(join(root, file), "utf8"));
     } catch (error) {

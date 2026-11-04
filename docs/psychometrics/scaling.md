@@ -1,7 +1,7 @@
 # Score reporting and prediction
 
 `@measurekit/psychometrics/scaling` turns theta and total scores into the scores a test reports, and predicts the
-score a person will be reported on an official form. It covers a linear scale with rounding and bounds, conversion
+score a person will be reported on an operational form. It covers a linear scale with rounding and bounds, conversion
 tables from total scores to scale scores, the conditional standard error of measurement of scale scores, the scale
 scores of equated scores, percentile ranks and norms with their standard errors in a norm sample, predictions from a
 posterior of theta, and joint draws of theta from separate posteriors. Every function is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
@@ -242,13 +242,13 @@ weighted.mean.estimate; // => 522.5, below 560 as the low scores weigh more
 weighted.scores[1]?.percentile; // => { estimate: 37.5, standardError: 13.666, lower: 10.715, upper: 64.285 }
 ```
 
-## Predicting an official score
+## Predicting an operational score
 
-A learner practices on a bank of items and then takes the official test. The practice responses give a posterior
+A learner practices on a bank of items and then takes the operational test. The practice responses give a posterior
 distribution of theta, a `ThetaDistribution` of `nodes` and `weights` that sum to 1. The prediction is the distribution
-of the score the official test will report, treating theta as constant.
+of the score the operational test will report, treating theta as constant.
 
-| Function                                        | Official test                            | Prediction by                                                       |
+| Function                                        | Operational test                         | Prediction by                                                       |
 | ----------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------- |
 | `predictFormScore(posterior, form, conversion)` | A fixed form scored by total score       | P(x) = Σ_q w_q P(x \| θ_q), converted by the form's table           |
 | `predictThetaScore(posterior, scale, options)`  | A test that reports theta, such as a CAT | The estimate θ + e, e ~ N(0, se²), rounded and bounded by the scale |
@@ -259,22 +259,22 @@ import { conversionTable, predictFormScore, predictThetaScore } from "@measureki
 
 const item = (a: number, b: number) => ({ model: twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } });
 const practice = [item(1, -1), item(1.2, -0.2), item(0.9, 0.5), item(1.4, 1.1)];
-const official = [item(1.1, -0.5), item(1.3, 0.4), item(0.8, 1)];
+const operational = [item(1.1, -0.5), item(1.3, 0.4), item(0.8, 1)];
 const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 };
 
 const posterior = thetaPosterior(practice, [1, 1, 0, 0]);
-const conversion = conversionTable(official, scale).map((row) => row.scaleScore); // => [410, 480, 540, 600]
-predictFormScore(posterior, official, conversion);
+const conversion = conversionTable(operational, scale).map((row) => row.scaleScore); // => [410, 480, 540, 600]
+predictFormScore(posterior, operational, conversion);
 // => { mean: 501.5, lower: 410, upper: 600,
 //   distribution: [{ score: 410, probability: 0.180 }, { score: 480, probability: 0.373 },
 //                  { score: 540, probability: 0.325 }, { score: 600, probability: 0.122 }] }
 predictThetaScore(posterior, scale, { standardError: 0.3, level: 0.9 }); // => { mean: 508.5, lower: 380, upper: 640, ... }
 ```
 
-| Option          | Of                  | Default | Valid range        | Meaning                                           |
-| --------------- | ------------------- | ------- | ------------------ | ------------------------------------------------- |
-| `level`         | both                | `0.8`   | above 0, below 1   | The probability of the central interval           |
-| `standardError` | `predictThetaScore` | `0`     | finite, at least 0 | The standard error of the official theta estimate |
+| Option          | Of                  | Default | Valid range        | Meaning                                              |
+| --------------- | ------------------- | ------- | ------------------ | ---------------------------------------------------- |
+| `level`         | both                | `0.8`   | above 0, below 1   | The probability of the central interval              |
+| `standardError` | `predictThetaScore` | `0`     | finite, at least 0 | The standard error of the operational theta estimate |
 
 | Result         | Meaning                                                                                       |
 | -------------- | --------------------------------------------------------------------------------------------- |
@@ -305,7 +305,7 @@ Where the posterior comes from:
 import { irt } from "@measurekit/knowledge-tracing/irt";
 import { predictFormScore } from "@measurekit/psychometrics/scaling";
 
-// `official` and `conversion` are those of the previous example; q1 to q4 are the practice items.
+// `operational` and `conversion` are those of the previous example; q1 to q4 are the practice items.
 const model = irt({
   parameters: {
     items: { q1: { a: 1, b: -1 }, q2: { a: 1.2, b: -0.2 }, q3: { a: 0.9, b: 0.5 }, q4: { a: 1.4, b: 1.1 } },
@@ -321,11 +321,11 @@ let ana = model.initialState("ana");
 answers.forEach(([item, outcome], time) => {
   ana = model.update(ana, { learner: "ana", item, skills: [], time, outcome });
 });
-predictFormScore(model.posterior(ana), official, conversion).mean; // => 501.5, as thetaPosterior gives
+predictFormScore(model.posterior(ana), operational, conversion).mean; // => 501.5, as thetaPosterior gives
 ```
 
 The libraries meet in data, not imports: both return `{ nodes, weights }`. The prediction is valid only if the practice
-items and the official form are on one theta scale. Calibrate the practice items with official items as anchors, or
+items and the operational form are on one theta scale. Calibrate the practice items with operational items as anchors, or
 link their scale first ([linking](equating.md#linking)); the prediction treats theta as constant between practice and
 the test, so pass recent responses where learning is likely.
 

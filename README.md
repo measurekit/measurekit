@@ -1,7 +1,10 @@
 # measurekit
 
-Libraries for measuring what people know, for JavaScript and TypeScript. This repository holds two libraries and
-the core that they share. They run in any JavaScript runtime: [`compat/`](compat/README.md) runs them on Node.js, Deno, Bun and
+Psychometrics and knowledge tracing for JavaScript and TypeScript, validated against R, pyBKT and RSMTool: IRT, CTT,
+adaptive testing, cognitive diagnosis, BKT.
+
+This repository holds two libraries and the core that they share. They run in any JavaScript runtime:
+[`compat/`](https://github.com/measurekit/measurekit/blob/main/compat/README.md) runs them on Node.js, Deno, Bun and
 workerd.
 
 ```mermaid
@@ -10,11 +13,13 @@ flowchart LR
   K["@measurekit/knowledge-tracing<br/>follow a learner over time"] --> C
 ```
 
-| Package                                                                 | What it is                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`@measurekit/psychometrics`](packages/psychometrics/README.md)         | Classical test theory, item response theory including multidimensional models, cognitive diagnosis, adaptive and multistage testing, item fit, differential item functioning, equating, score scaling and prediction, gains and reliable change, dimensionality, explanatory item response models, simulation, standard setting, rater agreement and effects, response times, and answer similarity for copying. Validated against R. |
-| [`@measurekit/knowledge-tracing`](packages/knowledge-tracing/README.md) | Learner models that estimate what learners know as they practice: Bayesian knowledge tracing, logistic models, Elo, online IRT and knowledge space theory, with practice recommendations and evaluation. Validated against pyBKT and R.                                                                                                                                                                                               |
-| [`@measurekit/core`](packages/core/README.md)                           | The shared foundation of the two libraries: their errors, argument checks, seeded random number generator and common numerics. Most users install a library, which depends on it.                                                                                                                                                                                                                                                     |
+## Which package
+
+| Package                                                                                        | What it is                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`@measurekit/psychometrics`](https://measurekit.wakan.dev/_measurekit/psychometrics/)         | Psychometrics for JavaScript and TypeScript, validated against R and RSMTool: item response theory including multidimensional models, classical test theory, adaptive testing, cognitive diagnosis, differential item functioning, equating, generalizability theory, standard setting, rater agreement, the evaluation of automated scores and answer similarity. |
+| [`@measurekit/knowledge-tracing`](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/) | Knowledge tracing for JavaScript and TypeScript, validated against pyBKT and R: Bayesian knowledge tracing, AFM and PFA, Elo, online IRT and knowledge space theory, with evaluation, mastery criteria and practice recommendations.                                                                                                                               |
+| [`@measurekit/core`](https://measurekit.wakan.dev/_measurekit/core/)                           | The shared foundation of the measurekit packages: errors, argument checks, a seeded random number generator and numerics. Install @measurekit/psychometrics or @measurekit/knowledge-tracing.                                                                                                                                                                      |
 
 ```bash
 npm install @measurekit/psychometrics
@@ -23,8 +28,6 @@ npm install @measurekit/knowledge-tracing
 
 Each library installs `@measurekit/core` with it, and re-exports `createRandom`, `Random`, `DataError`
 and `MeasurekitError`, so you do not import core yourself.
-
-## Which package
 
 - **Psychometrics** analyzes a test after the fact: item statistics, calibration, ability estimates, fit, bias and
   equating. It also runs adaptive tests and standard setting, reports and predicts scores, and checks dimensionality.
@@ -38,13 +41,17 @@ import paths and links to its guides.
 
 ## Documentation
 
-- Guides of [psychometrics](docs/psychometrics/architecture.md)
-  and [knowledge tracing](docs/knowledge-tracing/architecture.md), one per module, with their validation against R
-  and pyBKT.
-- Performance of [core](docs/core/performance.md), [psychometrics](docs/psychometrics/performance.md) and
-  [knowledge tracing](docs/knowledge-tracing/performance.md): the hot path of every module against its reference, the
-  sizes, the peak memory and the budgets.
-- The API reference is generated by TypeDoc, a section per package: `pnpm docs:api` writes it to `docs/api`.
+The docs site, [measurekit.wakan.dev](https://measurekit.wakan.dev/), holds the READMEs, the guides and the API reference
+generated by TypeDoc; `pnpm docs:api` builds it into `docs/api`.
+
+- Guides of [psychometrics](https://measurekit.wakan.dev/_measurekit/psychometrics/architecture/)
+  and [knowledge tracing](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/architecture/), one per module, with
+  their validation against [R and RSMTool](https://measurekit.wakan.dev/_measurekit/psychometrics/validation/) and
+  [pyBKT and R](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/validation/).
+- Performance of [core](https://measurekit.wakan.dev/_measurekit/core/performance/),
+  [psychometrics](https://measurekit.wakan.dev/_measurekit/psychometrics/performance/) and
+  [knowledge tracing](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/performance/): the hot path of every
+  module against its reference, the sizes, the peak memory and the budgets.
 
 ## Development
 
@@ -71,8 +78,9 @@ pnpm compat:runtimes    # a calibration and a knowledge tracing fit on Node.js, 
 pnpm docs:api           # builds, then TypeDoc into docs/api; fails on undocumented exports
 ```
 
-[AGENTS.md](AGENTS.md) states the conventions, [CONTRIBUTING.md](CONTRIBUTING.md) the process and
-[SECURITY.md](SECURITY.md) how to report a vulnerability and how to deploy safely.
+[AGENTS.md](https://github.com/measurekit/measurekit/blob/main/AGENTS.md) states the conventions,
+[CONTRIBUTING.md](https://github.com/measurekit/measurekit/blob/main/CONTRIBUTING.md) the process and
+[SECURITY.md](https://github.com/measurekit/measurekit/blob/main/SECURITY.md) how to report a vulnerability and how to deploy safely.
 
 ## Layout
 
@@ -90,4 +98,4 @@ biome/                       GritQL lint rules
 
 ## License
 
-[Apache-2.0](LICENSE). Copyright Fariz Wakan; see the NOTICE of each package.
+[Apache-2.0](https://github.com/measurekit/measurekit/blob/main/LICENSE). Copyright Fariz Wakan; see the NOTICE of each package.

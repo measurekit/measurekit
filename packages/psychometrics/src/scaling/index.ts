@@ -2,7 +2,7 @@
  * Score reporting and prediction: linear scales of theta with rounding and bounds, conversion tables from total scores
  * to scale scores by the EAP of the summed score or the test characteristic curve, conditional standard errors of
  * measurement of scale scores, scale scores of equated scores, growth between the groups of a vertical scale,
- * percentile ranks and norms with their standard errors in a norm sample, the prediction of an official score from a
+ * percentile ranks and norms with their standard errors in a norm sample, the prediction of an operational score from a
  * posterior of theta, and joint draws of theta from separate posteriors.
  *
  * @module @measurekit/psychometrics/scaling

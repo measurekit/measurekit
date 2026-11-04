@@ -1,2 +1,5 @@
-measurekit core
+@measurekit/core
 Copyright Fariz Wakan
+
+This package holds what the measurekit packages share: their errors, the checks of their arguments, a seeded random number
+generator and their numerics. It includes no code or data of others.

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isGitCheckout, prepare } from "../prepare.js";
+import { isGitCheckout, prepare } from "../prepare.ts";
 
 const folders: string[] = [];
 

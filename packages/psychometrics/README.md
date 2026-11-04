@@ -1,31 +1,23 @@
 # @measurekit/psychometrics
 
-Psychometrics for JavaScript and TypeScript: classical test theory, item response theory (calibration by marginal and
-conditional maximum likelihood, in groups, on sparse data, online and with survey weights; multidimensional and unfolding
-models; ability estimation; summed-score tables), cognitive diagnosis, adaptive and multistage testing with exposure
-control and form assembly, global, item and person fit, differential item functioning, linking and equating including
-kernel equating, score scaling and prediction, gains and reliable change, dimensionality, explanatory models of item
-difficulty, generalizability theory, Mokken scale analysis, simulation, standard setting with classification accuracy and
-consistency, rater agreement and effects, the evaluation of automated scores, response times, and answer similarity
-between pairs of persons for copying and collusion. Every statistic is
-validated against R. Its only dependency is `@measurekit/core`, which has none; it runs in any JavaScript runtime. The
-guide of each module lists what it leaves out under Not included, with the reason for each method, and shows as recipes
-what a few lines over its functions compute, such as plausible values and bootstrap standard errors.
+Psychometrics for JavaScript and TypeScript, validated against R and RSMTool: item response theory including
+multidimensional models, classical test theory, adaptive testing, cognitive diagnosis, differential item functioning,
+equating, generalizability theory, standard setting, rater agreement, the evaluation of automated scores and answer
+similarity.
 
-```mermaid
-flowchart LR
-  D["Responses: choices, matrices, records, ratings, times"] --> A["Analyze: ctt, irt, multidimensional, cdm, fit, dif, dimensionality, mokken, explanatory"]
-  A --> R["Report and compare: equating, scaling, change, standard-setting"]
-  A --> T["Test: cat, multistage tests, sim"]
-  D --> F["Raters and times: rater, response-time, generalizability"]
-  D --> S["Integrity of a sitting: similarity of pairs, person fit"]
-```
+It calibrates items by marginal and conditional maximum likelihood, in groups, on sparse data, online and with survey
+weights, with multidimensional, bifactor and unfolding models, estimates abilities and tabulates summed scores; runs
+adaptive and multistage tests with exposure control and form assembly; and gives global, item and person fit, linking and
+kernel equating, score scaling and prediction, gains and reliable change, dimensionality, explanatory models of item
+difficulty, Mokken scale analysis, simulation, classification accuracy and consistency, rater effects and response times.
+The guide of each module lists what it leaves out under Not included, with the reason for each method, and shows as recipes
+what a few lines over its functions compute, such as plausible values and bootstrap standard errors.
 
 ```bash
 npm install @measurekit/psychometrics
 ```
 
-## Example
+## Quick start
 
 ```ts
 import {
@@ -104,6 +96,21 @@ let state = cat.start(random); // => { next: "q1", ... }: the first item
 state = cat.answer(state, 1, random); // => { items: ["q1"], responses: [1], next: "q2", ... }: next is null at the end
 ```
 
+## Architecture
+
+```mermaid
+flowchart LR
+  D["Responses: choices, matrices, records, ratings, times"] --> A["Analyze: ctt, irt, multidimensional, cdm, fit, dif, dimensionality, mokken, explanatory"]
+  A --> R["Report and compare: equating, scaling, change, standard-setting"]
+  A --> T["Test: cat, multistage tests, sim"]
+  D --> F["Raters and times: rater, response-time, generalizability"]
+  D --> S["Integrity of a sitting: similarity of pairs, person fit"]
+```
+
+Every function takes plain arrays and objects and returns plain objects. Its only dependency is
+[`@measurekit/core`](https://measurekit.wakan.dev/_measurekit/core/), which has none; it reads no clock, network or
+environment, and runs in Node.js, browsers, Deno, Bun and edge runtimes such as Cloudflare Workers.
+
 ## API
 
 | Import                                       | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -135,74 +142,106 @@ Invalid input throws `DataError`. A statistic that is undefined for the data, su
 everyone answered correctly, is `null` in a table of statistics, and a `DataError` from a function that returns only
 that statistic. Results never contain `NaN`.
 
+## Supported
+
+Every statistic is compared with a reference in tests, within the tolerance that the
+[validation](https://measurekit.wakan.dev/_measurekit/psychometrics/validation/) gives with the versions of the references:
+
+| Area                                        | References                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| Classical test theory                       | psych, subscore and base R                                               |
+| Item response theory                        | mirt, TAM, eRm, ltm, GGUM and base R                                     |
+| Multidimensional, bifactor and longitudinal | mirt, TAM and GPArotation                                                |
+| Cognitive diagnosis                         | GDINA, CDM, NPCD and base R                                              |
+| Adaptive and multistage testing             | catR, mirtCAT, cdcatR and base R                                         |
+| Item and person fit                         | mirt, eRm, TAM, PerFit, KernSmoothIRT and base R                         |
+| Differential item functioning               | difR, lordif, rms, mirt, sirt, DFIT and base R                           |
+| Dimensionality                              | psych, polycor, GPArotation and base R                                   |
+| Linking and equating                        | equate, equateIRT, kequate and base R                                    |
+| Explanatory models                          | eRm, TAM, mirt, metafor and base R                                       |
+| Generalizability theory                     | base R and lme4, with GeneralizIT as a check of designs with empty cells |
+| Mokken scale analysis                       | mokken and base R                                                        |
+| Score reporting and prediction              | mirt, equate, mvtnorm, Hmisc, survey and base R                          |
+| Standard setting and classification         | mirt, cacIRT, betafunctions and base R                                   |
+| Rater agreement and effects                 | irr, psych, effsize, TAM, Iso and base R; RSMTool for automated scores   |
+| Response times                              | nlme, LNIRT, mirt and base R                                             |
+| Gains and reliable change                   | clinicalsignificance and base R                                          |
+| Answer similarity                           | CopyDetect                                                               |
+
+Simulation has no reference, as R's generator differs from `createRandom`: seeded tests check its distributions, and a
+calibration recovers the items it simulates.
+
 ## Documentation
 
-- [Data](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/data.md): response matrices,
+- [Data](https://measurekit.wakan.dev/_measurekit/psychometrics/data/): response matrices,
   response records for sparse data, missing responses, scoring against a key.
-- [Classical test theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/ctt.md):
+- [Classical test theory](https://measurekit.wakan.dev/_measurekit/psychometrics/ctt/):
   every statistic, its formula, missing data and edge cases, and augmented subscores.
-- [Item response theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/irt.md):
+- [Item response theory](https://measurekit.wakan.dev/_measurekit/psychometrics/irt/):
   models, calibration, groups and distributions of theta, latent regression, online calibration, testlets, standard
   errors, joint maximum likelihood, ability estimation, summed-score tables, information, reliability, adding a model.
-- [Multidimensional item response theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/multidimensional.md):
+- [Multidimensional item response theory](https://measurekit.wakan.dev/_measurekit/psychometrics/multidimensional/):
   compensatory models, exploratory and confirmatory calibration, standard errors, rotation, scoring, information.
-- [Cognitive diagnosis](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/cdm.md): G-DINA, DINA,
+- [Cognitive diagnosis](https://measurekit.wakan.dev/_measurekit/psychometrics/cdm/): G-DINA, DINA,
   DINO, A-CDM, LLM and R-RUM, attribute mastery, classification accuracy, Q-matrix validation, nonparametric
   classification.
-- [Adaptive and multistage testing](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/cat.md):
+- [Adaptive and multistage testing](https://measurekit.wakan.dev/_measurekit/psychometrics/cat/):
   adaptive tests, adaptive cognitive diagnosis and multidimensional adaptive tests, item selection, content balancing,
   enemy sets, testlets, exposure control and its calibration, stopping rules with classification by an interval or the
   SPRT, multistage panels and their routing cuts, simulation, form assembly.
-- [Item and person fit](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/fit.md): infit and
+- [Item and person fit](https://measurekit.wakan.dev/_measurekit/psychometrics/fit/): infit and
   outfit, S-X², RMSD, lz and lz*, Yen's Q3 and its critical value, the local-dependence chi-square, M2 and its fit
   indices, the Andersen, Martin-Löf and Wald tests, kernel-smoothed item curves.
-- [Differential item functioning](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/dif.md):
+- [Differential item functioning](https://measurekit.wakan.dev/_measurekit/psychometrics/dif/):
   Mantel-Haenszel and the ETS categories, logistic regression, the Mantel test and ordinal logistic regression for
   polytomous items, sparse data, purification, Lord's chi-square.
-- [Dimensionality](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/dimensionality.md):
+- [Dimensionality](https://measurekit.wakan.dev/_measurekit/psychometrics/dimensionality/):
   polychoric and tetrachoric correlations, parallel analysis, exploratory factors by minres or maximum likelihood with
   their fit, the Schmid-Leiman transformation and omega hierarchical.
-- [Linking and equating](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/equating.md):
+- [Linking and equating](https://measurekit.wakan.dev/_measurekit/psychometrics/equating/):
   scale linking from common items, observed-score equating with presmoothing, equating through common items,
   kernel equating, IRT true-score and observed-score equating, standard errors by bootstrap and the delta method, also
   across separate calibrations and chains of links, the anchor screen.
-- [Simulation](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/sim.md): thetas, item parameters
+- [Simulation](https://measurekit.wakan.dev/_measurekit/psychometrics/sim/): thetas, item parameters
   of every model and response matrices, from a seed.
-- [Mokken scale analysis](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/mokken.md):
+- [Mokken scale analysis](https://measurekit.wakan.dev/_measurekit/psychometrics/mokken/):
   two-way imputation, Guttman errors and person fit, scalability coefficients with standard errors, automated item
   selection, conditional association, checks of monotonicity and invariant item ordering, and the reliability of the
   total score.
-- [Generalizability theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/generalizability.md):
+- [Generalizability theory](https://measurekit.wakan.dev/_measurekit/psychometrics/generalizability/):
   variance components of crossed and nested designs, with empty cells too, and decision studies for the generalizability
   and dependability of a measurement procedure.
-- [Explanatory item response theory](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/explanatory.md):
+- [Explanatory item response theory](https://measurekit.wakan.dev/_measurekit/psychometrics/explanatory/):
   the linear logistic test model and its test against the Rasch model, the regression of item difficulties and slopes on
   item features, and predictions for new items as calibration priors.
-- [Score reporting and prediction](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/scaling.md):
+- [Score reporting and prediction](https://measurekit.wakan.dev/_measurekit/psychometrics/scaling/):
   scales, conversion tables, conditional errors of scale scores, equated scores, percentile ranks and norms,
-  prediction of an official score.
-- [Vertical scaling](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/vertical-scaling.md): grades
+  prediction of an operational score.
+- [Vertical scaling](https://measurekit.wakan.dev/_measurekit/psychometrics/vertical-scaling/): grades
   on one scale by concurrent calibration or chained links, and growth from grade to grade.
-- [Standard setting](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/standard-setting.md):
+- [Standard setting](https://measurekit.wakan.dev/_measurekit/psychometrics/standard-setting/):
   modified Angoff, Bookmark, Hofstee and Beuk cut scores, contrasting groups and Body of Work, borderline regression and
   the borderline group, classification accuracy by Rudner's and by Livingston and Lewis's method.
-- [Rater agreement and effects](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/rater.md):
+- [Rater agreement and effects](https://measurekit.wakan.dev/_measurekit/psychometrics/rater/):
   Cohen's and Fleiss' kappa, intraclass correlations, the evaluation of automated scores, the many-facet Rasch model with
   its bias analysis.
-- [Response times](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/response-time.md):
+- [Response times](https://measurekit.wakan.dev/_measurekit/psychometrics/response-time/):
   the lognormal model, speed, aberrant times, the joint model of speed and accuracy, rapid guessing.
-- [Change](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/change.md): gains, the reliability of a
+- [Change](https://measurekit.wakan.dev/_measurekit/psychometrics/change/): gains, the reliability of a
   difference, reliable change from scores and from ability estimates.
-- [Parameterization](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/parameterization.md):
+- [Parameterization](https://measurekit.wakan.dev/_measurekit/psychometrics/parameterization/):
   mirt's coefficients.
-- [Validation](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/validation.md): R
-  references, datasets and tolerances.
-- [Architecture](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/architecture.md):
+- [Validation](https://measurekit.wakan.dev/_measurekit/psychometrics/validation/): the R and
+  Python references, datasets and tolerances.
+- [Architecture](https://measurekit.wakan.dev/_measurekit/psychometrics/architecture/):
   design principles and layout, for contributors.
 - [API reference](https://measurekit.github.io/measurekit/): every export, generated by TypeDoc.
 
 ## License
 
-[Apache-2.0](LICENSE). Copyright Fariz Wakan; see
-[NOTICE](NOTICE). [CONTRIBUTING.md](https://github.com/measurekit/measurekit/blob/main/CONTRIBUTING.md) describes how
-to contribute.
+[Apache-2.0](https://github.com/measurekit/measurekit/blob/main/packages/psychometrics/LICENSE). Copyright Fariz Wakan. See
+[NOTICE](https://github.com/measurekit/measurekit/blob/main/packages/psychometrics/NOTICE).
+[CONTRIBUTING.md](https://github.com/measurekit/measurekit/blob/main/CONTRIBUTING.md) describes how to contribute.
+
+ETS® is a registered trademark of Educational Testing Service (ETS).
+measurekit is not affiliated with, endorsed by or approved by Educational Testing Service (ETS).

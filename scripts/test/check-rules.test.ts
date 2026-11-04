@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { checkRule, failedTests, RULES, type Rule, removeRule, timedOutTests } from "../check-rules.js";
+import { checkRule, failedTests, RULES, type Rule, removeRule, timedOutTests } from "../check-rules.ts";
 
 const ROOT = join(import.meta.dirname, "../..");
 const rule: Rule = {

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type Clone, clonesOf, findClones, judge, readRepeats } from "../check-duplication.js";
+import { type Clone, clonesOf, findClones, judge, readRepeats } from "../check-duplication.ts";
 
 const ROOT = join(import.meta.dirname, "../..");
 const AGENTS = `# AGENTS.md

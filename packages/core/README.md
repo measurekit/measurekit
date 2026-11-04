@@ -1,36 +1,18 @@
 # @measurekit/core
 
-The shared foundation of the measurekit packages: most users
-install
-[`@measurekit/psychometrics`](https://github.com/measurekit/measurekit/tree/main/packages/psychometrics#readme)
-or
-[`@measurekit/knowledge-tracing`](https://github.com/measurekit/measurekit/tree/main/packages/knowledge-tracing#readme),
-which depend on it and re-export `createRandom`, `Random`, `DataError` and `MeasurekitError`.
+The shared foundation of the measurekit packages: errors, argument checks, a seeded random number generator and numerics.
+Install @measurekit/psychometrics or @measurekit/knowledge-tracing.
 
-```mermaid
-flowchart BT
-  C["@measurekit/core<br/>DataError, checks, createRandom, numerics"]
-  P["@measurekit/psychometrics"] --> C
-  K["@measurekit/knowledge-tracing"] --> C
-```
-
-It holds the errors the packages throw, the checks of their arguments, a seeded random number generator, the numerics
-and the types that both packages use. It has no dependencies and runs in any JavaScript runtime.
+It holds the errors the packages throw, the checks of their arguments, a seeded random number generator, the numerics and
+the types that both packages use. [`@measurekit/psychometrics`](https://measurekit.wakan.dev/_measurekit/psychometrics/)
+and [`@measurekit/knowledge-tracing`](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/) depend on it and
+re-export `createRandom`, `Random`, `DataError` and `MeasurekitError`, so their users do not import it themselves.
 
 ```bash
 npm install @measurekit/core
 ```
 
-## API
-
-| Group    | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Errors   | `MeasurekitError`, the base class; `DataError`, for invalid input                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Random   | `createRandom(seed)`, a seeded xoshiro128\*\* generator, and its interface `Random`; `shuffle`, a uniform permutation in place                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Checks   | `describe`; `isNonEmptyString`, `isPositive`, `isRecord`, `isUnitInterval`; `checkRecord`, `checkArray`, `checkOptions`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`, `checkPositive`, `checkNonNegative`, `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval`, `checkSeed`, `checkStopping`                                                                                                                                                                                                                                    |
-| Numerics | `normalQuantile`, `logistic`, `logLogistic`, `logisticPair`, `normalizeLogs`, `cholesky`, `bfgs` with `GradientFunction`, `ValueAndGradient`, `OptimizerOptions` and `OptimizationResult` for minimization, `backtrack` with `BacktrackOptions` and `ARMIJO` for line searches, `stepAlong` with `DescentPoint` for a step of a descent, `iterateToConvergence` with `Stopping` and `Convergence`, `logGamma`, `chiSquareUpperTail`, `studentLowerTail`, `kappaOfPairs` with `KappaOptions` and `KappaWeights`, `dot`, `largestChange`, `maxAbs`, `mean`, `multiplyVector` |
-| Items    | `LogisticItem` and `ThresholdItem`, the parameters of a logistic and of a graded or partial credit item; `logisticProbabilities`, `gradedProbabilities`, `partialCreditProbabilities`, `softmax` and `stridedSoftmax`; `hasValidAsymptotes`, `hasOrderedThresholds`                                                                                                                                                                                                                                                                                                        |
-| Types    | `QMatrix`, the attributes or skills of each item by item id; `ThetaDistribution`, nodes of theta with weights that sum to 1                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+## Quick start
 
 A check throws `DataError` with a sentence that names the value and what was expected, such as
 `A seed must be a safe integer, found 1.5.`
@@ -49,6 +31,37 @@ try {
 refusal instanceof DataError; // => true
 ```
 
+## Architecture
+
+```mermaid
+flowchart BT
+  C["@measurekit/core<br/>DataError, checks, createRandom, numerics"]
+  P["@measurekit/psychometrics"] --> C
+  K["@measurekit/knowledge-tracing"] --> C
+```
+
+It has no dependencies, reads no clock, network or environment, and runs in Node.js, browsers, Deno, Bun and edge runtimes
+such as Cloudflare Workers.
+
+## API
+
+| Group    | Exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Errors   | `MeasurekitError`, the base class; `DataError`, for invalid input                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Random   | `createRandom(seed)`, a seeded xoshiro128\*\* generator, and its interface `Random`; `shuffle`, a uniform permutation in place                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Checks   | `describe`; `isNonEmptyString`, `isPositive`, `isRecord`, `isUnitInterval`; `checkRecord`, `checkArray`, `checkOptions`, `checkMethod`, `checkRandom`, `checkBoolean`, `checkChoice`, `checkFinite`, `checkPositive`, `checkNonNegative`, `checkPositiveInteger`, `checkIntegerFrom`, `checkUnitInterval`, `checkSeed`, `checkStopping`                                                                                                                                                                                                                                    |
+| Numerics | `normalQuantile`, `logistic`, `logLogistic`, `logisticPair`, `normalizeLogs`, `cholesky`, `bfgs` with `GradientFunction`, `ValueAndGradient`, `OptimizerOptions` and `OptimizationResult` for minimization, `backtrack` with `BacktrackOptions` and `ARMIJO` for line searches, `stepAlong` with `DescentPoint` for a step of a descent, `iterateToConvergence` with `Stopping` and `Convergence`, `logGamma`, `chiSquareUpperTail`, `studentLowerTail`, `kappaOfPairs` with `KappaOptions` and `KappaWeights`, `dot`, `largestChange`, `maxAbs`, `mean`, `multiplyVector` |
+| Items    | `LogisticItem` and `ThresholdItem`, the parameters of a logistic and of a graded or partial credit item; `logisticProbabilities`, `gradedProbabilities`, `partialCreditProbabilities`, `softmax` and `stridedSoftmax`; `hasValidAsymptotes`, `hasOrderedThresholds`                                                                                                                                                                                                                                                                                                        |
+| Types    | `QMatrix`, the attributes or skills of each item by item id; `ThetaDistribution`, nodes of theta with weights that sum to 1                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+## Supported
+
+The routines are validated by the fixtures of the packages that use them: the normal quantile, the logistic function and
+the chi-square upper tail against R's `qnorm`, `plogis` and `pchisq`, and the kappa of pairs against `irr::kappa2`, within
+the tolerances of the [psychometrics](https://measurekit.wakan.dev/_measurekit/psychometrics/validation/) and
+[knowledge tracing](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/validation/) validation. The tests of core
+cover their edge cases.
+
 ## Why the numerics are written here
 
 The numerics are written here rather than taken from `ml-matrix` 6.15.1 or the `@stdlib/stats-base-dists-*` packages
@@ -63,8 +76,14 @@ The numerics are written here rather than taken from `ml-matrix` 6.15.1 or the `
 
 Each routine is held to R within the tolerances of the libraries' validation, which a dependency would have to meet as
 well. What one library alone needs, such as an eigendecomposition, stays in its own `math/`
-([psychometrics](https://github.com/measurekit/measurekit/blob/main/docs/psychometrics/architecture.md#why-the-numerics-are-written-here)).
+([psychometrics](https://measurekit.wakan.dev/_measurekit/psychometrics/architecture/#why-the-numerics-are-written-here)).
+
+## Documentation
+
+[Performance](https://measurekit.wakan.dev/_measurekit/core/performance/) gives the speed of the numerics against base R
+and stats, and what the entry point adds to a bundle.
 
 ## License
 
-[Apache-2.0](LICENSE). Copyright Fariz Wakan; see [NOTICE](NOTICE).
+[Apache-2.0](https://github.com/measurekit/measurekit/blob/main/packages/core/LICENSE). Copyright Fariz Wakan. See
+[NOTICE](https://github.com/measurekit/measurekit/blob/main/packages/core/NOTICE).

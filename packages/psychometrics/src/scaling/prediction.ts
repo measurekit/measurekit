@@ -16,7 +16,7 @@ export const SCORE_PREDICTION_OPTIONS: FieldNames<ScorePredictionOptions> = { le
 /** Options of {@link predictThetaScore}. */
 export interface ThetaScorePredictionOptions extends ScorePredictionOptions {
   /**
-   * The standard error of the official theta estimate, finite and at least 0: a computerized adaptive test's target
+   * The standard error of the operational theta estimate, finite and at least 0: a computerized adaptive test's target
    * precision. 0 reports each theta as it is.
    *
    * @defaultValue `0`
@@ -37,7 +37,7 @@ export interface ScoreProbability {
   readonly probability: number;
 }
 
-/** A prediction of an official score. */
+/** A prediction of an operational score. */
 export interface ScorePrediction {
   /** The expected score. */
   readonly mean: number;

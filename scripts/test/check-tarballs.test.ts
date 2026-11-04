@@ -8,7 +8,7 @@ import {
   publishedFolders,
   RESOLUTIONS,
   typeAll,
-} from "../check-tarballs.js";
+} from "../check-tarballs.ts";
 
 const ROOT = join(import.meta.dirname, "../..");
 

@@ -1,2 +1,6 @@
-measurekit knowledge tracing
+@measurekit/knowledge-tracing
 Copyright Fariz Wakan
+
+This package implements published learner models and their evaluation, each cited in the documentation of its function and
+the guide of its module. It includes no code or data of others: its tests compare its results with pyBKT and R packages
+through fixtures, which it does not ship.

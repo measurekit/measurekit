@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { chainsOf, instrument, resultsShown, runSample } from "../guide-samples.js";
+import { chainsOf, instrument, resultsShown, runSample } from "../guide-samples.ts";
 
 /** Instruments a sample whose lines are named by their numbers. */
 const instrumented = (code: string) => instrument(code, (line) => `line ${line}`);

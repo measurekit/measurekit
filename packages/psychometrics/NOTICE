@@ -1,2 +1,9 @@
-measurekit psychometrics
+@measurekit/psychometrics
 Copyright Fariz Wakan
+
+This package implements published psychometric methods, each cited in the documentation of its function and the guide of its
+module, among them the DIF categories of ETS and the statistics of automated scores that RSMTool computes. It includes no
+code or data of others: its tests compare its results with R and Python packages through fixtures, which it does not ship.
+
+ETS® is a registered trademark of Educational Testing Service (ETS).
+measurekit is not affiliated with, endorsed by or approved by Educational Testing Service (ETS).

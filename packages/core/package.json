@@ -1,13 +1,12 @@
 {
   "name": "@measurekit/core",
   "version": "0.0.0",
-  "description": "The foundation that the measurekit packages share: their errors, the checks of their arguments, a seeded random number generator and common numerics.",
+  "description": "The shared foundation of the measurekit packages: errors, argument checks, a seeded random number generator and numerics. Install @measurekit/psychometrics or @measurekit/knowledge-tracing.",
   "keywords": [
     "measurekit",
     "psychometrics",
     "knowledge-tracing",
-    "random-number-generator",
-    "argument-validation"
+    "seeded-random"
   ],
   "author": "Fariz Wakan (https://github.com/luthfanwakan)",
   "license": "Apache-2.0",
@@ -16,7 +15,7 @@
     "url": "git+https://github.com/measurekit/measurekit.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/measurekit/measurekit/tree/main/packages/core#readme",
+  "homepage": "https://measurekit.wakan.dev/_measurekit/core/",
   "bugs": "https://github.com/measurekit/measurekit/issues",
   "type": "module",
   "sideEffects": false,

@@ -24,7 +24,8 @@ jobs:
   # instance when no run has passed yet, every job runs. A job runs when a member of the workspace that it reads, or a member
   # that uses that one, changed (core, psychometrics, knowledge-tracing, the examples and compat, with their dependencies read
   # from their package.json files); the lock file, the root configuration, the scripts that the benchmarks share and this
-  # workflow reach every job; the other Markdown and the configuration of the linters reach none but check. A file that no rule
+  # workflow reach every job; the other Markdown, the configuration of the linters and the plugin of the docs site reach none but
+  # check. A file that no rule
   # names reaches every job. The guides of a package and the README are tests of the examples alone, the runner of their
   # samples is a test of the examples and of the scripts, and AGENTS.md, the changesets, the manifests and the other workflows
   # are tests of the scripts alone. A package that changed also reaches the tests of the scripts, which bundle its entry
@@ -97,13 +98,14 @@ jobs:
             }
           }
 
-          // A change to these reaches no job but check (and a test of scripts, for what SCRIPT_TESTED names).
+          // A change to these reaches no job but check (and a test of scripts, for what SCRIPT_TESTED names), which builds the docs
+          // site with the plugin and the files at the top of docs/.
           const NOT_CHECKED =
-            /^(\.changeset\/|\.github\/(?!workflows\/ci\.yml$)|[^/]+\.md$|LICENSE$|biome\.json$|biome\/|cspell\.json$|knip\.json$|typedoc\.json$|lefthook\.yml$|\.editorconfig$|docs\/(diagrams\.css|[^/]+\/performance\.md)$|validation\/(?!benchmarks\/))/;
-          // The scripts that only check, or are checked by the tests of scripts. Every other script, bench-harness.ts, serves the
-          // tests and the benchmarks of the packages.
+            /^(\.changeset\/|\.github\/(?!workflows\/ci\.yml$)|[^/]+\.md$|LICENSE$|biome\.json$|biome\/|cspell\.json$|knip\.json$|typedoc\.json$|lefthook\.yml$|\.editorconfig$|docs\/([^/]+|[^/]+\/performance\.md)$|validation\/(?!benchmarks\/))/;
+          // The scripts that only check, or are checked by the tests of scripts, with the identity of the family, which check reads.
+          // Every other script, bench-harness.ts, serves the tests and the benchmarks of the packages.
           const OWN_SCRIPTS =
-            /^scripts\/(test\/|check-standards\.ts$|check-duplication\.ts$|check-licenses\.ts$|check-rules\.ts$|check-release\.ts$|check-tarballs\.ts$|entry-sizes\.ts$|size-budgets\.ts$|peak-memory\.ts$|prepare\.ts$)/;
+            /^scripts\/(test\/|check-standards\.ts$|check-identity\.ts$|family\.ts$|identity\.ts$|check-duplication\.ts$|check-licenses\.ts$|check-rules\.ts$|check-release\.ts$|check-tarballs\.ts$|entry-sizes\.ts$|size-budgets\.ts$|peak-memory\.ts$|prepare\.ts$)/;
 
           // The runner of the samples and the comparison of their results, which the examples run and the tests of scripts check.
           const SAMPLE_SCRIPTS = /^scripts\/(guide-samples|stated-values)\.ts$/;

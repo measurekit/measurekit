@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { bundle, entrySize, entrySources, moduleOf } from "../entry-sizes.js";
-import { ENTRY_BUDGETS } from "../size-budgets.js";
+import { bundle, entrySize, entrySources, moduleOf } from "../entry-sizes.ts";
+import { ENTRY_BUDGETS } from "../size-budgets.ts";
 
 const PACKAGES = resolve(import.meta.dirname, "../../packages");
 const ENTRIES = entrySources();

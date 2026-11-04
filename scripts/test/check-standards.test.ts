@@ -10,12 +10,14 @@ import {
   checkHistory,
   checkModuleExamples,
   checkNotIncluded,
+  checkReadmeSections,
   checkReadonlyResults,
   checkSectionSigns,
   checkStandards,
   checkTestTitles,
   type Files,
-} from "../check-standards.js";
+} from "../check-standards.ts";
+import { familyFiles } from "./family-repository.ts";
 
 /** The files of a repository as the checks read them. */
 function repository(files: Record<string, string>): Files {
@@ -404,10 +406,38 @@ describe("not included", () => {
   });
 });
 
+describe("README sections", () => {
+  const root = "# A\n## Which package\n## Documentation\n## Development\n## Layout\n## License\n";
+  const pkg = "# A\n## Quick start\n## Architecture\n## API\n## Supported\n## Documentation\n## License\n";
+
+  it("accepts the sections of the root and of a package in their order, with others between them", () => {
+    const files = repository({
+      "README.md": root,
+      "packages/a/README.md": pkg.replace("## API", "## Install\n## API"),
+      "examples/a/README.md": "# Example\n",
+    });
+    expect(checkReadmeSections(files)).toStrictEqual([]);
+  });
+
+  it("names the section that is missing or out of order", () => {
+    const files = repository({
+      "README.md": root.replace("## Layout\n", ""),
+      "packages/a/README.md":
+        "# A\n## Quick start\n## API\n## Architecture\n## Supported\n## Documentation\n## License\n",
+    });
+    expect(
+      checkReadmeSections(files).map(({ file, message }) => [file, message.match(/; "([^"]+)" is/)?.[1]]),
+    ).toStrictEqual([
+      ["README.md", "Layout"],
+      ["packages/a/README.md", "API"],
+    ]);
+  });
+});
+
 describe("all checks", () => {
   it("reports nothing for a repository that holds the standards", () => {
     const files = repository({
-      "README.md": `# A\n\n${DIAGRAM}`,
+      ...familyFiles(),
       "packages/a/src/index.ts": 'export { one } from "./one.js";\n',
       "packages/a/src/one.ts":
         "/**\n * One.\n *\n * @example\n * ```ts\n * one(); // 1\n * ```\n */\nexport function one(): number { return 1; }\n",
@@ -417,7 +447,7 @@ describe("all checks", () => {
   });
 
   it("names the rule and the line of each violation", () => {
-    const files = repository({ "packages/a/src/x.ts": "const a = 1;\n// §1\n" });
+    const files = repository({ ...familyFiles(), "packages/a/src/x.ts": "const a = 1;\n// §1\n" });
     expect(checkStandards(files)).toStrictEqual([
       {
         file: "packages/a/src/x.ts",

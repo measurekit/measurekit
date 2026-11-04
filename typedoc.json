@@ -6,7 +6,7 @@
   "readme": "README.md",
   "out": "docs/api",
   "treatWarningsAsErrors": true,
-  "plugin": ["typedoc-plugin-mermaid"],
+  "plugin": ["typedoc-plugin-mermaid", "./docs/typedoc-seo.ts"],
   "mermaidVersion": "11.17.2",
   "customCss": "docs/diagrams.css",
   "ignoredHighlightLanguages": ["r"]
