@@ -71,7 +71,7 @@ const data = buildResponseRecords(
   ],
   { itemIds: ["q2", "q7", "q9"] },
 );
-data.personIds; // ["ana", "budi"], in order of first appearance
+data.personIds; // => ["ana", "budi"], in order of first appearance
 ```
 
 | Rule      | Detail                                                                                                                                         |
@@ -135,7 +135,7 @@ const scored = scoreResponses(
   ["A", "C", "B"],
   { optionLabels: ["A", "B", "C", "D", "E"] },
 );
-scored.responses; // [[1, 1, null], [0, 1, 0]]
+scored.responses; // => [[1, 1, null], [0, 1, 0]]
 ```
 
 | Option         | Meaning                                                                                                         |

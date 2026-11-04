@@ -77,8 +77,8 @@ export interface M4Index {
  *   [1, 0, 0, 1, 0, 0],
  * ]);
  * const [pair] = m4Index(matrix, items, [0, 0], [["person1", "person2"]]);
- * pair?.identicalIncorrect; // 4
- * pair?.significance; // 0.0418, two identical correct and four identical incorrect responses
+ * pair?.identicalIncorrect; // => 4
+ * pair?.significance; // => 0.0418, two identical correct and four identical incorrect responses
  * ```
  */
 export function m4Index(

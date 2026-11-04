@@ -24,7 +24,8 @@ const model = elo({
 const ana = model.initialState("ana");
 const candidates = ["q1", "q2", "q3"].map((item) => ({ learner: "ana", item, skills: [], time: 1 }));
 recommend(model, ana, candidates);
-// [{ attempt: q2, prediction: 0.750 }, { attempt: q1, prediction: 0.924 }, { attempt: q3, prediction: 0.426 }]
+// => [{ attempt: { item: "q2", ... }, prediction: 0.750 }, { attempt: { item: "q1", ... }, prediction: 0.924 },
+//     { attempt: { item: "q3", ... }, prediction: 0.426 }]
 ```
 
 | Option | Default        | Meaning                                  |
@@ -126,10 +127,10 @@ const model = bkt({
     },
   },
 });
-streakMastery(log); // { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
-thresholdMastery(model, log); // { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
-movingAverageMastery(log, { decay: 0.5, threshold: 0.75 }); // { ana: { fractions: 3, decimals: null }, budi: { decimals: null } }
-windowMastery(log, { correct: 2, window: 3 }); // { ana: { fractions: 3, decimals: null }, budi: { decimals: null } }
+streakMastery(log); // => { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
+thresholdMastery(model, log); // => { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
+movingAverageMastery(log, { decay: 0.5, threshold: 0.75 }); // => { ana: { fractions: 3, decimals: null }, budi: { decimals: null } }
+windowMastery(log, { correct: 2, window: 3 }); // => { ana: { fractions: 3, decimals: null }, budi: { decimals: null } }
 
 // A logistic model has no mastery: the criterion is a predicted success of 0.7.
 const performance = logistic({
@@ -141,7 +142,7 @@ const performance = logistic({
     },
   },
 });
-predictedMastery(performance, log, { threshold: 0.7 }); // { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
+predictedMastery(performance, log, { threshold: 0.7 }); // => { ana: { fractions: 4, decimals: null }, budi: { decimals: null } }
 ```
 
 Comparing the opportunities of criteria on the same log shows how much practice each asks for (Pelánek and Řihák, 2017). `thresholdMastery` updates each learner from the model's initial state, with the model's parameters as given.

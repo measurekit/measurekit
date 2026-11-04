@@ -65,9 +65,10 @@ const test = createAdaptiveTest({
 
 const answers: Record<string, number> = { q1: 1, q2: 1, q3: 0, q4: 0, q5: 2, q6: 1 };
 const random = createRandom(42);
-let state = test.start(random); // { items: [], responses: [], withheld: [], estimate, next: "q6" }
+let state = test.start(random);
+// => { items: [], responses: [], withheld: [], estimate: { theta: 0.00, standardError: 1.00 }, next: "q6" }
 while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);
-state.estimate; // { theta, standardError }
+state.estimate; // => { theta: 0.485, standardError: 0.66 }
 ```
 
 | Option           | Default                 | Meaning                                                                                             |
@@ -186,9 +187,9 @@ const expected = createAdaptiveTest({
   estimator: posteriorModeEstimate,
 });
 const random = createAdaptiveTest({ pool, stopping, selection: progressive({ length: 6 }) });
-fixed.start(createRandom(1)).next; // "q6"
-expected.start(createRandom(1)).next; // "q8": the most information expected after its response
-random.start(createRandom(1)).next; // "q12", at random: the weight of information is 0 at the first item
+fixed.start(createRandom(1)).next; // => "q6"
+expected.start(createRandom(1)).next; // => "q8": the most information expected after its response
+random.start(createRandom(1)).next; // => "q12", at random: the weight of information is 0 at the first item
 ```
 
 | Option of the rules                       | Default                 | Meaning                                                                     |
@@ -352,7 +353,7 @@ const test = createAdaptiveTest({
 const random = createRandom(7);
 let state = test.start(random);
 while (state.next !== null) state = test.answer(state, random.uniform() < 0.6 ? 1 : 0, random);
-state.items.length; // 30
+state.items.length; // => 30
 // The counts of the items in algebra, geometry, number, recall and apply: 10, 9, 11, 12 and 18.
 ```
 
@@ -465,8 +466,8 @@ const run = (withinTestlet: "in-order" | "adaptive") => {
   while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);
   return state;
 };
-run("in-order").items; // ["q1", "p1", "p2", "p3"]
-run("adaptive").items; // ["q1", "p2", "p1", "p3"]
+run("in-order").items; // => ["q1", "p1", "p2", "p3"]
+run("adaptive").items; // => ["q1", "p2", "p1", "p3"]
 ```
 
 At theta 0 the passage's items have information 0.186, 0.251 and 0.089, a mean of 0.175, below `q1`'s 0.193, so `q1`
@@ -543,7 +544,7 @@ for (const theta of thetas) {
   for (const id of person?.state.items ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
   pool = pool.map((item) => ((counts.get(item.id) ?? 0) >= cap * thetas.length ? { ...item, exposure: 0 } : item));
 }
-Math.max(...counts.values()) / thetas.length; // 0.30; without the control, one item went to all 500 persons
+Math.max(...counts.values()) / thetas.length; // => 0.30; without the control, one item went to all 500 persons
 ```
 
 | Choice          | Value                                                                                                                                           |
@@ -621,11 +622,13 @@ const sprt = sequentialProbabilityRatio([
 ]);
 const test = createAdaptiveTest({ pool, stopping: anyOf(testLength(40), allOf(testLength(5), sprt)) });
 const { persons } = simulateAdaptiveTest(test, [1.1, -0.1], random);
-for (const { state } of persons) {
+persons.map(({ state }) => {
   const administered = state.items.map((id) => pool.findIndex((item) => item.id === id));
-  sprt.classify({ pool, administered, responses: state.responses, estimate: state.estimate });
-  // 2 after 11 items for the person at 1.1; 1, the middle, after 33 for the person at -0.1
-}
+  return [
+    sprt.classify({ pool, administered, responses: state.responses, estimate: state.estimate }),
+    state.items.length,
+  ];
+}); // => [[2, 11], [1, 33]]: the person at 1.1 in category 2 after 11 items, the one at -0.1 in the middle after 33
 ```
 
 On 400 seeded persons at each bound of a cut 0.3 from it, with a pool of 200 2PL items and at most 60 of them, the SPRT
@@ -663,7 +666,7 @@ const random = createRandom(6);
 const pool = simulateItems(twoParameterLogistic, 50, random).map((item, i) => ({ id: `item${i + 1}`, ...item }));
 const test = createAdaptiveTest({ pool, stopping: anyOf(testLength(30), thetaChangeBelow(0.05)) });
 const [person] = simulateAdaptiveTest(test, [0.5], random).persons;
-person?.state.items.length; // 25: the 25th response moved θ̂ by less than 0.05, to 0.44
+person?.state.items.length; // => 25: the 25th response moved θ̂ by less than 0.05, to 0.44
 ```
 
 ### Rules for other items and estimates
@@ -738,16 +741,16 @@ const test = createDiagnosticAdaptiveTest({
 // The first person answers the items the test selects.
 const answers = Object.fromEntries(matrix.itemIds.map((id, j) => [id, matrix.responses[0]?.[j] ?? 0]));
 let state = test.start(random);
-state.next; // "convert2", the first item
+state.next; // => "convert2", the first item
 while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);
-state.items; // ["convert2", "add2", "borrow3", "borrowConvert", "add1", "add3", "addConvert"]: stops at 0.87 >= 0.85
-state.estimate.mastery; // [0.936, 0.946, 0.983] to three digits; the true profile is [1, 1, 1]
-state.estimate.map; // [1, 1, 1]
+state.items; // => ["convert2", "add2", "borrow3", "borrowConvert", "add1", "add3", "addConvert"]: stops at 0.87 >= 0.85
+state.estimate.mastery; // => [0.936, 0.946, 0.983]; the true profile is [1, 1, 1]
+state.estimate.map; // => [1, 1, 1]
 
 const result = simulateDiagnosticTest(test, profiles.slice(0, 500), random);
-result.patternAccuracy; // 0.826
-result.attributeAccuracy; // [0.938, 0.934, 0.946]
-result.meanLength; // 6.726
+result.patternAccuracy; // => 0.826
+result.attributeAccuracy; // => [0.938, 0.934, 0.946]
+result.meanLength; // => 6.726
 ```
 
 | Option           | Default                    | Meaning                                                                                                       |
@@ -897,11 +900,11 @@ const test = createMultidimensionalAdaptiveTest({
 });
 
 let state = test.start(random);
-state.next; // "q46", an item on both dimensions
+state.next; // => "q46", an item on both dimensions
 state = test.answer(state, 1, random); // the response to it
-state.next; // "q51"
-state.estimate.theta; // [0.421, 0.421] to three digits
-state.estimate.standardErrors; // [0.862, 0.862]
+state.next; // => "q51"
+state.estimate.theta; // => [0.421, 0.421]
+state.estimate.standardErrors; // => [0.862, 0.862]
 
 // 300 persons with thetas from the prior.
 const thetas = Array.from({ length: 300 }, () => {
@@ -909,9 +912,9 @@ const thetas = Array.from({ length: 300 }, () => {
   return [z[0] ?? 0, 0.5 * (z[0] ?? 0) + Math.sqrt(0.75) * (z[1] ?? 0)];
 });
 const result = simulateMultidimensionalAdaptiveTest(test, thetas, random);
-result.bias; // [-0.045, -0.007]
-result.rootMeanSquareError; // [0.538, 0.478]
-result.meanLength; // 16.34
+result.bias; // => [-0.045, -0.007]
+result.rootMeanSquareError; // => [0.538, 0.478]
+result.meanLength; // => 16.34
 ```
 
 | Option           | Default                      | Meaning                                                                                    |
@@ -1017,10 +1020,10 @@ const test = createMultistageTest({
   routing: "number-correct",
 });
 
-let state = test.start(); // { modules: [], items: [], responses: [], estimate, next: "routing" }
-state = test.answer(state, [1, 1, 0, 0]); // score 2, from 2 to below 3: next is "medium"
-state = test.answer(state, [1, 0, 1]); // the last stage: next is null
-state.estimate;
+let state = test.start(); // => { modules: [], items: [], responses: [], estimate: { ... }, next: "routing" }
+state = test.answer(state, [1, 1, 0, 0]); // => { modules: ["routing"], next: "medium", ... }: score 2, from 2 to below 3
+state = test.answer(state, [1, 0, 1]); // => { modules: ["routing", "medium"], next: null, ... }: the last stage
+state.estimate; // => { theta: 0.20, standardError: 0.64 }
 ```
 
 | Option      | Default                 | Meaning                                                          |
@@ -1077,8 +1080,8 @@ const stages = [
   [module("routing", [-1, -0.3, 0.3, 1])],
   [module("easy", [-1.5, -1, -0.5]), module("medium", [-0.5, 0, 0.5]), module("hard", [0.5, 1, 1.5])],
 ];
-multistageCuts(stages); // [[-0.5, 0.5]]: the routing module's cuts in theta, where the modules' information is equal
-const [cuts] = multistageCuts(stages, { scale: "number-correct" }); // [2, 3]
+multistageCuts(stages); // => [[-0.5, 0.5]]: the routing module's cuts in theta, where the modules' information is equal
+const [cuts] = multistageCuts(stages, { scale: "number-correct" }); // => [2, 3]
 const test = createMultistageTest({
   stages: [[{ ...module("routing", [-1, -0.3, 0.3, 1]), cuts }], stages[1]],
   routing: "number-correct",
@@ -1145,7 +1148,7 @@ const result = simulateAdaptiveTest(
   simulateThetas(500, random),
   random,
 );
-result.rootMeanSquareError; // also bias, meanLength, exposureRates and persons
+result.rootMeanSquareError; // => 0.40; the result also has bias, meanLength, exposureRates and persons
 ```
 
 | Result                | Meaning                                                                                  |
@@ -1189,7 +1192,7 @@ let state = test.start(stepRandom(0, 0));
 for (const response of simulated?.state.responses ?? []) {
   state = test.answer(state, response, stepRandom(0, state.items.length + 1));
 }
-state.items.join() === simulated?.state.items.join(); // true
+state.items.join() === simulated?.state.items.join(); // => true
 ```
 
 ## Form assembly
@@ -1271,9 +1274,10 @@ const forms = assembleForms({
     ["q2", "q5", "q8"],
   ],
 });
-forms.map((form) => form.items.length); // [30, 30, 30]
-forms.map((form) => form.contentCounts); // algebra 12, 13 and 14; geometry 9, 8 and 9: within the bounds
-forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // [[6.05, 7.92, 6.07], [6.09, 7.83, 6.13], [6.03, 7.75, 6.07]]
+forms.map((form) => form.items.length); // => [30, 30, 30]
+forms.map((form) => form.contentCounts);
+// => [{ algebra: 12, geometry: 9 }, { algebra: 13, geometry: 8 }, { algebra: 14, geometry: 9 }]: within the bounds
+forms.map((form) => form.information.map((x) => Math.round(x * 100) / 100)); // => [[6.05, 7.92, 6.07], [6.09, 7.83, 6.13], [6.03, 7.75, 6.07]]
 ```
 
 | Situation                                                                                | Result                                                |

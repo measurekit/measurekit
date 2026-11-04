@@ -69,8 +69,8 @@ const matrix = buildResponseMatrix([
   [2, 3, 2, 3],
   [null, 1, 0, 1],
 ]);
-twoWayImputation(matrix, createRandom(1)).responses; // [[3, 4, 3, 4], [1, 2, 1, 2], [2, 3, 2, 3], [1, 1, 0, 1]]
-twoWayImputation(matrix, createRandom(2)).responses[3]; // [0, 1, 0, 1]: another draw of the error
+twoWayImputation(matrix, createRandom(1)).responses; // => [[3, 4, 3, 4], [1, 2, 1, 2], [2, 3, 2, 3], [1, 1, 0, 1]]
+twoWayImputation(matrix, createRandom(2)).responses[3]; // => [0, 1, 0, 1]: another draw of the error
 ```
 
 The result is a new matrix with the same ids and times; a matrix without missing responses comes back as a copy. Each
@@ -109,9 +109,9 @@ const simulated = simulateResponses(items, simulateThetas(400, random), random);
 const matrix = buildResponseMatrix(simulated.responses, { itemIds: simulated.itemIds });
 
 const { errors, upperFence, outliers } = guttmanErrors(matrix);
-errors.slice(0, 8); // [1, 3, 5, 0, 2, 0, 0, 4]
-upperFence; // 10
-outliers; // [217]: one person with more than 10 errors
+errors.slice(0, 8); // => [1, 3, 5, 0, 2, 0, 0, 4]
+upperFence; // => 10
+outliers; // => [217]: one person with more than 10 errors
 ```
 
 The order of the steps and the fence come from the persons who answered every item: a person with fewer responses has
@@ -140,8 +140,8 @@ is `guttmanErrors`' G+ over its largest value.
 import { personScalability } from "@measurekit/psychometrics/mokken";
 
 const fit = personScalability(matrix);
-fit[0]; // { id: "person1", normedGuttmanErrors: 0.067, u3: 0.025, ht: 0.53 }
-fit[217]; // { id: "person218", normedGuttmanErrors: 0.75, u3: 0.66, ht: -0.19 }: the outlier above
+fit[0]; // => { id: "person1", normedGuttmanErrors: 0.067, u3: 0.025, ht: 0.53 }
+fit[217]; // => { id: "person218", normedGuttmanErrors: 0.75, u3: 0.66, ht: -0.19 }: the outlier above
 ```
 
 The parametric lz and lz*, which need calibrated items, are in [fit](fit.md#lz).
@@ -175,9 +175,9 @@ const matrix = buildResponseMatrix(
 
 const result = scalability(matrix);
 const round = (value: number | null) => (value === null ? null : Math.round(value * 1000) / 1000);
-[round(result.scale.coefficient), round(result.scale.standardError)]; // [0.076, 0.018]
+[round(result.scale.coefficient), round(result.scale.standardError)]; // => [0.076, 0.018]
 result.items.map(({ id, coefficient }) => [id, round(coefficient)]);
-// [["item1", 0.074], ["item2", 0.173], ["item3", 0.108], ["item4", 0.175], ["item5", 0.043], ["item6", 0.191],
+// => [["item1", 0.074], ["item2", 0.173], ["item3", 0.108], ["item4", 0.175], ["item5", 0.043], ["item6", 0.191],
 //  ["item7", 0.145], ["item8", 0.153], ["reversed", -0.381]]
 ```
 
@@ -224,7 +224,7 @@ const matrix = buildResponseMatrix(
 );
 
 automatedItemSelection(matrix);
-// { scales: [["item2", "item4", "item5", "item6"], ["item3", "item8"]], unscalable: ["item1", "item7", "reversed"] }
+// => { scales: [["item2", "item4", "item5", "item6"], ["item3", "item8"]], unscalable: ["item1", "item7", "reversed"] }
 ```
 
 ## Conditional association
@@ -275,9 +275,9 @@ const matrix = buildResponseMatrix(
 );
 
 const { flagged } = conditionalAssociation(matrix);
-flagged.w1; // [["reversed", "item1"], ["reversed", "item2"], ..., ["reversed", "item8"]]: all but item 5
-flagged.w2; // ["reversed"]
-flagged.w3; // [["item5", "reversed"]]: the pair that contradicts itself
+flagged.w1; // => [["reversed", "item1"], ["reversed", "item2"], ..., ["reversed", "item8"]]: all but item 5
+flagged.w2; // => ["reversed"]
+flagged.w3; // => [["item5", "reversed"]]: the pair that contradicts itself
 ```
 
 `check.ca` then removes the item with the most flags, the one with the lowest H_i among ties and a random one among
@@ -348,7 +348,7 @@ monotonicity(matrix)
     check.significantViolations,
     check.criterion,
   ]);
-// [["item5", 1, 0.077, 1.138, 0, 59], ["reversed", 3, 0.444, 9.744, 3, 651]], after rounding
+// => [["item5", 1, 0.077, 1.138, 0, 59], ["reversed", 3, 0.444, 9.744, 3, 651]], after rounding
 ```
 
 ## Invariant item ordering
@@ -397,9 +397,9 @@ const matrix = buildResponseMatrix(
 );
 
 const result = invariantItemOrdering(matrix);
-result.removed; // ["reversed"]
-Math.round((result.coefficient ?? 0) * 1000) / 1000; // 0.366
-Math.round((invariantItemOrdering(matrix, { selection: false }).coefficient ?? 0) * 1000) / 1000; // 0.3
+result.removed; // => ["reversed"]
+Math.round((result.coefficient ?? 0) * 1000) / 1000; // => 0.366
+Math.round((invariantItemOrdering(matrix, { selection: false }).coefficient ?? 0) * 1000) / 1000; // => 0.3
 ```
 
 ## Reliability
@@ -437,8 +437,8 @@ const items = simulateItems(twoParameterLogistic, 8, random);
 const simulated = simulateResponses(items, simulateThetas(400, random), random);
 const matrix = buildResponseMatrix(simulated.responses, { itemIds: simulated.itemIds });
 
-Math.round(molenaarSijtsmaReliability(matrix) * 1000) / 1000; // 0.541
-Math.round(cronbachAlpha(matrix) * 1000) / 1000; // 0.531
+Math.round(molenaarSijtsmaReliability(matrix) * 1000) / 1000; // => 0.541
+Math.round(cronbachAlpha(matrix) * 1000) / 1000; // => 0.531
 ```
 
 MS is not limited to 1 and is meant for items that fit the model: check [monotonicity](#monotonicity) first. On 20 seeded

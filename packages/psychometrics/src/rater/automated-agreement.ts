@@ -96,9 +96,9 @@ export interface AutomatedScoreAgreement {
  *   group: i < 5 ? "a" : "b",
  * }));
  * const agreement = automatedScoreAgreement(scores, { scale: { lowest: 1, highest: 6 } });
- * agreement.machineHuman.quadraticKappa; // 0.78
- * agreement.degradation?.quadraticKappa; // -0.084, the machine's QWK less two people's
- * agreement.groups.map(({ smd }) => smd); // [0, 0.33]
+ * agreement.machineHuman.quadraticKappa; // => 0.78
+ * agreement.degradation?.quadraticKappa; // => -0.084, the machine's QWK less two people's
+ * agreement.groups.map(({ smd }) => smd); // => [0, 0.33]
  * ```
  */
 export function automatedScoreAgreement(

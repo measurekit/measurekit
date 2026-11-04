@@ -70,12 +70,12 @@ const model = irt({
 const attempt = { learner: "ana", item: "q1", skills: [], time: 1 };
 let ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
 ana = model.update(ana, { ...attempt, item: "essay", time: 2, outcome: 2 / 3 }); // category 2 of 0 to 3
-model.ability(ana); // { theta: 0.508, standardError: 0.748 }, EAP
-model.ability(ana, { estimator: "map" }); // the posterior mode
-model.predict(ana, { ...attempt, item: "q2", time: 3 }); // 0.625
+model.ability(ana); // => { theta: 0.508, standardError: 0.748 }, EAP
+model.ability(ana, { estimator: "map" }); // => { theta: 0.471, standardError: 0.731 }, the posterior mode
+model.predict(ana, { ...attempt, item: "q2", time: 3 }); // => 0.625
 const { nodes, weights } = model.posterior(ana);
-nodes.length; // 61, from -6 to 6
-weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // 0.706, P(θ > 0)
+nodes.length; // => 61, from -6 to 6
+weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // => 0.706, P(θ > 0)
 ```
 
 `ability(state, { estimator })` returns:
@@ -142,9 +142,9 @@ const monday = Date.UTC(2026, 0, 5, 9);
 const attempt = { learner: "ana", item: "q1", skills: [], time: monday };
 let ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
 ana = model.update(ana, { ...attempt, item: "q2", time: monday + 60_000, outcome: 1 });
-model.ability(ana); // { theta: 0.818, standardError: 0.787 }
-model.ability(ana, { at: monday + 26 * WEEK }); // { theta: 0.818, standardError: 1.067 }, half a year later
-model.predict(ana, { ...attempt, item: "q2", time: monday + 26 * WEEK }); // 0.605
+model.ability(ana); // => { theta: 0.818, standardError: 0.787 }
+model.ability(ana, { at: monday + 26 * WEEK }); // => { theta: 0.818, standardError: 1.067 }, half a year later
+model.predict(ana, { ...attempt, item: "q2", time: monday + 26 * WEEK }); // => 0.605
 ```
 
 **Choosing `points`.** The grid's chain is the continuous drift only as the grid gets finer. Measured against the same

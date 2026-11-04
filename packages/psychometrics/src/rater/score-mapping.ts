@@ -92,8 +92,8 @@ export type ScoreMapping = LinearScoreMapping | IsotonicScoreMapping;
  *   { machine: 2.5, human: 4 },
  * ];
  * const isotonic = scoreMapping(scores, { method: "isotonic" });
- * isotonic.method === "isotonic" && isotonic.knots.map(({ human }) => human); // [1, 2.5, 3.6667, 3.6667]
- * mappedScore(isotonic, 2.25); // 3.0833, between the knots of 2 and 2.5
+ * isotonic.method === "isotonic" && isotonic.knots.map(({ human }) => human); // => [1, 2.5, 3.6667, 3.6667]
+ * mappedScore(isotonic, 2.25); // => 3.0833, between the knots of 2 and 2.5
  * ```
  */
 export function scoreMapping(scores: readonly AutomatedScore[], options: ScoreMappingOptions = {}): ScoreMapping {

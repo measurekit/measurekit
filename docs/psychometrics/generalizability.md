@@ -62,14 +62,14 @@ const scores = ratings.flatMap((row, p) =>
   row.map((score, i) => ({ levels: { person: persons[p] ?? "", item: items[i] ?? "" }, score })),
 );
 const study = generalizabilityStudy(scores, { facets: ["item"] });
-study.sampleSizes; // { person: 6, item: 4 }
+study.sampleSizes; // => { person: 6, item: 4 }
 study.components.map(({ facets, degreesOfFreedom, meanSquare, variance }) => [
   facets.join(" x "),
   degreesOfFreedom,
   Math.round(meanSquare * 1000) / 1000,
   Math.round(variance * 1000) / 1000,
 ]);
-// [["person", 5, 6.342, 1.506], ["item", 3, 0.819, 0.083], ["person x item", 15, 0.319, 0.319]], after rounding
+// => [["person", 5, 6.342, 1.506], ["item", 3, 0.819, 0.083], ["person x item", 15, 0.319, 0.319]], after rounding
 ```
 
 | Field of a component | Meaning                                                                                            |
@@ -138,14 +138,14 @@ const scores = byPerson.flatMap((raters, p) =>
 );
 const design = { facets: ["rater", "item"], nested: { rater: ["person"] } };
 const study = generalizabilityStudy(scores, design);
-study.sampleSizes; // { person: 5, rater: 2, item: 3 }: raters per person
+study.sampleSizes; // => { person: 5, rater: 2, item: 3 }: raters per person
 study.components.map(({ facets, nestedIn, degreesOfFreedom, variance }) => [
   facets.join(" x "),
   nestedIn.join(" x "),
   degreesOfFreedom,
   Math.round(variance * 1000) / 1000,
 ]);
-// [["person", "", 4, 1.508], ["item", "", 2, 0.2], ["rater", "person", 5, 0.033], ["person x item", "", 8, 0],
+// => [["person", "", 4, 1.508], ["item", "", 2, 0.2], ["rater", "person", 5, 0.033], ["person x item", "", 8, 0],
 //  ["rater x item", "person", 10, 0.233]], after rounding
 
 // Labels of their own for each person's raters give the same study.
@@ -153,7 +153,7 @@ const labeled = scores.map(({ levels, score }) => ({
   levels: { ...levels, rater: `${levels.person}-${levels.rater}` },
   score,
 }));
-JSON.stringify(generalizabilityStudy(labeled, design)) === JSON.stringify(study); // true
+JSON.stringify(generalizabilityStudy(labeled, design)) === JSON.stringify(study); // => true
 ```
 
 The sample size of a nested facet is its number of elements within each element it is nested in.
@@ -203,16 +203,16 @@ const scores = ratings.flatMap((row, p) =>
   ),
 );
 const study = generalizabilityStudy(scores, { facets: ["rater"], unbalanced: true });
-study.balanced; // false
-study.sampleSizes; // { person: 6, rater: 4 }
+study.balanced; // => false
+study.sampleSizes; // => { person: 6, rater: 4 }
 study.components.map(({ facets, degreesOfFreedom, variance }) => [
   facets.join(" x "),
   degreesOfFreedom,
   Math.round(variance * 1000) / 1000,
 ]);
-// [["person", 5, 1.576], ["rater", 3, -0.036], ["person x rater", 12, 0.403]]
+// => [["person", 5, 1.576], ["rater", 3, -0.036], ["person x rater", 12, 0.403]]
 // A decision study has no one size to default to, so it needs the sizes of the procedure.
-decisionStudy(study, { sampleSizes: { rater: 3 } }).generalizability; // 0.922, with the negative rater component as 0
+decisionStudy(study, { sampleSizes: { rater: 3 } }).generalizability; // => 0.922, with the negative rater component as 0
 ```
 
 | Aspect             | Behavior                                                                                                                                                                            |
@@ -281,8 +281,8 @@ const scores = ratings.flatMap((row, p) =>
 const study = generalizabilityStudy(scores, { facets: ["item"] });
 
 const same = decisionStudy(study); // the study's 4 items
-Math.round(same.generalizability * 1000) / 1000; // 0.95
-Math.round(same.dependability * 1000) / 1000; // 0.937
+Math.round(same.generalizability * 1000) / 1000; // => 0.95
+Math.round(same.dependability * 1000) / 1000; // => 0.937
 const longer = decisionStudy(study, { sampleSizes: { item: 8 } });
 [
   longer.universeScoreVariance,
@@ -290,7 +290,7 @@ const longer = decisionStudy(study, { sampleSizes: { item: 8 } });
   longer.absoluteErrorVariance,
   longer.generalizability,
   longer.dependability,
-].map((value) => Math.round(value * 1000) / 1000); // [1.506, 0.04, 0.05, 0.974, 0.968]
+].map((value) => Math.round(value * 1000) / 1000); // => [1.506, 0.04, 0.05, 0.974, 0.968]
 ```
 
 Pooling and fixed facets work on any study. With the study of raters crossed with persons, a decision study in which each
@@ -334,7 +334,7 @@ nested.components.map(({ facets, nestedIn, variance, divisor }) => [
   Math.round(variance * 1000) / 1000,
   divisor,
 ]);
-// [["person", "", 1.517, 1], ["item", "", 0.2, 3], ["rater", "person", 0.033, 2], ["person x item", "", 0, 3],
+// => [["person", "", 1.517, 1], ["item", "", 0.2, 3], ["rater", "person", 0.033, 2], ["person x item", "", 0, 3],
 //  ["rater x item", "person", 0.233, 6]], after rounding
 
 // With the items fixed, the effects of the item alone are not error and the person by item effect joins the universe.
@@ -346,7 +346,7 @@ const fixed = decisionStudy(crossed, {
 [fixed.universeScoreVariance, fixed.relativeErrorVariance, fixed.generalizability].map(
   (value) => Math.round(value * 1000) / 1000,
 );
-// [1.517, 0.056, 0.965], after rounding
+// => [1.517, 0.056, 0.965], after rounding
 ```
 
 A study is plain data that JSON serializes; `decisionStudy` checks one that comes from storage: its design, a size for
@@ -400,8 +400,8 @@ const varianceX = components((p, i) => x[p]?.[i] ?? 0);
 const varianceY = components((p, i) => y[p]?.[i] ?? 0);
 const varianceSum = components((p, i) => (x[p]?.[i] ?? 0) + (y[p]?.[i] ?? 0));
 const covariance = varianceSum.map((total, k) => (total - (varianceX[k] ?? 0) - (varianceY[k] ?? 0)) / 2);
-// [0.568, 0.018, 0.0076], after rounding
-const correlation = (covariance[0] ?? 0) / Math.sqrt((varianceX[0] ?? 1) * (varianceY[0] ?? 1)); // 0.567
+// => [0.568, 0.018, 0.0076], after rounding
+const correlation = (covariance[0] ?? 0) / Math.sqrt((varianceX[0] ?? 1) * (varianceY[0] ?? 1)); // => 0.567
 ```
 
 The covariance components equal those from the mean products of the two scores, (MP(p) - MP(pi)) / n_i for the person,

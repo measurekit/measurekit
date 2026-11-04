@@ -52,13 +52,13 @@ const answers = [
 const test = scoreResponses(answers, ["A", "C", "B", "D", "A"], { itemIds: ["q1", "q2", "q3", "q4", "q5"] });
 
 itemStatistics(test)[0];
-// { id: "q1", count: 8, mean: 0.625, sd: 0.52, itemTotal: 0.63, itemRest: 0.42, biserial: 0.84,
+// => { id: "q1", count: 8, mean: 0.625, sd: 0.52, itemTotal: 0.63, itemRest: 0.42, biserial: 0.84,
 //   discriminationIndex: 0.53, alphaIfDeleted: 0.69 }
-classifyDifficulty(0.625); // "moderate": the p-value is from 0.30 to 0.70
-classifyDiscrimination(0.53); // "very-good": D is at least 0.40
+classifyDifficulty(0.625); // => "moderate": the p-value is from 0.30 to 0.70
+classifyDiscrimination(0.53); // => "very-good": D is at least 0.40
 
-cronbachAlpha(test); // 0.72, which is KR-20 for these 0/1 scores
-standardErrorOfMeasurement(test); // 0.94 points
+cronbachAlpha(test); // => 0.72, which is KR-20 for these 0/1 scores
+standardErrorOfMeasurement(test); // => 0.94, in points
 
 // Count, share and point-biserial correlation of every option, and its share in the upper and lower 27%.
 distractorAnalysis(test)[0]?.options;
@@ -84,8 +84,9 @@ const irt = calibrate(test, {
   priors: { a: logNormalPrior(0, 0.5), c: betaPrior(5, 17) },
   standardErrors: "hessian",
 });
-irt.items[0]; // { id: "q1", model, parameters: { a: 0.85, b: -0.26, c: 0.2, d: 1 }, standardErrors: { a, b, c } }
-weightedLikelihoodEstimate(irt.items, [1, 0, 1, 1, null]); // { theta: 0.64, standardError: 1.47 }
+irt.items[0];
+// => { id: "q1", parameters: { a: 0.85, b: -0.26, c: 0.20, d: 1 }, standardErrors: { a: 0.43, b: 1.175, c: 0.088 }, ... }
+weightedLikelihoodEstimate(irt.items, [1, 0, 1, 1, null]); // => { theta: 0.64, standardError: 1.47 }
 ```
 
 The calibrated items then make an adaptive test, which selects each next item from the responses so far:
@@ -99,8 +100,8 @@ const cat = createAdaptiveTest({
   stopping: anyOf(testLength(4), allOf(testLength(2), standardErrorThreshold(0.5))),
 });
 const random = createRandom(1);
-let state = cat.start(random); // state.next: the id of the first item
-state = cat.answer(state, 1, random); // the response to it; then the next item, or null at the end
+let state = cat.start(random); // => { next: "q1", ... }: the first item
+state = cat.answer(state, 1, random); // => { items: ["q1"], responses: [1], next: "q2", ... }: next is null at the end
 ```
 
 ## API

@@ -34,7 +34,7 @@ export interface AngoffCutScore {
  *   [0.6, 0.8, 2],
  *   [0.7, 0.9, 1.9],
  *   [0.5, 0.7, 2.1],
- * ]); // { cutScore: 3.4, panelistCutScores: [3.4, 3.5, 3.3], sd: 0.1, standardError: 0.058 }
+ * ]); // => { cutScore: 3.4, panelistCutScores: [3.4, 3.5, 3.3], sd: 0.1, standardError: 0.058 }
  * ```
  */
 export function angoffCutScore(ratings: readonly (readonly number[])[]): AngoffCutScore {

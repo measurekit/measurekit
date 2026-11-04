@@ -151,7 +151,7 @@ const LIKELIHOOD_ROUNDING = 1e-12;
  *   baseline: "control",
  *   itemGroups: Object.fromEntries(before.itemIds.map((id) => [id, "test"])),
  * });
- * change.effects.map(({ group, estimate }) => [group, estimate]); // [["control", 0.35], ["treated", 0.35]]
+ * change.effects.map(({ group, estimate }) => [group, estimate]); // => [["control", 0.35], ["treated", 0.35]]
  * ```
  *
  * @param occasions - One response matrix of dichotomous responses for each occasion, in time order, from two to 12.

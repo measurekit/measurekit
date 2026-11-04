@@ -502,8 +502,8 @@ function exportsExample(entry: string, files: Files, names: ReadonlySet<string> 
 
 /**
  * The entry of every subpath, `src/index.ts` and `src/<module>/index.ts` of a package, exports a function whose TSDoc has
- * an `@example`: the main function of the module. `examples/test/tsdoc.test.ts` runs every example and compares the values
- * its comments state.
+ * an `@example`: the main function of the module. `examples/test/tsdoc.test.ts` runs every example and compares the results
+ * it shows.
  */
 export function checkModuleExamples(files: Files): Violation[] {
   return [...files.keys()]

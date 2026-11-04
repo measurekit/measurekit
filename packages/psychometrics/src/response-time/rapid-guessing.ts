@@ -107,8 +107,8 @@ export function normativeThresholds(
  * );
  * // A response in under 5 seconds on any of the items is a rapid guess.
  * const [first, second] = responseTimeEffort(matrix, { item1: 5, item2: 5, item3: 5 });
- * first; // { id: "person1", effort: 1, rapidGuesses: 0 }
- * second; // { id: "person2", effort: 0.33, rapidGuesses: 2 }
+ * first; // => { id: "person1", effort: 1, rapidGuesses: 0 }
+ * second; // => { id: "person2", effort: 0.33, rapidGuesses: 2 }
  * ```
  */
 export function responseTimeEffort(

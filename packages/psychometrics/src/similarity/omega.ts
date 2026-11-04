@@ -56,8 +56,8 @@ export interface OmegaIndex {
  *   { personIds: ["copier", "source"] },
  * );
  * const [pair] = omegaIndex(matrix, Array(6).fill(item), [0, 0], [["copier", "source"]]);
- * pair?.matches; // 6
- * pair?.omega; // 3.52, three and a half standard deviations above the 2 matches expected
+ * pair?.matches; // => 6
+ * pair?.omega; // => 3.52, three and a half standard deviations above the 2 matches expected
  * ```
  */
 export function omegaIndex(

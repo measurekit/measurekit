@@ -141,8 +141,8 @@ export interface GeneralizabilityStudy {
  * );
  * const study = generalizabilityStudy(scores, { facets: ["item"] });
  * const variances = study.components.map(({ facets, variance }) => [facets.join(" x "), variance]);
- * study.sampleSizes; // { person: 6, item: 4 }
- * variances; // [["person", 1.51], ["item", 0.08], ["person x item", 0.32]]
+ * study.sampleSizes; // => { person: 6, item: 4 }
+ * variances; // => [["person", 1.51], ["item", 0.08], ["person x item", 0.32]]
  * ```
  */
 export function generalizabilityStudy(

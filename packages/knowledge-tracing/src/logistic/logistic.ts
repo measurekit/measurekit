@@ -230,7 +230,7 @@ export interface LogisticFit extends ModelFit<LogisticState, LogisticParameters>
  *   })),
  * );
  * const fit = logistic({ features: ["logSuccesses", "logFailures"], ridge: 1 }).fit(buildEventLog(events));
- * fit.predictions.slice(0, 4); // [0.38, 0.46, 0.51, 0.73], the predictions for the first learner's four attempts
+ * fit.predictions.slice(0, 4); // => [0.38, 0.46, 0.51, 0.73], the predictions for the first learner's four attempts
  * ```
  */
 export function logistic(options: LogisticOptions = {}): LogisticModel {

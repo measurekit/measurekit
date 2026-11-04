@@ -145,8 +145,10 @@ const events = Array.from({ length: 30 }, (_, learner) =>
 const qMatrix = { q1: ["fractions"], q2: ["fractions"], q3: ["decimals"], q4: ["decimals"] };
 const log = buildEventLog(events, { qMatrix });
 const fit = bkt({ forgetting: true, itemGuessSlip: true }).fit(log);
-fit.model.parameters.skills.fractions; // { prior, learn, forget, guess, slip, itemGuessSlip: { q1, q2 } }
-fit.states.l0; // { learner: "l0", skills: { fractions, decimals } }: the learner's P(L) after the log
+fit.model.parameters.skills.fractions;
+// => { prior: 0.22, learn: 0.64, forget: 0.00, guess: 0.00, slip: 0.25,
+//      itemGuessSlip: { q1: { guess: 0.00, slip: 0.12 }, q2: { guess: 0.00, slip: 0.33 } } }
+fit.states.l0; // => { learner: "l0", skills: { fractions: 1.00, decimals: 1.00 } }: the learner's P(L) after the log
 ```
 
 | Fit field                 | Meaning                                                                                                                                                                           |
@@ -179,12 +181,12 @@ import { bkt } from "@measurekit/knowledge-tracing/bkt";
 const model = bkt({
   parameters: { skills: { fractions: { prior: 0.3, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 } } },
 });
-const ana = model.initialState("ana"); // { learner: "ana", skills: {} }
+const ana = model.initialState("ana"); // => { learner: "ana", skills: {} }
 const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 1 };
-model.predict(ana, attempt); // 0.41
-const next = model.update(ana, { ...attempt, outcome: 1 }); // { learner: "ana", skills: { fractions: 0.73 } }
-model.mastery(next, "fractions"); // 0.73, P(L)
-model.opportunitiesToMastery(next, "fractions"); // 8
+model.predict(ana, attempt); // => 0.41
+const next = model.update(ana, { ...attempt, outcome: 1 }); // => { learner: "ana", skills: { fractions: 0.73 } }
+model.mastery(next, "fractions"); // => 0.73, P(L)
+model.opportunitiesToMastery(next, "fractions"); // => 8
 ```
 
 - `update(state, event)` returns a new state; `predict` and `mastery` read it. A skill the learner has not practiced

@@ -53,7 +53,7 @@ const EVENT_LOG_OPTIONS: FieldNames<EventLogOptions> = { qMatrix: true };
  *   ],
  *   { qMatrix: { q1: ["fractions"] } },
  * );
- * log[0]; // { learner: "ana", item: "q1", skills: ["fractions"], time: 1, outcome: 1 }
+ * log[0]; // => { learner: "ana", item: "q1", skills: ["fractions"], time: 1, outcome: 1 }
  * ```
  */
 export function buildEventLog(events: readonly EventInput[], options: EventLogOptions = {}): EventLog {

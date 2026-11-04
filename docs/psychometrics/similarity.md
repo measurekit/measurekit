@@ -60,7 +60,7 @@ const level = 0.01 / bothWays.length;
 omegaIndex(matrix, items, thetas, bothWays)
   .filter(({ significance }) => significance !== null && significance < level)
   .map(({ persons, omega }) => [persons, omega]);
-// [[["person3", "person4"], 5.41], [["person4", "person3"], 4.88]]
+// => [[["person3", "person4"], 5.41], [["person4", "person3"], 4.88]]
 ```
 
 The screen compares 3,800 pairs both ways, so it divides its level by 7,600, Bonferroni's bound on the chance that
@@ -93,12 +93,12 @@ const choices = [
   ["A", "C", "D", "B"],
 ];
 const key = ["B", "C", "A", "A"];
-scoreResponses(choices, key, { optionLabels }).responses; // [[1, 1, null, 1], [1, 1, 0, 1], [0, 1, 0, 0]]
+scoreResponses(choices, key, { optionLabels }).responses; // => [[1, 1, null, 1], [1, 1, 0, 1], [0, 1, 0, 0]]
 // The options as categories of the nominal response model, and the key as categories.
 const matrix = buildResponseMatrix(
   choices.map((row) => row.map((choice) => (choice === null ? null : optionLabels.indexOf(choice)))),
 );
-const keyed = key.map((label) => optionLabels.indexOf(label)); // [1, 2, 0, 0]
+const keyed = key.map((label) => optionLabels.indexOf(label)); // => [1, 2, 0, 0]
 ```
 
 A missing response, `null`, leaves its item out of each pair it is in: the indices compare the items both persons
@@ -123,9 +123,9 @@ const selection = selectPairs(
   },
   { maxGroup: 2 },
 );
-selection.pairs; // [["ana", "ben"]]
+selection.pairs; // => [["ana", "ben"]]
 selection.skipped;
-// [{ context: "room", value: "r2", persons: 3 }, { context: "network", value: "campus", persons: 3 }]
+// => [{ context: "room", value: "r2", persons: 3 }, { context: "network", value: "campus", persons: 3 }]
 ```
 
 | Option     | Default     | Meaning                                                                                                       |
@@ -189,7 +189,7 @@ const matrix = buildResponseMatrix([
   [0, 1, 0, 0, 2, 3],
 ]);
 kIndex(matrix, [["person1", "person2"]], { key: [0, 0, 0, 0, 0, 0], guessing: 0.25 })[0];
-// { sourceIncorrect: 4, identicalIncorrect: 4, k: 0.0123, k1: 0.0123, k2: 0.0123, s1: 0.0347, s2: 0.0776, ... }
+// => { sourceIncorrect: 4, identicalIncorrect: 4, k: 0.0123, k1: 0.0123, k2: 0.0123, s1: 0.0347, s2: 0.0776, ... }
 ```
 
 | Option     | Default                                     | Meaning                                                                             |
@@ -224,7 +224,7 @@ const matrix = buildResponseMatrix([
   [1, 1, 0, 1, 0, 1],
   [1, 1, 0, 1, 0, 1],
 ]);
-generalizedBinomialTest(matrix, items, [0, 0], [["person1", "person2"]])[0]?.significance; // 0.0462
+generalizedBinomialTest(matrix, items, [0, 0], [["person1", "person2"]])[0]?.significance; // => 0.0462
 ```
 
 ## M4
@@ -251,7 +251,7 @@ const matrix = buildResponseMatrix([
 const [pair] = m4Index(matrix, Array(8).fill(item), [0.4, -0.2], [["person1", "person2"]], {
   key: [2, 2, 2, 2, 2, 2, 2, 2],
 });
-pair; // { compared: 8, identicalCorrect: 3, identicalIncorrect: 3, significance: 0.001, ... }
+pair; // => { compared: 8, identicalCorrect: 3, identicalIncorrect: 3, significance: 0.001, ... }
 ```
 
 | Option | Default                                         | Meaning                                                                  |

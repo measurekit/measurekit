@@ -1,9 +1,8 @@
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import ts from "typescript";
+import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { readStated } from "./stated-values.js";
+import { type Instrumented, instrument, resultsShown, runSample } from "../../scripts/guide-samples.js";
 
 /** The root of the repository. */
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -15,15 +14,12 @@ const RUNNING = join(ROOT, "examples", ".tsdoc");
 const TSDOC = /\/\*\*[\s\S]*?\*\//g;
 const FENCE = /^```ts\n([\s\S]*?)^```$/m;
 
-/** An example of a TSDoc comment: where it is, its code and the statements whose comments state a value. */
-interface Example {
+/** An example of a TSDoc comment: where it is, its code with its results checked, and the results it shows. */
+interface Example extends Instrumented {
   readonly file: string;
   readonly line: number;
-  readonly source: string;
-  /** The statements whose comments state a value. */
-  readonly statements: number;
-  /** What is wrong with a comment that begins like a value and is not one, if anything. */
-  readonly problem: string | undefined;
+  /** The results that the example shows, whether a statement picked them up or not. */
+  readonly shown: number;
 }
 
 /** Returns the `.ts` files below a folder. */
@@ -45,49 +41,6 @@ function withoutStars(comment: string): string {
     .join("\n");
 }
 
-/** The comment after a statement: on its line, or on the lines directly under it, joined into one line. */
-function commentAfter(code: string, end: number): string | undefined {
-  const rest = code.slice(end);
-  const sameLine = /^[ \t]*\/\/ ?([^\n]*)/.exec(rest)?.[1];
-  if (sameLine !== undefined) return sameLine.trim();
-  const under = /^[ \t]*\n((?:[ \t]*\/\/[^\n]*(?:\n|$))+)/.exec(rest)?.[1];
-  return under
-    ?.split("\n")
-    .map((line) => line.replace(/^\s*\/\/ ?/, "").trim())
-    .join(" ")
-    .trim();
-}
-
-/**
- * Returns the code of the example, with each statement whose comment begins with a value checked against it, and the
- * number of those statements.
- */
-function checked(code: string, where: string): Pick<Example, "source" | "statements" | "problem"> {
-  const file = ts.createSourceFile("example.ts", code, ts.ScriptTarget.ES2022, true);
-  const edits: { start: number; end: number; text: string }[] = [];
-  let problem: string | undefined;
-  for (const statement of file.statements) {
-    if (!ts.isExpressionStatement(statement)) continue;
-    const text = commentAfter(code, statement.end);
-    if (text === undefined) continue;
-    const line = file.getLineAndCharacterOfPosition(statement.getStart(file)).line + 1;
-    try {
-      if (readStated(text) === undefined) continue;
-    } catch (error) {
-      problem ??= `${where}, line ${line} of the example: ${(error as Error).message}`;
-      continue;
-    }
-    edits.push({
-      start: statement.expression.getStart(file),
-      end: statement.expression.end,
-      text: `__stated(${statement.expression.getText(file)}, ${JSON.stringify(text)}, ${JSON.stringify(`${where}, line ${line} of the example`)})`,
-    });
-  }
-  let source = code;
-  for (const { start, end, text } of edits.reverse()) source = source.slice(0, start) + text + source.slice(end);
-  return { source, statements: edits.length, problem };
-}
-
 /** Returns the examples of the TSDoc comments of a source file. */
 function examplesOf(path: string): Example[] {
   const text = readFileSync(path, "utf8");
@@ -100,8 +53,12 @@ function examplesOf(path: string): Example[] {
     const file = relative(ROOT, path);
     const line = text.slice(0, match.index).split("\n").length;
     const code = fence?.[1] ?? "";
-    const where = `${file}:${line}`;
-    found.push({ file, line, ...checked(code, where) });
+    found.push({
+      file,
+      line,
+      shown: resultsShown(code),
+      ...instrument(code, (codeLine) => `${file}:${line}, line ${codeLine} of the example`),
+    });
   }
   return found;
 }
@@ -123,24 +80,20 @@ describe("the examples of the TSDoc comments", () => {
     expect(examples.length).toBeGreaterThan(0);
   });
 
-  it("begins a comment with a value only to state it", () => {
-    expect(examples.flatMap(({ problem }) => (problem === undefined ? [] : [problem]))).toEqual([]);
+  it("shows each result after a statement that gives it, with its mark", () => {
+    expect(examples.flatMap(({ problems }) => problems)).toEqual([]);
   });
 
-  it("states at least one value in each example, so that running it checks something", () => {
-    expect(examples.filter(({ statements }) => statements === 0).map(({ file, line }) => `${file}:${line}`)).toEqual(
-      [],
-    );
+  it("shows at least one result in each example and checks every one, so that running it checks something", () => {
+    expect(
+      examples
+        .filter(({ results, shown }) => results === 0 || results !== shown)
+        .map(({ file, line }) => `${file}:${line}`),
+    ).toEqual([]);
   });
 
-  it.each(examples)(
-    "runs the example of $file from line $line and gets the values its comments state",
-    async (example) => {
-      vi.spyOn(console, "log").mockImplementation(() => {});
-      mkdirSync(RUNNING, { recursive: true });
-      const path = join(RUNNING, `${example.file.replaceAll(/[/.]/g, "-")}-${example.line}.ts`);
-      writeFileSync(path, `import { stated as __stated } from "../test/stated-values.js";\n${example.source}`);
-      await import(pathToFileURL(path).href);
-    },
-  );
+  it.each(examples)("runs the example of $file from line $line and gets the results it shows", async (example) => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await runSample(RUNNING, `${example.file.replaceAll(/[/.]/g, "-")}-${example.line}`, example.source);
+  });
 });

@@ -120,8 +120,9 @@ const result = calibrate(matrix, {
   standardErrors: "hessian",
 });
 
-result.items[3]; // { id: "item4", model, parameters: { a: 0.93, b: [-0.97, 0.26] }, standardErrors: { a, b1, b2 } }
-result.logLikelihood; // also aic, bic, converged and iterations
+result.items[3];
+// => { id: "item4", parameters: { a: 0.93, b: [-0.97, 0.26] }, standardErrors: { a: 0.46, b1: 1.11, b2: 1.01 }, ... }
+result.logLikelihood; // => -23.3; the result also has aic, bic, converged and iterations
 ```
 
 `calibrate(data, options)` takes a [response matrix](data.md) or, for sparse
@@ -218,8 +219,8 @@ const { covariance } = calibrateWithCovariance(matrix, {
   standardErrors: "hessian",
 });
 
-covariance?.parameters; // [{ item: "item2", name: "a" }, ..., { item: "item4", name: "b2" }]
-covariance?.matrix[0]?.[0]; // 0.160, the square of the standard error of item2's a
+covariance?.parameters; // => [{ item: "item2", name: "a" }, ..., { item: "item4", name: "b2" }]
+covariance?.matrix[0]?.[0]; // => 0.160, the square of the standard error of item2's a
 ```
 
 | Member        | Meaning                                                                                                                                          |
@@ -288,7 +289,7 @@ const result = calibrate(simulateResponses(items, thetas, random), {
   groups: thetas.map((_, person) => (person < 500 ? "2025" : "2026")),
   latent: { "2026": "normal" },
 });
-result.groups[1]; // { group: "2026", distribution: "normal", mean: 0.54, sd: 1.21, standardErrors: null, ... }
+result.groups[1]; // => { group: "2026", distribution: "normal", mean: 0.54, sd: 1.21, standardErrors: null, ... }
 ```
 
 ### Latent regression
@@ -332,19 +333,19 @@ const responses = simulateResponses(items, thetas, random);
 
 // Free slopes: sigma is 1, so the coefficient is 0.6 / 0.8 in units of the residual SD.
 const free = calibrate(responses, { model: twoParameterLogistic, covariates: { x }, standardErrors: "hessian" });
-free.regression; // { coefficients: { x: 0.72 }, residualSd: 1, standardErrors: { x: 0.04 } }
+free.regression; // => { coefficients: { x: 0.72 }, residualSd: 1, standardErrors: { x: 0.04 } }
 
 // Six items fixed at their generating values fix the scale, so sigma is estimated.
 const anchors = Object.fromEntries(items.slice(0, 6).map((item, j) => [`item${j + 1}`, item.parameters]));
 const anchored = calibrate(responses, { model: twoParameterLogistic, covariates: { x }, fixed: anchors });
-anchored.regression; // { coefficients: { x: 0.57 }, residualSd: 0.79, standardErrors: null }
+anchored.regression; // => { coefficients: { x: 0.57 }, residualSd: 0.79, standardErrors: null }
 
 // A person's ability given the responses: the prior is N(xᵀβ, σ²) with the person's own mean.
 const prior = {
   mean: (anchored.regression?.coefficients.x ?? 0) * (x[0] ?? 0),
   sd: anchored.regression?.residualSd ?? 1,
 };
-posteriorMeanEstimate(anchored.items, responses.responses[0] ?? [], { prior }); // { theta: -1.80, standardError: 0.48 }
+posteriorMeanEstimate(anchored.items, responses.responses[0] ?? [], { prior }); // => { theta: -1.80, standardError: 0.48 }
 ```
 
 The 1PL and the PCM estimate one slope `a` for all items, so they belong to the free-slope row: σ is 1. Their Rasch
@@ -393,8 +394,8 @@ const result = calibrate(data, {
   latent: "normal",
   standardErrors: "cross-product",
 });
-result.items.find((item) => item.id === "item21"); // parameters { a: 0.84, b: 0.15 }, simulated from a = 0.86, b = 0.24
-result.groups[0]; // { mean: 0.28, sd: 1.12, ... }: the population, on the operational scale
+result.items.find((item) => item.id === "item21")?.parameters; // => { a: 0.84, b: 0.15, c: 0, d: 1 }: simulated from a = 0.86, b = 0.24
+result.groups[0]; // => { mean: 0.28, sd: 1.12, ... }: the population, on the operational scale
 ```
 
 ### Error of fixed items
@@ -432,9 +433,9 @@ const pretest = simulateResponses(items, thetas, random);
 const options = { model: twoParameterLogistic, fixed, latent: "normal", standardErrors: "hessian" } as const;
 const known = calibrate(pretest, options);
 const carried = calibrate(pretest, { ...options, fixedCovariance: bank.covariance ?? undefined });
-known.items[10]?.standardErrors; // { a: 0.145, b: 0.218 }: item 11, its fixed items taken as known
-carried.items[10]?.standardErrors; // { a: 0.166, b: 0.265 }: with their error
-known.groups[0]?.standardErrors; // { mean: 0.041, sd: 0.042 }; carried, { mean: 0.086, sd: 0.088 }
+known.items[10]?.standardErrors; // => { a: 0.145, b: 0.218 }: item 11, its fixed items taken as known
+carried.items[10]?.standardErrors; // => { a: 0.166, b: 0.265 }: with their error
+known.groups[0]?.standardErrors; // => { mean: 0.041, sd: 0.042 }; carried, { mean: 0.086, sd: 0.088 }
 ```
 
 | The fixed items were calibrated on            | The new calibration                                     | V + J Σ Jᵀ |
@@ -558,12 +559,12 @@ const thetas = simulateThetas(4000, random).filter((theta) => random.uniform() <
 const responses = simulateResponses(items, thetas, random);
 const personWeights = thetas.map((theta) => (theta > 0 ? 4 / 3 : 4));
 
-items[0]?.parameters; // { a: 0.91, b: -0.24, c: 0, d: 1 }, the truth
+items[0]?.parameters; // => { a: 0.91, b: -0.24, c: 0, d: 1 }, the truth
 const weighted = calibrate(responses, { model: twoParameterLogistic, personWeights, standardErrors: "hessian" });
-weighted.items[0]?.parameters; // { a: 0.90, b: -0.17, c: 0, d: 1 }, on the population's scale
-weighted.items[0]?.standardErrors; // { a: 0.069, b: 0.060 }
+weighted.items[0]?.parameters; // => { a: 0.90, b: -0.17, c: 0, d: 1 }, on the population's scale
+weighted.items[0]?.standardErrors; // => { a: 0.069, b: 0.060 }
 const unweighted = calibrate(responses, { model: twoParameterLogistic });
-unweighted.items[0]?.parameters; // { a: 0.82, b: -0.68, c: 0, d: 1 }, on the scale of the sample, whose mean is higher
+unweighted.items[0]?.parameters; // => { a: 0.82, b: -0.68, c: 0, d: 1 }, on the scale of the sample, whose mean is higher
 ```
 
 | Where a weight w enters                   | How                                                                        |
@@ -649,8 +650,9 @@ const { calibration, covariance } = calibrateWithCovariance(responses, {
   fixedParameters,
   standardErrors: "hessian",
 });
-calibration.items[0]; // parameters { a: 0.93, b: -0.27, c: 0.25, d: 1 }, standardErrors { a: 0.13, b: 0.079 }
-covariance?.parameters.length; // 16: a and b of each item
+calibration.items[0];
+// => { id: "item1", parameters: { a: 0.93, b: -0.27, c: 0.25, d: 1 }, standardErrors: { a: 0.13, b: 0.079 }, ... }
+covariance?.parameters.length; // => 16: a and b of each item
 ```
 
 | What                                      | A held parameter                                                                                    |
@@ -723,9 +725,9 @@ const items = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2].map((b) => ({
 }));
 const matrix = simulateResponses(items, simulateThetas(1000, random), random);
 const result = calibrateUnfolding(matrix, { standardErrors: "cross-product" });
-result.items[0]?.parameters; // { a: 1.22, b: 2.11, t: [-1.63, -1.11, -0.51] }: this scale is reflected
-result.persons; // 998: two persons disagreed with every statement
-posteriorMeanEstimate(result.items, [3, 2, 1, 0, 0, 0, 0, 0, 0]); // { theta: 2.30, standardError: 0.37 }
+result.items[0]?.parameters; // => { a: 1.22, b: 2.11, t: [-1.63, -1.11, -0.51] }: this scale is reflected
+result.persons; // => 998: two persons disagreed with every statement
+posteriorMeanEstimate(result.items, [3, 2, 1, 0, 0, 0, 0, 0, 0]); // => { theta: 2.30, standardError: 0.37 }
 ```
 
 | Option           | Default        | Meaning                                                                          |
@@ -775,9 +777,9 @@ const result = jointMaximumLikelihood(
     [0, 0, 0],
   ]),
 );
-result.items[0]; // { id: "item1", model: oneParameterLogistic, parameters: { a: 1, b, c: 0, d: 1 }, standardErrors: { b } }
-result.items[2]; // { id: "item3", model: partialCredit, parameters: { a: 1, b: [b1, b2] }, standardErrors: { b1, b2 } }
-result.persons[5]; // { id: "person6", theta, standardError }
+result.items[0]; // => { id: "item1", parameters: { a: 1, b: 0.00, c: 0, d: 1 }, standardErrors: { b: 0.72 }, ... }
+result.items[2]; // => { id: "item3", parameters: { a: 1, b: [-0.63, 0.63] }, standardErrors: { b1: 0.79, b2: 0.79 }, ... }
+result.persons[5]; // => { id: "person6", theta: -2.63, standardError: 1.92 }
 ```
 
 - **Iteration.** Each iteration solves each person's score equation Σ E(X_i | θ) = total score, centers theta on the
@@ -827,8 +829,9 @@ const result = conditionalMaximumLikelihood(
     [0, 0, 0],
   ]),
 );
-result.items[2]; // { id: "item3", model: partialCredit, parameters: { a: 1, b: [-0.693, 0.693] }, standardErrors: { b1: 1.12, b2: 1.12 } }
-result.persons; // 4: persons 3 and 6 have extreme scores
+result.items[2];
+// => { id: "item3", parameters: { a: 1, b: [-0.693, 0.693] }, standardErrors: { b1: 1.12, b2: 1.12 }, ... }
+result.persons; // => 4: persons 3 and 6 have extreme scores
 ```
 
 With γ_r(A) the elementary symmetric function of total r over the items A a person answered, the sum over every response
@@ -896,7 +899,7 @@ const items = [
   { model: twoParameterLogistic, parameters: { a: 0.8, b: 0.3, c: 0, d: 1 } },
   { model: twoParameterLogistic, parameters: { a: 1.5, b: 1.1, c: 0, d: 1 } },
 ];
-weightedLikelihoodEstimate(items, [1, 0, null]); // { theta, standardError }
+weightedLikelihoodEstimate(items, [1, 0, null]); // => { theta: -0.04, standardError: 1.43 }
 posteriorMeanEstimate(items, [1, 0, null], { prior: { mean: 0, sd: 1 } });
 ```
 
@@ -940,8 +943,8 @@ taken. Without responses the posterior is the prior's quadrature.
 import { thetaPosterior } from "@measurekit/psychometrics/irt";
 
 const { nodes, weights } = thetaPosterior(items, [1, 0, null]);
-nodes.length; // 61, from -6 to 6
-weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // 0.482, P(theta > 0)
+nodes.length; // => 61, from -6 to 6
+weights.reduce((sum, weight, q) => ((nodes[q] ?? 0) > 0 ? sum + weight : sum), 0); // => 0.482, P(theta > 0)
 ```
 
 A calibration's `GroupDistribution` has the same `nodes` and `weights`, so it is a `ThetaDistribution` too: the
@@ -964,7 +967,9 @@ const form = [
   { model: twoParameterLogistic, parameters: { a: 0.8, b: 0.3, c: 0, d: 1 } },
   { model: twoParameterLogistic, parameters: { a: 1.5, b: 1.1, c: 0, d: 1 } },
 ];
-summedScoreTable(form); // [{ score: 0, theta, standardError, probability }, ..., { score: 3, ... }]
+summedScoreTable(form);
+// => [{ score: 0, theta: -0.86, standardError: 0.80, probability: 0.23 }, ...,
+//     { score: 3, theta: 1.17, standardError: 0.76, probability: 0.12 }]
 ```
 
 ### Tables with testlets
@@ -1006,8 +1011,8 @@ const form = [
 ];
 const testlets = [{ items: ["p1", "p2", "p3"], sd: 0.8 }];
 
-summedScoreTable(form).map((row) => row.standardError); // [0.727, 0.697, 0.683, 0.685, 0.704, 0.731]
-summedScoreTable(form, { testlets }).map((row) => row.standardError); // [0.763, 0.742, 0.731, 0.731, 0.746, 0.774]
+summedScoreTable(form).map((row) => row.standardError); // => [0.727, 0.697, 0.683, 0.685, 0.704, 0.731]
+summedScoreTable(form, { testlets }).map((row) => row.standardError); // => [0.763, 0.742, 0.731, 0.731, 0.746, 0.774]
 ```
 
 Each testlet's items are evaluated at Q × G points, θ_q + σ z_g, for Q nodes of theta and G of the effect, so a
@@ -1032,7 +1037,7 @@ with `testlets`.
 
 ```ts continues
 const rows = summedScoreTable(form, { testlets });
-1 - rows.reduce((sum, row) => sum + row.probability * (row.standardError ?? 0) ** 2, 0); // 0.448, 0.513 without testlets
+1 - rows.reduce((sum, row) => sum + row.probability * (row.standardError ?? 0) ** 2, 0); // => 0.448, 0.513 without testlets
 ```
 
 ## Information
@@ -1075,7 +1080,7 @@ const parameters = (fit: { aic: number; logLikelihood: number }) => (fit.aic + 2
 const chiSquare = 2 * (general.logLikelihood - restricted.logLikelihood);
 const degreesOfFreedom = parameters(general) - parameters(restricted);
 ({ chiSquare, degreesOfFreedom, pValue: chiSquareUpperTail(chiSquare, degreesOfFreedom) });
-// { chiSquare: 79.9, degreesOfFreedom: 11, pValue: 1.5e-12 }: equal slopes are rejected
+// => { chiSquare: 79.9, degreesOfFreedom: 11, pValue: 1.5e-12 }: equal slopes are rejected
 ```
 
 | The test holds when                                           | Because                                                                          |
@@ -1132,7 +1137,7 @@ fit.items.slice(0, 2).map((item, j) => ({
   bootstrap: standardDeviation(replicates.map((replicate) => replicate.items[j]?.parameters.a ?? 0)),
   hessian: item.standardErrors?.a,
 }));
-// [{ id: "item1", bootstrap: 0.118, hessian: 0.117 }, { id: "item2", bootstrap: 0.128, hessian: 0.130 }]: the errors of a
+// => [{ id: "item1", bootstrap: 0.118, hessian: 0.117 }, { id: "item2", bootstrap: 0.128, hessian: 0.130 }]: the errors of a
 ```
 
 | Choice                 | Value                                                                                                        |
@@ -1191,8 +1196,8 @@ const models: IrtModel<LogisticItem | ThresholdItem>[] = [
 // calibrate(buildResponseMatrix(rows), { model: models }) throws: item7 has no response in category 0.
 
 const scores = rows.flatMap((row) => (row[6] === null || row[6] === undefined ? [] : [row[6]]));
-const lowest = scores.reduce((least, score) => Math.min(least, score)); // 1
-const highest = scores.reduce((most, score) => Math.max(most, score)); // 9
+const lowest = scores.reduce((least, score) => Math.min(least, score)); // => 1
+const highest = scores.reduce((most, score) => Math.max(most, score)); // => 9
 const collapsed = rows.map((row) => row.map((score, j) => (j === 6 && score !== null ? score - lowest : score)));
 const fit = calibrate(buildResponseMatrix(collapsed), { model: models });
 
@@ -1205,9 +1210,9 @@ const thresholds = Array.from({ length: 10 }, (_, k) =>
 );
 const text = { model: generalizedPartialCredit, parameters: { a, b: thresholds } };
 const table = summedScoreTable([...fit.items.slice(0, 6), text]);
-table.length; // 17: the totals 0 to 16
-table[0]?.probability; // 3.9e-17: nobody scores 0, as nobody scored 0 on the text
-table[1]?.theta; // -1.993, the collapsed calibration's theta of its total 0
+table.length; // => 17: the totals 0 to 16
+table[0]?.probability; // => 3.9e-17: nobody scores 0, as nobody scored 0 on the text
+table[1]?.theta; // => -1.993, the collapsed calibration's theta of its total 0
 ```
 
 The table over the points is the table of the collapsed items moved by the lowest point, with structural zeros at the

@@ -46,10 +46,11 @@ const focal = simulateResponses(shifted, simulateThetas(500, random), random);
 const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
-mantelHaenszel(matrix, groups).items[2]; // { id: "item3", chiSquare: 33.6, ..., delta: -2.76, etsCategory: "C" }
-// Purification flags item3 alone and leaves the other items as anchors.
-logisticRegressionDif(matrix, groups, { purify: true }).purification; // { anchors, iterations: 1, converged: true }
-lordChiSquare(matrix, groups, { model: twoParameterLogistic }).items[2]; // { id: "item3", chiSquare: 19.3, ... }
+mantelHaenszel(matrix, groups).items[2]; // => { id: "item3", chiSquare: 33.6, ..., delta: -2.76, etsCategory: "C" }
+// Purification flags item3 and item4 and leaves the other eight items as anchors.
+logisticRegressionDif(matrix, groups, { purify: true }).purification;
+// => { anchors: ["item1", "item2", "item5", "item6", "item7", "item8", "item9", "item10"], iterations: 1, converged: true }
+lordChiSquare(matrix, groups, { model: twoParameterLogistic }).items[2]; // => { id: "item3", chiSquare: 19.3, ... }
 ```
 
 ## Matching score
@@ -244,14 +245,15 @@ const focal = simulateResponses(shifted, simulateThetas(500, random), random);
 const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
-mantelTest(matrix, groups).items[2]; // { id: "item3", chiSquare: 94.3, ..., standardizedMeanDifference: -0.62, effectSize: -0.52, etsCategory: "CC", liuAgresti }
-mantelTest(matrix, groups).items[2]?.liuAgresti; // { oddsRatio: 3.89, logStandardError: 0.144, z: 9.47, significance: 2.8e-21 }
-ordinalLogisticRegressionDif(matrix, groups).items[2]?.uniform; // { chiSquare: 99.4, degreesOfFreedom: 1, significance: 2.0e-23, rSquaredChange: 0.075 }
+mantelTest(matrix, groups).items[2];
+// => { id: "item3", chiSquare: 94.3, ..., standardizedMeanDifference: -0.62, effectSize: -0.52, etsCategory: "CC" }
+mantelTest(matrix, groups).items[2]?.liuAgresti; // => { oddsRatio: 3.89, logStandardError: 0.144, z: 9.47, significance: 2.8e-21 }
+ordinalLogisticRegressionDif(matrix, groups).items[2]?.uniform; // => { chiSquare: 99.4, degreesOfFreedom: 1, significance: 2.0e-23, rSquaredChange: 0.075 }
 // Matched on theta from a graded response calibration, as lordif does in one pass.
 const calibration = calibrate(matrix, { model: gradedResponse });
 const matching = abilityEstimates(matrix, calibration.items).map((estimate) => estimate.theta);
-ordinalLogisticRegressionDif(matrix, groups, { matching }).items[2]?.uniform.chiSquare; // 99.5
-logisticDiscriminantDif(matrix, groups).items[2]?.uniform; // { chiSquare: 98.1, degreesOfFreedom: 1, significance: 4.0e-23, rSquaredChange: 0.124 }
+ordinalLogisticRegressionDif(matrix, groups, { matching }).items[2]?.uniform.chiSquare; // => 99.5
+logisticDiscriminantDif(matrix, groups).items[2]?.uniform; // => { chiSquare: 98.1, degreesOfFreedom: 1, significance: 4.0e-23, rSquaredChange: 0.124 }
 ```
 
 ### Mantel test
@@ -403,11 +405,14 @@ const focal = simulateResponses(shifted, focalThetas, random);
 const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
-sibtest(matrix, groups).items[2]; // { id: "item3", beta: 0.092, standardError: 0.025, chiSquare: 13.5, significance: 0.00024, persons: 1000 }
-sibtest(matrix, groups).items[10]; // { id: "item11", beta: 0.010, standardError: 0.027, chiSquare: 0.14, significance: 0.71, persons: 1000 }
-// The two items as one bundle, purified: each item alone has 16.0 and 14.2 on the same anchors.
+sibtest(matrix, groups).items[2]; // => { id: "item3", beta: 0.092, standardError: 0.025, chiSquare: 13.5, significance: 0.00024, persons: 1000 }
+sibtest(matrix, groups).items[10]; // => { id: "item11", beta: 0.010, standardError: 0.027, chiSquare: 0.14, significance: 0.71, persons: 1000 }
+// The two items alone, then as one bundle, purified.
+sibtest(matrix, groups, { purify: true })
+  .items.slice(2, 4)
+  .map(({ chiSquare }) => chiSquare); // => [16.0, 14.2]
 sibtest(matrix, groups, { bundles: { passage: ["item3", "item4"] }, purify: true }).bundles;
-// [{ id: "passage", beta: 0.210, standardError: 0.041, chiSquare: 26.9, significance: 2.1e-7, persons: 1000 }]
+// => [{ id: "passage", beta: 0.210, standardError: 0.041, chiSquare: 26.9, significance: 2.1e-7, persons: 1000 }]
 ```
 
 | Field           | Definition                                                                                                                   |
@@ -513,9 +518,11 @@ const matrix = buildResponseMatrix([...reference.responses, ...focal.responses])
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
 const dif = irtLikelihoodRatioDif(matrix, groups, { model: twoParameterLogistic, purify: true });
-dif.items[2]; // { id: "item3", chiSquare: 34.0, degreesOfFreedom: 2, significance: 4.2e-8 }
-dif.purification; // { anchors: [8 items], iterations: 1, converged: true }: item3 and item4 are flagged
-dif.constrained.items.map((item) => item.id); // ["item1", "item2", "item3:reference", "item3:focal", "item4:reference", ...]
+dif.items[2]; // => { id: "item3", chiSquare: 34.0, degreesOfFreedom: 2, significance: 4.2e-8 }
+dif.purification;
+// => { anchors: ["item1", "item2", "item5", "item6", "item7", "item8", "item9", "item10"], iterations: 1, converged: true }:
+//    item3 and item4 are flagged
+dif.constrained.items.map((item) => item.id); // => ["item1", "item2", "item3:reference", "item3:focal", "item4:reference", ...]
 ```
 
 The constrained model calibrates both groups with every item equal across them, the reference group N(0, 1) and the focal
@@ -578,8 +585,8 @@ const focalGroup = dif.constrained.groups.find((distribution) => distribution.gr
 const functioning = differentialFunctioning(freeOf("reference"), freeOf("focal"), {
   population: { nodes: focalGroup?.nodes ?? [], weights: focalGroup?.weights ?? [] },
 });
-functioning.items[2]; // { id: "item3", ncdif: 0.0276, cdif: 0.0219 }
-functioning.dtf; // 0.0263
+functioning.items[2]; // => { id: "item3", ncdif: 0.0276, cdif: 0.0219 }
+functioning.dtf; // => 0.0263
 ```
 
 A bundle's differential functioning, DBF (Oshima et al., 1998), is the `dtf` of its items alone, such as those of a
@@ -589,7 +596,7 @@ reading passage:
 const inPassage = (item: { id: string }) => ["item3", "item4"].includes(item.id);
 differentialFunctioning(freeOf("reference").filter(inPassage), freeOf("focal").filter(inPassage), {
   population: { nodes: focalGroup?.nodes ?? [], weights: focalGroup?.weights ?? [] },
-}).dtf; // 0.0263: the free items hold all of the test's DIF, as the anchors are equal in both lists
+}).dtf; // => 0.0263: the free items hold all of the test's DIF, as the anchors are equal in both lists
 ```
 
 Raju et al. flag an item whose NCDIF is above 0.006 for a dichotomous item, a cutoff the caller applies; their item
@@ -684,8 +691,8 @@ const flagged = (focal: "first" | "second"): string[] => {
     .items.filter((item) => (item.significance ?? 1) < 0.05 / 20)
     .map((item) => item.id);
 };
-flagged("first"); // ["item4", "item5"]
-flagged("second"); // ["item5", "item8"]
+flagged("first"); // => ["item4", "item5"]
+flagged("second"); // => ["item5", "item8"]
 ```
 
 Item 5 is flagged for both focal groups and item 8 for the second alone. Item 4 is a chance flag at this seed: the
@@ -721,7 +728,7 @@ const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "
 mantelTest(matrix, groups)
   .items.map((item) => item.standardizedMeanDifference)
   .slice(0, 4);
-// [0.009, -0.009, -0.111, -0.002]: on item 3 the focal group's proportion correct is 0.11 lower at equal scores
+// => [0.009, -0.009, -0.111, -0.002]: on item 3 the focal group's proportion correct is 0.11 lower at equal scores
 ```
 
 ## Recipe: DIF variance
@@ -763,8 +770,8 @@ const shrunken = estimates.map(({ id, delta, standardError }) => {
   return { id, delta: shrinkage * delta + (1 - shrinkage) * center };
 });
 
-Math.sqrt(difVariance); // 0.361
-shrunken[2]; // { id: "item3", delta: -0.86 }, from -2.29
+Math.sqrt(difVariance); // => 0.361
+shrunken[2]; // => { id: "item3", delta: -0.86 }, from -2.29
 ```
 
 Its test compares with `sirt::dif.variance`. That function's `eb.dif` is λ (d - d̄) + (1 - λ) d̄, the shrunken estimate only
@@ -813,9 +820,9 @@ const found = (focal: number) => {
   }
   return flagged.map((count) => count / 100);
 };
-found(100); // [0.9, 0.44]: the shares that classify item 1 (size C) and item 2 (size B) as B or C
-found(200); // [0.99, 0.58]
-found(500); // [1, 0.58]
+found(100); // => [0.9, 0.44]: the shares that classify item 1 (size C) and item 2 (size B) as B or C
+found(200); // => [0.99, 0.58]
+found(500); // => [1, 0.58]
 ```
 
 Item 1 is found in 0.9 of the replicates at 100 focal persons and nearly always from 200. Item 2, whose MH D-DIF lies

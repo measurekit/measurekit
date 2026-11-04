@@ -106,7 +106,7 @@ const METHODS: readonly ConversionMethod[] = ["eap-sum", "true-score"];
  *   { model: twoParameterLogistic, parameters: { a: 1.5, b: 0.9, c: 0, d: 1 } },
  * ];
  * const table = conversionTable(items, { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 });
- * table.map((row) => row.scaleScore); // [400, 470, 530, 610]
+ * table.map((row) => row.scaleScore); // => [400, 470, 530, 610]
  * ```
  * @throws `DataError` when the items are not an array, there are none, an item is invalid, the scale, the options, the
  * prior, the quadrature or the testlets are invalid, or `"true-score"` is asked of a form whose curve does not increase

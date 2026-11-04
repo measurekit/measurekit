@@ -62,8 +62,8 @@ export interface Scalability {
  * ]);
  * const { scale, items } = scalability(matrix);
  * const coefficients = items.map(({ id, coefficient }) => [id, coefficient]);
- * scale; // { coefficient: 0.85, standardError: 0.11 }, the coefficient H of the scale
- * coefficients; // [["item1", 1], ["item2", 1], ["item3", 0.73], ["item4", 0.73]]
+ * scale; // => { coefficient: 0.85, standardError: 0.11 }, the coefficient H of the scale
+ * coefficients; // => [["item1", 1], ["item2", 1], ["item3", 0.73], ["item4", 0.73]]
  * ```
  */
 export function scalability(matrix: ResponseMatrix): Scalability {

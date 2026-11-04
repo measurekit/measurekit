@@ -288,8 +288,8 @@ interface Settings extends StructureOptions {
  * );
  * const qMatrix = { q0: ["fractions"], q1: ["fractions"], q2: ["fractions"], q3: ["fractions"] };
  * const fit = bkt().fit(buildEventLog(events, { qMatrix }));
- * fit.model.parameters.skills.fractions; // { prior: 0.095, learn: 0.46, forget: 0, guess: 0.13, slip: 0.15 }
- * fit.states.l0; // { learner: "l0", skills: { fractions: 0.99 } }, the probability that l0 has learned the skill
+ * fit.model.parameters.skills.fractions; // => { prior: 0.095, learn: 0.46, forget: 0, guess: 0.13, slip: 0.15 }
+ * fit.states.l0; // => { learner: "l0", skills: { fractions: 0.99 } }, the probability that l0 has learned the skill
  * ```
  */
 export function bkt(options: BktOptions = {}): BktModel {

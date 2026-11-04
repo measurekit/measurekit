@@ -162,8 +162,8 @@ interface Step {
  * const { model, states } = elo().fit(log);
  * const ana = states.ana ?? model.initialState("ana");
  * const attempt = { learner: "ana", item: "q1", skills: [], time: 4 };
- * model.predict(ana, attempt); // 0.68, the probability of a correct answer
- * model.update(ana, { ...attempt, outcome: 0 }).ability; // 0.24, a new state; ana's was 0.86
+ * model.predict(ana, attempt); // => 0.68, the probability of a correct answer
+ * model.update(ana, { ...attempt, outcome: 0 }).ability; // => 0.24, a new state; ana's was 0.86
  * ```
  */
 export function elo(options: EloOptions = {}): EloModel {

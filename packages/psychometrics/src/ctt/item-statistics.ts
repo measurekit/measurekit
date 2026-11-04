@@ -57,7 +57,7 @@ export interface ItemStatistics {
  *   [0, 1, 0, 0],
  *   [0, 0, 0, 0],
  * ]);
- * itemStatistics(matrix)[0]; // { id: "item1", count: 6, mean: 0.5, sd: 0.55, itemTotal: 0.87, itemRest: 0.71, ... }
+ * itemStatistics(matrix)[0]; // => { id: "item1", count: 6, mean: 0.5, sd: 0.55, itemTotal: 0.87, itemRest: 0.71, ... }
  * ```
  */
 export function itemStatistics(matrix: ResponseMatrix, options: GroupOptions = {}): readonly ItemStatistics[] {

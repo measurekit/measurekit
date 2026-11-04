@@ -1,7 +1,10 @@
 // The peak memory that each reader of untrusted input adds to a Node.js process, on its worst inputs within the limits of
 // SECURITY.md: the peak resident memory of a process that parses the input from JSON and reads it, less that of the
-// same process that parses it and does not. `test/peak-memory.test.ts` checks each against its budget; `node
-// scripts/peak-memory.ts` prints them, the median of three pairs, as the table of docs/performance.md.
+// same process that parses it and does not. Each process has a heap bounded to the case's `heap`, so that a reading that
+// keeps more alive at once fails, whenever the collector runs and however busy the machine is; the budget of the rise bounds
+// what the heap does not hold, the buffers of typed arrays. `test/peak-memory.test.ts` checks each case; `node
+// scripts/peak-memory.ts` prints the rises, the median of three pairs, as the table of docs/performance.md, and `node
+// scripts/peak-memory.ts --heap` the least heap in which each reading ends, from which `heap` is chosen.
 
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -13,10 +16,19 @@ import { build } from "esbuild";
 const PACKAGES = resolve(import.meta.dirname, "../packages");
 const LIBRARIES = ["psychometrics", "knowledge-tracing"] as const;
 const MEGABYTE = 2 ** 20;
-/** The heap a reader may take, above V8's default, so that a large input fails on its budget, not on the heap. */
-const HEAP_MEGABYTES = 8192;
+/**
+ * The heap of the processes whose rise the table of docs/performance.md gives, in MiB: above V8's default, as the rise that a
+ * host sees depends on when the collector runs, which a bounded heap brings forward.
+ */
+const TABLE_HEAP = 8192;
 /** The first argument of the script in a child process. */
 const CHILD = "--child";
+/** The argument that prints the least heap of each case. */
+const LEAST_HEAP = "--heap";
+/** The step of the search for the least heap, in MiB. */
+const HEAP_STEP = 8;
+/** The most heap that the search tries, in MiB; a reading that needs more is reported as above it. */
+const HEAP_SEARCH_LIMIT = 4096;
 
 /** The libraries as the child process loads them, bundled from their sources. */
 // biome-ignore lint/suspicious/noExplicitAny: the bundles are loaded at run time, and each case checks what it calls.
@@ -34,6 +46,11 @@ interface ReaderCase {
    * macOS and on Linux, rounded up to 10 MB.
    */
   readonly budget: number;
+  /**
+   * The heap of both processes, in MiB, with the input and the code: twice the least heap in which the reading ended on
+   * Node.js 22, 24 and 26, rounded up to 16 MiB.
+   */
+  readonly heap: number;
   readonly input: () => unknown;
   readonly prepare?: (input: never, libraries: Libraries) => unknown;
   readonly read: (prepared: never, libraries: Libraries) => unknown;
@@ -70,18 +87,21 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "buildResponseMatrix: 1 person, 1,000,000 items, with the ids it gives them",
     budget: 150,
+    heap: 144,
     input: () => [Array.from({ length: 1_000_000 }, (_, i) => i % 2)],
     read: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
   },
   {
     name: "buildResponseRecords: 1,000,000 records, each of its own person and item",
     budget: 1070,
+    heap: 1056,
     input: () => Array.from({ length: 1_000_000 }, (_, k) => ({ person: `p${k}`, item: `i${k}`, response: k % 2 })),
     read: (records: unknown[], { psychometrics }) => psychometrics.buildResponseRecords(records),
   },
   {
     name: "buildEventLog: 1,000,000 events, each of its own learner, item and skill",
     budget: 230,
+    heap: 1136,
     input: () =>
       Array.from({ length: 1_000_000 }, (_, k) => ({
         learner: `l${k}`,
@@ -95,6 +115,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "iita: 1,000,000 events, each of its own learner and item, which it refuses, from the events",
     budget: 740,
+    heap: 1344,
     input: () =>
       Array.from({ length: 1_000_000 }, (_, k) => ({
         learner: `l${k}`,
@@ -114,6 +135,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "iita: 1,000 items, 276 learners, 24 candidates of 23.9 million cells, from the events",
     budget: 620,
+    heap: 608,
     // Learners who fail one item each, 1 to 23 of them per item: 24 candidates of a million prerequisites, the most
     // that the limit of the candidates' cells lets through.
     input: () =>
@@ -133,6 +155,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "surmiseStructure: 1,000 elements, 12 free and a class of 988, 8,192 states",
     budget: 270,
+    heap: 160,
     input: () => ({
       ...Object.fromEntries(ids("e", 12).map((element) => [element, []])),
       ...Object.fromEntries(ids("c", 988).map((element, k) => [element, [`c${((k + 1) % 988) + 1}`]])),
@@ -142,6 +165,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "kst: the masks of 4,096 sets of 16 skills over 65,536 states, the most cells",
     budget: 520,
+    heap: 64,
     input: () => {
       const skills = ids("s", 16);
       return {
@@ -176,12 +200,14 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "qMatrixIdentifiability: 100,000 items of 20 attributes",
     budget: 320,
+    heap: 352,
     input: () => Object.fromEntries(ids("item", 100_000).map((id) => [id, ids("a", 20)])),
     read: (qMatrix: unknown, { psychometrics }) => psychometrics.qMatrixIdentifiability(qMatrix),
   },
   {
     name: "calibrateCdm: 128 items of 11 of 15 attributes, the most items × 2^K and latent groups, two persons, LLM",
     budget: 460,
+    heap: 48,
     // Item i measures the 11 attributes from the i-th, round the 15: 2^22 cells and 2^18 latent groups, both limits.
     input: () => ({
       itemIds: ids("item", 128),
@@ -203,6 +229,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "bkt: the stored parameters of 100,000 skills",
     budget: 250,
+    heap: 112,
     input: () => ({
       skills: Object.fromEntries(
         ids("s", 100_000).map((skill) => [skill, { prior: 0.3, learn: 0.1, forget: 0, guess: 0.2, slip: 0.1 }]),
@@ -213,6 +240,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "manyFacetRasch: 1,994 persons, 1 item, 997 raters, each person by two: 1,000 parameters, one EM iteration",
     budget: 160,
+    heap: 32,
     // Person j is scored by raters j and j + 1, round the raters, so that the design connects 997 rater measures: with
     // the threshold, the mean and the SD, the most parameters. One EM iteration without standard errors holds the
     // matrices of every pair of them, and keeps the case within the time of a test; a fit to convergence takes 99 s.
@@ -229,6 +257,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "personScalability: 2 persons, 1,000,000 items",
     budget: 400,
+    heap: 224,
     input: () => {
       const row = Array.from({ length: 1_000_000 }, (_, i) => i % 2);
       return [row, row.map((response) => 1 - response)];
@@ -239,6 +268,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "localDependenceChiSquare: 2 persons, 1,000 2PL items, the most, 499,500 pairs",
     budget: 460,
+    heap: 224,
     input: () => pairItems(1000),
     prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
     read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
@@ -247,6 +277,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "localDependenceChiSquare: 2 graded items of 4,096 categories, the most cells of its tables",
     budget: 530,
+    heap: 32,
     input: () => Array.from({ length: 4095 }, (_, k) => -3 + (6 * k) / 4094),
     prepare: (thresholds: number[], { psychometrics }) => ({
       matrix: psychometrics.buildResponseMatrix([
@@ -261,6 +292,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "summedScoreFit: 2 persons, 300 2PL items, the highest total score",
     budget: 20,
+    heap: 32,
     input: () => pairItems(300),
     prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
     read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
@@ -269,6 +301,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "yenQ3: 2 persons, 1,000 2PL items, the most",
     budget: 50,
+    heap: 48,
     input: () => pairItems(1000),
     prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
     read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
@@ -277,6 +310,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "selectPairs: 10,000 persons in 50 groups of 200, the most, 995,000 pairs, formed by two contexts alike",
     budget: 320,
+    heap: 176,
     input: () => {
       const groups = Array.from({ length: 10_000 }, (_, person) => `g${Math.floor(person / 200)}`);
       return { personIds: ids("p", 10_000), contexts: { room: groups, network: groups } };
@@ -287,6 +321,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "m4Index: 2 persons, 1,000 2PL items, the most",
     budget: 50,
+    heap: 32,
     input: () => pairItems(1000),
     prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
     read: ({ matrix, items }: { matrix: unknown; items: unknown }, { psychometrics }) =>
@@ -295,6 +330,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "kIndex: 2,896 persons with 0 to 2,895 incorrect responses to 2,895 items, the most cells of its counts",
     budget: 330,
+    heap: 448,
     input: () =>
       Array.from({ length: 2896 }, (_, person) => Array.from({ length: 2895 }, (_, i) => (i < person ? 0 : 1))),
     prepare: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
@@ -303,6 +339,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "scalability: 200 persons of distinct patterns, 1,000 items, the most",
     budget: 240,
+    heap: 160,
     input: () =>
       Array.from({ length: 200 }, (_, person) => Array.from({ length: 1000 }, (_, i) => ((person + 1) * (i + 3)) % 5)),
     prepare: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
@@ -311,6 +348,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "assembleForms: 8,191 forms of the one item of a pool, the most counts",
     budget: 580,
+    heap: 48,
     input: () => ({ id: "q1", a: 1, b: 0 }),
     prepare: ({ id, a, b }: { id: string; a: number; b: number }, { psychometrics }) => ({
       pool: [{ id, model: psychometrics.twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } }],
@@ -321,6 +359,7 @@ export const READERS: readonly ReaderCase[] = [
   {
     name: "createDiagnosticAdaptiveTest: 128 items of 11 of 15 attributes, the most items × 2^K and latent groups",
     budget: 180,
+    heap: 48,
     input: () => ({
       attributes: ids("a", 15),
       pool: Array.from({ length: 128 }, (_, j) => ({
@@ -353,23 +392,38 @@ interface ChildPeak {
   readonly peak: number;
 }
 
-/** Runs a case in a child process, reading the input or not, and returns its peak. */
-function childPeak(directory: string, name: string, read: boolean): ChildPeak {
+/** Runs a case in a child process whose heap holds `heap` MiB, reading the input or not; the end of its error when it fails. */
+function attempt(directory: string, name: string, read: boolean, heap: number): ChildPeak | string {
   const run = spawnSync(
     process.execPath,
-    [
-      `--max-old-space-size=${HEAP_MEGABYTES}`,
-      "--expose-gc",
-      import.meta.filename,
-      CHILD,
-      directory,
-      name,
-      String(read),
-    ],
+    [`--max-old-space-size=${heap}`, "--expose-gc", import.meta.filename, CHILD, directory, name, String(read)],
     { encoding: "utf8" },
   );
-  if (run.status !== 0) throw new Error(`The case "${name}" failed: ${run.stderr}`);
-  return JSON.parse(run.stdout);
+  return run.status === 0 ? (JSON.parse(run.stdout) as ChildPeak) : run.stderr.slice(-1000);
+}
+
+/** Runs a case in a child process whose heap holds `heap` MiB, reading the input or not, and returns its peak. */
+function childPeak(directory: string, name: string, read: boolean, heap: number): ChildPeak {
+  const peak = attempt(directory, name, read, heap);
+  if (typeof peak === "string") throw new Error(`The case "${name}" did not end within a heap of ${heap} MiB: ${peak}`);
+  return peak;
+}
+
+/** Finds the least heap, in steps of 8 MiB, in which a case's reading ends; `undefined` when it needs more than the search tries. */
+function leastHeap(directory: string, name: string): number | undefined {
+  let low = 1;
+  let high = HEAP_SEARCH_LIMIT / HEAP_STEP;
+  let found: number | undefined;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    if (typeof attempt(directory, name, true, middle * HEAP_STEP) === "string") {
+      low = middle + 1;
+    } else {
+      found = middle * HEAP_STEP;
+      high = middle - 1;
+    }
+  }
+  return found;
 }
 
 /** The rise of the peak that reading an input adds, in megabytes, and the megabytes of its JSON. */
@@ -380,16 +434,16 @@ export interface PeakRise {
 
 /**
  * Returns the median rise of the peak that a case's reading adds over `pairs` pairs of child processes, one that does
- * not read and one that does, run one after the other.
+ * not read and one that does, run one after the other, each with a heap of `heap` MiB. Throws when a process does not end.
  *
  * @param directory - The directory of the bundles of {@link bundleLibraries}.
  */
-export function peakRise(directory: string, name: string, pairs = 1): PeakRise {
+export function peakRise(directory: string, name: string, heap: number, pairs = 1): PeakRise {
   const rises: number[] = [];
   let bytes = 0;
   for (let pair = 0; pair < pairs; pair++) {
-    const without = childPeak(directory, name, false);
-    const reading = childPeak(directory, name, true);
+    const without = childPeak(directory, name, false, heap);
+    const reading = childPeak(directory, name, true, heap);
     bytes = reading.bytes;
     rises.push(reading.peak - without.peak);
   }
@@ -425,17 +479,25 @@ if (import.meta.main) {
     await runChild(rest);
   } else {
     // `node scripts/peak-memory.ts calibrateCdm bkt` measures the cases whose names begin with the words given.
-    const chosen = READERS.filter(
-      ({ name }) => first === undefined || [first, ...rest].some((word) => name.startsWith(word)),
-    );
+    const heaps = first === LEAST_HEAP;
+    const words = heaps ? rest : process.argv.slice(2);
+    const chosen = READERS.filter(({ name }) => words.length === 0 || words.some((word) => name.startsWith(word)));
     const directory = mkdtempSync(join(tmpdir(), "measurekit-peak-"));
     try {
       await bundleLibraries(directory);
-      console.log("| Reader | JSON (MB) | Peak added (MB) | Budget (MB) |");
-      console.log("| ------ | --------: | --------------: | ----------: |");
-      for (const { name, budget } of chosen) {
-        const { json, rise } = peakRise(directory, name, 3);
-        console.log(`| ${name} | ${json.toFixed(1)} | ${Math.round(rise)} | ${budget} |`);
+      if (heaps) {
+        console.log("| Reader | Least heap (MiB) | Heap (MiB) |");
+        console.log("| ------ | ---------------: | ---------: |");
+        for (const { name, heap } of chosen) {
+          console.log(`| ${name} | ${leastHeap(directory, name) ?? `above ${HEAP_SEARCH_LIMIT}`} | ${heap} |`);
+        }
+      } else {
+        console.log("| Reader | JSON (MB) | Peak added (MB) | Budget (MB) |");
+        console.log("| ------ | --------: | --------------: | ----------: |");
+        for (const { name, budget } of chosen) {
+          const { json, rise } = peakRise(directory, name, TABLE_HEAP, 3);
+          console.log(`| ${name} | ${json.toFixed(1)} | ${Math.round(rise)} | ${budget} |`);
+        }
       }
     } finally {
       rmSync(directory, { recursive: true, force: true });

@@ -38,15 +38,15 @@ const fit = calibrateMultidimensional(matrix, {
   loadings,
   standardErrors: "hessian",
 });
-fit.dimensions; // ["verbal", "quantitative"]
-fit.items[0]?.parameters; // { a: [1.17, 0], intercept: -1.34, c: 0, d: 1 }
-fit.items[0]?.standardErrors; // { a1: 0.18, intercept: 0.11 }
-fit.correlations; // [[1, 0.46], [0.46, 1]]
-fit.converged; // true
+fit.dimensions; // => ["verbal", "quantitative"]
+fit.items[0]?.parameters; // => { a: [1.17, 0], intercept: -1.34, c: 0, d: 1 }
+fit.items[0]?.standardErrors; // => { a1: 0.18, intercept: 0.11 }
+fit.correlations; // => [[1, 0.46], [0.46, 1]]
+fit.converged; // => true
 
 // A person's thetas, with the calibration's correlations as the prior.
 const prior = { mean: [0, 0], covariance: fit.correlations };
-multidimensionalPosteriorModeEstimate(fit.items, [1, 1, 0, 1, null, 1, 1, 0], { prior }).theta; // [0.61, 0.32]
+multidimensionalPosteriorModeEstimate(fit.items, [1, 1, 0, 1, null, 1, 1, 0], { prior }).theta; // => [0.61, 0.32]
 ```
 
 ## Models
@@ -238,9 +238,9 @@ const fit = calibrateMultidimensional(matrix, {
   loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [i < 10 ? "verbal" : "quantitative"]])),
   groups: thetas.map((_, person) => (person < 1000 ? "2025" : "2026")),
 });
-fit.groups?.[0]; // { group: "2025", means: [0, 0], covariance: [[1, 0.5], [0.5, 1]] }
-fit.groups?.[1]; // { group: "2026", means: [0.35, 0.41], covariance: [[0.98, 0.5], [0.5, 1.04]] }
-fit.converged; // true
+fit.groups?.[0]; // => { group: "2025", means: [0, 0], covariance: [[1, 0.5], [0.5, 1]] }
+fit.groups?.[1]; // => { group: "2026", means: [0.35, 0.41], covariance: [[0.98, 0.5], [0.5, 1.04]] }
+fit.converged; // => true
 ```
 
 The groups' distributions can serve as priors of the scoring functions: pass `{ mean: group.means, covariance:
@@ -322,12 +322,12 @@ const after = before.map((theta) => 0.4 + 1.2 * (0.8 * theta + 0.6 * random.norm
 const fit = calibrateLongitudinal([simulateResponses(items, before, random), simulateResponses(items, after, random)], {
   standardErrors: "hessian",
 });
-fit.occasions; // [{ mean: 0, sd: 1 }, { mean: 0.43, sd: 1.22 }]
-fit.correlations; // [[1, 0.84], [0.84, 1]]
-fit.changes[0]; // { from: 0, to: 1, mean: 0.43, sd: 0.66, correlationWithStart: 0.03 }
-fit.items[0]?.parameters; // { a: 0.81, b: -0.15, c: 0, d: 1 }
-fit.standardErrors?.slice(-3); // [0.024, 0.051, 0.042]: the correlation, SD and mean of the second occasion
-fit.converged; // true
+fit.occasions; // => [{ mean: 0, sd: 1 }, { mean: 0.43, sd: 1.22 }]
+fit.correlations; // => [[1, 0.84], [0.84, 1]]
+fit.changes[0]; // => { from: 0, to: 1, mean: 0.43, sd: 0.66, correlationWithStart: 0.03 }
+fit.items[0]?.parameters; // => { a: 0.81, b: -0.15, c: 0, d: 1 }
+fit.standardErrors?.slice(-3); // => [0.024, 0.051, 0.042]: the correlation, SD and mean of the second occasion
+fit.converged; // => true
 ```
 
 **Convergence.** A later occasion's distribution that runs to the edge of the grid, a mean outside it or a standard
@@ -486,19 +486,19 @@ const matrix = simulateMultidimensionalResponses(items, thetas, random);
 // The specific dimension of each item by id; `null` for an item without one.
 const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, `passage${1 + Math.floor(i / 4)}`]));
 const fit = calibrateBifactor(matrix, { specific, standardErrors: "hessian" });
-fit.dimensions; // ["general", "passage1", "passage2", "passage3"]
-fit.items[0]?.parameters; // { a: [1.19, 1.07, 0, 0], intercept: -0.96, c: 0, d: 1 }
-fit.items[0]?.standardErrors; // { a1: 0.11, a2: 0.17, intercept: 0.08 }
-fit.items[5]?.parameters.a; // [1.08, 0, 0.87, 0]
-fit.logLikelihood; // -14468.29
-fit.converged; // true
+fit.dimensions; // => ["general", "passage1", "passage2", "passage3"]
+fit.items[0]?.parameters; // => { a: [1.19, 1.07, 0, 0], intercept: -0.96, c: 0, d: 1 }
+fit.items[0]?.standardErrors; // => { a1: 0.11, a2: 0.17, intercept: 0.08 }
+fit.items[5]?.parameters.a; // => [1.08, 0, 0.87, 0]
+fit.logLikelihood; // => -14468.29
+fit.converged; // => true
 
 // A person's thetas on all dimensions, with the calibration's correlations as the prior.
 const prior = { mean: [0, 0, 0, 0], covariance: fit.correlations };
 const scores = multidimensionalEstimates(matrix, fit.items, {
   estimator: (calibrated, responses) => multidimensionalPosteriorModeEstimate(calibrated, responses, { prior }),
 });
-scores[0]?.estimate?.theta; // [0.63, 0.14, 0.14, 0.22]
+scores[0]?.estimate?.theta; // => [0.63, 0.14, 0.14, 0.22]
 ```
 
 | Option           | Default                                        | Meaning                                                                                                                                 |
@@ -597,9 +597,9 @@ const matrix = simulateMultidimensionalResponses(items, thetas, random);
 
 const exploratory = calibrateMultidimensional(matrix, { model: multidimensionalTwoParameterLogistic, dimensions: 2 });
 const rotated = rotateLoadings(exploratory, { method: "oblimin" });
-rotated.loadings.slice(0, 2); // [[0.61, -0.04], [0.51, 0.08]]
-rotated.correlations; // [[1, 0.44], [0.44, 1]]
-rotated.converged; // true
+rotated.loadings.slice(0, 2); // => [[0.61, -0.04], [0.51, 0.08]]
+rotated.correlations; // => [[1, 0.44], [0.44, 1]]
+rotated.converged; // => true
 ```
 
 A calibration with correlated dimensions is not rotated: `rotateLoadings` throws `DataError` unless its correlations
@@ -723,12 +723,12 @@ function withIndicators(data: ResponseMatrix) {
 
 const { matrix: combined, loadings } = withIndicators(matrix);
 const fit = calibrateMultidimensional(combined, { model: multidimensionalTwoParameterLogistic, loadings });
-fit.correlations; // [[1, 0.48], [0.48, 1]]: the truth is 0.5
+fit.correlations; // => [[1, 0.48], [0.48, 1]]: the truth is 0.5
 
 // The first person answered 4 of 8 items. Scored with the indicators and the correlation as the prior, the omissions count.
 const person = combined.responses[0] ?? [];
 const prior = { mean: [0, 0], covariance: fit.correlations };
-multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // [-0.54, -0.45]
+multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // => [-0.54, -0.45]
 ```
 
 | Choice     | Value                                                                                                                                          |

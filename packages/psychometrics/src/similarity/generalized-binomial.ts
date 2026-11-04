@@ -60,8 +60,8 @@ export interface GeneralizedBinomialTest {
  *   ["person1", "person2"],
  *   ["person1", "person3"],
  * ]);
- * same?.significance; // 0.0462, six matches of the 3.6 expected
- * other?.significance; // 0.9968, one match
+ * same?.significance; // => 0.0462, six matches of the 3.6 expected
+ * other?.significance; // => 0.9968, one match
  * ```
  */
 export function generalizedBinomialTest(

@@ -197,7 +197,7 @@ const STATISTICS: readonly Q3Statistic[] = ["largest", "pairs"];
  * const matrix = buildResponseMatrix(others.responses.map((row, person) => [...(passage.responses[person] ?? []), ...row]));
  * const fit = calibrate(matrix, { model: twoParameterLogistic });
  * const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { model: twoParameterLogistic, replications: 20 });
- * q3.flagged.map((pair) => pair.items); // [["item1", "item2"]]
+ * q3.flagged.map((pair) => pair.items); // => [["item1", "item2"]]
  * ```
  */
 export function yenQ3CriticalValue<TParameters>(

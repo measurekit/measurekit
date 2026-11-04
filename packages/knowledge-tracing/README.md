@@ -44,15 +44,15 @@ const log = buildEventLog(
 
 // Batch: replay the log, updating learners and items after each event.
 const { model, states } = elo({ skills: true }).fit(log);
-model.parameters.items.q1; // { difficulty: 0.09, count: 2 }
-states.ana; // { learner: "ana", ability: 0.03, count: 3, skills: { fractions, decimals } }
-states.ana?.skills.fractions; // { ability: 0.76, count: 2 }
+model.parameters.items.q1; // => { difficulty: 0.09, count: 2 }
+states.ana; // => { learner: "ana", ability: 0.03, count: 3, skills: { fractions: { ... }, decimals: { ... } } }
+states.ana?.skills.fractions; // => { ability: 0.76, count: 2 }
 
 // Online: predict the next attempt, then update the learner's state with its outcome.
 const attempt = { learner: "ana", item: "q2", skills: ["fractions"], time: 6 };
 const ana = states.ana ?? model.initialState("ana");
-model.predict(ana, attempt); // 0.74, the probability of a correct answer
-const next = model.update(ana, { ...attempt, outcome: 1 }); // a new state; JSON.stringify it to store it
+model.predict(ana, attempt); // => 0.74, the probability of a correct answer
+const next = model.update(ana, { ...attempt, outcome: 1 }); // => { learner: "ana", ability: 0.25, count: 4, ... }: store it
 ```
 
 Bayesian knowledge tracing gives the probability that a learner has mastered each skill:
@@ -69,8 +69,8 @@ const budi = tracer.update(tracer.initialState("budi"), {
   time: 6,
   outcome: 1,
 });
-tracer.mastery(budi, "fractions"); // P(L), the probability that budi knows fractions
-tracer.opportunitiesToMastery(budi, "fractions"); // further attempts until P(L) is expected to reach 0.95
+tracer.mastery(budi, "fractions"); // => 1.00, P(L): the probability that budi knows fractions
+tracer.opportunitiesToMastery(budi, "fractions"); // => 0: the further attempts until P(L) is expected to reach 0.95
 ```
 
 Models are compared by cross-validation on the same folds:
@@ -86,8 +86,8 @@ import { afm } from "@measurekit/knowledge-tracing/logistic";
 // log: the log of the first sample
 const folds = splitByLearner(log, 2, createRandom(1));
 compareModels({ elo: elo(), bkt: bkt(), afm: afm({ proficiency: "random" }) }, folds);
-// [{ name: "elo", metrics: { count, auc, rmse, logLoss, accuracy }, folds: [...] }, ...]
-learningCurve(log).skills.fractions; // [{ opportunity: 1, count: 2, errorRate: 0.5, ... }, ...]
+// => [{ name: "elo", metrics: { count: 5, auc: 0.17, rmse: 0.66, logLoss: 1.14, accuracy: 0.2, ... }, folds: [...] }, ...]
+learningCurve(log).skills.fractions; // => [{ opportunity: 1, count: 2, errorRate: 0.5, ... }, ...]
 ```
 
 ## API

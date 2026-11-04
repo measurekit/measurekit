@@ -53,8 +53,8 @@ const WEIGHTS: readonly KappaWeights[] = ["none", "linear", "quadratic"];
  *   [2, 2],
  *   [0, 1],
  * ];
- * cohenKappa(ratings); // 0.5
- * cohenKappa(ratings, { weights: "quadratic" }); // 0.8125, which counts a near miss as part agreement
+ * cohenKappa(ratings); // => 0.5
+ * cohenKappa(ratings, { weights: "quadratic" }); // => 0.8125, which counts a near miss as part agreement
  * ```
  */
 export function cohenKappa(ratings: readonly (readonly (number | null)[])[], options: CohenKappaOptions = {}): number {

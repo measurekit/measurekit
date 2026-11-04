@@ -63,8 +63,8 @@ export interface ReplayShift {
  *   locked.map((score, i) => [score, replayed[i] ?? null]),
  *   { maxShiftSd: 0.05 },
  * );
- * replay.standardizedShift; // 0.24, a quarter of an SD higher
- * replay.passed; // false
+ * replay.standardizedShift; // => 0.24, a quarter of an SD higher
+ * replay.passed; // => false
  * ```
  */
 export function replayShift(

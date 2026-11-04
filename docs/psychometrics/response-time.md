@@ -84,11 +84,14 @@ const data = buildResponseMatrix(
   { times },
 );
 
-const calibration = calibrateResponseTimes(data); // intensities 3.94, 3.46, 3.02; discriminations 2.24, 2.00, 1.91
-calibration.speedSd; // 0.32
+const calibration = calibrateResponseTimes(data);
+calibration.items.map(({ intensity, discrimination }) => [intensity, discrimination]);
+// => [[3.943, 2.241], [3.455, 2.004], [3.018, 1.913]]: the intensities and the discriminations
+calibration.speedSd; // => 0.32
 const options = { sd: calibration.speedSd };
-speedEstimates(data, calibration.items, options)[0]; // { id: "person1", speed: -0.09, standardError: 0.21 }
-responseTimeFit(data, calibration.items, options)[0]; // residuals [0.48, -0.01, -0.12], statistic 0.24
+speedEstimates(data, calibration.items, options)[0]; // => { id: "person1", speed: -0.09, standardError: 0.21 }
+responseTimeFit(data, calibration.items, options)[0];
+// => { id: "person1", residuals: [0.48, -0.01, -0.12], statistic: 0.24, ... }
 ```
 
 ## Speed
@@ -137,10 +140,11 @@ const times = speeds.map((speed) => items.map((_, i) => Math.exp(3 + i / 8 - spe
 const data = buildResponseMatrix(simulateResponses(items, thetas, random).responses, { times });
 
 const calibration = calibrateSpeedAccuracy(data, { model: twoParameterLogistic, standardErrors: "hessian" });
-calibration.correlation; // 0.63, standard error 0.05: the true value is 0.6
-calibration.speedSd; // 0.41
-calibration.items[0]; // parameters { a: 0.74, b: -0.33, c: 0, d: 1 }, intensity 3.00, discrimination 1.51, ...
-speedAccuracyEstimates(data, calibration)[0]; // { id: "person1", theta: -0.11, thetaStandardError: 0.57, speed: 0.14, ... }
+calibration.correlation; // => 0.63, standard error 0.05: the true value is 0.6
+calibration.speedSd; // => 0.41
+calibration.items[0];
+// => { id: "item1", parameters: { a: 0.74, b: -0.33, c: 0, d: 1 }, intensity: 3.00, discrimination: 1.51, ... }
+speedAccuracyEstimates(data, calibration)[0]; // => { id: "person1", theta: -0.11, thetaStandardError: 0.57, speed: 0.14, ... }
 ```
 
 The model has two levels for each person. Responses follow the IRT model of each item, and the log times
@@ -241,14 +245,18 @@ const data = buildResponseMatrix(
     ],
   },
 );
-const thresholds = normativeThresholds(data); // { item1: 2.15, item2: 3.3, item3: 2.85 }
-responseTimeEffort(data, thresholds); // person2 guessed items 1 and 2: effort 1/3
+const thresholds = normativeThresholds(data); // => { item1: 2.15, item2: 3.3, item3: 2.85 }
+responseTimeEffort(data, thresholds);
+// => [{ id: "person1", effort: 1, rapidGuesses: 0 }, { id: "person2", effort: 0.33, rapidGuesses: 2 }]: person2
+//    guessed items 1 and 2
 const items = [
   { id: "item1", model: twoParameterLogistic, parameters: { a: 1.2, b: -0.5, c: 0, d: 1 } },
   { id: "item2", model: twoParameterLogistic, parameters: { a: 0.8, b: 0.3, c: 0, d: 1 } },
   { id: "item3", model: twoParameterLogistic, parameters: { a: 1.5, b: 1.1, c: 0, d: 1 } },
 ];
-effortModeratedEstimates(data, items, thresholds); // person2 from item 3 alone
+effortModeratedEstimates(data, items, thresholds);
+// => [{ id: "person1", theta: 0.72, standardError: 0.75 }, { id: "person2", theta: 0.85, standardError: 0.84 }]: person2
+//    from item 3 alone
 ```
 
 ## Errors

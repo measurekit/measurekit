@@ -53,8 +53,8 @@ const RESPONSE_SIMULATION_OPTIONS: FieldNames<ResponseSimulationOptions> = { mis
  * const items = simulateItems(twoParameterLogistic, 3, random);
  * const thetas = simulateThetas(4, random);
  * const data = simulateResponses(items, thetas, random);
- * data.itemIds; // ["item1", "item2", "item3"]
- * data.responses; // [[0, 1, 0], [1, 0, 0], [0, 0, 0], [0, 1, 1]], a row for each person
+ * data.itemIds; // => ["item1", "item2", "item3"]
+ * data.responses; // => [[0, 1, 0], [1, 0, 0], [0, 0, 0], [0, 1, 1]], a row for each person
  * ```
  */
 export function simulateResponses(

@@ -36,7 +36,7 @@ const attempts = Array.from({ length: 500 }, (_, learner) =>
 ).flat();
 const { log } = simulate(bkt({ parameters: { skills: truth } }), attempts, createRandom(42));
 bkt().fit(log).model.parameters.skills.fractions;
-// { prior: 0.253, learn: 0.146, forget: 0, guess: 0.203, slip: 0.094 }
+// => { prior: 0.253, learn: 0.146, forget: 0, guess: 0.203, slip: 0.094 }
 ```
 
 For BKT, logistic models, IRT and KST, the prediction is the probability of a correct answer given the learner's

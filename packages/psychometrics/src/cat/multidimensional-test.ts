@@ -106,10 +106,10 @@ export interface MultidimensionalAdaptiveTest {
  * const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
  * const random = createRandom(1);
  * let state = test.start(random);
- * state.next; // "q2", the id of the first item
+ * state.next; // => "q2", the id of the first item
  * state = test.answer(state, 1, random); // the response to it
- * state.estimate.theta; // [0, 0.52], the estimate of each dimension
- * state.next; // "q1"
+ * state.estimate.theta; // => [0, 0.52], the estimate of each dimension
+ * state.next; // => "q1"
  * ```
  */
 export function createMultidimensionalAdaptiveTest(

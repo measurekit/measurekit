@@ -42,7 +42,7 @@ angoffCutScore([
   [0.6, 0.8, 2],
   [0.7, 0.9, 1.9],
   [0.5, 0.7, 2.1],
-]); // { cutScore: 3.4, panelistCutScores: [3.4, 3.5, 3.3], sd: 0.1, standardError: 0.058 }
+]); // => { cutScore: 3.4, panelistCutScores: [3.4, 3.5, 3.3], sd: 0.1, standardError: 0.058 }
 ```
 
 | Field               | Meaning                                                                |
@@ -69,8 +69,9 @@ const items = [
   { id: "q2", model: threeParameterLogistic, parameters: { a: 0.9, b: 0.3, c: 0.25, d: 1 } },
   { id: "essay", model: gradedResponse, parameters: { a: 1.1, b: [-1.2, 0.4, 1.5] } },
 ];
-orderedItemBooklet(items); // [{ id: "essay", category: 1, location }, { id: "q1", category: 1, location }, ...]
-bookmarkCutScore(items, 3); // { theta, cutScore }: the location of page 3 and the expected total score there
+orderedItemBooklet(items);
+// => [{ id: "essay", category: 1, location: -0.56 }, { id: "q1", category: 1, location: -0.51 }, ...]
+bookmarkCutScore(items, 3); // => { theta: 0.568, cutScore: 3.225 }: the location of page 3 and the expected total score there
 ```
 
 - **Pages.** An item with K categories has a page for each score point k from 1 to K - 1, located at the theta where
@@ -102,7 +103,7 @@ hofsteeCutScore(distribution, {
   maximumCutScore: 7,
   minimumFailureRate: 0.1,
   maximumFailureRate: 0.4,
-}); // { cutScore, failureRate }
+}); // => { cutScore: 4.71, failureRate: 0.33 }
 ```
 
 F is taken at each score from 0 to the highest and is linear between them, so the cut score need not be a score. The
@@ -122,7 +123,7 @@ import { beukCutScore } from "@measurekit/psychometrics/standard-setting";
 // The number of persons at each total score from 0 to 10.
 const distribution = [1, 2, 4, 7, 10, 12, 11, 8, 5, 3, 1];
 beukCutScore(distribution, { cutScore: 6, passRate: 0.4, cutScoreSd: 1, passRateSd: 0.1 });
-// { cutScore: 6.138, failureRate: 0.586 }, after rounding
+// => { cutScore: 6.138, failureRate: 0.586 }, after rounding
 ```
 
 | Judgment     | Meaning                                                                       |
@@ -148,8 +149,8 @@ import { contrastingGroupsCutScores } from "@measurekit/psychometrics/standard-s
 
 const scores = [12, 15, 17, 18, 20, 21, 21, 23, 24, 26, 27, 29, 31, 33];
 const masters = [0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1]; // the panel's judgment of each person
-contrastingGroupsCutScores(scores, masters); // { cutScores: [21.154], converged: true }, after rounding
-contrastingGroupsCutScores(scores, masters, { probability: 0.67 }); // { cutScores: [22.816], ... }
+contrastingGroupsCutScores(scores, masters); // => { cutScores: [21.154], converged: true }, after rounding
+contrastingGroupsCutScores(scores, masters, { probability: 0.67 }); // => { cutScores: [22.816], ... }
 ```
 
 More categories give the Body of Work method (Kingston, Kahl, Sweeney and Bay, 2001): a panel sorts collections of work
@@ -160,7 +161,7 @@ import { contrastingGroupsCutScores } from "@measurekit/psychometrics/standard-s
 
 const work = [8, 12, 15, 19, 22, 24, 27, 29, 31, 34, 36, 38, 41, 43, 46, 49, 52, 55];
 const levels = [0, 0, 0, 1, 0, 1, 1, 1, 2, 1, 2, 2, 2, 3, 2, 3, 3, 3]; // below basic to advanced
-contrastingGroupsCutScores(work, levels).cutScores; // [20.031, 32.5, 44.76], after rounding
+contrastingGroupsCutScores(work, levels).cutScores; // => [20.031, 32.5, 44.76], after rounding
 ```
 
 | Option        | Default | Meaning                                                          |
@@ -218,9 +219,9 @@ const ratings = [
   [3, 2, 3],
 ];
 const regression = borderlineRegressionCutScores(marks, ratings, 2);
-regression.stations[0]; // { cutScore: 10.833, standardError: 0.369, rSquared: 0.925, intercept: 3.5, slope: 3.667 }
-regression.cutScore; // 30.730, with standardError 0.686
-borderlineGroupCutScores(marks, ratings, 2).cutScore; // 31: the means 11, 10.5 and 9.5
+regression.stations[0]; // => { cutScore: 10.833, standardError: 0.369, rSquared: 0.925, intercept: 3.5, slope: 3.667 }
+regression.cutScore; // => 30.730, with standardError 0.686
+borderlineGroupCutScores(marks, ratings, 2).cutScore; // => 31: the means 11, 10.5 and 9.5
 ```
 
 **Borderline regression** (Kramer et al., 2003) fits each station's least-squares line of the marks on the ratings, as
@@ -286,7 +287,7 @@ const result = classificationAccuracy(
   ],
   [0.5],
 );
-result.persons[1]; // { category: 1, probabilities: [0.37, 0.63] }: 0.63 = Φ((0.6 - 0.5) / 0.3)
+result.persons[1]; // => { category: 1, probabilities: [0.37, 0.63] }: 0.63 = Φ((0.6 - 0.5) / 0.3)
 ```
 
 ## Livingston and Lewis
@@ -325,12 +326,12 @@ const answers = [
   [1, 1, 0, 1, 1, 0, 1, 0],
   [0, 1, 0, 0, 1, 1, 0, 0],
 ];
-const reliability = cronbachAlpha(buildResponseMatrix(answers)); // 0.716
+const reliability = cronbachAlpha(buildResponseMatrix(answers)); // => 0.716
 const scores = answers.map((row) => row.reduce((sum, x) => sum + x, 0));
 const result = livingstonLewisClassification(scores, [4], { reliability, maximum: 8 });
-result.accuracy; // 0.811
-result.consistency; // 0.757
-result.trueScore; // { alpha: 2.226, beta: 1.964, lower: 0, upper: 1, effectiveLength: 7.959 }: the fail-safe beta
+result.accuracy; // => 0.811
+result.consistency; // => 0.757
+result.trueScore; // => { alpha: 2.226, beta: 1.964, lower: 0, upper: 1, effectiveLength: 7.959 }: the fail-safe beta
 ```
 
 | Option        | Default  | Meaning                                            |
@@ -385,7 +386,7 @@ const optionsLeft = [
   [2, 3, 1, 2],
   [2, 2, 1, 3],
 ];
-angoffCutScore(optionsLeft.map((row) => row.map((options) => 1 / options))).cutScore; // 2.333
+angoffCutScore(optionsLeft.map((row) => row.map((options) => 1 / options))).cutScore; // => 2.333
 ```
 
 **Ebel.** The panel sorts the items into cells of relevance by difficulty and judges the share of each cell's items a
@@ -401,7 +402,7 @@ const cells = [
   { items: 4, proportion: 0.55 },
 ];
 const ratings = cells.flatMap(({ items, proportion }) => new Array<number>(items).fill(proportion));
-angoffCutScore([ratings]).cutScore; // 14.35
+angoffCutScore([ratings]).cutScore; // => 14.35
 ```
 
 ## Not included

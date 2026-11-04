@@ -49,7 +49,7 @@ function classify(change: number, standardError: number, critical: number): Reli
  * ```ts
  * import { reliableChange } from "@measurekit/psychometrics/change";
  *
- * reliableChange(12, 21, { sd: 9, reliability: 0.88 }); // { index: 2.041241452319315, classification: "improved" }
+ * reliableChange(12, 21, { sd: 9, reliability: 0.88 }); // => { index: 2.041241452319315, classification: "improved" }
  * ```
  * @throws `DataError` when a score is not a finite number, the test is not an object `{ sd, reliability }` of valid
  * values, the reliability is 1, the options are not an object or the level is not between 0 and 1, exclusive.

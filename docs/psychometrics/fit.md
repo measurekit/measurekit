@@ -77,14 +77,16 @@ const matrix = buildResponseMatrix([
 // Rasch items and their persons: infit and outfit.
 const rasch = jointMaximumLikelihood(matrix);
 const raschThetas = matrix.responses.map((row) => weightedLikelihoodEstimate(rasch.items, row).theta);
-itemFit(matrix, rasch.items, raschThetas); // [{ id, infitMeanSquare, outfitMeanSquare, ... }, ...]
+itemFit(matrix, rasch.items, raschThetas); // => [{ id: "item1", infitMeanSquare: 0.50, outfitMeanSquare: 0.48, ... }, ...]
 
 // Items of any model: S-X², lz and Q3. With few persons, a prior keeps the slopes finite.
 const { items } = calibrate(matrix, { model: twoParameterLogistic, priors: { a: logNormalPrior(0, 0.5) } });
 const thetas = matrix.responses.map((row) => posteriorMeanEstimate(items, row).theta);
-summedScoreFit(matrix, items); // [{ id, chiSquare, degreesOfFreedom, significance }, ...]
-personFit(matrix, items, thetas); // [{ id, ..., standardizedLogLikelihood }, ...]
-yenQ3(matrix, items, thetas); // 4 × 4, symmetric, 1 on the diagonal
+summedScoreFit(matrix, items);
+// => [{ id: "item1", chiSquare: null, degreesOfFreedom: 0, significance: null }, ...]: these few persons leave no
+//    score group to test
+personFit(matrix, items, thetas); // => [{ id: "person1", ..., standardizedLogLikelihood: 0.78 }, ...]
+yenQ3(matrix, items, thetas); // => [[1, 0.03, 0.32, 0.03], [0.03, 1, -0.45, -0.17], ...]: 4 × 4, symmetric
 ```
 
 ## Infit and outfit
@@ -167,9 +169,9 @@ const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 6, random);
 const matrix = simulateResponses(items, simulateThetas(1000, random), random);
 const calibration = calibrate(matrix, { model: twoParameterLogistic });
-rootMeanSquareDeviation(matrix, calibration.items)[0]; // { id: "item1", rmsd: 0.0020, meanDeviation: -2.7e-7 }
+rootMeanSquareDeviation(matrix, calibration.items)[0]; // => { id: "item1", rmsd: 0.0020, meanDeviation: -2.7e-7 }
 localDependenceChiSquare(matrix, calibration.items)[0];
-// { items: ["item1", "item2"], chiSquare: 0.041, degreesOfFreedom: 1, significance: 0.84, cramersV: -0.0064 }
+// => { items: ["item1", "item2"], chiSquare: 0.041, degreesOfFreedom: 1, significance: 0.84, cramersV: -0.0064 }
 ```
 
 On 2,000 seeded persons and 10 2PL items, an item given 1 logit harder than its responses has an RMSD above 0.1, and
@@ -223,8 +225,8 @@ const items = simulateItems(twoParameterLogistic, 8, random);
 const matrix = simulateResponses(items, simulateThetas(400, random), random);
 const thetas = matrix.responses.map((row) => weightedLikelihoodEstimate(items, row).theta);
 const fit = correctedPersonFit(matrix, items, thetas, { estimator: "weighted-likelihood" });
-fit[0]; // { id: "person1", standardized: 1.20 }
-fit[217]; // { id: "person218", standardized: -2.66 }: that guide's outlier
+fit[0]; // => { id: "person1", standardized: 1.20 }
+fit[217]; // => { id: "person218", standardized: -2.66 }: that guide's outlier
 ```
 
 On 5,000 seeded persons and 30 2PL items that fit, at their maximum likelihood estimates, lz* has a standard deviation of
@@ -303,9 +305,9 @@ const matrix = buildResponseMatrix(
 const options = { model: twoParameterLogistic };
 const fit = calibrate(matrix, options);
 const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { ...options, replications: 100 });
-q3.criticalExcess; // 0.115
-q3.flagged.map((pair) => pair.items); // [["item2", "item3"], ["item1", "item2"], ["item1", "item3"]]
-q3.flagged.map((pair) => pair.q3); // [0.070, 0.068, 0.066]: the fixed cut 0.2 flags none
+q3.criticalExcess; // => 0.115
+q3.flagged.map((pair) => pair.items); // => [["item2", "item3"], ["item1", "item2"], ["item1", "item3"]]
+q3.flagged.map((pair) => pair.q3); // => [0.070, 0.068, 0.066]: the fixed cut 0.2 flags none
 ```
 
 `items` are the calibration's, in the order of the matrix, with their ids, and `options` hold the calibration's own:
@@ -413,10 +415,10 @@ const random = createRandom(7);
 const items = simulateItems(twoParameterLogistic, 12, random);
 const matrix = simulateResponses(items, simulateThetas(1000, random), random);
 const fit = limitedInformationFit(matrix, calibrate(matrix, { model: twoParameterLogistic }));
-fit.statistic; // 39.90
-fit.degreesOfFreedom; // 54
-fit.significance; // 0.92
-fit.srmsr; // 0.021
+fit.statistic; // => 39.90
+fit.degreesOfFreedom; // => 54
+fit.significance; // => 0.92
+fit.srmsr; // => 0.021
 ```
 
 The population is the calibration's group, with its nodes and weights. Δ has one column for each estimated parameter:
@@ -505,11 +507,11 @@ const items = [-1.5, -1, -0.5, 0, 0.5, 1, 1.5].map((b) => ({
   parameters: { a: 1, b, c: 0, d: 1 },
 }));
 const matrix = simulateResponses(items, simulateThetas(500, random), random);
-andersenTest(matrix); // { statistic: 6.92, degreesOfFreedom: 6, significance: 0.33, persons: 467, excluded: [], ... }
-martinLofTest(matrix); // { statistic: 7.25, degreesOfFreedom: 11, significance: 0.78, persons: 500, ... }
-raschWaldTest(matrix).items[1]; // { id: "item2", z: 1.72, significance: 0.085 }
+andersenTest(matrix); // => { statistic: 6.92, degreesOfFreedom: 6, significance: 0.33, persons: 467, excluded: [], ... }
+martinLofTest(matrix); // => { statistic: 7.25, degreesOfFreedom: 11, significance: 0.78, persons: 500, ... }
+raschWaldTest(matrix).items[1]; // => { id: "item2", z: 1.72, significance: 0.085 }
 const halves = matrix.personIds.map((_, person) => (person % 2 === 0 ? "even" : "odd"));
-andersenTest(matrix, { split: halves }).statistic; // 7.77
+andersenTest(matrix, { split: halves }).statistic; // => 7.77
 ```
 
 On 100 seeded sets of 500 persons and 10 Rasch items, at 0.05, Andersen's test rejected 5% of the sets, the Martin-Löf
@@ -557,12 +559,12 @@ import {
 } from "@measurekit/psychometrics";
 
 const random = createRandom(13);
-const items = simulateItems(twoParameterLogistic, 10, random); // the first: a = 1.44, b = 1.28
+const items = simulateItems(twoParameterLogistic, 10, random); // => [{ parameters: { a: 1.44, b: 1.28, c: 0, d: 1 }, ... }, ...]
 const matrix = simulateResponses(items, simulateThetas(1000, random), random);
 const [first] = kernelItemCurves(matrix, { points: 5 });
-first?.nodes; // [-3.09, -1.55, 0, 1.55, 3.09]
-first?.probabilities[1]; // [2.3e-13, 0.0060, 0.12, 0.65, 0.9994]: P(correct) rises through b
-first?.standardErrors[1]; // [2.3e-7, 0.0070, 0.017, 0.043, 0.011]
+first?.nodes; // => [-3.09, -1.55, 0.00, 1.55, 3.09]
+first?.probabilities[1]; // => [2.3e-13, 0.0060, 0.12, 0.65, 0.9994]: P(correct) rises through b
+first?.standardErrors[1]; // => [2.3e-7, 0.0070, 0.017, 0.043, 0.011]
 ```
 
 On 2,000 seeded persons and 20 2PL items with slopes from 0.5 to 2, the curves are 0.059 from the true curves at the

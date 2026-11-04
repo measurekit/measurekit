@@ -103,7 +103,7 @@ import { simulateItems, simulateResponses } from "@measurekit/psychometrics/sim"
 
 const random = createRandom(3);
 const items = simulateItems(twoParameterLogistic, 3, random).map((item, i) => ({ ...item, id: `reading-${i + 1}` }));
-simulateResponses(items, [0, 1], random).itemIds; // ["reading-1", "reading-2", "reading-3"]
+simulateResponses(items, [0, 1], random).itemIds; // => ["reading-1", "reading-2", "reading-3"]
 ```
 
 `missingProbability` (default `0`) makes each response missing with that probability, independently of everything
@@ -128,7 +128,7 @@ const items = [
   { model: multidimensionalTwoParameterLogistic, parameters: { a: [0.4, 1.1], intercept: -0.5, c: 0, d: 1 } },
 ];
 const thetas = Array.from({ length: 4 }, () => [random.normal(), random.normal()]);
-simulateMultidimensionalResponses(items, thetas, random).responses; // [[1, 1], [0, 1], [1, 1], [0, 0]]
+simulateMultidimensionalResponses(items, thetas, random).responses; // => [[1, 1], [0, 1], [1, 1], [0, 0]]
 ```
 
 `simulateCdmResponses(model, profiles, random)` simulates responses from a [cognitive diagnosis](cdm.md) model, its

@@ -31,9 +31,9 @@ const ratings = [
 cohenKappa(
   ratings.map((row) => row.slice(0, 2)),
   { weights: "quadratic" },
-); // QWK of raters 1 and 2
-fleissKappa(ratings); // over essays 1 to 3
-intraclassCorrelation(ratings); // { oneWay, agreement, consistency, oneWayAverage, ... }
+); // => 0.80, the QWK of raters 1 and 2
+fleissKappa(ratings); // => 0.40, over essays 1 to 3
+intraclassCorrelation(ratings); // => { oneWay: 0.88, agreement: 0.89, consistency: 0.91, oneWayAverage: 0.96, ... }
 ```
 
 ## Kappa
@@ -102,12 +102,12 @@ const ratings = [
   [4, 4, 4],
   [2, 1, null],
 ];
-exactAgreement(ratings); // 0.33: the three raters agree on essay 3 alone
-adjacentAgreement(ratings); // 1: on essays 1 to 3 no two raters differ by more than 1
+exactAgreement(ratings); // => 0.33: the three raters agree on essay 3 alone
+adjacentAgreement(ratings); // => 1: on essays 1 to 3 no two raters differ by more than 1
 adjacentAgreement(
   ratings.map((row) => row.slice(0, 2)),
   { width: 0 },
-); // 0.5: raters 1 and 2 agree exactly on two of four essays
+); // => 0.5: raters 1 and 2 agree exactly on two of four essays
 ```
 
 ## Intraclass correlation
@@ -155,7 +155,7 @@ ratingCorrelation([
   [3, 2],
   [1, 1],
   [4, 4],
-]); // 0.93
+]); // => 0.93
 
 // A rater who scores everything 3 higher correlates perfectly and is 2.3 standard deviations harsher.
 const shifted = [
@@ -164,8 +164,8 @@ const shifted = [
   [1, 4],
   [4, 7],
 ];
-ratingCorrelation(shifted); // 1
-standardizedMeanDifference(shifted); // -2.32
+ratingCorrelation(shifted); // => 1
+standardizedMeanDifference(shifted); // => -2.32
 ```
 
 ## Standardized mean difference
@@ -200,7 +200,7 @@ standardizedMeanDifference([
   [3, 2],
   [1, 1],
   [4, 4],
-]); // 0.22: rater 1 is 0.22 standard deviations more lenient
+]); // => 0.22: rater 1 is 0.22 standard deviations more lenient
 ```
 
 A subgroup's SMD, as of the essays of one group of writers, is read against the whole population's: `population` gives
@@ -299,11 +299,13 @@ const scores = machine.map((score, i) => ({
 const scale = { lowest: 1, highest: 6 };
 
 const agreement = automatedScoreAgreement(scores, { scale });
-agreement.machineHuman; // exact 0.4, adjacent 1, kappa 0.21, QWK 0.78, r 0.86, SMD 0.16
-agreement.humanHuman; // exact 0.6, adjacent 1, kappa 0.49, QWK 0.86, r 0.90, SMD 0
-agreement.degradation?.quadraticKappa; // -0.084
-agreement.disattenuatedCorrelation; // 0.91
-agreement.groups.map(({ group, smd }) => [group, smd]); // [["a", 0], ["b", 0.33]], where b's own SDs give 0.26
+agreement.machineHuman;
+// => { exactAgreement: 0.4, adjacentAgreement: 1, kappa: 0.21, quadraticKappa: 0.78, correlation: 0.86, smd: 0.16, ... }
+agreement.humanHuman;
+// => { exactAgreement: 0.6, adjacentAgreement: 1, kappa: 0.49, quadraticKappa: 0.86, correlation: 0.90, smd: 0.00, ... }
+agreement.degradation?.quadraticKappa; // => -0.084
+agreement.disattenuatedCorrelation; // => 0.91
+agreement.groups.map(({ group, smd }) => [group, smd]); // => [["a", 0], ["b", 0.33]], where b's own SDs give 0.26
 ```
 
 ### Acceptance
@@ -327,8 +329,8 @@ the defaults are Williamson et al.'s, which ETS applies, and the two that are of
 
 ```ts continues
 validateAutomatedScores(agreement);
-// { accepted: false, failures: [{ rule: "smd", value: 0.16, ... }, { rule: "group-smd", value: 0.33, group: "b", ... }] }
-validateAutomatedScores(agreement, { thresholds: { smd: 0.2, groupSmd: null } }).accepted; // true
+// => { accepted: false, failures: [{ rule: "smd", value: 0.16, ... }, { rule: "group-smd", value: 0.33, group: "b", ... }] }
+validateAutomatedScores(agreement, { thresholds: { smd: 0.2, groupSmd: null } }).accepted; // => true
 ```
 
 ### Drift, routing and mapping
@@ -358,12 +360,12 @@ as R's `approx` with `rule = 2`. Round the result to the scale, as `automatedSco
 import { automatedScoreDrift, mappedScore, routingCurve, scoreMapping } from "@measurekit/psychometrics/rater";
 
 automatedScoreDrift(scores, { width: 7 * day, scale }).map(({ agreement }) => agreement.quadraticKappa);
-// [0.67, 0.81, 0.63]: weeks of 4, 3 and 3 essays
+// => [0.67, 0.81, 0.625]: weeks of 4, 3 and 3 essays
 routingCurve(scores, { scale }).map(({ minConfidence, coverage }) => [minConfidence, coverage]);
-// [[0.95, 0.1], [0.9, 0.3], [0.85, 0.4], ...]: the QWK of the 30% at or above 0.9 is 1
+// => [[0.95, 0.1], [0.9, 0.3], [0.85, 0.4], ...]: the QWK of the 30% at or above 0.9 is 1
 const linear = scoreMapping(scores);
-mappedScore(linear, 3.5); // 3.23
-mappedScore(scoreMapping(scores, { method: "isotonic" }), 3.5); // 3.25, between the knots of 3.4 and 3.6
+mappedScore(linear, 3.5); // => 3.23
+mappedScore(scoreMapping(scores, { method: "isotonic" }), 3.5); // => 3.25, between the knots of 3.4 and 3.6
 ```
 
 ### Replay
@@ -388,7 +390,7 @@ const replayed = [2, 3, 4, 4, 1, 3, 4, 3];
 replayShift(
   locked.map((score, i) => [score, replayed[i] ?? null]),
   { maxShiftSd: 0.05 },
-); // standardizedShift 0.24, standardError 0.16, passed false
+); // => { standardizedShift: 0.24, standardError: 0.16, passed: false, ... }
 ```
 
 ### Differences from RSMTool
@@ -447,18 +449,18 @@ const scores = rows.flatMap(([person, rater, content, style]) => [
 ]);
 
 const model = manyFacetRasch(scores, { facets: ["item", "rater"] });
-model.facets[1]?.elements.map(({ id, measure }) => [id, measure]); // [["r1", 0.77], ["r2", -0.31], ["r3", -0.46]]
-model.facets[1]?.elements.map(({ fairAverage }) => fairAverage); // [1.15, 1.87, 1.96]: r1 is the severe rater
-model.facets[1]?.reliability; // 0.68
-expectedRating(model, 0.5, { levels: { rater: "r1" } }); // 1.35: the score of a person of theta 0.5 from the severest rater
-expectedRating(model, 0.5, { levels: { rater: "r3" } }); // 2.12
-const persons = manyFacetEstimates(scores, model); // EAP: e1 { theta: 0.03, standardError: 0.42 }
-manyFacetFit(scores, model, persons).find(({ id }) => id === "r3")?.infitMeanSquare; // 1.22
+model.facets[1]?.elements.map(({ id, measure }) => [id, measure]); // => [["r1", 0.77], ["r2", -0.31], ["r3", -0.46]]
+model.facets[1]?.elements.map(({ fairAverage }) => fairAverage); // => [1.15, 1.87, 1.96]: r1 is the severe rater
+model.facets[1]?.reliability; // => 0.68
+expectedRating(model, 0.5, { levels: { rater: "r1" } }); // => 1.35: the score of a person of theta 0.5 from the severest rater
+expectedRating(model, 0.5, { levels: { rater: "r3" } }); // => 2.12
+const persons = manyFacetEstimates(scores, model); // => [{ id: "e1", theta: 0.03, standardError: 0.42 }, ...]: EAP
+manyFacetFit(scores, model, persons).find(({ id }) => id === "r3")?.infitMeanSquare; // => 1.22
 
 // A bias for each rater on each item, [item, rater, bias]: no pair stands out in these few scores.
 const biased = manyFacetRasch(scores, { facets: ["item", "rater"], interactions: [["item", "rater"]] });
 biased.interactions?.map(({ levels, bias }) => [...levels, Math.round(bias * 100) / 100]);
-// [["content", "r1", -0.13], ["style", "r1", 0.13], ["content", "r2", 0.07], ["style", "r2", -0.07], ["content", "r3", 0.05], ["style", "r3", -0.05]]
+// => [["content", "r1", -0.13], ["style", "r1", 0.13], ["content", "r2", 0.07], ["style", "r2", -0.07], ["content", "r3", 0.05], ["style", "r3", -0.05]]
 ```
 
 ### Scores

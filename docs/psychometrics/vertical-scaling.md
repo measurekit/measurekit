@@ -105,10 +105,10 @@ const chainedScales = grades.map(({ group }, g) => {
 });
 
 scaleGrowth(concurrentScales);
-// [{ from: "grade 3", to: "grade 4", meanChange: 0.887, sdRatio: 1.236, effectSize: 0.789 },
+// => [{ from: "grade 3", to: "grade 4", meanChange: 0.887, sdRatio: 1.236, effectSize: 0.789 },
 //  { from: "grade 4", to: "grade 5", meanChange: 0.437, sdRatio: 0.872, effectSize: 0.377 }]
 scaleGrowth(chainedScales);
-// [{ from: "grade 3", to: "grade 4", meanChange: 0.885, sdRatio: 1.240, effectSize: 0.785 },
+// => [{ from: "grade 3", to: "grade 4", meanChange: 0.885, sdRatio: 1.240, effectSize: 0.785 },
 //  { from: "grade 4", to: "grade 5", meanChange: 0.413, sdRatio: 0.859, effectSize: 0.357 }]
 ```
 
@@ -141,7 +141,7 @@ import { chainTransformations } from "@measurekit/psychometrics/equating";
 chainTransformations([
   { slope: 2, intercept: 1 },
   { slope: 0.5, intercept: 3 },
-]); // { slope: 1, intercept: 3.5 }
+]); // => { slope: 1, intercept: 3.5 }
 ```
 
 | Rule          | Definition                                                                                                 |

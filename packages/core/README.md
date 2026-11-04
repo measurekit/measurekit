@@ -39,12 +39,14 @@ A check throws `DataError` with a sentence that names the value and what was exp
 import { createRandom, DataError } from "@measurekit/core";
 
 const random = createRandom(42);
-random.uniform(); // a draw from [0, 1), the same for every run with seed 42
+random.uniform(); // => 0.66, a draw from [0, 1), the same for every run with seed 42
+let refusal: unknown;
 try {
   createRandom(1.5);
 } catch (error) {
-  error instanceof DataError; // true
+  refusal = error;
 }
+refusal instanceof DataError; // => true
 ```
 
 ## License

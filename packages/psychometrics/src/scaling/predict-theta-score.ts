@@ -47,7 +47,7 @@ const MAX_REPORTABLE_SCORES = 10_000;
  *
  * const posterior = { nodes: [-1, 0, 1], weights: [0.25, 0.5, 0.25] };
  * const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 };
- * predictThetaScore(posterior, scale, { standardError: 0.3 }).mean; // 500
+ * predictThetaScore(posterior, scale, { standardError: 0.3 }).mean; // => 500
  * ```
  * @throws `DataError` when the distribution, the scale or the options are invalid, or the scale lacks finite bounds or
  * a step above 0, or reports more than 10,000 scores.

@@ -55,8 +55,8 @@ export interface Simulation<TState> {
  *   })),
  * ).flat();
  * const { log } = simulate(bkt({ parameters: { skills: truth } }), attempts, createRandom(42));
- * log.length; // 12
- * log.map(({ outcome }) => outcome); // [0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]
+ * log.length; // => 12
+ * log.map(({ outcome }) => outcome); // => [0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1]
  * ```
  */
 export function simulate<TState>(

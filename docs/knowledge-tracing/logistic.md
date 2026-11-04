@@ -260,7 +260,7 @@ const model = logistic({
 });
 const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 100 };
 const ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
-model.predict(ana, { ...attempt, item: "q2", time: 104 }); // 0.68: θ 0.6, -0.4 + 0.15 × 1 + 0.8 × 4^-0.5
+model.predict(ana, { ...attempt, item: "q2", time: 104 }); // => 0.68: θ 0.6, -0.4 + 0.15 × 1 + 0.8 × 4^-0.5
 ```
 
 The state holds each skill's history: `successes`, `failures`, `last`, the time of the last attempt, and `decayed`, the

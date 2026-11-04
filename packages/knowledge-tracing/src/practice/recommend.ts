@@ -59,7 +59,7 @@ const RECOMMEND_OPTIONS: FieldNames<RecommendOptions> = { band: true };
  * const ana = model.initialState("ana");
  * const candidates = ["q1", "q2", "q3"].map((item) => ({ learner: "ana", item, skills: [], time: 1 }));
  * const ranked = recommend(model, ana, candidates).map(({ attempt, prediction }) => [attempt.item, prediction]);
- * ranked; // [["q2", 0.75], ["q1", 0.92], ["q3", 0.43]], the items nearest the band of success first
+ * ranked; // => [["q2", 0.75], ["q1", 0.92], ["q3", 0.43]], the items nearest the band of success first
  * ```
  */
 export function recommend<TState>(

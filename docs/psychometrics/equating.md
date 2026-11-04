@@ -37,10 +37,10 @@ const commonOnY = [item(0.95, -0.2, 0.2), item(0.8, 0.85, 0.15)];
 const formX = [...commonOnX, item(1.3, 0.1, 0.25)];
 const formY = [...commonOnY, item(1.0, -0.9, 0.2)];
 
-const transformation = haebaraLinking(commonOnX, commonOnY); // { slope, intercept, converged, iterations }
+const transformation = haebaraLinking(commonOnX, commonOnY); // => { slope: 1.13, intercept: 0.22, converged: true, ... }
 const formXOnY = formX.map((x) => transformItem(x, transformation));
-transformTheta(0.5, transformation); // a theta of form X's calibration on form Y's scale
-trueScoreEquating(formXOnY, formY); // the form Y true score of each form X score, 0 to 3
+transformTheta(0.5, transformation); // => 0.78, a theta of form X's calibration on form Y's scale
+trueScoreEquating(formXOnY, formY); // => [0.00, 1.17, 2.16, 3.00]: the form Y true score of each form X score, 0 to 3
 ```
 
 | Function                                 | A and B                                                                                                        |
@@ -165,11 +165,11 @@ const groupY = [
   [0, 1, 5, 9],
 ]; // took form Y
 
-tuckerEquating(groupX, groupY); // [0.407, 1.372, 2.337, 3.301, 4.266, 5.231]: the form Y score of each form X score
-levineEquating(groupX, groupY, { trueScore: true }); // [0.586, 1.48, 2.375, 3.27, 4.164, 5.059]
-chainedLinearEquating(groupX, groupY); // [0.425, 1.383, 2.34, 3.298, 4.255, 5.213]
-chainedEquipercentileEquating(groupX, groupY); // [0.298, 1.43, 2.459, 3.369, 4.186, 5.1]
-frequencyEstimationEquating(groupX, groupY); // [0.305, 1.44, 2.438, 3.35, 4.234, 5.121]
+tuckerEquating(groupX, groupY); // => [0.407, 1.372, 2.337, 3.301, 4.266, 5.231]: the form Y score of each form X score
+levineEquating(groupX, groupY, { trueScore: true }); // => [0.586, 1.48, 2.375, 3.27, 4.164, 5.059]
+chainedLinearEquating(groupX, groupY); // => [0.425, 1.383, 2.34, 3.298, 4.255, 5.213]
+chainedEquipercentileEquating(groupX, groupY); // => [0.298, 1.43, 2.459, 3.369, 4.186, 5.1]
+frequencyEstimationEquating(groupX, groupY); // => [0.305, 1.44, 2.438, 3.35, 4.234, 5.121]
 ```
 
 ### Synthetic population
@@ -256,8 +256,8 @@ const groupX = [
   [0, 1, 4, 7],
 ];
 const smooth = bivariateLogLinearPresmoothing(groupX, { degrees: [3, 2] });
-smooth.converged; // true
-smooth.distribution[0]?.map((count) => Math.round(count * 10) / 10); // [7.8, 3.6, 0.6, 0]: fitted persons at total score 0
+smooth.converged; // => true
+smooth.distribution[0]?.map((count) => Math.round(count * 10) / 10); // => [7.8, 3.6, 0.6, 0]: fitted persons at total score 0
 ```
 
 ## Standard errors by bootstrap
@@ -307,7 +307,7 @@ const groupY = [
 ];
 const sample = { design: "neat", from: groupX, to: groupY } as const;
 bootstrapEquating(sample, (s) => tuckerEquating(s.from, s.to), createRandom(1), { replications: 200 });
-// [0.216, 0.168, 0.137, 0.133, 0.16, 0.205]: the standard error of each form X score's equivalent
+// => [0.216, 0.168, 0.137, 0.133, 0.16, 0.205]: the standard error of each form X score's equivalent
 ```
 
 A single group equates the marginal distributions of its two forms with `linearEquating` and `equipercentileEquating`;
@@ -326,13 +326,13 @@ const sum = (counts: readonly number[]) => counts.reduce((total, count) => total
 const marginals = (pairs: readonly (readonly number[])[]) =>
   [pairs.map(sum), (pairs[0] ?? []).map((_, y) => sum(pairs.map((row) => row[y] ?? 0)))] as const;
 
-linearEquating(...marginals(joint)); // [0.129, 1.118, 2.106]
+linearEquating(...marginals(joint)); // => [0.129, 1.118, 2.106]
 bootstrapEquating(
   { design: "single-group", joint },
   (sample) => linearEquating(...marginals(sample.joint)),
   createRandom(1),
   { replications: 200 },
-); // [0.153, 0.116, 0.152]
+); // => [0.153, 0.116, 0.152]
 ```
 
 ## Kernel equating
@@ -407,11 +407,11 @@ const data = {
   degrees: [3, 3],
 } as const;
 const kernel = kernelEquating(data);
-kernel.equated; // [-0.282, 0.582, 1.554, 2.589, 3.648, 4.715, 5.785, 6.854, 7.919, 8.974, 10.001], after rounding
-kernel.standardErrors; // [0.346, 0.487, 0.483, 0.424, 0.398, 0.401, 0.417, 0.461, 0.551, 0.616, 0.459]
-kernel.bandwidths; // { from: 0.608, to: 0.585 }, after rounding
+kernel.equated; // => [-0.282, 0.582, 1.554, 2.589, 3.648, 4.715, 5.785, 6.854, 7.919, 8.974, 10.001], after rounding
+kernel.standardErrors; // => [0.346, 0.487, 0.483, 0.424, 0.398, 0.401, 0.417, 0.461, 0.551, 0.616, 0.459]
+kernel.bandwidths; // => { from: 0.608, to: 0.585 }, after rounding
 const linear = kernelEquating(data, { linear: true });
-kernelEquatingDifference(kernel, linear); // [0.397, 0.299, 0.182, 0.054, 0.102, 0.146, 0.115, 0.053, 0.191, 0.343, 0.41]
+kernelEquatingDifference(kernel, linear); // => [0.397, 0.299, 0.182, 0.054, 0.102, 0.146, 0.115, 0.053, 0.191, 0.343, 0.41]
 ```
 
 ## Anchor screen
@@ -438,7 +438,7 @@ const item = (b: number) => ({ model: twoParameterLogistic, parameters: { a: 1, 
 const from = [-1.2, -0.6, -0.1, 0.4, 0.9, 1.5].map(item);
 const to = [-0.85, -0.34, 0.22, 0.67, 2.1, 1.81].map(item);
 robustZ(from, to).map(({ z, flagged }) => [Math.round(z * 100) / 100, flagged]);
-// [[0.76, false], [-1.19, false], [0.11, false], [-0.97, false], [19.14, true], [-0.11, false]]
+// => [[0.76, false], [-1.19, false], [0.11, false], [-0.97, false], [19.14, true], [-0.11, false]]
 ```
 
 ## True-score equating
@@ -490,7 +490,7 @@ const nodes = [-2, -1, 0, 1, 2];
 const weights = [0.06, 0.24, 0.4, 0.24, 0.06];
 irtObservedScoreEquating(formX, formY, {
   populations: { from: { nodes, weights }, to: { nodes: nodes.map((z) => 0.4 + 1.2 * z), weights } },
-}); // [0.145, 1.163, 2.118, 3.05, 4.004], after rounding
+}); // => [0.145, 1.163, 2.118, 3.05, 4.004], after rounding
 ```
 
 ## Standard errors of IRT equating
@@ -539,11 +539,11 @@ if (covariance === null) throw new Error("The calibration has no covariance.");
 // Form X is items 1 to 9 and form Y items 6 to 14, so that items 6 to 9 are common.
 const formX = calibration.items.slice(0, 9);
 const formY = calibration.items.slice(5);
-trueScoreEquating(formX, formY); // [0, 1.477, 2.642, 3.627, 4.527, 5.404, 6.29, 7.195, 8.101, 9], after rounding
+trueScoreEquating(formX, formY); // => [0, 1.477, 2.642, 3.627, 4.527, 5.404, 6.29, 7.195, 8.101, 9], after rounding
 irtEquatingStandardErrors(formX, formY, covariance);
-// [0, 0.094, 0.071, 0.048, 0.036, 0.035, 0.043, 0.049, 0.033, 0], after rounding
+// => [0, 0.094, 0.071, 0.048, 0.036, 0.035, 0.043, 0.049, 0.033, 0], after rounding
 irtEquatingStandardErrors(formX, formY, covariance, { method: "observed-score" });
-// [0.04, 0.048, 0.042, 0.035, 0.033, 0.033, 0.034, 0.034, 0.029, 0.022], after rounding
+// => [0.04, 0.048, 0.042, 0.035, 0.033, 0.033, 0.034, 0.034, 0.029, 0.022], after rounding
 ```
 
 ## Standard errors across separate calibrations
@@ -609,10 +609,10 @@ const calibrated = (first: number, shift: number) => {
 const formX = calibrated(1, 0);
 const formY = calibrated(7, 0.5);
 const { transformation, errors } = linkCovariance([formX, formY]); // Y's scale to X's
-transformation; // { slope: 0.976, intercept: 0.411 }, after rounding
-errors.standardErrors; // { slope: 0.082, intercept: 0.065 }, after rounding
+transformation; // => { slope: 0.976, intercept: 0.411 }, after rounding
+errors.standardErrors; // => { slope: 0.082, intercept: 0.065 }, after rounding
 linkedEquatingErrors(formY, formX);
-// [0, 0.139, 0.192, 0.181, 0.126, 0.087, 0.091, 0.108, 0.112, 0.086, 0]: the error of each form Y score's equivalent
+// => [0, 0.139, 0.192, 0.181, 0.126, 0.087, 0.091, 0.108, 0.112, 0.086, 0]: the error of each form Y score's equivalent
 ```
 
 ## Not included

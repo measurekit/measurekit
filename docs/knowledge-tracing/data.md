@@ -56,7 +56,7 @@ const log = buildEventLog(
   ],
   { qMatrix: { q1: ["fractions"], q2: ["fractions", "decimals"] } },
 );
-log.map((event) => event.skills); // [["fractions"], ["fractions", "decimals"], ["decimals"]]
+log.map((event) => event.skills); // => [["fractions"], ["fractions", "decimals"], ["decimals"]]
 ```
 
 | Rule   | Detail                                                                                                                                       |

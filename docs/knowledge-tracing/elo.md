@@ -66,9 +66,11 @@ const log = buildEventLog(
   { qMatrix: { q1: ["fractions"], q2: ["fractions", "decimals"] } },
 );
 const fit = elo({ skills: true }).fit(log);
-fit.model.parameters.items; // { q1: { difficulty: -1.09, count: 2 }, q2: { difficulty: 0.56, count: 2 } }
-fit.states.ana; // { learner: "ana", ability: 0.44, count: 2, skills: { fractions, decimals } }
-fit.predictions; // each event's prediction before its outcome, as online use would have made it
+fit.model.parameters.items; // => { q1: { difficulty: -1.09, count: 2 }, q2: { difficulty: 0.56, count: 2 } }
+fit.states.ana;
+// => { learner: "ana", ability: 0.44, count: 2,
+//      skills: { fractions: { ability: 0.44, count: 2 }, decimals: { ability: -0.06, count: 1 } } }
+fit.predictions; // => [0.5, 0.5, 0.56, 0.38]: each event's prediction before its outcome, as online use would have made it
 ```
 
 The fit's `logLikelihood` sums the log-likelihoods of these predictions; `aic` and `bic` are `null`, as Elo estimates
@@ -90,10 +92,10 @@ An app keeps each learner's state and each item's rating as a row, and an answer
 const rows = JSON.parse(JSON.stringify({ q1: fit.model.parameters.items.q1, ana: fit.states.ana }));
 const model = elo({ skills: true, parameters: { items: { q1: rows.q1 } } });
 const attempt = { learner: "ana", item: "q1", skills: ["fractions"], time: 5 };
-model.predict(rows.ana, attempt); // 0.88, P(correct), for choosing items
+model.predict(rows.ana, attempt); // => 0.88, P(correct), for choosing items
 const event = { ...attempt, outcome: 0 };
-const ana = model.update(rows.ana, event); // ana's new state: write it to the learner's row
-const q1 = model.updateItem(rows.ana, event); // q1's new rating, { difficulty, count }: write it to its row
+const ana = model.update(rows.ana, event); // => { learner: "ana", ability: -0.36, count: 3, ... }: write it to ana's row
+const q1 = model.updateItem(rows.ana, event); // => { difficulty: -0.29, count: 3 }: write it to q1's row
 ```
 
 - `update(state, event)` returns the learner's new state, with the model's item ratings fixed.

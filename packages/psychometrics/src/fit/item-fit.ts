@@ -41,7 +41,7 @@ export interface ItemFit extends MeanSquareFit {
  * ]);
  * const items = [-1, -0.3, 0.3, 1].map((b) => ({ model: oneParameterLogistic, parameters: { a: 1, b, c: 0, d: 1 } }));
  * const thetas = [0.5, -1, 1.2, -0.7, 0.6, -0.5];
- * itemFit(matrix, items, thetas)[0]; // { id: "item1", infitMeanSquare: 1.01, outfitMeanSquare: 0.885, ... }
+ * itemFit(matrix, items, thetas)[0]; // => { id: "item1", infitMeanSquare: 1.01, outfitMeanSquare: 0.885, ... }
  * ```
  */
 export function itemFit(

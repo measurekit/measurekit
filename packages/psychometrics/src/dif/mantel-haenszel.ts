@@ -97,9 +97,9 @@ const DELTA_SCALE = -2.35;
  * const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
  * const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
  * const item3 = mantelHaenszel(matrix, groups).items[2];
- * item3?.chiSquare; // 33.6
- * item3?.delta; // -2.76, in the ETS delta metric
- * item3?.etsCategory; // "C", large DIF
+ * item3?.chiSquare; // => 33.6
+ * item3?.delta; // => -2.76, in the ETS delta metric
+ * item3?.etsCategory; // => "C", large DIF
  * ```
  */
 export function mantelHaenszel(

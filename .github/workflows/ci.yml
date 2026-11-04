@@ -25,10 +25,11 @@ jobs:
   # that uses that one, changed (core, psychometrics, knowledge-tracing, the examples and compat, with their dependencies read
   # from their package.json files); the lock file, the root configuration, the scripts that the benchmarks share and this
   # workflow reach every job; the other Markdown and the configuration of the linters reach none but check. A file that no rule
-  # names reaches every job. The guides of a package and the README are tests of the examples alone, and AGENTS.md, the
-  # changesets, the manifests and the other workflows are tests of the scripts alone. A package that changed also reaches the
-  # tests of the scripts, which bundle its entry points. Outputs: projects is the JSON array of the Vitest projects whose tests
-  # run, one matrix leg each on each Node.js; bench and runtimes say whether the job runs. The rules job is in rules.yml.
+  # names reaches every job. The guides of a package and the README are tests of the examples alone, the runner of their
+  # samples is a test of the examples and of the scripts, and AGENTS.md, the changesets, the manifests and the other workflows
+  # are tests of the scripts alone. A package that changed also reaches the tests of the scripts, which bundle its entry
+  # points. Outputs: projects is the JSON array of the Vitest projects whose tests run, one matrix leg each on each Node.js;
+  # bench and runtimes say whether the job runs. The rules job is in rules.yml.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -104,6 +105,9 @@ jobs:
           const OWN_SCRIPTS =
             /^scripts\/(test\/|check-standards\.ts$|check-duplication\.ts$|check-licenses\.ts$|check-rules\.ts$|check-release\.ts$|check-tarballs\.ts$|entry-sizes\.ts$|size-budgets\.ts$|peak-memory\.ts$|prepare\.ts$)/;
 
+          // The runner of the samples and the comparison of their results, which the examples run and the tests of scripts check.
+          const SAMPLE_SCRIPTS = /^scripts\/(guide-samples|stated-values)\.ts$/;
+
           // The files that a test of scripts reads besides the scripts: AGENTS.md, whose table of repeats it compares with the
           // code, the changesets and every manifest, which it holds to the packages released and to exact versions, and the
           // workflows, whose jobs it holds to a timeout and whose release it holds to the mutation rules.
@@ -122,6 +126,7 @@ jobs:
             else if (top === "docs" && third !== undefined && members.has(`packages/${name}`)) guides = true;
             else if (file === "README.md") guides = true;
             else if (top === "validation" && name === "benchmarks") benchmarks = true;
+            else if (SAMPLE_SCRIPTS.test(file)) guides = scriptTests = true;
             else if (OWN_SCRIPTS.test(file)) scriptTests = true;
             else if (!NOT_CHECKED.test(file)) everything = true;
           }

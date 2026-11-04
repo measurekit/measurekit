@@ -55,10 +55,11 @@ const features = {
   item6: { steps: 6 },
 };
 const model = lltm(responses, features);
-model.effects; // (intercept) -1.56 (SE 0.11), steps 0.50 (SE 0.03)
-model.sd; // 0.98
-model.comparison; // { raschLogLikelihood: -1831.8, chiSquare: 2.43, degreesOfFreedom: 4, significance: 0.66 }
-model.items[0]?.parameters; // { a: 1, b: -1.06, c: 0, d: 1 }
+model.effects;
+// => [{ name: "(intercept)", estimate: -1.56, standardError: 0.11 }, { name: "steps", estimate: 0.50, standardError: 0.03 }]
+model.sd; // => 0.98
+model.comparison; // => { raschLogLikelihood: -1831.8, chiSquare: 2.43, degreesOfFreedom: 4, significance: 0.66 }
+model.items[0]?.parameters; // => { a: 1, b: -1.06, c: 0, d: 1 }
 ```
 
 `data` is a [response matrix or response records](data.md) of dichotomous responses; `features` are the
@@ -143,9 +144,10 @@ const items = [1, 2, 3, 4, 5, 6].map((steps) => ({
 const responses = simulateResponses(items, simulateThetas(800, random), random);
 const features = Object.fromEntries([1, 2, 3, 4, 5, 6].map((steps) => [`item${steps}`, { steps }]));
 const model = lltm(responses, features, { model: "partial-credit" });
-model.effects; // (intercept) -1.01 (SE 0.07), steps 0.51 (SE 0.02)
-model.comparison; // { raschLogLikelihood: -4236.6, chiSquare: 7.13, degreesOfFreedom: 4, significance: 0.13, ... }
-model.items[0]?.parameters; // { a: 1, b: [-1.04, 0.03] }
+model.effects;
+// => [{ name: "(intercept)", estimate: -1.015, standardError: 0.070 }, { name: "steps", estimate: 0.508, standardError: 0.019 }]
+model.comparison; // => { raschLogLikelihood: -4236.6, chiSquare: 7.13, degreesOfFreedom: 4, significance: 0.13, ... }
+model.items[0]?.parameters; // => { a: 1, b: [-1.04, 0.03] }
 ```
 
 - **Result.** The effects, σ and the test are those of the dichotomous model, and `items` are partial credit items with
@@ -202,8 +204,9 @@ const change = linearChange([before, after], {
   itemGroups: Object.fromEntries(before.itemIds.map((id) => [id, "test"])),
 });
 change.effects;
-// test, occasion 2, control: 0.35 (SE 0.08), the trend
-// test, occasion 2, treated: 0.35 (SE 0.12), the gain beyond the trend
+// => [{ itemGroup: "test", occasion: 2, group: "control", estimate: 0.35, standardError: 0.08 },
+//     { itemGroup: "test", occasion: 2, group: "treated", estimate: 0.35, standardError: 0.12 }]: the trend of the
+//    control group, then the gain of the treated group beyond it
 ```
 
 | Option          | Default                        | Valid range                           | Meaning                                                                        |
@@ -284,7 +287,7 @@ const features = Object.fromEntries(
     },
   ]),
 );
-lltm(stacked, features, { intercept: false }).effects.at(-1); // { name: "time2", estimate: -0.44, standardError: 0.06 }
+lltm(stacked, features, { intercept: false }).effects.at(-1); // => { name: "time2", estimate: -0.44, standardError: 0.06 }
 ```
 
 It assumes one trait across items and occasions, and treats the two responses of a person as independent given it. Use
@@ -366,14 +369,16 @@ const calibration = calibrate(
   { model: twoParameterLogistic, standardErrors: "hessian" },
 );
 const regression = itemFeatureRegression(calibration.items, features);
-regression.effects; // (intercept) -1.40 (SE 0.14), steps 0.49 (0.03), open 0.21 (0.11)
-regression.residualSd; // 0.18: the spread of difficulties that the features leave
+regression.effects;
+// => [{ name: "(intercept)", estimate: -1.40, standardError: 0.14 }, { name: "steps", estimate: 0.49, standardError: 0.03 },
+//     { name: "open", estimate: 0.21, standardError: 0.11 }]
+regression.residualSd; // => 0.18: the spread of difficulties that the features leave
 const slopes = itemFeatureRegression(calibration.items, features, { parameter: "a" });
 
 // 2. Predict the new item from its features: the prior of its difficulty and of its slope.
 const itsFeatures = { steps: 4, open: 1 };
-const b = predictItemParameter(regression, itsFeatures); // { mean: 0.78, sd: 0.20 }
-const a = predictItemParameter(slopes, itsFeatures); // { mean: 0.05, sd: 0.04 }, the logarithm of the slope
+const b = predictItemParameter(regression, itsFeatures); // => { mean: 0.78, sd: 0.20 }
+const a = predictItemParameter(slopes, itsFeatures); // => { mean: 0.05, sd: 0.04 }, the logarithm of the slope
 
 // 3. Calibrate the new item on the bank's scale, with the prediction as its prior.
 const sparse = buildResponseMatrix(
@@ -382,8 +387,9 @@ const sparse = buildResponseMatrix(
 );
 const fixed = Object.fromEntries(calibration.items.map(({ id, parameters }) => [id, parameters]));
 const itemPriors = { new1: { b: normalPrior(b.mean, b.sd), a: logNormalPrior(a.mean, a.sd) } };
-calibrate(sparse, { model: twoParameterLogistic, fixed }).items[16]?.parameters; // a: 1.00, b: 0.59
-calibrate(sparse, { model: twoParameterLogistic, fixed, itemPriors }).items[16]?.parameters; // a: 1.05, b: 0.75
+calibrate(sparse, { model: twoParameterLogistic, fixed }).items[16]?.parameters; // => { a: 1.00, b: 0.59, c: 0, d: 1 }
+calibrate(sparse, { model: twoParameterLogistic, fixed, itemPriors }).items[16]?.parameters;
+// => { a: 1.05, b: 0.75, c: 0, d: 1 }
 ```
 
 | Option          | Default | Valid range                   | Meaning                                                          |

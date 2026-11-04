@@ -24,7 +24,7 @@ import { checkRounding, roundScore, SCORE_ROUNDING_FIELDS, type ScoreRounding } 
  * import { scaleConversion } from "@measurekit/psychometrics/scaling";
  *
  * // Form Y's scale scores of the total scores 0 to 3, and the equivalents on Y of form X's scores 0 to 3.
- * scaleConversion([0.4, 1.5, 2.2, 3.4], [300, 410, 520, 650], { step: 10 }); // [340, 470, 550, 650]
+ * scaleConversion([0.4, 1.5, 2.2, 3.4], [300, 410, 520, 650], { step: 10 }); // => [340, 470, 550, 650]
  * ```
  * @throws `DataError` when the equivalents or the conversion are not arrays of finite numbers, the conversion is empty,
  * or the rounding is invalid.

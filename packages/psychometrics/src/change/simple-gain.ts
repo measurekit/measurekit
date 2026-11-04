@@ -16,7 +16,7 @@ import { checkPairedScores } from "./paired-scores.js";
  * ```ts
  * import { simpleGain } from "@measurekit/psychometrics/change";
  *
- * simpleGain([12, 20, 31], [18, 19, 40]); // [6, -1, 9]
+ * simpleGain([12, 20, 31], [18, 19, 40]); // => [6, -1, 9]
  * ```
  * @throws `DataError` when the scores are not arrays of the same length with at least one finite number each.
  * @see {@link https://doi.org/10.1037/h0029382 | Cronbach and Furby (1970)}

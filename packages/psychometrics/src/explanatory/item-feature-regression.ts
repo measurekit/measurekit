@@ -110,7 +110,7 @@ const SLOPE = "a";
  * const items = [item("q1", -1.1, 0.12), item("q2", -0.4, 0.1), item("q3", 0.2, 0.11), item("q4", 0.9, 0.1), item("q5", 1.6, 0.13)];
  * const features = { q1: { steps: 1 }, q2: { steps: 2 }, q3: { steps: 3 }, q4: { steps: 4 }, q5: { steps: 5 } };
  * const regression = itemFeatureRegression(items, features);
- * regression.effects; // [{ name: "(intercept)", estimate: -1.76, ... }, { name: "steps", estimate: 0.67, ... }]
+ * regression.effects; // => [{ name: "(intercept)", estimate: -1.76, ... }, { name: "steps", estimate: 0.67, ... }]
  * ```
  *
  * @param items - The items of a calibration, with the standard errors of their parameters.

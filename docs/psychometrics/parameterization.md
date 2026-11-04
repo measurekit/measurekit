@@ -69,7 +69,7 @@ import { readMirtMultidimensional } from "@measurekit/psychometrics/parameteriza
 import { multidimensionalGradedResponse } from "@measurekit/psychometrics/multidimensional";
 
 const item = readMirtMultidimensional({ a1: 1.1, a2: 0.4, d1: 2, d2: 0, d3: -1.5 }, multidimensionalGradedResponse);
-item.parameters; // { a: [1.1, 0.4], intercepts: [2, 0, -1.5] }
+item.parameters; // => { a: [1.1, 0.4], intercepts: [2, 0, -1.5] }
 ```
 
 In R, write the coefficients as one object per item; jsonlite leaves out the columns of other item types:
@@ -89,7 +89,7 @@ const items = [
   readMirtIrt({ a: 1.09, b: -1.46, g: 0.2, u: 1 }, threeParameterLogistic),
   readMirtIrt({ a: 0.86, b1: -3.27, b2: -2.89, b3: 1.54 }, generalizedPartialCredit),
 ];
-items[1]; // { model: generalizedPartialCredit, parameters: { a: 0.86, b: [-3.27, -2.89, 1.54] } }
+items[1]; // => { parameters: { a: 0.86, b: [-3.27, -2.89, 1.54] }, ... }
 ```
 
 ## Not included

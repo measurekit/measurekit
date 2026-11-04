@@ -46,7 +46,7 @@ const SCORING_OPTIONS: FieldNames<ScoringOptions> = { optionLabels: true, person
  *   ],
  *   ["A", "C"],
  * );
- * matrix.responses; // [[1, 1], [0, 1], [1, 0]]
+ * matrix.responses; // => [[1, 1], [0, 1], [1, 0]]
  * ```
  */
 export function scoreResponses(

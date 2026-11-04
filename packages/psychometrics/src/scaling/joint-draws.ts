@@ -208,7 +208,7 @@ export function correlationFactor(correlation: readonly (readonly number[])[], s
  *   [0.7, 1],
  * ];
  * const draws = drawJointThetas([reading, writing], correlation, 1000, createRandom(1));
- * draws.length; // 1000: each draw holds a theta for reading and one for writing
+ * draws.length; // => 1000: each draw holds a theta for reading and one for writing
  * ```
  */
 export function drawJointThetas(

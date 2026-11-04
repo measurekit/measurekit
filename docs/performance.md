@@ -146,7 +146,7 @@ xychart-beta horizontal
   title "Knowledge tracing: kst, logistic"
   x-axis ["unionClosure", "structureBase", "clauseStructure", "blim", "iita", "mdml", "identifiability", "validity", "diffTest", "features", "fitItems", "fitManyItems", "searchRates", "afm"]
   y-axis "Time of measurekit over the time of the reference" 0 --> 2
-  bar [0.0078, 0.000037, 0.0011, 0.81, 0.000015, 0.51, 1.2, 0.008, 0.00026, 0.67, 1.6, 0.75, 0.39, 0.025]
+  bar [0.0078, 0.000037, 0.0011, 0.81, 0.000015, 0.51, 1.2, 0.008, 0.00026, 0.67, 1.6, 0.75, 0.23, 0.025]
   line [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ```
 
@@ -390,7 +390,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 26.8.1 and R versio
 | The 16 features of LKT's other names, before each event                                                                               | 1,941 events of 17 learners, 16 features         |            38.5 | LKT 1.7.0 `computefeatures`               |           57.0 |     0.67× |
 | **Fit with an intercept for each skill and item, a proficiency for each learner and a ridge of 1**                                    | 20,000 events of 200 learners at 1,000 items     |            38.9 | LiblineaR 2.10.26 `LiblineaR(type = 0)`   |           24.5 |  **1.6×** |
 | Fit with an intercept for each skill and item, a proficiency for each learner and a ridge of 1                                        | 150,000 events of 3,000 learners at 49,546 items |             286 | LiblineaR 2.10.26 `LiblineaR(type = 0)`   |            381 |     0.75× |
-| Search for the decay of a proportion of successes and the exponent of a recency                                                       | 3,600 events of 60 learners at 4 skills, 2 rates |             177 | LKT 1.7.0 `LKT(seedpars = c(0.5, 0.5))`   |            454 |     0.39× |
+| Search for the decay of a proportion of successes and the exponent of a recency                                                       | 3,600 events of 60 learners at 4 skills, 2 rates |             149 | LKT 1.7.0 `LKT(seedpars = c(0.5, 0.5))`   |            643 |     0.23× |
 | Fit of the additive factors model by maximum likelihood                                                                               | 20,000 attempts of 200 learners at 5 skills      |            10.7 | base R `glm`, binomial family             |            426 |    0.025× |
 | The candidates ranked by their distance to the band of success of a learner                                                           | 500 candidate items, an Elo model                |           0.044 | none                                      |                |           |
 | A log built from and checked for events                                                                                               | 100,000 events                                   |            14.3 | none                                      |                |           |
@@ -496,16 +496,20 @@ Rscript validation/benchmarks.R table
 ## Budgets
 
 A benchmark fails when its fastest sample is above its budget, which is in `packages/<package>/test/budgets.ts`. The fastest
-sample is the least affected by the other work of a shared machine. The budget of a time is five times the median, over the
-last runs of the `bench` job, of the fastest sample that the CI runner took, rounded up to one significant digit. The sample
-is the runner's, because the gate runs there: the runner took a median of 2.5 times as long as a laptop with an Apple M5 and
-up to 6 times as long (`numerics.logistic`), so a budget holds on a machine up to about five times slower than the runner,
-and on a slower one only the ratios to the references apply. The factor allows for the noise of a shared runner, whose
-fastest samples of one benchmark differed by a median of 1.9 times and by up to 3.2 times between runs; every budget stands at
-least 2.9 times above the slowest of those samples. It is far below the cost of the changes that the budgets exist to catch.
-A benchmark that the runner has not taken yet has five times its fastest sample on the laptop, times the median ratio of the
-runner's fastest samples to the laptop's for the other benchmarks of its module, rounded up to one significant digit. A budget
-changes only with the reason in the commit that changes it.
+sample is the least affected by the other work of a shared machine. The budget of a time is five times the fastest sample that
+the CI runner took, rounded up to one significant digit, the one rule of STANDARDS.md section 11: the median, over the green
+runs of the `bench` job of 2026-11-03 and 2026-11-04 (three to eight for each benchmark), of the fastest sample of each run.
+The sample is the runner's, because the gate runs there, and the budget is absolute, so it holds for the runner's class of
+machine: the runner took a median of 2.4 times as long as a laptop with an Apple M5, from 0.35 times (`ctt.mcdonaldOmega`)
+to 5.9 times as long (`numerics.logistic`), so a budget holds on a machine up to about five times slower than the runner,
+and on a slower one only the ratios to the references apply, which are documented and not gated, as R does not run on the
+runner. The factor allows for the noise of a shared runner, whose fastest samples of one benchmark differed by a median of
+1.8 times and by up to 8.6 times (`bkt.fitPairs`) between those runs; every budget stands at least 2.3 times above the
+slowest of those samples. It is far below the cost of the changes that the budgets exist to catch. A benchmark that the
+runner has not taken, or took only before its code changed, has five times its fastest sample on the laptop, times the
+median ratio of the runner's fastest samples to the laptop's for the other benchmarks of its module, rounded up to one
+significant digit, until the runner's samples replace it; `budgets.ts` marks it. A budget changes only with the reason in
+the commit that changes it.
 
 ## Sizes
 
@@ -631,7 +635,10 @@ to a specific dimension's items, the mean scores of its items at each primary no
 on the grid of two primary dimensions take about 7 KB per response.
 
 `scripts/test/peak-memory.test.ts`, which `pnpm test --project scripts` runs without a build, measures the readers of
-`scripts/peak-memory.ts`, the worst rows of the table, from the sources, each in a pair of child processes, and fails
-when one adds more than its budget: twice the largest rise measured on Node.js 22 and 24, on macOS and on Linux, rounded
-up to 10 MB, as the peak varies with the moment the collector runs and with the version of V8. `node
-scripts/peak-memory.ts` prints them, the median of three pairs.
+`scripts/peak-memory.ts`, the worst rows of the table, from the sources, each in a pair of child processes whose heap is
+bounded, as STANDARDS.md section 7 asks: twice the least heap in which the reading ended on Node.js 22, 24 and 26, rounded up
+to 16 MiB, so that a reading that keeps more alive at once fails, whenever the collector runs and however busy the machine
+is. The test fails too when a reading adds more than its budget to the peak: twice the largest rise measured on Node.js 22 and
+24, on macOS and on Linux, rounded up to 10 MB, which bounds what the heap does not hold, the buffers of typed arrays. `node
+scripts/peak-memory.ts` prints the rises, the median of three pairs, with a heap of 8 GiB, as a host's process collects
+later than a bounded one, and `node scripts/peak-memory.ts --heap` the least heap of each reading.

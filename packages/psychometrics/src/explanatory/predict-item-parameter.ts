@@ -44,7 +44,7 @@ export interface ParameterPrediction {
  * ];
  * const features = { q1: { steps: 1 }, q2: { steps: 2 }, q3: { steps: 3 }, q4: { steps: 4 }, q5: { steps: 5 } };
  * const regression = itemFeatureRegression(items, features);
- * predictItemParameter(regression, { steps: 6 }); // { mean: 2.24, sd: 0.12 }
+ * predictItemParameter(regression, { steps: 6 }); // => { mean: 2.24, sd: 0.12 }
  * ```
  *
  * @param regression - The regression of the parameter on the features.

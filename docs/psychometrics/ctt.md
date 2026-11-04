@@ -126,10 +126,10 @@ function percentileInterval(
   return [values[Math.floor(tail * resamples)] ?? 0, values[Math.ceil((1 - tail) * resamples) - 1] ?? 0];
 }
 
-cronbachAlpha(matrix); // 0.741
-percentileInterval(matrix, cronbachAlpha); // [0.677, 0.793]
-mcdonaldOmega(matrix).omega; // 0.755
-percentileInterval(matrix, (resample) => mcdonaldOmega(resample).omega); // [0.695, 0.802]
+cronbachAlpha(matrix); // => 0.741
+percentileInterval(matrix, cronbachAlpha); // => [0.677, 0.793]
+mcdonaldOmega(matrix).omega; // => 0.755
+percentileInterval(matrix, (resample) => mcdonaldOmega(resample).omega); // => [0.695, 0.802]
 ```
 
 | Choice        | Value                                                                                                                                                                                                             |
@@ -168,7 +168,7 @@ const matrix = buildResponseMatrix(
 );
 
 subscoreValue(matrix, { reading: matrix.itemIds.slice(0, 12), listening: matrix.itemIds.slice(12) });
-// [{ section: "reading", subscorePrmse: 0.68, totalPrmse: 0.59, addedValue: true },
+// => [{ section: "reading", subscorePrmse: 0.68, totalPrmse: 0.59, addedValue: true },
 //  { section: "listening", subscorePrmse: 0.67, totalPrmse: 0.59, addedValue: true }]
 ```
 
@@ -246,8 +246,8 @@ result.sections.map(({ section, reliability, augmentedReliability }) => [
   Math.round(reliability * 1000) / 1000,
   Math.round(augmentedReliability * 1000) / 1000,
 ]);
-// [["reading", 0.678, 0.721], ["listening", 0.67, 0.717]]
-result.weights.map((row) => row.map((weight) => Math.round(weight * 100) / 100)); // [[0.63, 0.14], [0.14, 0.62]]
+// => [["reading", 0.678, 0.721], ["listening", 0.67, 0.717]]
+result.weights.map((row) => row.map((weight) => Math.round(weight * 100) / 100)); // => [[0.63, 0.14], [0.14, 0.62]]
 ```
 
 `sections` is as for `subscoreValue`. The result has these fields:
@@ -306,7 +306,7 @@ defaults are exported.
 ```ts
 import { classifyDifficulty, DIFFICULTY_THRESHOLDS } from "@measurekit/psychometrics/ctt";
 
-classifyDifficulty(0.75, { thresholds: { ...DIFFICULTY_THRESHOLDS, easy: 0.8 } }); // "moderate"
+classifyDifficulty(0.75, { thresholds: { ...DIFFICULTY_THRESHOLDS, easy: 0.8 } }); // => "moderate"
 ```
 
 Ebel's bounds were set for D; they are often applied to `itemTotal` and `itemRest` as well.

@@ -54,9 +54,9 @@ const rows = Array.from({ length: 800 }, () => {
 const matrix = buildResponseMatrix(rows);
 
 const { correlations, thresholds } = polychoricCorrelations(matrix);
-correlations[0]?.[1]; // 0.557: items 1 and 2 share a trait
-correlations[0]?.[6]; // -0.031: items 1 and 7 do not
-thresholds[0]; // [-0.006]: one for a dichotomous item
+correlations[0]?.[1]; // => 0.557: items 1 and 2 share a trait
+correlations[0]?.[6]; // => -0.031: items 1 and 7 do not
+thresholds[0]; // => [-0.006]: one for a dichotomous item
 ```
 
 Each item's thresholds come from all the persons who answered it. For each pair of items, the correlation ρ maximizes
@@ -108,12 +108,12 @@ Randomness comes from the `random` argument, so a seeded generator reproduces th
 
 ```ts continues
 const result = parallelAnalysis(matrix, createRandom(1));
-result.components.observed; // [3.671, 3.406, 0.647, 0.611, ...]: 12 eigenvalues of the correlation matrix
-result.components.randomQuantile; // [1.4, 1.274, 1.206, 1.153, ...]: of random data
-result.components.suggested; // 2
-result.factors.observed; // [3.185, 2.423, 0.088, 0.035, ...]
-result.factors.randomQuantile; // [1.049, 0.294, 0.231, 0.177, ...]
-result.factors.suggested; // 2
+result.components.observed; // => [3.671, 3.406, 0.647, 0.611, ...]: 12 eigenvalues of the correlation matrix
+result.components.randomQuantile; // => [1.4, 1.274, 1.206, 1.153, ...]: of random data
+result.components.suggested; // => 2
+result.factors.observed; // => [3.185, 2.423, 0.088, 0.035, ...]
+result.factors.randomQuantile; // => [1.049, 0.294, 0.231, 0.177, ...]
+result.factors.suggested; // => 2
 ```
 
 The result has two `EigenvalueComparison`s, one for the components and one for the factors.
@@ -180,11 +180,11 @@ import { exploratoryFactorAnalysis } from "@measurekit/psychometrics/dimensional
 
 // `matrix` is the response matrix of the example above: two independent traits, six items each.
 const fit = exploratoryFactorAnalysis(matrix, { factors: 2, correlation: "polychoric" });
-fit.loadings.slice(0, 2); // [[0.774, -0.021], [0.753, 0.025]]: items 1 and 2 load on the first factor
-fit.loadings.slice(6, 8); // [[-0.01, 0.717], [-0.073, 0.718]]: items 7 and 8 on the second
-fit.communalities.slice(0, 3); // [0.599, 0.569, 0.476]
-fit.correlations; // [[1, 0.017], [0.017, 1]]: the traits are independent
-fit.converged; // true
+fit.loadings.slice(0, 2); // => [[0.774, -0.021], [0.753, 0.025]]: items 1 and 2 load on the first factor
+fit.loadings.slice(6, 8); // => [[-0.01, 0.717], [-0.073, 0.718]]: items 7 and 8 on the second
+fit.communalities.slice(0, 3); // => [0.599, 0.569, 0.476]
+fit.correlations; // => [[1, 0.017], [0.017, 1]]: the traits are independent
+fit.converged; // => true
 ```
 
 **The extraction.** The unknowns are the communalities h, which lie from 0 to 0.995: each item's uniqueness is at least
@@ -232,11 +232,11 @@ fit, as it is.
 
 ```ts continues
 const ml = exploratoryFactorAnalysis(matrix, { factors: 2, extraction: "maximum-likelihood" });
-ml.loadings.slice(0, 2); // [[0.638, -0.018], [0.618, 0.02]]: of Pearson correlations, lower than polychoric
+ml.loadings.slice(0, 2); // => [[0.638, -0.018], [0.618, 0.02]]: of Pearson correlations, lower than polychoric
 ml.fit;
-// { chiSquare: 36.1, degreesOfFreedom: 43, significance: 0.762, rmsea: 0, rmseaInterval: [0, 0.0173], tli: 1.006,
+// => { chiSquare: 36.1, degreesOfFreedom: 43, significance: 0.762, rmsea: 0, rmseaInterval: [0, 0.0173], tli: 1.006,
 //   bic: -251.3, srmsr: 0.0172 }
-exploratoryFactorAnalysis(matrix, { factors: 1, extraction: "maximum-likelihood" }).fit?.rmsea; // 0.133: one factor misfits
+exploratoryFactorAnalysis(matrix, { factors: 1, extraction: "maximum-likelihood" }).fit?.rmsea; // => 0.133: one factor misfits
 ```
 
 **Which function.** `exploratoryFactorAnalysis` works on the correlations of the items, takes milliseconds and returns
@@ -301,11 +301,11 @@ const rows = Array.from({ length: 1000 }, () => {
 const matrix = buildResponseMatrix(rows);
 
 const omega = omegaHierarchical(matrix);
-omega.hierarchical; // 0.717: the general trait's share of the total's variance
-omega.total; // 0.87
-omega.loadings.general.slice(0, 3); // [0.606, 0.566, 0.606]
-omega.loadings.specific[0]; // [0.016, 0.386, -0.008]: item 1 on the second group factor
-cronbachAlpha(matrix); // 0.832
+omega.hierarchical; // => 0.717: the general trait's share of the total's variance
+omega.total; // => 0.87
+omega.loadings.general.slice(0, 3); // => [0.606, 0.566, 0.606]
+omega.loadings.specific[0]; // => [0.016, 0.386, -0.008]: item 1 on the second group factor
+cronbachAlpha(matrix); // => 0.832
 ```
 
 Items count as scored: a reversed item lowers both omegas, as it lowers alpha, so reverse-score it first. An orthogonal
@@ -334,8 +334,8 @@ lowest value, the first when tied, and `smoothed`.
 import { minimumAveragePartial } from "@measurekit/psychometrics/dimensionality";
 
 const { map, factors } = minimumAveragePartial(matrix, { correlation: "polychoric" });
-map.slice(0, 4); // [0.0448, 0.0539, 0.063, 0.1071]: the lowest is after 1 component, the general trait
-factors; // 1
+map.slice(0, 4); // => [0.0448, 0.0539, 0.063, 0.1071]: the lowest is after 1 component, the general trait
+factors; // => 1
 ```
 
 `map` is the `map` of psych's `VSS`, which starts at one component, so the test never answers none; Velicer's original also

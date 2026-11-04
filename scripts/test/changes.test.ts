@@ -56,6 +56,8 @@ const CASES: readonly (readonly [file: string, reach: Reach])[] = [
   [".changeset/pending.md", [["scripts"], false, false]],
   [".github/workflows/rules.yml", [["scripts"], false, false]],
   ["scripts/check-rules.ts", [["scripts"], false, false]],
+  ["scripts/guide-samples.ts", [["examples", "scripts"], false, false]],
+  ["scripts/stated-values.ts", [["examples", "scripts"], false, false]],
   ["scripts/test/versions.test.ts", [["scripts"], false, false]],
   ["examples/psychometrics/item-analysis.ts", [["examples"], false, false]],
   ["validation/benchmarks/input.json", [[], true, false]],

@@ -31,10 +31,10 @@ const GOLDEN_GAMMA = 0x9e3779b9;
  * import { createRandom } from "@measurekit/core";
  *
  * const random = createRandom(42);
- * random.uniform(); // 0.66
- * random.uniform(); // 0.11
- * createRandom(42).uniform(); // 0.66, the same seed gives the same draws
- * createRandom(42).normal(); // 0.41
+ * random.uniform(); // => 0.66
+ * random.uniform(); // => 0.11
+ * createRandom(42).uniform(); // => 0.66, the same seed gives the same draws
+ * createRandom(42).normal(); // => 0.41
  * ```
  */
 export function createRandom(seed: number): Random {

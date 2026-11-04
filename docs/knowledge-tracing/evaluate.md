@@ -33,9 +33,9 @@ equal length with at least one entry.
 ```ts
 import { auc, metrics } from "@measurekit/knowledge-tracing/evaluate";
 
-auc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]); // 0.75
+auc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]); // => 0.75
 metrics([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]);
-// { count: 4, auc: 0.75, rmse: 0.4, logLoss: 0.47, accuracy: 0.75, rSquared: 0.37, kappa: 0.5 }
+// => { count: 4, auc: 0.75, rmse: 0.4, logLoss: 0.47, accuracy: 0.75, rSquared: 0.37, kappa: 0.5 }
 ```
 
 - **AUC** depends only on the order of the predictions, so it is unchanged by any increasing transformation of them.
@@ -103,8 +103,10 @@ const log = buildEventLog(
   ),
 );
 const result = crossValidate(elo(), splitByLearner(log, 2, createRandom(1)));
-result.metrics; // the metrics of every fold's predictions together
-result.folds[0]; // { predictions, metrics }: the predictions of the fold's test events, in log order
+result.metrics; // => { count: 12, auc: 0, rmse: 0.76, logLoss: 1.48, accuracy: 0, rSquared: -1.33, kappa: -1 }
+result.folds[0];
+// => { predictions: [0.30, 0.85, 0.27, 0.30, 0.85, 0.27], metrics: { count: 6, auc: 0, ... }, skipped: 0 }: the
+//    predictions of the fold's test events, in log order
 ```
 
 The metrics are those of the test events with an outcome and a prediction. A fold whose test log has none has
@@ -163,8 +165,8 @@ const folds = splitByTime(log, 2); // train on fractions, test decimals; train o
 
 // crossValidate(bkt(), folds) throws: The model has no parameters for skill "decimals".
 const result = crossValidate(bkt(), folds, { unseenSkills: "skip" });
-result.folds.map((fold) => fold.skipped); // [12, 12]
-result.metrics.count; // 24, of the 48 test events
+result.folds.map((fold) => fold.skipped); // => [12, 12]
+result.metrics.count; // => 24, of the 48 test events
 ```
 
 ## Predictions with nulls
@@ -197,7 +199,7 @@ import { compareModels } from "@measurekit/knowledge-tracing/evaluate";
 // log: the log of the curriculum sample
 const folds = splitByLearner(log, 2, createRandom(1));
 compareModels({ elo: elo(), "concept elo": elo({ skills: true }) }, folds);
-// [{ name: "elo", metrics, folds }, { name: "concept elo", metrics, folds }]
+// => [{ name: "elo", metrics: { auc: 0.28, ... }, folds: [...] }, { name: "concept elo", ... }]
 ```
 
 A fit's `logLikelihood`, `aic` and `bic` compare models on the data they were fitted to, where the models define
@@ -231,7 +233,7 @@ import { compareByLearner, compareModels } from "@measurekit/knowledge-tracing/e
 const folds = splitByLearner(log, 3, createRandom(1));
 const [plain, concept] = compareModels({ elo: elo(), "concept elo": elo({ skills: true }) }, folds);
 compareByLearner(plain, concept, folds);
-// { learners: 6, meanDifference: -0.19, standardError: 0.023, statistic: -8.27, degreesOfFreedom: 5, pValue: 0.0004 }
+// => { learners: 6, meanDifference: -0.19, standardError: 0.023, statistic: -8.27, degreesOfFreedom: 5, pValue: 0.0004 }
 ```
 
 - **Why by learner.** The events of a learner depend on each other, and a test on the AUC over events assumes independent
@@ -263,8 +265,8 @@ import { learningCurve } from "@measurekit/knowledge-tracing/evaluate";
 
 // log: the log of the curriculum sample
 const curve = learningCurve(log, { predictions: elo({ skills: true }).fit(log).predictions });
-curve.overall; // [{ opportunity: 1, count: 18, errorRate: 0.67, predictedErrorRate: 0.52 }, { opportunity: 2, ... }, ...]
-curve.skills.fractions; // the curve of one skill
+curve.overall; // => [{ opportunity: 1, count: 18, errorRate: 0.67, predictedErrorRate: 0.52 }, { opportunity: 2, ... }, ...]
+curve.skills.fractions; // => [{ opportunity: 1, count: 6, errorRate: 0.67, predictedErrorRate: 0.52 }, ...]: one skill's
 ```
 
 | Field                | Meaning                                                                              |
@@ -293,7 +295,7 @@ import { metricsByOpportunity } from "@measurekit/knowledge-tracing/evaluate";
 
 // log: the log of the curriculum sample
 const table = metricsByOpportunity(log, elo({ skills: true }).fit(log).predictions);
-table.skills.fractions[0]; // { opportunity: 1, metrics: { count: 6, auc: 0.25, rmse: 0.53, ... } }
+table.skills.fractions[0]; // => { opportunity: 1, metrics: { count: 6, auc: 0.25, rmse: 0.53, ... } }
 ```
 
 ### Power law and categories
@@ -333,8 +335,8 @@ import { categorizeCurve, fitPowerLaw, learningCurve } from "@measurekit/knowled
 // log: the log of the curriculum sample
 const fractions =
   learningCurve(log, { predictions: elo({ skills: true }).fit(log).predictions }).skills.fractions ?? [];
-fitPowerLaw(fractions); // { scale: 0.60, exponent: 0.21, rSquared: 0.19 }
-categorizeCurve(fractions, { minLearners: 3, minPoints: 3, slope: 0.2, minSlope: 0.1 }); // "good"
+fitPowerLaw(fractions); // => { scale: 0.60, exponent: 0.21, rSquared: 0.19 }
+categorizeCurve(fractions, { minLearners: 3, minPoints: 3, slope: 0.2, minSlope: 0.1 }); // => "good"
 ```
 
 ## Errors

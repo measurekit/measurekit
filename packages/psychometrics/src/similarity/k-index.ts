@@ -105,8 +105,8 @@ const HIGHEST_RATE = 0.999;
  *   [0, 1, 0, 0, 2, 3],
  * ]);
  * const [pair] = kIndex(matrix, [["person1", "person2"]], { key: [0, 0, 0, 0, 0, 0], guessing: 0.25 });
- * pair?.identicalIncorrect; // 4
- * pair?.k; // 0.0123, the probability of 4 of 4 matches at the copier's group's rate
+ * pair?.identicalIncorrect; // => 4
+ * pair?.k; // => 0.0123, the probability of 4 of 4 matches at the copier's group's rate
  * ```
  */
 export function kIndex(

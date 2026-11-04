@@ -90,9 +90,9 @@ export interface AdaptiveTest {
  * const test = createAdaptiveTest({ pool, stopping: testLength(2) });
  * const random = createRandom(1);
  * let state = test.start(random);
- * state.next; // "q2", the id of the first item
+ * state.next; // => "q2", the id of the first item
  * state = test.answer(state, 1, random); // the response to it
- * state.next; // "q3"; null when the test has ended
+ * state.next; // => "q3"; null when the test has ended
  * ```
  */
 export function createAdaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {

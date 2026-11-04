@@ -38,7 +38,7 @@ export interface NormalizedGain {
  * ```ts
  * import { normalizedGain } from "@measurekit/psychometrics/change";
  *
- * normalizedGain([10, 30, 50], [30, 40, 50], { maximum: 50 }); // { group: 0.5, persons: [0.5, 0.5, null] }
+ * normalizedGain([10, 30, 50], [30, 40, 50], { maximum: 50 }); // => { group: 0.5, persons: [0.5, 0.5, null] }
  * ```
  * @throws `DataError` when the scores are not arrays of the same length with at least one finite number each, the
  * options are not an object, the maximum is not a finite number, or a score exceeds it.

@@ -17,8 +17,8 @@ decimal, 52.3 rather than 523 · 0.1 = 52.300000000000004.
 import { scaleScore } from "@measurekit/psychometrics/scaling";
 
 const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 };
-scaleScore(0.234, scale); // 520
-scaleScore(-4.2, scale); // 200
+scaleScore(0.234, scale); // => 520
+scaleScore(-4.2, scale); // => 200
 ```
 
 | Option      | Default     | Valid range              | Meaning                                           |
@@ -47,7 +47,7 @@ const items = [
 ];
 const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 };
 conversionTable(items, scale);
-// [{ score: 0, theta: -0.969, standardError: 0.787, scaleScore: 400, scaleStandardError: 47.5 },
+// => [{ score: 0, theta: -0.969, standardError: 0.787, scaleScore: 400, scaleStandardError: 47.5 },
 //  { score: 1, theta: -0.297, standardError: 0.761, scaleScore: 470, scaleStandardError: 51.0 },
 //  { score: 2, theta: 0.331, standardError: 0.756, scaleScore: 530, scaleStandardError: 53.2 },
 //  { score: 3, theta: 1.081, standardError: 0.761, scaleScore: 610, scaleStandardError: 52.5 }]
@@ -91,7 +91,7 @@ points by default, as a [table with testlets](#tables-with-testlets) does.
 import { conditionalScaleError } from "@measurekit/psychometrics/scaling";
 
 // `items` is the form of the previous example and 400, 470, 530, 610 its table's scale scores.
-conditionalScaleError(items, [400, 470, 530, 610], 0); // 52.1
+conditionalScaleError(items, [400, 470, 530, 610], 0); // => 52.1
 ```
 
 `conversion` holds one finite scale score for each total score from 0 to the form's highest, the sum of its items'
@@ -111,11 +111,11 @@ import { linearEquating } from "@measurekit/psychometrics/equating";
 import { conversionTable, scaleConversion } from "@measurekit/psychometrics/scaling";
 
 // The number of persons at each total score of forms X and Y, 0 to 3, taken by random groups.
-const equated = linearEquating([2, 8, 20, 10], [4, 11, 22, 8]); // [-0.295, 0.757, 1.808, 2.860]
+const equated = linearEquating([2, 8, 20, 10], [4, 11, 22, 8]); // => [-0.295, 0.757, 1.808, 2.860]
 // Y's unrounded scale scores; `items` and `scale` are those of the first example, for form Y.
 const unrounded = conversionTable(items, { ...scale, step: 0 }).map((row) => row.scaleScore);
 const { lowest, highest, step } = scale;
-scaleConversion(equated, unrounded, { lowest, highest, step }); // [400, 450, 520, 600]
+scaleConversion(equated, unrounded, { lowest, highest, step }); // => [400, 450, 520, 600]
 ```
 
 Interpolate unrounded scores: rounding Y's table first rounds twice. Any equating that returns equivalents on Y's raw
@@ -146,10 +146,10 @@ const form = [
 ];
 const testlets = [{ items: ["p1", "p2", "p3"], sd: 0.8 }];
 const table = conversionTable(form, { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 }, { testlets });
-const conversion = table.map((row) => row.scaleScore); // [380, 430, 470, 520, 560, 610]
+const conversion = table.map((row) => row.scaleScore); // => [380, 430, 470, 520, 560, 610]
 
-conditionalScaleError(form, conversion, 0, { testlets }); // 51.8
-conditionalScaleError(form, conversion, 0); // 47.7, the items taken as independent
+conditionalScaleError(form, conversion, 0, { testlets }); // => 51.8
+conditionalScaleError(form, conversion, 0); // => 47.7, the items taken as independent
 ```
 
 `"true-score"` takes no testlets: its curve and its standard error 1 / √I(θ) take the items as independent, and the
@@ -165,7 +165,7 @@ Brennan's percentile rank, and the `px` of the equate package times 100.
 import { percentileRanks } from "@measurekit/psychometrics/scaling";
 
 const sample = [420, 480, 480, 510, 540, 600, 600, 600, 650, 720];
-percentileRanks(sample, [480, 500, 600, 800]); // [20, 30, 65, 100]
+percentileRanks(sample, [480, 500, 600, 800]); // => [20, 30, 65, 100]
 ```
 
 The sample is sorted once and each rank found by binary search, so n scores and m ranks take O((n + m) log n). It needs
@@ -188,7 +188,7 @@ flowchart LR
 ```ts continues
 // Three persons sampled from a stratum at a third of the others' rate stand for three persons each.
 const personWeights = [3, 3, 3, 1, 1, 1, 1, 1, 1, 1];
-percentileRanks(sample, [480, 500, 600, 800], { personWeights }); // [37.5, 56.25, 78.125, 100]
+percentileRanks(sample, [480, 500, 600, 800], { personWeights }); // => [37.5, 56.25, 78.125, 100]
 ```
 
 `normStatistics(scores, options)` gives the norms of a sample with the standard errors that a norm sample's size
@@ -222,11 +222,11 @@ the strata and clusters of a design change them, and need the design itself ([no
 import { normStatistics } from "@measurekit/psychometrics/scaling";
 
 const norms = normStatistics(sample);
-norms.mean; // { estimate: 560, standardError: 27.166, lower: 506.755, upper: 613.245 }
-norms.sd.estimate; // 90.554, with a standard error of 15.719
-norms.scores[1]?.z; // { estimate: -0.883, standardError: 0.314, lower: -1.499, upper: -0.267 }: of the score 480
-norms.scores[1]?.percentile; // { estimate: 20, standardError: 10.488, lower: -0.556, upper: 40.556 }
-norms.stanines.map(({ estimate }) => estimate); // [401.531, 446.808, 492.085, 537.362, 582.638, 627.915, 673.192, 718.469]
+norms.mean; // => { estimate: 560, standardError: 27.166, lower: 506.755, upper: 613.245 }
+norms.sd.estimate; // => 90.554, with a standard error of 15.719
+norms.scores[1]?.z; // => { estimate: -0.883, standardError: 0.314, lower: -1.499, upper: -0.267 }: of the score 480
+norms.scores[1]?.percentile; // => { estimate: 20, standardError: 10.488, lower: -0.556, upper: 40.556 }
+norms.stanines.map(({ estimate }) => estimate); // => [401.531, 446.808, 492.085, 537.362, 582.638, 627.915, 673.192, 718.469]
 ```
 
 The scores are finite numbers, at least two and not all equal. A sample of ten gives wide intervals: the percentile of
@@ -234,8 +234,8 @@ The scores are finite numbers, at least two and not all equal. A sample of ten g
 
 ```ts continues
 const weighted = normStatistics(sample, { personWeights });
-weighted.mean.estimate; // 522.5, below 560 as the low scores weigh more
-weighted.scores[1]?.percentile; // { estimate: 37.5, standardError: 13.666, lower: 10.715, upper: 64.285 }
+weighted.mean.estimate; // => 522.5, below 560 as the low scores weigh more
+weighted.scores[1]?.percentile; // => { estimate: 37.5, standardError: 13.666, lower: 10.715, upper: 64.285 }
 ```
 
 ## Predicting an official score
@@ -259,12 +259,12 @@ const official = [item(1.1, -0.5), item(1.3, 0.4), item(0.8, 1)];
 const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 };
 
 const posterior = thetaPosterior(practice, [1, 1, 0, 0]);
-const conversion = conversionTable(official, scale).map((row) => row.scaleScore); // [410, 480, 540, 600]
+const conversion = conversionTable(official, scale).map((row) => row.scaleScore); // => [410, 480, 540, 600]
 predictFormScore(posterior, official, conversion);
-// { mean: 501.5, lower: 410, upper: 600,
+// => { mean: 501.5, lower: 410, upper: 600,
 //   distribution: [{ score: 410, probability: 0.180 }, { score: 480, probability: 0.373 },
 //                  { score: 540, probability: 0.325 }, { score: 600, probability: 0.122 }] }
-predictThetaScore(posterior, scale, { standardError: 0.3, level: 0.9 }); // mean 508.5, lower 380, upper 640
+predictThetaScore(posterior, scale, { standardError: 0.3, level: 0.9 }); // => { mean: 508.5, lower: 380, upper: 640, ... }
 ```
 
 | Option          | Of                  | Default | Valid range        | Meaning                                           |
@@ -317,7 +317,7 @@ let ana = model.initialState("ana");
 answers.forEach(([item, outcome], time) => {
   ana = model.update(ana, { learner: "ana", item, skills: [], time, outcome });
 });
-predictFormScore(model.posterior(ana), official, conversion).mean; // 501.5, as thetaPosterior gives
+predictFormScore(model.posterior(ana), official, conversion).mean; // => 501.5, as thetaPosterior gives
 ```
 
 The libraries meet in data, not imports: both return `{ nodes, weights }`. The prediction is valid only if the practice
@@ -352,8 +352,8 @@ const reading = thetaPosterior([item(1, -1), item(1.2, -0.2), item(0.9, 0.5), it
 });
 const writing = thetaPosterior([item(1.1, -0.6), item(0.8, 0.3), item(1.3, 0.9)], [1, 0, 0], { quadrature });
 
-// The sum of the two thetas at the correlations 0 and 1, which bound it for any correlation.
-for (const r of [0, 1]) {
+// The mean and the SD of the sum of the two thetas at the correlations 0 and 1, which bound it for any correlation.
+[0, 1].map((r) => {
   const draws = drawJointThetas(
     [reading, writing],
     [
@@ -366,8 +366,8 @@ for (const r of [0, 1]) {
   const sums = draws.map(([x, y]) => (x ?? 0) + (y ?? 0));
   const mean = sums.reduce((total, sum) => total + sum, 0) / sums.length;
   const sd = Math.sqrt(sums.reduce((total, sum) => total + (sum - mean) ** 2, 0) / (sums.length - 1));
-  console.log(r, mean.toFixed(3), sd.toFixed(3)); // 0 -0.123 1.054, then 1 -0.139 1.474
-}
+  return [mean, sd];
+}); // => [[-0.123, 1.054], [-0.139, 1.474]]
 ```
 
 | Argument      | Valid range                                                                                                       | Meaning                                             |
@@ -448,9 +448,9 @@ const noise = simulateThetas(1500, random, { distribution: normalDistribution(0,
 const thetas = x.map((value, person) => 0.6 * value + (noise[person] ?? 0));
 const responses = simulateResponses(items, thetas, random);
 
-// Free slopes fix σ at 1, so β is in units of the residual SD: 0.6 / 0.8 = 0.75, estimated as 0.72.
+// Free slopes fix σ at 1, so β is in units of the residual SD: 0.6 / 0.8 = 0.75.
 const fit = calibrate(responses, { model: twoParameterLogistic, covariates: { x } });
-const coefficient = fit.regression?.coefficients.x ?? 0;
+const coefficient = fit.regression?.coefficients.x ?? 0; // => 0.72
 const residualSd = fit.regression?.residualSd ?? 1;
 
 // Five plausible values for each person: draws from the posterior given the responses and the person's own prior.
@@ -459,7 +459,7 @@ const plausibleValues = responses.responses.map((row, person) => {
   const posterior = thetaPosterior(fit.items, row, { prior, quadrature: { points: 241 } });
   return drawJointThetas([posterior], [[1]], 5, random).map(([theta]) => theta ?? 0);
 });
-plausibleValues[0]; // [-3.04, -2.41, -2.36, -2.92, -3.25]
+plausibleValues[0]; // => [-3.04, -2.41, -2.36, -2.92, -3.25]
 ```
 
 | Choice          | Value                                                                                                                             |
@@ -518,7 +518,7 @@ combine(
   sets.map(average),
   sets.map((values) => sampleVariance(values) / values.length),
 );
-// { estimate: 0.0075, within: 0.0010, between: 0.00016, total: 0.0012, standardError: 0.035, degreesOfFreedom: 157 }
+// => { estimate: 0.0075, within: 0.0010, between: 0.00016, total: 0.0012, standardError: 0.035, degreesOfFreedom: 156.8 }
 ```
 
 The same function combines any statistic that has a sampling variance, such as the slope of theta on x with the variance of

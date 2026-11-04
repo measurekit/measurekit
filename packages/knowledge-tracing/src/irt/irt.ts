@@ -188,8 +188,8 @@ const CATEGORY_TOLERANCE = 1e-9;
  * const model = irt({ parameters: { items: { q1: { a: 1.2, b: -0.5 }, q2: { a: 1.5, b: 0.4, c: 0.2 } } } });
  * const attempt = { learner: "ana", item: "q1", skills: [], time: 1 };
  * const ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
- * model.ability(ana); // { theta: 0.362, standardError: 0.895 }
- * model.predict(ana, { ...attempt, item: "q2", time: 2 }); // 0.59, the probability of a correct answer to q2
+ * model.ability(ana); // => { theta: 0.362, standardError: 0.895 }
+ * model.predict(ana, { ...attempt, item: "q2", time: 2 }); // => 0.59, the probability of a correct answer to q2
  * ```
  */
 export function irt(options: IrtOptions): IrtModel {

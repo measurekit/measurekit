@@ -121,8 +121,8 @@ const DEFAULT_QUANTILE = 0.95;
  *   });
  * });
  * const analysis = parallelAnalysis(buildResponseMatrix(rows), createRandom(1));
- * analysis.components.suggested; // 2, the components to keep
- * analysis.components.observed.slice(0, 3); // [2.75, 2.3, 0.71], the largest eigenvalues
+ * analysis.components.suggested; // => 2, the components to keep
+ * analysis.components.observed.slice(0, 3); // => [2.75, 2.3, 0.71], the largest eigenvalues
  * ```
  */
 export function parallelAnalysis(

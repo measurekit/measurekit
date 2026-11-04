@@ -136,8 +136,8 @@ export function scoreOfTheta(theta: number, scale: CheckedScale): number {
  * import { scaleScore } from "@measurekit/psychometrics/scaling";
  *
  * const scale = { slope: 100, intercept: 500, lowest: 200, highest: 800, step: 10 };
- * scaleScore(0.234, scale); // 520
- * scaleScore(-4.2, scale); // 200
+ * scaleScore(0.234, scale); // => 520
+ * scaleScore(-4.2, scale); // => 200
  * ```
  * @throws `DataError` when theta is not finite or the scale is invalid.
  */

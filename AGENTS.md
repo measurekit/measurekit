@@ -111,10 +111,12 @@ scripts/                      check-standards.ts, check-rules.ts, check-licenses
                               with their tests; prepare.ts installs the git hooks in a clone and skips them in a copy;
                               bench-harness.ts is what the benchmarks of the packages share; entry-sizes.ts bundles each
                               entry point alone, with code splitting, against the budgets of size-budgets.ts in
-                              test/entry-sizes.test.ts; peak-memory.ts measures the readers of untrusted input, against
-                              their budgets in test/peak-memory.test.ts; test/workflows.test.ts holds each job of the workflows
-                              to a timeout and each job of ci.yml but check to the changes job, and test/changes.test.ts runs
-                              that job's program on sample changes
+                              test/entry-sizes.test.ts; peak-memory.ts measures the readers of untrusted input in processes
+                              of a bounded heap, against their budgets in test/peak-memory.test.ts; guide-samples.ts runs
+                              the samples of the guides and the examples of the TSDoc, and stated-values.ts compares the
+                              results they show; test/workflows.test.ts holds each job of the workflows to a timeout and
+                              each job of ci.yml but check to the changes job, and test/changes.test.ts runs that job's
+                              program on sample changes
 biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
 ```
 
@@ -344,23 +346,26 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
   - `@throws` lists the errors.
   - `@see {@link https://doi.org/... | Author (year)}` cites the literature, one tag per work, with the DOI where it has
     one. The summary and `@remarks` name no year.
-  - `@example` goes on the main function of each module, as `pnpm check:standards` demands; others may have one. It is complete, with its imports, and runs alone. A statement followed by a comment that
-    begins with a value, `expression; // 0.68, what it means`, states that value, in the form that
-    `examples/test/stated-values.ts` reads: a number is compared at the decimals shown (an integer exactly), an array
-    element by element, an object by its keys unless `...` stands among them. A comment that does not begin with a value
-    states none, and each example states at least one.
+  - `@example` goes on the main function of each module, as `pnpm check:standards` demands; others may have one. It is
+    complete, with its imports, runs alone and shows at least one result, as the samples of the guides do.
   - No other tags and no boilerplate.
 - `//` comments only explain why something non-obvious is done, or cite a source. No commented-out code.
 - Docs lead with a picture, then tables, then prose. Diagrams are Mermaid in Markdown: GitHub renders them, and
   `typedoc-plugin-mermaid`, pinned in `typedoc.json` with the Mermaid version it loads, renders them on the docs site.
-- US English; short sentences, a table or list rather than prose; complete samples with their imports, and values
-  shown in samples come from running them; a source's section is cited in words ("section 3.1"). No marketing, emojis or
-  filler.
-- `examples/test/tsdoc.test.ts` runs every `@example` of the TSDoc on the sources and fails when one throws or gives a
-  value other than its comments state. `examples/test/guides.test.ts` runs every `ts` sample of the guides and READMEs
-  and fails when one throws; it does not compare the values in comments. A fence `ts continues` runs after the sample
-  before it and shares its variables, and `ts no-run` marks code that needs a worker or a package the repository does not
-  have.
+- US English; short sentences, a table or list rather than prose; complete samples with their imports; a source's section
+  is cited in words ("section 3.1"). No marketing, emojis or filler.
+- A sample shows what a statement gives as `// => value`, on the statement's line or the line under it, with an
+  explanation after a `,`, `;` or `:`: `model.mastery(next, "fractions"); // => 0.73, P(L)`. A declaration of one name is
+  checked by the value it declares, and a value that spans lines goes on in the comment lines under it until its brackets
+  close. `scripts/stated-values.ts` compares the value: a number at the digits shown (an integer exactly, so a computed
+  zero is `0.0`), an array element by element, with `...` for the elements left out, an object by its keys unless `...`
+  stands among them. Results follow statements of the top level: one inside a block is never picked up, and fails the test
+  as a value in a plain comment on a statement's line does.
+- `examples/test/guides.test.ts` runs every `ts` sample of the guides and READMEs and `examples/test/tsdoc.test.ts` every
+  `@example` of the TSDoc, on the sources, through `scripts/guide-samples.ts`; each fails when a sample throws, gives a
+  value other than a result it shows, or shows a result that no statement picks up or a value without `=>`. A fence `ts
+  continues` runs after the sample before it and shares its variables, and `ts no-run` marks code that needs a worker or a
+  package the repository does not have, and shows no result.
 - One purpose for each document: a package's `README.md` for its users, `docs/<package>/` for its guides,
   `CONTRIBUTING.md` for the process, `AGENTS.md` for conventions, `validation/README.md` for running the reference scripts.
 
@@ -403,7 +408,7 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
   in `test/budgets.ts` and, where a reference does the task, the same task timed in
   `validation/benchmarks/<package>/<module>.R`, or a `<module>-<topic>.R` beside it, on the same data. Each entry point has
   a size budget in `scripts/size-budgets.ts`, and the readers of untrusted input of the largest peaks, at the limits or
-  past the size of their input, a case with a budget in `scripts/peak-memory.ts`. `docs/performance.md` explains the method and the budgets, and
+  past the size of their input, a case with a heap and a budget in `scripts/peak-memory.ts`. `docs/performance.md` explains the method and the budgets, and
   gives the sizes and the peak memory of the readers of untrusted input.
 - A bug fix comes with a test that fails without it, in the test file of the fixed folder. A rule that keeps untrusted
   input from being misread, or from costing what its size does not, has an entry in `scripts/check-rules.ts`.

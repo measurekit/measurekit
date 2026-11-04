@@ -57,8 +57,8 @@ const fractionsRow = { prior: 0.3, learn: 0.2, forget: 0, guess: 0.2, slip: 0.1 
 // Elo: the learner's row and the item's row.
 const model = elo({ parameters: { items: { q7: itemRow } } });
 const event = { learner: "ana", item: "q7", skills: [], time: Date.now(), outcome: 1 };
-const state = model.update(learnerRow, event); // { learner: "ana", ability: 0.51, count: 13, skills: {} }: the learner's row
-const item = model.updateItem(learnerRow, event); // { difficulty: -0.55, count: 26 }: the item's row
+const state = model.update(learnerRow, event); // => { learner: "ana", ability: 0.51, count: 13, skills: {} }: the learner's row
+const item = model.updateItem(learnerRow, event); // => { difficulty: -0.55, count: 26 }: the item's row
 
 // BKT: the learner's row and the rows of the item's skills.
 const tracer = bkt({ parameters: { skills: { fractions: fractionsRow } } });
@@ -68,7 +68,7 @@ const next = tracer.update(stateRow, {
   skills: ["fractions"],
   time: Date.now(),
   outcome: 1,
-}); // { learner: "ana", skills: { fractions: 0.9 } }: the learner's row
+}); // => { learner: "ana", skills: { fractions: 0.9 } }: the learner's row
 ```
 
 A logistic model takes the rows of the item's skills and, with fixed proficiency, the learner's θ; an IRT model the

@@ -34,10 +34,10 @@ import { normalizedGain, residualGain, simpleGain } from "@measurekit/psychometr
 const pre = [12, 20, 31, 50, 25];
 const post = [18, 19, 40, 50, 34];
 
-simpleGain(pre, post); // [6, -1, 9, 0, 9]
-residualGain(pre, post); // [-0.097, -6.329, 4.726, -2.451, 4.151]
+simpleGain(pre, post); // => [6, -1, 9, 0, 9]
+residualGain(pre, post); // => [-0.097, -6.329, 4.726, -2.451, 4.151]
 normalizedGain(pre, post, { maximum: 50 });
-// { group: 0.205, persons: [0.158, -0.033, 0.474, null, 0.36] }
+// => { group: 0.205, persons: [0.158, -0.033, 0.474, null, 0.36] }
 ```
 
 | Gain       | Definition                                                                      | Reads as                                                           |
@@ -64,9 +64,9 @@ manual or a calibration reports.
 import { differenceReliability } from "@measurekit/psychometrics/change";
 
 const score = { sd: 9, reliability: 0.88 };
-differenceReliability({ pre: score, post: score, correlation: 0.7 }); // 0.6
-differenceReliability({ pre: score, post: score, correlation: 0.88 }); // 0
-differenceReliability({ pre: score, post: score, correlation: 0.95 }); // -1.4
+differenceReliability({ pre: score, post: score, correlation: 0.7 }); // => 0.6
+differenceReliability({ pre: score, post: score, correlation: 0.88 }); // => 0
+differenceReliability({ pre: score, post: score, correlation: 0.95 }); // => -1.4
 ```
 
 ```mermaid
@@ -93,13 +93,13 @@ change is reliable when its index lies beyond the critical value of the level: 1
 import { reliableChange, reliableChangeFromTheta } from "@measurekit/psychometrics/change";
 
 const test = { sd: 9, reliability: 0.88 };
-reliableChange(12, 21, test); // { index: 2.041, classification: "improved" }
-reliableChange(21, 12, test); // { index: -2.041, classification: "declined" }
-reliableChange(25, 34, test, { level: 0.9 }); // { index: 2.041, classification: "improved" }
-reliableChange(12, 14, test); // { index: 0.454, classification: "unchanged" }
+reliableChange(12, 21, test); // => { index: 2.041, classification: "improved" }
+reliableChange(21, 12, test); // => { index: -2.041, classification: "declined" }
+reliableChange(25, 34, test, { level: 0.9 }); // => { index: 2.041, classification: "improved" }
+reliableChange(12, 14, test); // => { index: 0.454, classification: "unchanged" }
 
 reliableChangeFromTheta({ theta: -0.4, standardError: 0.3 }, { theta: 0.5, standardError: 0.2 });
-// { index: 2.496, classification: "improved" }
+// => { index: 2.496, classification: "improved" }
 ```
 
 `reliableChangeFromTheta` takes the index from two ability estimates, as Jabrayilov, Emons and Sijtsma compare for

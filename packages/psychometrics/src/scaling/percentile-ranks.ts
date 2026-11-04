@@ -53,8 +53,8 @@ export interface WeightedScores {
  * ```ts
  * import { percentileRanks } from "@measurekit/psychometrics/scaling";
  *
- * percentileRanks([10, 20, 20, 30, 40], [20, 25, 50]); // [40, 60, 100]
- * percentileRanks([10, 20, 20, 30, 40], [20], { personWeights: [3, 1, 1, 1, 2] }); // [50], as 3 of 8 lie below and 2 at 20
+ * percentileRanks([10, 20, 20, 30, 40], [20, 25, 50]); // => [40, 60, 100]
+ * percentileRanks([10, 20, 20, 30, 40], [20], { personWeights: [3, 1, 1, 1, 2] }); // => [50], as 3 of 8 lie below and 2 at 20
  * ```
  * @throws `DataError` when the sample is not an array of at least one finite number, the scores are not an array of
  * finite numbers, or the weights are not a positive number for each score of the sample.

@@ -42,7 +42,7 @@ and so the DINO, as CDM's `din_identifiability`:
 import { qMatrixIdentifiability } from "@measurekit/psychometrics/cdm";
 
 qMatrixIdentifiability({ q1: ["a"], q2: ["a", "b"], q3: ["a", "b"], q4: ["b"] });
-// { singleItems: { a: true, b: true }, threeItems: { a: true, b: true }, distinctColumns: false, dinaIdentified: false }
+// => { singleItems: { a: true, b: true }, threeItems: { a: true, b: true }, distinctColumns: false, dinaIdentified: false }
 ```
 
 Where no attribute has an item of its own, the whole Q-matrix is compared, and where nothing remains the columns are
@@ -135,7 +135,7 @@ const matrix = buildResponseMatrix([
 ]);
 const qMatrix = { item1: ["a"], item2: ["a", "b"], item3: ["b"], item4: ["a"] };
 const rrum = calibrateCdm(matrix, qMatrix, { model: "rrum" });
-rrum.items[1]?.coefficients; // [-7.073, 1.098, 5.975]: δ₀, δ_a, δ_b, on the log scale
+rrum.items[1]?.coefficients; // => [-7.073, 1.098, 5.975]: δ₀, δ_a, δ_b, on the log scale
 ```
 
 Profiles whose ideal responses agree on every item, frequent under the DINA and DINO with many attributes, cannot be
@@ -179,9 +179,9 @@ const matrix = buildResponseMatrix([
 ]);
 const qMatrix = { item1: ["a"], item2: ["a", "b"], item3: ["b"], item4: ["a"] };
 const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
-attributeProfiles(matrix, calibration)[0]; // { id, mastery: [pa, pb], map, eap }
-attributeProfiles(matrix, calibration, { posterior: true })[0]; // the same, with posterior
-cdmClassificationAccuracy(matrix, calibration); // { accuracy, consistency, ... }
+attributeProfiles(matrix, calibration)[0]; // => { id: "person1", mastery: [1.00, 0.50], map: [1, 0], eap: [1, 0] }
+attributeProfiles(matrix, calibration, { posterior: true })[0]?.posterior; // => [0.00, 0.50, 0.00, 0.50]
+cdmClassificationAccuracy(matrix, calibration); // => { accuracy: 0.83, consistency: 0.79, ... }
 ```
 
 ## Q-matrix validation
@@ -235,10 +235,10 @@ const matrix = simulateCdmResponses(model, profiles, random);
 const qMatrix = Object.fromEntries(model.items.map(({ id, attributes }) => [id, attributes]));
 
 const calibration = calibrateCdm(matrix, qMatrix, { standardErrors: "incomplete" });
-calibration.items[2]?.standardErrors; // [0.027, 0.055, 0.052, 0.041]: one for each latent group of item3
+calibration.items[2]?.standardErrors; // => [0.027, 0.055, 0.052, 0.041]: one for each latent group of item3
 const comparisons = compareItemModels(calibration);
-comparisons.map(({ item, selected }) => [item, selected]); // [["item3", "dina"], ["item4", "acdm"]]
-comparisons[0]?.tests[0]; // { model: "dina", statistic: 3.29, degreesOfFreedom: 2, pValue: 0.193 }, rounded
+comparisons.map(({ item, selected }) => [item, selected]); // => [["item3", "dina"], ["item4", "acdm"]]
+comparisons[0]?.tests[0]; // => { model: "dina", statistic: 3.29, degreesOfFreedom: 2, pValue: 0.193 }, rounded
 ```
 
 The items with one attribute have no reduced form and are left out. Each test is of constraints on the G-DINA's
@@ -318,8 +318,8 @@ const profiles = Array.from({ length: 1000 }, () => attributes.map(() => (random
 const matrix = simulateCdmResponses({ attributes, items }, profiles, random);
 
 const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
-cdmModelFit(matrix, calibration); // { m2: 27.27, degreesOfFreedom: 28, significance: 0.50, rmsea: 0, srmsr: 0.025, ... }
-cdmItemFit(matrix, calibration)[0]; // { id: "q1", proportion: { observed: 0.519, expected: 0.519, z: 0 }, correlationZ: 1.46, ... }
+cdmModelFit(matrix, calibration); // => { m2: 27.27, degreesOfFreedom: 28, significance: 0.50, rmsea: 0, srmsr: 0.025, ... }
+cdmItemFit(matrix, calibration)[0]; // => { id: "q1", proportion: { observed: 0.519, expected: 0.519, z: 0.0 }, correlationZ: 1.46, ... }
 ```
 
 | `CdmModelFit` field | Definition                                                                                                     |

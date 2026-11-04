@@ -159,10 +159,10 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * const matrix = simulateMultidimensionalResponses(items, thetas, random);
  * const loadings = Object.fromEntries(matrix.itemIds.map((id, i) => [id, [i < 3 ? "verbal" : "quantitative"]]));
  * const fit = calibrateMultidimensional(matrix, { model: multidimensionalTwoParameterLogistic, loadings });
- * fit.dimensions; // ["verbal", "quantitative"]
- * fit.converged; // true
- * fit.items[0]?.parameters; // { a: [1.08, 0], intercept: -0.9, c: 0, d: 1 }
- * fit.correlations[0]?.[1]; // 0.01, the correlation of the dimensions
+ * fit.dimensions; // => ["verbal", "quantitative"]
+ * fit.converged; // => true
+ * fit.items[0]?.parameters; // => { a: [1.08, 0], intercept: -0.9, c: 0, d: 1 }
+ * fit.correlations[0]?.[1]; // => 0.01, the correlation of the dimensions
  * ```
  */
 export function calibrateMultidimensional<TParameters>(

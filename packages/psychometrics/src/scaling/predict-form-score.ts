@@ -39,7 +39,7 @@ import {
  * const practice = [item(-1), item(0), item(1)];
  * const official = [item(-0.5), item(0.5)];
  * const posterior = thetaPosterior(practice, [1, 1, 0]);
- * predictFormScore(posterior, official, [200, 500, 800]).mean; // 543.9
+ * predictFormScore(posterior, official, [200, 500, 800]).mean; // => 543.9
  * ```
  * @throws `DataError` when the distribution, the form, the conversion or the options are invalid.
  */

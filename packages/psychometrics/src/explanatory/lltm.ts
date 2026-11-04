@@ -188,8 +188,8 @@ const RASCH_MODEL_NAME = "The Rasch model of an LLTM's comparison";
  *   item6: { steps: 6 },
  * };
  * const model = lltm(responses, features);
- * model.effects.map(({ name, estimate }) => [name, estimate]); // [["(intercept)", -1.56], ["steps", 0.50]]
- * model.comparison; // { chiSquare: 2.43, degreesOfFreedom: 4, significance: 0.66, ... }
+ * model.effects.map(({ name, estimate }) => [name, estimate]); // => [["(intercept)", -1.56], ["steps", 0.50]]
+ * model.comparison; // => { chiSquare: 2.43, degreesOfFreedom: 4, significance: 0.66, ... }
  * ```
  *
  * @param data - The responses: a response matrix or response records, dichotomous.

@@ -192,10 +192,10 @@ const MIN_PROPORTION = Number.EPSILON;
  * ]);
  * const qMatrix = { item1: ["a"], item2: ["a", "b"], item3: ["b"], item4: ["a"] };
  * const calibration = calibrateCdm(matrix, qMatrix, { model: "dina" });
- * calibration.attributes; // ["a", "b"]
- * calibration.converged; // true
- * calibration.profiles.map(({ profile }) => profile); // [[0, 0], [1, 0], [0, 1], [1, 1]]
- * calibration.items[1]?.attributes; // ["a", "b"]
+ * calibration.attributes; // => ["a", "b"]
+ * calibration.converged; // => true
+ * calibration.profiles.map(({ profile }) => profile); // => [[0, 0], [1, 0], [0, 1], [1, 1]]
+ * calibration.items[1]?.attributes; // => ["a", "b"]
  * ```
  */
 export function calibrateCdm(

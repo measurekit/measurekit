@@ -91,9 +91,9 @@ const MAX_SELECTED_PERSONS = 94_906_265;
  *   room: ["r1", "r1", "r2", "r2"],
  *   network: ["n1", null, "n1", "n2"],
  * });
- * selection.pairs; // [["ana", "ben"], ["ana", "cy"], ["cy", "dee"]]
+ * selection.pairs; // => [["ana", "ben"], ["ana", "cy"], ["cy", "dee"]]
  * selectPairs(["ana", "ben", "cy"], { school: ["s1", "s1", "s1"] }, { maxGroup: 2 }).skipped;
- * // [{ context: "school", value: "s1", persons: 3 }]
+ * // => [{ context: "school", value: "s1", persons: 3 }]
  * ```
  */
 export function selectPairs(

@@ -62,10 +62,10 @@ import { fringes, isLearningSpace, surmiseStructure } from "@measurekit/knowledg
 
 const structure = surmiseStructure({ add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] });
 structure.states;
-// [[], ["add"], ["add", "subtract"], ["add", "multiply"], ["add", "subtract", "multiply"],
+// => [[], ["add"], ["add", "subtract"], ["add", "multiply"], ["add", "subtract", "multiply"],
 //  ["add", "subtract", "multiply", "divide"]]
-isLearningSpace(structure); // true
-fringes(structure, ["add", "subtract"]); // { inner: ["subtract"], outer: ["multiply"] }
+isLearningSpace(structure); // => true
+fringes(structure, ["add", "subtract"]); // => { inner: ["subtract"], outer: ["multiply"] }
 ```
 
 `prerequisites` has every element as a key, with its prerequisites; theirs are implied. Elements that require each
@@ -91,9 +91,9 @@ with an empty clause, needs nothing.
 import { clauseStructure, isLearningSpace, learningPaths } from "@measurekit/knowledge-tracing/kst";
 
 const space = clauseStructure({ a: [], b: [], c: [["a"], ["b", "d"]], d: [["a"]] });
-space.states.length; // 10
-isLearningSpace(space); // true
-learningPaths(space).length; // 8
+space.states.length; // => 10
+isLearningSpace(space); // => true
+learningPaths(space).length; // => 8
 ```
 
 The states grow one element at a time from the empty state, so every state can be learned element by element and the
@@ -236,24 +236,24 @@ const log = buildEventLog(
 );
 
 const free = kst({ structure, over: "items" }).fit(log);
-free.goodnessOfFit; // { g2: 2.535, degreesOfFreedom: 2, pValue: 0.282 }
-free.discrepancy; // 0.068
+free.goodnessOfFit; // => { g2: 2.535, degreesOfFreedom: 2, pValue: 0.282 }
+free.discrepancy; // => 0.068
 const partway = `l${answers.findIndex(({ pattern }) => pattern === "1100")}`;
-free.mostLikelyStates[partway]; // { state: ["add", "subtract"], probability: 0.816 }: a learner who answered 1100
+free.mostLikelyStates[partway]; // => { state: ["add", "subtract"], probability: 0.816 }: a learner who answered 1100
 
 const equal = kst({ structure, over: "items", equal: { guess: [structure.domain], slip: [structure.domain] } }).fit(
   log,
 );
-compareFits(equal, free); // { g2: 1.460, degreesOfFreedom: 6, pValue: 0.962 }: one guess and one slip fit as well
+compareFits(equal, free); // => { g2: 1.460, degreesOfFreedom: 6, pValue: 0.962 }: one guess and one slip fit as well
 
-free.model.identifiability(); // { parameters: 13, rank: 11, identifiable: false }
+free.model.identifiability(); // => { parameters: 13, rank: 11, identifiable: false }
 const held = kst({
   structure,
   over: "items",
   parameters: free.model.parameters,
   fixed: { guess: { add: 0.05 }, slip: { divide: 0.05 } },
 });
-held.identifiability(); // { parameters: 11, rank: 11, identifiable: true }
+held.identifiability(); // => { parameters: 11, rank: 11, identifiable: true }
 ```
 
 The Jacobian has 2^items rows and one column for each parameter, so `identifiability` stops at `MAX_JACOBIAN_CELLS`, 10
@@ -295,12 +295,15 @@ const skills = { q1: ["add"], q2: ["subtract"], q3: ["multiply"], q4: ["divide"]
 let open = Object.entries(skills).map(([item, itemSkills]) => ({ learner: "ana", item, skills: itemSkills, time: 0 }));
 const answers: Record<string, number> = { q1: 1, q2: 1, q3: 0, q4: 0 };
 let ana = model.initialState("ana");
+const asked: string[] = [];
 for (let question = model.nextQuestion(ana, open); question !== null; question = model.nextQuestion(ana, open)) {
-  ana = model.update(ana, { ...question, outcome: answers[question.item] ?? 0 }); // asks q2, q3, q1, q4
+  ana = model.update(ana, { ...question, outcome: answers[question.item] ?? 0 });
+  asked.push(question.item);
   open = open.filter((candidate) => candidate !== question);
 }
-model.mostLikelyState(ana); // { state: ["add", "subtract"], probability: 0.794 }
-fringes(structure, model.mostLikelyState(ana).state).outer; // ["multiply"]: what to practice next
+asked; // => ["q2", "q3", "q1", "q4"]
+model.mostLikelyState(ana); // => { state: ["add", "subtract"], probability: 0.794 }
+fringes(structure, model.mostLikelyState(ana).state).outer; // => ["multiply"]: what to practice next
 ```
 
 Remove asked items from the candidates, or an uncertain item is asked again. The outer fringe of the most likely state
@@ -358,8 +361,8 @@ passes.
 | `solutionRates`            | The share of learners who solved each item, from 0 to 1 (`percent` of kvalidate over 100)                                                             |
 
 ```ts continues
-structureValidity(structure, log).gamma; // 0.862
-structureValidity(structure, log).distances; // { "0": 41, "1": 3 }
+structureValidity(structure, log).gamma; // => 0.862
+structureValidity(structure, log).distances; // => { "0": 41, "1": 3 }
 ```
 
 Each learner's first outcome at each item is used, every learner must have answered every item, with outcomes 0 or 1,
@@ -385,9 +388,9 @@ import { diffTest, iita } from "@measurekit/knowledge-tracing/kst";
 
 const found = iita(log);
 diffTest(log, found.prerequisites);
-// { estimate: 0.00140, z: 1.293, pValue: 0.196, interval: [-0.00072, 0.00352] }
+// => { estimate: 0.00140, z: 1.293, pValue: 0.196, interval: [-0.00072, 0.00352] }
 const designed = { add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] };
-diffTest(log, found.prerequisites, { alternative: designed }).pValue; // 0.679
+diffTest(log, found.prerequisites, { alternative: designed }).pValue; // => 0.679
 ```
 
 `prerequisites` has every item of the log as a key, and is closed under transitivity. The `interval` of a one-sided test
@@ -428,7 +431,7 @@ removed alone, as the prerequisites are closed under transitivity.
 const sparse = buildEventLog(log.filter((_, k) => k % 7 !== 3));
 const withEdge = { add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] };
 const withoutEdge = { add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract"] };
-diffTest(sparse, withEdge, { alternative: withoutEdge, tail: "greater" }).pValue; // 0.691: the order fits as well with the edge
+diffTest(sparse, withEdge, { alternative: withoutEdge, tail: "greater" }).pValue; // => 0.691: the order fits as well with the edge
 ```
 
 The test of the difference of two orders is reliable where the test of one order against `mean` is not. The estimate of

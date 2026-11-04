@@ -133,8 +133,8 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * const items = simulateItems(twoParameterLogistic, 5, random);
  * const responses = simulateResponses(items, simulateThetas(200, random), random);
  * const fit = calibrate(responses, { model: twoParameterLogistic });
- * fit.items[0]?.parameters; // { a: 1.43, b: 0.16, c: 0, d: 1 }
- * fit.converged; // true
+ * fit.items[0]?.parameters; // => { a: 1.43, b: 0.16, c: 0, d: 1 }
+ * fit.converged; // => true
  * ```
  */
 export function calibrate<TParameters>(
