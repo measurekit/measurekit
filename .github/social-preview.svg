@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <title>measurekit: psychometrics and knowledge tracing for JavaScript and TypeScript</title>
+  <rect width="1280" height="640" fill="#1f3a5f"/>
+  <rect x="0" y="0" width="16" height="640" fill="#9cc3e6"/>
+  <path d="M900 330C1010 330 1040 130 1200 130" fill="none" stroke="#9cc3e6" stroke-width="10" stroke-linecap="round"/>
+  <path d="M890 350h320" stroke="#4f7aa8" stroke-width="4" stroke-linecap="round"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#ffffff">
+    <text x="80" y="150" font-size="96" font-weight="700">measurekit</text>
+    <text x="80" y="218" font-size="38">Psychometrics and knowledge tracing</text>
+    <text x="80" y="266" font-size="38">for JavaScript and TypeScript</text>
+    <text x="80" y="326" font-size="28" fill="#d6e6f5">IRT · CTT · adaptive testing · cognitive diagnosis · BKT</text>
+    <text x="80" y="366" font-size="28" fill="#d6e6f5">Validated against R, pyBKT and RSMTool</text>
+  </g>
+  <g font-family="Menlo, Consolas, monospace" font-size="25" fill="#ffffff">
+    <text x="80" y="448">@measurekit/psychometrics</text>
+    <text x="80" y="492">@measurekit/knowledge-tracing</text>
+    <text x="80" y="536">@measurekit/core</text>
+  </g>
+  <text x="80" y="596" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" fill="#9cc3e6">measurekit.wakan.dev</text>
+</svg>

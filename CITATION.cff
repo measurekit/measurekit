@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: If you use measurekit in your work, please cite it as below.
+type: software
+title: measurekit
+abstract: >-
+  Psychometrics and knowledge tracing for JavaScript and TypeScript, validated against R, pyBKT and RSMTool: IRT, CTT,
+  adaptive testing, cognitive diagnosis, BKT.
+authors:
+  - given-names: Fariz
+    family-names: Wakan
+license: Apache-2.0
+repository-code: https://github.com/measurekit/measurekit
+url: https://measurekit.wakan.dev/
+keywords:
+  - psychometrics
+  - item-response-theory
+  - irt
+  - classical-test-theory
+  - rasch-model
+  - computerized-adaptive-testing
+  - adaptive-testing
+  - cognitive-diagnosis
+  - test-equating
+  - knowledge-tracing
+  - bayesian-knowledge-tracing
+  - educational-data-mining
+  - learning-analytics
+  - assessment
+  - statistics
+  - edtech
+  - typescript
+  - javascript
