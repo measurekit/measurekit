@@ -24,7 +24,14 @@ import { type DifAnalysis, type PurificationOptions, purified, significant } fro
  */
 export type LordOptions = Omit<
   CalibrationOptions<LogisticItem>,
-  "fixed" | "fixedParameters" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
+  | "fixed"
+  | "fixedCovariance"
+  | "fixedParameters"
+  | "groups"
+  | "latent"
+  | "covariates"
+  | "standardErrors"
+  | "personWeights"
 > &
   PurificationOptions;
 

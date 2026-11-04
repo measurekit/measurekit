@@ -128,22 +128,23 @@ result.logLikelihood; // also aic, bic, converged and iterations
 data, [response records](data.md#response-records): both give the same calibration, and records take memory
 in proportion to the responses only.
 
-| Option            | Default             | Meaning                                                                                                                                   |
-| ----------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`           | required            | One model for every item, or an array with one per item, such as the 3PL and the GPCM.                                                    |
-| `fixed`           | none                | Parameters of anchor items by item id. They are not estimated; the others take their scale.                                               |
-| `priors`          | none                | A prior per vector entry name, such as `{ c: betaPrior(5, 17) }`, for every item estimating it.                                           |
-| `itemPriors`      | none                | Priors by item id, then entry name, such as `{ new1: { b: normalPrior(0.4, 0.8) } }`: [priors of single items](#priors).                  |
-| `fixedParameters` | none                | Values by item id, then entry name, such as `{ q7: { c: 0.25 } }`, held while the rest is estimated: [held parameters](#held-parameters). |
-| `quadrature`      | 61 rectangular      | Nodes over theta: `{ method: "rectangular" \| "gauss-hermite", points }`.                                                                 |
-| `groups`          | one group           | Each person's group label, for [several groups on one scale](#groups-and-distributions-of-theta).                                         |
-| `latent`          | `"standard-normal"` | The distribution of theta, for every group or by group label: `"standard-normal"`, `"normal"`, `"empirical-histogram"`.                   |
-| `covariates`      | none                | Each person's covariates by name, for a [latent regression](#latent-regression) of theta.                                                 |
-| `standardErrors`  | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                                          |
-| `testlets`        | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                                               |
-| `personWeights`   | 1 for every person  | Each person's survey weight, above 0, for [a sample that stands for a population](#person-weights).                                       |
-| `tolerance`       | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                                       |
-| `maxIterations`   | `500`               | The most EM iterations.                                                                                                                   |
+| Option            | Default             | Meaning                                                                                                                                    |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model`           | required            | One model for every item, or an array with one per item, such as the 3PL and the GPCM.                                                     |
+| `fixed`           | none                | Parameters of anchor items by item id. They are not estimated; the others take their scale.                                                |
+| `fixedCovariance` | none                | The covariance of the `fixed` items' estimates, whose error the standard errors then carry: [error of fixed items](#error-of-fixed-items). |
+| `priors`          | none                | A prior per vector entry name, such as `{ c: betaPrior(5, 17) }`, for every item estimating it.                                            |
+| `itemPriors`      | none                | Priors by item id, then entry name, such as `{ new1: { b: normalPrior(0.4, 0.8) } }`: [priors of single items](#priors).                   |
+| `fixedParameters` | none                | Values by item id, then entry name, such as `{ q7: { c: 0.25 } }`, held while the rest is estimated: [held parameters](#held-parameters).  |
+| `quadrature`      | 61 rectangular      | Nodes over theta: `{ method: "rectangular" \| "gauss-hermite", points }`.                                                                  |
+| `groups`          | one group           | Each person's group label, for [several groups on one scale](#groups-and-distributions-of-theta).                                          |
+| `latent`          | `"standard-normal"` | The distribution of theta, for every group or by group label: `"standard-normal"`, `"normal"`, `"empirical-histogram"`.                    |
+| `covariates`      | none                | Each person's covariates by name, for a [latent regression](#latent-regression) of theta.                                                  |
+| `standardErrors`  | `"none"`            | `"none"`, `"hessian"` or `"cross-product"`: [standard errors](#standard-errors).                                                           |
+| `testlets`        | none                | Item ids by testlet id, for the [testlet model](#testlets).                                                                                |
+| `personWeights`   | 1 for every person  | Each person's survey weight, above 0, for [a sample that stands for a population](#person-weights).                                        |
+| `tolerance`       | `1e-4`              | EM stops when no estimated parameter or histogram weight changes by more than this in an iteration.                                        |
+| `maxIterations`   | `500`               | The most EM iterations.                                                                                                                    |
 
 The estimates maximize the marginal log-likelihood, theta integrated over its distribution, N(0, 1) by default; with
 priors, the log-likelihood plus the log prior densities. Bock-Aitkin EM alternates two steps:
@@ -395,6 +396,67 @@ const result = calibrate(data, {
 result.items.find((item) => item.id === "item21"); // parameters { a: 0.84, b: 0.15 }, simulated from a = 0.86, b = 0.24
 result.groups[0]; // { mean: 0.28, sd: 1.12, ... }: the population, on the operational scale
 ```
+
+### Error of fixed items
+
+```mermaid
+flowchart LR
+  E["Earlier calibration<br/>calibrateWithCovariance"] -->|"items: fixed<br/>covariance: fixedCovariance"| N["calibrate the new data"]
+  N --> V["Standard errors V + J Σ Jᵀ"]
+```
+
+Standard errors with fixed items take the fixed parameters as known, as mirt's does with `est = FALSE`, so they leave
+out the error of the calibration that estimated them: through the fixed items, it moves the scale on which the new
+items and the distribution of theta are estimated. With `fixedCovariance`, the covariance of the fixed items' estimates
+as `calibrateWithCovariance` returned it, the covariance of the estimates is V + J Σ Jᵀ: V the covariance as if the
+fixed parameters were known, Σ theirs, and J = -V C the derivative of the estimates with respect to them, C the
+derivative of the gradient of the negative log-posterior with respect to them, by central differences of the exact
+gradient. This is the variance of a pseudo maximum likelihood estimate (Gong and Samaniego, 1981; Parke, 1986), the
+restricted recalibration of IRT models (Liu, Yang and Maydeu-Olivares, 2019). The estimates do not change.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { calibrate, calibrateWithCovariance, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { normalDistribution, simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
+
+// Items 1 to 10 are calibrated on 300 persons; 1,000 others of N(0.3, 1.1²) take them with the pretest items 11 and 12.
+const random = createRandom(7);
+const items = simulateItems(twoParameterLogistic, 12, random);
+const bank = calibrateWithCovariance(simulateResponses(items.slice(0, 10), simulateThetas(300, random), random), {
+  model: twoParameterLogistic,
+  standardErrors: "hessian",
+});
+const fixed = Object.fromEntries(bank.calibration.items.map((item) => [item.id, item.parameters]));
+const thetas = simulateThetas(1000, random, { distribution: normalDistribution(0.3, 1.1) });
+const pretest = simulateResponses(items, thetas, random);
+const options = { model: twoParameterLogistic, fixed, latent: "normal", standardErrors: "hessian" } as const;
+const known = calibrate(pretest, options);
+const carried = calibrate(pretest, { ...options, fixedCovariance: bank.covariance ?? undefined });
+known.items[10]?.standardErrors; // { a: 0.145, b: 0.218 }: item 11, its fixed items taken as known
+carried.items[10]?.standardErrors; // { a: 0.166, b: 0.265 }: with their error
+known.groups[0]?.standardErrors; // { mean: 0.041, sd: 0.042 }; carried, { mean: 0.086, sd: 0.088 }
+```
+
+| The fixed items were calibrated on            | The new calibration                                     | V + J Σ Jᵀ |
+| --------------------------------------------- | ------------------------------------------------------- | ---------- |
+| Other persons                                 | Any: items, distributions of theta, groups, testlets    | Holds      |
+| The same persons, from their fixed items only | Estimates no distribution of theta: `"standard-normal"` | Holds      |
+| The same persons                              | Estimates a distribution of theta                       | Too small  |
+| Responses to the items estimated here         | Any                                                     | Too small  |
+
+The variance holds when the score of the new estimates is independent of the earlier ones: so it is for other persons,
+and for the same persons when the earlier calibration read their fixed items alone and the new one estimates only
+items, whose score has mean 0 given those responses. Where the same persons' distribution is estimated again, the two
+calibrations' scores correlate, and a concurrent calibration of every item gives the right errors.
+
+- **Labels.** Each label of `fixedCovariance` names a parameter of a `fixed` item, as `calibrateWithCovariance` labels
+  them; labels of items that the data do not have are skipped, so the covariance of a whole pool serves a form.
+- **Cost.** Two E-steps for each fixed parameter listed, beside those of the standard errors, and at most 2,000 of them,
+  as the [standard errors](#standard-errors) take; it needs `standardErrors` `"hessian"` or `"cross-product"`.
+- **Errors.** A label of an estimated item, of a parameter the model lacks or listed twice, a parameter on a bound of
+  its range, such as c = 0, and a covariance that adds a negative variance throw `DataError`.
+- **Validation.** Base R's V + J Σ Jᵀ within 1e-6, J also by maximizing again with each fixed parameter moved, and the
+  coverage of 95% intervals in simulations ([validation](validation.md#error-of-fixed-items)).
 
 ### Testlets
 
@@ -1117,6 +1179,7 @@ Validate a new model against an R reference before relying on it, as [validation
 | Starts of an item of six or more categories                  | Its share at or above the middle category, or the first agree category | The GGUM package's share at or above category 2                                                                                                                                                                                                                        |
 | Start of an item agreed with too little to find its distance | 6, the end of the bracket of distances                                 | The GGUM package's 2                                                                                                                                                                                                                                                   |
 | First stage with items of different numbers of categories    | Thresholds shared by the items with the same number                    | The GGUM package's one set, each item taking its last thresholds                                                                                                                                                                                                       |
+| Standard errors with fixed items                             | With `fixedCovariance`, they carry the fixed items' error              | mirt, with `est = FALSE` on the fixed items, takes them as known, as this package without the option                                                                                                                                                                   |
 | Person weights in a latent regression                        | Covariate patterns count their persons' weights, as TAM's `pweights`   | mirt's `survey.weights` leave the regression out: on the fixture's 600 persons of weights 1 to 4, its coefficient is 0.754 against 0.712 for the persons repeated, its items differ by up to 0.19, and base R's weighted log-likelihood is 1.65 lower at its estimates |
 
 ## Not included

@@ -29,7 +29,6 @@ export {
   type CovarianceCalibration,
   calibrate,
   calibrateWithCovariance,
-  type ParameterCovariance,
 } from "./calibration.js";
 export type { CalibrationOptions, FixedParameters, StandardErrorMethod } from "./calibration-options.js";
 export {
@@ -55,6 +54,7 @@ export {
 } from "./logistic.js";
 export type { IrtItem, IrtModel, ModelParameter, TestItem } from "./model.js";
 export { type NominalParameters, nominalResponse } from "./nominal.js";
+export type { ParameterCovariance } from "./parameter-covariance.js";
 export { generalizedPartialCredit, partialCredit } from "./partial-credit.js";
 export { betaPrior, logNormalPrior, normalPrior, type ParameterPrior } from "./prior.js";
 export type { QuadratureMethod, QuadratureOptions } from "./quadrature.js";

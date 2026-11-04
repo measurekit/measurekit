@@ -21,7 +21,6 @@ export {
   type Calibration,
   calibrate,
   calibrateWithCovariance,
-  type ParameterCovariance,
 } from "./calibration.js";
 export type { CalibrationOptions, FixedParameters, StandardErrorMethod } from "./calibration-options.js";
 export { type Setup, setUp } from "./calibration-setup.js";
@@ -69,6 +68,13 @@ export {
 export { type Maximization, maximization, unboundedCoordinates, unboundedScales } from "./m-step.js";
 export type { IrtItem, IrtModel, ModelParameter, TestItem } from "./model.js";
 export { centered, type NominalParameters, nominalResponse } from "./nominal.js";
+export {
+  checkCovariance,
+  differenceStep,
+  type ParameterCovariance,
+  parameterEntry,
+  VARIANCE_ROUNDING,
+} from "./parameter-covariance.js";
 export { generalizedPartialCredit, partialCredit } from "./partial-credit.js";
 export { estimatePersons } from "./person-estimates.js";
 export { checkPrior, type ParameterPrior } from "./prior.js";

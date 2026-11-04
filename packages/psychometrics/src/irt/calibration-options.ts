@@ -1,6 +1,7 @@
 import type { FieldNames } from "@measurekit/core";
 import type { LatentDistribution } from "./latent.js";
 import type { IrtModel } from "./model.js";
+import type { ParameterCovariance } from "./parameter-covariance.js";
 import type { ParameterPrior } from "./prior.js";
 import type { QuadratureOptions } from "./quadrature.js";
 
@@ -30,6 +31,21 @@ export interface CalibrationOptions<TParameters> {
    * @defaultValue none: every item is estimated
    */
   readonly fixed?: Readonly<Record<string, TParameters>>;
+  /**
+   * The covariance of the estimates of the `fixed` items' parameters, from the calibration that estimated them, such
+   * as `calibrateWithCovariance` returns it: the standard errors then carry the fixed items' sampling error into the
+   * estimated items and distributions of theta, by the pseudo maximum likelihood variance of restricted recalibration,
+   * V + J Σ Jᵀ, with V the covariance as if the fixed parameters were known, Σ this covariance and J the derivative of
+   * the estimates with respect to the fixed parameters. It holds when the earlier calibration used none of these
+   * responses to the items estimated here, and either other persons or, for the same persons, no distribution of
+   * theta estimated here. Labels of items absent from the data are skipped; the others must name parameters of fixed
+   * items. It needs standard errors, and costs two E-steps for each fixed parameter it lists.
+   *
+   * @defaultValue none: the fixed parameters are taken as known
+   * @see {@link https://doi.org/10.1007/s11336-019-09667-4 | Liu, Yang and Maydeu-Olivares (2019)}
+   * @see {@link https://doi.org/10.1214/aos/1176345526 | Gong and Samaniego (1981)}
+   */
+  readonly fixedCovariance?: ParameterCovariance;
   /**
    * Values of single parameters of estimated items, by item id, then parameter name, such as `{ q7: { c: 0.25 } }` for
    * a 3PL item whose lower asymptote is held at 1/4 while its `a` and `b` are estimated, as mirt's `est = FALSE` on one
@@ -128,6 +144,7 @@ export interface CalibrationOptions<TParameters> {
 export const CALIBRATION_OPTIONS: FieldNames<CalibrationOptions<unknown>> = {
   model: true,
   fixed: true,
+  fixedCovariance: true,
   fixedParameters: true,
   priors: true,
   itemPriors: true,

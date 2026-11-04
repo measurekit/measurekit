@@ -221,3 +221,9 @@ designs, scales, Hofstee bounds and Beuk judgments): a misspelled name left its 
 calibration asked to hold `c` at 0.25 under a misspelled option estimated it at 0.68. `scaleConversion` takes the
 `lowest`, `highest` and `step` of a scale, not the scale, and a summed-score table and marginal reliability refuse
 `testlets`.
+
+`calibrate` takes `fixedCovariance`, the covariance of the fixed items' estimates from the calibration that made them,
+and carries their sampling error into the standard errors of the items and distributions it estimates: V + J Σ Jᵀ, the
+pseudo maximum likelihood variance of restricted recalibration, validated against base R and by the coverage of 95%
+intervals in simulations. The errors of a covariance that the IRT equating errors and `fixedCovariance` refuse name "the
+matrix of" it.

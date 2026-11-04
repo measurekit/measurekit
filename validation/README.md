@@ -25,6 +25,7 @@ Rscript validation/psychometrics/irt.R               # item response theory: cal
 Rscript validation/psychometrics/latent-regression.R # latent regression in `calibrate`: mirt's covdata and formula, TAM's tam.mml(Y = x)
 Rscript validation/psychometrics/person-weights.R   # person weights in `calibrate`: mirt's survey.weights, TAM's pweights, base R's weighted likelihood and mirt on repeated persons
 Rscript validation/psychometrics/irt-fixed-parameters.R # held parameters in `calibrate`: mirt with est = FALSE on g and a1, and its S-X²
+Rscript validation/psychometrics/irt-fixed-error.R  # standard errors with the fixed items' error: base R's V + J Σ Jᵀ, J also by maximizing again
 Rscript validation/psychometrics/nested-models.R     # nested-model chi-squares of the recipe: mirt's anova of the 1PL against the 2PL and the PCM against the GPCM
 JAVA_HOME=<a JDK> Rscript validation/psychometrics/irt-unfolding.R # the generalized graded unfolding model: the GGUM package, base R for the log-likelihood and the cross-product errors; case names as arguments run only those cases
 Rscript validation/psychometrics/dimensionality.R    # polychoric correlations, parallel analysis: psych, polycor

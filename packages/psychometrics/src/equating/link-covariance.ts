@@ -1,9 +1,8 @@
 import { checkArray, checkChoice, checkOptions, checkRecord, DataError, type FieldNames } from "@measurekit/core";
-import { type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
+import { checkCovariance, type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
 import { curveLink, type LinkingOptions } from "./characteristic-curve.js";
 import {
   bilinearForm,
-  checkCovariance,
   checkedVariance,
   differenceGradient,
   moved,
@@ -196,7 +195,7 @@ export function linker<TOptions extends LinkErrorOptions>(
 export function checkForm(form: CalibratedForm, label: string): CheckedForm {
   checkRecord(form, `${label} must be an object { items, covariance }`);
   const indices = indexItems(form.items);
-  const labels = checkCovariance(form.covariance);
+  const labels = checkCovariance(form.covariance, "the covariance");
   return { items: form.items, indices, labels, matrix: form.covariance.matrix };
 }
 

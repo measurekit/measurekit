@@ -11,6 +11,7 @@ import { CALIBRATION_OPTIONS, type CalibrationOptions, type StandardErrorMethod 
 import { type ItemState, type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
 import { type ExpectationStep, expectationStep } from "./expectation.js";
+import { addFixedError, fixedErrorOf } from "./fixed-error.js";
 import { hessianCovariance } from "./hessian-covariance.js";
 import {
   type GroupDistribution,
@@ -23,6 +24,7 @@ import {
 } from "./latent.js";
 import { type Maximization, maximization, unboundedCoordinates } from "./m-step.js";
 import type { TestItem } from "./model.js";
+import type { ParameterCovariance } from "./parameter-covariance.js";
 import { quadratureRule } from "./quadrature.js";
 import { type CompressedResponses, compressResponses, respondentsOf } from "./responses.js";
 import { squarem } from "./squarem.js";
@@ -102,17 +104,19 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * expected counts, the log-likelihood, the starting values and the cross-products.
  *
  * @param data - The responses of the persons, as a matrix or as records.
- * @param options - The model, fixed items, priors, quadrature, groups, distributions of theta, covariates, standard
- *   errors, testlets, person weights and stopping rules; each option has its default.
+ * @param options - The model, fixed items and their covariance, priors, quadrature, groups, distributions of theta,
+ *   covariates, standard errors, testlets, person weights and stopping rules; each option has its default.
  * @returns The items with their parameters, the groups, the regression, the testlets, the log-likelihood, AIC and BIC,
  *   whether the EM converged and the iterations run.
  * @throws `DataError` when the matrix or an option is invalid, there are no responses, a fixed item's parameters are
- * invalid or do not fit its responses, an estimated item lacks responses in a category up to its highest or has more
- * categories than its model allows, estimated items of a model that share parameters, as RSM items share the steps,
- * have different numbers of categories, a group has no person with a response, distributions are estimated without
- * the rectangular rule or without fixed items or a standard normal group, a testlet has no response, or covariates
- * are not a finite number for each person, come with groups, `latent`, testlets or the standard errors
- * `"cross-product"`, or are collinear, or the person weights are not a positive number for each person.
+ * invalid or do not fit its responses, `fixedCovariance` is invalid, comes without standard errors, labels an estimated
+ * item or a parameter on a bound of its range, or adds a negative variance, an estimated item lacks responses in a
+ * category up to its highest or has more categories than its model allows, estimated items of a model that share
+ * parameters, as RSM items share the steps, have different numbers of categories, a group has no person with a
+ * response, distributions are estimated without the rectangular rule or without fixed items or a standard normal
+ * group, a testlet has no response, or covariates are not a finite number for each person, come with groups,
+ * `latent`, testlets or the standard errors `"cross-product"`, or are collinear, or the person weights are not a
+ * positive number for each person.
  *
  * @example
  * ```ts
@@ -138,29 +142,6 @@ export function calibrate<TParameters>(
   options: CalibrationOptions<TParameters>,
 ): Calibration<TParameters> {
   return calibrateWithCovariance(data, options).calibration;
-}
-
-/**
- * The covariance matrix of the estimated parameters of a calibration's items, labeled by item id and parameter name.
- * Plain data, which JSON serializes.
- */
-export interface ParameterCovariance {
-  /**
-   * The item and the parameter name of each row and column: the estimated items in item order, each with the names of
-   * its `standardErrors`. Items whose model shares a parameter, as the rating scale model shares its steps, repeat the
-   * shared parameter, with the same variance and a correlation of 1.
-   */
-  readonly parameters: readonly {
-    /** The item id. */
-    readonly item: string;
-    /** The parameter's name in the item's parameter vector. */
-    readonly name: string;
-  }[];
-  /**
-   * The covariance matrix by rows: `matrix[i][j]` is the covariance of `parameters[i]` and `parameters[j]`, on the
-   * parameters' own scale.
-   */
-  readonly matrix: readonly (readonly number[])[];
 }
 
 /** A calibration with the covariance matrix of its estimated item parameters. */
@@ -221,10 +202,11 @@ export function calibrateResponses<TParameters>(
   const { nodes } = rule;
   const setup = setUp(responses, options, answered, rule, starts);
   const { items, values, population: latent, design } = setup;
+  const fixedError = fixedErrorOf(options.fixedCovariance, items, standardErrors);
   if (standardErrors !== "none") {
     // The covariance reported lists a parameter that items share once for each of them.
     const listed = items.reduce((sum, item) => sum + freeEntries(item).length, 0);
-    checkStandardErrorSize(Math.max(values.length, listed));
+    checkStandardErrorSize(Math.max(values.length, listed, fixedError?.targets.length ?? 0));
   }
   const mStep = maximization(setup, nodes);
   const eStep = expectationStep(responses, items, nodes, latent, design);
@@ -233,7 +215,9 @@ export function calibrateResponses<TParameters>(
   const converged = stopped && !hasDegenerateGroup(latent, values, nodes);
   const logLikelihood = eStep.run();
   const size = values.length;
-  const covariance = size > 0 ? covarianceOf(standardErrors, setup, mStep, eStep, responses, nodes) : null;
+  const known = size > 0 ? covarianceOf(standardErrors, setup, mStep, eStep, responses, nodes) : null;
+  const covariance =
+    known === null || fixedError === null ? known : addFixedError(known, setup, mStep, eStep, fixedError);
   const standardError = covariance === null ? null : (slot: number) => Math.sqrt(covariance[slot * size + slot] ?? 0);
 
   const parameterCount = size + histogramParameters(latent);

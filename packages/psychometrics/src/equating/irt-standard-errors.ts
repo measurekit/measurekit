@@ -1,14 +1,14 @@
+import { checkChoice, checkOptions, DataError, type FieldNames } from "@measurekit/core";
 import {
-  checkArray,
-  checkChoice,
-  checkFinite,
-  checkOptions,
-  checkRecord,
-  DataError,
-  describe,
-  type FieldNames,
-} from "@measurekit/core";
-import { type IrtItem, indexItems, type ParameterCovariance, type TestItem } from "../irt/internal.js";
+  checkCovariance,
+  differenceStep,
+  type IrtItem,
+  indexItems,
+  type ParameterCovariance,
+  parameterEntry,
+  type TestItem,
+  VARIANCE_ROUNDING,
+} from "../irt/internal.js";
 import {
   type IrtObservedScoreOptions,
   type ObservedScoreSetup,
@@ -34,15 +34,6 @@ const IRT_EQUATING_ERROR_OPTIONS: FieldNames<IrtEquatingErrorOptions> = {
   weight: true,
 };
 
-/**
- * The step of the central differences, relative to a parameter of at least 1 in size: the cube root of the machine
- * epsilon, which balances truncation and rounding error.
- */
-const DIFFERENCE_STEP = 6e-6;
-/** The share of the room to a parameter's bound that a difference may use. */
-const BOUND_ROOM = 0.5;
-/** The negative variance, relative to the size of its terms, that rounding of a positive semidefinite matrix can give. */
-const VARIANCE_ROUNDING = 1e-9;
 const METHODS = ["true-score", "observed-score"];
 
 /** Where one parameter of a covariance sits in the items of the forms. */
@@ -94,7 +85,7 @@ export function irtEquatingStandardErrors(
   const forms = [from, to] as const;
   const indices = forms.map((items) => indexItems(items));
   checkCommonItems(forms, indices);
-  const labels = checkCovariance(covariance);
+  const labels = checkCovariance(covariance, "the covariance");
   const { scores, equate } = equator(from, to, method === "observed-score" ? observedScoreSetup(options) : null);
   const targets = parameterTargets(forms, indices, labels);
   const used = targets.flatMap((found, k) => (found.length > 0 ? [k] : []));
@@ -158,46 +149,6 @@ function checkCommonItems(
 }
 
 /**
- * Checks a covariance and returns its labels.
- *
- * @throws `DataError` when it is not an object with a label of two strings for each row and a square matrix of finite
- * numbers of that size.
- */
-export function checkCovariance(
-  covariance: ParameterCovariance,
-): readonly { readonly item: string; readonly name: string }[] {
-  checkRecord(covariance, "The covariance must be an object { parameters, matrix }");
-  const { parameters, matrix } = covariance;
-  checkArray(parameters, "The parameters of the covariance must be an array of labels { item, name }");
-  checkArray(matrix, "The matrix of the covariance must be an array of rows");
-  if (matrix.length !== parameters.length) {
-    throw new DataError(
-      `The covariance needs a row for each of its ${parameters.length} parameters, found ${matrix.length}.`,
-    );
-  }
-  parameters.forEach((label, k) => {
-    checkRecord(label, `Parameter ${k + 1} of the covariance must be an object { item, name }`);
-    if (!(typeof label.item === "string" && typeof label.name === "string")) {
-      throw new DataError(
-        `Parameter ${k + 1} of the covariance needs a string item and name, found ${describe(label.item)} and ${describe(label.name)}.`,
-      );
-    }
-  });
-  matrix.forEach((row, i) => {
-    checkArray(row, `Row ${i + 1} of the covariance matrix must be an array of numbers`);
-    if (row.length !== parameters.length) {
-      throw new DataError(
-        `The covariance matrix must be square: row ${i + 1} has ${row.length} entries for ${parameters.length} parameters.`,
-      );
-    }
-    row.forEach((value, j) => {
-      checkFinite(value, `Entry (${i + 1}, ${j + 1}) of the covariance matrix`);
-    });
-  });
-  return parameters;
-}
-
-/**
  * Returns, for each parameter of the covariance, where it sits in the items of the forms: none if its item is on none.
  *
  * @throws `DataError` when an item's model does not estimate the named parameter.
@@ -213,14 +164,7 @@ export function parameterTargets(
       const index = indices[form]?.get(id);
       const item = index === undefined ? undefined : items[index];
       if (index === undefined || item === undefined) return;
-      const names = item.model.parameters(item.model.categoryCount(item.parameters)).map((parameter) => parameter.name);
-      const entry = names.indexOf(name);
-      if (entry < 0) {
-        throw new DataError(
-          `The covariance has the parameter "${name}" of item "${id}", which its ${item.model.name} model does not estimate; it estimates ${names.join(", ")}.`,
-        );
-      }
-      found.push({ form, item: index, entry });
+      found.push({ form, item: index, entry: parameterEntry(item, name, "the covariance") });
     });
     return found;
   });
@@ -229,7 +173,7 @@ export function parameterTargets(
 /**
  * Returns the gradient of the `outputs` values of a function of the items by central differences in each parameter
  * `used` of a covariance, by output, then parameter: (f(+h) - f(-h)) / 2h, `evaluate` giving f with the parameter's
- * places moved by a step and h from {@link differenceStep}.
+ * places moved by a step and h from {@link differenceStepOfCopies}.
  */
 export function differenceGradient(
   forms: readonly (readonly TestItem[])[],
@@ -241,7 +185,7 @@ export function differenceGradient(
   const gradient = new Float64Array(outputs * used.length);
   used.forEach((k, column) => {
     const found = targets[k] ?? [];
-    const step = differenceStep(forms, found);
+    const step = differenceStepOfCopies(forms, found);
     const above = evaluate(found, step);
     const below = evaluate(found, -step);
     for (let x = 0; x < outputs; x++) {
@@ -256,21 +200,11 @@ export function differenceGradient(
  *
  * @throws `DataError` when a copy lies on a bound of its range, where the equating has no derivative to take.
  */
-function differenceStep(forms: readonly (readonly TestItem[])[], found: readonly ParameterTarget[]): number {
-  let step = Infinity;
+function differenceStepOfCopies(forms: readonly (readonly TestItem[])[], found: readonly ParameterTarget[]): number {
+  let step = Number.POSITIVE_INFINITY;
   for (const { form, item, entry } of found) {
     const target = forms[form]?.[item];
-    if (target === undefined) continue;
-    const value = target.model.toVector(target.parameters)[entry] ?? 0;
-    const parameter = target.model.parameters(target.model.categoryCount(target.parameters))[entry];
-    const { lower = -Infinity, upper = Infinity } = parameter ?? {};
-    const room = BOUND_ROOM * Math.min(value - lower, upper - value);
-    if (!(room > 0)) {
-      throw new DataError(
-        `The parameter "${parameter?.name}" of item "${target.id}" is ${value}, on a bound of its range; the standard error needs it inside the range.`,
-      );
-    }
-    step = Math.min(step, DIFFERENCE_STEP * Math.max(1, Math.abs(value)), room);
+    if (target !== undefined) step = Math.min(step, differenceStep(target, entry));
   }
   return step;
 }

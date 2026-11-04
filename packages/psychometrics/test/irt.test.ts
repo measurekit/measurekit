@@ -7,6 +7,7 @@ import {
   betaPrior,
   buildResponseMatrix,
   buildResponseRecords,
+  type Calibration,
   type CalibrationOptions,
   type ConditionalCalibration,
   calibrate,
@@ -221,6 +222,22 @@ interface IrtLatentFixture {
   };
 }
 const latent = readFixture<IrtLatentFixture>("irt-latent.json");
+
+interface IrtFixedErrorCase {
+  name: string;
+  itemIds: string[];
+  responses: (number | null)[][];
+  latent: "normal" | "standard-normal";
+  fixed: Record<string, LogisticItem>;
+  fixedCovariance: ParameterCovariance;
+  items: { id: string; a: number; b: number }[];
+  groups: { mean: number; sd: number } | null;
+  covariance: { parameters: { item: string; name: string }[]; matrix: number[][] };
+  knownCovariance: number[][];
+  groupErrors: { mean: number; sd: number } | null;
+  knownGroupErrors: { mean: number; sd: number } | null;
+}
+const fixedError = readFixture<{ cases: IrtFixedErrorCase[] }>("irt-fixed-error.json");
 
 interface IrtLatentRegressionFixture {
   source: string;
@@ -1823,6 +1840,267 @@ describe("item priors", () => {
     expect(() => calibrate(matrix, { ...options, itemPriors: JSON.parse('{ "constructor": {} }') })).toThrow(
       'Priors are given for "constructor", which is not an item id.',
     );
+  });
+});
+
+describe("the sampling error of fixed items", () => {
+  const options = (reference: IrtFixedErrorCase) => ({
+    model: twoParameterLogistic,
+    fixed: reference.fixed,
+    ...(reference.latent === "normal" && { latent: "normal" as const }),
+    standardErrors: "hessian" as const,
+    tolerance: EM_TOLERANCE,
+    maxIterations: 10_000,
+  });
+  const matrixOf = (reference: IrtFixedErrorCase) =>
+    buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
+  const [independent] = fixedError.cases;
+
+  for (const reference of fixedError.cases) {
+    it(`matches base R's V + J S J' with ${reference.name}`, () => {
+      const known = calibrateWithCovariance(matrixOf(reference), options(reference));
+      const { calibration, covariance } = calibrateWithCovariance(matrixOf(reference), {
+        ...options(reference),
+        fixedCovariance: reference.fixedCovariance,
+      });
+      expect(calibration.converged).toBe(true);
+      for (const expected of reference.items) {
+        const actual = defined(calibration.items.find((item) => item.id === expected.id));
+        expectParameters(
+          actual.parameters,
+          { a: expected.a, b: expected.b, c: 0, d: 1 },
+          LATENT_PARAMETER_TOLERANCE,
+          actual.id,
+        );
+      }
+      expect(defined(covariance).parameters).toEqual(reference.covariance.parameters);
+      const compare = (actual: readonly (readonly number[])[], expected: number[][], what: string) => {
+        expected.forEach((row, i) => {
+          row.forEach((value, j) => {
+            const scale = Math.sqrt((expected[i]?.[i] ?? 0) * (expected[j]?.[j] ?? 0));
+            expectClose(
+              defined(actual[i]?.[j]),
+              value,
+              LATENT_STANDARD_ERROR_TOLERANCE * scale,
+              `${what} (${i}, ${j})`,
+            );
+          });
+        });
+      };
+      compare(defined(known.covariance).matrix, reference.knownCovariance, "known covariance");
+      compare(defined(covariance).matrix, reference.covariance.matrix, "covariance");
+      if (reference.groupErrors === null || reference.knownGroupErrors === null) return;
+      const [group] = calibration.groups;
+      const errors = defined(defined(group).standardErrors);
+      expectClose(errors.mean, reference.groupErrors.mean, LATENT_STANDARD_ERROR_TOLERANCE * errors.mean, "SE of mean");
+      expectClose(errors.sd, reference.groupErrors.sd, LATENT_STANDARD_ERROR_TOLERANCE * errors.sd, "SE of sd");
+      const knownErrors = defined(defined(known.calibration.groups[0]).standardErrors);
+      expectClose(
+        knownErrors.mean,
+        reference.knownGroupErrors.mean,
+        LATENT_STANDARD_ERROR_TOLERANCE * knownErrors.mean,
+      );
+    });
+  }
+
+  it("leaves the estimates as they are and adds as much to the variances as the covariance has", () => {
+    const reference = defined(independent);
+    const without = calibrateWithCovariance(matrixOf(reference), options(reference));
+    const scaled = (factor: number): ParameterCovariance => ({
+      parameters: reference.fixedCovariance.parameters,
+      matrix: reference.fixedCovariance.matrix.map((row) => row.map((value) => value * factor)),
+    });
+    const run = (factor: number) =>
+      calibrateWithCovariance(matrixOf(reference), { ...options(reference), fixedCovariance: scaled(factor) });
+    const zero = run(0);
+    const once = run(1);
+    const four = run(4);
+    expect(zero.calibration.items).toEqual(without.calibration.items);
+    expect(zero.covariance).toEqual(without.covariance);
+    expect(once.calibration.items.map((item) => item.parameters)).toEqual(
+      without.calibration.items.map((item) => item.parameters),
+    );
+    const base = defined(without.covariance).matrix;
+    defined(once.covariance).matrix.forEach((row, i) => {
+      row.forEach((value, j) => {
+        const added = value - (base[i]?.[j] ?? 0);
+        const fourfold = (defined(four.covariance).matrix[i]?.[j] ?? 0) - (base[i]?.[j] ?? 0);
+        expectClose(fourfold, 4 * added, 1e-9 * Math.max(1, Math.abs(fourfold)), `(${i}, ${j})`);
+      });
+      expect(row[i]).toBeGreaterThan(base[i]?.[i] ?? 0);
+    });
+  });
+
+  it("carries the fixed items' error with the cross-product standard errors too", () => {
+    const reference = defined(independent);
+    const crossProduct = { ...options(reference), standardErrors: "cross-product" as const };
+    const without = calibrate(matrixOf(reference), crossProduct);
+    const withError = calibrate(matrixOf(reference), { ...crossProduct, fixedCovariance: reference.fixedCovariance });
+    without.items.forEach((item, i) => {
+      if (item.standardErrors === null) return;
+      expect(defined(withError.items[i]?.standardErrors?.b)).toBeGreaterThan(defined(item.standardErrors.b));
+    });
+  });
+
+  it("skips the parameters of items the data do not have", () => {
+    const reference = defined(independent);
+    const pool: ParameterCovariance = {
+      parameters: [...reference.fixedCovariance.parameters, { item: "elsewhere", name: "a" }],
+      matrix: [
+        ...reference.fixedCovariance.matrix.map((row) => [...row, 0]),
+        [...reference.fixedCovariance.matrix.map(() => 0), 0.01],
+      ],
+    };
+    const listed = calibrateWithCovariance(matrixOf(reference), { ...options(reference), fixedCovariance: pool });
+    const exact = calibrateWithCovariance(matrixOf(reference), {
+      ...options(reference),
+      fixedCovariance: reference.fixedCovariance,
+    });
+    expect(listed.covariance).toEqual(exact.covariance);
+  });
+
+  /**
+   * Replicates a pretest under fixed items calibrated before, and counts the 95% intervals of the pretest items' a and b
+   * and of the mean of theta that cover the truth, with the fixed items taken as known and with their error carried.
+   */
+  const coverage = (design: {
+    readonly samePersons: boolean;
+    readonly replications: number;
+    readonly seed: number;
+  }) => {
+    const random = createRandom(design.seed);
+    const operational = 10;
+    const items = Array.from({ length: operational + 4 }, (_, j) => ({
+      id: `q${String(j + 1).padStart(2, "0")}`,
+      model: twoParameterLogistic,
+      parameters: { a: 0.8 + 1.2 * random.uniform(), b: random.normal(), c: 0, d: 1 },
+    }));
+    const itemIds = items.map((item) => item.id);
+    const z = normalQuantile(0.975);
+    const counts = { known: { a: 0, b: 0, mean: 0 }, carried: { a: 0, b: 0, mean: 0 }, items: 0, means: 0 };
+    for (let replication = 0; replication < design.replications; replication++) {
+      const persons = (count: number, mean: number, sd: number) =>
+        simulateThetas(count, random).map((theta) => mean + sd * theta);
+      const thetas = design.samePersons ? persons(1000, 0, 1) : persons(1000, 0.3, 1.1);
+      const rows = simulateResponses(items, thetas, random).responses;
+      const first = design.samePersons
+        ? rows.map((row) => row.slice(0, operational))
+        : simulateResponses(items.slice(0, operational), persons(250, 0, 1), random).responses;
+      const calibration = calibrateWithCovariance(
+        buildResponseMatrix(first, { itemIds: itemIds.slice(0, operational) }),
+        { model: twoParameterLogistic, standardErrors: "hessian" },
+      );
+      const base = {
+        model: twoParameterLogistic,
+        fixed: Object.fromEntries(calibration.calibration.items.map((item) => [item.id, item.parameters])),
+        ...(design.samePersons ? {} : { latent: "normal" as const }),
+        standardErrors: "hessian" as const,
+      };
+      const matrix = buildResponseMatrix(rows, { itemIds });
+      const fits = {
+        known: calibrate(matrix, base),
+        carried: calibrate(matrix, { ...base, fixedCovariance: defined(calibration.covariance) }),
+      };
+      for (const [name, fit] of Object.entries(fits) as [keyof typeof fits, Calibration<LogisticItem>][]) {
+        items.slice(operational).forEach((truth, k) => {
+          const estimate = defined(fit.items[operational + k]);
+          const errors = defined(estimate.standardErrors);
+          const parameters = estimate.parameters as LogisticItem;
+          if (Math.abs(parameters.a - truth.parameters.a) <= z * defined(errors.a)) counts[name].a++;
+          if (Math.abs(parameters.b - truth.parameters.b) <= z * defined(errors.b)) counts[name].b++;
+        });
+        const group = defined(fit.groups[0]);
+        if (!design.samePersons && Math.abs(group.mean - 0.3) <= z * defined(group.standardErrors).mean) {
+          counts[name].mean++;
+        }
+      }
+      counts.items += 4;
+      counts.means += 1;
+    }
+    return counts;
+  };
+
+  it("covers the pretest items and the mean when the fixed items were calibrated on other persons", () => {
+    // Thresholds fixed before the first run: with the error carried, 95% intervals of a and b cover the truth 0.92 to
+    // 0.98 of the time and those of the mean at least 0.88; taken as known, b's cover at most 0.90 and the mean's 0.85.
+    const counts = coverage({ samePersons: false, replications: 60, seed: 20261104 });
+    const share = (count: number, total: number) => count / total;
+    expect(share(counts.carried.a, counts.items)).toBeGreaterThanOrEqual(0.92);
+    expect(share(counts.carried.a, counts.items)).toBeLessThanOrEqual(0.98);
+    expect(share(counts.carried.b, counts.items)).toBeGreaterThanOrEqual(0.92);
+    expect(share(counts.carried.b, counts.items)).toBeLessThanOrEqual(0.98);
+    expect(share(counts.carried.mean, counts.means)).toBeGreaterThanOrEqual(0.88);
+    expect(share(counts.known.b, counts.items)).toBeLessThanOrEqual(0.9);
+    expect(share(counts.known.mean, counts.means)).toBeLessThanOrEqual(0.85);
+  }, 120_000);
+
+  it("covers the pretest items when the fixed items were calibrated on the same persons, theta standard normal", () => {
+    // Thresholds fixed before the first run: with the error carried, 95% intervals of a and b cover the truth 0.92 to
+    // 0.98 of the time.
+    const counts = coverage({ samePersons: true, replications: 40, seed: 20261105 });
+    for (const count of [counts.carried.a, counts.carried.b]) {
+      expect(count / counts.items).toBeGreaterThanOrEqual(0.92);
+      expect(count / counts.items).toBeLessThanOrEqual(0.98);
+    }
+  }, 120_000);
+
+  it("refuses a covariance without standard errors, of estimated items or of parameters it cannot move", () => {
+    const reference = defined(independent);
+    const matrix = matrixOf(reference);
+    const covariance = (item: string, name: string, variance = 0.01): ParameterCovariance => ({
+      parameters: [{ item, name }],
+      matrix: [[variance]],
+    });
+    expect(() =>
+      calibrate(matrix, { ...options(reference), standardErrors: "none", fixedCovariance: covariance("q01", "a") }),
+    ).toThrow('The option fixedCovariance needs the standard errors "hessian" or "cross-product".');
+    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: covariance("q09", "a") })).toThrow(
+      'The option fixedCovariance has the parameter "a" of item "q09", which is estimated here, not fixed.',
+    );
+    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: covariance("q01", "slope") })).toThrow(
+      'The option fixedCovariance has the parameter "slope" of item "q01", which its 2PL model does not estimate; it estimates a, b.',
+    );
+    const twice: ParameterCovariance = {
+      parameters: [
+        { item: "q01", name: "a" },
+        { item: "q01", name: "a" },
+      ],
+      matrix: [
+        [0.01, 0],
+        [0, 0.01],
+      ],
+    };
+    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: twice })).toThrow(
+      'The option fixedCovariance lists the parameter "a" of item "q01" twice.',
+    );
+    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: covariance("q01", "a", -0.01) })).toThrow(
+      "The option fixedCovariance is not positive semidefinite: the variance it adds to an estimate is negative",
+    );
+    const guessing = { ...options(reference), model: threeParameterLogistic, fixed: { ...reference.fixed } };
+    const pretest = reference.itemIds.filter((id) => !(id in reference.fixed));
+    expect(() =>
+      calibrate(matrix, {
+        ...guessing,
+        model: reference.itemIds.map((id) => (pretest.includes(id) ? twoParameterLogistic : threeParameterLogistic)),
+        fixedCovariance: covariance("q01", "c"),
+      }),
+    ).toThrow(
+      'The parameter "c" of item "q01" is 0, on a bound of its range; the standard error needs it inside the range.',
+    );
+  });
+
+  it("rejects a covariance of another type from JavaScript", () => {
+    const reference = defined(independent);
+    const matrix = matrixOf(reference);
+    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: JSON.parse("null") })).toThrow(
+      "The option fixedCovariance must be an object { parameters, matrix }, found null.",
+    );
+    expect(() =>
+      calibrate(matrix, {
+        ...options(reference),
+        fixedCovariance: JSON.parse('{"parameters":[{"item":"q01","name":"a"}],"matrix":[["1"]]}'),
+      }),
+    ).toThrow('Entry (1, 1) of the matrix of the option fixedCovariance must be a finite number, found "1".');
   });
 });
 

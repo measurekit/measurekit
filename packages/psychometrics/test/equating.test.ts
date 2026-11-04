@@ -1967,10 +1967,10 @@ describe("irtEquatingStandardErrors", () => {
     ).toThrow("The covariance needs a row for each of its 1 parameters, found 2.");
     expect(() =>
       irtEquatingStandardErrors(from, to, { parameters: [{ item: "C1", name: "a" }], matrix: [[1, 2]] }),
-    ).toThrow("The covariance matrix must be square: row 1 has 2 entries for 1 parameters.");
+    ).toThrow("The matrix of the covariance must be square: row 1 has 2 entries for 1 parameters.");
     expect(() =>
       irtEquatingStandardErrors(from, to, { parameters: [{ item: "C1", name: "a" }], matrix: [[Number.NaN]] }),
-    ).toThrow("Entry (1, 1) of the covariance matrix must be a finite number, found NaN.");
+    ).toThrow("Entry (1, 1) of the matrix of the covariance must be a finite number, found NaN.");
     expect(() =>
       irtEquatingStandardErrors(from, to, { parameters: JSON.parse('[{"item": 1, "name": "a"}]'), matrix: [[1]] }),
     ).toThrow('Parameter 1 of the covariance needs a string item and name, found 1 and "a".');

@@ -12,6 +12,7 @@ import { type DifAnalysis, type PurificationOptions, purified, significant } fro
 export type IrtDifOptions<TParameters> = Omit<
   CalibrationOptions<TParameters>,
   | "fixed"
+  | "fixedCovariance"
   | "fixedParameters"
   | "groups"
   | "latent"
