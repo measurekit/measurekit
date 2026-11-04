@@ -58,6 +58,8 @@ pnpm bench            # the benchmarks of every package, against their budgets
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # the built packages
 pnpm check:packages   # publint and Are the Types Wrong on the packed packages
+pnpm check:release    # every package of a changeset is published, and a first release is 1.0.0
+pnpm check:tarballs   # packs the packages, installs them and imports every subpath
 pnpm check:rules      # the rules on untrusted input: each one's test fails without it
 pnpm check:licenses   # the licenses of the production dependencies
 pnpm check:audit      # known vulnerabilities of the dependencies

@@ -2,6 +2,11 @@ packages:
   - packages/*
   - examples
 
+# A version is installed only when it has been on the registry for 14 days, which STANDARDS.md asks of every dependency:
+# `minimumReleaseAge: 20160` (in minutes). It is not set yet. pnpm checks the lock file against it on every install, and 44
+# of its 400 entries (Biome 2.6.4 of 2026-10-28, @babel/parser 7.29.12 of 2026-10-29 and others) are younger, so `pnpm
+# install --frozen-lockfile` would fail until 2026-11-13. Add the line on that day.
+
 allowBuilds:
   esbuild: false
   lefthook: false

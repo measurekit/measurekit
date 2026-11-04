@@ -105,7 +105,7 @@ validation/<package>/         R and Python scripts that write the fixtures; vali
 validation/benchmarks/        the inputs of the benchmarks and the timing of their references; bench/ their harness
 examples/<package>/           runnable examples; examples/test/ runs each of them, the samples of the guides and the
                               examples of the TSDoc
-scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts and their tests; entry-sizes.ts
+scripts/                      check-standards.ts, check-rules.ts, check-licenses.ts, check-release.ts, check-tarballs.ts and their tests; entry-sizes.ts
                               bundles each entry point alone, against the budgets of size-budgets.ts in test/entry-sizes.test.ts;
                               peak-memory.ts measures the readers of untrusted input, against their budgets in test/peak-memory.test.ts
 biome/  .changeset/           GritQL lint rules; the pending release, one changeset for each package
@@ -124,6 +124,8 @@ pnpm bench            # builds, then the benchmarks of every package against the
 pnpm knip             # unused files, exports and dependencies
 pnpm build            # every package, from a clean dist/
 pnpm check:packages   # builds, then publint and Are the Types Wrong on each packed package
+pnpm check:release    # fails when a package of a changeset is private, lacks publishConfig.access, or is at 0.0.0 with less than major
+pnpm check:tarballs   # builds, packs every package, installs the tarballs into a scratch project, imports every subpath and type-checks it with bundler and node16
 pnpm check:rules      # removes each rule of scripts/check-rules.ts from a copy of the code; its test must fail
 pnpm check:licenses   # fails on a production dependency whose license is not MIT, Apache-2.0, BSD or ISC
 pnpm check:audit      # pnpm audit of the production dependencies at any severity and of all at high; needs the network
@@ -146,6 +148,8 @@ merged, the maintainer runs the Release workflow by hand: it runs `rules.yml`, a
 of psychometrics pass, `pnpm release`, which builds and runs `changeset publish` with npm trusted publishing, and
 publishes the versions not yet on npm; it uses no changesets/action. No
 workflow opens pull requests, and Dependabot version updates are off. Changesets, docs and TSDoc describe current behavior only.
+A package at 0.0.0 takes `major` in its first changeset, so that it is released as 1.0.0; `pnpm check:release` fails on a
+`minor` or a `patch` for it, and on a package of a changeset that is private or lacks `publishConfig.access`.
 
 ## Dependencies
 
@@ -156,6 +160,9 @@ workflow opens pull requests, and Dependabot version updates are off. Changesets
 - Code goes into `@measurekit/core` only if both libraries use it. What one library uses stays in that library, so that
   core does not become a place for everything. A generic routine that both use, such as a Cholesky factorization, is
   written once, in core.
+- Every dependency of every `package.json` of the workspace is an exact version, development tools too, so that every
+  machine and CI run builds the same output; `scripts/test/versions.test.ts` fails on a range. `@types/node` stays on the
+  oldest supported Node.js major, and Dependabot ignores its major versions.
 - Code outside `packages/` imports a package by name.
 - A module imports another only through its `index.ts` or its `internal.ts`, which lists what the modules and tests of
   the package share and is never exported from the package. `pnpm check:standards` fails on a deep path.

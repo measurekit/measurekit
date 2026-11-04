@@ -11,7 +11,7 @@
     "@measurekit/psychometrics": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "22.20.5"
   },
   "license": "Apache-2.0"
 }
