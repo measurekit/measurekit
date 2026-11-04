@@ -91,9 +91,12 @@ describe("the changes job of ci.yml", () => {
   let repository = "";
   let base = "";
 
+  /** The environment without git's variables: a hook sets `GIT_DIR`, and a test's git would then write to the real repository. */
+  const withoutGit = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
   const git = (...args: string[]): string =>
     execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args], {
       cwd: repository,
+      env: withoutGit,
       encoding: "utf8",
     }).trim();
 
@@ -104,7 +107,7 @@ describe("the changes job of ci.yml", () => {
       input: program,
       encoding: "utf8",
       // biome-ignore lint/style/useNamingConvention: these are the names of the variables.
-      env: { ...process.env, BASE: since, GITHUB_OUTPUT: "" },
+      env: { ...withoutGit, BASE: since, GITHUB_OUTPUT: "" },
     });
     expect(run.status, run.stderr).toBe(0);
     const outputs = new Map(
