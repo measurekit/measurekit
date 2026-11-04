@@ -75,6 +75,12 @@ has no standard error, prior or place in the covariance, and the AIC and BIC do 
 and `summedScoreFit` take the same object, and `summedScoreFit` the anchors' ids, so that Δ and the degrees of freedom
 count only the estimated parameters, as mirt's.
 
+Lord's chi-square, Raju's area and the IRT likelihood-ratio test take `fixedParameters` too, held in both groups, as
+difR's `c` holds the lower asymptotes of the 3PL in `difLord` and `difRaju`, and mirt's `est = FALSE` in a multiple-group
+model: a held parameter is not compared or counted in the degrees of freedom. Lord's and Raju's hold the asymptotes
+alone, as the link moves a and b, and Raju's area takes a 3PL or 4PL item whose asymptotes are held, whose areas are
+d - c times the 2PL's.
+
 `calibrate` takes `personWeights`, each person's survey weight, rescaled to sum to the persons with a response, as mirt's
 `survey.weights` asks: every sum over persons counts the person times the weight, the regression of theta on covariates
 included, so that the estimates are the population's and the standard errors keep the sample's size. Without the

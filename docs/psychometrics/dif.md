@@ -15,18 +15,18 @@ mirt, the differential functioning against DFIT, and the sparse-data rule agains
 Every function takes a [response matrix](data.md) and one `DifGroup` per person: `"reference"` or `"focal"`, the group
 whose items are studied. Both groups need persons.
 
-| Function                                                | Items           | Matching                                                        | Persons used                                                            |
-| ------------------------------------------------------- | --------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `mantelHaenszel(matrix, groups, options)`               | Dichotomous     | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
-| `logisticRegressionDif(matrix, groups, options)`        | Dichotomous     | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
-| `lordChiSquare(matrix, groups, options)`                | 2PL, 3PL or 4PL | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
-| `mantelTest(matrix, groups, options)`                   | Any             | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
-| `ordinalLogisticRegressionDif(matrix, groups, options)` | Any             | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
-| `logisticDiscriminantDif(matrix, groups, options)`      | Any             | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
-| `sibtest(matrix, groups, options)`                      | Any, or bundles | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
-| `rajuAreaDif(matrix, groups, options)`                  | 2PL             | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
-| `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model       | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
-| `differentialFunctioning(reference, focal, options)`    | Any model       | Theta of the focal group's population                           | None: it takes items                                                    |
+| Function                                                | Items                              | Matching                                                        | Persons used                                                            |
+| ------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `mantelHaenszel(matrix, groups, options)`               | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
+| `logisticRegressionDif(matrix, groups, options)`        | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
+| `lordChiSquare(matrix, groups, options)`                | 2PL, 3PL or 4PL                    | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
+| `mantelTest(matrix, groups, options)`                   | Any                                | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
+| `ordinalLogisticRegressionDif(matrix, groups, options)` | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
+| `logisticDiscriminantDif(matrix, groups, options)`      | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
+| `sibtest(matrix, groups, options)`                      | Any, or bundles                    | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
+| `rajuAreaDif(matrix, groups, options)`                  | 2PL; 3PL, 4PL with held asymptotes | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
+| `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model                          | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
+| `differentialFunctioning(reference, focal, options)`    | Any model                          | Theta of the focal group's population                           | None: it takes items                                                    |
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -169,11 +169,14 @@ flowchart LR
 ```
 
 1. It calibrates each group separately with `calibrate` and `options`: the [calibration options](irt.md#calibration)
-   without `fixed`. The model is the 2PL, 3PL or 4PL.
+   without `fixed`. The model is the 2PL, 3PL or 4PL, and `fixedParameters` holds an asymptote at its value in both
+   groups, as difR's `c` holds the lower asymptote of a 3PL item: `{ q7: { c: 0.25 } }`. It holds c and d alone, as
+   the link moves a and b.
 2. It moves the focal group's estimates to the reference scale by the mean-sigma transformation over the anchors, all
    items at first ([equating](equating.md#linking)): a / A and A b + B, and their covariance matrices with them.
 3. For each item, with v the estimated parameters and Σ their covariance matrix from the calibration,
-   χ² = (v_R - v_F)ᵀ (Σ_R + Σ_F)⁻¹ (v_R - v_F), with as many degrees of freedom as parameters.
+   χ² = (v_R - v_F)ᵀ (Σ_R + Σ_F)⁻¹ (v_R - v_F), with as many degrees of freedom as estimated parameters: a held
+   parameter is not compared, so a 3PL item whose c is held has 2, as in difR.
 
 The covariance matrices are the observed information: the inverse Hessian of the marginal log-likelihood
 (`standardErrors: "hessian"` in [calibration](irt.md#standard-errors)), which is what ltm's `vcov` gives to difR's
@@ -183,10 +186,11 @@ With `purify: true` the two calibrations are kept: each round links the scales a
 round before, and compares every item, flagged ones included, on that link. The calibrations are not repeated, as in
 difR, so purification costs the linking and the statistics only.
 
-| Option   | Default        | Meaning                                                                                                |
-| -------- | -------------- | ------------------------------------------------------------------------------------------------------ |
-| `purify` | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                                   |
-| Others   | As `calibrate` | The [calibration options](irt.md#calibration) without `fixed`, `groups`, `latent` and `standardErrors` |
+| Option            | Default        | Meaning                                                                                                 |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------- |
+| `fixedParameters` | None           | Values of c and d held in both groups by item id, as in [calibration](irt.md#calibration); not compared |
+| `purify`          | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                                    |
+| Others            | As `calibrate` | The [calibration options](irt.md#calibration) without `fixed`, `groups`, `latent` and `standardErrors`  |
 
 The result holds `items`, `{ id, chiSquare, degreesOfFreedom, significance }` each, both calibrations, whose
 `converged` reports their EM, the `transformation` of the final round and the `purification`. difR's ltm uses 21
@@ -197,9 +201,12 @@ items, which a dichotomous model has none of.
 ## Raju's areas
 
 `rajuAreaDif` measures the area between an item's curves in the two groups (Raju, 1988, 1990), as difR's `difRaju`. It
-calibrates and links the groups as [Lord's chi-square](#lords-chi-square) does, with the same options, for the 2PL alone:
-a 3PL item with unequal lower asymptotes has an infinite unsigned area. With Δb = b_F - b_R and the focal estimates on
-the reference scale:
+calibrates and links the groups as [Lord's chi-square](#lords-chi-square) does, with the same options. Curves with
+unequal asymptotes enclose an infinite area, so each item estimates its slope and location alone: a 2PL item, or
+a 3PL or 4PL item whose asymptotes `fixedParameters` holds in both groups, as difR's `c` holds the 3PL's. Curves
+c + (d - c) P(θ) enclose d - c times the area of the 2PL curves P, so the areas and their standard errors are d - c times
+the 2PL's, and the z tests are the 2PL's. With Δb = b_F - b_R and the focal estimates on the reference scale, for a 2PL
+item:
 
 | Field          | Definition                                                                                                        |
 | -------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -516,12 +523,13 @@ group normal, its mean and standard deviation estimated with the items. An item 
 `<id>:reference` answered by the reference group and `<id>:focal` by the focal group, and calibrating again. χ² is twice
 the difference of the log-likelihoods, with as many degrees of freedom as the item has parameters its model does not
 share: 2 for the 2PL, K for a graded or generalized partial credit item of K categories, 1 for the 1PL, whose slope is
-shared. Missing responses are skipped, as in calibration.
+shared. A parameter `fixedParameters` holds is held at its value in both groups and every calibration, as mirt's
+`est = FALSE`, and is not counted: 2 for a 3PL item whose c is held. Missing responses are skipped, as in calibration.
 
 | Field              | Definition                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `chiSquare`        | 2 (ln L with the item free in each group - ln L with it equal); `null` when a group lacks one of its categories, or a fit did not converge |
-| `degreesOfFreedom` | The entries of the item's parameter vector its model does not share                                                                        |
+| `degreesOfFreedom` | The entries of the item's parameter vector its model does not share and `fixedParameters` does not hold                                    |
 | `significance`     | The probability of a chi-square at least as large without DIF                                                                              |
 
 The result holds `items`, the [`purification`](#purification) and `constrained`, the calibration of the last round, whose
@@ -530,13 +538,14 @@ The result holds `items`, the [`purification`](#purification) and `constrained`,
 constraining it. It stops before fewer than two items are constrained, as the free item of a test is linked to the
 reference scale through the others. Each round runs one calibration more than there are items.
 
-| Option          | Default        | Meaning                                                                               |
-| --------------- | -------------- | ------------------------------------------------------------------------------------- |
-| `model`         | Required       | One model for every item, or one per item                                             |
-| `quadrature`    | 61 rectangular | The rule over theta; the focal group's normal distribution needs the rectangular rule |
-| `tolerance`     | `1e-4`         | EM's tolerance in each calibration                                                    |
-| `maxIterations` | `500`          | EM's most iterations in each calibration                                              |
-| `purify`        | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                  |
+| Option            | Default        | Meaning                                                                                   |
+| ----------------- | -------------- | ----------------------------------------------------------------------------------------- |
+| `model`           | Required       | One model for every item, or one per item                                                 |
+| `fixedParameters` | None           | Values held in both groups by item id, then parameter name, such as `{ q7: { c: 0.25 } }` |
+| `quadrature`      | 61 rectangular | The rule over theta; the focal group's normal distribution needs the rectangular rule     |
+| `tolerance`       | `1e-4`         | EM's tolerance in each calibration                                                        |
+| `maxIterations`   | `500`          | EM's most iterations in each calibration                                                  |
+| `purify`          | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                      |
 
 Priors, fixed items, covariates, testlets and the choice of groups and distributions are not options: priors would turn
 the ratio of likelihoods into one of posteriors, and the rest are the test's own.
@@ -827,8 +836,10 @@ Invalid input throws `DataError` naming the value found.
 | `smallCell` is below 2, or `guessing` is 1 or more                                                         | Give an integer from 2, and a guessing parameter from 0 to below 1                                   |
 | A bundle is empty, or names an unknown item or one item twice                                              | Give each bundle its distinct items, by their ids in the matrix                                      |
 | An item's persons use more than 255 categories, for `mantelTest` and `ordinalLogisticRegressionDif`        | Group the categories into at most 255                                                                |
-| Raju's area with a model other than the 2PL                                                                | Use `lordChiSquare` for the 3PL and 4PL, or `irtLikelihoodRatioDif` for any model                    |
+| Raju's area with an item that estimates more than a and b, such as a 3PL item whose c is not held          | Hold the asymptotes in `fixedParameters`, or use `lordChiSquare` or `irtLikelihoodRatioDif`          |
 | IRT likelihood-ratio DIF with fewer than two items, or the Gauss-Hermite rule                              | Give at least two items, and the rectangular rule, which the focal group's normal distribution needs |
+| `fixedParameters` names an item or a parameter that the matrix or the item's model lacks                   | Name the items by their ids in the matrix, and parameters of their models that are not shared        |
+| `fixedParameters` holds a or b in Lord's chi-square or Raju's area                                         | Hold the asymptotes alone, as the link moves a and b                                                 |
 | Differential functioning with lists of other items or order, or a population whose weights do not sum to 1 | Give the same items in the same order in both lists, and a distribution of theta                     |
 
 ## Differences from difR
@@ -839,6 +850,7 @@ Invalid input throws `DataError` naming the value found.
 | ETS categories             | ETS's rule with its significance tests                                                                                         | `print` codes \|MH D-DIF\| alone: below 1 A, below 1.5 B, else C                                                                                           |
 | Lord's calibrations        | EM to `tolerance`                                                                                                              | ltm's default control, 40 EM cycles then BFGS, stops short: up to 2% in χ²                                                                                 |
 | Lord's 1PL                 | Not supported: `oneParameterLogistic` estimates a common a                                                                     | a fixed at 1                                                                                                                                               |
+| Held parameters            | `fixedParameters` holds c and d of any item in Lord's and Raju's tests, and any parameter in the likelihood-ratio test         | `c` holds the lower asymptotes of the 3PL, one value or one per item, in `difLord` and `difRaju`                                                           |
 | Liu-Agresti standard error | Equation 3 of Liu and Agresti: on 1,000 seeded sets its mean is the spread of ln ψ̂ within 5%, the same with the groups swapped | `liu_agresti_ccor(se = "liu_agresti")` is another estimate, 1.69 times the spread with the focal group first and 0.37 times with the reference group first |
 | Lord's purification        | Stops before fewer than 2 anchors are left, and `converged` says so                                                            | Rescales on the items not flagged, whose spread is undefined for fewer than two                                                                            |
 | Raju's unsigned area       | The area between the curves, at least 0                                                                                        | Negative where the focal slope is the lower: the expression inside the absolute value, `integrate` shows                                                   |

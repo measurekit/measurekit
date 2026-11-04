@@ -92,12 +92,20 @@ export const RULES: readonly Rule[] = [
     titles: "lacks a category",
   },
   {
-    rule: "Raju's areas take the 2PL alone, as a 3PL with unequal lower asymptotes has an infinite unsigned area.",
+    rule: "Raju's areas take items that estimate a and b alone, as curves with unequal asymptotes enclose an infinite area.",
     file: "packages/psychometrics/src/dif/raju-area.ts",
-    find: "if (model !== twoParameterLogistic) {",
+    find: "if (names.join() !== AREA_PARAMETERS) {",
     replace: "if (false) {",
     test: "packages/psychometrics/test/dif.test.ts",
-    titles: "rejects models other than the 2PL",
+    titles: "an item with an estimated asymptote",
+  },
+  {
+    rule: "Lord's and Raju's statistics hold the asymptotes alone, as the link moves a and b away from their held values.",
+    file: "packages/psychometrics/src/dif/linked-calibrations.ts",
+    find: "if (!UNLINKED_PARAMETERS.has(name)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/dif.test.ts",
+    titles: "refuses held parameters that the link moves",
   },
   {
     rule: "Differential functioning compares each item with itself: the focal list holds the reference items in their order.",

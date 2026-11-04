@@ -1,19 +1,28 @@
 import { checkBoolean, checkOptions, chiSquareUpperTail, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
-import { type Calibration, type CalibrationOptions, calibrate, checkModel, modelsOf } from "../irt/internal.js";
+import {
+  type Calibration,
+  type CalibrationOptions,
+  calibrate,
+  checkHeldParameters,
+  checkModel,
+  type FixedParameters,
+  modelsOf,
+  readFixedParameters,
+} from "../irt/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 
 /**
- * Options of {@link irtLikelihoodRatioDif}: the model, quadrature and stopping rules of the calibrations, and `purify`.
- * The groups and their distributions of theta are the test's own, priors would turn the likelihood ratio into a ratio
- * of posteriors, and person weights would turn it into a ratio of pseudo-likelihoods, which is not chi-square.
+ * Options of {@link irtLikelihoodRatioDif}: the model, the parameters held in both groups (`fixedParameters`), the
+ * quadrature and stopping rules of the calibrations, and `purify`. The groups and their distributions of theta are the
+ * test's own, priors would turn the likelihood ratio into a ratio of posteriors, and person weights would turn it into
+ * a ratio of pseudo-likelihoods, which is not chi-square.
  */
 export type IrtDifOptions<TParameters> = Omit<
   CalibrationOptions<TParameters>,
   | "fixed"
   | "fixedCovariance"
-  | "fixedParameters"
   | "groups"
   | "latent"
   | "covariates"
@@ -27,6 +36,7 @@ export type IrtDifOptions<TParameters> = Omit<
 
 const IRT_DIF_OPTIONS: FieldNames<IrtDifOptions<unknown>> = {
   model: true,
+  fixedParameters: true,
   quadrature: true,
   tolerance: true,
   maxIterations: true,
@@ -42,7 +52,7 @@ export interface IrtDifTest {
    * in a group or a fit did not converge.
    */
   readonly chiSquare: number | null;
-  /** The entries of the item's parameter vector that its model does not share among items. */
+  /** The entries of the item's parameter vector that its model does not share among items and that are not held. */
   readonly degreesOfFreedom: number;
   /** The probability of a chi-square at least as large without DIF. */
   readonly significance: number | null;
@@ -75,9 +85,11 @@ const LATENT = { focal: "normal" } as const;
  * The constrained model calibrates both groups on one scale with every item equal across them: the reference group
  * N(0, 1) and the focal group normal, its mean and standard deviation estimated with the items. An item is tested by
  * replacing it with two items, one answered by each group, and calibrating again: χ² = 2 (ln L₁ - ln L₀), with as many
- * degrees of freedom as the item has parameters its model does not share. Missing responses are skipped, as in
- * calibration. An item's test is `null` when a group lacks one of its categories from 0 to its highest response, as
- * its parameters would not be identified in that group, or when one of the two fits did not converge.
+ * degrees of freedom as the item has parameters its model does not share. A parameter `fixedParameters` holds, such as a
+ * 3PL item's lower asymptote, is held at its value in both groups and in every calibration, as mirt's `est = FALSE`,
+ * and is not counted. Missing responses are skipped, as in calibration. An item's test is `null` when a group lacks one
+ * of its categories from 0 to its highest response, as its parameters would not be identified in that group, or when
+ * one of the two fits did not converge.
  *
  * With `purify`, the items flagged at 0.05 stay free in both models of the next round: an item not flagged is tested
  * by freeing it, a flagged one by constraining it, each against the model of that round. Purification stops, with
@@ -86,13 +98,13 @@ const LATENT = { focal: "normal" } as const;
  *
  * @param matrix - The responses of the persons.
  * @param groups - The group of each person, in the order of the matrix.
- * @param options - The model, the quadrature, which must be rectangular, and the stopping rules of the calibrations, and
- *   whether to purify.
+ * @param options - The model, the held parameters, the quadrature, which must be rectangular, and the stopping rules of
+ *   the calibrations, and whether to purify.
  * @returns The test of every item, the purification when it was asked for, and the constrained calibration of the last
  *   round.
- * @throws `DataError` when the matrix or the groups are invalid, there are fewer than two items, `purify` is not a
- * boolean, a calibration option is invalid, or the constrained calibration throws it, as for the Gauss-Hermite rule or
- * an item without responses in a category below its highest.
+ * @throws `DataError` when the matrix or the groups are invalid, there are fewer than two items, `fixedParameters` is
+ * invalid for the items, `purify` is not a boolean, a calibration option is invalid, or the constrained calibration
+ * throws it, as for the Gauss-Hermite rule or an item without responses in a category below its highest.
  * @see {@link https://doi.org/10.1177/014662169802200403 | Kim and Cohen (1998)}
  */
 export function irtLikelihoodRatioDif<TParameters>(
@@ -102,7 +114,7 @@ export function irtLikelihoodRatioDif<TParameters>(
 ): IrtDif<TParameters> {
   checkGroups(matrix, groups);
   checkOptions(options, IRT_DIF_OPTIONS);
-  const { purify = false, model, quadrature, tolerance, maxIterations } = options;
+  const { purify = false, model, fixedParameters = {}, quadrature, tolerance, maxIterations } = options;
   checkBoolean(purify, "The option purify");
   const { itemIds } = matrix;
   if (itemIds.length < MINIMUM_ITEMS) {
@@ -112,10 +124,19 @@ export function irtLikelihoodRatioDif<TParameters>(
     checkModel(each, "The option model must be an IRT model such as twoParameterLogistic");
   });
   const highest = highestResponses(matrix);
+  const heldOfItem = readFixedParameters(fixedParameters, itemIds, new Set());
+  const degrees = models.map((each, item) => {
+    const id = itemIds[item] ?? "";
+    const specifications = each.parameters((highest[item] ?? 0) + 1);
+    const held = heldOfItem.get(id) ?? new Map<string, number>();
+    checkHeldParameters(id, each.name, specifications, held);
+    return specifications.filter(({ name, shared }) => shared !== true && !held.has(name)).length;
+  });
   const testable = itemIds.map((_, item) => answersEveryCategory(matrix, groups, item, highest[item] ?? 0));
   const fit = (free: Uint8Array): Calibration<TParameters> =>
     calibrate(splitMatrix(matrix, groups, free), {
       model: models.flatMap((each, item) => (free[item] === 1 ? [each, each] : [each])),
+      fixedParameters: splitHeld(fixedParameters, itemIds, free),
       quadrature,
       tolerance,
       maxIterations,
@@ -128,9 +149,7 @@ export function irtLikelihoodRatioDif<TParameters>(
     const base = fit(free);
     constrained = base;
     return itemIds.map((id, item) => {
-      const degreesOfFreedom = (models[item]?.parameters((highest[item] ?? 0) + 1) ?? []).filter(
-        (parameter) => parameter.shared !== true,
-      ).length;
+      const degreesOfFreedom = degrees[item] ?? 0;
       const undefinedTest = { id, chiSquare: null, degreesOfFreedom, significance: null };
       if (!testable[item]) return undefinedTest;
       const toggled = free.slice();
@@ -173,6 +192,26 @@ function answersEveryCategory(
     if (response !== null) seen[(groups[person] === "focal" ? categories : 0) + response] = 1;
   });
   return seen.every((answered) => answered === 1);
+}
+
+/**
+ * Returns the held parameters of the items of {@link splitMatrix}: an item marked 1 in `free` holds them in both
+ * groups.
+ */
+function splitHeld(fixedParameters: FixedParameters, itemIds: readonly string[], free: Uint8Array): FixedParameters {
+  return Object.fromEntries(
+    itemIds.flatMap((id, item) => {
+      // An own entry only, so that an item id such as "constructor" holds nothing it was not given.
+      const held = Object.hasOwn(fixedParameters, id) ? fixedParameters[id] : undefined;
+      if (held === undefined) return [];
+      return free[item] === 1
+        ? [
+            [`${id}:reference`, held],
+            [`${id}:focal`, held],
+          ]
+        : [[id, held]];
+    }),
+  );
 }
 
 /**

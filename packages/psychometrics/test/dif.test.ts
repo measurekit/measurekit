@@ -9,6 +9,7 @@ import {
   type DifGroup,
   type DifPurification,
   differentialFunctioning,
+  fourParameterLogistic,
   generalizedPartialCredit,
   gradedResponse,
   type IrtDifOptions,
@@ -251,6 +252,43 @@ interface DifLordPurificationFixture {
   }[];
 }
 const lordPurification = readFixture<DifLordPurificationFixture>("dif-lord-purification.json");
+
+interface DifFixedParametersFixture {
+  itemIds: string[];
+  responses: number[][];
+  focal: number[];
+  fixedParameters: Record<string, { c: number }>;
+  calibrationTolerance: number;
+  lord: {
+    chiSquare: number[];
+    degreesOfFreedom: number;
+    significance: number[];
+    reference: { a: number[]; b: number[] };
+    focal: { a: number[]; b: number[] };
+    transformation: { slope: number; intercept: number };
+  };
+  raju: RajuFixture;
+  likelihoodRatioTolerance: number;
+  likelihoodRatio: {
+    chiSquare: number[];
+    degreesOfFreedom: number[];
+    significance: number[];
+    logLikelihood: number;
+    focal: { mean: number; sd: number };
+  };
+}
+const heldFixture = readFixture<DifFixedParametersFixture>("dif-fixed-parameters.json");
+/** The 3PL items of dif-fixed-parameters.json with their lower asymptotes held, as difR's `c` holds them. */
+const heldCase = {
+  matrix: buildResponseMatrix(heldFixture.responses, { itemIds: heldFixture.itemIds }),
+  groups: groups(heldFixture.focal),
+  options: {
+    model: threeParameterLogistic,
+    fixedParameters: heldFixture.fixedParameters,
+    tolerance: heldFixture.calibrationTolerance,
+    maxIterations: 10_000,
+  },
+};
 
 interface DifPolytomousFixture {
   cases: {
@@ -769,6 +807,8 @@ const LOGISTIC_TOLERANCE = 1e-9;
 const LORD_RELATIVE_TOLERANCE = 1e-5;
 /** The mean-sigma transformation of the focal scale. */
 const LORD_TRANSFORMATION_TOLERANCE = 1e-8;
+/** Item parameters and the transformation against mirt's calibrations with g held, both run to the optimum. */
+const HELD_PARAMETER_TOLERANCE = 1e-8;
 /** Mantel's chi-square, the generalized chi-square and the standardized mean difference against base R. */
 const MANTEL_TEST_TOLERANCE = 1e-12;
 /** Ordinal logistic regression chi-squares, R² changes and slope changes against MASS::polr. */
@@ -1178,6 +1218,51 @@ describe("lordChiSquare", () => {
     });
   }
 
+  it("matches difR's difLord with c on 3PL items whose lower asymptotes are held in both groups", () => {
+    const result = lordChiSquare(heldCase.matrix, heldCase.groups, heldCase.options);
+    const { lord } = heldFixture;
+    result.items.forEach((item, i) => {
+      const expected = lord.chiSquare[i] ?? 0;
+      expectClose(item.chiSquare, expected, LORD_RELATIVE_TOLERANCE * expected, `chi-square ${i + 1}`);
+      expectClose(item.significance, lord.significance[i] ?? null, LORD_RELATIVE_TOLERANCE, `significance ${i + 1}`);
+      expect(item.degreesOfFreedom).toBe(lord.degreesOfFreedom);
+    });
+    for (const [calibration, expected] of [
+      [result.reference, lord.reference],
+      [result.focal, lord.focal],
+    ] as const) {
+      calibration.items.forEach((item, i) => {
+        expectClose(item.parameters.a, expected.a[i] ?? 0, HELD_PARAMETER_TOLERANCE, `a of ${item.id}`);
+        expectClose(item.parameters.b, expected.b[i] ?? 0, HELD_PARAMETER_TOLERANCE, `b of ${item.id}`);
+        expect(item.parameters.c).toBe(heldFixture.fixedParameters[item.id]?.c);
+      });
+    }
+    expectClose(result.transformation.slope, lord.transformation.slope, HELD_PARAMETER_TOLERANCE);
+    expectClose(result.transformation.intercept, lord.transformation.intercept, HELD_PARAMETER_TOLERANCE);
+  });
+
+  it("refuses held parameters that the link moves, that a model lacks, or of other ids", () => {
+    const matrix = buildResponseMatrix(CONSTANT_ROWS);
+    const options = { model: threeParameterLogistic };
+    expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, { ...options, fixedParameters: { item2: { a: 1 } } })).toThrow(
+      'Lord\'s chi-square holds the asymptotes c and d alone, which the link leaves unchanged; the option fixedParameters holds "a" of item "item2".',
+    );
+    expect(() =>
+      rajuAreaDif(matrix, CONSTANT_GROUPS, { ...options, fixedParameters: { item2: { b: 0, c: 0.2 } } }),
+    ).toThrow(
+      'Raju\'s area holds the asymptotes c and d alone, which the link leaves unchanged; the option fixedParameters holds "b" of item "item2".',
+    );
+    expect(() =>
+      lordChiSquare(matrix, CONSTANT_GROUPS, { model: twoParameterLogistic, fixedParameters: { item2: { c: 0.2 } } }),
+    ).toThrow('The option fixedParameters holds "c" of item "item2", whose 2PL model has a, b.');
+    expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, { ...options, fixedParameters: { q1: { c: 0.2 } } })).toThrow(
+      'The option fixedParameters holds parameters of "q1", which is not an item id.',
+    );
+    expect(() => lordChiSquare(matrix, CONSTANT_GROUPS, { ...options, fixedParameters: JSON.parse("null") })).toThrow(
+      "The option fixedParameters must be an object of values by item id and parameter name, found null.",
+    );
+  });
+
   it("rejects models other than the 2PL, 3PL and 4PL, and a group without persons", () => {
     const matrix = buildResponseMatrix(CONSTANT_ROWS);
     const custom = { ...twoParameterLogistic, name: "custom 2PL" };
@@ -1259,14 +1344,41 @@ describe("rajuAreaDif", () => {
     }
   });
 
-  it("rejects models other than the 2PL, and a group without persons", () => {
+  it("matches difR's difRaju with c on 3PL items whose lower asymptotes are held in both groups", () => {
+    const result = rajuAreaDif(heldCase.matrix, heldCase.groups, heldCase.options);
+    expectRaju(result.items, heldFixture.raju);
+  });
+
+  it("gives 4PL items whose asymptotes are held at c and 1 the areas difR gives the 3PL items", () => {
+    const fixedParameters = Object.fromEntries(
+      Object.entries(heldFixture.fixedParameters).map(([id, { c }]) => [id, { c, d: 1 }]),
+    );
+    const result = rajuAreaDif(heldCase.matrix, heldCase.groups, {
+      ...heldCase.options,
+      model: fourParameterLogistic,
+      fixedParameters,
+    });
+    expectRaju(result.items, heldFixture.raju);
+  });
+
+  it("rejects models other than the 2PL, 3PL and 4PL, an item with an estimated asymptote, and a group without persons", () => {
     const matrix = buildResponseMatrix(CONSTANT_ROWS);
     for (const model of [oneParameterLogistic, threeParameterLogistic, { ...twoParameterLogistic, name: "copy" }]) {
       expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, { model })).toThrow(DataError);
     }
     expect(() =>
-      rajuAreaDif(matrix, CONSTANT_GROUPS, { model: [twoParameterLogistic, threeParameterLogistic] }),
-    ).toThrow('Raju\'s area needs the 2PL model, found the "3PL" model.');
+      rajuAreaDif(matrix, CONSTANT_GROUPS, {
+        model: [twoParameterLogistic, threeParameterLogistic, twoParameterLogistic],
+      }),
+    ).toThrow(
+      'Raju\'s area needs items that estimate a and b alone, as the 2PL does, or the 3PL and 4PL with their asymptotes in the option fixedParameters; item "item2" of the 3PL model estimates a, b, c.',
+    );
+    expect(() =>
+      rajuAreaDif(matrix, CONSTANT_GROUPS, { model: fourParameterLogistic, fixedParameters: { item1: { c: 0.2 } } }),
+    ).toThrow('item "item1" of the 4PL model estimates a, b, d.');
+    expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, { model: oneParameterLogistic })).toThrow(
+      'Raju\'s area needs the 2PL, 3PL or 4PL model, found the "1PL" model.',
+    );
     const focal: DifGroup[] = CONSTANT_GROUPS.map(() => "focal");
     expect(() => rajuAreaDif(matrix, focal, { model: twoParameterLogistic })).toThrow(
       "Raju's area needs persons in the reference group.",
@@ -1282,7 +1394,7 @@ describe("rajuAreaDif", () => {
       'There is no option "verbose"',
     );
     expect(() => rajuAreaDif(matrix, CONSTANT_GROUPS, { model: JSON.parse('"2PL"') })).toThrow(
-      'The option model must be the 2PL model, found "2PL".',
+      'The option model must be the 2PL, 3PL or 4PL model, found "2PL".',
     );
     expect(() =>
       rajuAreaDif(matrix, CONSTANT_GROUPS, { model: twoParameterLogistic, purify: JSON.parse('"yes"') }),
@@ -1349,6 +1461,42 @@ describe("irtLikelihoodRatioDif", () => {
       );
     });
   }
+
+  it("matches mirt's multiple-group likelihood ratios with the lower asymptotes of 3PL items held in both groups", () => {
+    const { likelihoodRatio } = heldFixture;
+    const result = irtLikelihoodRatioDif(heldCase.matrix, heldCase.groups, {
+      ...heldCase.options,
+      tolerance: heldFixture.likelihoodRatioTolerance,
+    });
+    expectLikelihoodRatio(result.items, likelihoodRatio);
+    const { constrained } = result;
+    expect(constrained.converged).toBe(true);
+    expectClose(constrained.logLikelihood, likelihoodRatio.logLikelihood, LIKELIHOOD_RATIO_TOLERANCE);
+    const focal = constrained.groups.find((group) => group.group === "focal");
+    expectClose(focal?.mean ?? null, likelihoodRatio.focal.mean, LATENT_TOLERANCE);
+    expectClose(focal?.sd ?? null, likelihoodRatio.focal.sd, LATENT_TOLERANCE);
+    for (const item of constrained.items) expect(item.parameters.c).toBe(heldFixture.fixedParameters[item.id]?.c);
+  });
+
+  it("leaves a held parameter out of the degrees of freedom, and refuses held parameters of other ids or models", () => {
+    const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
+    const subset = buildResponseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
+    const { items, constrained } = irtLikelihoodRatioDif(subset, caseGroups, {
+      model: twoParameterLogistic,
+      fixedParameters: { item2: { a: 1 } },
+    });
+    expect(items.map((item) => item.degreesOfFreedom)).toEqual([2, 1, 2, 2, 2, 2]);
+    expect(constrained.items[1]?.parameters.a).toBe(1);
+    expect(() =>
+      irtLikelihoodRatioDif(subset, caseGroups, {
+        model: twoParameterLogistic,
+        fixedParameters: { "item1:focal": { a: 1 } },
+      }),
+    ).toThrow('The option fixedParameters holds parameters of "item1:focal", which is not an item id.');
+    expect(() =>
+      irtLikelihoodRatioDif(subset, caseGroups, { model: gradedResponse, fixedParameters: { item1: { c: 0.2 } } }),
+    ).toThrow('The option fixedParameters holds "c" of item "item1", whose GRM model has a, b1.');
+  });
 
   it("gives the values of the guide's sample, and the differential functioning of its free items", () => {
     const { matrix, personGroups } = guideSample(10, { 2: 1 }, 0);
