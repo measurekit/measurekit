@@ -1,4 +1,5 @@
-# Evaluation fixtures: AUC by pROC; RMSE, log-loss, accuracy, calibration bins and learning curves in base R.
+# Evaluation fixtures: AUC by pROC; RMSE, log-loss, accuracy, calibration bins and learning curves in base R. Log-loss
+# clips each prediction to [eps, 1 - eps] with eps the machine epsilon, as scikit-learn's log_loss does.
 
 source("validation/knowledge-tracing/common.R")
 suppressPackageStartupMessages(library(pROC))
@@ -28,7 +29,10 @@ metric_case <- function(name, p, y) {
     auc = if (binary) as.numeric(auc(roc(response = y, predictor = p, levels = c(0, 1), direction = "<",
                                           quiet = TRUE))) else NA,
     rmse = sqrt(mean((p - y)^2)),
-    logLoss = -mean(ifelse(y > 0, y * log(p), 0) + ifelse(y < 1, (1 - y) * log(1 - p), 0)),
+    logLoss = {
+      q <- pmin(pmax(p, .Machine$double.eps), 1 - .Machine$double.eps)
+      -mean(ifelse(y > 0, y * log(q), 0) + ifelse(y < 1, (1 - y) * log(1 - q), 0))
+    },
     accuracy = if (binary) mean((p > 0.5) == (y == 1)) else NA,
     calibration = calibration_bins(p, y, 10),
     calibration4 = calibration_bins(p, y, 4)
@@ -42,11 +46,16 @@ binary_y <- rbinom(400, 1, binary_p)
 partial_p <- runif(150, 0.02, 0.98)
 partial_y <- round(runif(150), 1)
 write_fixture("evaluate-metrics", list(
-  source = "pROC::auc of roc(direction = \"<\"); RMSE, log-loss, accuracy (p > 0.5) and cut() bins in base R.",
+  source = paste(
+    "pROC::auc of roc(direction = \"<\"); RMSE, log-loss with predictions clipped to the machine epsilon as",
+    "scikit-learn's log_loss, accuracy (p > 0.5) and cut() bins in base R."
+  ),
   cases = list(
     metric_case("textbook", c(0.1, 0.4, 0.35, 0.8), c(0, 0, 1, 1)),
     metric_case("binary", binary_p, binary_y),
-    metric_case("partial credit", partial_p, partial_y)
+    metric_case("partial credit", partial_p, partial_y),
+    # Certain predictions, right and wrong, and predictions closer to 0 or 1 than the machine epsilon.
+    metric_case("certain", c(0, 1, 1, 0, 1e-300, 0.5, 0.3, 0.9, 1e-17, 1 - 1e-16), c(1, 0, 1, 0, 1, 0, 1, 1, 0, 0))
   )
 ))
 

@@ -1,7 +1,7 @@
 import { checkArray, checkChoice, checkOptions, checkRecord, DataError, studentLowerTail } from "@measurekit/core";
 import { checkLog, type Fold } from "../data/internal.js";
-import { outcomeLogLikelihood } from "../math/internal.js";
 import type { CrossValidation } from "./cross-validation.js";
+import { predictionLogLoss } from "./metrics.js";
 import { checkPredictionList } from "./observed-pairs.js";
 
 /** The loss of one prediction that {@link compareByLearner} averages. */
@@ -10,8 +10,8 @@ export type LearnerLoss = "log" | "squared";
 /** Options of {@link compareByLearner}. */
 export interface CompareByLearnerOptions {
   /**
-   * The loss of a prediction: `"log"`, -(y ln p + (1 - y) ln(1 - p)), or `"squared"`, (p - y)². Log loss is infinite for
-   * a certain prediction that is wrong, which leaves the test undefined: use `"squared"` then.
+   * The loss of a prediction: `"log"`, -(y ln p + (1 - y) ln(1 - p)) with p clipped to [ε, 1 - ε] as `logLoss` clips it,
+   * or `"squared"`, (p - y)².
    *
    * @defaultValue `"log"`
    */
@@ -24,7 +24,7 @@ export interface LearnerComparison {
   readonly learners: number;
   /** The mean over learners of the first model's loss minus the second's: negative when the first predicts better. */
   readonly meanDifference: number | null;
-  /** The standard error of the mean difference, s / √n; `null` with one learner, or an infinite loss. */
+  /** The standard error of the mean difference, s / √n; `null` with one learner. */
   readonly standardError: number | null;
   /** The t statistic, the mean difference over its standard error; `null` where that is undefined. */
   readonly statistic: number | null;
@@ -53,8 +53,6 @@ const ESSENTIALLY_CONSTANT = 10 * Number.EPSILON;
  * predicted take part, and a learner in several test folds, as under a split by item or by time, has the mean over all
  * of their events. The standard error, the statistic and the p-value are `null` for one learner, which has no variance
  * of differences, and the statistic and the p-value for differences that are all equal, which have none to test.
- * A learner with an infinite loss under either model has no difference, and the mean difference, the standard error,
- * the statistic and the p-value are `null`.
  *
  * @param first - The evaluation of the first model on `folds`, as `crossValidate` returns it.
  * @param second - The evaluation of the second model on the same folds.
@@ -124,16 +122,13 @@ function predictionsOf(
 }
 
 function lossOf(loss: LearnerLoss, prediction: number, outcome: number): number {
-  return loss === "log" ? -outcomeLogLikelihood(prediction, outcome) : (prediction - outcome) ** 2;
+  return loss === "log" ? predictionLogLoss(prediction, outcome) : (prediction - outcome) ** 2;
 }
 
 /** Returns the paired t test of differences, one per learner, as R's `t.test(paired = TRUE)` computes it. */
 function pairedTest(differences: readonly number[]): LearnerComparison {
   const learners = differences.length;
   const degreesOfFreedom = learners - 1;
-  if (differences.some((difference) => !Number.isFinite(difference))) {
-    return { learners, meanDifference: null, standardError: null, statistic: null, degreesOfFreedom, pValue: null };
-  }
   const meanDifference = differences.reduce((sum, difference) => sum + difference, 0) / learners;
   if (learners === 1) {
     return { learners, meanDifference, standardError: null, statistic: null, degreesOfFreedom, pValue: null };

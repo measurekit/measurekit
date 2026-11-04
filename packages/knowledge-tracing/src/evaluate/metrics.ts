@@ -10,7 +10,10 @@ export interface Metrics {
   readonly auc: number | null;
   /** The root mean square error √(mean (p - y)²). */
   readonly rmse: number;
-  /** The mean negative log-likelihood -mean(y ln p + (1 - y) ln(1 - p)), natural logarithm. */
+  /**
+   * The mean negative log-likelihood -mean(y ln p + (1 - y) ln(1 - p)), natural logarithm, with each prediction clipped
+   * to [ε, 1 - ε], ε = 2^-52.
+   */
   readonly logLoss: number;
   /**
    * The share of outcomes predicted right, a prediction above 0.5 meaning correct, or `null` unless outcomes are 0 or
@@ -65,12 +68,19 @@ export function rmse(predictions: readonly number[], outcomes: readonly number[]
 
 /**
  * Returns the mean negative log-likelihood of outcomes under predictions, -mean(y ln p + (1 - y) ln(1 - p)) with the
- * natural logarithm. A prediction of 0 or 1 that is wrong makes it `Infinity`.
+ * natural logarithm, each prediction clipped to [ε, 1 - ε] with ε = 2^-52, the machine epsilon of a double.
+ *
+ * @remarks
+ * The clip is scikit-learn's: a prediction of 0 or 1 that is wrong costs -ln ε, about 36.04, rather than making the
+ * mean infinite, and one that is right costs about ε. A logistic model rounds to exactly 1 once its linear predictor
+ * passes about 36.7, and R's `glm` bounds the probabilities of its logit link by the same ε, so the log loss of such a
+ * prediction is the one glm's would have.
  *
  * @param predictions - The predicted probabilities.
  * @param outcomes - The outcomes, one for each prediction.
- * @returns The mean negative log-likelihood, at least 0.
+ * @returns The mean negative log-likelihood, from 0 to -ln ε.
  * @throws `DataError` when the predictions and outcomes are malformed.
+ * @see {@link https://scikit-learn.org/stable/modules/generated/sklearn.metrics.log_loss.html | scikit-learn's log_loss}
  */
 export function logLoss(predictions: readonly number[], outcomes: readonly number[]): number {
   checkPredictions(predictions, outcomes);
@@ -213,8 +223,20 @@ function rootMeanSquareError(predictions: readonly number[], outcomes: readonly 
 
 function meanLogLoss(predictions: readonly number[], outcomes: readonly number[]): number {
   let sum = 0;
-  for (let k = 0; k < predictions.length; k++) sum += -outcomeLogLikelihood(predictions[k] ?? 0, outcomes[k] ?? 0);
+  for (let k = 0; k < predictions.length; k++) sum += predictionLogLoss(predictions[k] ?? 0, outcomes[k] ?? 0);
   return sum / predictions.length;
+}
+
+/**
+ * How far log loss keeps a prediction from 0 and 1: the machine epsilon of a double, 2^-52, at which scikit-learn's
+ * `log_loss` clips predictions and the inverse logit link of R's `binomial()` bounds those of `glm` beyond a linear
+ * predictor of 30.
+ */
+const PREDICTION_BOUND = Number.EPSILON;
+
+/** Returns the log loss of one prediction, -(y ln p + (1 - y) ln(1 - p)), with p clipped to [ε, 1 - ε]. */
+export function predictionLogLoss(prediction: number, outcome: number): number {
+  return -outcomeLogLikelihood(Math.min(Math.max(prediction, PREDICTION_BOUND), 1 - PREDICTION_BOUND), outcome);
 }
 
 function shareRight(predictions: readonly number[], outcomes: readonly number[]): number {

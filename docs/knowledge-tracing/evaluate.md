@@ -24,7 +24,7 @@ equal length with at least one entry.
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------- |
 | `auc(predictions, outcomes)`      | The area under the ROC curve: P(a correct outcome has a higher prediction than an incorrect one), ties counting ½ | 0/1 outcomes, both present |
 | `rmse(predictions, outcomes)`     | √(mean (p - y)²)                                                                                                  | Any outcomes               |
-| `logLoss(predictions, outcomes)`  | -mean(y ln p + (1 - y) ln(1 - p)), natural logarithm                                                              | Any outcomes               |
+| `logLoss(predictions, outcomes)`  | -mean(y ln p + (1 - y) ln(1 - p)), natural logarithm, p clipped to [ε, 1 - ε] with ε = 2^-52                      | Any outcomes               |
 | `accuracy(predictions, outcomes)` | The share of outcomes predicted right; a prediction above 0.5 predicts a correct outcome                          | 0/1 outcomes               |
 | `rSquared(predictions, outcomes)` | 1 - Σ(y - p)² / Σ(y - ȳ)²: the share of the variance of the outcomes that the predictions explain                 | Outcomes not all equal     |
 | `kappa(predictions, outcomes)`    | Cohen's kappa of the predictions above 0.5 and the outcomes: agreement beyond chance, (p_o - p_e) / (1 - p_e)     | 0/1 outcomes, p_e below 1  |
@@ -41,7 +41,11 @@ metrics([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]);
 - **AUC** depends only on the order of the predictions, so it is unchanged by any increasing transformation of them.
   It measures how well predictions rank outcomes, not whether their values are right; RMSE, log-loss and calibration
   measure that.
-- **Log-loss** is `Infinity` when a prediction of 0 or 1 is wrong; a right one adds 0.
+- **Log-loss** clips each prediction to [ε, 1 - ε], with ε = 2^-52 ≈ 2.2e-16, the machine epsilon of a double, as
+  scikit-learn's `log_loss` does. A prediction of 0 or 1 that is wrong adds -ln ε ≈ 36.04 instead of making the mean
+  infinite, and a right one adds about ε. Logistic models predict exactly 1 once their linear predictor passes about
+  36.7; R's `glm` bounds the probabilities of its logit link by the same ε, so their log-loss is the one `glm`'s
+  predictions would have.
 - **R²** is 0 for predictions that equal the mean outcome and below 0 for worse ones. Like RMSE it measures the values
   of the predictions, not their order.
 - **Kappa** is 0 for predictions that agree with the outcomes only as often as chance gives, and 1 for exact agreement.
@@ -236,8 +240,8 @@ compareByLearner(plain, concept, folds);
 - **Pairing.** Only test events with an outcome that both models predicted take part, so `unseenSkills: "skip"` leaves
   the same events out of both.
 - **Where the test is undefined.** `statistic` and `pValue` are `null` with one learner and when every difference is
-  equal, as for a model against itself. A certain prediction that is wrong has an infinite log loss: the learner has no
-  difference, and `meanDifference`, `standardError`, `statistic` and `pValue` are `null`. Use `"squared"` then.
+  equal, as for a model against itself. The log loss of a prediction is clipped as `logLoss` clips it, so a certain
+  prediction that is wrong counts -ln ε, about 36.04.
 - **Comparing Q-matrices.** Build one log per Q-matrix from the same events with `buildEventLog(events, { qMatrix })`,
   split each with `splitByLearner` and the same seed, so that the folds hold the same learners, run `compareModels` on
   each, and pass a row of each to `compareByLearner` with either log's folds.
@@ -355,4 +359,7 @@ categorizeCurve(fractions, { minLearners: 3, minPoints: 3, slope: 0.2, minSlope:
 ## Differences from the references
 
 - `compareByLearner` gives `null` where `t.test` stops with "data are essentially constant" or with one pair.
+- `logLoss` clips predictions at the machine epsilon, as scikit-learn's `log_loss` does, and so pyBKT's `evaluate` with
+  `metric="log_loss"`, which calls it. LKT clips the predictions of its LiblineaR fits to [1e-5, 1 - 1e-5] before its
+  log-likelihood, which changes the predictions themselves; measurekit leaves predictions as the models give them.
 - `categorizeCurve` takes the AFM slope as an argument; DataShop computes it on its own.

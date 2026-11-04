@@ -10,7 +10,11 @@ suppressPackageStartupMessages({
   library(pROC)
 })
 
-outcome_log_likelihood <- function(p, y) ifelse(y > 0, y * log(p), 0) + ifelse(y < 1, (1 - y) * log1p(-p), 0)
+# Predictions clipped to [eps, 1 - eps] with eps the machine epsilon, as scikit-learn's log_loss and measurekit clip them.
+outcome_log_likelihood <- function(p, y) {
+  q <- pmin(pmax(p, .Machine$double.eps), 1 - .Machine$double.eps)
+  ifelse(y > 0, y * log(q), 0) + ifelse(y < 1, (1 - y) * log1p(-q), 0)
+}
 
 r_squared <- function(p, y) if (length(unique(y)) < 2) NA else 1 - sum((y - p)^2) / sum((y - mean(y))^2)
 

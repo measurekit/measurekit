@@ -48,6 +48,9 @@ split by time of a curriculum gives, so that BKT and logistic models can be eval
 whether two models predict differently well, with a paired t test of their losses averaged per learner.
 `metricsByOpportunity` gives the metrics by opportunity, `learningCurve` takes `predictions` and `minOpportunities` in
 an options object, and `fitPowerLaw` and `categorizeCurve` fit a curve's power law and give DataShop's category of it.
+Log-loss, in `logLoss`, `metrics` and `compareByLearner`, clips each prediction to [ε, 1 - ε] at the machine epsilon, as
+scikit-learn's `log_loss` does, so a certain prediction that is wrong, such as a logistic model's past a linear predictor
+of about 36.7, costs about 36.04 instead of making the loss infinite.
 
 The basic local independence model of `kst` holds rates at given values with `fixed`, gives items one rate with `equal`, and
 is fitted by maximum likelihood, minimum discrepancy or both together (`method: "mdml"`). A fit reports G² against the

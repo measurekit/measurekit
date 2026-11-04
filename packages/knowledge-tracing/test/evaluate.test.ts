@@ -526,9 +526,32 @@ describe("metrics", () => {
     });
   });
 
-  it("give a log-loss of Infinity for a certain prediction that is wrong, and 0 for one that is right", () => {
-    expect(logLoss([1, 0], [1, 0])).toBe(0);
-    expect(logLoss([1, 0.5], [0, 1])).toBe(Number.POSITIVE_INFINITY);
+  it("clip a certain prediction to the machine epsilon in log-loss, as scikit-learn's log_loss does", () => {
+    // A wrong one costs -ln 2^-52 = 52 ln 2, a right one -ln(1 - 2^-52), which is 2^-52 to double precision.
+    expectClose(logLoss([1, 0.5], [0, 1]), (52 * Math.LN2 + Math.LN2) / 2, 1e-14);
+    expectClose(logLoss([0, 0.5], [1, 0]), (52 * Math.LN2 + Math.LN2) / 2, 1e-14);
+    expectClose(logLoss([1, 0], [1, 0]), Number.EPSILON, 1e-30);
+    expectClose(logLoss([1e-300], [0.5]), (52 * Math.LN2) / 2, 1e-14);
+  });
+
+  it("keep the log-loss of a logistic model finite where its prediction rounds to 1", () => {
+    // AFM with a slope of 1 a practice predicts logistic(40) after 40 attempts, which is 1 in double precision.
+    const events = Array.from({ length: 41 }, (_, time) => ({
+      learner: "ana",
+      item: "q",
+      skills: ["fractions"],
+      time,
+      outcome: time < 40 ? 1 : 0,
+    }));
+    const model = afm({
+      proficiency: "none",
+      parameters: { skills: { fractions: { intercept: 0, coefficients: { opportunities: 1 } } } },
+    });
+    let state = model.initialState("ana");
+    for (const event of events.slice(0, 40)) state = model.update(state, event);
+    const prediction = model.predict(state, defined(events[40]));
+    expect(prediction).toBe(1);
+    expectClose(logLoss([prediction], [0]), 52 * Math.LN2, 1e-14);
   });
 
   it("predict a correct outcome above 0.5 only", () => {
@@ -805,16 +828,14 @@ describe("compareByLearner", () => {
       expectClose(result.pValue, 1 - 1 / Math.sqrt(3), 1e-12);
     });
 
-    it("has no test where a certain prediction is wrong, as its log loss is infinite", () => {
+    it("tests a certain prediction that is wrong at the log loss logLoss gives it, 52 ln 2", () => {
+      // Differences of 51 ln 2, 0 and 0 have a mean of 17 ln 2 and an error of 17 ln 2, so t = 1.
       const result = compareByLearner(evaluate([0, 0.5, 0.5]), evaluate([0.5, 0.5, 0.5]), [fold]);
-      expect(result).toEqual({
-        learners: 3,
-        meanDifference: null,
-        standardError: null,
-        statistic: null,
-        degreesOfFreedom: 2,
-        pValue: null,
-      });
+      expect(result.learners).toBe(3);
+      expectClose(result.meanDifference, 17 * Math.LN2, 1e-14);
+      expectClose(result.standardError, 17 * Math.LN2, 1e-14);
+      expectClose(result.statistic, 1, 1e-14);
+      expectClose(result.pValue, 1 - 1 / Math.sqrt(3), 1e-12);
     });
 
     it("has a difference but no variance for one learner", () => {
