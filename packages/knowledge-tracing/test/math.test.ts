@@ -1,4 +1,4 @@
-import { logistic, normalQuantile } from "@measurekit/core";
+import { logistic, normalQuantile, shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { createRandom } from "../src/index.js";
@@ -7,12 +7,11 @@ import {
   createHiddenMarkovBuffers,
   createProblem,
   expectationMaximization,
-  forwardBackward,
+  type HiddenMarkovBuffers,
   logisticRegression,
   newtonCg,
   outcomeLogLikelihood,
   penalizedNewton,
-  permutation,
   quinticDerivative,
   quinticHermite,
   quinticMaximum,
@@ -82,18 +81,6 @@ describe("outcomeLogLikelihood", () => {
     expect(outcomeLogLikelihood(0, 0)).toBe(0);
     expect(outcomeLogLikelihood(0, 1)).toBe(Number.NEGATIVE_INFINITY);
     expect(outcomeLogLikelihood(1, 0)).toBe(Number.NEGATIVE_INFINITY);
-  });
-});
-
-describe("permutation", () => {
-  it("returns every index once and reproduces from the same seed", () => {
-    fc.assert(
-      fc.property(fc.integer({ min: 0, max: 50 }), fc.integer(), (size, seed) => {
-        const order = permutation(size, createRandom(seed));
-        expect([...order].toSorted((a, b) => a - b)).toEqual(Array.from({ length: size }, (_, i) => i));
-        expect(permutation(size, createRandom(seed))).toEqual(order);
-      }),
-    );
   });
 });
 
@@ -320,6 +307,26 @@ function invert(matrix: readonly (readonly number[])[]): number[][] {
     }
   }
   return work.map((row) => row.slice(n));
+}
+
+/**
+ * The forward-backward algorithm on one sequence, in buffers of its exact length: the oracle of {@link smoothSequence},
+ * which a fit runs on the first steps of buffers made for its longest sequence.
+ */
+function forwardBackward(sequence: Pick<HiddenMarkovBuffers, "stateCount" | "initial" | "transitions" | "emissions">) {
+  const { stateCount: k, emissions } = sequence;
+  const steps = emissions.length / k;
+  const pairs = k * k * Math.max(steps - 1, 0);
+  const buffers: HiddenMarkovBuffers = {
+    ...sequence,
+    predictions: new Float64Array(steps * k),
+    filtered: new Float64Array(steps * k),
+    posteriors: new Float64Array(steps * k),
+    transitionPosteriors: new Float64Array(pairs),
+  };
+  const logLikelihood = smoothSequence(buffers, steps);
+  const { posteriors, transitionPosteriors, predictions } = buffers;
+  return { logLikelihood, posteriors, transitionPosteriors, predictions };
 }
 
 describe("forwardBackward", () => {
@@ -599,7 +606,9 @@ describe("rank", () => {
         );
         const all = [...chosen.map(unit), ...mixed];
         expect(rank(columns(...all))).toBe(chosen.length);
-        const shuffled = Array.from(permutation(all.length, createRandom(seed)), (at) => defined(all[at]));
+        const order = Uint32Array.from(all, (_, at) => at);
+        shuffle(order, createRandom(seed));
+        const shuffled = Array.from(order, (at) => defined(all[at]));
         expect(rank(columns(...shuffled))).toBe(chosen.length);
       }),
     );

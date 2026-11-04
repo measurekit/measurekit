@@ -2,13 +2,8 @@
 
 export { createProblem, type FlatDirection, linear, penalizedNewton } from "./arrow-system.js";
 export { expectationMaximization } from "./expectation-maximization.js";
-export { indexOfMax, minimum } from "./extremes.js";
-export {
-  createHiddenMarkovBuffers,
-  forwardBackward,
-  type HiddenMarkovBuffers,
-  smoothSequence,
-} from "./hidden-markov.js";
+export { indexOfMax } from "./extremes.js";
+export { createHiddenMarkovBuffers, type HiddenMarkovBuffers, smoothSequence } from "./hidden-markov.js";
 export { choleskySolve } from "./linear-algebra.js";
 export { outcomeLogLikelihood } from "./logistic.js";
 export {
@@ -18,7 +13,6 @@ export {
   MAX_DENSE_COEFFICIENTS,
 } from "./logistic-regression.js";
 export { newtonCg } from "./newton-cg.js";
-export { permutation } from "./permutation.js";
 export { type Jet, quinticDerivative, quinticHermite, quinticMaximum } from "./quintic.js";
 export { rank } from "./rank.js";
 export { reflectedWalk } from "./reflected-walk.js";

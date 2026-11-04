@@ -1,8 +1,11 @@
 /**
- * One observed sequence of a hidden Markov model with K states, whose transitions and emissions may change from step
- * to step, as those of knowledge tracing models do with the item practiced. Matrices are stored by rows.
+ * The arrays of the forward-backward algorithm for hidden Markov models with K states, whose transitions and emissions
+ * may change from step to step, as those of knowledge tracing models do with the item practiced. They are long enough
+ * for the longest of several sequences, which a caller fills and reads one sequence at a time, so that the E-step of a
+ * model allocates nothing for each sequence. A sequence of T steps takes the first entries of each. Matrices are stored
+ * by rows.
  */
-export interface HiddenMarkovSequence {
+export interface HiddenMarkovBuffers {
   /** K, the number of hidden states. */
   readonly stateCount: number;
   /** P(state i at step 0): K entries. */
@@ -14,31 +17,17 @@ export interface HiddenMarkovSequence {
   readonly transitions: Float64Array;
   /** P(observation at step t | state i at step t): T × K, by step, then i. Every step has a positive probability. */
   readonly emissions: Float64Array;
-}
-
-/** The posterior quantities of a sequence, by the scaled forward-backward algorithm. */
-export interface ForwardBackward {
-  /** ln P(observations). */
-  readonly logLikelihood: number;
-  /** P(state i at step t | all observations): T × K, by step, then i. */
-  readonly posteriors: Float64Array;
-  /** P(state i at step t, state j at step t + 1 | all observations): T - 1 matrices of K × K, as `transitions`. */
-  readonly transitionPosteriors: Float64Array;
   /**
    * P(state i at step t | the observations before step t): T × K, by step, then i. These are the predictions of online
    * inference, made before each observation.
    */
   readonly predictions: Float64Array;
-}
-
-/**
- * The arrays of the forward-backward algorithm, long enough for the longest of several sequences, which a caller fills
- * and reads one sequence at a time, so that the E-step of a model allocates nothing for each sequence. A sequence of T
- * steps takes the first entries of each, as {@link HiddenMarkovSequence} and {@link ForwardBackward} lay them out.
- */
-export interface HiddenMarkovBuffers extends HiddenMarkovSequence, Omit<ForwardBackward, "logLikelihood"> {
   /** P(state i at step t | the observations to step t): T × K, by step, then i. */
   readonly filtered: Float64Array;
+  /** P(state i at step t | all observations): T × K, by step, then i. */
+  readonly posteriors: Float64Array;
+  /** P(state i at step t, state j at step t + 1 | all observations): T - 1 matrices of K × K, as `transitions`. */
+  readonly transitionPosteriors: Float64Array;
 }
 
 /** Returns the buffers of sequences of K states and at most `maxSteps` steps. */
@@ -58,34 +47,14 @@ export function createHiddenMarkovBuffers(stateCount: number, maxSteps: number):
 }
 
 /**
- * Runs the forward-backward algorithm on one sequence: the forward pass normalizes the forward variables at each step,
- * with the log-likelihood the sum of the logs of the normalizers, and the backward pass smooths the normalized ones, so
- * that long sequences neither underflow nor overflow.
- *
- * @see {@link https://doi.org/10.1109/5.18626 | Rabiner (1989)}
- */
-export function forwardBackward(sequence: HiddenMarkovSequence): ForwardBackward {
-  const { stateCount: k, emissions } = sequence;
-  const steps = emissions.length / k;
-  const pairs = k * k * Math.max(steps - 1, 0);
-  const buffers: HiddenMarkovBuffers = {
-    ...sequence,
-    predictions: new Float64Array(steps * k),
-    filtered: new Float64Array(steps * k),
-    posteriors: new Float64Array(steps * k),
-    transitionPosteriors: new Float64Array(pairs),
-  };
-  const logLikelihood = smoothSequence(buffers, steps);
-  const { posteriors, transitionPosteriors, predictions } = buffers;
-  return { logLikelihood, posteriors, transitionPosteriors, predictions };
-}
-
-/**
- * Runs the forward-backward algorithm, as {@link forwardBackward} does, on the first `steps` steps of the buffers'
- * `initial`, `transitions` and `emissions`, and writes the first entries of their `predictions`, `filtered`,
- * `posteriors` and `transitionPosteriors`.
+ * Runs the forward-backward algorithm on the first `steps` steps of the buffers' `initial`, `transitions` and
+ * `emissions`, and writes the first entries of their `predictions`, `filtered`, `posteriors` and
+ * `transitionPosteriors`: the forward pass normalizes the forward variables at each step, with the log-likelihood the
+ * sum of the logs of the normalizers, and the backward pass smooths the normalized ones, so that long sequences neither
+ * underflow nor overflow.
  *
  * @returns ln P(observations).
+ * @see {@link https://doi.org/10.1109/5.18626 | Rabiner (1989)}
  */
 export function smoothSequence(buffers: HiddenMarkovBuffers, steps: number): number {
   const logLikelihood = forward(buffers, steps);

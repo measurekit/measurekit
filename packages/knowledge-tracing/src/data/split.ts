@@ -1,5 +1,4 @@
-import { checkIntegerFrom, checkRandom, DataError, type Random } from "@measurekit/core";
-import { permutation } from "../math/internal.js";
+import { checkIntegerFrom, checkRandom, DataError, type Random, shuffle } from "@measurekit/core";
 import { type Event, isObserved } from "./event.js";
 import { checkLog, type EventLog } from "./event-log.js";
 
@@ -105,8 +104,10 @@ function splitByKey(
     );
   }
   // Dealing the ids out in random order gives every fold the same number of them, up to one.
+  const order = Uint32Array.from(ids, (_, index) => index);
+  shuffle(order, random);
   const position = new Uint32Array(ids.length);
-  permutation(ids.length, random).forEach((index, place) => {
+  order.forEach((index, place) => {
     position[index] = place;
   });
   const foldOf = new Map(ids.map((id, index) => [id, (position[index] ?? 0) % folds]));

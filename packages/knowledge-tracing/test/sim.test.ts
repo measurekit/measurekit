@@ -1,3 +1,4 @@
+import { shuffle } from "@measurekit/core";
 import { describe, expect, it } from "vitest";
 import {
   type Attempt,
@@ -17,7 +18,6 @@ import {
   simulate,
   surmiseStructure,
 } from "../src/index.js";
-import { permutation } from "../src/math/internal.js";
 import { correlation, defined } from "./assertions.js";
 
 // Recovery thresholds, fixed before the simulations were first run.
@@ -208,14 +208,16 @@ describe("recovery from simulated learners", () => {
         learners: Object.fromEntries(abilities.map((theta, l) => [`l${l}`, theta])),
       },
     });
-    const attempts = abilities.flatMap((_, l) =>
-      Array.from(permutation(difficulties.length, random), (i, k) => ({
+    const attempts = abilities.flatMap((_, l) => {
+      const order = Uint32Array.from(difficulties, (__, i) => i);
+      shuffle(order, random);
+      return Array.from(order, (i, k) => ({
         learner: `l${l}`,
         item: `q${i}`,
         skills: [`q${i}`],
         time: k * 1000 + l,
-      })),
-    );
+      }));
+    });
     const fit = elo().fit(simulate(rasch, attempts, random).log);
     const found = abilities.map((_, l) => defined(fit.states[`l${l}`]).ability);
     const items = difficulties.map((_, i) => defined(fit.model.parameters.items[`q${i}`]).difficulty);

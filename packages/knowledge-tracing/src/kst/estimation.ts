@@ -1,5 +1,5 @@
 import { DataError, normalizeLogs, type Stopping } from "@measurekit/core";
-import { expectationMaximization, minimum } from "../math/internal.js";
+import { expectationMaximization } from "../math/internal.js";
 
 /** A learner's answers to one item: the item, the states that master it, the count and the sum of outcomes. */
 export interface Row {
@@ -314,7 +314,9 @@ export function meanDiscrepancy(groups: readonly Group[], parameters: Blim, cons
 function nearestStates(group: Group, parameters: Blim, constraints: Constraints, out: Float64Array): number {
   out.fill(0);
   for (const row of group.rows) addDiscrepancy(row, parameters, constraints, out);
-  const least = minimum(out);
+  // A loop: spreading many values into `Math.min` overflows the call stack, at about 120,000 values in V8.
+  let least = Number.POSITIVE_INFINITY;
+  for (const discrepancy of out) least = Math.min(least, discrepancy);
   if (least === Number.POSITIVE_INFINITY) {
     throw new DataError("A learner's outcomes have probability 0 under the parameters, as with a guess or slip of 0.");
   }
