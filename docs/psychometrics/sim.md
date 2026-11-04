@@ -92,7 +92,19 @@ catR draws the number of categories of each polytomous item from a Poisson distr
 `simulateResponses(items, thetas, random, { missingProbability })` draws each response from its item's category
 probabilities at the person's theta, by inverting their distribution function at one uniform draw: category k with
 probability P(k | θ). Items of any model work, a custom one included. Persons are drawn in order, each person's items
-in order.
+in order. The matrix names its columns by the items' ids when they carry them, as the items of a test or a calibration
+do, so that options by item id apply to it, and `item1` and on when they do not; items of which some carry an id and
+others none throw `DataError`.
+
+```ts
+import { createRandom } from "@measurekit/psychometrics";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses } from "@measurekit/psychometrics/sim";
+
+const random = createRandom(3);
+const items = simulateItems(twoParameterLogistic, 3, random).map((item, i) => ({ ...item, id: `reading-${i + 1}` }));
+simulateResponses(items, [0, 1], random).itemIds; // ["reading-1", "reading-2", "reading-3"]
+```
 
 `missingProbability` (default `0`) makes each response missing with that probability, independently of everything
 else: missing completely at random. The missing responses are drawn after all responses, so a seed gives the same
@@ -102,8 +114,8 @@ responses with and without missingness, less the missing ones.
 
 `simulateMultidimensionalResponses(items, thetas, random, { missingProbability })` draws responses of items of the
 [multidimensional models](multidimensional.md) in the same way, from each person's vector of thetas: `thetas` has one
-array per person, as many numbers as the items have dimensions. Every item has the same number of dimensions. The
-thetas come from any source, such as correlated normal draws:
+array per person, as many numbers as the items have dimensions. Every item has the same number of dimensions, and the
+columns are named alike. The thetas come from any source, such as correlated normal draws:
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";

@@ -1,8 +1,18 @@
 import { checkArray, checkFinite, checkRandom, DataError, type Random } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { largestCategoryCount } from "../irt/internal.js";
-import { checkMultidimensionalItems, type MultidimensionalItem } from "../multidimensional/internal.js";
-import { drawCategory, matrixWithMissing, missingProbabilityOf, type ResponseSimulationOptions } from "./responses.js";
+import {
+  checkMultidimensionalItems,
+  type MultidimensionalItem,
+  type MultidimensionalTestItem,
+} from "../multidimensional/internal.js";
+import {
+  carriedItemIds,
+  drawCategory,
+  matrixWithMissing,
+  missingProbabilityOf,
+  type ResponseSimulationOptions,
+} from "./responses.js";
 
 /**
  * Simulates the responses of persons with known vectors of thetas to multidimensional items of any models.
@@ -11,25 +21,27 @@ import { drawCategory, matrixWithMissing, missingProbabilityOf, type ResponseSim
  * Each response is drawn from its item's category probabilities at the person's thetas, by person, then item, by
  * inverting the distribution function of the categories at one uniform draw. Then, with a `missingProbability`, each
  * response is missing with that probability, so a seed gives the same responses with and without missingness, less
- * the missing ones. The matrix has a row per person and a column per item, with the default ids.
+ * the missing ones. The matrix has a row per person and a column per item, named by the items' ids when they carry
+ * them, as a test's items do, and `item1` and on otherwise.
  *
- * @param items - The multidimensional items.
+ * @param items - The multidimensional items, each with an `id` or none.
  * @param thetas - One array of thetas per person, as many as the items have dimensions.
  * @param random - The generator of the responses.
  * @param options - The probability that a response is missing.
  * @returns The responses, one row for each person.
  * @throws `DataError` without items or thetas, when an item is invalid, the items differ in their number of dimensions,
- * a person's thetas are not that many finite numbers, `random` is not a random number generator, or
- * `missingProbability` is outside [0, 1].
+ * some items carry an id and others none, the ids are not distinct non-empty strings, a person's thetas are not that
+ * many finite numbers, `random` is not a random number generator, or `missingProbability` is outside [0, 1].
  */
 export function simulateMultidimensionalResponses(
-  items: readonly MultidimensionalItem[],
+  items: readonly (MultidimensionalItem | MultidimensionalTestItem)[],
   thetas: readonly (readonly number[])[],
   random: Random,
   options: ResponseSimulationOptions = {},
 ): ResponseMatrix {
   const missingProbability = missingProbabilityOf(options);
   const dimensions = checkMultidimensionalItems(items, "A simulation");
+  const itemIds = carriedItemIds(items);
   checkThetas(thetas, dimensions);
   checkRandom(random);
   const theta = new Float64Array(dimensions);
@@ -38,7 +50,7 @@ export function simulateMultidimensionalResponses(
     theta.set(person);
     return items.map((item) => simulateResponse(item, theta, random, probabilities));
   });
-  return matrixWithMissing(rows, missingProbability, random);
+  return matrixWithMissing(rows, missingProbability, random, itemIds);
 }
 
 /**

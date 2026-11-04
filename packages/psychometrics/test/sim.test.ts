@@ -362,6 +362,42 @@ describe("simulateResponses", () => {
     expect(matrix.itemIds).toEqual(["item1", "item2"]);
   });
 
+  it("names the columns by the items' ids when the items carry them, with the same responses", () => {
+    const named = Items.map((item, j) => ({ ...item, id: `q${5 - j}` }));
+    const thetas = [0, 1, -1];
+    const matrix = simulateResponses(named, thetas, createRandom(17));
+    expect(matrix.itemIds).toEqual(["q5", "q4", "q3", "q2", "q1"]);
+    expect(matrix.responses).toEqual(simulateResponses(Items, thetas, createRandom(17)).responses);
+  });
+
+  it("rejects items of which some carry an id and others none, or ids that repeat", () => {
+    const random = createRandom(19);
+    const [first, second] = [defined(Items[0]), defined(Items[1])];
+    expect(() => simulateResponses([first, { ...second, id: "q2" }], [0], random)).toThrow(
+      "Item 1 needs a string id, as item 2 has one, found undefined.",
+    );
+    expect(() =>
+      simulateResponses(
+        [
+          { ...first, id: "q1" },
+          { ...second, id: JSON.parse("2") },
+        ],
+        [0],
+        random,
+      ),
+    ).toThrow("Item 2 needs a string id, as item 1 has one, found 2.");
+    expect(() =>
+      simulateResponses(
+        [
+          { ...first, id: "q1" },
+          { ...second, id: "q1" },
+        ],
+        [0],
+        random,
+      ),
+    ).toThrow(DataError);
+  });
+
   it("rejects missing items and thetas, invalid items, thetas and missing probabilities", () => {
     const random = createRandom(18);
     expect(() => simulateResponses([], [0], random)).toThrow("A simulation needs at least one item.");
@@ -456,6 +492,21 @@ describe("simulateMultidimensionalResponses", () => {
     );
     expect(matrix.personIds).toEqual(["person1", "person2", "person3"]);
     expect(matrix.itemIds).toEqual(["item1", "item2"]);
+  });
+
+  it("names the columns by the items' ids when the items carry them", () => {
+    const named = Items.map((item, j) => ({ ...item, id: `m${j + 1}` }));
+    const thetas = [
+      [0, 1],
+      [1, -1],
+    ];
+    const matrix = simulateMultidimensionalResponses(named, thetas, createRandom(36));
+    expect(matrix.itemIds).toEqual(["m1", "m2", "m3"]);
+    expect(matrix.responses).toEqual(simulateMultidimensionalResponses(Items, thetas, createRandom(36)).responses);
+    const mixed = [...named.slice(0, 2), defined(Items[2])];
+    expect(() => simulateMultidimensionalResponses(mixed, thetas, createRandom(36))).toThrow(
+      "Item 3 needs a string id, as item 1 has one, found undefined.",
+    );
   });
 
   it("rejects missing items and thetas, invalid items, thetas and missing probabilities", () => {

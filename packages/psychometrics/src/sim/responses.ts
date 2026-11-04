@@ -5,10 +5,11 @@ import {
   checkRandom,
   checkUnitInterval,
   DataError,
+  describe,
   type Random,
 } from "@measurekit/core";
 import { buildResponseMatrix, type ResponseMatrix } from "../data/internal.js";
-import { checkItemList, type IrtItem, largestCategoryCount } from "../irt/internal.js";
+import { checkItemList, type IrtItem, largestCategoryCount, type TestItem } from "../irt/internal.js";
 
 /** Options of {@link simulateResponses}. */
 export interface ResponseSimulationOptions {
@@ -27,16 +28,17 @@ export interface ResponseSimulationOptions {
  * @remarks
  * Each response is drawn from its item's category probabilities at the person's theta, by person, then item. Then, with
  * a `missingProbability`, each response is missing with that probability, so a seed gives the same responses with and
- * without missingness, less the missing ones. The matrix has a row per theta and a column per item, with the default
- * ids.
+ * without missingness, less the missing ones. The matrix has a row per theta and a column per item, named by the items'
+ * ids when they carry them, as a test's items do, and `item1` and on otherwise.
  *
- * @param items - The items.
+ * @param items - The items, each with an `id` or none.
  * @param thetas - The ability of each person.
  * @param random - The generator of the responses.
  * @param options - The probability that a response is missing.
  * @returns The responses, one row for each person.
- * @throws `DataError` without items or thetas, when an item is invalid, a theta is not finite, `random` is not a random
- * number generator, or `missingProbability` is outside [0, 1].
+ * @throws `DataError` without items or thetas, when an item is invalid, some items carry an id and others none, the ids
+ * are not distinct non-empty strings, a theta is not finite, `random` is not a random number generator, or
+ * `missingProbability` is outside [0, 1].
  *
  * @example
  * ```ts
@@ -53,20 +55,38 @@ export interface ResponseSimulationOptions {
  * ```
  */
 export function simulateResponses(
-  items: readonly IrtItem[],
+  items: readonly (IrtItem | TestItem)[],
   thetas: readonly number[],
   random: Random,
   options: ResponseSimulationOptions = {},
 ): ResponseMatrix {
   const missingProbability = missingProbabilityOf(options);
   checkItemList(items, "A simulation");
+  const itemIds = carriedItemIds(items);
   checkThetas(thetas);
   checkRandom(random);
   const probabilities = new Float64Array(largestCategoryCount(items));
   const rows: (number | null)[][] = thetas.map((theta) =>
     items.map((item) => simulateResponse(item, theta, random, probabilities)),
   );
-  return matrixWithMissing(rows, missingProbability, random);
+  return matrixWithMissing(rows, missingProbability, random, itemIds);
+}
+
+/**
+ * Returns the ids that items carry, as the items of a test or a calibration do, or `undefined` when none carries one.
+ *
+ * @throws `DataError` when some items carry an id and others none, or an id is not a string.
+ */
+export function carriedItemIds(items: readonly object[]): string[] | undefined {
+  const first = items.findIndex((item) => Object.hasOwn(item, "id"));
+  if (first === -1) return undefined;
+  return items.map((item, index) => {
+    const id: unknown = Reflect.get(item, "id");
+    if (typeof id !== "string") {
+      throw new DataError(`Item ${index + 1} needs a string id, as item ${first + 1} has one, found ${describe(id)}.`);
+    }
+    return id;
+  });
 }
 
 /**
@@ -81,18 +101,22 @@ export function missingProbabilityOf(options: ResponseSimulationOptions): number
   return missingProbability;
 }
 
-/** Makes each response missing with `missingProbability`, in row order, and returns the matrix of the rows. */
+/**
+ * Makes each response missing with `missingProbability`, in row order, and returns the matrix of the rows, with the
+ * item ids given or the default ones.
+ */
 export function matrixWithMissing(
   rows: (number | null)[][],
   missingProbability: number,
   random: Random,
+  itemIds: readonly string[] | undefined,
 ): ResponseMatrix {
   if (missingProbability > 0) {
     for (const row of rows) {
       for (let j = 0; j < row.length; j++) if (random.uniform() < missingProbability) row[j] = null;
     }
   }
-  return buildResponseMatrix(rows);
+  return buildResponseMatrix(rows, itemIds === undefined ? {} : { itemIds });
 }
 
 /**

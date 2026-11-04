@@ -134,6 +134,9 @@ The options that restrict the items of an adaptive test, `contentTargets`, `enem
 generator of the test's random choices at each step of each person, so that a simulation gives the items of a host that
 seeds each call of `start` and `answer`; without it, the generator of the responses makes them.
 
+`simulateResponses` and `simulateMultidimensionalResponses` name the columns of their matrix by the items' ids when the
+items carry them, as a test's or a calibration's do, and `item1` and on when they do not.
+
 `generalizedGradedUnfolding` is the generalized graded unfolding model for agree-disagree items, whose persons agree most
 near an item's location. `calibrateUnfolding` calibrates it as the GGUM package does: from Roberts and Laughlin's starts,
 through the graded unfolding model and the model with a = 1, to every parameter, leaving out the persons who disagree
