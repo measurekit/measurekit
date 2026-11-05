@@ -16,6 +16,7 @@ export {
   type ThetaPrior,
 } from "./ability.js";
 export { ABILITY_ESTIMATES_OPTIONS, type AbilityEstimatesOptions, abilityEstimates } from "./ability-estimates.js";
+export { addItemHessian, arrowDirection, arrowSystem } from "./arrow-system.js";
 export { fromUnbounded, toUnbounded, unboundedDerivative } from "./bounds.js";
 export {
   type CalibratedItem,

@@ -43,7 +43,7 @@ export {
   startingCommunalities,
 } from "./minres.js";
 export { noncentralChiSquareCdf } from "./noncentral-chi-square.js";
-export { type HessianFunction, type NewtonOptions, newton } from "./optimize.js";
+export { type HessianFunction, keepDescent, type NewtonOptions, newton } from "./optimize.js";
 export { orthonormalBasis } from "./orthonormal-basis.js";
 export { poissonFit } from "./poisson-fit.js";
 export { gaussHermite, type Quadrature, rectangular } from "./quadrature.js";

@@ -309,6 +309,14 @@ export const READERS: readonly ReaderCase[] = [
       psychometrics.yenQ3(matrix, items, [0, 0]),
   },
   {
+    name: "calibrateUnfolding: 2 persons, 1,000 items, the most",
+    budget: 220,
+    heap: 48,
+    input: () => pairItems(1000).rows,
+    prepare: (rows: number[][], { psychometrics }) => psychometrics.buildResponseMatrix(rows),
+    read: (matrix: unknown, { psychometrics }) => psychometrics.calibrateUnfolding(matrix),
+  },
+  {
     name: "selectPairs: 10,000 persons in 50 groups of 200, the most, 995,000 pairs, formed by two contexts alike",
     budget: 320,
     heap: 176,

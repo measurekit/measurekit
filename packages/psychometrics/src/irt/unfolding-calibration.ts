@@ -1,5 +1,5 @@
 import { checkChoice, checkOptions, checkStopping, DataError, type FieldNames } from "@measurekit/core";
-import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
+import { checkMatrixItems, type ResponseMatrix, type ResponseRecords } from "../data/internal.js";
 import { type Calibration, calibrateResponses } from "./calibration.js";
 import { type CalibrationOptions, STANDARD_ERROR_METHODS, type StandardErrorMethod } from "./calibration-options.js";
 import type { IrtModel } from "./model.js";
@@ -64,13 +64,6 @@ export interface UnfoldingCalibration extends Calibration<UnfoldingParameters> {
 
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
-/**
- * The most items of an unfolding calibration: its first stage shares the thresholds among the items, so each Newton step
- * of its M-step solves for the locations of every item at once, in time that grows with the cube of the items. On the
- * responses of two persons, the calibration takes about 12 s at 500 items and 77 s at 1,000; its starts, which decompose
- * the correlations of every pair of items, 0.3 s and 3 s.
- */
-const MAX_ITEMS = 500;
 
 /**
  * Calibrates the generalized graded unfolding model in the GGUM package's three stages, each starting from the last:
@@ -90,7 +83,7 @@ const MAX_ITEMS = 500;
  * @param options - The quadrature, standard errors and stopping rules; each option has its default.
  * @returns The items with their parameters of {@link generalizedGradedUnfolding}, the group, the log-likelihood, AIC
  *   and BIC of the persons used, whether the last stage converged, its iterations, and the persons used.
- * @throws `DataError` when the data or an option is invalid, there are more than 500 items, or an item has responses in
+ * @throws `DataError` when the data or an option is invalid, there are more than 1,000 items, or an item has responses in
  * fewer than two categories or none in a category below its highest.
  *
  * @see {@link https://doi.org/10.1177/01466216000241001 | Roberts, Donoghue and Laughlin (2000)}
@@ -112,11 +105,9 @@ export function calibrateUnfolding(
   // Checks the quadrature before any stage runs.
   quadratureRule(quadrature);
   const all = compressResponses(data);
-  if (all.itemIds.length > MAX_ITEMS) {
-    throw new DataError(
-      `Unfolding calibration takes at most ${MAX_ITEMS} items, as its first stage estimates the locations of every item at once; found ${all.itemIds.length}.`,
-    );
-  }
+  // The starts hold sums and correlations of every pair of items and decompose them: at the limit of 1,000, about 2 s
+  // and 70 MB on two persons, whatever the data.
+  checkMatrixItems(all.itemIds.length, "Unfolding calibration");
   const allTallies = categoryTallies(all);
   const categoryCounts = all.itemIds.map(
     (id, i) => checkCategories(id, generalizedGradedUnfolding, allTallies[i] ?? NO_RESPONSES).length,

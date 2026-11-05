@@ -148,12 +148,12 @@ export const RULES: readonly Rule[] = [
     titles: "many groups",
   },
   {
-    rule: "An unfolding calibration takes at most 500 items, as its first stage solves for the locations of every item at once, in time that grows with their cube.",
+    rule: "An unfolding calibration takes at most 1,000 items, as its starts hold sums and correlations of every pair of items and decompose them.",
     file: "packages/psychometrics/src/irt/unfolding-calibration.ts",
-    find: "if (all.itemIds.length > MAX_ITEMS) {",
-    replace: "if (false) {",
+    find: 'checkMatrixItems(all.itemIds.length, "Unfolding calibration");',
+    replace: "",
     test: "packages/psychometrics/test/irt.test.ts",
-    titles: "more than 500 items",
+    titles: "more than 1,000 items, whose starts",
   },
   {
     rule: "A quadrature rule has at most 1,000 points, as an option of a few bytes would otherwise size every item's table over them.",

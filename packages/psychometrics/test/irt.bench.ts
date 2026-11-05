@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
 import { buildResponseMatrix } from "../src/data/index.js";
+import { createRandom } from "../src/index.js";
 import {
   abilityEstimates,
   calibrate,
@@ -20,6 +21,7 @@ import {
   twoParameterLogistic,
   weightedLikelihoodEstimate,
 } from "../src/irt/index.js";
+import { simulateItems, simulateResponses, simulateThetas } from "../src/sim/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtConditionalFixture, type BenchIrtFixture, readFixture } from "./fixtures.js";
@@ -54,6 +56,18 @@ const items: TestItem[] = fixture.items.a.map((a, i) => ({
   model: twoParameterLogistic,
   parameters: { a, b: defined(fixture.items.b[i]), c: 0, d: 1 },
 }));
+
+test("calibrates the one-parameter model of 500 persons and 1,000 items, whose a the items share", async (context) => {
+  // Seeded 1PL responses: the M-step solves for the 1,001 parameters of one block by its Schur complement.
+  const random = createRandom(11);
+  const truth = simulateItems(twoParameterLogistic, 1000, random).map((item) => ({
+    ...item,
+    parameters: { ...item.parameters, a: 1.2 },
+  }));
+  const many = simulateResponses(truth, simulateThetas(500, random), random);
+  expect(calibrate(many, oneParameterLogistic).converged).toBe(true);
+  await benchmark(context, "irt.calibrate1plManyItems", () => calibrate(many, oneParameterLogistic), SLOW_OPTIONS);
+});
 
 test("calibrates the one-parameter model of 2,000 persons and 40 items", async (context) => {
   expect(calibrate(binary, oneParameterLogistic).converged).toBe(true);

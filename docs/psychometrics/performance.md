@@ -430,9 +430,9 @@ What each reader of untrusted input adds to the peak resident memory of a Node.j
 the limits of [SECURITY.md](../../SECURITY.md): the peak of a process that parses the input from JSON and reads it, less
 the peak of the same process that parses it and does not, the median of three pairs run one after the other. Each reader
 grows in proportion to its input, but for the designs of cognitive diagnosis, the analyses of the pairs of items that
-hold a matrix of them, whose limits bound them, the statistics of pairs of items of fit and of Mokken scales, which
-their limit of 1,000 items bounds, and the selection of pairs of persons, M4 and the K index of answer similarity, which
-their limits bound.
+hold a matrix of them, whose limits bound them, the statistics of pairs of items of fit and of Mokken scales and the
+starts of an unfolding calibration, which their limit of 1,000 items bounds, and the selection of pairs of persons, M4
+and the K index of answer similarity, which their limits bound.
 
 | Reader                             | Input                                                         | JSON (MB) | Peak added (MB)             |
 | ---------------------------------- | ------------------------------------------------------------- | --------- | --------------------------- |
@@ -461,6 +461,7 @@ their limits bound.
 | `localDependenceChiSquare`         | 2 graded items of 4,096 categories, the most cells            | 0.1       | 132 to 262 by version, OS   |
 | `summedScoreFit`                   | 2 persons, 300 2PL items, the highest total score             | 0.008     | 4 to 14 by version, OS      |
 | `yenQ3`                            | 2 persons, 1,000 2PL items, the most                          | 0.028     | 14 to 22 by version, OS     |
+| `calibrateUnfolding`               | 2 persons, 1,000 items, the most                              | 0.004     | 65 to 108 by version, macOS |
 | `scalability`                      | 200 persons of distinct patterns, 1,000 items, the most       | 0.4       | 75 to 117 by version, OS    |
 | `conditionalAssociation`           | 8 persons, 1,000 items, the most                              | 0.015     | 141                         |
 | `assembleForms`                    | 8,191 forms of the one item of a pool, the most counts        | 0.0001    | 223 to 288 by version, OS   |

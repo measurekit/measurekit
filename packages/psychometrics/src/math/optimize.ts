@@ -84,7 +84,15 @@ function direction(hessian: Float64Array, gradient: Float64Array, out: Float64Ar
     multiplyVector(inverse, gradient, out);
     for (let i = 0; i < out.length; i++) out[i] = -(out[i] ?? 0);
   }
-  if (inverse === null || dot(gradient, out) >= 0) {
+  keepDescent(inverse !== null, gradient, out);
+}
+
+/**
+ * Keeps the Newton direction in `out` where it was `solved` and descends, and writes the negative gradient there where
+ * the Hessian was singular or the direction does not descend, as where the Hessian is not positive definite.
+ */
+export function keepDescent(solved: boolean, gradient: Float64Array, out: Float64Array): void {
+  if (!solved || dot(gradient, out) >= 0) {
     for (let i = 0; i < out.length; i++) out[i] = -(gradient[i] ?? 0);
   }
 }

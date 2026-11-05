@@ -11,6 +11,7 @@ import { benchmarksOf } from "../../../scripts/bench-harness.js";
  */
 const BUDGETS = {
   "irt.calibrate1pl": 500,
+  "irt.calibrate1plManyItems": 6_000, // laptop
   "irt.calibrate2pl": 700,
   "irt.calibrate3pl": 4_000,
   "irt.calibrate2plCrossProduct": 800,

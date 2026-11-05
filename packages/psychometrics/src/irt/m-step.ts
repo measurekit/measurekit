@@ -1,4 +1,13 @@
-import { type NewtonOptions, newton } from "../math/internal.js";
+import { type DescentPoint, maxAbs, stepAlong } from "@measurekit/core";
+import {
+  type ArrowSystem,
+  addDiagonal,
+  addItemHessian,
+  arrowDirection,
+  arrowSystem,
+  clearSystem,
+  scaleSystem,
+} from "./arrow-system.js";
 import { fromUnbounded, toUnbounded, unboundedDerivative } from "./bounds.js";
 import type { FreeParameter, ItemState, Setup } from "./calibration-setup.js";
 import { distributionObjective, normalWeights } from "./latent.js";
@@ -6,11 +15,6 @@ import type { IrtModel } from "./model.js";
 import { MIN_PROBABILITY } from "./probability.js";
 import { testletObjective, testletWeights } from "./testlets.js";
 
-/**
- * Each M-step takes one Fisher-scoring step with a line search: a generalized EM step, which never lowers the expected
- * log-posterior and, from the previous iteration's estimates, is close to exact.
- */
-const M_STEP: NewtonOptions = { tolerance: 0, maxIterations: 1 };
 /** Items whose parameters the M-step estimates together because they share some, with those free parameters. */
 interface Block<TParameters> {
   readonly items: readonly ItemState<TParameters>[];
@@ -33,10 +37,14 @@ export interface Maximization<TParameters> {
   /**
    * Assigns `eta` to the block and returns the negative expected complete-data log-posterior of its items and
    * distributions, given the expected counts of the last E-step, writing its gradient with respect to `eta` into
-   * `gradient` and, when given, its items' Fisher-scoring Hessian into `hessian`.
+   * `gradient`.
    */
-  objective(block: Block<TParameters>, eta: Float64Array, gradient: Float64Array, hessian?: Float64Array): number;
-  /** Takes one Fisher-scoring step up the block's expected complete-data log-posterior and assigns the result. */
+  objective(block: Block<TParameters>, eta: Float64Array, gradient: Float64Array): number;
+  /**
+   * Takes one Fisher-scoring step up the block's expected complete-data log-posterior, with a line search, and assigns
+   * the result: a generalized EM step, which never lowers the expected log-posterior and, from the previous iteration's
+   * estimates, is close to exact. The step solves the block's arrow-shaped system by its Schur complement.
+   */
   maximize(block: Block<TParameters>): void;
 }
 
@@ -49,6 +57,9 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
   const entries = estimated.reduce((most, item) => Math.max(most, item.vector.length), 0);
   const probabilities = new Float64Array(categories);
   const derivatives = new Float64Array(categories * entries);
+  // The Hessian of one item's free entries, by rows, which the block's system takes apart.
+  const local = new Float64Array(entries * entries);
+  const systems = new Map<Block<TParameters>, ArrowSystem>();
 
   const assign = (block: Block<TParameters>, eta: Float64Array): void => {
     for (let l = 0; l < block.parameters.length; l++) {
@@ -75,25 +86,18 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
 
   /**
    * Returns -Σ count log P over an item's nodes and categories, adds its gradient at the item's slots and, when
-   * `hessian` is given, the expected information Σ n P'P'ᵀ / P of the item's counts, n persons at a node.
+   * `information` is set, writes the expected information Σ n P'P'ᵀ / P of the item's counts, n persons at a node, of
+   * its free entries into `local`.
    */
-  const itemObjective = (
-    item: ItemState<TParameters>,
-    hessian: Float64Array | undefined,
-    blockSize: number,
-  ): number => {
+  const itemObjective = (item: ItemState<TParameters>, information: boolean): number => {
+    if (information) local.fill(0, 0, item.freeEntries.length ** 2);
     let value = 0;
-    for (let q = 0; q < item.nodes.length; q++) value += nodeObjective(item, q, hessian, blockSize);
+    for (let q = 0; q < item.nodes.length; q++) value += nodeObjective(item, q, information);
     return value;
   };
 
   /** Returns the item's term of {@link itemObjective} at node q. */
-  const nodeObjective = (
-    item: ItemState<TParameters>,
-    q: number,
-    hessian: Float64Array | undefined,
-    blockSize: number,
-  ): number => {
+  const nodeObjective = (item: ItemState<TParameters>, q: number, information: boolean): number => {
     const theta = item.nodes[q] ?? 0;
     const categoryCount = item.categoryCount;
     item.model.probabilities(item.parameters, theta, probabilities);
@@ -106,7 +110,7 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
       const probability = Math.max(probabilities[k] ?? 0, MIN_PROBABILITY);
       if (count > 0) value -= count * Math.log(probability);
       addGradient(item, k, count / probability);
-      if (hessian !== undefined) addInformation(item, k, persons / probability, hessian, blockSize);
+      if (information) addInformation(item, k, persons / probability);
     }
     return value;
   };
@@ -122,33 +126,29 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
     }
   };
 
-  /** Adds `weight` times the outer product of category k's derivatives to the block's Hessian. */
-  const addInformation = (
-    item: ItemState<TParameters>,
-    k: number,
-    weight: number,
-    hessian: Float64Array,
-    blockSize: number,
-  ): void => {
+  /** Adds `weight` times the outer product of category k's derivatives at the item's free entries to `local`. */
+  const addInformation = (item: ItemState<TParameters>, k: number, weight: number): void => {
     const size = item.vector.length;
     const entries = item.freeEntries;
-    for (let e = 0; e < entries.length; e++) {
-      const i = entries[e] ?? 0;
-      const row = (positions[item.slots[i] ?? 0] ?? 0) * blockSize;
-      const scaled = weight * (derivatives[k * size + i] ?? 0);
-      for (let f = 0; f < entries.length; f++) {
-        const j = entries[f] ?? 0;
-        const index = row + (positions[item.slots[j] ?? 0] ?? 0);
-        hessian[index] = (hessian[index] ?? 0) + scaled * (derivatives[k * size + j] ?? 0);
+    const count = entries.length;
+    for (let e = 0; e < count; e++) {
+      const scaled = weight * (derivatives[k * size + (entries[e] ?? 0)] ?? 0);
+      for (let f = 0; f < count; f++) {
+        const index = e * count + f;
+        local[index] = (local[index] ?? 0) + scaled * (derivatives[k * size + (entries[f] ?? 0)] ?? 0);
       }
     }
   };
 
-  const objective = (
+  /**
+   * Returns the objective of {@link Maximization.objective}, and with `system` writes the block's Fisher-scoring
+   * Hessian with respect to `eta` into it.
+   */
+  const evaluate = (
     block: Block<TParameters>,
     eta: Float64Array,
     out: Float64Array,
-    hessian?: Float64Array,
+    system: ArrowSystem | null,
   ): number => {
     assign(block, eta);
     const size = block.parameters.length;
@@ -157,15 +157,18 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
       gradient[j] = 0;
       positions[j] = l;
     }
-    hessian?.fill(0);
+    if (system !== null) clearSystem(system);
     let value = 0;
-    for (const item of block.items) value += itemObjective(item, hessian, size);
-    value += priorObjective(block, hessian);
+    block.items.forEach((item, t) => {
+      value += itemObjective(item, system !== null);
+      if (system !== null) addItemHessian(system, t, local, item.freeEntries.length);
+    });
+    value += priorObjective(block, system);
     if (block.distributions) {
       value += distributionObjective(population, values, nodes, gradient);
       if (design !== null) value += testletObjective(design, values, nodes, gradient);
     }
-    toUnboundedScale(block, out, hessian);
+    toUnboundedScale(block, out, system);
     return value;
   };
 
@@ -173,7 +176,7 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
    * Returns minus the sum of the block's log priors, adding their gradient and curvature to the gradient and the
    * Hessian's diagonal on the parameters' own scale.
    */
-  const priorObjective = (block: Block<TParameters>, hessian: Float64Array | undefined): number => {
+  const priorObjective = (block: Block<TParameters>, system: ArrowSystem | null): number => {
     const size = block.parameters.length;
     let value = 0;
     for (let l = 0; l < size; l++) {
@@ -183,8 +186,7 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
       const x = values[j] ?? 0;
       value -= prior.logDensity(x);
       gradient[j] = (gradient[j] ?? 0) - prior.logDensityDerivative(x);
-      if (hessian !== undefined)
-        hessian[l * size + l] = (hessian[l * size + l] ?? 0) - prior.logDensitySecondDerivative(x);
+      if (system !== null) addDiagonal(system, l, -prior.logDensitySecondDerivative(x));
     }
     return value;
   };
@@ -194,7 +196,7 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
    * diagonal of dx/dη. Fisher scoring leaves out the term in the second derivative of the transformation, which
    * vanishes for unbounded parameters.
    */
-  const toUnboundedScale = (block: Block<TParameters>, out: Float64Array, hessian: Float64Array | undefined): void => {
+  const toUnboundedScale = (block: Block<TParameters>, out: Float64Array, system: ArrowSystem | null): void => {
     const size = block.parameters.length;
     for (let l = 0; l < size; l++) {
       const j = block.parameters[l] ?? 0;
@@ -202,27 +204,37 @@ export function maximization<TParameters>(setup: Setup<TParameters>, nodes: Floa
       scales[l] = unboundedDerivative(values[j] ?? 0, lower, upper);
       out[l] = (gradient[j] ?? 0) * (scales[l] ?? 0);
     }
-    if (hessian !== undefined) scaleHessian(hessian, size);
-  };
-
-  const scaleHessian = (hessian: Float64Array, size: number): void => {
-    for (let l = 0; l < size; l++) {
-      const scale = scales[l] ?? 0;
-      for (let m = 0; m < size; m++) hessian[l * size + m] = (hessian[l * size + m] ?? 0) * scale * (scales[m] ?? 0);
-    }
+    if (system !== null) scaleSystem(system, scales);
   };
 
   return {
     blocks: blocksOf(estimated),
     all: { items: estimated, parameters: Int32Array.from(values.keys()), distributions: true },
     assign,
-    objective,
+    objective: (block, eta, out) => evaluate(block, eta, out, null),
     maximize(block) {
-      const start = Float64Array.from(block.parameters, (j) => {
-        const { lower, upper } = free[j] ?? UNBOUNDED;
-        return toUnbounded(values[j] ?? 0, lower, upper);
-      });
-      assign(block, newton((eta, out, hessian) => objective(block, eta, out, hessian), start, M_STEP).x);
+      const size = block.parameters.length;
+      const system = systems.get(block) ?? arrowSystem(block.items.map(freeSlots), block.parameters);
+      systems.set(block, system);
+      const point: DescentPoint = {
+        x: Float64Array.from(block.parameters, (j) => {
+          const { lower, upper } = free[j] ?? UNBOUNDED;
+          return toUnbounded(values[j] ?? 0, lower, upper);
+        }),
+        gradient: new Float64Array(size),
+        value: 0,
+      };
+      point.value = evaluate(block, point.x, point.gradient, system);
+      // At a stationary point the step is 0; elsewhere it follows the line search, as one step of Newton's method.
+      if (maxAbs(point.gradient) === 0) {
+        assign(block, point.x);
+        return;
+      }
+      const search = new Float64Array(size);
+      arrowDirection(system, point.gradient, search);
+      const trial: DescentPoint = { x: new Float64Array(size), gradient: new Float64Array(size), value: 0 };
+      const moved = stepAlong((eta, out) => evaluate(block, eta, out, null), point, search, trial);
+      assign(block, moved ? trial.x : point.x);
     },
   };
 }

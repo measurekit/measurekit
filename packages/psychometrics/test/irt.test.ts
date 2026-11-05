@@ -1,4 +1,10 @@
-import { chiSquareUpperTail, normalQuantile, type ThetaDistribution, type ThresholdItem } from "@measurekit/core";
+import {
+  chiSquareUpperTail,
+  multiplyVector,
+  normalQuantile,
+  type ThetaDistribution,
+  type ThresholdItem,
+} from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { createAdaptiveTest, simulateAdaptiveTest, testLength } from "../src/cat/index.js";
@@ -52,6 +58,9 @@ import {
   weightedLikelihoodEstimate,
 } from "../src/irt/index.js";
 import {
+  addItemHessian,
+  arrowDirection,
+  arrowSystem,
   categoryTallies,
   checkCategories,
   combine,
@@ -71,7 +80,7 @@ import {
   startAtHeldParameters,
   unfoldingStarts,
 } from "../src/irt/internal.js";
-import { rectangular } from "../src/math/internal.js";
+import { invert, rectangular } from "../src/math/internal.js";
 import { normalDistribution, simulateItems, simulateResponses, simulateThetas } from "../src/sim/index.js";
 import {
   arbitraryItem,
@@ -3330,6 +3339,75 @@ describe("latent regression", () => {
   });
 });
 
+describe("the arrow-shaped system of the M-step", () => {
+  /**
+   * Builds a block of items with `own` parameters each and `shared` parameters they all hold, each item's Hessian a
+   * random positive definite matrix of its free entries, and returns the direction by the Schur complement with the one
+   * of the whole matrix, -H⁻¹ g, and H.
+   */
+  const directions = (items: number, own: number, shared: number, seed: number) => {
+    const random = createRandom(seed);
+    const count = own + shared;
+    // Block positions: each item's own parameters, then the shared ones; slots are the positions.
+    const parameters = Int32Array.from({ length: items * own + shared }, (_, l) => l);
+    const slots = Array.from({ length: items }, (_, t) =>
+      Int32Array.from({ length: count }, (_, e) => (e < own ? t * own + e : items * own + e - own)),
+    );
+    const system = arrowSystem(slots, parameters);
+    const size = parameters.length;
+    const whole = new Float64Array(size * size);
+    slots.forEach((itemSlots, t) => {
+      const factor = Float64Array.from({ length: count * count }, () => random.normal());
+      const local = new Float64Array(count * count);
+      for (let e = 0; e < count; e++) {
+        for (let f = 0; f < count; f++) {
+          let sum = e === f ? 0.5 : 0;
+          for (let k = 0; k < count; k++) sum += defined(factor[e * count + k]) * defined(factor[f * count + k]);
+          local[e * count + f] = sum;
+          const cell = defined(itemSlots[e]) * size + defined(itemSlots[f]);
+          whole[cell] = defined(whole[cell]) + sum;
+        }
+      }
+      addItemHessian(system, t, local, count);
+    });
+    const gradient = Float64Array.from({ length: size }, () => random.normal());
+    const schur = new Float64Array(size);
+    arrowDirection(system, gradient, schur);
+    // Newton's method's direction of the whole matrix.
+    const dense = new Float64Array(size);
+    multiplyVector(defined(invert(whole, size)), gradient, dense);
+    return { schur, dense: dense.map((value) => -value) };
+  };
+
+  it("gives the direction of the whole matrix's inverse, -H⁻¹ g, by the Schur complement of the items' parameters", () => {
+    for (const [items, own, shared, seed] of [
+      [1, 2, 0, 1],
+      [5, 1, 1, 2],
+      [8, 2, 3, 3],
+      [30, 3, 2, 4],
+    ] as const) {
+      const { schur, dense } = directions(items, own, shared, seed);
+      const scale = Math.max(...dense.map(Math.abs));
+      dense.forEach((value, i) => {
+        expectClose(defined(schur[i]), value, 1e-10 * scale, `${items} items, entry ${i}`);
+      });
+    }
+  });
+
+  it("gives an item without shared parameters exactly the direction of Newton's method, -D⁻¹ g", () => {
+    const { schur, dense } = directions(1, 3, 0, 5);
+    expect([...schur]).toEqual([...dense]);
+  });
+
+  it("follows the negative gradient where a block is singular", () => {
+    const system = arrowSystem([Int32Array.of(0, 2), Int32Array.of(1, 2)], Int32Array.of(0, 1, 2));
+    const gradient = Float64Array.of(1, -2, 0.5);
+    const out = new Float64Array(3);
+    arrowDirection(system, gradient, out);
+    expect([...out]).toEqual([-1, 2, -0.5]);
+  });
+});
+
 describe("the M-step of the linear Rasch model", () => {
   const target = Float64Array.of(0.25, -0.5);
 
@@ -4685,13 +4763,13 @@ describe("calibrateUnfolding", () => {
     );
   });
 
-  it("rejects more than 500 items, whose first stage would take minutes from data of a few kilobytes", () => {
-    // Four persons answer each of 501 items in each of its four categories: a design of 2,004 records.
-    const records = Array.from({ length: 501 }, (_, j) =>
+  it("rejects more than 1,000 items, whose starts hold a matrix of every pair from data of a few kilobytes", () => {
+    // Four persons answer each of 1,001 items in each of its four categories: a design of 4,004 records.
+    const records = Array.from({ length: 1001 }, (_, j) =>
       Array.from({ length: 4 }, (_, k) => ({ person: `p${4 * j + k}`, item: `i${j}`, response: k })),
     ).flat();
     expect(() => calibrateUnfolding(buildResponseRecords(records))).toThrow(
-      "Unfolding calibration takes at most 500 items, as its first stage estimates the locations of every item at once; found 501.",
+      "Unfolding calibration holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.",
     );
   });
 
