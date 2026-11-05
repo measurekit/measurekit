@@ -866,6 +866,10 @@ Invalid input throws `DataError` naming the value found.
 - **Held parameters.** `fixedParameters` stands for mirt's `pars` with `est = FALSE` on a parameter. mirt keeps a held `g` on
   its logit, 0.2499999999999999 for 1/4; here the value given is kept exactly. mirt refuses a held intercept of a graded
   item that its starting values leave out of order, until the others are set in `pars`; here their starts move to fit it.
+- **Wide groups.** For a group whose standard deviations are near 2 on the scale of the first, mirt's `multipleGroup` stops
+  below the maximum of its own likelihood, with that group's variances too small: on 800 simulated persons in two groups,
+  0.148 log-likelihood units below, at variances of 3.06 and 3.24 where the maximum has 3.31 and 3.69. Its own likelihood
+  at the maximum that EM here and a base R optimizer reach is the maximum's ([validation](validation.md)).
 - **Groups of few persons.** mirt's `multipleGroup` estimates the correlation of a group of one or two persons on two
   dimensions as 1 and reports convergence, and stops with a singular covariance at five; here a group of no more persons
   than its correlated dimensions is refused.

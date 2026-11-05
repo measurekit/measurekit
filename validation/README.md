@@ -129,8 +129,9 @@ CopyDetect 1.4 is on GitHub only, CRAN having archived 1.3, and exports nothing:
 similarity call its internal functions. Install it at its commit into a library of its own and name the library:
 `git clone https://github.com/jaminsore/CopyDetect.git && git -C CopyDetect checkout 32bdd322fba438b654b4ccc1e78406e208a361ad`,
 `R CMD INSTALL --no-test-load -l <library> CopyDetect`, then `R_LIBS=<library> Rscript validation/psychometrics/similarity.R`.
-`multidimensional-groups.R` writes one fixture of five cases, two groups of correlated dimensions, the same data with fixed
-items, three groups with items missing by design, the graded model and three dimensions, and takes about 20 seconds.
+`multidimensional-groups.R` writes one fixture of six cases, two groups of correlated dimensions, the same data with fixed
+items, three groups with items missing by design, the graded model, three dimensions, and a group of standard deviations
+near 2 with the maximum of its likelihood by BFGS in base R and mirt's likelihood there, and takes about a minute.
 `exploratory-factors.R` writes one fixture of ten correlation matrices, simulated, `bfi`, `SAT12`, Harman's tests and a Heywood case,
 with their minres solutions in base R and psych, and takes seconds. `factor-solutions.R` holds the base R solutions by
 minres and maximum likelihood and their rotations, which it, `efa-fit.R` and `factor-hierarchy.R` share.

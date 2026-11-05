@@ -262,4 +262,110 @@ cases$three <- local({
   )
 })
 
+# --- A wide group ---------------------------------------------------------------------------------------------------------
+
+# mirt's log-likelihood at the estimates of `maximum`, evaluated with every parameter held and TOL = NaN, so that mirt
+# judges the base R maximum by its own likelihood.
+mirt_log_likelihood_at <- function(data, model, group, points, maximum) {
+  values <- multipleGroup(data, model, group = group, quadpts = points, pars = "values")
+  for (g in seq_along(maximum$groupMoments)) {
+    moments <- maximum$groupMoments[[g]]
+    label <- moments$group
+    for (i in seq_along(maximum$items)) {
+      item <- maximum$items[[i]]
+      for (name in c("a1", "a2", "d")) {
+        value <- if (name == "d") item$intercept else item$a[[as.integer(substr(name, 2, 2))]]
+        values$value[values$group == label & values$item == colnames(data)[i] & values$name == name] <- value
+      }
+    }
+    entries <- c(MEAN_1 = moments$means[[1]], MEAN_2 = moments$means[[2]], COV_11 = moments$covariance[1, 1],
+                 COV_21 = moments$covariance[2, 1], COV_22 = moments$covariance[2, 2])
+    for (name in names(entries)) values$value[values$group == label & values$item == "GROUP" & values$name == name] <- entries[[name]]
+  }
+  values$est <- FALSE
+  extract.mirt(multipleGroup(data, model, group = group, quadpts = points, pars = values, TOL = NaN, verbose = FALSE), "logLik")
+}
+
+# The maximum of the marginal likelihood of two groups of the M2PL with simple structure on the rectangular grid of `points`
+# nodes per dimension from -6 to 6, from mirt's estimates, by BFGS in base R: the slopes and intercepts, the first group's
+# correlation, and the second group's means and covariance through its Cholesky factor. Each group's normal density at the
+# nodes is normalized to 1, as measurekit and mirt weigh the nodes.
+base_groups_maximum <- function(fit, data, group, per_dimension, points) {
+  nodes <- seq(-6, 6, length.out = points)
+  grid <- as.matrix(expand.grid(nodes, nodes))
+  items <- ncol(data)
+  dimension <- ceiling(seq_len(items) / per_dimension)
+  labels <- unique(group)
+  unpack <- function(x) {
+    slopes <- matrix(0, items, 2)
+    slopes[cbind(seq_len(items), dimension)] <- x[seq_len(items)]
+    factor <- matrix(c(exp(x[2 * items + 4]), x[2 * items + 5], 0, exp(x[2 * items + 6])), 2)
+    list(slopes = slopes, intercepts = x[items + seq_len(items)],
+         moments = list(list(means = c(0, 0), covariance = matrix(c(1, tanh(x[2 * items + 1]), tanh(x[2 * items + 1]), 1), 2)),
+                        list(means = x[2 * items + 2:3], covariance = factor %*% t(factor))))
+  }
+  log_likelihood <- function(x) {
+    p <- unpack(x)
+    z <- grid %*% t(p$slopes) + rep(p$intercepts, each = nrow(grid))
+    total <- 0
+    for (g in seq_along(labels)) {
+      rows <- data[group == labels[g], , drop = FALSE]
+      log_weights <- dmvnorm(grid, p$moments[[g]]$means, p$moments[[g]]$covariance, log = TRUE)
+      log_weights <- log_weights - log(sum(exp(log_weights - max(log_weights)))) - max(log_weights)
+      log_joint <- rows %*% t(plogis(z, log.p = TRUE)) + (1 - rows) %*% t(plogis(-z, log.p = TRUE)) +
+        rep(log_weights, each = nrow(rows))
+      largest <- apply(log_joint, 1, max)
+      total <- total + sum(largest + log(rowSums(exp(log_joint - largest))))
+    }
+    total
+  }
+  values <- coef(fit, simplify = TRUE)
+  first <- values[[1]]$items
+  second <- values[[2]]$cov
+  factor <- t(chol(second))
+  start <- c(first[cbind(seq_len(items), dimension)], first[, "d"], atanh(cov2cor(values[[1]]$cov)[1, 2]),
+             values[[2]]$means, log(factor[1, 1]), factor[2, 1], log(factor[2, 2]))
+  found <- optim(start, function(x) -log_likelihood(x), method = "BFGS", control = list(reltol = 1e-15, maxit = 5000))
+  stopifnot(found$convergence == 0)
+  found$value <- -found$value
+  gradient <- numDeriv::grad(log_likelihood, found$par)
+  p <- unpack(found$par)
+  list(
+    items = lapply(seq_len(items), function(i) list(a = I(p$slopes[i, ]), intercept = p$intercepts[i])),
+    groupMoments = lapply(seq_along(labels), function(g) {
+      list(group = labels[g], means = I(p$moments[[g]]$means), covariance = p$moments[[g]]$covariance)
+    }),
+    logLikelihood = found$value, gradient = max(abs(gradient))
+  )
+}
+
+# The second group's standard deviations are near 2 on the scale of the first. mirt's EM stops at estimates whose
+# log-likelihood, by mirt's own evaluation, is below the maximum, with that group's variances smaller: the reference is the
+# maximum of the same likelihood in base R, and the test holds measurekit's log-likelihood to at least mirt's.
+cases$wide <- local({
+  set.seed(20261106)
+  slopes <- simulate_slopes(4, 2)
+  intercepts <- round(rnorm(8), 3)
+  spread <- diag(c(2, 1.9))
+  wide <- simulate_groups(slopes, intercepts, c(400, 400), list(c(0, 0), c(0.5, -0.3)),
+                          list(matrix(c(1, 0.4, 0.4, 1), 2), spread %*% matrix(c(1, 0.3, 0.3, 1), 2) %*% spread))
+  colnames(wide$data) <- ids(8)
+  fit <- calibrate(wide$data, simple_model(4, 2, TRUE), wide$group, "2PL", 21, FALSE)
+  stopifnot_converged(fit)
+  c(
+    list(
+      source = "mirt::simdata (set.seed(20261106)): 400 persons of N(0, R) and 400 of N((0.5, -0.3), S), S with standard deviations 2 and 1.9 and correlation 0.3, 8 dichotomous items, 4 on each of 2 dimensions.",
+      model = "m2pl", points = 21, itemIds = colnames(wide$data), responses = unname(wide$data),
+      personGroups = wide$group, loadings = loading_pattern(4, 2),
+      items = mirt_items(fit, 2, graded = FALSE, errors = FALSE)
+    ),
+    mirt_groups(fit, FALSE), mirt_statistics(fit),
+    local({
+      maximum <- base_groups_maximum(fit, wide$data, wide$group, 4, 21)
+      maximum$mirtLogLikelihood <- mirt_log_likelihood_at(wide$data, simple_model(4, 2, TRUE), wide$group, 21, maximum)
+      list(baseMaximum = maximum)
+    })
+  )
+})
+
 write_fixture("multidimensional-groups", cases)

@@ -325,6 +325,28 @@ interface MultidimensionalGroupsFixture {
     bic: number;
     iterations: number;
   };
+  wide: {
+    source: string;
+    model: string;
+    points: number;
+    itemIds: string[];
+    responses: number[][];
+    personGroups: string[];
+    loadings: { q02: string[] };
+    items: { id: string; parameters: { a: number[]; intercept: number; c: number; d: number } }[];
+    groupMoments: { group: string; means: number[]; covariance: number[][] }[];
+    correlations: number[][];
+    logLikelihood: number;
+    aic: number;
+    bic: number;
+    iterations: number;
+    baseMaximum: {
+      items: { a: number[]; intercept: number }[];
+      groupMoments: { group: string; means: number[]; covariance: number[][] }[];
+      logLikelihood: number;
+      gradient: number;
+    };
+  };
 }
 const groups = readFixture<MultidimensionalGroupsFixture>("multidimensional-groups.json");
 
@@ -2326,6 +2348,25 @@ describe("multiple groups", () => {
     expectCalibration(fit, three, mirtTolerances, "three dimensions");
     expectGroups(fit, three, 5e-4);
   }, 300_000);
+
+  it("reaches the maximum of the likelihood that mirt's EM stops short of for a group of standard deviations near 2", () => {
+    const { wide } = groups;
+    const fit = calibrateGroups(wide, "none");
+    const { baseMaximum } = wide;
+    expect(fit.converged).toBe(true);
+    // mirt stops 0.15 below the maximum, with the wide group's variances smaller; its own likelihood at these estimates is
+    // the maximum's (validation.md). The likelihood is never lower than mirt's, and equals the maximum found in base R.
+    expect(fit.logLikelihood).toBeGreaterThanOrEqual(wide.logLikelihood);
+    expectClose(fit.logLikelihood, baseMaximum.logLikelihood, 1e-6, "log-likelihood");
+    baseMaximum.items.forEach(({ a, intercept }, i) => {
+      const parameters = defined(fit.items[i]).parameters as MultidimensionalLogisticParameters;
+      a.forEach((slope, d) => {
+        expectClose(defined(parameters.a[d]), slope, 1e-5, `item ${i + 1} a${d + 1}`);
+      });
+      expectClose(parameters.intercept, intercept, 1e-5, `item ${i + 1} intercept`);
+    });
+    expectGroups(fit, { ...wide, groupMoments: baseMaximum.groupMoments }, 5e-5);
+  });
 
   it("gives the same calibration with the cross-product standard errors for the same groups", () => {
     const cross = calibrateGroups(twoGroups, "cross-product");
