@@ -226,16 +226,7 @@ export function calibrateResponses<TParameters>(
   const regression = regressionEstimate(latent, values, standardError);
   return {
     calibration: {
-      items: items.map((item) => ({
-        id: item.id,
-        model: item.model,
-        parameters: item.parameters,
-        estimated: freeEntries(item).map(({ name }) => name),
-        standardErrors:
-          standardError === null || !item.estimated
-            ? null
-            : Object.fromEntries(freeEntries(item).map(({ name, slot }) => [name, standardError(slot)])),
-      })),
+      items: items.map((item) => calibratedItem(item, item.estimated ? standardError : null)),
       groups: groupDistributions(latent, values, nodes, standardError),
       ...(regression !== undefined && { regression }),
       testlets: design === null ? [] : testletEstimates(design, responses.itemIds, values, standardError),
@@ -303,6 +294,25 @@ function parameterCovariance<TParameters>(
     matrix: slots.map((row) =>
       slots.map((column) => ((covariance[row * size + column] ?? 0) + (covariance[column * size + row] ?? 0)) / 2),
     ),
+  };
+}
+
+/**
+ * Returns an item as a calibration reports it: its parameters, the names of those it estimated, and their standard errors
+ * by name, which `standardError` gives by the slot of each free parameter; `null` without it.
+ */
+export function calibratedItem<TParameters>(
+  item: ItemState<TParameters>,
+  standardError: ((slot: number) => number) | null,
+): CalibratedItem<TParameters> {
+  const entries = freeEntries(item);
+  return {
+    id: item.id,
+    model: item.model,
+    parameters: item.parameters,
+    estimated: entries.map(({ name }) => name),
+    standardErrors:
+      standardError === null ? null : Object.fromEntries(entries.map(({ name, slot }) => [name, standardError(slot)])),
   };
 }
 

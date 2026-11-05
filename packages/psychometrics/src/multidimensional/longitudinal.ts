@@ -10,12 +10,12 @@ import {
 import type { ResponseMatrix } from "../data/internal.js";
 import {
   type CalibratedItem,
+  calibratedItem,
   checkStandardErrorSize,
   gradedResponse,
   type IrtModel,
   maximization,
   oneParameterLogistic,
-  type Setup,
   STANDARD_ERROR_METHODS,
   type StandardErrorMethod,
   setUp,
@@ -108,8 +108,8 @@ export interface OccasionChange {
 /** Items and the distribution of one trait per occasion, estimated together from the occasions' responses. */
 export interface LongitudinalCalibration {
   /**
-   * The items, in order of first appearance across the occasions, with the parameters they have on every occasion and
-   * the standard errors of those parameters by name, on their own scale: a parameter that the items share, the 1PL's
+   * The items, in order of first appearance across the occasions, with the parameters they have on every occasion, the
+   * names of those the calibration estimated, and their standard errors by name, on their own scale: a parameter that the items share, the 1PL's
    * slope, has its error at each item. The errors are `null` without the option `standardErrors`, and for every item
    * when the information cannot be inverted or gives a variance that is not positive.
    */
@@ -203,12 +203,7 @@ export function calibrateLongitudinal(
   const latentErrors = errors?.subarray(setup.values.length) ?? null;
   const { occasions: moments, correlations, changes } = momentsOf(latent.mean, latent.matrix);
   return {
-    items: setup.items.map((item) => ({
-      id: item.id,
-      model: item.model,
-      parameters: item.parameters,
-      standardErrors: errors === null ? null : itemErrors(item, errors),
-    })),
+    items: setup.items.map((item) => calibratedItem(item, errors === null ? null : (slot) => errors[slot] ?? 0)),
     occasions: moments.map((moment, t) => ({ ...moment, standardErrors: occasionErrors(latent, latentErrors, t) })),
     correlations,
     correlationStandardErrors: latentErrors === null ? null : correlationErrors(latent, latentErrors),
@@ -230,13 +225,6 @@ function checkModel(model: unknown): void {
       `The option model must be oneParameterLogistic, twoParameterLogistic or gradedResponse, found ${describe(model)}.`,
     );
   }
-}
-
-/** Returns the standard errors of an item's estimated parameters by name, from those of every estimated parameter. */
-function itemErrors(item: Setup<unknown>["items"][number], errors: Float64Array): Readonly<Record<string, number>> {
-  return Object.fromEntries(
-    Array.from(item.freeEntries, (p) => [item.names[p] ?? "", errors[item.slots[p] ?? 0] ?? 0]),
-  );
 }
 
 /**

@@ -14,6 +14,7 @@ import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import {
   type CalibratedItem,
   type CalibrationOptions,
+  calibratedItem,
   checkStandardErrorSize,
   type IrtModel,
   indexItems,
@@ -213,14 +214,7 @@ export function calibrateSpeedAccuracy<TParameters>(
     covariance === null ? null : Math.sqrt(covariance[slot * size + slot] ?? 0);
   return {
     items: setup.items.map((item, i) => ({
-      id: item.id,
-      model: item.model,
-      parameters: item.parameters,
-      estimated: Array.from(item.freeEntries, (p) => item.names[p] ?? ""),
-      standardErrors:
-        covariance === null
-          ? null
-          : Object.fromEntries(item.names.map((name, p) => [name, error(item.slots[p] ?? 0) ?? 0])),
+      ...calibratedItem(item, covariance === null ? null : (slot) => error(slot) ?? 0),
       intensity: parameters[i] ?? 0,
       discrimination: parameters[itemCount + i] ?? 0,
       timeStandardErrors:

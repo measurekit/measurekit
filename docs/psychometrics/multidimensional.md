@@ -346,15 +346,15 @@ scale: the other means and standard deviations are on it.
 | Linked occasions | Every occasion must share an item with the first, directly or through the others, or its mean has no scale: a `DataError`    |
 | Categories       | Pooled over the occasions: an item needs responses in every category up to its highest, as in `calibrate`                    |
 
-| Result                      | Meaning                                                                                                                                                 |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `items`                     | Each item's `id`, `model`, `parameters` and `standardErrors`, as `calibrate` gives them; they serve `abilityEstimates` and the other functions of items |
-| `occasions`                 | The `mean` and `sd` of each occasion's trait, with their `standardErrors`; the first is 0 and 1                                                         |
-| `correlations`              | The correlations between the occasions, by rows                                                                                                         |
-| `correlationStandardErrors` | Their standard errors, by rows with 0 on the diagonal                                                                                                   |
-| `changes`                   | For each pair of consecutive occasions, `from` and `to` (indexes from 0): the `mean` and `sd` of the change and its `correlationWithStart`              |
-| `logLikelihood`             | The marginal log-likelihood at the estimates                                                                                                            |
-| `converged`                 | Whether EM reached `tolerance` within `maxIterations`, with every later occasion's distribution on the grid; `iterations` counts them                   |
+| Result                      | Meaning                                                                                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`                     | Each item's `id`, `model`, `parameters`, `estimated` and `standardErrors`, as `calibrate` gives them; they serve `abilityEstimates` and the other functions of items |
+| `occasions`                 | The `mean` and `sd` of each occasion's trait, with their `standardErrors`; the first is 0 and 1                                                                      |
+| `correlations`              | The correlations between the occasions, by rows                                                                                                                      |
+| `correlationStandardErrors` | Their standard errors, by rows with 0 on the diagonal                                                                                                                |
+| `changes`                   | For each pair of consecutive occasions, `from` and `to` (indexes from 0): the `mean` and `sd` of the change and its `correlationWithStart`                           |
+| `logLikelihood`             | The marginal log-likelihood at the estimates                                                                                                                         |
+| `converged`                 | Whether EM reached `tolerance` within `maxIterations`, with every later occasion's distribution on the grid; `iterations` counts them                                |
 
 `changes` carries the change in the trait that growth models use: the later trait less the earlier, with the mean and
 standard deviation of the difference from the covariance matrix, and its correlation with the earlier trait, which is

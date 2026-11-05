@@ -3196,6 +3196,23 @@ describe("longitudinal calibration data", () => {
     expect(fit.correlationStandardErrors).toBeNull();
   });
 
+  it("names the parameters each item estimated, leaving out those its model fixes", () => {
+    // The 2PL holds c at 0 and d at 1; the 1PL's slope, which the items share, is estimated at each.
+    expect(fit.items.map(({ estimated }) => estimated)).toEqual(Array.from({ length: 6 }, () => ["a", "b"]));
+    fit.items.forEach(({ parameters }) => {
+      expect(parameters).toMatchObject({ c: 0, d: 1 });
+    });
+    const shared = calibrateLongitudinal(occasions, {
+      ...base,
+      model: oneParameterLogistic,
+      standardErrors: "hessian",
+    });
+    shared.items.forEach(({ estimated, standardErrors }) => {
+      expect(estimated).toEqual(["a", "b"]);
+      expect(Object.keys(defined(standardErrors))).toEqual(estimated);
+    });
+  });
+
   it("reports the change from the moments of the two occasions", () => {
     const [first, second] = fit.occasions;
     const rho = defined(fit.correlations[0]?.[1]);

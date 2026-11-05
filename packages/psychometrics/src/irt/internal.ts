@@ -21,6 +21,7 @@ export {
   type CalibratedItem,
   type Calibration,
   calibrate,
+  calibratedItem,
   calibrateWithCovariance,
 } from "./calibration.js";
 export {
