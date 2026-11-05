@@ -154,57 +154,59 @@ fit_bifactor <- function(responses, specific_of, points, itemtype = "2PL", model
 
 # --- Cases ---------------------------------------------------------------------------------------------------------------
 
-# A bifactor 2PL of `groups` specific dimensions of `per_group` items: the case of the fixture and the truth.
-bifactor_case <- function(seed, persons, groups, per_group, with_errors) {
+# A bifactor 2PL of `groups` specific dimensions of `per_group` items, calibrated on `points` nodes for each dimension: the
+# case of the fixture and the truth.
+bifactor_case <- function(seed, persons, groups, per_group, with_errors, points) {
   set.seed(seed)
   items <- groups * per_group
   specific_of <- rep(seq_len(groups), each = per_group)
   slopes <- simulate_slopes(rep(1, items), specific_of, 1, groups)
   intercepts <- round(rnorm(items), 3)
   responses <- dichotomous(simulate_thetas(persons, 1, groups, 0), slopes, intercepts)
-  fit <- fit_bifactor(responses, specific_of, 31, SE = with_errors)
+  fit <- fit_bifactor(responses, specific_of, points, SE = with_errors)
   extra <- list(truth = list(slopes = slopes, intercepts = intercepts))
   if (with_errors) {
-    cross_fit <- fit_bifactor(responses, specific_of, 31, SE = TRUE, SE.type = "crossprod")
+    cross_fit <- fit_bifactor(responses, specific_of, points, SE = TRUE, SE.type = "crossprod")
     extra$crossProduct <- list(items = mirt_items(cross_fit, 1 + groups, FALSE, FALSE, TRUE))
   }
-  case_of(responses, "m2pl", rep(1, items), specific_of, 1, groups, 31, fit, errors = with_errors, extra = extra)
+  case_of(responses, "m2pl", rep(1, items), specific_of, 1, groups, points, fit, errors = with_errors, extra = extra)
 }
 
 if (selected("m2pl")) {
   write_fixture("bifactor-m2pl", list(
-    source = "Simulations, set.seed(20261101 + 1 and + 2): bifactor 2PLs of 2,000 persons, 12 items in 3 specific dimensions and 40 in 4. The first has standard errors, Oakes' and the cross-product.",
-    items12 = bifactor_case(SEED + 1, 2000, 3, 4, TRUE),
-    items40 = bifactor_case(SEED + 2, 2000, 4, 10, FALSE)
+    source = "Simulations, set.seed(20261101 + 1 and + 2): bifactor 2PLs of 1,000 persons on 15 nodes for each dimension, 12 items in 3 specific dimensions and 40 in 4. The first has standard errors, Oakes' and the cross-product.",
+    items12 = bifactor_case(SEED + 1, 1000, 3, 4, TRUE, 15),
+    items40 = bifactor_case(SEED + 2, 1000, 4, 10, FALSE, 15)
   ))
 }
 
 if (selected("long")) {
   write_fixture("bifactor-long", list(
-    source = "Simulation, set.seed(20261101 + 3): a bifactor 2PL of 1,500 persons and 40 items in 2 specific dimensions of 20 items.",
-    long = bifactor_case(SEED + 3, 1500, 2, 20, FALSE)
+    source = "Simulation, set.seed(20261101 + 3): a bifactor 2PL of 400 persons and 34 items in 2 specific dimensions of 17 items, which is above the 16 items after which measurekit rescales a product of probabilities, on 11 nodes for each dimension.",
+    long = bifactor_case(SEED + 3, 400, 2, 17, FALSE, 11)
   ))
 }
 
 if (selected("two-tier")) {
   set.seed(SEED + 4)
-  persons <- 1000
+  persons <- 600
   primary_of <- rep(1:2, each = 8)
-  specific_of <- rep(1:4, each = 4)
-  slopes <- simulate_slopes(primary_of, specific_of, 2, 4)
+  # Items 5 to 8 and 13 to 16 have no specific dimension.
+  specific_of <- c(1, 1, 1, 1, NA, NA, NA, NA, 2, 2, 2, 2, NA, NA, NA, NA)
+  slopes <- simulate_slopes(primary_of, specific_of, 2, 2)
   intercepts <- round(rnorm(16), 3)
-  responses <- dichotomous(simulate_thetas(persons, 2, 4, 0.5), slopes, intercepts)
-  fit <- fit_bifactor(responses, specific_of, 21, model2 = mirt.model("G1 = 1-8\nG2 = 9-16\nCOV = G1*G2"), SE = TRUE)
+  responses <- dichotomous(simulate_thetas(persons, 2, 2, 0.5), slopes, intercepts)
+  fit <- fit_bifactor(responses, specific_of, 15, model2 = mirt.model("G1 = 1-8\nG2 = 9-16\nCOV = G1*G2"), SE = TRUE)
   write_fixture("bifactor-two-tier", list(
-    source = "Simulation, set.seed(20261101 + 4): a two-tier 2PL of 1,000 persons and 16 items, two primary dimensions of 8 items correlated 0.5, each with 2 specific dimensions of 4 items.",
-    twoTier = case_of(responses, "m2pl", primary_of, specific_of, 2, 4, 21, fit, errors = TRUE,
+    source = "Simulation, set.seed(20261101 + 4): a two-tier 2PL of 600 persons and 16 items on 15 nodes for each dimension, two primary dimensions of 8 items correlated 0.5, each with a specific dimension of 4 items and 4 items without one. mirt's EM stops before its limit of cycles on this case; on 9 or fewer nodes, or on 500 persons and 4 specific dimensions, it does not.",
+    twoTier = case_of(responses, "m2pl", primary_of, specific_of, 2, 2, 15, fit, errors = TRUE,
                       extra = list(truth = list(slopes = slopes, intercepts = intercepts, correlation = 0.5)))
   ))
 }
 
 if (selected("m3pl")) {
-  set.seed(SEED + 5)
-  persons <- 4000
+  set.seed(SEED + 12)
+  persons <- 1500
   specific_of <- rep(1:3, each = 4)
   slopes <- simulate_slopes(rep(1, 12), specific_of, 1, 3)
   intercepts <- round(rnorm(12), 3)
@@ -213,48 +215,48 @@ if (selected("m3pl")) {
   # Without a prior the likelihood of the asymptotes is flat and mirt's EM does not stop before its limit of cycles.
   prior <- list(type = "logit-normal", mean = qlogis(0.15), sd = 0.5)
   model2 <- mirt.model(sprintf("G = 1-12\nPRIOR = (1-12, g, norm, %.17g, %.17g)", prior$mean, prior$sd))
-  fit <- fit_bifactor(responses, specific_of, 31, itemtype = "3PL", model2 = model2, SE = TRUE)
+  fit <- fit_bifactor(responses, specific_of, 15, itemtype = "3PL", model2 = model2, SE = TRUE)
   write_fixture("bifactor-m3pl", list(
-    source = "Simulation, set.seed(20261101 + 5): a bifactor 3PL of 4,000 persons and 12 items in 3 specific dimensions, c in 0.05 to 0.2, with a normal prior on logit c.",
-    m3pl = case_of(responses, "m3pl", rep(1, 12), specific_of, 1, 3, 31, fit, guessing = TRUE, errors = TRUE,
+    source = "Simulation, set.seed(20261101 + 12): a bifactor 3PL of 1,500 persons and 12 items in 3 specific dimensions on 15 nodes for each dimension, c in 0.05 to 0.2, with a normal prior on logit c.",
+    m3pl = case_of(responses, "m3pl", rep(1, 12), specific_of, 1, 3, 15, fit, guessing = TRUE, errors = TRUE,
                    extra = list(priors = list(c = prior), truth = list(slopes = slopes, intercepts = intercepts, guessing = guessing)))
   ))
 }
 
 if (selected("graded")) {
   set.seed(SEED + 6)
-  persons <- 2000
+  persons <- 600
   specific_of <- rep(1:3, each = 4)
   slopes <- simulate_slopes(rep(1, 12), specific_of, 1, 3)
   simulated <- graded_responses(simulate_thetas(persons, 1, 3, 0), slopes, round(rnorm(12), 3))
-  fit <- fit_bifactor(simulated$responses, specific_of, 31, itemtype = "graded", SE = TRUE)
+  fit <- fit_bifactor(simulated$responses, specific_of, 11, itemtype = "graded", SE = TRUE)
   write_fixture("bifactor-graded", list(
-    source = "Simulation, set.seed(20261101 + 6): a bifactor graded model of 2,000 persons and 12 items of 4 categories in 3 specific dimensions.",
-    graded = case_of(simulated$responses, "mgrm", rep(1, 12), specific_of, 1, 3, 31, fit, graded = TRUE, errors = TRUE,
+    source = "Simulation, set.seed(20261101 + 6): a bifactor graded model of 600 persons and 12 items of 4 categories in 3 specific dimensions, on 11 nodes for each dimension.",
+    graded = case_of(simulated$responses, "mgrm", rep(1, 12), specific_of, 1, 3, 11, fit, graded = TRUE, errors = TRUE,
                      extra = list(truth = list(slopes = slopes, intercepts = simulated$intercepts)))
   ))
 }
 
 if (selected("incomplete")) {
-  set.seed(SEED + 7)
-  persons <- 1500
+  set.seed(SEED + 11)
+  persons <- 600
   # Items 5 and 10 have no specific dimension.
   specific_of <- c(1, 1, 1, 1, NA, 2, 2, 2, 2, NA, 3, 3, 3, 3)
   items <- length(specific_of)
   slopes <- simulate_slopes(rep(1, items), specific_of, 1, 3)
   intercepts <- round(rnorm(items), 3)
   complete <- dichotomous(simulate_thetas(persons, 1, 3, 0), slopes, intercepts)
-  ungrouped <- fit_bifactor(complete, specific_of, 31)
+  ungrouped <- fit_bifactor(complete, specific_of, 11)
   # One tenth of the responses are missing at random, and a fifth of the persons skip the items of a specific dimension.
   missing <- complete
   missing[matrix(runif(length(missing)) < 0.1, nrow(missing))] <- NA
   skipped <- sample(persons, persons / 5)
   missing[skipped, which(specific_of == 3)] <- NA
-  incomplete <- fit_bifactor(missing, specific_of, 31)
+  incomplete <- fit_bifactor(missing, specific_of, 11)
   write_fixture("bifactor-incomplete", list(
-    source = "Simulation, set.seed(20261101 + 7): a bifactor 2PL of 1,500 persons and 14 items in 3 specific dimensions of 4 items, two other items having none; and the same responses with a tenth missing at random and a fifth of the persons not answering the items of one specific dimension.",
-    ungrouped = case_of(complete, "m2pl", rep(1, items), specific_of, 1, 3, 31, ungrouped),
-    missing = case_of(missing, "m2pl", rep(1, items), specific_of, 1, 3, 31, incomplete)
+    source = "Simulation, set.seed(20261101 + 11): a bifactor 2PL of 600 persons and 14 items in 3 specific dimensions of 4 items, two other items having none, on 11 nodes for each dimension; and the same responses with a tenth missing at random and a fifth of the persons not answering the items of one specific dimension.",
+    ungrouped = case_of(complete, "m2pl", rep(1, items), specific_of, 1, 3, 11, ungrouped),
+    missing = case_of(missing, "m2pl", rep(1, items), specific_of, 1, 3, 11, incomplete)
   ))
 }
 

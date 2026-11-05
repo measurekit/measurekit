@@ -1,0 +1,20 @@
+{
+  "source": "calibrateBifactor on the responses of bifactor.R's case recovery: a two-tier 2PL of 3,000 persons and 80 items, 40 on each of two primary dimensions correlated 0.5, in 16 specific dimensions of 5 items, on 21 nodes",
+  "persons": 3000,
+  "items": 80,
+  "tolerance": 0.001,
+  "bounds": {
+    "primary": 0.1,
+    "specific": 0.14,
+    "correlation": 0.04
+  },
+  "errors": {
+    "primary": 0.08255800975373774,
+    "specific": 0.11744460272871357,
+    "correlation": 0.0176251886198473
+  },
+  "iterations": 13,
+  "converged": true,
+  "within": true,
+  "seconds": 5.4
+}

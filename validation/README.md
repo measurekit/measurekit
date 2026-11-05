@@ -88,6 +88,7 @@ Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mir
 Rscript validation/psychometrics/multidimensional-groups.R # multidimensional IRT in several groups, with fixed items: mirt's multipleGroup
 Rscript validation/psychometrics/missing-not-at-random.R # responses missing not at random: mirt's two-dimensional 2PL of the responses and their indicators
 Rscript validation/psychometrics/bifactor.R           # bifactor and two-tier models: mirt's bfactor; case names as arguments run only those cases
+node validation/psychometrics/bifactor-recovery.ts  # the recovery of a two-tier model of 80 items and 3,000 persons on 21 nodes, from the data of bifactor.R's `recovery`; run `pnpm build` first, about 10 seconds
 Rscript validation/psychometrics/longitudinal.R      # the same persons over two or three occasions: mirt with one dimension per occasion and tied items; TAM's tam.mml for the Rasch model
 Rscript validation/psychometrics/longitudinal-recovery.R # how well mirt recovers the moments of the occasions, which bounds the recovery tests and the number of occasions
 Rscript validation/psychometrics/change.R            # gains, reliability of a difference and reliable change: clinicalsignificance and base R
@@ -136,9 +137,8 @@ with their minres solutions in base R and psych, and takes seconds. `factor-solu
 minres and maximum likelihood and their rotations, which it, `efa-fit.R` and `factor-hierarchy.R` share.
 
 `bifactor.R` takes the cases `m2pl`, `long`, `two-tier`, `m3pl`, `graded`, `incomplete` and `recovery` as arguments, and runs
-all of them without; it takes about half an hour, as mirt's EM at `TOL = 1e-10` runs to its limit of 5,000 cycles on the 3PL and
-on the data with missing responses, and each fixture records whether mirt stopped before it. `recovery` writes the data and
-the truth only.
+all of them without; it takes about 5 minutes, mirt's EM at `TOL = 1e-10` running 80 to 2,700 cycles, and each fixture records
+whether mirt stopped before its limit of 5,000. `recovery` writes the data and the truth only: `bifactor-recovery.ts` reads them.
 
 `longitudinal.R` writes one fixture of five cases, two occasions with persons missing from the second, three occasions, items
 that only one occasion has, the graded model and the Rasch model, and takes about ten minutes; `longitudinal-mirt.R` holds the

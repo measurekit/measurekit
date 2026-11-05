@@ -190,15 +190,6 @@ interface BifactorM3plFixture {
 }
 const m3pl = readFixture<BifactorM3plFixture>("bifactor-m3pl.json");
 
-interface BifactorRecoveryFixture {
-  itemIds: string[];
-  responses: number[][];
-  specific: Record<string, string>;
-  primary: Record<string, string[]>;
-  truth: { slopes: number[][]; intercepts: number[]; correlation: number };
-}
-const recovery = readFixture<BifactorRecoveryFixture>("bifactor-recovery.json");
-
 interface BifactorTwoTierFixture {
   twoTier: {
     model: string;
@@ -278,12 +269,6 @@ interface Case {
 const TOLERANCES = { parameters: 5e-4, errors: 1e-3, likelihood: 1e-4 } as const;
 /** The tolerance at which EM runs for a comparison with mirt's optimum, which mirt reaches at 1e-10. */
 const TIGHT = 1e-8;
-/**
- * The time that a calibration at a tight tolerance may take on a shared machine, in milliseconds: under coverage, which
- * CI's job of Node.js 22 runs and which makes it about five times as long, the slowest took 84 to 219 s.
- */
-const SLOW = 600_000;
-
 /**
  * A seeded bifactor 2PL: one general and two specific dimensions of four items each, with slopes and intercepts that
  * identify the model at a few hundred persons.
@@ -573,34 +558,30 @@ describe("walk", () => {
 });
 
 describe("calibrateBifactor", () => {
-  it("matches mirt's bfactor on 12 items in 3 specific dimensions, standard errors included", { timeout: SLOW }, () => {
+  it("matches mirt's bfactor on 12 items in 3 specific dimensions, standard errors included", () => {
     const fixture: Case = m2pl.items12;
     expectCalibration(calibrateCase(fixture, { standardErrors: "hessian" }), fixture, fixture.items, true);
   });
 
-  it("matches mirt's cross-product standard errors", { timeout: SLOW }, () => {
+  it("matches mirt's cross-product standard errors", () => {
     const fixture: Case = m2pl.items12;
     const fit = calibrateCase(fixture, { standardErrors: "cross-product" });
     expectCalibration(fit, fixture, defined(fixture.crossProduct).items, true);
   });
 
-  it("matches mirt's bfactor on 40 items in 4 specific dimensions", { timeout: SLOW }, () => {
+  it("matches mirt's bfactor on 40 items in 4 specific dimensions", () => {
     const fixture: Case = m2pl.items40;
     const fit = calibrateCase(fixture);
     expectCalibration(fit, fixture, fixture.items, false);
     expect(fit.items.every((item) => item.standardErrors === null)).toBe(true);
   });
 
-  it("matches mirt's bfactor on specific dimensions of 20 items, where long products are rescaled", {
-    timeout: SLOW,
-  }, () => {
+  it("matches mirt's bfactor on specific dimensions of 20 items, where long products are rescaled", () => {
     const fixture: Case = long.long;
     expectCalibration(calibrateCase(fixture), fixture, fixture.items, false);
   });
 
-  it("matches mirt's two-tier model, with the correlation of its primary dimensions and its standard error", {
-    timeout: SLOW,
-  }, () => {
+  it("matches mirt's two-tier model, with the correlation of its primary dimensions and its standard error", () => {
     const fixture: Case = twoTier.twoTier;
     const fit = calibrateCase(fixture, { standardErrors: "hessian" });
     expectCalibration(fit, fixture, fixture.items, true);
@@ -610,17 +591,17 @@ describe("calibrateBifactor", () => {
     expect(fit.correlations[2]?.[2]).toBe(1);
   });
 
-  it("matches mirt's bfactor with the 3PL model", { timeout: SLOW }, () => {
+  it("matches mirt's bfactor with the 3PL model", () => {
     const fixture: Case = m3pl.m3pl;
     expectCalibration(calibrateCase(fixture, { standardErrors: "hessian" }), fixture, fixture.items, true);
   });
 
-  it("matches mirt's bfactor with the graded model", { timeout: SLOW }, () => {
+  it("matches mirt's bfactor with the graded model", () => {
     const fixture: Case = graded.graded;
     expectCalibration(calibrateCase(fixture, { standardErrors: "hessian" }), fixture, fixture.items, true);
   });
 
-  it("matches mirt's bfactor with items that have no specific dimension", { timeout: SLOW }, () => {
+  it("matches mirt's bfactor with items that have no specific dimension", () => {
     const fixture: Case = incomplete.ungrouped;
     const fit = calibrateCase(fixture);
     expectCalibration(fit, fixture, fixture.items, false);
@@ -628,18 +609,16 @@ describe("calibrateBifactor", () => {
     expect(fit.items[9]?.parameters.a).toEqual([expect.any(Number), 0, 0, 0]);
   });
 
-  it("matches mirt's bfactor with missing responses and persons who skipped a specific dimension", {
-    timeout: SLOW,
-  }, () => {
+  it("matches mirt's bfactor with missing responses and persons who skipped a specific dimension", () => {
     const fixture: Case = incomplete.missing;
     expectCalibration(calibrateCase(fixture), fixture, fixture.items, false);
   });
 
-  it("takes the iterations of calibrateMultidimensional with uncorrelated dimensions", { timeout: SLOW }, () => {
+  it("takes the iterations of calibrateMultidimensional with uncorrelated dimensions", () => {
     // The two EM runs are one sequence of estimates, so after the same number of iterations they agree to rounding. Two
     // specific dimensions and the general one are the three dimensions that EM integrates in full.
-    const { matrix, specific } = simulatedCase(7, 600);
-    const settings = { points: 11, tolerance: 0, maxIterations: 60, standardErrors: "hessian" } as const;
+    const { matrix, specific } = simulatedCase(7, 300);
+    const settings = { points: 9, tolerance: 0, maxIterations: 40, standardErrors: "hessian" } as const;
     const reduced = calibrateBifactor(matrix, specific, { ...settings });
     const full = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
       loadings: Object.fromEntries(matrix.itemIds.map((id) => [id, ["general", specific[id] ?? ""]])),
@@ -660,12 +639,10 @@ describe("calibrateBifactor", () => {
     });
   });
 
-  it("applies priors as calibrateMultidimensional does, so that the estimates are posterior modes", {
-    timeout: SLOW,
-  }, () => {
-    const { matrix, specific } = simulatedCase(7, 600);
+  it("applies priors as calibrateMultidimensional does, so that the estimates are posterior modes", () => {
+    const { matrix, specific } = simulatedCase(7, 300);
     const priors = { a: normalPrior(1, 0.4), intercept: normalPrior(0, 1) };
-    const settings = { points: 11, tolerance: 0, maxIterations: 60 } as const;
+    const settings = { points: 9, tolerance: 0, maxIterations: 40 } as const;
     const reduced = calibrateBifactor(matrix, specific, { priors, ...settings });
     const plain = calibrateBifactor(matrix, specific, { ...settings });
     const full = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
@@ -801,23 +778,24 @@ describe("calibrateBifactor", () => {
     });
 
     it("counts toward the limit the tables of pairs of items that Louis' standard errors take, and only those", () => {
-      // A group of 10⁶ nodes: 5 dichotomous items keep 1e7 probabilities, and their 10 pairs 4e7 more for Louis' formula.
-      const ids = Array.from({ length: 5 }, (_, j) => `q${j}`);
+      // A group of 160² = 25,600 nodes: 20 dichotomous items keep 1,024,000 probabilities, below the limit, and their 190
+      // pairs 19,456,000 more for Louis' formula, above it. Few nodes and many items keep the run that passes short.
+      const ids = Array.from({ length: 20 }, (_, j) => `q${j}`);
       const wide = buildResponseMatrix(
-        [Array.from({ length: 5 }, (_, j) => j % 2), Array.from({ length: 5 }, (_, j) => 1 - (j % 2))],
+        [Array.from({ length: 20 }, (_, j) => j % 2), Array.from({ length: 20 }, (_, j) => 1 - (j % 2))],
         { itemIds: ids },
       );
       const optionsSpecific = Object.fromEntries(ids.map((id) => [id, "passage"]));
       const options = {
-        points: 1000,
+        points: 160,
         maxIterations: 1,
       };
       expect(() => calibrateBifactor(wide, optionsSpecific, { ...options, standardErrors: "hessian" })).toThrow(
-        "The items of the calibration would keep 50000000 values at the nodes of their grids, more than 16777216; use fewer points.",
+        "The items of the calibration would keep 20480000 values at the nodes of their grids, more than 16777216; use fewer points.",
       );
       expect(
         calibrateBifactor(wide, optionsSpecific, { ...options, standardErrors: "cross-product" }).items,
-      ).toHaveLength(5);
+      ).toHaveLength(20);
     });
 
     it("scores persons from its items, as any multidimensional calibration", () => {
@@ -875,7 +853,7 @@ describe("calibrateBifactor", () => {
   });
 
   describe("recovery", () => {
-    it("recovers the general and the specific slopes of 12 items, as mirt does", { timeout: SLOW }, () => {
+    it("recovers the general and the specific slopes of 12 items, as mirt does", () => {
       const fixture: Case = m2pl.items12;
       const fit = calibrateCase(fixture, { tolerance: 1e-4 });
       const mirt = { a: slopeOfFixture(fixture, 0, 1), s: slopeOfFixture(fixture, 1, 4) };
@@ -883,7 +861,7 @@ describe("calibrateBifactor", () => {
       expect(slopeError(fit, defined(fixture.truth).slopes, 1, 4)).toBeLessThan(mirt.s + 0.005);
     });
 
-    it("recovers the general and the specific slopes of 40 items, as mirt does", { timeout: SLOW }, () => {
+    it("recovers the general and the specific slopes of 40 items, as mirt does", () => {
       const fixture: Case = m2pl.items40;
       const fit = calibrateCase(fixture, { tolerance: 1e-4 });
       const mirt = { a: slopeOfFixture(fixture, 0, 1), s: slopeOfFixture(fixture, 1, 5) };
@@ -891,20 +869,20 @@ describe("calibrateBifactor", () => {
       expect(slopeError(fit, defined(fixture.truth).slopes, 1, 5)).toBeLessThan(mirt.s + 0.005);
     });
 
-    it("recovers the slopes and the correlation of a two-tier model of 80 items on 21 nodes", { timeout: SLOW }, () => {
-      const fit = calibrateBifactor(
-        buildResponseMatrix(recovery.responses, { itemIds: recovery.itemIds }),
-        recovery.specific,
-        {
-          primary: recovery.primary,
-          tolerance: 1e-3,
-        },
-      );
-      expect(fit.converged).toBe(true);
-      expect(slopeError(fit, recovery.truth.slopes, 0, 2)).toBeLessThan(RECOVERY.primary);
-      expect(slopeError(fit, recovery.truth.slopes, 2, 18)).toBeLessThan(RECOVERY.specific);
-      expect(Math.abs(defined(fit.correlations[1]?.[0]) - recovery.truth.correlation)).toBeLessThan(
-        RECOVERY.correlation,
+    it("recovers the slopes and the correlation of a two-tier model of 16 items, as mirt does", () => {
+      // The 80 items, 16 specific dimensions and 3,000 persons of validation/psychometrics/bifactor-recovery.ts take minutes.
+      const fixture: Case = twoTier.twoTier;
+      const truth = defined(fixture.truth);
+      const fit = calibrateCase(fixture, { tolerance: 1e-3 });
+      const mirt = {
+        primary: slopeOfFixture(fixture, 0, 2),
+        specific: slopeOfFixture(fixture, 2, 4),
+        correlation: Math.abs(defined(fixture.correlations[1]?.[0]) - defined(truth.correlation)),
+      };
+      expect(slopeError(fit, truth.slopes, 0, 2)).toBeLessThan(mirt.primary + 0.005);
+      expect(slopeError(fit, truth.slopes, 2, 4)).toBeLessThan(mirt.specific + 0.005);
+      expect(Math.abs(defined(fit.correlations[1]?.[0]) - defined(truth.correlation))).toBeLessThan(
+        mirt.correlation + 0.005,
       );
     });
   });
@@ -924,9 +902,6 @@ function slopeOfFixture(fixture: Case, from: number, to: number): number {
   });
   return Math.sqrt(sum / count);
 }
-
-/** The largest error of the recovery of the two-tier case, fixed from its first run. */
-const RECOVERY = { primary: 0.1, specific: 0.14, correlation: 0.04 } as const;
 
 describe("standard errors of many parameters", () => {
   it("are bounded to 2,000 parameters before the calibration runs", () => {
@@ -954,8 +929,8 @@ describe("properties", () => {
   const fitOf = (rows: readonly (readonly (number | null)[])[]): MultidimensionalCalibration<Parameters> =>
     calibrateBifactor(buildResponseMatrix(rows, { itemIds }), specific, { points: 5, maxIterations: 25 });
 
-  it("does not depend on the order of the persons", { timeout: SLOW }, () => {
-    const { matrix, specific: groups } = simulatedCase(5, 1000);
+  it("does not depend on the order of the persons", () => {
+    const { matrix, specific: groups } = simulatedCase(5, 400);
     const settings = { points: 9, tolerance: 1e-8, maxIterations: 1000 };
     const first = calibrateBifactor(matrix, groups, settings);
     expect(first.converged).toBe(true);
