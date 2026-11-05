@@ -133,19 +133,16 @@ function checkSample(sample: readonly number[]): void {
 }
 
 /**
- * Checks the persons' weights and returns them, divided by the largest when their sum would overflow, which leaves their
- * ratios, the only thing the norms use; `null` without weights.
+ * Checks the persons' weights and returns them divided by the power of two at or below the largest, which changes
+ * neither their ratios, the only thing the norms use, nor any rounding, and keeps their sum and the sums of their
+ * squares from overflowing or underflowing; `null` without weights.
  */
 function personWeightsOf(personWeights: readonly number[] | undefined, persons: number): Float64Array | null {
   if (personWeights === undefined) return null;
   checkPersonWeights(personWeights, persons);
   let largest = 0;
-  let sum = 0;
-  for (const weight of personWeights) {
-    largest = Math.max(largest, weight);
-    sum += weight;
-  }
-  const scale = Number.isFinite(sum) ? 1 : largest;
+  for (const weight of personWeights) largest = Math.max(largest, weight);
+  const scale = 2 ** Math.floor(Math.log2(largest));
   return Float64Array.from(personWeights, (weight) => weight / scale);
 }
 

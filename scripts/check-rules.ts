@@ -868,12 +868,12 @@ export const RULES: readonly Rule[] = [
     titles: "rejects fewer than two scores",
   },
   {
-    rule: "Person weights whose sum overflows are divided by the largest, so the ranks are not NaN.",
+    rule: "Person weights are divided by the power of two at or below the largest, so that their sums and the sums of their squares neither overflow nor underflow, and no rank or standard error is NaN, infinite or 0 for want of range.",
     file: "packages/psychometrics/src/scaling/percentile-ranks.ts",
-    find: "Number.isFinite(sum) ? 1 : largest",
+    find: "2 ** Math.floor(Math.log2(largest))",
     replace: "1",
     test: "packages/psychometrics/test/scaling.test.ts",
-    titles: "even those whose sum overflows",
+    titles: "even those whose sum overflows|weights of any magnitude",
   },
   {
     rule: "A component that leaves an item no variance ends the test, and gives no NaN.",

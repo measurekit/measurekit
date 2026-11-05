@@ -1042,6 +1042,21 @@ describe("normStatistics", () => {
     );
   });
 
+  it("gives the same norms for weights of any magnitude, whose squares would overflow or underflow", () => {
+    const scores = [1, 2, 3, 4, 5, 2, 3];
+    const personWeights = scores.map((_, k) => 1 + k / 10);
+    const plain = normStatistics(scores, { personWeights });
+    for (const magnitude of [1e160, 1e-160, 1e-300]) {
+      const scaled = normStatistics(scores, { personWeights: personWeights.map((weight) => weight * magnitude) });
+      expectClose(scaled.mean.standardError, plain.mean.standardError, 1e-12, `mean at ${magnitude}`);
+      expectClose(scaled.sd.standardError, plain.sd.standardError, 1e-12, `sd at ${magnitude}`);
+      plain.scores.forEach((norm, k) => {
+        const rank = defined(scaled.scores[k]).percentile;
+        expectClose(rank.standardError, norm.percentile.standardError, 1e-12, `rank of ${norm.score} at ${magnitude}`);
+      });
+    }
+  });
+
   it("gives a weighted mean the standard error of its linearization, derived by hand", () => {
     // Scores 0, 0, 10 weighted 1, 1, 2: W = 4, mean 5; u_l = w_l (x_l - 5) / 4 is -1.25, -1.25 and 2.5, of mean 0, so
     // Var = 1.5625 · 2 + 6.25 = 9.375.
