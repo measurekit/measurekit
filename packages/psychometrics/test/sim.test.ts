@@ -390,6 +390,19 @@ describe("simulateResponses", () => {
     expect(() =>
       simulateResponses(
         [
+          { ...first, id: JSON.parse("7") },
+          { ...second, id: "q2" },
+        ],
+        [0],
+        random,
+      ),
+    ).toThrow("Item 1 needs a string id, as item 2 has one, found 7.");
+    expect(() => simulateResponses([{ ...first, id: JSON.parse("7") }, second], [0], random)).toThrow(
+      "Item 1 needs a string id, found 7.",
+    );
+    expect(() =>
+      simulateResponses(
+        [
           { ...first, id: "q1" },
           { ...second, id: "q1" },
         ],

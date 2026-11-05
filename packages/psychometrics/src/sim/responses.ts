@@ -40,7 +40,7 @@ const RESPONSE_SIMULATION_OPTIONS: FieldNames<ResponseSimulationOptions> = { mis
  * @param options - The probability that a response is missing.
  * @returns The responses, one row for each person.
  * @throws `DataError` without items or thetas, when an item is invalid, some items carry an id and others none, the ids
- * are not distinct non-empty strings, a theta is not finite, `random` is not a random number generator, or
+ * are not distinct strings, a theta is not finite, `random` is not a random number generator, or
  * `missingProbability` is outside [0, 1].
  *
  * @example
@@ -81,12 +81,13 @@ export function simulateResponses(
  * @throws `DataError` when some items carry an id and others none, or an id is not a string.
  */
 export function carriedItemIds(items: readonly object[]): string[] | undefined {
-  const first = items.findIndex((item) => Object.hasOwn(item, "id"));
-  if (first === -1) return undefined;
+  if (!items.some((item) => Object.hasOwn(item, "id"))) return undefined;
+  const named = items.findIndex((item) => Object.hasOwn(item, "id") && typeof Reflect.get(item, "id") === "string");
   return items.map((item, index) => {
     const id: unknown = Reflect.get(item, "id");
     if (typeof id !== "string") {
-      throw new DataError(`Item ${index + 1} needs a string id, as item ${first + 1} has one, found ${describe(id)}.`);
+      const reason = named === -1 ? "" : `, as item ${named + 1} has one`;
+      throw new DataError(`Item ${index + 1} needs a string id${reason}, found ${describe(id)}.`);
     }
     return id;
   });

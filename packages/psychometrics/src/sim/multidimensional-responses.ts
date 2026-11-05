@@ -30,7 +30,7 @@ import {
  * @param options - The probability that a response is missing.
  * @returns The responses, one row for each person.
  * @throws `DataError` without items or thetas, when an item is invalid, the items differ in their number of dimensions,
- * some items carry an id and others none, the ids are not distinct non-empty strings, a person's thetas are not that
+ * some items carry an id and others none, the ids are not distinct strings, a person's thetas are not that
  * many finite numbers, `random` is not a random number generator, or `missingProbability` is outside [0, 1].
  */
 export function simulateMultidimensionalResponses(
