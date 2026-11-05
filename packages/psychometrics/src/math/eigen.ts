@@ -40,14 +40,7 @@ const MAX_ITERATIONS = 30;
  */
 export function symmetricEigen(a: Float64Array, size: number): SymmetricEigen {
   const work = Float64Array.from(a);
-  if (!work.every(Number.isFinite)) {
-    return {
-      values: new Float64Array(size).fill(Number.NaN),
-      vectors: work.fill(Number.NaN),
-      iterations: 0,
-      converged: false,
-    };
-  }
+  if (!work.every(Number.isFinite)) return { ...undecomposed(size), vectors: work.fill(Number.NaN) };
   const { diagonal, offDiagonal, norms } = tridiagonalize(work, size);
   const basis = reflectionProduct(work, size, norms);
   const { iterations, converged } = diagonalize(diagonal, offDiagonal, basis, size);
@@ -70,12 +63,15 @@ export function symmetricEigen(a: Float64Array, size: number): SymmetricEigen {
  */
 export function symmetricEigenvalues(a: Float64Array, size: number): Omit<SymmetricEigen, "vectors"> {
   const work = Float64Array.from(a);
-  if (!work.every(Number.isFinite)) {
-    return { values: new Float64Array(size).fill(Number.NaN), iterations: 0, converged: false };
-  }
+  if (!work.every(Number.isFinite)) return undecomposed(size);
   const { diagonal, offDiagonal } = tridiagonalize(work, size);
   const { iterations, converged } = diagonalize(diagonal, offDiagonal, null, size);
   return { values: Float64Array.from(descendingOrder(diagonal), (k) => diagonal[k] ?? 0), iterations, converged };
+}
+
+/** Returns what a matrix with an entry that is not finite gives: NaN eigenvalues, no iteration, no convergence. */
+function undecomposed(size: number): Omit<SymmetricEigen, "vectors"> {
+  return { values: new Float64Array(size).fill(Number.NaN), iterations: 0, converged: false };
 }
 
 /** Returns the indices of the eigenvalues from the largest, ties in index order. */
