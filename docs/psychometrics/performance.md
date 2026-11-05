@@ -458,7 +458,7 @@ their limits bound.
 | `personScalability`                | 2 persons, 1,000,000 items, from their response matrix        | 3.8       | 195                         |
 | `localDependenceChiSquare`         | 2 persons, 1,000 2PL items, the most: 499,500 pairs           | 0.028     | 102 to 228 by version, OS   |
 | `localDependenceChiSquare`         | 2 graded items of 4,096 categories, the most cells            | 0.1       | 132 to 262 by version, OS   |
-| `summedScoreFit`                   | 2 persons, 300 2PL items, the highest total score             | 0.008     | 5 to 9 by version, OS       |
+| `summedScoreFit`                   | 2 persons, 300 2PL items, the highest total score             | 0.008     | 4 to 14 by version, OS      |
 | `yenQ3`                            | 2 persons, 1,000 2PL items, the most                          | 0.028     | 14 to 22 by version, OS     |
 | `scalability`                      | 200 persons of distinct patterns, 1,000 items, the most       | 0.4       | 75 to 117 by version, OS    |
 | `conditionalAssociation`           | 8 persons, 1,000 items, the most                              | 0.015     | 141                         |

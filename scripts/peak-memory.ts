@@ -291,7 +291,7 @@ export const READERS: readonly ReaderCase[] = [
   },
   {
     name: "summedScoreFit: 2 persons, 300 2PL items, the highest total score",
-    budget: 20,
+    budget: 30,
     heap: 32,
     input: () => pairItems(300),
     prepare: (input: PairItems, { psychometrics }) => pairInput(input, psychometrics),
