@@ -172,6 +172,10 @@ At the public release the owner sets what a repository file cannot: the reposito
   oldest supported Node.js major, and Dependabot ignores its major versions.
 - A version is installed only when it is at least 3 days old: `pnpm-workspace.yaml` sets `minimumReleaseAge: 4320`, which
   pnpm checks against the lock file on every install.
+- `pnpm check:audit` lets one advisory below high pass, of a development dependency that reads no untrusted input
+  (2026-11-05): minimatch 10.2.6 (GHSA-g3hv-75wg-m249), which TypeDoc 0.28.20, the latest, runs on the entry points of
+  `typedoc.json`, and whose repair, minimatch 11, makes private the `matchOne` that TypeDoc calls. The production
+  dependencies have none.
 - Code outside `packages/` imports a package by name.
 - A module imports another only through its `index.ts` or its `internal.ts`, which lists what the modules and tests of
   the package share and is never exported from the package. `pnpm check:standards` fails on a deep path.
