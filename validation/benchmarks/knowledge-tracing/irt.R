@@ -63,12 +63,13 @@ colnames(nominal_data) <- ids(item_count)
 nominal_values <- mirt(nominal_data, 1, itemtype = "nominal", pars = "values")
 for (j in seq_len(item_count)) {
   id <- colnames(nominal_data)[j]
-  set <- function(name, value) nominal_values$value[nominal_values$item == id & nominal_values$name == name] <<- value
+  # Not `set`, which would hide sets::set from the scripts that benchmarks.R runs after this one in the same session.
+  fix_value <- function(name, value) nominal_values$value[nominal_values$item == id & nominal_values$name == name] <<- value
   a1 <- (nominal_slopes[j, 4] - nominal_slopes[j, 1]) / 3
-  set("a1", a1)
+  fix_value("a1", a1)
   for (k in 1:4) {
-    set(paste0("ak", k - 1), (nominal_slopes[j, k] - nominal_slopes[j, 1]) / a1)
-    set(paste0("d", k - 1), nominal_intercepts[j, k] - nominal_intercepts[j, 1])
+    fix_value(paste0("ak", k - 1), (nominal_slopes[j, k] - nominal_slopes[j, 1]) / a1)
+    fix_value(paste0("d", k - 1), nominal_intercepts[j, k] - nominal_intercepts[j, 1])
   }
 }
 nominal_values$est <- FALSE
