@@ -57,19 +57,18 @@ and
 
 P(correct) = logistic(θ + mean θ_k - d)
 
-over the item's skills; after the event, each of those θ_k ← θ_k + γ U(n_k) (y - P), with γ = `skillWeight`. For items
+over the item's skills; after the event, each of those θ_k ← θ_k + U(n_k) (y - P), with n_k the skill's own earlier updates. For items
 with one skill this is the hierarchical model of Nižnan, Pelánek and Řihák (2015). For an item with several skills,
 the mean makes an update move the prediction as much as for an item with one skill. Events without skills update only
 θ and d.
 
-| Option        | Default             | Meaning                                                                        |
-| ------------- | ------------------- | ------------------------------------------------------------------------------ |
-| `uncertainty` | `{ a: 1, b: 0.05 }` | The uncertainty function U(n) = a / (1 + b n); a > 0, b ≥ 0                    |
-| `skills`      | `false`             | Whether learners have skill abilities: concept-specific Elo                    |
-| `skillWeight` | `1`                 | γ, the size of skill updates relative to global ones; only with `skills: true` |
-| `parameters`  | none                | Item ratings to start from, such as a fit's `model.parameters`                 |
+| Option        | Default             | Meaning                                                        |
+| ------------- | ------------------- | -------------------------------------------------------------- |
+| `uncertainty` | `{ a: 1, b: 0.05 }` | The uncertainty function U(n) = a / (1 + b n); a > 0, b ≥ 0    |
+| `skills`      | `false`             | Whether learners have skill abilities: concept-specific Elo    |
+| `parameters`  | none                | Item ratings to start from, such as a fit's `model.parameters` |
 
-The defaults of U are those Pelánek (2016) recommends as a starting point. To tune a, b or γ, compare candidates by
+The defaults of U are those Pelánek (2016) recommends as a starting point. To tune a or b, compare candidates by
 [cross-validation](evaluate.md#model-comparison).
 
 ## Batch: replaying a log
@@ -133,13 +132,13 @@ item, which practice decisions can use directly.
 
 Invalid input throws `DataError` naming the value found.
 
-| Error                                                                                               | What to do                                                              |
-| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| An uncertainty function with a ≤ 0 or b < 0, or `skillWeight` not above 0 or without `skills: true` | Give a above 0, b from 0, and `skillWeight` with `skills: true`         |
-| An item rating or an ability that is not finite, or a count that is not an integer from 0           | Pass the ratings and states as the model wrote them                     |
-| A malformed state, or the state of another learner than the attempt's                               | Pass the learner's own state, as `initialState` or `update` returned it |
-| A malformed event or log                                                                            | Build the log with [`buildEventLog`](data.md#logs)                      |
-| A log without an event with an outcome, for `fit`                                                   | Fit a log with outcomes                                                 |
+| Error                                                                                     | What to do                                                                     |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| An uncertainty function with a ≤ 0 or b < 0, or an option that Elo does not have          | Give a above 0 and b from 0, and only `uncertainty`, `skills` and `parameters` |
+| An item rating or an ability that is not finite, or a count that is not an integer from 0 | Pass the ratings and states as the model wrote them                            |
+| A malformed state, or the state of another learner than the attempt's                     | Pass the learner's own state, as `initialState` or `update` returned it        |
+| A malformed event or log                                                                  | Build the log with [`buildEventLog`](data.md#logs)                             |
+| A log without an event with an outcome, for `fit`                                         | Fit a log with outcomes                                                        |
 
 ## Not included
 

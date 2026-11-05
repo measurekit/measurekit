@@ -31,7 +31,7 @@ const recovery = readFixture<EloRecoveryFixture>("elo-recovery.json");
 interface EloWorkedFixture {
   cases: {
     name: string;
-    options: { uncertainty: { a: number; b: number }; skills: boolean; skillWeight?: number };
+    options: { uncertainty: { a: number; b: number }; skills: boolean };
     parameters: { items: { q1?: { difficulty: number; count: number }; q3?: { difficulty: number; count: number } } };
     events: { learner: string; item: string; skills: string[]; time: number; outcome: number }[];
     predictions: number[];
@@ -152,7 +152,6 @@ const arbitraryOptions: fc.Arbitrary<EloOptions> = fc.oneof(
       b: fc.double({ min: 0, max: 1, noNaN: true }),
     }),
     skills: fc.constant(true),
-    skillWeight: fc.double({ min: 0.1, max: 2, noNaN: true }),
   }),
 );
 
@@ -303,8 +302,10 @@ describe("elo input checks", () => {
     ['{"uncertainty": {"a": 0, "b": 0.05}}', "The uncertainty function's a must be a positive number, found 0."],
     ['{"uncertainty": {"a": 1, "b": -1}}', "The uncertainty function's b must be a non-negative number, found -1."],
     ['{"uncertainty": {"a": 1, "b": 0, "c": 1}}', 'The uncertainty function may hold only a and b, found "c".'],
-    ['{"skillWeight": 0.5}', "The option skillWeight needs skills: true."],
-    ['{"skills": true, "skillWeight": 0}', "The option skillWeight must be a positive number, found 0."],
+    [
+      '{"skills": true, "skillWeight": 1}',
+      'There is no option "skillWeight": the options are uncertainty, skills and parameters.',
+    ],
     ['{"skills": "yes"}', 'The option skills must be a boolean, found "yes".'],
     [
       '{"parameters": {"items": {"q1": {"difficulty": 0, "count": -1}}}}',

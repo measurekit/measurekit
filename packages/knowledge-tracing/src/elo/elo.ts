@@ -5,7 +5,6 @@ import {
   checkOptions,
   checkPositive,
   checkRecord,
-  DataError,
   type FieldNames,
   logistic,
 } from "@measurekit/core";
@@ -57,12 +56,6 @@ export interface EloOptions {
    */
   readonly skills?: boolean;
   /**
-   * γ, the size of a skill ability's update relative to the global ability's; only with `skills`.
-   *
-   * @defaultValue `1`
-   */
-  readonly skillWeight?: number;
-  /**
    * The item ratings to start from, such as a fit's.
    *
    * @defaultValue none: every item starts at difficulty 0
@@ -70,7 +63,7 @@ export interface EloOptions {
   readonly parameters?: EloParameters;
 }
 
-const ELO_OPTIONS: FieldNames<EloOptions> = { uncertainty: true, skills: true, skillWeight: true, parameters: true };
+const ELO_OPTIONS: FieldNames<EloOptions> = { uncertainty: true, skills: true, parameters: true };
 
 /** An Elo model: a learner model whose item ratings can also be updated online. */
 export interface EloModel extends LearnerModel<EloState, EloParameters> {
@@ -108,7 +101,6 @@ export interface EloFit extends ModelFit<EloState, EloParameters> {
  * @see {@link https://doi.org/10.1016/j.compedu.2016.03.017 | Pelánek (2016)}
  */
 const DEFAULT_UNCERTAINTY: Uncertainty = { a: 1, b: 0.05 };
-const DEFAULT_SKILL_WEIGHT = 1;
 const UNRATED: EloItem = { difficulty: 0, count: 0 };
 const UNPRACTICED: SkillAbility = { ability: 0, count: 0 };
 
@@ -116,7 +108,6 @@ const UNPRACTICED: SkillAbility = { ability: 0, count: 0 };
 interface Settings {
   readonly uncertainty: Uncertainty;
   readonly skills: boolean;
-  readonly skillWeight: number;
 }
 
 /** One step of the Elo system: the prediction of an event, and the learner's and the item's ratings after it. */
@@ -135,7 +126,7 @@ interface Step {
  * U(n_d)(y - P), where n counts the estimate's earlier updates. Partial credit outcomes work as they are.
  *
  * With `skills`, a learner also has an ability θ_k in each skill k, and P(correct) = logistic(θ + mean θ_k - d) over
- * the item's skills, unpracticed skills at 0; each θ_k moves by γ U(n_k)(y - P). For an item with one skill this is the
+ * the item's skills, unpracticed skills at 0; each θ_k moves by U(n_k)(y - P). For an item with one skill this is the
  * hierarchical model of Nižnan, Pelánek and Řihák. The mean keeps the change of the prediction from the skill abilities
  * the same for an item with several skills as for one with a single skill.
  *
@@ -232,7 +223,7 @@ function step(settings: Settings, state: EloState, item: EloItem, event: Observe
         ...Object.fromEntries(
           event.skills.map((skill): [string, SkillAbility] => {
             const { ability, count } = skillAbility(state, skill);
-            return [skill, { ability: ability + settings.skillWeight * change(count), count: count + 1 }];
+            return [skill, { ability: ability + change(count), count: count + 1 }];
           }),
         ),
       }
@@ -266,15 +257,11 @@ function checkStep(state: EloState, event: Event): void {
 
 function settingsOf(options: EloOptions): Settings {
   checkOptions(options, ELO_OPTIONS);
-  const { uncertainty = DEFAULT_UNCERTAINTY, skills = false, skillWeight } = options;
+  const { uncertainty = DEFAULT_UNCERTAINTY, skills = false } = options;
   checkRecord(uncertainty, "The uncertainty function must be an object { a, b }");
   checkFields(uncertainty, UNCERTAINTY_FIELDS, "The uncertainty function");
   checkPositive(uncertainty.a, "The uncertainty function's a");
   checkNonNegative(uncertainty.b, "The uncertainty function's b");
   checkBoolean(skills, "The option skills");
-  if (skillWeight !== undefined) {
-    if (!skills) throw new DataError("The option skillWeight needs skills: true.");
-    checkPositive(skillWeight, "The option skillWeight");
-  }
-  return { uncertainty, skills, skillWeight: skillWeight ?? DEFAULT_SKILL_WEIGHT };
+  return { uncertainty, skills };
 }

@@ -15,7 +15,7 @@ initial_learner <- function() list(ability = 0, count = 0, skills = setNames(lis
 skill_of <- function(learner, skill) learner$skills[[skill]] %||% list(ability = 0, count = 0)
 
 # One event: P = logistic(theta + mean of the skill abilities - d); every estimate moves by U(n) (y - P), U(n) = a / (1
-# + b n) with n its earlier updates, skill abilities by gamma U(n_k) (y - P), the difficulty the other way.
+# + b n) with n its earlier updates (a skill ability's own), the difficulty the other way.
 elo_step <- function(settings, learner, item, skills, outcome) {
   skill_term <- 0
   if (settings$skills && length(skills) > 0) {
@@ -31,7 +31,7 @@ elo_step <- function(settings, learner, item, skills, outcome) {
   if (settings$skills) {
     for (skill in skills) {
       s <- skill_of(learner, skill)
-      updated$skills[[skill]] <- list(ability = s$ability + settings$gamma * change(s$count), count = s$count + 1)
+      updated$skills[[skill]] <- list(ability = s$ability + change(s$count), count = s$count + 1)
     }
   }
   list(prediction = p, learner = updated, item = list(difficulty = item$difficulty - change(item$count),
@@ -80,11 +80,9 @@ elo_holdout <- function(settings, train, test) {
   })
 }
 
-settings_of <- function(a = 1, b = 0.05, skills = FALSE, gamma = 1) list(a = a, b = b, skills = skills, gamma = gamma)
+settings_of <- function(a = 1, b = 0.05, skills = FALSE) list(a = a, b = b, skills = skills)
 options_of <- function(settings) {
-  options <- list(uncertainty = list(a = settings$a, b = settings$b), skills = settings$skills)
-  if (settings$skills) options$skillWeight <- settings$gamma
-  options
+  list(uncertainty = list(a = settings$a, b = settings$b), skills = settings$skills)
 }
 states_of <- function(learners) {
   lapply(setNames(names(learners), names(learners)), function(id) {
@@ -125,7 +123,7 @@ write_fixture("elo-worked", list(
   cases = list(
     basic,
     worked_case("constant K", settings_of(a = 0.4, b = 0), basic_events),
-    worked_case("skills, partial credit, starting ratings", settings_of(a = 0.8, b = 0.1, skills = TRUE, gamma = 0.8),
+    worked_case("skills, partial credit, starting ratings", settings_of(a = 0.8, b = 0.1, skills = TRUE),
                 skill_events, list(q1 = list(difficulty = 0.3, count = 4), q3 = list(difficulty = -0.2, count = 1)))
   )
 ))
