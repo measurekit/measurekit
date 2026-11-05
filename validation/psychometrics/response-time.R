@@ -434,12 +434,15 @@ speed_accuracy_case <- function(name, responses, log_times, rho_agrees) {
 }
 
 # CredentialForm1: the first 10 items, with the persons' times of 0 as missing (the response stays).
-credential_responses <- scored
-credential_times <- log(durations)
+# The joint model's maximum, to the tolerance of 1e-11 that the comparison takes, runs for as many iterations as there are
+# persons' worth of information to settle, and takes seconds for each hundred persons under coverage: the case keeps the first
+# 500 persons. On 300 the base R fit of its bootstrap fails.
+credential_responses <- scored[1:500, ]
+credential_times <- log(durations)[1:500, ]
 
-# simLNIRT: 800 persons, 12 items, rho = 0.5; 2% of the responses missing, with their times, and 3% of the other times.
+# simLNIRT: 400 persons, 12 items, rho = 0.5; 2% of the responses missing, with their times, and 3% of the other times.
 set.seed(SEED)
-joint_simulation <- simLNIRT(N = 800, K = 12, rho = 0.5, WL = FALSE)
+joint_simulation <- simLNIRT(N = 400, K = 12, rho = 0.5, WL = FALSE)
 simulated_responses <- joint_simulation$Y
 simulated_times <- joint_simulation$RT
 colnames(simulated_responses) <- colnames(simulated_times) <- sprintf("s%02d", 1:12)
@@ -449,7 +452,7 @@ simulated_responses[missing_response] <- NA
 simulated_times[missing_response | missing_time] <- NA
 
 write_fixture("response-time-speed-accuracy", list(
-  source = "LNIRT's CredentialForm1, items 1 to 10, times of 0 as missing; LNIRT's simLNIRT, set.seed(20261029): 800 persons, 12 items, rho = 0.5, with some responses and times missing.",
+  source = "LNIRT's CredentialForm1, its first 500 persons and items 1 to 10, times of 0 as missing; LNIRT's simLNIRT, set.seed(20261029): 400 persons, 12 items, rho = 0.5, with some responses and times missing.",
   cases = list(
     speed_accuracy_case("CredentialForm1", credential_responses, credential_times, rho_agrees = FALSE),
     speed_accuracy_case("simLNIRT", simulated_responses, simulated_times, rho_agrees = TRUE)

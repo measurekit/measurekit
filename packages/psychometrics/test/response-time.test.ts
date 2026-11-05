@@ -499,8 +499,19 @@ describe("calibrateSpeedAccuracy", () => {
     });
 
     it(`gives the correlation and the time parameters of LNIRT's Gibbs sampler within its Monte Carlo error on ${reference.name}`, () => {
-      const result = calibrateSpeedAccuracy(jointData(reference), twoParameterLogistic);
+      // LNIRT takes the persons who answered every item and have every time, so the comparison is on them.
+      const complete = reference.responses.flatMap((row, person) =>
+        row.every((response) => response !== null) && defined(reference.times[person]).every((time) => time !== null)
+          ? [person]
+          : [],
+      );
+      const data = buildResponseMatrix(
+        complete.map((person) => defined(reference.responses[person])),
+        { itemIds: reference.itemIds, times: complete.map((person) => defined(reference.times[person])) },
+      );
       const { lnirt } = reference;
+      expect(data.responses).toHaveLength(lnirt.persons);
+      const result = calibrateSpeedAccuracy(data, twoParameterLogistic);
       expectClose(result.speedSd, lnirt.speedSd, LNIRT_TOLERANCE, "speed SD");
       result.items.forEach((item, i) => {
         expectClose(item.intensity, defined(lnirt.intensity[i]), LNIRT_TOLERANCE, `${item.id} intensity`);
