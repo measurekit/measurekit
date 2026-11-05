@@ -206,7 +206,7 @@ Knowledge tracing: the model families never import each other, nor does anything
 | Module                                                                        | Imports                      |
 | ----------------------------------------------------------------------------- | ---------------------------- |
 | `math/`                                                                       | none                         |
-| `data/`                                                                       | `math/`                      |
+| `data/`                                                                       | none                         |
 | `model.ts`                                                                    | the types of `data/`         |
 | `elo/`, `bkt/`, `logistic/`, `irt/`, `kst/`, `evaluate/`, `practice/`, `sim/` | `data/`, `math/`, `model.ts` |
 

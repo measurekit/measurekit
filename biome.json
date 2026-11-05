@@ -626,8 +626,8 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["../*", "../*/**", "!../math/**"],
-                    "message": "data/ builds on math/ only; models and evaluation build on data/."
+                    "group": ["../*", "../*/**"],
+                    "message": "data/ imports no other module; models and evaluation build on data/."
                   }
                 ]
               }

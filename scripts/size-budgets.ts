@@ -173,7 +173,7 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     gzip: 10_500,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math"],
   },
-  "@measurekit/knowledge-tracing/data": { gzip: 3000, holds: ["core", "knowledge-tracing/math"] },
+  "@measurekit/knowledge-tracing/data": { gzip: 3000, holds: ["core"] },
   "@measurekit/knowledge-tracing/elo": {
     gzip: 3000,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math"],

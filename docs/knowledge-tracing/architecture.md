@@ -78,12 +78,11 @@ Modules form layers; a module imports only from lower layers, never from its own
 | Layer | Modules                                                                       |
 | ----- | ----------------------------------------------------------------------------- |
 | 1     | `@measurekit/core`                                                            |
-| 2     | `math/`                                                                       |
-| 3     | `data/`                                                                       |
-| 4     | `model.ts`                                                                    |
-| 5     | `elo/`, `bkt/`, `logistic/`, `irt/`, `kst/`, `evaluate/`, `practice/`, `sim/` |
+| 2     | `math/`, `data/`                                                              |
+| 3     | `model.ts`                                                                    |
+| 4     | `elo/`, `bkt/`, `logistic/`, `irt/`, `kst/`, `evaluate/`, `practice/`, `sim/` |
 
-`data/` builds on `math/` for the random splits, and `model.ts` on the types of `data/`. The model families,
+`math/` and `data/` import nothing but core, and `model.ts` the types of `data/`. The model families,
 `evaluate/`, `practice/` and `sim/` never import each other: evaluation, practice and simulation know models only
 through the interface. [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces
 them, the absence of Node modules and platform globals in `src/`, and that code outside `packages/` imports
